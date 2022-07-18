@@ -4,7 +4,9 @@
 
 #include <iostream>
 
-int main() {
+int main(int argc, char** argv) {
+
+
     std::cout << "Welcome to Infinity!" << std::endl;
     return 0;
 }

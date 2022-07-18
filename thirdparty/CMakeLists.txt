@@ -1,9 +1,9 @@
 
-# Build sql-parser library
+# Build sql-parser
 set(PARSER_DIR sql-parser)
 
 add_library(
-        sqlparser
+        sql-parser
 
         ${PARSER_DIR}/src/parser/bison_parser.cpp
         ${PARSER_DIR}/src/parser/flex_lexer.cpp
@@ -17,16 +17,20 @@ add_library(
 )
 
 target_include_directories(
-        sqlparser
+        sql-parser
 
         INTERFACE
         ${PARSER_DIR}/src
 )
 
 target_compile_options(
-        sqlparser
+        sql-parser
         PRIVATE
         -std=c++20
         -O3 -Wno-sign-compare
         -fPIC
 )
+
+# Build cxxopts
+add_library(cxxopts INTERFACE)
+target_include_directories(cxxopts INTERFACE cxxopts/include)
