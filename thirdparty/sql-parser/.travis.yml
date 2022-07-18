@@ -1,0 +1,62 @@
+
+language: cpp
+
+matrix:
+  include:
+    - name: gcc-6
+      dist: xenial
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-6
+            - valgrind
+            - bison
+            - flex
+      env:
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
+
+    - name: gcc-10
+      dist: focal
+      addons:
+        apt:
+          packages:
+            - g++-10
+            - valgrind
+            - bison
+            - flex
+      env:
+        - MATRIX_EVAL="CC=gcc-10 && CXX=g++-10"
+
+    - name: clang-12
+      dist: focal
+      addons:
+        apt:
+          packages:
+            - clang-12
+            - valgrind
+            - bison
+            - flex
+      env:
+        - MATRIX_EVAL="CC=clang-12 && CXX=clang++-12"
+
+before_install:
+  - eval "${MATRIX_EVAL}"
+
+script:
+  # print package versions
+  - bison --version
+  - flex --version
+  - valgrind --version
+
+  # build with flex/bison files checked into repo
+  - make -j4
+  - make test
+  - make test_example
+
+  # build flex/bison files in CI
+  - make cleanall
+  - make -j4
+  - make test
+  - make test_example
