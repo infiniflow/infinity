@@ -1,0 +1,39 @@
+language: cpp
+
+jobs:
+  include:
+    - os: linux
+      dist: xenial
+      compiler: gcc
+      env: COVERALLS=no
+      script:
+        - ./configure
+        - make libhv examples unittest evpp
+
+    - os: osx
+      compiler: clang
+      env: COVERALLS=no
+      script:
+        - ./configure
+        - make libhv examples unittest evpp
+
+    - os: windows
+      compiler: msvc
+      env: COVERALLS=no
+      script:
+        - mkdir win64
+        - cd win64
+        - cmake .. -G "Visual Studio 15 2017 Win64"
+        - cmake --build .
+
+before_script:
+  - if [ "$COVERALLS" = "yes" ]; then
+      pip install --user cpp-coveralls;
+      export CC="$CC --coverage" CXX="$CXX --coverage";
+    fi
+
+after_success:
+  - if [ "$COVERALLS" = "yes" ]; then
+      scripts/test-coverage.sh;
+      coveralls --gcov-options '\-lp' --include base --include event --include http;
+    fi

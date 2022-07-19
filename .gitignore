@@ -35,4 +35,9 @@
 .idea/**
 cmake-build-debug/**
 
+# OSX dir
 .DS_Store
+
+# compressed file
+*.tar.gz
+*.zip

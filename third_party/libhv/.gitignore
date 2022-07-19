@@ -1,0 +1,72 @@
+# Compiled Object files
+*.o
+*.lo
+*.slo
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.a
+*.la
+*.lai
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# cache
+*~
+*.bk
+*.bak
+*.old
+*.new
+
+# IDE
+.vs
+.vscode
+.DS_Store
+
+tags
+cscope*
+.ycm*
+
+# generated
+examples/protorpc/generated
+
+# output
+*.pid
+*.log
+*.db
+
+include
+lib
+bin
+tmp
+dist
+test
+*_test
+build
+config.mk
+hconfig.h
+html/uploads
+
+# msvc
+*.VC.*
+*.vcxproj.*
+Debug
+Release
+
+# cmake
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
