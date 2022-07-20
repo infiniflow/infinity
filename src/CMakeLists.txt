@@ -6,6 +6,15 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        common_src
+        CONFIGURE_DEPENDS
+        common/*.cpp
+        common/*.h
+        common/utility/*.cpp
+        common/utility/*.h
+        )
+
+file(GLOB_RECURSE
         network_src
         CONFIGURE_DEPENDS
         network/*.cpp
@@ -13,7 +22,8 @@ file(GLOB_RECURSE
 
 add_executable(infinity_main
         ${infinity_main_src}
-        ${network_src})
+        ${network_src}
+        ${common_src})
 
 target_link_libraries(
         infinity_main

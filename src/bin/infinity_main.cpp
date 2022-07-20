@@ -6,7 +6,7 @@
 #include "network/db_server.h"
 #include "cxxopts.hpp"
 
-void parse_arguments(int argc, char** argv, StartupParameter& parameters) {
+void parse_arguments(int argc, char** argv, infinity::StartupParameter& parameters) {
     cxxopts::Options options("./infinity_server", "");
 
     options.add_options()
@@ -27,10 +27,10 @@ void parse_arguments(int argc, char** argv, StartupParameter& parameters) {
 }
 
 int main(int argc, char** argv) {
-    StartupParameter parameters;
+    infinity::StartupParameter parameters;
     parse_arguments(argc, argv, parameters);
 
-    DBServer db_server(parameters);
+    infinity::DBServer db_server(parameters);
     db_server.run();
     return 0;
 }

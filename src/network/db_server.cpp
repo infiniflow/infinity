@@ -4,7 +4,10 @@
 
 #include "db_server.h"
 
-DBServer::DBServer(const StartupParameter &parameter) : address_(parameter.address), port_(parameter.port) { }
+namespace infinity {
+
+DBServer::DBServer(const StartupParameter &parameter)
+    : address_(parameter.address), port_(parameter.port) { }
 
 void DBServer::run() {
     int listen_fd = hv_server_.createsocket(port_, address_.c_str());
@@ -43,5 +46,7 @@ void DBServer::run() {
 }
 
 void DBServer::shutdown() {
+
+}
 
 }

@@ -8,6 +8,8 @@
 #include "hv/TcpServer.h"
 #include "session.h"
 
+namespace infinity {
+
 struct StartupParameter {
     std::string address;
     uint16_t    port;
@@ -26,6 +28,6 @@ private:
     std::map<uint32_t, std::shared_ptr<Session>> session_set_;
 };
 
-
+}
 
 

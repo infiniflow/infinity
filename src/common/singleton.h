@@ -4,6 +4,8 @@
 
 #pragma once
 
+namespace infinity {
+
 template<typename T>
 class Singleton {
 public:
@@ -14,3 +16,5 @@ public:
 
     virtual ~Singleton() {}
 };
+
+}

@@ -4,17 +4,22 @@
 
 #pragma once
 #include "hv/TcpServer.h"
+#include "pg_protocol_handler.h"
+
+namespace infinity {
 
 class Session {
 public:
     explicit Session(const hv::SocketChannelPtr& channel);
     void run(hv::Buffer* buffer);
 private:
-    void handle_connection(hv::Buffer* buffer);
+    void handle_connection();
     void handle_request();
 
     bool terminated_ = false;
-    const hv::SocketChannelPtr& channel_;
+    PGProtocolHandler pg_handler_;
 };
+
+}
 
 
