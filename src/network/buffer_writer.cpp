@@ -3,22 +3,25 @@
 //
 
 #include "buffer_writer.h"
+#include "session.h"
 
 namespace infinity {
 
-BufferWriter::BufferWriter(const hv::SocketChannelPtr &channel) : channel_(channel) {
+BufferWriter::BufferWriter(const hv::SocketChannelPtr &channel)
+    : channel_(channel) {
 }
 
 void
 BufferWriter::flush() {
     Assert(current_pos_ + 1 <= INT_MAX, "Flush data size is weird, panic!");
-    int data_size = static_cast<int>(current_pos_ + 1);
+    int data_size = static_cast<int>(current_pos_);
     auto sent_size = channel_->write(data_, data_size);
+    session_ptr_->suspend();
     if(sent_size == -1) {
         // Nothing can be done except panic.
         Assert(false, "Send data error, panic!");
     }
-    if(sent_size != current_pos_ + 1) {
+    if(sent_size != data_size) {
         // TODO: error message should include the sent size.
         Assert(false, "Send data size isn't correct, panic!");
     }
@@ -32,7 +35,7 @@ BufferWriter::send_string(const std::string& value, NullTerminator null_terminat
 
     while(value_pos < value.size()) {
         const uint64_t sending_size = std::min(value.size() - value_pos, available_capacity());
-        memcpy(data_, value.c_str(), sending_size);
+        memcpy(data_ + current_pos_, value.c_str(), sending_size);
         value_pos += sending_size;
         current_pos_ += sending_size;
         if(available_capacity() == 0) flush();

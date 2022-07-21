@@ -3,6 +3,8 @@
 //
 
 #include "pg_protocol_handler.h"
+
+#include <utility>
 #include "pg_message.h"
 
 namespace infinity {
@@ -19,6 +21,7 @@ uint32_t PGProtocolHandler::read_startup_header() {
         // Now we said not support ssl
         buffer_writer_.send_value(static_cast<unsigned char>(PGMessageType::kSSLNo));
         buffer_writer_.flush();
+        buffer_reader_.reset();
         return read_startup_header();
     } else {
         return length - 2 * infinity::LENGTH_FIELD_SIZE;
@@ -36,11 +39,12 @@ PGProtocolHandler::send_authentication() {
     buffer_writer_.send_value(PGMessageType::kAuthentication);
 
     // length = LENGTH FIELD + Authentication response code
-    buffer_writer_.send_value(2 * LENGTH_FIELD_SIZE);
+    constexpr uint32_t AUTHENTICATION_ERROR_CODE = 0;
+    buffer_writer_.send_value<uint32_t>(LENGTH_FIELD_SIZE + sizeof(AUTHENTICATION_ERROR_CODE));
 
     // Always successful
     // TODO: Add real authentication workflow.
-    buffer_writer_.send_value(0);
+    buffer_writer_.send_value<uint32_t>(AUTHENTICATION_ERROR_CODE);
 }
 
 void
@@ -54,10 +58,16 @@ PGProtocolHandler::send_parameter(const std::string &key, const std::string &val
 
 void
 PGProtocolHandler::send_ready_for_query() {
-    buffer_writer_.send_value(PGMessageType::kReadyForQuery);
-    buffer_writer_.send_value<uint32_t>(LENGTH_FIELD_SIZE + 1);
-    buffer_writer_.send_value(TransactionStateType::kIDLE);
+    buffer_writer_.send_value(static_cast<char>(PGMessageType::kReadyForQuery));
+    buffer_writer_.send_value<uint32_t>(LENGTH_FIELD_SIZE + sizeof(TransactionStateType::kIDLE));
+    buffer_writer_.send_value(static_cast<char>(TransactionStateType::kIDLE));
     buffer_writer_.flush();
+    buffer_reader_.reset();
+}
+
+void
+PGProtocolHandler::set_session(std::shared_ptr<Session> session_ptr) {
+    buffer_writer_.set_session(std::move(session_ptr));
 }
 
 }

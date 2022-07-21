@@ -26,14 +26,12 @@ public:
     T read_value() {
         while(start_pos_ + sizeof(T) > buffer_->size()) {
             // TODO: need to read more data
-            channel_->readOnce();
-            std::cout << "Buffer size: " << buffer_->size() << std::endl;
             Assert(false, "Try to read the data out of the buffer.");
         }
 
         T network_value = 0;
-        char* data_pos = start_pos_ + (char*)buffer_->data();
-        memcpy((void*)&network_value, data_pos, sizeof(T));
+        char* data_pos = start_pos_ + (char*)(buffer_->data());
+        memcpy((char*)&network_value, data_pos, sizeof(T));
         start_pos_ += sizeof(T);
         if constexpr(std::is_same_v<T, char> || std::is_same_v<T, u_char>) {
             return network_value;

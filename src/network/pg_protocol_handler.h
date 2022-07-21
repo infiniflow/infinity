@@ -8,11 +8,12 @@
 #include "buffer_writer.h"
 
 namespace infinity {
-
+class Session;
 class PGProtocolHandler {
 public:
     explicit PGProtocolHandler(const hv::SocketChannelPtr &channel);
     void set_reader_buffer(hv::Buffer* buf) { buffer_reader_.set_buffer(buf); }
+    void set_session(std::shared_ptr<Session> session_ptr);
 
     uint32_t read_startup_header();
     void read_startup_body(uint32_t body_size);

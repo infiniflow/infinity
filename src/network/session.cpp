@@ -9,15 +9,43 @@
 namespace infinity {
 
 Session::Session(const hv::SocketChannelPtr &channel)
-    : pg_handler_(channel) {}
+    : pg_handler_(channel), id_(channel->id()) {}
 
 void
 Session::run(hv::Buffer* buffer) {
+    start();
+    pg_handler_.set_session(shared_from_this());
     pg_handler_.set_reader_buffer(buffer);
     handle_connection();
-    while(!terminated_) {
+    while(status_ == SessionStatus::kRunning) {
         handle_request();
     }
+}
+
+void
+Session::start() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    status_ = SessionStatus::kRunning;
+}
+
+void
+Session::stop() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    status_ = SessionStatus::kTerminated;
+}
+
+void
+Session::suspend() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    status_ = SessionStatus::kSuspend;
+    waiting_cv_.wait(lock, [&] { return status_ == SessionStatus::kRunning; });
+}
+
+void
+Session::resume() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    status_ = SessionStatus::kRunning;
+    waiting_cv_.notify_one();
 }
 
 void
@@ -44,15 +72,15 @@ Session::handle_request() {
     const PGMessageType message_type = pg_handler_.read_message_type();
     switch (message_type) {
         case PGMessageType::kBindCommand : {
-            std::cout << "ExecuteCommand" << std::endl;
+            std::cout << "BindCommand" << std::endl;
             break;
         }
         case PGMessageType::kCloseCommand : {
-            std::cout << "ExecuteCommand" << std::endl;
+            std::cout << "CloseCommand" << std::endl;
             break;
         }
         case PGMessageType::kDescribeCommand : {
-            std::cout << "ExecuteCommand" << std::endl;
+            std::cout << "DescribeCommand" << std::endl;
             break;
         }
         case PGMessageType::kExecuteCommand : {
@@ -60,24 +88,24 @@ Session::handle_request() {
             break;
         }
         case PGMessageType::kFlushCommand : {
-            std::cout << "ExecuteCommand" << std::endl;
+            std::cout << "FlushCommand" << std::endl;
             break;
         }
         case PGMessageType::kParseCommand : {
-            std::cout << "ExecuteCommand" << std::endl;
+            std::cout << "ParseCommand" << std::endl;
             break;
         }
         case PGMessageType::kSimpleQueryCommand : {
-            std::cout << "ExecuteCommand" << std::endl;
+            std::cout << "SimpleQueryCommand" << std::endl;
             break;
         }
         case PGMessageType::kSyncCommand : {
-            std::cout << "ExecuteCommand" << std::endl;
+            std::cout << "SyncCommand" << std::endl;
             break;
         }
         case PGMessageType::kTerminateCommand : {
-            std::cout << "ExecuteCommand" << std::endl;
-            terminated_ = true;
+            std::cout << "TerminateCommand" << std::endl;
+            status_ = SessionStatus::kTerminated;
             break;
         }
         default: {

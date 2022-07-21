@@ -1,6 +1,6 @@
 #add_subdirectory(bin)
 file(GLOB_RECURSE
-        infinity_main_src
+        bin_src
         CONFIGURE_DEPENDS
         bin/*.cpp
         )
@@ -20,8 +20,15 @@ file(GLOB_RECURSE
         network/*.cpp
         )
 
+file(GLOB_RECURSE
+        infinity_src
+        CONFIGURE_DEPENDS
+        main/*.cpp
+        )
+
 add_executable(infinity_main
-        ${infinity_main_src}
+        ${bin_src}
+        ${infinity_src}
         ${network_src}
         ${common_src})
 

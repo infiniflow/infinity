@@ -5,7 +5,16 @@
 #pragma once
 
 #include "common/singleton.h"
+#include "network/session.h"
 
-class Infinity: public Singleton<Infinity> {
+namespace infinity {
+
+class Infinity : public Singleton<Infinity> {
+public:
+
+private:
 
 };
+
+}
+
