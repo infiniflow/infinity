@@ -5,14 +5,15 @@
 #pragma once
 
 #include <string>
-#include "hv/TcpServer.h"
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/ip/tcp.hpp>
 #include "session.h"
 #include "common/singleton.h"
 
 namespace infinity {
 
 struct StartupParameter {
-    std::string address;
+    boost::asio::ip::address address;
     uint16_t    port;
 };
 
@@ -23,19 +24,13 @@ public:
     void shutdown();
 
 private:
-    void create_session(const hv::SocketChannelPtr& channel);
-    void start_session(std::shared_ptr<Session> session, hv::Buffer* buf);
-    std::shared_ptr<Session> get_session_by_id(uint32_t id);
-    void destroy_session(uint32_t id);
+    void create_session();
+    void start_session(std::shared_ptr<Session> session);
 
-    std::string address_;
-    uint16_t    port_;
-    hv::TcpServer hv_server_;
-
-    std::map<uint32_t, std::shared_ptr<Session>> session_set_;
-    std::mutex session_mutex_;
-
-    uint64_t running_session_count = 0;
+    std::atomic_bool initialized{false};
+    std::atomic_uint64_t running_session_count_{0};
+    boost::asio::io_service io_service_;
+    boost::asio::ip::tcp::acceptor acceptor_;
 };
 
 }

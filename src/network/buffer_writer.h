@@ -4,53 +4,53 @@
 
 #pragma once
 #include <array>
-#include "hv/TcpServer.h"
 #include "pg_message.h"
 #include "common/utility/asserter.h"
+#include "ring_buffer_iterator.h"
+#include <boost/asio/ip/tcp.hpp>
 
 namespace infinity {
-class Session;
+
 class BufferWriter {
 public:
-    explicit BufferWriter(const hv::SocketChannelPtr &channel);
+    explicit BufferWriter(const std::shared_ptr<boost::asio::ip::tcp::socket> socket) : socket_(socket) {}
 
-    void set_session(std::shared_ptr<Session> session_ptr) { session_ptr_ = std::move(session_ptr); }
+    [[nodiscard]] size_t size() const;
 
-    void send_string(const std::string& value, NullTerminator null_terminator);
-    [[nodiscard]] uint64_t available_capacity() const { return WRITE_BUFFER_SIZE - current_pos_ - 1; }
+    inline static size_t max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }
+
+    inline bool full() const { return size() == max_capacity(); }
 
     template<typename T>
-    void send_value(T value) {
-        while(sizeof(T) + current_pos_ >= WRITE_BUFFER_SIZE) {
-            flush();
-        }
+    void send_value(T host_value) {
+        try_flush(sizeof(T));
+
         T network_value;
-//        if constexpr(std::is_same_v<T, char> || std::is_same_v<T, u_char>) {
-//            network_value = value;
-//        } else
         if constexpr(std::is_same_v<T, int16_t> || std::is_same_v<T, uint16_t>) {
-            network_value = htons(value);
+            network_value = htons(host_value);
         } else if constexpr(std::is_same_v<T, int32_t> || std::is_same_v<T, uint32_t>) {
-            network_value = htonl(value);
+            network_value = htonl(host_value);
         } else if constexpr(std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>) {
-            network_value = htonll(value);
+            network_value = htonll(host_value);
         } else {
-            // char
-            network_value = value;
-//            Assert(false, "Try to write invalid type of data into the buffer.");
+            network_value = host_value;
         }
-        memcpy(data_ + current_pos_, (char*)(&network_value), sizeof(T));
-        current_pos_ += sizeof(T);
+        std::copy_n(reinterpret_cast<const char*>(&network_value), sizeof(T), current_pos_);
+        std::advance(current_pos_, sizeof(T));
     }
 
-    void flush();
+    void send_string(const std::string& value, NullTerminator null_terminator = NullTerminator::kYes);
+
+    // 0 means flush whole buffer.
+    void flush(size_t bytes = 0);
 
 private:
-    char data_[WRITE_BUFFER_SIZE]{};
-    uint64_t current_pos_ = 0;
+    void try_flush(size_t bytes);
 
-    const hv::SocketChannelPtr &channel_;
-    std::shared_ptr<Session> session_ptr_;
+    std::array<char, PG_MSG_BUFFER_SIZE> data_{};
+    RingBufferIterator start_pos_{data_};
+    RingBufferIterator current_pos_{data_};
+    std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 };
 
 }

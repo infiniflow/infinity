@@ -6,6 +6,9 @@
 #include "hv/TcpServer.h"
 #include "pg_protocol_handler.h"
 
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/ip/tcp.hpp>
+
 namespace infinity {
 
 enum class SessionStatus : char {
@@ -15,29 +18,22 @@ enum class SessionStatus : char {
     kTerminated
 };
 
-class Session: public std::enable_shared_from_this<Session> {
+class Session {
 public:
-    explicit Session(const hv::SocketChannelPtr& channel);
-    void run(hv::Buffer* buffer);
-    void start();
-    void suspend();
-    void resume();
-    void stop();
-    uint32_t id() const { return id_; }
-    SessionStatus status() { return status_; }
+    explicit Session(boost::asio::io_service& io_service);
+    void run();
+
+    std::shared_ptr<boost::asio::ip::tcp::socket> socket() { return socket_; }
 private:
     void handle_connection();
+
     void handle_request();
 
-    SessionStatus status_ = SessionStatus::kIdle;
-    PGProtocolHandler pg_handler_;
-    uint32_t id_;
+    const std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 
-    // mutex for protecting buffer of libhv
-    std::mutex mutex_;
+    const std::shared_ptr<PGProtocolHandler> pg_handler_;
 
-    // Condition variable for notify message received
-    std::condition_variable waiting_cv_;
+    bool terminate_session_ = false;
 };
 
 }

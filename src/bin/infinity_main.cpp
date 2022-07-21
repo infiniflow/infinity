@@ -22,7 +22,11 @@ void parse_arguments(int argc, char** argv, infinity::StartupParameter& paramete
         return ;
     }
 
-    parameters.address = result["address"].as<std::string>();
+    boost::system::error_code error;
+    parameters.address = boost::asio::ip::make_address(result["address"].as<std::string>(), error);
+
+    Assert(!error, "Not a valid IPv4 address: " + result["address"].as<std::string>() + ", panic!");
+
     parameters.port = result["port"].as<uint16_t>();
 }
 

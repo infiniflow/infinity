@@ -8,7 +8,9 @@ namespace infinity {
 
 // Each message has the length field to indicate the message size.
 static constexpr auto LENGTH_FIELD_SIZE = 4u;
-static constexpr auto WRITE_BUFFER_SIZE = 4096u;
+static constexpr auto PG_MSG_BUFFER_SIZE = 4096u;
+
+static constexpr char NULL_END = '\0';
 
 enum class NullTerminator : bool {
     kYes = true,

@@ -3,36 +3,35 @@
 //
 
 #pragma once
-#include "hv/TcpServer.h"
 #include "common/utility/str.h"
 #include "common/utility/asserter.h"
 #include "pg_message.h"
+#include "ring_buffer_iterator.h"
 
 #include <iostream>
+#include <utility>
+
+#include <boost/asio/ip/tcp.hpp>
 
 namespace infinity {
 
 class BufferReader {
 public:
-    explicit BufferReader(const hv::SocketChannelPtr &channel);
-    void set_buffer(hv::Buffer* buf) { buffer_ = buf; };
-    inline uint64_t unread_buffer_size();
+    explicit BufferReader(std::shared_ptr<boost::asio::ip::tcp::socket> socket) : socket_(std::move(socket)) {};
 
-    std::string read_by_size(uint64_t size, NullTerminator flag);
+    [[nodiscard]] size_t size() const;
 
-    inline void reset() { start_pos_ = 0; }
+    [[nodiscard]] static inline size_t max_capacity() { return PG_MSG_BUFFER_SIZE - 1;}
+
+    [[nodiscard]] inline bool full() const { return size() == max_capacity(); }
 
     template<typename T>
     T read_value() {
-        while(start_pos_ + sizeof(T) > buffer_->size()) {
-            // TODO: need to read more data
-            Assert(false, "Try to read the data out of the buffer.");
-        }
+        receive_more(sizeof(T));
+        T network_value{0};
+        std::copy_n(start_pos_, sizeof(T), reinterpret_cast<char*>(&network_value));
+        std::advance(start_pos_, sizeof(T));
 
-        T network_value = 0;
-        char* data_pos = start_pos_ + (char*)(buffer_->data());
-        memcpy((char*)&network_value, data_pos, sizeof(T));
-        start_pos_ += sizeof(T);
         if constexpr(std::is_same_v<T, char> || std::is_same_v<T, u_char>) {
             return network_value;
         }
@@ -48,10 +47,16 @@ public:
         Assert(false, "Try to read invalid type of data from the buffer.");
     }
 
+    std::string read_string(const size_t string_length, NullTerminator null_terminator = NullTerminator::kYes);
+    std::string read_string();
 private:
-    const hv::SocketChannelPtr &channel_;
-    hv::Buffer* buffer_ = nullptr;
-    uint64_t start_pos_ = 0;
+    void receive_more(size_t more_bytes = 1);
+
+    std::array<char, PG_MSG_BUFFER_SIZE> data_{};
+    RingBufferIterator start_pos_{data_};
+    RingBufferIterator current_pos_{data_};
+
+    std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 };
 
 }

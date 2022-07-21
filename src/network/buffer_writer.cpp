@@ -5,48 +5,73 @@
 #include "buffer_writer.h"
 #include "session.h"
 
+#include <boost/asio/write.hpp>
+
 namespace infinity {
 
-BufferWriter::BufferWriter(const hv::SocketChannelPtr &channel)
-    : channel_(channel) {
+size_t
+BufferWriter::size() const {
+    const auto current_size = std::distance(&*start_pos_, &*current_pos_);
+    return (current_size < 0) ? (current_size + PG_MSG_BUFFER_SIZE) : current_size;
 }
 
 void
-BufferWriter::flush() {
-    Assert(current_pos_ + 1 <= INT_MAX, "Flush data size is weird, panic!");
-    int data_size = static_cast<int>(current_pos_);
-    auto sent_size = channel_->write(data_, data_size);
-    session_ptr_->suspend();
-    if(sent_size == -1) {
-        // Nothing can be done except panic.
-        Assert(false, "Send data error, panic!");
-    }
-    if(sent_size != data_size) {
-        // TODO: error message should include the sent size.
-        Assert(false, "Send data size isn't correct, panic!");
-    }
-    current_pos_ = 0;
-}
+BufferWriter::send_string(const std::string &value, NullTerminator null_terminator) {
+    auto position_in_string = 0u;
 
-void
-BufferWriter::send_string(const std::string& value, NullTerminator null_terminator) {
-    // Data after the position which will be sent.
-    uint64_t value_pos = 0;
+    if(!full()) {
+        position_in_string = static_cast<uint32_t>(std::min(max_capacity() - size(), value.size()));
+        std::copy_n(value.begin(), position_in_string, current_pos_);
+        std::advance(current_pos_, position_in_string);
+    }
 
-    while(value_pos < value.size()) {
-        const uint64_t sending_size = std::min(value.size() - value_pos, available_capacity());
-        memcpy(data_ + current_pos_, value.c_str(), sending_size);
-        value_pos += sending_size;
-        current_pos_ += sending_size;
-        if(available_capacity() == 0) flush();
+    while(position_in_string < value.size()) {
+        const auto bytes_to_transfer = std::min(max_capacity(), value.size() - position_in_string);
+        try_flush(bytes_to_transfer);
+        std::copy_n(value.begin() + position_in_string, bytes_to_transfer, current_pos_);
+        std::advance(current_pos_, bytes_to_transfer);
+        position_in_string += bytes_to_transfer;
     }
 
     if(null_terminator == NullTerminator::kYes) {
-        while(1 + current_pos_ >= WRITE_BUFFER_SIZE) {
-            flush();
-        }
-        data_[current_pos_] = '\0';
+        try_flush(sizeof (char));
+        *current_pos_ = NULL_END;
         ++ current_pos_;
+    }
+}
+
+void
+BufferWriter::flush(size_t bytes) {
+    Assert(bytes <= size(), "Can't flush more bytes than available");
+    const auto bytes_to_send = bytes ? bytes : size();
+    size_t bytes_sent;
+
+    boost::system::error_code boost_error;
+    if (std::distance(&*start_pos_, &*current_pos_) < 0) {
+        bytes_sent = boost::asio::write(*socket_,
+                                        std::array<boost::asio::mutable_buffer, 2> {
+                                            boost::asio::buffer(&*start_pos_, std::distance(&*start_pos_, data_.end())),
+                                            boost::asio::buffer(data_.begin(), std::distance(data_.begin(), &*current_pos_))
+                                        },
+                                        boost::asio::transfer_at_least(bytes_to_send), boost_error);
+
+    } else {
+        bytes_sent = boost::asio::write(*socket_, boost::asio::buffer(&*start_pos_, size()),
+                                        boost::asio::transfer_at_least(bytes_to_send), boost_error);
+    }
+
+    if(boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_sent == 0) {
+        Assert(false, "Write failed. Client close connection.");
+    }
+
+    Assert(!boost_error, boost_error.message());
+    std::advance(start_pos_, bytes_sent);
+}
+
+void
+BufferWriter::try_flush(size_t bytes) {
+    if (bytes >= max_capacity() - size()) {
+        flush(bytes);
     }
 }
 
