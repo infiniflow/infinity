@@ -34,14 +34,14 @@ DBServer::create_session() {
 }
 
 void
-DBServer::start_session(std::shared_ptr<Session> session_ptr) {
-    std::thread session_thread ([&] {
-        ++ running_session_count_;
-        session_ptr->run();
+DBServer::start_session(std::shared_ptr<Session>& session_ptr) {
+    std::thread session_thread ([session = session_ptr, &num_running_sessions = this->running_session_count_]() mutable {
+        ++ num_running_sessions;
+        session->run();
 
         // User disconnected
-        session_ptr.reset();
-        -- running_session_count_;
+        session.reset();
+        -- num_running_sessions;
     });
 
     session_thread.detach();

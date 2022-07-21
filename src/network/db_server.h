@@ -25,7 +25,7 @@ public:
 
 private:
     void create_session();
-    void start_session(std::shared_ptr<Session> session);
+    void start_session(std::shared_ptr<Session>& session);
 
     std::atomic_bool initialized{false};
     std::atomic_uint64_t running_session_count_{0};
