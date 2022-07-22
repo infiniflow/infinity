@@ -3,6 +3,7 @@
 //
 
 #include "session.h"
+#include "main/query_handler.h"
 
 #include <iostream>
 
@@ -18,11 +19,21 @@ Session::run() {
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
     handle_connection();
     while(!terminate_session_) {
-        handle_request();
+        try {
+            handle_request();
+        } catch (const std::exception& e) {
+            std::map<PGMessageType, std::string> error_message_map;
+            error_message_map[PGMessageType::kHumanReadableError] = e.what();
+            std::cout << "Error: " << e.what() << std::endl;
+            pg_handler_->send_error_response(error_message_map);
+            pg_handler_->send_ready_for_query();
+        }
+
     }
 }
 
-void Session::handle_connection() {
+void
+Session::handle_connection() {
     const auto body_length = pg_handler_->read_startup_header();
 
     pg_handler_->read_startup_body(body_length);
@@ -34,7 +45,8 @@ void Session::handle_connection() {
     pg_handler_->send_ready_for_query();
 }
 
-void Session::handle_request() {
+void
+Session::handle_request() {
     const auto cmd_type = pg_handler_->read_command_type();
 
     switch (cmd_type) {
@@ -56,6 +68,7 @@ void Session::handle_request() {
         }
         case PGMessageType::kSimpleQueryCommand: {
             std::cout << "SimpleQuery" << std::endl;
+            handle_simple_query();
             break;
         }
         case PGMessageType::kSyncCommand: {
@@ -70,6 +83,14 @@ void Session::handle_request() {
             Assert(false, "Unknown command type");
         }
     }
+}
+
+void
+Session::handle_simple_query() {
+    const std::string& query = pg_handler_->read_command_body();
+    std::cout << "Query: " << query << std::endl;
+
+    QueryHandler::execute_simple_query(query);
 }
 
 }

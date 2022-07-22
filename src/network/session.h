@@ -29,6 +29,8 @@ private:
 
     void handle_request();
 
+    void handle_simple_query();
+
     const std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 
     const std::shared_ptr<PGProtocolHandler> pg_handler_;

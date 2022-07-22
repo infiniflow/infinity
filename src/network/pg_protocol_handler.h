@@ -4,6 +4,7 @@
 
 #pragma once
 #include <utility>
+#include <map>
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -24,6 +25,9 @@ public:
     void send_ready_for_query();
 
     PGMessageType read_command_type();
+    std::string read_command_body();
+
+    void send_error_response(const std::map<PGMessageType, std::string>& error_response_map);
 //
 //    std::string read_query_packet();
 

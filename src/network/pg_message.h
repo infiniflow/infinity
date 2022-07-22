@@ -19,9 +19,14 @@ enum class NullTerminator : bool {
 
 // From https://www.postgresql.org/docs/14/protocol-message-formats.html
 enum class PGMessageType : unsigned char {
+    // Response
     kAuthentication = 'R',
+    kError = 'E',
     kParameterStatus = 'S',
     kReadyForQuery = 'Z',
+
+    // Errors
+    kHumanReadableError = 'M',
 
     // SSL related
     kSSLYes = 'S',

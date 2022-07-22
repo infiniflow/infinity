@@ -63,8 +63,41 @@ PGProtocolHandler::send_ready_for_query() {
     buffer_writer_.flush();
 }
 
-PGMessageType PGProtocolHandler::read_command_type() {
+PGMessageType
+PGProtocolHandler::read_command_type() {
     return static_cast<PGMessageType>(buffer_reader_.read_value<char>());
+}
+
+std::string
+PGProtocolHandler::read_command_body() {
+    const auto command_length = buffer_reader_.read_value<uint32_t>() - LENGTH_FIELD_SIZE;
+    return buffer_reader_.read_string(command_length);
+}
+
+void
+PGProtocolHandler::send_error_response(const std::map<PGMessageType, std::string> &error_response_map) {
+    // message header
+    buffer_writer_.send_value(PGMessageType::kError);
+
+    uint32_t message_size = 0;
+    for(const auto& error: error_response_map) {
+        message_size += error.second.size() + 1u + sizeof(PGMessageType); // Error message string + null terminator
+    }
+
+    message_size += LENGTH_FIELD_SIZE + 1; // Length field and last null terminator
+
+    // message length
+    buffer_writer_.send_value<uint32_t>(message_size);
+
+    // message body
+    for(const auto& error: error_response_map) {
+        buffer_writer_.send_value(error.first);
+        buffer_writer_.send_string(error.second);
+    }
+
+    // message ending terminator
+    buffer_writer_.send_value(NULL_END);
+    buffer_writer_.flush();
 }
 
 }

@@ -33,9 +33,10 @@ DBServer::create_session() {
     acceptor_.async_accept(*(session_ptr->socket()), boost::bind(&DBServer::start_session, this, session_ptr));
 }
 
+
 void
-DBServer::start_session(std::shared_ptr<Session>& session_ptr) {
-    std::thread session_thread ([session = session_ptr, &num_running_sessions = this->running_session_count_]() mutable {
+DBServer::start_session(std::shared_ptr<Session>& session) {
+    std::thread session_thread ([session = session, &num_running_sessions = this->running_session_count_]() mutable {
         ++ num_running_sessions;
         session->run();
 
