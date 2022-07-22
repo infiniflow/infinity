@@ -3,6 +3,7 @@
 //
 
 #include <boost/bind/bind.hpp>
+#include <thread>
 #include "db_server.h"
 
 namespace infinity {

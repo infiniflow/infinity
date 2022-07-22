@@ -35,6 +35,5 @@ target_compile_options(
         -fPIC
 )
 
-add_subdirectory(libhv)
 #add_library(libhv INTERFACE)
 #target_include_directories(libhv INTERFACE libhv/include)

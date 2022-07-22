@@ -35,6 +35,5 @@ add_executable(infinity_main
 target_link_libraries(
         infinity_main
         sql-parser
-        hv
         #        pqxx_static
 )
