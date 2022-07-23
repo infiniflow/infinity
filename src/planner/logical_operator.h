@@ -8,8 +8,8 @@
 
 class LogicalOperator {
 public:
-    LogicalOperator(LogicalOperatorType node_type);
-
+    explicit LogicalOperator(LogicalOperatorType node_type);
+    virtual ~LogicalOperator() = default;
 private:
     LogicalOperatorType node_type_ = LogicalOperatorType::kInvalid;
 };

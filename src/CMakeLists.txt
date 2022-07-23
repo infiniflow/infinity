@@ -32,12 +32,19 @@ file(GLOB_RECURSE
         main/*.cpp
         )
 
+file(GLOB_RECURSE
+        storage_src
+        CONFIGURE_DEPENDS
+        storage/*.cpp
+        )
+
 add_executable(infinity_main
         ${bin_src}
         ${common_src}
         ${infinity_src}
         ${network_src}
         ${planner_src}
+        ${storage_src}
         )
 
 target_link_libraries(
