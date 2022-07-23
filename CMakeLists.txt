@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 include_directories(
         src
         third_party/cxxopts/include
+        third_party/spdlog/include
         ${CMAKE_CURRENT_BINARY_DIR}/third_party/libhv/include
         /usr/local/include
 )

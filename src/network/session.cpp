@@ -89,8 +89,10 @@ Session::handle_simple_query() {
     const std::string& query = pg_handler_->read_command_body();
     std::cout << "Query: " << query << std::endl;
 
+    // Start to execute the query.
     QueryHandler::execute_query(query);
 
+    // Response to the result message to client
     std::map<PGMessageType, std::string> error_message_map;
     std::string response_message = "SimpleQuery: " + query;
     error_message_map[PGMessageType::kHumanReadableError] = response_message;

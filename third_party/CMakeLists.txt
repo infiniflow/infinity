@@ -3,6 +3,9 @@
 # Build cxxopts
 add_subdirectory(cxxopts)
 
+# Build spdlog
+add_subdirectory(spdlog)
+
 # Build sql-parser
 set(PARSER_DIR sql-parser)
 
