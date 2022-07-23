@@ -21,6 +21,12 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        planner_src
+        CONFIGURE_DEPENDS
+        planner/*.cpp
+        )
+
+file(GLOB_RECURSE
         infinity_src
         CONFIGURE_DEPENDS
         main/*.cpp
@@ -28,9 +34,11 @@ file(GLOB_RECURSE
 
 add_executable(infinity_main
         ${bin_src}
+        ${common_src}
         ${infinity_src}
         ${network_src}
-        ${common_src})
+        ${planner_src}
+        )
 
 target_link_libraries(
         infinity_main

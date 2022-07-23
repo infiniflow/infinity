@@ -14,4 +14,5 @@ if(!(is_true)) {                                                            \
     throw std::logic_error(errmsg);                                       \
 }
 
+#define ResponseError(message) Assert(false, message)
 }

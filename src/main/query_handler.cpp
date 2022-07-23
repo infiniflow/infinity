@@ -3,6 +3,7 @@
 //
 
 #include "query_handler.h"
+#include "planner/planner.h"
 
 #include "SQLParser.h"
 #include "SQLParserResult.h"
@@ -16,10 +17,9 @@ infinity::QueryHandler::execute_query(const std::string &query) {
     // Parse sql
     hsql::SQLParser::parse(query, &parse_result);
 
-    // Build plan for each SQL statement.
-    for(hsql::SQLStatement* statement : parse_result.getStatements()) {
-        
-    }
+    // Build unoptimized logical plan for each SQL statement.
+    Planner planner;
+    planner.create_logical_plan(parse_result);
 }
 
 }
