@@ -10,7 +10,7 @@ namespace infinity {
 
 class QueryHandler {
 public:
-    static void execute_simple_query(const std::string& query);
+    static void execute_query(const std::string& query);
 private:
 };
 

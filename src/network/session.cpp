@@ -67,7 +67,6 @@ Session::handle_request() {
             break;
         }
         case PGMessageType::kSimpleQueryCommand: {
-            std::cout << "SimpleQuery" << std::endl;
             handle_simple_query();
             break;
         }
@@ -90,7 +89,14 @@ Session::handle_simple_query() {
     const std::string& query = pg_handler_->read_command_body();
     std::cout << "Query: " << query << std::endl;
 
-    QueryHandler::execute_simple_query(query);
+    QueryHandler::execute_query(query);
+
+    std::map<PGMessageType, std::string> error_message_map;
+    std::string response_message = "SimpleQuery: " + query;
+    error_message_map[PGMessageType::kHumanReadableError] = response_message;
+    pg_handler_->send_error_response(error_message_map);
+    pg_handler_->send_ready_for_query();
+
 }
 
 }
