@@ -14,7 +14,7 @@ public:
         return instance;
     }
 
-    virtual ~Singleton() {}
+    virtual ~Singleton() = default;
 };
 
 }
