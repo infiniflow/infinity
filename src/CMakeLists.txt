@@ -10,8 +10,6 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         common/*.cpp
         common/*.h
-        common/utility/*.cpp
-        common/utility/*.h
         )
 
 file(GLOB_RECURSE

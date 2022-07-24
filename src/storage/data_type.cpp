@@ -26,6 +26,7 @@ infinity::LogicalType::LogicalType(infinity::LogicalTypeId logical_type_id) : lo
         case LogicalTypeId::kInterval: physical_type_ = PhysicalType::kInt64; break;
         case LogicalTypeId::kVarchar: physical_type_ = PhysicalType::kString; break;
         case LogicalTypeId::kText: physical_type_ = PhysicalType::kString; break;
+        default: break;
     }
 }
 
@@ -45,9 +46,9 @@ std::string LogicalType::to_string() const {
         case LogicalTypeId::kInterval: return "Interval";
         case LogicalTypeId::kVarchar: return "Varchar";
         case LogicalTypeId::kText: return "Text";
+        default:
+            ResponseError("Invalid logical data type.");
     }
-    ResponseError("Invalid logical data type.");
-    return std::string();
 }
 
 }

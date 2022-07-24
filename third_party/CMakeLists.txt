@@ -3,6 +3,9 @@
 # Build cxxopts
 add_subdirectory(cxxopts)
 
+# Build doctest
+add_subdirectory(googletest)
+
 # Build spdlog
 add_subdirectory(spdlog)
 
