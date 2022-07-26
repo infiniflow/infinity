@@ -7,6 +7,7 @@
 #include "table_definition.h"
 
 #include <unordered_map>
+#include <memory>
 
 namespace infinity {
 

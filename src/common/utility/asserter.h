@@ -6,6 +6,8 @@
 
 #include "str.h"
 
+#include <stdexcept>
+
 namespace infinity {
 
 #define Assert(is_true, message)                                              \
