@@ -13,6 +13,13 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        executor_src
+        CONFIGURE_DEPENDS
+        executor/*.cpp
+        executor/*.h
+        )
+
+file(GLOB_RECURSE
         network_src
         CONFIGURE_DEPENDS
         network/*.cpp
@@ -39,6 +46,7 @@ file(GLOB_RECURSE
 add_executable(infinity_main
         ${bin_src}
         ${common_src}
+        ${executor_src}
         ${infinity_src}
         ${network_src}
         ${planner_src}

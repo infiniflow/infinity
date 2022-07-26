@@ -4,6 +4,9 @@
 
 #include "query_handler.h"
 #include "planner/planner.h"
+#include "planner/optimizer.h"
+#include "executor/physical_planner.h"
+#include "executor/physical_operator.h"
 #include "common/utility/asserter.h"
 
 #include "SQLParser.h"
@@ -21,12 +24,21 @@ infinity::QueryHandler::ExecuteQuery(const std::string &query) {
         ResponseError(parse_result.errorMsg())
     }
 
-    // Build unoptimized logical plan for each SQL statement.
-    Planner planner;
+    Planner logical_planner;
+    Optimizer optimizer;
+    PhysicalPlanner physical_planner;
 
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {
-        planner.CreateLogicalPlan(statement);
-        ResponseError(planner.root_operator()->ToString(0));
+        // Build unoptimized logical plan for each SQL statement.
+        std::shared_ptr<LogicalOperator> unoptimized_plan = logical_planner.CreateLogicalOperator(*statement);
+
+        // Apply optimized rule to the logical plan
+        std::shared_ptr<LogicalOperator> optimized_plan = optimizer.optimize(unoptimized_plan);
+
+        // Build physical plan
+        std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
+
+        ResponseError(optimized_plan->ToString(0));
     }
 }
 

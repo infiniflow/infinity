@@ -29,8 +29,10 @@ public:
     virtual std::string ToString(uint64_t space) = 0;
     static uint64_t get_new_id() { return ++ node_id_count_; }
 
+    LogicalOperatorType operator_type() const {return operator_type_; }
+
 protected:
-    LogicalOperatorType node_type_ = LogicalOperatorType::kInvalid;
+    LogicalOperatorType operator_type_ = LogicalOperatorType::kInvalid;
 
     std::shared_ptr<LogicalOperator> left_node_;
     std::shared_ptr<LogicalOperator> right_node_;

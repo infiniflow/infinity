@@ -27,11 +27,11 @@ enum class LogicalOperatorType: uint8_t {
     kExport,
 
     // DDL
-    kAlter = 3,
-    kCreateTable = 4,
-    kCreateView = 5,
-    kDropTable = 6,
-    kDropView = 7,
+    kAlter,
+    kCreateTable,
+    kCreateView,
+    kDropTable,
+    kDropView,
 
     // ?
     kAlias,
