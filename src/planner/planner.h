@@ -21,26 +21,31 @@
 #include "sql/PrepareStatement.h"
 #include "sql/ExecuteStatement.h"
 
+#include "storage/data_type.h"
+
 namespace infinity {
 
 class Planner {
 public:
-    void create_logical_plan(const hsql::SQLParserResult &parse_result);
+    void CreateLogicalPlan(hsql::SQLStatement *statement);
+    [[nodiscard]] std::shared_ptr<LogicalOperator> root_operator() const { return root_operator_; }
+    [[nodiscard]] std::string ToString() const;
 
+    static LogicalType TypeConversion(hsql::ColumnType type);
 private:
-    std::shared_ptr<LogicalOperator> create_logical_operator(const hsql::SQLStatement &statement);
+    std::shared_ptr<LogicalOperator> CreateLogicalOperator(const hsql::SQLStatement &statement);
 
     // Create operator
-    std::shared_ptr<LogicalOperator> build_create(const hsql::CreateStatement& statement);
-    std::shared_ptr<LogicalOperator> build_create_table(const hsql::CreateStatement& statement);
-    std::shared_ptr<LogicalOperator> build_create_table_from_table(const hsql::CreateStatement& statement);
-    std::shared_ptr<LogicalOperator> build_create_view(const hsql::CreateStatement& statement);
-    std::shared_ptr<LogicalOperator> build_create_index(const hsql::CreateStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildCreate(const hsql::CreateStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildCreateTable(const hsql::CreateStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildCreateTableFromTable(const hsql::CreateStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildCreateView(const hsql::CreateStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildCreateIndex(const hsql::CreateStatement& statement);
 
     // Drop operator
-    std::shared_ptr<LogicalOperator> build_drop(const hsql::DropStatement& statement);
-    std::shared_ptr<LogicalOperator> build_drop_table(const hsql::DropStatement& statement);
-    std::shared_ptr<LogicalOperator> build_drop_schema(const hsql::DropStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildDrop(const hsql::DropStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildDropTable(const hsql::DropStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildDropSchema(const hsql::DropStatement& statement);
     std::shared_ptr<LogicalOperator> build_drop_index(const hsql::DropStatement& statement);
     std::shared_ptr<LogicalOperator> build_drop_view(const hsql::DropStatement& statement);
     std::shared_ptr<LogicalOperator> build_drop_prepared_statement(const hsql::DropStatement& statement);
@@ -57,7 +62,7 @@ private:
     std::shared_ptr<LogicalOperator> build_update(const hsql::UpdateStatement& statement);
 
     // Select operator
-    std::shared_ptr<LogicalOperator> build_select(const hsql::SelectStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildSelect(const hsql::SelectStatement& statement);
 
     // Show operator
     std::shared_ptr<LogicalOperator> build_show(const hsql::ShowStatement& statement);
@@ -94,6 +99,7 @@ private:
     // Execute operator
     std::shared_ptr<LogicalOperator> build_execute(const hsql::ExecuteStatement& statement);
 
+    std::shared_ptr<LogicalOperator> root_operator_{nullptr};
 };
 
 }

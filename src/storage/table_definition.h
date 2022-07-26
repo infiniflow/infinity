@@ -6,12 +6,14 @@
 
 #include "column_definition.h"
 
+#include <vector>
+
 namespace infinity {
 
 class TableDefinition {
 public:
-    explicit TableDefinition(std::string table_name, std::vector<ColumnDefinition> columns)
-        : columns_(std::move(columns)), name_(std::move(table_name)) { }
+    explicit TableDefinition(std::string table_name, std::vector<ColumnDefinition> columns, bool if_not_exists)
+        : columns_(std::move(columns)), name_(std::move(table_name)), if_not_exists_(if_not_exists) {}
 
     void set_table_id(uint64_t table_id) { table_id_ = table_id; }
     [[nodiscard]] const std::vector<ColumnDefinition>& columns() const { return columns_; }
@@ -20,6 +22,7 @@ public:
 private:
     std::vector<ColumnDefinition> columns_;
     std::string name_;
+    bool if_not_exists_{false};
     uint64_t table_id_{0};
 };
 

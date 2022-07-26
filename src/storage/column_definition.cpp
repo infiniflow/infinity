@@ -9,10 +9,19 @@
 namespace infinity {
 
 
-ColumnDefinition::ColumnDefinition(std::string column_name, infinity::LogicalType logical_type, bool nullable, std::vector<ConstrainType> constrains)
-    : name_(std::move(column_name)), logical_type_(logical_type), nullable_(nullable), constrains_(std::move(constrains)) {}
+ColumnDefinition::ColumnDefinition(
+        std::string column_name,
+        uint64_t column_id,
+        infinity::LogicalType logical_type,
+        bool nullable,
+        std::set<ConstrainType> constrains)
+    : name_(std::move(column_name)),
+    column_id_(column_id),
+    logical_type_(logical_type),
+    nullable_(nullable),
+    constrains_(std::move(constrains)) {}
 
-std::string ColumnDefinition::to_string() const {
+std::string ColumnDefinition::ToString() const {
     std::stringstream ss;
     ss << name_ << " " << logical_type_.to_string() << " " << (nullable_ ? "null" : "not null") << std::endl;
     return ss.str();

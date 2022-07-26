@@ -20,12 +20,12 @@ struct StartupParameter {
 class DBServer : public Singleton<DBServer> {
 public:
     explicit DBServer(const StartupParameter& parameter);
-    void run();
-    void shutdown();
+    void Run();
+    void Shutdown();
 
 private:
-    void create_session();
-    void start_session(std::shared_ptr<Session>& session);
+    void CreateSession();
+    void StartSession(std::shared_ptr<Session>& session);
 
     std::atomic_bool initialized{false};
     std::atomic_uint64_t running_session_count_{0};

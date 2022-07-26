@@ -5,7 +5,7 @@
 #pragma once
 
 #include <string>
-#include <vector>
+#include <set>
 #include "data_type.h"
 
 namespace infinity {
@@ -14,20 +14,22 @@ enum class ConstrainType {
     kInvalid,
     kPrimaryKey,
     kUnique,
-    kNullable,
+    kNull,
+    kNotNull,
 };
 
 
 class ColumnDefinition {
 public:
-    ColumnDefinition(std::string column_name, LogicalType logical_type, bool nullable, std::vector<ConstrainType> constrains);
+    ColumnDefinition(std::string column_name, uint64_t column_id, LogicalType logical_type, bool nullable, std::set<ConstrainType> constrains);
 
-    [[nodiscard]] std::string to_string() const;
+    [[nodiscard]] std::string ToString() const;
 private:
     std::string name_;
-    LogicalType logical_type_{LogicalTypeId::kInvalid};
+    uint64_t column_id_;
+    LogicalType logical_type_{LogicalTypeId::kInvalid, -1, -1, -1};
     bool nullable_{false};
-    std::vector<ConstrainType> constrains_;
+    std::set<ConstrainType> constrains_;
 };
 
 struct TableColumnDefinition final {

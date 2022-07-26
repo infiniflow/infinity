@@ -4,12 +4,25 @@
 
 #pragma once
 
+#include <utility>
+
 #include "planner/logical_operator.h"
+#include "storage/table_definition.h"
 
 namespace infinity {
 
 class LogicalCreateTable : public LogicalOperator {
+public:
+    LogicalCreateTable(
+            LogicalOperatorType node_type,
+            uint64_t node_id,
+            std::shared_ptr<TableDefinition> table_def_ptr)
+        : LogicalOperator(node_type, node_id),
+        table_def_ptr_(std::move(table_def_ptr)) {}
 
+    std::string ToString(uint64_t space) final;
+private:
+    std::shared_ptr<TableDefinition> table_def_ptr_;
 };
 
 }

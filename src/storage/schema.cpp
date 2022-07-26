@@ -8,7 +8,7 @@
 namespace infinity {
 
 std::shared_ptr<TableDefinition>
-Schema::get_table_by_name(const std::string &name) {
+Schema::GetTableByName(const std::string &name) {
     if (tables_.find(name) == tables_.end()) {
         ResponseError("Table not found: " + name);
     }
@@ -16,7 +16,7 @@ Schema::get_table_by_name(const std::string &name) {
 }
 
 void
-Schema::add_table(const std::shared_ptr<TableDefinition>& table_def) {
+Schema::AddTable(const std::shared_ptr<TableDefinition>& table_def) {
     const std::string& table_name = table_def->name();
     if (tables_.find(table_name) == tables_.end()) {
         table_def->set_table_id(table_id_counter_++);
@@ -27,7 +27,7 @@ Schema::add_table(const std::shared_ptr<TableDefinition>& table_def) {
 }
 
 void
-Schema::delete_table(const std::string &table_name) {
+Schema::DeleteTable(const std::string &table_name) {
     if (tables_.find(table_name) == tables_.end()) {
         ResponseError("Table not found, can't be dropped: " + table_name);
     }

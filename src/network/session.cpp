@@ -14,13 +14,13 @@ Session::Session(boost::asio::io_service& io_service)
       pg_handler_(std::make_shared<PGProtocolHandler>(socket())){}
 
 void
-Session::run() {
+Session::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
-    handle_connection();
+    HandleConnection();
     while(!terminate_session_) {
         try {
-            handle_request();
+            HandleRequest();
         } catch (const std::exception& e) {
             std::map<PGMessageType, std::string> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();
@@ -33,7 +33,7 @@ Session::run() {
 }
 
 void
-Session::handle_connection() {
+Session::HandleConnection() {
     const auto body_length = pg_handler_->read_startup_header();
 
     pg_handler_->read_startup_body(body_length);
@@ -46,7 +46,7 @@ Session::handle_connection() {
 }
 
 void
-Session::handle_request() {
+Session::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
     switch (cmd_type) {
@@ -67,7 +67,7 @@ Session::handle_request() {
             break;
         }
         case PGMessageType::kSimpleQueryCommand: {
-            handle_simple_query();
+            HandlerSimpleQuery();
             break;
         }
         case PGMessageType::kSyncCommand: {
@@ -85,12 +85,12 @@ Session::handle_request() {
 }
 
 void
-Session::handle_simple_query() {
+Session::HandlerSimpleQuery() {
     const std::string& query = pg_handler_->read_command_body();
     std::cout << "Query: " << query << std::endl;
 
     // Start to execute the query.
-    QueryHandler::execute_query(query);
+    QueryHandler::ExecuteQuery(query);
 
     // Response to the result message to client
     std::map<PGMessageType, std::string> error_message_map;

@@ -2,7 +2,7 @@
 // Created by JinHai on 2022/7/23.
 //
 
-#pragma
+#pragma once
 
 #include <cstdint>
 #include <string>
@@ -61,10 +61,14 @@ enum class LogicalTypeId : uint8_t {
 
 class LogicalType {
 public:
-    explicit LogicalType(LogicalTypeId logical_type_id);
+    explicit LogicalType(LogicalTypeId logical_type_id, int64_t length, int64_t precision, int64_t scale);
 
     std::string to_string() const;
 private:
+    int64_t length_;
+    int64_t precision_;
+    int64_t scale_;
+
     LogicalTypeId logical_type_;
     PhysicalType physical_type_;
 };

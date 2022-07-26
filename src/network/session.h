@@ -20,15 +20,15 @@ enum class SessionStatus : char {
 class Session {
 public:
     explicit Session(boost::asio::io_service& io_service);
-    void run();
+    void Run();
 
     std::shared_ptr<boost::asio::ip::tcp::socket> socket() { return socket_; }
 private:
-    void handle_connection();
+    void HandleConnection();
 
-    void handle_request();
+    void HandleRequest();
 
-    void handle_simple_query();
+    void HandlerSimpleQuery();
 
     const std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 
