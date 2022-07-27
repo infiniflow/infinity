@@ -38,6 +38,12 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        scheduler_src
+        CONFIGURE_DEPENDS
+        scheduler/*.cpp
+        )
+
+file(GLOB_RECURSE
         storage_src
         CONFIGURE_DEPENDS
         storage/*.cpp
@@ -50,6 +56,7 @@ add_executable(infinity_main
         ${infinity_src}
         ${network_src}
         ${planner_src}
+        ${scheduler_src}
         ${storage_src}
         )
 
