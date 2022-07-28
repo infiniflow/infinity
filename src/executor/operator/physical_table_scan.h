@@ -11,7 +11,8 @@ namespace infinity {
 
 class PhysicalTableScan : public PhysicalOperator{
 public:
-    PhysicalTableScan(): PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr) {}
+    explicit PhysicalTableScan(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr,id) {}
     ~PhysicalTableScan() = default;
 };
 

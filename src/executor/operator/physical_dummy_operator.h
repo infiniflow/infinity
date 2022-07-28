@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalDummyOperator : public PhysicalOperator {
 public:
-    PhysicalDummyOperator() : PhysicalOperator(PhysicalOperatorType::kInvalid, nullptr, nullptr) {}
+    explicit PhysicalDummyOperator(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kInvalid, nullptr, nullptr, id) {}
     ~PhysicalDummyOperator() override = default;
 };
 

@@ -10,7 +10,7 @@ namespace infinity {
 
 class PhysicalAlter : public PhysicalOperator{
 public:
-    PhysicalAlter() : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr) {}
+    explicit PhysicalAlter(uint64_t id) : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id) {}
     ~PhysicalAlter() = default;
 };
 

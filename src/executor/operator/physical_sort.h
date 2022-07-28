@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalSort : public PhysicalOperator {
 public:
-    PhysicalSort(): PhysicalOperator(PhysicalOperatorType::kSort, nullptr, nullptr) {}
+    explicit PhysicalSort(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kSort, nullptr, nullptr, id) {}
     ~PhysicalSort() = default;
 };
 

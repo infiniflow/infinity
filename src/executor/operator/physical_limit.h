@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalLimit : public PhysicalOperator {
 public:
-    PhysicalLimit() : PhysicalOperator(PhysicalOperatorType::kLimit, nullptr, nullptr) {}
+    explicit PhysicalLimit(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kLimit, nullptr, nullptr, id) {}
     ~PhysicalLimit() = default;
 };
 

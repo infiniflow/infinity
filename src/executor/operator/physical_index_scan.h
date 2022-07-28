@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalIndexScan : public PhysicalOperator {
 public:
-    PhysicalIndexScan(): PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr) {}
+    explicit PhysicalIndexScan(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id) {}
     ~PhysicalIndexScan() = default;
 };
 

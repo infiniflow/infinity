@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalInsert : public PhysicalOperator {
 public:
-    PhysicalInsert() : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr) {}
+    explicit PhysicalInsert(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr, id) {}
     ~PhysicalInsert() = default;
 };
 

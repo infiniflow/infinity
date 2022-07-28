@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalCreateView : public PhysicalOperator {
 public:
-    PhysicalCreateView(): PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr) {}
+    explicit PhysicalCreateView(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr, id) {}
     ~PhysicalCreateView() = default;
 };
 

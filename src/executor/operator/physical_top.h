@@ -10,7 +10,7 @@ namespace infinity {
 
 class PhysicalTop : public PhysicalOperator {
 public:
-    PhysicalTop(): PhysicalOperator(PhysicalOperatorType::kTop, nullptr, nullptr) {}
+    explicit PhysicalTop(uint64_t id): PhysicalOperator(PhysicalOperatorType::kTop, nullptr, nullptr, id) {}
     ~PhysicalTop() = default;
 };
 

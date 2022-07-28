@@ -9,7 +9,8 @@
 namespace infinity {
 class PhysicalDropView : public PhysicalOperator {
 public:
-    PhysicalDropView() : PhysicalOperator(PhysicalOperatorType::kDropView, nullptr, nullptr) {}
+    explicit PhysicalDropView(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kDropView, nullptr, nullptr, id) {}
     ~PhysicalDropView() = default;
 };
 

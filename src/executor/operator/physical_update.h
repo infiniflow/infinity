@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalUpdate : public PhysicalOperator{
 public:
-    PhysicalUpdate(): PhysicalOperator(PhysicalOperatorType::kUpdate, nullptr, nullptr) {}
+    explicit PhysicalUpdate(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kUpdate, nullptr, nullptr, id) {}
     ~PhysicalUpdate() override = default;
 };
 

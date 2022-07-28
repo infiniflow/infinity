@@ -11,7 +11,8 @@ namespace infinity {
 
 class PhysicalImport : public PhysicalOperator {
 public:
-    PhysicalImport(): PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr) {}
+    explicit PhysicalImport(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id) {}
     ~PhysicalImport() = default;
 };
 

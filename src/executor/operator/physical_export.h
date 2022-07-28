@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalExport : public PhysicalOperator {
 public:
-    PhysicalExport(): PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr) {}
+    explicit PhysicalExport(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id) {}
     ~PhysicalExport() = default;
 };
 

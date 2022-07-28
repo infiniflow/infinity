@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalProject : public PhysicalOperator {
 public:
-    PhysicalProject() : PhysicalOperator(PhysicalOperatorType::kProjection, nullptr, nullptr) {}
+    explicit PhysicalProject(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kProjection, nullptr, nullptr, id) {}
     ~PhysicalProject() = default;
 };
 

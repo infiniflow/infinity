@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalProduct : public PhysicalOperator {
 public:
-    PhysicalProduct(): PhysicalOperator(PhysicalOperatorType::kProduct, nullptr, nullptr) {}
+    explicit PhysicalProduct(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kProduct, nullptr, nullptr, id) {}
     ~PhysicalProduct() = default;
 };
 

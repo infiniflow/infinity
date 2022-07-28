@@ -3,16 +3,20 @@
 //
 
 #include "query_handler.h"
+#include "infinity.h"
 #include "planner/planner.h"
 #include "planner/optimizer.h"
 #include "executor/physical_planner.h"
 #include "executor/physical_operator.h"
 #include "common/utility/asserter.h"
+#include "scheduler/operator_pipeline.h"
 
 #include "SQLParser.h"
 #include "SQLParserResult.h"
 
 namespace infinity {
+
+class Pipeline;
 
 void
 infinity::QueryHandler::ExecuteQuery(const std::string &query) {
@@ -38,6 +42,9 @@ infinity::QueryHandler::ExecuteQuery(const std::string &query) {
         // Build physical plan
         std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
+        std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
+
+        Infinity::instance().scheduler()->Schedule(pipeline);
         ResponseError(optimized_plan->ToString(0));
     }
 }

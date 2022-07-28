@@ -20,7 +20,7 @@ namespace infinity {
 
 class Pipeline : public std::enable_shared_from_this<Pipeline> {
 public:
-    Pipeline() = default;
+    explicit Pipeline(uint64_t id) : id_(id) {}
     virtual ~Pipeline() = 0;
 
     bool IsReady() const { return pending_predecessors_ == 0; }
@@ -35,6 +35,7 @@ public:
     void Execute();
 
     TaskState state() const { return state_; }
+    uint64_t Id() const { return id_; }
 
 protected:
     virtual void OnExecute() = 0;
@@ -49,6 +50,8 @@ private:
     std::atomic<uint64_t> pending_predecessors_{0};
     std::vector<std::weak_ptr<Pipeline>> predecessors_;
     std::vector<std::shared_ptr<Pipeline>> successors_;
+
+    uint64_t id_{0};
 };
 
 

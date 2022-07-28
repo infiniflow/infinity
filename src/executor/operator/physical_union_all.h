@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalUnionAll : public PhysicalOperator {
 public:
-    PhysicalUnionAll(): PhysicalOperator(PhysicalOperatorType::kUnionAll, nullptr, nullptr) {}
+    explicit PhysicalUnionAll(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kUnionAll, nullptr, nullptr, id) {}
     ~PhysicalUnionAll() = default;
 };
 

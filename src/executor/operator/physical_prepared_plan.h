@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalPreparedPlan : public PhysicalOperator {
 public:
-    PhysicalPreparedPlan(): PhysicalOperator(PhysicalOperatorType::kPreparedPlan, nullptr, nullptr) {}
+    explicit PhysicalPreparedPlan(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kPreparedPlan, nullptr, nullptr, id) {}
     ~PhysicalPreparedPlan() = default;
 
 };

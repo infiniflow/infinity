@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalDelete : public PhysicalOperator {
 public:
-    PhysicalDelete(): PhysicalOperator(PhysicalOperatorType::kDelete, nullptr, nullptr) {}
+    explicit PhysicalDelete(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kDelete, nullptr, nullptr, id) {}
     ~PhysicalDelete() = default;
 };
 

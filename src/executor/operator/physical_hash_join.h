@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalHashJoin : public PhysicalOperator {
 public:
-    PhysicalHashJoin(): PhysicalOperator(PhysicalOperatorType::kJoinHash, nullptr, nullptr) {}
+    explicit PhysicalHashJoin(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kJoinHash, nullptr, nullptr, id) {}
     ~PhysicalHashJoin() = default;
 };
 

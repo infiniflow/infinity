@@ -10,7 +10,7 @@ namespace infinity {
 
 class PhysicalFilter : public PhysicalOperator {
 public:
-    PhysicalFilter(): PhysicalOperator(PhysicalOperatorType::kFilter, nullptr, nullptr) {}
+    explicit PhysicalFilter(uint64_t id): PhysicalOperator(PhysicalOperatorType::kFilter, nullptr, nullptr, id) {}
     ~PhysicalFilter() = default;
 };
 

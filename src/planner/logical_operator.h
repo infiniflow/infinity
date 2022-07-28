@@ -28,6 +28,7 @@ public:
 
     virtual std::string ToString(uint64_t space) = 0;
     static uint64_t get_new_id() { return ++ node_id_count_; }
+    uint64_t node_id() const { return node_id_; }
 
     LogicalOperatorType operator_type() const {return operator_type_; }
 

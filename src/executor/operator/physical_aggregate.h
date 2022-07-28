@@ -10,7 +10,7 @@ namespace infinity {
 
 class PhysicalAggregate : public PhysicalOperator{
 public:
-    PhysicalAggregate() : PhysicalOperator(PhysicalOperatorType::kAggregate, nullptr, nullptr) {}
+    explicit PhysicalAggregate(uint64_t id) : PhysicalOperator(PhysicalOperatorType::kAggregate, nullptr, nullptr, id) {}
     ~PhysicalAggregate() = default;
 };
 

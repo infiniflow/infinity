@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalIndexJoin : public PhysicalOperator {
 public:
-    PhysicalIndexJoin(): PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr) {}
+    explicit PhysicalIndexJoin(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr, id) {}
     ~PhysicalIndexJoin() = default;
 };
 

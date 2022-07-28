@@ -13,8 +13,8 @@ namespace infinity {
 
 class PhysicalCreateTable : public PhysicalOperator {
 public:
-    explicit PhysicalCreateTable(std::shared_ptr<TableDefinition> table_def_ptr);
-    explicit PhysicalCreateTable(const std::shared_ptr<PhysicalOperator>& input);
+    explicit PhysicalCreateTable(std::shared_ptr<TableDefinition> table_def_ptr, uint64_t id);
+    explicit PhysicalCreateTable(const std::shared_ptr<PhysicalOperator>& input, uint64_t id);
 
     ~PhysicalCreateTable() = default;
 

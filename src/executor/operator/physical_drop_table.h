@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalDropTable : public PhysicalOperator {
 public:
-    PhysicalDropTable(): PhysicalOperator(PhysicalOperatorType::kDropTable, nullptr, nullptr) {}
+    explicit PhysicalDropTable(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kDropTable, nullptr, nullptr, id) {}
 
     ~PhysicalDropTable() = default;
 };

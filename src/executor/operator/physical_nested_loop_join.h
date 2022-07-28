@@ -10,7 +10,8 @@ namespace infinity {
 
 class PhysicalNestedLoopJoin : public PhysicalOperator {
 public:
-    PhysicalNestedLoopJoin(): PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, nullptr, nullptr) {}
+    explicit PhysicalNestedLoopJoin(uint64_t id)
+        : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, nullptr, nullptr, id) {}
     ~PhysicalNestedLoopJoin() = default;
 };
 

@@ -16,6 +16,8 @@ public:
     explicit OperatorPipeline(std::shared_ptr<PhysicalOperator> op);
     ~OperatorPipeline() override = default;
 
+    static std::shared_ptr<OperatorPipeline> Create(const std::shared_ptr<PhysicalOperator>& op);
+
 protected:
     void OnExecute() final;
 
