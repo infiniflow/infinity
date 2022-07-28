@@ -3,3 +3,10 @@
 //
 
 #include "physical_operator.h"
+
+namespace infinity {
+
+PhysicalOperator::~PhysicalOperator() = default;
+
+}
+

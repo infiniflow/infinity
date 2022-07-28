@@ -2,12 +2,14 @@
 // Created by JinHai on 2022/7/28.
 //
 
-#include "task.h"
+#include "pipeline.h"
 
 namespace infinity {
 
+Pipeline::~Pipeline() = default;
+
 void
-Task::SetPredecessorOf(const std::shared_ptr<Task> &successor) {
+Pipeline::SetPredecessorOf(const std::shared_ptr<Pipeline> &successor) {
     // Prevents add a duplicated successor.
     if(std::find(successors_.cbegin(), successors_.cend(), successor) != successors_.cend()) return ;
 
@@ -21,17 +23,17 @@ Task::SetPredecessorOf(const std::shared_ptr<Task> &successor) {
 }
 
 void
-Task::Schedule() {
+Pipeline::Schedule() {
 
 }
 
 void
-Task::Execute() {
+Pipeline::Execute() {
 
 }
 
 void
-Task::OnPredecessorDone() {
+Pipeline::OnPredecessorDone() {
 
 }
 

@@ -18,18 +18,18 @@ enum class TaskState {
 namespace infinity {
 
 
-class Task : public std::enable_shared_from_this<Task> {
+class Pipeline : public std::enable_shared_from_this<Pipeline> {
 public:
-    Task() = default;
-    virtual ~Task() = 0;
+    Pipeline() = default;
+    virtual ~Pipeline() = 0;
 
     bool IsReady() const { return pending_predecessors_ == 0; }
     bool IsDone() const { return state_ == TaskState::kDone; }
 
     // Set dependencies
-    void SetPredecessorOf(const std::shared_ptr<Task>& successor);
-    const std::vector<std::weak_ptr<Task>>& predecessors() const { return predecessors_; }
-    const std::vector<std::shared_ptr<Task>>& successors() const { return successors_; }
+    void SetPredecessorOf(const std::shared_ptr<Pipeline>& successor);
+    const std::vector<std::weak_ptr<Pipeline>>& predecessors() const { return predecessors_; }
+    const std::vector<std::shared_ptr<Pipeline>>& successors() const { return successors_; }
 
     void Schedule();
     void Execute();
@@ -47,8 +47,8 @@ private:
 
     // Task dependencies
     std::atomic<uint64_t> pending_predecessors_{0};
-    std::vector<std::weak_ptr<Task>> predecessors_;
-    std::vector<std::shared_ptr<Task>> successors_;
+    std::vector<std::weak_ptr<Pipeline>> predecessors_;
+    std::vector<std::shared_ptr<Pipeline>> successors_;
 };
 
 

@@ -3,6 +3,32 @@
 //
 
 #include "physical_planner.h"
+#include "executor/operator/physcial_drop_view.h"
+#include "executor/operator/physical_aggregate.h"
+#include "executor/operator/physical_alter.h"
+#include "executor/operator/physical_create_table.h"
+#include "executor/operator/physical_create_view.h"
+#include "executor/operator/physical_delete.h"
+#include "executor/operator/physical_drop_table.h"
+#include "executor/operator/physical_export.h"
+#include "executor/operator/physical_filter.h"
+#include "executor/operator/physical_hash_join.h"
+#include "executor/operator/physical_import.h"
+#include "executor/operator/physical_index_join.h"
+#include "executor/operator/physical_index_scan.h"
+#include "executor/operator/physical_insert.h"
+#include "executor/operator/physical_nested_loop_join.h"
+#include "executor/operator/physical_product.h"
+#include "executor/operator/physical_project.h"
+#include "executor/operator/physical_sort.h"
+#include "executor/operator/physical_limit.h"
+#include "executor/operator/physical_table_scan.h"
+#include "executor/operator/physical_top.h"
+#include "executor/operator/physical_union_all.h"
+#include "executor/operator/physical_update.h"
+#include "executor/operator/physical_prepared_plan.h"
+#include "executor/operator/physical_dummy_operator.h"
+
 
 namespace infinity {
 
@@ -38,107 +64,107 @@ PhysicalPlanner::BuildPhysicalOperator(const std::shared_ptr<LogicalOperator>& l
             break;
     }
 
-    return std::make_shared<PhysicalOperator>();
+    return std::make_shared<PhysicalDummyOperator>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildCreateTable(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalCreateTable>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildPreparedPlan(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalPreparedPlan>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildCreateView(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalCreateView>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildDropTable(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalDropTable>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildDropView(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalDropView>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildInsert(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalInsert>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildDelete(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalDelete>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildUpdate(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalUpdate>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildImport(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalImport>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildExport(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalExport>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildAlter(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalAlter>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildAggregate(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalAggregate>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildJoin(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalHashJoin>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildSort(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalSort>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildLimit(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalLimit>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildProjection(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalProject>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildPredicate(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalFilter>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildIntersect(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalHashJoin>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildUnion(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalUnionAll>();
 }
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildExcept(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::shared_ptr<PhysicalOperator>();
+    return std::shared_ptr<PhysicalHashJoin>();
 }
 
 
