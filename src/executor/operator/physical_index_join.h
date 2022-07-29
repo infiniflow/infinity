@@ -13,6 +13,8 @@ public:
     explicit PhysicalIndexJoin(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr, id) {}
     ~PhysicalIndexJoin() = default;
+
+    void Execute() override;
 };
 
 }

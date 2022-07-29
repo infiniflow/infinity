@@ -3,3 +3,12 @@
 //
 
 #include "physical_aggregate.h"
+
+namespace infinity {
+
+void
+PhysicalAggregate::Execute() {
+
+}
+
+}

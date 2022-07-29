@@ -13,6 +13,8 @@ public:
     explicit PhysicalProject(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kProjection, nullptr, nullptr, id) {}
     ~PhysicalProject() = default;
+
+    void Execute() override;
 };
 
 }

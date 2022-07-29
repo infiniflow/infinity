@@ -3,3 +3,13 @@
 //
 
 #include "physical_index_scan.h"
+
+namespace infinity {
+
+void
+PhysicalIndexScan::Execute() {
+
+}
+
+
+}

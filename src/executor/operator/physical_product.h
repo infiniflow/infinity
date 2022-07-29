@@ -13,6 +13,7 @@ public:
     explicit PhysicalProduct(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kProduct, nullptr, nullptr, id) {}
     ~PhysicalProduct() = default;
+    void Execute() override;
 };
 
 }

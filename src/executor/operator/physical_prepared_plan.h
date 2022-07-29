@@ -13,7 +13,7 @@ public:
     explicit PhysicalPreparedPlan(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kPreparedPlan, nullptr, nullptr, id) {}
     ~PhysicalPreparedPlan() = default;
-
+    void Execute() override;
 };
 
 }

@@ -3,3 +3,12 @@
 //
 
 #include "physical_drop_table.h"
+
+namespace infinity {
+
+void PhysicalDropTable::Execute() {
+
+}
+
+
+}

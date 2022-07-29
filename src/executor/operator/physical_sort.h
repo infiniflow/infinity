@@ -13,6 +13,8 @@ public:
     explicit PhysicalSort(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kSort, nullptr, nullptr, id) {}
     ~PhysicalSort() = default;
+
+    void Execute() override;
 };
 
 }

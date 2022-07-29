@@ -3,3 +3,11 @@
 //
 
 #include "physical_prepared_plan.h"
+
+namespace infinity {
+void
+PhysicalPreparedPlan::Execute() {
+
+}
+
+}

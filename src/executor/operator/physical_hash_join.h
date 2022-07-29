@@ -13,6 +13,8 @@ public:
     explicit PhysicalHashJoin(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kJoinHash, nullptr, nullptr, id) {}
     ~PhysicalHashJoin() = default;
+
+    void Execute() override;
 };
 
 }

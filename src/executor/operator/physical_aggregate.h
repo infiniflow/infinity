@@ -12,6 +12,7 @@ class PhysicalAggregate : public PhysicalOperator{
 public:
     explicit PhysicalAggregate(uint64_t id) : PhysicalOperator(PhysicalOperatorType::kAggregate, nullptr, nullptr, id) {}
     ~PhysicalAggregate() = default;
+    void Execute() override;
 };
 
 }

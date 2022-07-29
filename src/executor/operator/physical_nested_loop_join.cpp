@@ -3,3 +3,12 @@
 //
 
 #include "physical_nested_loop_join.h"
+
+namespace infinity {
+
+void
+PhysicalNestedLoopJoin::Execute() {
+
+}
+
+}

@@ -14,6 +14,8 @@ public:
     explicit PhysicalImport(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id) {}
     ~PhysicalImport() = default;
+
+    void Execute() override;
 };
 
 

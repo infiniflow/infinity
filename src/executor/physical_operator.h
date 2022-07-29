@@ -32,6 +32,8 @@ public:
     std::shared_ptr<PhysicalOperator> left() const { return left_; }
     std::shared_ptr<PhysicalOperator> right() const { return right_; }
     uint64_t operator_id() const { return operator_id_; }
+
+    virtual void Execute() = 0;
 protected:
     uint64_t operator_id_;
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};

@@ -3,3 +3,12 @@
 //
 
 #include "physical_table_scan.h"
+
+namespace infinity {
+
+void
+PhysicalTableScan::Execute() {
+
+}
+
+}

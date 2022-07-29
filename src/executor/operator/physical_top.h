@@ -12,6 +12,8 @@ class PhysicalTop : public PhysicalOperator {
 public:
     explicit PhysicalTop(uint64_t id): PhysicalOperator(PhysicalOperatorType::kTop, nullptr, nullptr, id) {}
     ~PhysicalTop() = default;
+
+    void Execute() override;
 };
 
 }

@@ -3,3 +3,13 @@
 //
 
 #include "physical_filter.h"
+
+namespace infinity {
+
+void
+PhysicalFilter::Execute() {
+
+}
+
+}
+

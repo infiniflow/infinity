@@ -3,3 +3,13 @@
 //
 
 #include "physical_sort.h"
+
+namespace infinity {
+
+void
+PhysicalSort::Execute() {
+
+}
+
+}
+

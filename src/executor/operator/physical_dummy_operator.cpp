@@ -3,3 +3,12 @@
 //
 
 #include "physical_dummy_operator.h"
+
+namespace infinity {
+
+void
+PhysicalDummyOperator::Execute() {
+
+}
+
+}

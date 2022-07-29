@@ -18,9 +18,10 @@ public:
 
     ~PhysicalCreateTable() = default;
 
+    void Execute() override;
+
 private:
     std::shared_ptr<TableDefinition> table_def_ptr_;
-
 
 };
 

@@ -13,6 +13,8 @@ public:
     explicit PhysicalSortMergeJoin(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kJoinSortMerge, nullptr, nullptr, id) {}
     ~PhysicalSortMergeJoin() = default;
+
+    void Execute() override;
 };
 
 }

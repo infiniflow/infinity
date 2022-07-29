@@ -3,3 +3,13 @@
 //
 
 #include "physical_insert.h"
+
+namespace infinity {
+
+void
+PhysicalInsert::Execute() {
+
+}
+
+}
+

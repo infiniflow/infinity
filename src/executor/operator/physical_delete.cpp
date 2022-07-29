@@ -3,3 +3,12 @@
 //
 
 #include "physical_delete.h"
+
+namespace infinity {
+
+void
+PhysicalDelete::Execute() {
+
+}
+
+}

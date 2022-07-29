@@ -29,7 +29,7 @@ OperatorPipeline::OperatorPipeline(std::shared_ptr<PhysicalOperator> op)
 
 void
 OperatorPipeline::OnExecute() {
-    operator_-
+    operator_->Execute();
 }
 
 

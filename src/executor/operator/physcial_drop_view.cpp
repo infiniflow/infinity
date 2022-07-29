@@ -3,3 +3,12 @@
 //
 
 #include "physcial_drop_view.h"
+
+namespace infinity {
+
+void
+PhysicalDropView::Execute() {
+
+}
+
+}

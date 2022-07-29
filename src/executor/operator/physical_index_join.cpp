@@ -3,3 +3,12 @@
 //
 
 #include "physical_index_join.h"
+
+namespace infinity {
+
+void
+PhysicalIndexJoin::Execute() {
+
+}
+
+}

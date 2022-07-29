@@ -3,3 +3,12 @@
 //
 
 #include "physical_top.h"
+
+namespace infinity {
+
+void
+PhysicalTop::Execute() {
+
+}
+
+}

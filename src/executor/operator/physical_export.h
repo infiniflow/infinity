@@ -13,6 +13,8 @@ public:
     explicit PhysicalExport(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id) {}
     ~PhysicalExport() = default;
+
+    void Execute() override;
 };
 
 }

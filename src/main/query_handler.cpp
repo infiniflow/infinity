@@ -45,7 +45,7 @@ infinity::QueryHandler::ExecuteQuery(const std::string &query) {
         std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
 
         Infinity::instance().scheduler()->Schedule(pipeline);
-        ResponseError(optimized_plan->ToString(0));
+//        ResponseError(optimized_plan->ToString(0));
     }
 }
 

@@ -3,3 +3,12 @@
 //
 
 #include "physical_create_view.h"
+
+namespace infinity {
+
+void PhysicalCreateView::Execute() {
+
+}
+
+}
+

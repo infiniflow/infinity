@@ -13,6 +13,8 @@ public:
     explicit PhysicalCreateView(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr, id) {}
     ~PhysicalCreateView() = default;
+
+    void Execute() override;
 };
 
 }

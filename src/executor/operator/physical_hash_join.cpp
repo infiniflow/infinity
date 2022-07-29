@@ -3,3 +3,14 @@
 //
 
 #include "physical_hash_join.h"
+
+namespace infinity {
+
+void
+PhysicalHashJoin::Execute() {
+
+}
+
+}
+
+

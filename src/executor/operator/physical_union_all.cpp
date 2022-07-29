@@ -3,3 +3,12 @@
 //
 
 #include "physical_union_all.h"
+
+namespace infinity {
+
+void
+PhysicalUnionAll::Execute() {
+
+}
+
+}

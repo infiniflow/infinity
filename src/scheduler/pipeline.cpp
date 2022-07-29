@@ -29,7 +29,7 @@ Pipeline::Schedule() {
 
 void
 Pipeline::Execute() {
-
+    OnExecute();
 }
 
 void

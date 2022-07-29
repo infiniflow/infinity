@@ -3,3 +3,13 @@
 //
 
 #include "physical_import.h"
+
+namespace infinity {
+
+void PhysicalImport::Execute() {
+
+}
+
+}
+
+

@@ -3,3 +3,12 @@
 //
 
 #include "physical_project.h"
+
+namespace infinity {
+
+void
+PhysicalProject::Execute() {
+
+}
+
+}

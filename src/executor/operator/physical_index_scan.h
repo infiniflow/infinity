@@ -13,6 +13,7 @@ public:
     explicit PhysicalIndexScan(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id) {}
     ~PhysicalIndexScan() = default;
+    void Execute() override;
 };
 
 }

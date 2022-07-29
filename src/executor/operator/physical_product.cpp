@@ -3,3 +3,14 @@
 //
 
 #include "physical_product.h"
+
+namespace infinity {
+
+void
+PhysicalProduct::Execute() {
+
+}
+
+}
+
+

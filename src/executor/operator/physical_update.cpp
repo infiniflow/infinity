@@ -3,3 +3,13 @@
 //
 
 #include "physical_update.h"
+
+namespace infinity {
+
+void
+PhysicalUpdate::Execute() {
+
+}
+
+}
+

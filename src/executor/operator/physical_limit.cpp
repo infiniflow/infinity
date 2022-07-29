@@ -3,3 +3,14 @@
 //
 
 #include "physical_limit.h"
+
+namespace infinity {
+
+void
+PhysicalLimit::Execute() {
+
+}
+
+}
+
+

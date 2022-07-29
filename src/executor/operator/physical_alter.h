@@ -12,6 +12,8 @@ class PhysicalAlter : public PhysicalOperator{
 public:
     explicit PhysicalAlter(uint64_t id) : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id) {}
     ~PhysicalAlter() = default;
+
+    void Execute() override;
 };
 
 }

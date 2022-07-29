@@ -13,6 +13,7 @@ public:
     explicit PhysicalUpdate(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kUpdate, nullptr, nullptr, id) {}
     ~PhysicalUpdate() override = default;
+    void Execute() override;
 };
 
 }

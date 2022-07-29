@@ -3,3 +3,12 @@
 //
 
 #include "physical_alter.h"
+
+namespace infinity {
+
+void
+PhysicalAlter::Execute() {
+
+}
+
+}

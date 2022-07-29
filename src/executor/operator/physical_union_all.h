@@ -13,6 +13,8 @@ public:
     explicit PhysicalUnionAll(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kUnionAll, nullptr, nullptr, id) {}
     ~PhysicalUnionAll() = default;
+
+    void Execute() override;
 };
 
 }

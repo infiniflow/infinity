@@ -4,6 +4,8 @@
 
 #include "physical_create_table.h"
 
+#include "common/utility/asserter.h"
+
 #include <utility>
 
 namespace infinity {
@@ -17,6 +19,11 @@ PhysicalCreateTable::PhysicalCreateTable(std::shared_ptr<TableDefinition> table_
 PhysicalCreateTable::PhysicalCreateTable(const std::shared_ptr<PhysicalOperator>& input, uint64_t id)
     : PhysicalOperator(PhysicalOperatorType::kCreateTable, input, nullptr, id) {
 
+}
+
+void
+PhysicalCreateTable::Execute() {
+    ResponseError("Execute: Create table: " + table_def_ptr_->name());
 }
 
 

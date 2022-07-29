@@ -13,6 +13,8 @@ public:
     explicit PhysicalLimit(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kLimit, nullptr, nullptr, id) {}
     ~PhysicalLimit() = default;
+
+    void Execute() override;
 };
 
 }

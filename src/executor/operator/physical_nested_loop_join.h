@@ -13,6 +13,8 @@ public:
     explicit PhysicalNestedLoopJoin(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, nullptr, nullptr, id) {}
     ~PhysicalNestedLoopJoin() = default;
+
+    void Execute() override;
 };
 
 }

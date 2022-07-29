@@ -14,6 +14,7 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kDropTable, nullptr, nullptr, id) {}
 
     ~PhysicalDropTable() = default;
+    void Execute() override;
 };
 
 }

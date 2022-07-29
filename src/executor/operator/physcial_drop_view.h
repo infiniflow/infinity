@@ -12,6 +12,8 @@ public:
     explicit PhysicalDropView(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kDropView, nullptr, nullptr, id) {}
     ~PhysicalDropView() = default;
+
+    void Execute() override;
 };
 
 }
