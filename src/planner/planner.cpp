@@ -2,11 +2,16 @@
 // Created by JinHai on 2022/7/23.
 //
 
-#include "storage/table_definition.h"
-#include "planner/operator/logical_create_table.h"
-#include "storage/column_definition.h"
-#include "common/utility/asserter.h"
 #include "planner.h"
+
+#include "planner/operator/logical_create_table.h"
+#include "planner/operator/logical_drop_table.h"
+
+#include "storage/table_definition.h"
+#include "storage/column_definition.h"
+
+#include "common/utility/asserter.h"
+
 
 namespace infinity {
 
@@ -129,12 +134,18 @@ Planner::BuildCreateTable(const hsql::CreateStatement& statement) {
         columns.emplace_back(column_name, idx, logical_type, nullable, constraints);
     }
 
+    std::shared_ptr<std::string> schema_name_ptr = std::make_shared<std::string>("Default");
+    if(statement.schema != nullptr) {
+        schema_name_ptr = std::make_shared<std::string>(statement.schema);
+    }
+
     std::shared_ptr<TableDefinition> table_def_ptr
         = std::make_shared<TableDefinition>(statement.tableName, columns, statement.ifNotExists);
     std::shared_ptr<LogicalOperator> logical_create_table_operator
         = std::make_shared<LogicalCreateTable>(
                 LogicalOperatorType::kCreateTable,
                 LogicalOperator::get_new_id(),
+                schema_name_ptr,
                 table_def_ptr);
     if(statement.select != nullptr) {
         std::shared_ptr<LogicalOperator> select_node = BuildSelect(*statement.select);
@@ -179,8 +190,19 @@ std::shared_ptr<LogicalOperator> Planner::BuildDrop(const hsql::DropStatement &s
 }
 
 std::shared_ptr<LogicalOperator> Planner::BuildDropTable(const hsql::DropStatement &statement) {
-    ResponseError("Dropping table isn't supported.");
-    return std::shared_ptr<LogicalOperator>();
+
+    std::shared_ptr<std::string> schema_name_ptr = std::make_shared<std::string>("Default");
+    if(statement.schema != nullptr) {
+        schema_name_ptr = std::make_shared<std::string>(statement.schema);
+    }
+
+    std::shared_ptr<LogicalOperator> logical_drop_table
+        = std::make_shared<LogicalDropTable>(LogicalOperatorType::kDropTable,
+                                             LogicalOperator::get_new_id(),
+                                             schema_name_ptr,
+                                             std::make_shared<std::string>(statement.name));
+
+    return logical_drop_table;
 }
 
 std::shared_ptr<LogicalOperator> Planner::BuildDropSchema(const hsql::DropStatement &statement) {
@@ -241,8 +263,17 @@ std::shared_ptr<LogicalOperator> Planner::BuildSelect(const hsql::SelectStatemen
 }
 
 std::shared_ptr<LogicalOperator> Planner::BuildShow(const hsql::ShowStatement &statement) {
-    ResponseError("Show isn't supported.");
-    return std::shared_ptr<LogicalOperator>();
+    switch(statement.type) {
+        case hsql::kShowTables : {
+            return BuildShowTables(statement);
+        }
+        case hsql::kShowColumns : {
+            return BuildShowColumns(statement);
+        }
+        default:
+            ResponseError("Don't support show type.");
+    }
+//    return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator> Planner::BuildShowColumns(const hsql::ShowStatement &statement) {

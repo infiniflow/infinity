@@ -4,6 +4,7 @@
 
 #include "physical_planner.h"
 #include "planner/operator/logical_create_table.h"
+#include "planner/operator/logical_drop_table.h"
 
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_aggregate.h"
@@ -73,7 +74,10 @@ std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildCreateTable(const std::shared_ptr<LogicalOperator> &logical_operator) const {
     std::shared_ptr<LogicalCreateTable> logical_create_table =
             std::static_pointer_cast<LogicalCreateTable>(logical_operator);
-    return std::make_shared<PhysicalCreateTable>(logical_create_table->table_definitions(), logical_operator->node_id());
+    return std::make_shared<PhysicalCreateTable>(
+            logical_create_table->schema_name(),
+            logical_create_table->table_definitions(),
+            logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
@@ -88,7 +92,12 @@ PhysicalPlanner::BuildCreateView(const std::shared_ptr<LogicalOperator> &logical
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildDropTable(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::make_shared<PhysicalDropTable>(logical_operator->node_id());
+    std::shared_ptr<LogicalDropTable> logical_drop_table =
+            std::static_pointer_cast<LogicalDropTable>(logical_operator);
+    return std::make_shared<PhysicalDropTable>(
+            logical_drop_table->schema_name(),
+            logical_drop_table->table_name(),
+            logical_drop_table->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>

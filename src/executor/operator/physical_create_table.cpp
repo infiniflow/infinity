@@ -3,7 +3,7 @@
 //
 
 #include "physical_create_table.h"
-
+#include "main/infinity.h"
 #include "common/utility/asserter.h"
 
 #include <utility>
@@ -11,19 +11,28 @@
 namespace infinity {
 
 
-PhysicalCreateTable::PhysicalCreateTable(std::shared_ptr<TableDefinition> table_def_ptr, uint64_t id)
-    : PhysicalOperator(PhysicalOperatorType::kCreateTable, nullptr, nullptr, id), table_def_ptr_(std::move(table_def_ptr)) {
+PhysicalCreateTable::PhysicalCreateTable(std::shared_ptr<std::string> schema_name,
+                                         std::shared_ptr<TableDefinition> table_def_ptr,
+                                         uint64_t id)
+    : PhysicalOperator(PhysicalOperatorType::kCreateTable, nullptr, nullptr, id),
+      schema_name_(std::move(schema_name)),
+    table_def_ptr_(std::move(table_def_ptr)) {
 
 }
 
-PhysicalCreateTable::PhysicalCreateTable(const std::shared_ptr<PhysicalOperator>& input, uint64_t id)
-    : PhysicalOperator(PhysicalOperatorType::kCreateTable, input, nullptr, id) {
+PhysicalCreateTable::PhysicalCreateTable(std::shared_ptr<std::string> schema_name,
+                                         const std::shared_ptr<PhysicalOperator>& input,
+                                         uint64_t id)
+    : PhysicalOperator(PhysicalOperatorType::kCreateTable, input, nullptr, id),
+      schema_name_(std::move(schema_name)) {
 
 }
 
 void
 PhysicalCreateTable::Execute() {
-    ResponseError("Execute: Create table: " + table_def_ptr_->name());
+//    ResponseError("Execute: Create table: " + table_def_ptr_->name());
+    std::shared_ptr<Table> table_ptr = std::make_shared<Table>(table_def_ptr_);
+    Infinity::instance().catalog()->AddTable(*schema_name_, table_ptr);
 }
 
 
