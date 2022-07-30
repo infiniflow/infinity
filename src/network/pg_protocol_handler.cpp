@@ -100,4 +100,69 @@ PGProtocolHandler::send_error_response(const std::map<PGMessageType, std::string
     buffer_writer_.flush();
 }
 
+void
+PGProtocolHandler::SendDescriptionHeader(uint32_t total_column_name_length, uint32_t column_count) {
+    // https://www.postgresql.org/docs/14/static/protocol-message-formats.html
+    buffer_writer_.send_value(PGMessageType::kRowDescription);
+
+    // Length + column count + values for each columns
+    uint32_t message_size = LENGTH_FIELD_SIZE + sizeof(uint16_t)
+                            + column_count * (sizeof('\0')) + 3 * sizeof(uint32_t) + 3 * sizeof(uint16_t)
+                            + total_column_name_length;
+    buffer_writer_.send_value<uint32_t>(message_size);
+    buffer_writer_.send_value<uint16_t>(column_count);
+}
+
+void
+PGProtocolHandler::SendDescription(const std::string& column_name, uint32_t object_id, uint16_t width) {
+    buffer_writer_.send_string(column_name);
+
+    buffer_writer_.send_value<uint32_t>(0); // No OID for the table;
+    buffer_writer_.send_value<uint16_t>(0); // No attribute number;
+
+    buffer_writer_.send_value<uint32_t>(object_id);   // OID of the type
+    buffer_writer_.send_value<uint16_t>(width);       // Type width
+    buffer_writer_.send_value<int32_t>(-1); // No modifier
+    buffer_writer_.send_value<int16_t>(0);  // Text format
+}
+
+void
+PGProtocolHandler::SendData(const std::vector<std::optional<std::string>>& values_as_strings, uint64_t string_length_sum) {
+    // https://www.postgresql.org/docs/14/static/protocol-message-formats.html
+    buffer_writer_.send_value(PGMessageType::kData);
+
+    uint32_t message_size =
+            LENGTH_FIELD_SIZE + sizeof(uint16_t) + values_as_strings.size() * LENGTH_FIELD_SIZE + string_length_sum;
+
+    // Message length field
+    buffer_writer_.send_value<uint32_t>(message_size);
+
+    // Number of columns in row
+    buffer_writer_.send_value<uint16_t>(values_as_strings.size());
+
+    for (const std::optional<std::string> &value_string: values_as_strings) {
+        if (value_string.has_value()) {
+            const std::string &value_ref = value_string.value();
+
+            // Value string size
+            buffer_writer_.send_value<uint32_t>(value_ref.size());
+
+            // Value without terminator
+            buffer_writer_.send_string(value_ref, NullTerminator::kNo);
+        } else {
+            // Null value
+            buffer_writer_.send_value<int32_t>(-1);
+        }
+    }
+}
+
+void
+PGProtocolHandler::SendComplete(const std::string& complete_message) {
+    // Field length + message size + null terminator
+    uint32_t message_size = LENGTH_FIELD_SIZE + complete_message.size() + 1;
+    buffer_writer_.send_value(PGMessageType::kComplete);
+    buffer_writer_.send_value<uint32_t>(message_size);
+    buffer_writer_.send_string(complete_message);
+}
+
 }

@@ -18,7 +18,7 @@ namespace infinity {
 
 class Pipeline;
 
-void
+QueryResult
 infinity::QueryHandler::ExecuteQuery(const std::string &query) {
     hsql::SQLParserResult parse_result;
 
@@ -32,6 +32,7 @@ infinity::QueryHandler::ExecuteQuery(const std::string &query) {
     Optimizer optimizer;
     PhysicalPlanner physical_planner;
 
+    Assert(parse_result.getStatements().size() == 1, "Not support more statements");
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {
         // Build unoptimized logical plan for each SQL statement.
         std::shared_ptr<LogicalOperator> unoptimized_plan = logical_planner.CreateLogicalOperator(*statement);
@@ -45,8 +46,17 @@ infinity::QueryHandler::ExecuteQuery(const std::string &query) {
         std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
 
         Infinity::instance().scheduler()->Schedule(pipeline);
+
+        QueryResult query_result;
+        query_result.result_ = pipeline->GetResult();
+        query_result.root_operator_type_ = unoptimized_plan->operator_type();
+
+        return query_result;
 //        ResponseError(optimized_plan->ToString(0));
     }
+
+    ResponseError("Can't reach here.")
+//    return QueryResult();
 }
 
 }

@@ -33,6 +33,9 @@ enum class LogicalOperatorType: uint8_t {
     kDropTable,
     kDropView,
 
+    // Scan
+    kChunkScan,
+    kTableScan,
     // ?
     kAlias,
     kMock,

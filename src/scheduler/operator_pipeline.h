@@ -18,6 +18,7 @@ public:
 
     static std::shared_ptr<OperatorPipeline> Create(const std::shared_ptr<PhysicalOperator>& op);
 
+    std::shared_ptr<Table> GetResult() override;
 protected:
     void OnExecute() final;
 

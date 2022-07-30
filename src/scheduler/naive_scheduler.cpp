@@ -29,7 +29,6 @@ NaiveScheduler::Schedule(const std::shared_ptr<Pipeline> &pipeline) {
             current_pipeline->Execute();
             last_visited_pipeline_id = current_pipeline->Id();
             pipeline_stack.pop();
-
         }
     }
 }

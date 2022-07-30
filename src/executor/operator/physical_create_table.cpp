@@ -33,6 +33,11 @@ PhysicalCreateTable::Execute() {
 //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
     std::shared_ptr<Table> table_ptr = std::make_shared<Table>(table_def_ptr_);
     Infinity::instance().catalog()->AddTable(*schema_name_, table_ptr);
+
+    // Generate the result
+    std::vector<ColumnDefinition> column_defs = {{"OK", 0, LogicalType(LogicalTypeId::kInteger), false, std::set<ConstrainType>()}};
+    std::shared_ptr<TableDefinition> table_def_ptr = std::make_shared<TableDefinition>("Tables", column_defs, false);
+    output_ = std::make_shared<Table>(table_def_ptr);
 }
 
 

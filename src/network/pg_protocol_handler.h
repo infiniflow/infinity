@@ -31,11 +31,10 @@ public:
 //
 //    std::string read_query_packet();
 
-//    void send_description_header(uint32_t total_column_name_length, uint32_t column_count);
-//    void send_description(const std::string& column_name, const uint64_t object_id, const int64_t type_width);
-//    void send_data_row(const std::vector<std::optional<std::string>>& values_as_strings,
-//                       const uint64_t string_length_sum);
-//    void send_command_complete(const std::string& complete_message);
+    void SendDescriptionHeader(uint32_t total_column_name_length, uint32_t column_count);
+    void SendDescription(const std::string& column_name, uint32_t object_id, uint16_t width);
+    void SendData(const std::vector<std::optional<std::string>>& values_as_strings, uint64_t string_length_sum);
+    void SendComplete(const std::string& complete_message);
 //
 //    std::pair<std::string, std::string> read_parse_packet();
 //    void read_sync_packet();

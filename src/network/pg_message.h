@@ -24,6 +24,9 @@ enum class PGMessageType : unsigned char {
     kError = 'E',
     kParameterStatus = 'S',
     kReadyForQuery = 'Z',
+    kRowDescription = 'T',
+    kData = 'D',
+    kComplete = 'C',
 
     // Errors
     kHumanReadableError = 'M',

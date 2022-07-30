@@ -4,8 +4,11 @@
 
 #include "planner.h"
 
+#include "main/infinity.h"
+
 #include "planner/operator/logical_create_table.h"
 #include "planner/operator/logical_drop_table.h"
+#include "planner/operator/logical_chunk_scan.h"
 
 #include "storage/table_definition.h"
 #include "storage/column_definition.h"
@@ -142,9 +145,7 @@ Planner::BuildCreateTable(const hsql::CreateStatement& statement) {
     std::shared_ptr<TableDefinition> table_def_ptr
         = std::make_shared<TableDefinition>(statement.tableName, columns, statement.ifNotExists);
     std::shared_ptr<LogicalOperator> logical_create_table_operator
-        = std::make_shared<LogicalCreateTable>(
-                LogicalOperatorType::kCreateTable,
-                LogicalOperator::get_new_id(),
+        = std::make_shared<LogicalCreateTable>(LogicalOperator::get_new_id(),
                 schema_name_ptr,
                 table_def_ptr);
     if(statement.select != nullptr) {
@@ -197,8 +198,7 @@ std::shared_ptr<LogicalOperator> Planner::BuildDropTable(const hsql::DropStateme
     }
 
     std::shared_ptr<LogicalOperator> logical_drop_table
-        = std::make_shared<LogicalDropTable>(LogicalOperatorType::kDropTable,
-                                             LogicalOperator::get_new_id(),
+        = std::make_shared<LogicalDropTable>(LogicalOperator::get_new_id(),
                                              schema_name_ptr,
                                              std::make_shared<std::string>(statement.name));
 
@@ -282,6 +282,27 @@ std::shared_ptr<LogicalOperator> Planner::BuildShowColumns(const hsql::ShowState
 }
 
 std::shared_ptr<LogicalOperator> Planner::BuildShowTables(const hsql::ShowStatement &statement) {
+    std::vector<ColumnDefinition> column_defs = {
+            {"table_name", 0, LogicalType(LogicalTypeId::kVarchar), false, std::set<ConstrainType>()},
+            {"column_count", 1, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
+            {"row_count", 2, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
+            {"chunk_count", 3, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
+            {"chunk_size", 4, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
+    };
+
+    std::shared_ptr<TableDefinition> table_def_ptr = std::make_shared<TableDefinition>("Tables", column_defs, false);
+
+    std::shared_ptr<Table> table_ptr = std::make_shared<Table>(table_def_ptr);
+    // TODO: Insert tables into table
+
+    std::shared_ptr<LogicalOperator> logical_chunk_scan =
+            std::make_shared<LogicalChunkScan>(table_ptr, LogicalOperator::get_new_id());
+
+    return logical_chunk_scan;
+
+//    TableDefinition table_def =
+
+//    Infinity::instance().catalog()->
     ResponseError("Show tables isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }

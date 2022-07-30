@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "storage/table.h"
+
 #include <atomic>
 #include <memory>
 #include <vector>
@@ -36,6 +38,7 @@ public:
 
     TaskState state() const { return state_; }
     uint64_t Id() const { return id_; }
+    virtual std::shared_ptr<Table> GetResult() = 0;
 
 protected:
     virtual void OnExecute() = 0;

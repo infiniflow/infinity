@@ -10,6 +10,10 @@
 
 namespace infinity {
 
+LogicalType::LogicalType(LogicalTypeId logical_type_id)
+    : LogicalType(logical_type_id, 0, 0, 0) {}
+
+
 LogicalType::LogicalType(infinity::LogicalTypeId logical_type_id, int64_t length, int64_t precision, int64_t scale)
     : logical_type_(logical_type_id), length_(length), precision_(precision), scale_(scale) {
     switch(logical_type_) {

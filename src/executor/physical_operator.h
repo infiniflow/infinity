@@ -5,6 +5,7 @@
 #pragma once
 
 #include "physical_operator_type.h"
+#include "storage/table.h"
 
 #include <memory>
 #include <utility>
@@ -34,6 +35,7 @@ public:
     uint64_t operator_id() const { return operator_id_; }
 
     virtual void Execute() = 0;
+    std::shared_ptr<Table> output() const { return output_; }
 protected:
     uint64_t operator_id_;
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
@@ -41,7 +43,7 @@ protected:
     std::shared_ptr<PhysicalOperator> right_{nullptr};
 
     std::weak_ptr<OperatorPipeline> operator_pipeline_;
-
+    std::shared_ptr<Table> output_;
 };
 
 

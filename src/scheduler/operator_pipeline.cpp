@@ -32,6 +32,8 @@ OperatorPipeline::OnExecute() {
     operator_->Execute();
 }
 
+std::shared_ptr<Table>
+OperatorPipeline::GetResult() { return operator_->output(); }
 
 }
 
