@@ -5,6 +5,7 @@
 #pragma once
 #include <utility>
 #include <map>
+#include <optional>
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>

@@ -4,6 +4,8 @@
 
 #include "pipeline.h"
 
+#include <algorithm>
+
 namespace infinity {
 
 Pipeline::~Pipeline() = default;

@@ -32,6 +32,7 @@
 #include "executor/operator/physical_prepared_plan.h"
 #include "executor/operator/physical_dummy_operator.h"
 
+#include <limits>
 
 namespace infinity {
 
@@ -66,7 +67,6 @@ PhysicalPlanner::BuildPhysicalOperator(const std::shared_ptr<LogicalOperator>& l
         default:
             break;
     }
-
     return std::make_shared<PhysicalDummyOperator>(std::numeric_limits<uint64_t>::max());
 }
 

@@ -5,6 +5,7 @@
 #include "naive_scheduler.h"
 
 #include <stack>
+#include <limits>
 
 namespace infinity {
 
