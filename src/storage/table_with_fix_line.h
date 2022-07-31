@@ -10,7 +10,9 @@ namespace infinity {
 class FixedRowCountTable: public Table {
 public:
     explicit FixedRowCountTable(std::shared_ptr<TableDefinition> table_def);
+    void Append(const TransientBlock& block) override;
 private:
+    uint64_t row_count_limit_{0};
 
 };
 

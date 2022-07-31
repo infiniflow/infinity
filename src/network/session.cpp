@@ -188,7 +188,7 @@ void
 Session::SendQueryResponse(const std::shared_ptr<Table>& result_table) {
     uint64_t column_count = result_table->table_def()->column_count();
     auto values_as_strings = std::vector<std::optional<std::string>>(column_count);
-    uint64_t row_group_count = result_table->row_group_count();
+    uint64_t row_group_count = result_table->block_count();
     for(uint64_t idx = 0; idx < row_group_count; ++ idx) {
         // pg_handler_->SendData(values_as_strings, string_length_sum)
     }

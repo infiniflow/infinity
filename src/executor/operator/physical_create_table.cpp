@@ -37,7 +37,9 @@ PhysicalCreateTable::Execute() {
 
     // Generate the result
     std::vector<ColumnDefinition> column_defs = {{"OK", 0, LogicalType(LogicalTypeId::kInteger), false, std::set<ConstrainType>()}};
-    std::shared_ptr<TableDefinition> table_def_ptr = std::make_shared<TableDefinition>("Tables", column_defs, false);
+
+    std::shared_ptr<TableDefinition> table_def_ptr
+        = std::make_shared<TableDefinition>("Tables", column_defs, false);
     output_ = std::make_shared<FixedRowCountTable>(table_def_ptr);
 }
 

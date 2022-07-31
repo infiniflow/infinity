@@ -5,24 +5,29 @@
 #pragma once
 
 #include "table_definition.h"
-#include "row_group.h"
+#include "transient_block.h"
+#include "block.h"
+
+#include <any>
 
 namespace infinity {
 
-enum class TableType { kInvalid, kFixedRowCount, kFixedChunkSize };
+class Block;
 
 class Table {
 public:
     explicit Table(std::shared_ptr<TableDefinition> table_def);
     [[nodiscard]] std::shared_ptr<TableDefinition> table_def() const { return table_def_; }
     [[nodiscard]] uint64_t row_count() const { return row_count_; }
-    [[nodiscard]] uint64_t row_group_count() const { return row_groups_.size(); }
+    [[nodiscard]] uint64_t block_count() const { return blocks_.size(); }
+    [[nodiscard]] TableType table_type() const { return table_type_; }
+    virtual void Append(const TransientBlock& block) = 0;
 
 protected:
     std::shared_ptr<TableDefinition> table_def_;
     uint64_t row_count_{0};
     TableType table_type_{TableType::kInvalid};
-    std::vector<std::shared_ptr<RowGroup>> row_groups_;
+    std::vector<std::shared_ptr<Block>> blocks_;
 };
 
 }

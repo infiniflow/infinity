@@ -9,6 +9,8 @@
 
 namespace infinity {
 
+enum class TableType { kInvalid, kFixedRowCount, kFixedChunkSize };
+
 enum class PhysicalType : uint8_t {
     // Null type
     kNA = 0,
@@ -58,6 +60,28 @@ enum class LogicalTypeId : uint8_t {
     kNull,
     kAny,
 };
+
+struct DecimalT {
+    int8_t flags;
+    int16_t precision;
+    int16_t scale;
+    int64_t number;
+};
+
+using BooleanT = bool;
+using TinyIntT = int8_t;
+using SmallIntT = int16_t;
+using IntegerT = int32_t;
+using BigIntT = int64_t;
+using FloatT = float;
+using DoubleT = double;
+using DateT = int32_t;
+using TimeT = int32_t;
+using DateTimeT = int64_t;
+using IntervalT = int64_t;
+using VarcharT = std::string;
+using TextT = std::string;
+
 
 class LogicalType {
 public:
