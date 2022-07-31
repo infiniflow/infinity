@@ -12,7 +12,7 @@
 
 #include "storage/table_definition.h"
 #include "storage/column_definition.h"
-#include "storage/table_with_fix_line.h"
+#include "storage/table_with_fix_row.h"
 
 #include "common/utility/asserter.h"
 

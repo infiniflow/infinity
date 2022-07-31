@@ -5,7 +5,7 @@
 #include "physical_create_table.h"
 #include "main/infinity.h"
 #include "common/utility/asserter.h"
-#include "storage/table_with_fix_line.h"
+#include "storage/table_with_fix_row.h"
 
 #include <utility>
 
