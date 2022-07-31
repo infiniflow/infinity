@@ -9,7 +9,7 @@ namespace infinity {
 
 class FixedRowCountTable: public Table {
 public:
-    explicit FixedRowCountTable(std::shared_ptr<TableDefinition> table_def) : Table(table_def) {}
+    explicit FixedRowCountTable(std::shared_ptr<TableDefinition> table_def);
 private:
 
 };

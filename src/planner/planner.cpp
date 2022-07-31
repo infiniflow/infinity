@@ -12,6 +12,7 @@
 
 #include "storage/table_definition.h"
 #include "storage/column_definition.h"
+#include "storage/table_with_fix_line.h"
 
 #include "common/utility/asserter.h"
 
@@ -292,7 +293,7 @@ std::shared_ptr<LogicalOperator> Planner::BuildShowTables(const hsql::ShowStatem
 
     std::shared_ptr<TableDefinition> table_def_ptr = std::make_shared<TableDefinition>("Tables", column_defs, false);
 
-    std::shared_ptr<Table> table_ptr = std::make_shared<Table>(table_def_ptr);
+    std::shared_ptr<Table> table_ptr = std::make_shared<FixedRowCountTable>(table_def_ptr);
     // TODO: Insert tables into table
 
     std::shared_ptr<LogicalOperator> logical_chunk_scan =

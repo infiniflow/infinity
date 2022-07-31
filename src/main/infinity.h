@@ -8,20 +8,23 @@
 #include "network/session.h"
 #include "scheduler/naive_scheduler.h"
 #include "storage/catalog.h"
+#include "config.h"
 
 namespace infinity {
 
 class Infinity : public Singleton<Infinity> {
 public:
-    [[nodiscard]] std::shared_ptr<Scheduler> scheduler() const { return scheduler_; }
-    [[nodiscard]] std::shared_ptr<Catalog> catalog() const { return catalog_; }
+    [[nodiscard]] std::unique_ptr<Scheduler>& scheduler() { return scheduler_; }
+    [[nodiscard]] std::unique_ptr<Catalog>& catalog() { return catalog_; }
+    [[nodiscard]] std::unique_ptr<Config>& config() { return config_; }
 
 private:
     friend class Singleton;
     Infinity();
 
-    std::shared_ptr<Scheduler> scheduler_;
-    std::shared_ptr<Catalog> catalog_;
+    std::unique_ptr<Scheduler> scheduler_;
+    std::unique_ptr<Catalog> catalog_;
+    std::unique_ptr<Config> config_;
 };
 
 }

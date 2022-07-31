@@ -8,6 +8,7 @@
 
 namespace infinity {
 
-Table::Table(std::shared_ptr<TableDefinition> table_def) : table_def_(std::move(table_def)) {}
+Table::Table(std::shared_ptr<TableDefinition> table_def)
+    : table_def_(std::move(table_def)) {}
 
 }

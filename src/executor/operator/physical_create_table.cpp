@@ -5,6 +5,7 @@
 #include "physical_create_table.h"
 #include "main/infinity.h"
 #include "common/utility/asserter.h"
+#include "storage/table_with_fix_line.h"
 
 #include <utility>
 
@@ -31,13 +32,13 @@ PhysicalCreateTable::PhysicalCreateTable(std::shared_ptr<std::string> schema_nam
 void
 PhysicalCreateTable::Execute() {
 //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
-    std::shared_ptr<Table> table_ptr = std::make_shared<Table>(table_def_ptr_);
+    std::shared_ptr<Table> table_ptr = std::make_shared<FixedRowCountTable>(table_def_ptr_);
     Infinity::instance().catalog()->AddTable(*schema_name_, table_ptr);
 
     // Generate the result
     std::vector<ColumnDefinition> column_defs = {{"OK", 0, LogicalType(LogicalTypeId::kInteger), false, std::set<ConstrainType>()}};
     std::shared_ptr<TableDefinition> table_def_ptr = std::make_shared<TableDefinition>("Tables", column_defs, false);
-    output_ = std::make_shared<Table>(table_def_ptr);
+    output_ = std::make_shared<FixedRowCountTable>(table_def_ptr);
 }
 
 
