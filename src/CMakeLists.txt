@@ -20,6 +20,13 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        expression_src
+        CONFIGURE_DEPENDS
+        expression/*.cpp
+        expression/*.h
+        )
+
+file(GLOB_RECURSE
         network_src
         CONFIGURE_DEPENDS
         network/*.cpp
@@ -53,6 +60,7 @@ add_executable(infinity_main
         ${bin_src}
         ${common_src}
         ${executor_src}
+        ${expression_src}
         ${infinity_src}
         ${network_src}
         ${planner_src}

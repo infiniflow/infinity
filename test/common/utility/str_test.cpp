@@ -11,7 +11,7 @@ class StrTest : public BaseTest {
 };
 
 TEST_F(StrTest, test1) {
-    std::string path = "/usr/src/engine/db";
+    std::string path = "/usr/src/storage/db";
     std::string trimed_path = infinity::TrimPath(path);
-    ASSERT_EQ(trimed_path, "src/engine/db");
+    ASSERT_EQ(trimed_path, "src/storage/db");
 }
