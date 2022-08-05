@@ -69,11 +69,14 @@ enum class ExpressionType {
     // WINDOW Function
     kWindowRank,
     kWindowRowNumber,
+
+    // Correlated parameter expression
+    kCorrelatedParam,
 };
 
 class BaseExpression : public std::enable_shared_from_this<BaseExpression> {
 public:
-    explicit BaseExpression(ExpressionType type, std::vector<std::shared_ptr<BaseExpression>>  arguments)
+    explicit BaseExpression(ExpressionType type, std::vector<std::shared_ptr<BaseExpression>> arguments)
         : type_(type), arguments_(std::move(arguments)) {};
     virtual ~BaseExpression() = default;
 

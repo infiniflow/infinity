@@ -23,7 +23,7 @@ ColumnDefinition::ColumnDefinition(
 
 std::string ColumnDefinition::ToString() const {
     std::stringstream ss;
-    ss << name_ << " " << logical_type_.to_string() << " " << (nullable_ ? "null" : "not null") << std::endl;
+    ss << name_ << " " << logical_type_.ToString() << " " << (nullable_ ? "null" : "not null") << std::endl;
     return ss.str();
 }
 

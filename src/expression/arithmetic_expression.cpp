@@ -4,6 +4,8 @@
 
 #include "arithmetic_expression.h"
 
+#include <sstream>
+
 namespace infinity {
 
 
@@ -16,26 +18,31 @@ ArithmeticExpression::ArithmeticExpression(ArithmeticType arithmetic_type,
 std::string
 ArithmeticExpression::ToString() const {
 
-    std::string op;
+    std::stringstream op;
+
+    op << "(" << arguments_[0]->ToString();
+
     switch(arithmetic_type_) {
         case ArithmeticType::kAddition:
-            op = "+";
+            op << "+";
             break;
         case ArithmeticType::kSubtraction:
-            op = "-";
+            op << "-";
             break;
         case ArithmeticType::kMultiplication:
-            op = "*";
+            op << "*";
             break;
         case ArithmeticType::kDivision:
-            op = "/";
+            op << "/";
             break;
         case ArithmeticType::kModulo:
-            op = "%";
+            op << "%";
             break;
     }
 
-    return "(" + arguments_[0]->ToString() + op + arguments_[1]->ToString() + ")";
+    op << arguments_[1]->ToString() << ")";
+
+    return  op.str();
 }
 
 LogicalType

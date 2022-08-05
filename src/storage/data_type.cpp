@@ -35,7 +35,7 @@ LogicalType::LogicalType(infinity::LogicalTypeId logical_type_id, int64_t length
     }
 }
 
-std::string LogicalType::to_string() const {
+std::string LogicalType::ToString() const {
     switch(logical_type_) {
         case LogicalTypeId::kBoolean: return "Boolean";
         case LogicalTypeId::kTinyInt: return "TinyInt";
