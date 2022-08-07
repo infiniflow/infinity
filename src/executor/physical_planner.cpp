@@ -5,6 +5,7 @@
 #include "physical_planner.h"
 #include "planner/operator/logical_create_table.h"
 #include "planner/operator/logical_drop_table.h"
+#include "planner/operator/logical_insert.h"
 
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_aggregate.h"
@@ -107,7 +108,9 @@ PhysicalPlanner::BuildDropView(const std::shared_ptr<LogicalOperator> &logical_o
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildInsert(const std::shared_ptr<LogicalOperator> &logical_operator) const {
-    return std::make_shared<PhysicalInsert>(logical_operator->node_id());
+
+    std::shared_ptr<LogicalInsert> logical_insert_ptr = std::dynamic_pointer_cast<LogicalInsert>(logical_operator);
+    return std::make_shared<PhysicalInsert>(logical_operator->node_id(), logical_insert_ptr->table_ptr(), logical_insert_ptr->value_list());
 }
 
 std::shared_ptr<PhysicalOperator>

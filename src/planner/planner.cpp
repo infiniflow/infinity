@@ -17,6 +17,11 @@
 
 #include "common/utility/asserter.h"
 
+#include "expression/value_expression.h"
+#include "expression/cast_expression.h"
+
+#include <vector>
+
 
 namespace infinity {
 
@@ -261,9 +266,7 @@ Planner::BuildInsertValue(const hsql::InsertStatement &statement) {
     // Check schema and table in the catalog
     std::shared_ptr<Table> table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, table_name);
 
-    // Create logical insert node.
-    std::shared_ptr<LogicalOperator> logical_insert =
-            std::make_shared<LogicalInsert>(LogicalOperator::get_new_id(), table_ptr);
+
 
     // Create value list
     std::vector<std::shared_ptr<BaseExpression>> value_list;
@@ -272,8 +275,45 @@ Planner::BuildInsertValue(const hsql::InsertStatement &statement) {
         std::shared_ptr<BaseExpression> value_expr = BuildExpression(*expr);
         value_list.emplace_back(value_expr);
     }
-    ResponseError("Inserting values isn't supported.");
-    return std::shared_ptr<LogicalOperator>();
+
+    // Rearrange the inserted value to match the table.
+    // SELECT INTO TABLE (c, a) VALUES (1, 2); => SELECT INTO TABLE (a, b, c) VALUES( 2, NULL, 1);
+    if (statement.columns != nullptr) {
+        size_t statement_column_count = statement.columns->size();
+        Assert(statement_column_count == value_list.size(),
+               "INSERT: Target column count and input column count mismatch");
+
+        std::shared_ptr<BaseExpression> null_value_expr = std::make_shared<ValueExpression>(LogicalType(LogicalTypeId::kNull));
+
+        size_t table_column_count = table_ptr->table_def()->columns().size();
+
+        // Create value list with table column size and null value
+        std::vector<std::shared_ptr<BaseExpression>> rewrite_value_list(table_column_count, null_value_expr);
+
+        size_t column_idx = 0;
+        for(const auto& column_name : *statement.columns) {
+            // Get table index from the inserted value column name;
+            size_t table_column_id = table_ptr->table_def()->GetIdByName(column_name);
+            LogicalType table_column_type = table_ptr->table_def()->columns()[table_column_id].logical_type();
+            LogicalType value_type = value_list[column_idx]->DataType();
+            if(value_type == table_column_type) {
+                rewrite_value_list[table_column_id] = value_list[column_idx];
+            } else {
+                // If the inserted value type mismatches with table column type, cast the inserted value type to correct one.
+                std::shared_ptr<BaseExpression> cast_expr = std::make_shared<CastExpression>(value_list[column_idx], table_column_type);
+                rewrite_value_list[table_column_id] = cast_expr;
+            }
+            ++ column_idx;
+        }
+
+        value_list = rewrite_value_list;
+    }
+
+    // Create logical insert node.
+    std::shared_ptr<LogicalOperator> logical_insert =
+            std::make_shared<LogicalInsert>(LogicalOperator::get_new_id(), table_ptr, value_list);
+
+    return logical_insert;
 }
 
 std::shared_ptr<LogicalOperator>

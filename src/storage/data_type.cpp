@@ -35,7 +35,8 @@ LogicalType::LogicalType(infinity::LogicalTypeId logical_type_id, int64_t length
     }
 }
 
-std::string LogicalType::ToString() const {
+std::string
+LogicalType::ToString() const {
     switch(logical_type_) {
         case LogicalTypeId::kBoolean: return "Boolean";
         case LogicalTypeId::kTinyInt: return "TinyInt";
@@ -54,6 +55,12 @@ std::string LogicalType::ToString() const {
         default:
             ResponseError("Invalid logical data type.");
     }
+}
+
+bool
+LogicalType::operator==(const LogicalType& other) const {
+    if(this->logical_type_ == other.logical_type_) return true;
+    else return false;
 }
 
 }

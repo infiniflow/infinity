@@ -19,6 +19,7 @@ public:
     [[nodiscard]] const std::vector<ColumnDefinition>& columns() const { return columns_; }
     [[nodiscard]] uint64_t column_count() const { return columns_.size(); }
     [[nodiscard]] const std::string& name() const { return name_; }
+    [[nodiscard]] size_t GetIdByName(const std::string& name) const;
 private:
     std::vector<ColumnDefinition> columns_;
     std::string name_;
