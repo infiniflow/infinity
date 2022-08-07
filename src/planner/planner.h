@@ -23,6 +23,8 @@
 
 #include "storage/data_type.h"
 
+#include "expression/base_expression.h"
+
 namespace infinity {
 
 class Planner {
@@ -94,6 +96,9 @@ private:
 
     // Execute operator
     std::shared_ptr<LogicalOperator> BuildExecute(const hsql::ExecuteStatement& statement);
+
+    // Expression
+    std::shared_ptr<BaseExpression> BuildExpression(const hsql::Expr& expr);
 };
 
 }
