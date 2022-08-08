@@ -336,6 +336,24 @@ Planner::BuildUpdate(const hsql::UpdateStatement &statement) {
 
 std::shared_ptr<LogicalOperator>
 Planner::BuildSelect(const hsql::SelectStatement &statement) {
+    // 1. WITH
+    // 2. FROM (BaseTable, Join and Subquery)
+    // 3. ON
+    // 4. JOIN
+    // 5. SELECT list (aliases)
+    // 6. WHERE
+    // 7. GROUP BY
+    // 8. WITH CUBE / WITH ROLLUP
+    // 9. HAVING
+    // 10. SELECT
+    // 11. DISTINCT
+    // 12. LIMIT
+    // 13. ORDER BY
+    // 14. TOP
+    // 15. UNION/INTERSECT/EXCEPT
+    // 16. LIMIT
+    // 17. ORDER BY
+    // 18. TOP
     ResponseError("Select isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
@@ -531,6 +549,34 @@ Planner::BuildExecute(const hsql::ExecuteStatement &statement) {
 std::shared_ptr<BaseExpression>
 Planner::BuildExpression(const hsql::Expr &expr) {
 
+    std::string expr_name = expr.name ? std::string(expr.name) : std::string();
+
+    std::shared_ptr<BaseExpression> left = expr.expr ? BuildExpression(*expr.expr) : nullptr;
+    std::shared_ptr<BaseExpression> right = expr.expr2 ? BuildExpression(*expr.expr2) : nullptr;
+
+    LogicalType logical_type(LogicalTypeId::kNull);
+    switch(expr.type) {
+        case hsql::kExprLiteralFloat:
+            logical_type = LogicalType(LogicalTypeId::kDouble);
+            return std::make_shared<ValueExpression>(logical_type, expr.fval);
+        case hsql::kExprLiteralInt:
+            // TODO: int16/int8 also can be found out.
+            logical_type = static_cast<int32_t>(expr.ival) == expr.ival ?
+                           LogicalType(LogicalTypeId::kInteger): LogicalType(LogicalTypeId::kBigInt);
+            return std::make_shared<ValueExpression>(logical_type, expr.ival);
+
+        case hsql::kExprLiteralString:
+            logical_type = LogicalType(LogicalTypeId::kVarchar);
+            return std::make_shared<ValueExpression>(logical_type, expr_name);
+
+        case hsql::kExprLiteralNull:
+            logical_type = LogicalType(LogicalTypeId::kNull);
+            return std::make_shared<ValueExpression>(logical_type);
+
+
+        default:
+            ResponseError("Unsupported expr type");
+    }
 
     return std::shared_ptr<BaseExpression>();
 }
