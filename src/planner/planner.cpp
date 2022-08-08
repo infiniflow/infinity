@@ -54,9 +54,13 @@ Planner::TypeConversion(hsql::ColumnType type) {
 
 std::shared_ptr<LogicalOperator>
 Planner::CreateLogicalOperator(const hsql::SQLStatement &statement) {
+
+    current_bind_context_ptr_ = std::make_shared<BindContext>();
+    bind_contexts_.emplace_back(current_bind_context_ptr_);
+
     switch (statement.type()) {
         case hsql::kStmtSelect:
-            return BuildSelect(static_cast<const hsql::SelectStatement &>(statement));
+            return BuildSelect(static_cast<const hsql::SelectStatement &>(statement), current_bind_context_ptr_);
         case hsql::kStmtInsert:
             return BuildInsert(static_cast<const hsql::InsertStatement&>(statement));
         case hsql::kStmtDelete:
@@ -155,8 +159,9 @@ Planner::BuildCreateTable(const hsql::CreateStatement& statement) {
                 schema_name_ptr,
                 table_def_ptr);
     if(statement.select != nullptr) {
-        std::shared_ptr<LogicalOperator> select_node = BuildSelect(*statement.select);
-        logical_create_table_operator->set_left_node(select_node);
+        // TODO: build select here, bind context is needed.
+//        std::shared_ptr<LogicalOperator> select_node = BuildSelect(*statement.select);
+//        logical_create_table_operator->set_left_node(select_node);
     }
     return logical_create_table_operator;
 }
@@ -335,8 +340,28 @@ Planner::BuildUpdate(const hsql::UpdateStatement &statement) {
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildSelect(const hsql::SelectStatement &statement) {
-    // 1. WITH
+Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
+
+    Assert(statement.selectList != nullptr, "SELECT list is needed");
+    Assert(statement.selectList->empty(), "SELECT list can't be empty");
+
+
+
+    // 1. WITH clause
+    if (statement.withDescriptions != nullptr) {
+        for(const auto& with_description: *statement.withDescriptions) {
+            std::string name = with_description->alias;
+            if(bind_context_ptr->CTE_map_.contains(name)) {
+                ResponseError("WITH query name: " + name + " occurs more than once.");
+            }
+
+            std::shared_ptr<CommonTableExpressionInfo> cte_info_ptr
+                = std::make_shared<CommonTableExpressionInfo>(name, with_description->select);
+
+            bind_context_ptr->CTE_map_[name] = cte_info_ptr;
+        }
+    }
+
     // 2. FROM (BaseTable, Join and Subquery)
     // 3. ON
     // 4. JOIN

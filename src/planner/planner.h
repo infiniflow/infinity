@@ -21,6 +21,8 @@
 #include "sql/PrepareStatement.h"
 #include "sql/ExecuteStatement.h"
 
+#include "bind_context.h"
+
 #include "storage/data_type.h"
 
 #include "expression/base_expression.h"
@@ -60,7 +62,7 @@ private:
     std::shared_ptr<LogicalOperator> BuildUpdate(const hsql::UpdateStatement& statement);
 
     // Select operator
-    std::shared_ptr<LogicalOperator> BuildSelect(const hsql::SelectStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildSelect(const hsql::SelectStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Show operator
     std::shared_ptr<LogicalOperator> BuildShow(const hsql::ShowStatement& statement);
@@ -99,6 +101,13 @@ private:
 
     // Expression
     std::shared_ptr<BaseExpression> BuildExpression(const hsql::Expr& expr);
+
+    // All operators
+    std::vector<LogicalOperator> operators_;
+
+    // Bind Contexts
+    std::vector<std::shared_ptr<BindContext>> bind_contexts_;
+    std::shared_ptr<BindContext> current_bind_context_ptr_;
 };
 
 }

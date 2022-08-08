@@ -117,7 +117,7 @@ Session::SendTableDescription(const std::shared_ptr<Table>& result_table) {
         column_name_length_sum += column.name().size();
     }
 
-    // No output columns
+    // No output columns, no need to send table description, just return.
     if (column_name_length_sum == 0) return ;
 
     pg_handler_->SendDescriptionHeader(column_name_length_sum, result_table->table_def()->columns().size());
