@@ -27,6 +27,7 @@ public:
     [[nodiscard]] uint64_t memory_size() const { return row_count_ * sizeof(T); }
 
     void Append(const Chunk<T>& chunk, uint64_t start_idx);
+    void Append(const T& value);
 
 protected:
     TableType type_;
@@ -48,6 +49,12 @@ Chunk<T>::Append(const Chunk<T>& chunk, uint64_t start_idx) {
     } else {
         data_.insert(data_.begin() + row_count_, chunk.data_.begin() + start_idx, chunk.data_.begin() + available_size);
     }
+}
+
+template<typename T>
+void
+Chunk<T>::Append(const T& value) {
+    data_.emplace_back(value);
 }
 
 /*

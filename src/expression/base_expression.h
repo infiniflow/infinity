@@ -82,6 +82,7 @@ public:
 
     [[nodiscard]] virtual std::string ToString() const = 0;
     virtual LogicalType DataType() = 0;
+    [[nodiscard]] ExpressionType type() const { return type_; }
 
 protected:
     ExpressionType type_;

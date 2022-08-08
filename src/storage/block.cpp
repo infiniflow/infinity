@@ -75,94 +75,94 @@ Block::Block(const std::shared_ptr<TableDefinition>& table_def, TableType type, 
 }
 
 
-void Block::Append(const std::vector<std::any>& chunks, uint64_t start_idx) {
+void Block::Append(const std::vector<std::any>& values, uint64_t start_idx) {
     uint64_t column_count = columns_.size();
-    Assert(chunks.size() == column_count, "Wrong column data are appended to the row group");
+    Assert(values.size() == column_count, "Wrong column data are appended to the row group");
 
     for(uint64_t i = 0; i < column_count; ++ i) {
         switch(column_defs_[i].logical_type().GetTypeId()) {
             case LogicalTypeId::kBoolean: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<BooleanT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<BooleanT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<BooleanT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kTinyInt: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<TinyIntT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<TinyIntT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<TinyIntT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kSmallInt: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<SmallIntT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<SmallIntT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<SmallIntT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kInteger: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<IntegerT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<IntegerT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<IntervalT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kBigInt: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<BigIntT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<BigIntT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<BigIntT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kFloat: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<FloatT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<FloatT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<FloatT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kDouble: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<DoubleT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<DoubleT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<DoubleT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kDecimal: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<DecimalT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<DecimalT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<DecimalT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kDate: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<DateT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<DateT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<DateT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kTime: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<TimeT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<TimeT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<TimeT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kDateTime: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<DateTimeT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<DateTimeT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<DateTimeT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kInterval: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<IntervalT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<IntervalT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<IntervalT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kVarchar: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<VarcharT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<VarcharT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<VarcharT>(values[i]);
+                column->Append(value);
                 break;
             }
             case LogicalTypeId::kText: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<TextT>>>(columns_[i]);
-                auto chunk = std::any_cast<std::shared_ptr<Chunk<TextT>>>(chunks[i]);
-                column->Append(*chunk, start_idx);
+                auto value = std::any_cast<TextT>(values[i]);
+                column->Append(value);
                 break;
             }
             default:
