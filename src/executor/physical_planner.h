@@ -48,7 +48,7 @@ private:
     std::shared_ptr<PhysicalOperator> BuildSort(const std::shared_ptr<LogicalOperator> &logical_operator) const;
     std::shared_ptr<PhysicalOperator> BuildLimit(const std::shared_ptr<LogicalOperator> &logical_operator) const;
     std::shared_ptr<PhysicalOperator> BuildProjection(const std::shared_ptr<LogicalOperator> &logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildPredicate(const std::shared_ptr<LogicalOperator> &logical_operator) const;
+    std::shared_ptr<PhysicalOperator> BuildFilter(const std::shared_ptr<LogicalOperator> &logical_operator) const;
     std::shared_ptr<PhysicalOperator> BuildIntersect(const std::shared_ptr<LogicalOperator> &logical_operator) const;
     std::shared_ptr<PhysicalOperator> BuildUnion(const std::shared_ptr<LogicalOperator> &logical_operator) const;
     std::shared_ptr<PhysicalOperator> BuildExcept(const std::shared_ptr<LogicalOperator> &logical_operator) const;

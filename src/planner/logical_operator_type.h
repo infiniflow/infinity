@@ -15,7 +15,7 @@ enum class LogicalOperatorType: uint8_t {
     kIntersect,
     kJoin,
     kLimit,
-    kPredicate,
+    kFilter,
     kProjection,
     kSort,
 

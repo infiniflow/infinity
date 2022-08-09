@@ -99,9 +99,21 @@ private:
     // Execute operator
     std::shared_ptr<LogicalOperator> BuildExecute(const hsql::ExecuteStatement& statement);
 
-    // Expression
-    std::shared_ptr<BaseExpression> BuildExpression(const hsql::Expr& expr);
 
+    // Expression
+    std::shared_ptr<BaseExpression>
+    BuildExpression(const hsql::Expr& expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+
+    // Build From clause
+    std::shared_ptr<LogicalOperator>
+    BuildFromClause(const hsql::TableRef* fromTable, const std::shared_ptr<BindContext>& bind_context_ptr);
+
+    void
+    BuildSelectList(const std::vector<hsql::Expr*>& select_list, const std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalOperator>
+    BuildFilter(const hsql::Expr* whereClause, const std::shared_ptr<BindContext>& bind_context_ptr);
+private:
     // All operators
     std::vector<LogicalOperator> operators_;
 

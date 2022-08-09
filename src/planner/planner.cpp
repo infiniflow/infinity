@@ -277,7 +277,7 @@ Planner::BuildInsertValue(const hsql::InsertStatement &statement) {
     std::vector<std::shared_ptr<BaseExpression>> value_list;
     value_list.reserve(statement.values->size());
     for (const auto* expr : *statement.values) {
-        std::shared_ptr<BaseExpression> value_expr = BuildExpression(*expr);
+        std::shared_ptr<BaseExpression> value_expr = BuildExpression(*expr, current_bind_context_ptr_);
         value_list.emplace_back(value_expr);
     }
 
@@ -346,7 +346,7 @@ Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_p
     Assert(statement.selectList->empty(), "SELECT list can't be empty");
 
 
-
+    std::shared_ptr<LogicalOperator> root_node_ptr;
     // 1. WITH clause
     if (statement.withDescriptions != nullptr) {
         for(const auto& with_description: *statement.withDescriptions) {
@@ -362,11 +362,25 @@ Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_p
         }
     }
 
-    // 2. FROM (BaseTable, Join and Subquery)
+    // 2. FROM clause (BaseTable, Join and Subquery)
     // 3. ON
     // 4. JOIN
+    if (statement.fromTable != nullptr) {
+        // Build table reference
+        root_node_ptr = BuildFromClause(statement.fromTable, bind_context_ptr);
+    } else {
+        // No table reference, just evaluate the expr of the select list.
+    }
+
     // 5. SELECT list (aliases)
+    if (statement.whereClause) {
+        auto where_expr = BuildExpression(*statement.whereClause, current_bind_context_ptr_);
+
+    }
+    BuildSelectList(*statement.selectList, current_bind_context_ptr_);
+
     // 6. WHERE
+    std::shared_ptr<LogicalOperator> filter_operatpr = BuildFilter(statement.whereClause, current_bind_context_ptr_);
     // 7. GROUP BY
     // 8. WITH CUBE / WITH ROLLUP
     // 9. HAVING
@@ -572,12 +586,12 @@ Planner::BuildExecute(const hsql::ExecuteStatement &statement) {
 }
 
 std::shared_ptr<BaseExpression>
-Planner::BuildExpression(const hsql::Expr &expr) {
+Planner::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
 
     std::string expr_name = expr.name ? std::string(expr.name) : std::string();
 
-    std::shared_ptr<BaseExpression> left = expr.expr ? BuildExpression(*expr.expr) : nullptr;
-    std::shared_ptr<BaseExpression> right = expr.expr2 ? BuildExpression(*expr.expr2) : nullptr;
+    std::shared_ptr<BaseExpression> left = expr.expr ? BuildExpression(*expr.expr, bind_context_ptr) : nullptr;
+    std::shared_ptr<BaseExpression> right = expr.expr2 ? BuildExpression(*expr.expr2, bind_context_ptr) : nullptr;
 
     LogicalType logical_type(LogicalTypeId::kNull);
     switch(expr.type) {
@@ -606,5 +620,21 @@ Planner::BuildExpression(const hsql::Expr &expr) {
     return std::shared_ptr<BaseExpression>();
 }
 
+std::shared_ptr<LogicalOperator>
+Planner::BuildFromClause(const hsql::TableRef* fromTable, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    ResponseError("BuildFromClause is not implemented");
+    return std::shared_ptr<LogicalOperator>();
+}
+
+void
+Planner::BuildSelectList(const std::vector<hsql::Expr*>& select_list, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    ResponseError("BuildSelectList is not implemented");
+}
+
+std::shared_ptr<LogicalOperator>
+Planner::BuildFilter(const hsql::Expr* whereClause, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    ResponseError("BuildFilter is not implemented");
+    return std::shared_ptr<LogicalOperator>();
+}
 
 }

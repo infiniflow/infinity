@@ -60,7 +60,7 @@ PhysicalPlanner::BuildPhysicalOperator(const std::shared_ptr<LogicalOperator>& l
         case LogicalOperatorType::kJoin: return BuildJoin(logical_operator);
         case LogicalOperatorType::kSort: return BuildSort(logical_operator);
         case LogicalOperatorType::kLimit: return BuildLimit(logical_operator);
-        case LogicalOperatorType::kPredicate: return BuildPredicate(logical_operator);
+        case LogicalOperatorType::kFilter: return BuildFilter(logical_operator);
         case LogicalOperatorType::kProjection: return BuildProjection(logical_operator);
         case LogicalOperatorType::kUnion: return BuildUnion(logical_operator);
         case LogicalOperatorType::kExcept: return BuildExcept(logical_operator);
@@ -164,7 +164,7 @@ PhysicalPlanner::BuildProjection(const std::shared_ptr<LogicalOperator> &logical
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildPredicate(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildFilter(const std::shared_ptr<LogicalOperator> &logical_operator) const {
     return std::make_shared<PhysicalFilter>(logical_operator->node_id());
 }
 
