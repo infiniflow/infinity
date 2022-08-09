@@ -380,21 +380,43 @@ Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_p
     BuildSelectList(*statement.selectList, current_bind_context_ptr_);
 
     // 6. WHERE
-    std::shared_ptr<LogicalOperator> filter_operatpr = BuildFilter(statement.whereClause, current_bind_context_ptr_);
+    std::shared_ptr<LogicalOperator> filter_operator = BuildFilter(statement.whereClause, current_bind_context_ptr_);
+    filter_operator->set_left_node(root_node_ptr);
+    root_node_ptr = filter_operator;
+
     // 7. GROUP BY
     // 8. WITH CUBE / WITH ROLLUP
     // 9. HAVING
-    // 10. SELECT
-    // 11. DISTINCT
-    // 12. LIMIT
-    // 13. ORDER BY
+    // 10. DISTINCT
+    root_node_ptr = BuildGroupByHaving(statement, current_bind_context_ptr_, root_node_ptr);
+
+    // 11. SELECT
+
+
+    // 12. ORDER BY
+    if(statement.order != nullptr && statement.limit == nullptr) {
+        std::shared_ptr<LogicalOperator> order_operator = BuildOrderBy(*statement.order, current_bind_context_ptr_);
+        order_operator->set_left_node(root_node_ptr);
+        root_node_ptr = order_operator;
+    }
+    // 13. LIMIT
+    if(statement.limit !=nullptr && statement.order == nullptr) {
+        std::shared_ptr<LogicalOperator> limit_operator = BuildLimit(*statement.limit, current_bind_context_ptr_);
+        limit_operator->set_left_node(root_node_ptr);
+        root_node_ptr = limit_operator;
+    }
     // 14. TOP
+    if(statement.limit != nullptr && statement.order != nullptr) {
+        std::shared_ptr<LogicalOperator> top_operator = BuildTop(*statement.order, *statement.limit, current_bind_context_ptr_);
+        top_operator->set_left_node(root_node_ptr);
+        root_node_ptr = top_operator;
+    }
     // 15. UNION/INTERSECT/EXCEPT
     // 16. LIMIT
     // 17. ORDER BY
     // 18. TOP
     ResponseError("Select isn't supported.");
-    return std::shared_ptr<LogicalOperator>();
+    return root_node_ptr;
 }
 
 std::shared_ptr<LogicalOperator>
@@ -634,6 +656,39 @@ Planner::BuildSelectList(const std::vector<hsql::Expr*>& select_list, const std:
 std::shared_ptr<LogicalOperator>
 Planner::BuildFilter(const hsql::Expr* whereClause, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("BuildFilter is not implemented");
+    return std::shared_ptr<LogicalOperator>();
+}
+
+std::shared_ptr<LogicalOperator>
+Planner::BuildGroupByHaving(
+        const hsql::SelectStatement& select,
+        const std::shared_ptr<BindContext>& bind_context_ptr,
+        const std::shared_ptr<LogicalOperator>& root_operator) {
+    ResponseError("BuildGroupByHaving is not implemented");
+    return std::shared_ptr<LogicalOperator>();
+}
+
+std::shared_ptr<LogicalOperator>
+Planner::BuildOrderBy(
+        const std::vector<hsql::OrderDescription*>& order_by_clause,
+        const std::shared_ptr<BindContext>& bind_context_ptr) {
+    ResponseError("BuildOrderBy is not implemented");
+    return std::shared_ptr<LogicalOperator>();
+}
+
+std::shared_ptr<LogicalOperator>
+Planner::BuildLimit(
+        const hsql::LimitDescription& limit_description,
+        const std::shared_ptr<BindContext>& bind_context_ptr) {
+    ResponseError("BuildLimit is not implemented");
+    return std::shared_ptr<LogicalOperator>();
+}
+
+std::shared_ptr<LogicalOperator>
+Planner::BuildTop(const std::vector<hsql::OrderDescription*>& order_by_clause,
+         const hsql::LimitDescription& limit_description,
+         const std::shared_ptr<BindContext>& bind_context_ptr) {
+    ResponseError("BuildTop is not implemented");
     return std::shared_ptr<LogicalOperator>();
 }
 

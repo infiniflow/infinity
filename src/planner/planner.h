@@ -112,7 +112,24 @@ private:
     BuildSelectList(const std::vector<hsql::Expr*>& select_list, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     std::shared_ptr<LogicalOperator>
-    BuildFilter(const hsql::Expr* whereClause, const std::shared_ptr<BindContext>& bind_context_ptr);
+    BuildFilter(const hsql::Expr* where_clause, const std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalOperator>
+    BuildGroupByHaving(
+            const hsql::SelectStatement& select,
+            const std::shared_ptr<BindContext>& bind_context_ptr,
+            const std::shared_ptr<LogicalOperator>& root_operator);
+
+    std::shared_ptr<LogicalOperator>
+    BuildOrderBy(const std::vector<hsql::OrderDescription*>& order_by_clause, const std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalOperator>
+    BuildLimit(const hsql::LimitDescription& limit_description, const std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalOperator>
+    BuildTop(const std::vector<hsql::OrderDescription*>& order_by_clause,
+             const hsql::LimitDescription& limit_description,
+             const std::shared_ptr<BindContext>& bind_context_ptr);
 private:
     // All operators
     std::vector<LogicalOperator> operators_;
