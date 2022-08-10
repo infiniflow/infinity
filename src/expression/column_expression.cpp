@@ -15,7 +15,7 @@ BoundColumnExpression::BoundColumnExpression(LogicalType logical_type, ColumnBin
    {}
 
 std::string BoundColumnExpression::ToString() const {
-    return column_binding_.column_name_;
+    return *column_binding_.column_name_ptr_;
 }
 
 }

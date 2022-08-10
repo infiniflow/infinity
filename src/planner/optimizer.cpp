@@ -8,7 +8,7 @@ namespace infinity {
 
 void
 Optimizer::AddRule(std::unique_ptr<OptimizerRule> rule) {
-    rules_.push_back(std::move(rule));
+    rules_.emplace_back(std::move(rule));
 }
 
 std::shared_ptr<LogicalOperator>

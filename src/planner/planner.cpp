@@ -12,6 +12,7 @@
 #include "planner/operator/logical_table_scan.h"
 #include "planner/operator/logical_view_scan.h"
 #include "planner/operator/logical_insert.h"
+#include "planner/operator/logical_filter.h"
 
 #include "storage/table_definition.h"
 #include "storage/column_definition.h"
@@ -21,6 +22,7 @@
 
 #include "expression/value_expression.h"
 #include "expression/cast_expression.h"
+#include "expression/column_expression.h"
 
 #include <vector>
 
@@ -376,16 +378,14 @@ Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_p
     }
 
     // 5. SELECT list (aliases)
-    if (statement.whereClause) {
-        auto where_expr = BuildExpression(*statement.whereClause, current_bind_context_ptr_);
-
-    }
     BuildSelectList(*statement.selectList, current_bind_context_ptr_);
 
     // 6. WHERE
-    std::shared_ptr<LogicalOperator> filter_operator = BuildFilter(statement.whereClause, current_bind_context_ptr_);
-    filter_operator->set_left_node(root_node_ptr);
-    root_node_ptr = filter_operator;
+    if (statement.whereClause) {
+        std::shared_ptr<LogicalOperator> filter_operator = BuildFilter(statement.whereClause, current_bind_context_ptr_);
+        filter_operator->set_left_node(root_node_ptr);
+        root_node_ptr = filter_operator;
+    }
 
     // 7. GROUP BY
     // 8. WITH CUBE / WITH ROLLUP
@@ -621,24 +621,34 @@ Planner::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindConte
 
     LogicalType logical_type(LogicalTypeId::kNull);
     switch(expr.type) {
-        case hsql::kExprLiteralFloat:
+        case hsql::kExprLiteralFloat: {
             logical_type = LogicalType(LogicalTypeId::kDouble);
             return std::make_shared<ValueExpression>(logical_type, expr.fval);
-        case hsql::kExprLiteralInt:
+        }
+        case hsql::kExprLiteralInt: {
             // TODO: int16/int8 also can be found out.
             logical_type = static_cast<int32_t>(expr.ival) == expr.ival ?
                            LogicalType(LogicalTypeId::kInteger): LogicalType(LogicalTypeId::kBigInt);
             return std::make_shared<ValueExpression>(logical_type, expr.ival);
-
-        case hsql::kExprLiteralString:
+        }
+        case hsql::kExprLiteralString: {
             logical_type = LogicalType(LogicalTypeId::kVarchar);
             return std::make_shared<ValueExpression>(logical_type, expr_name);
-
-        case hsql::kExprLiteralNull:
+        }
+        case hsql::kExprLiteralNull: {
             logical_type = LogicalType(LogicalTypeId::kNull);
             return std::make_shared<ValueExpression>(logical_type);
-
-
+        }
+        case hsql::kExprColumnRef: {
+            // Resolve column
+            std::optional<std::string> table_name = nullptr;
+            if(expr.table != nullptr) {
+                table_name = std::optional<std::string>(std::string(expr.table));
+            }
+            ColumnIdentifier column_identifier(table_name, expr_name);
+            std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnIdentifier(column_identifier);
+            return column_expr;
+        }
         default:
             ResponseError("Unsupported expr type");
     }
@@ -677,15 +687,88 @@ Planner::BuildFromClause(const hsql::TableRef* from_table, const std::shared_ptr
     return std::shared_ptr<LogicalOperator>();
 }
 
-void
+std::vector<SelectListElement>
 Planner::BuildSelectList(const std::vector<hsql::Expr*>& select_list, const std::shared_ptr<BindContext>& bind_context_ptr) {
+
+    std::vector<SelectListElement> select_lists;
+    select_lists.reserve(select_list.size());
+    for(const hsql::Expr* select_expr: select_list) {
+        switch(select_expr->type) {
+            case hsql::kExprStar: {
+                std::shared_ptr<Table> table_ptr;
+                if(select_expr->table == nullptr) {
+                    // select * from t1;
+                    Assert(!bind_context_ptr->tables_.empty(), "No table is bound.");
+
+                    // Use first table as the default table: select * from t1, t2; means select t1.* from t1, t2;
+                    table_ptr = bind_context_ptr->tables_[0];
+                } else {
+                    // select t1.* from t1;
+                    std::string table_name(select_expr->table);
+                    if (bind_context_ptr->tables_by_name_.contains(table_name)) {
+                        table_ptr = bind_context_ptr->tables_by_name_[table_name];
+                    } else {
+                        Assert(!bind_context_ptr->tables_.empty(), "Table: '" + table_name + "' not found in select list.");
+                    }
+                }
+
+                std::shared_ptr<std::string> table_name_ptr = std::make_shared<std::string>(table_ptr->table_def()->name());
+
+                // Get corresponding column definition from binding context.
+                const std::vector<ColumnDefinition>& columns_def = bind_context_ptr->tables_[0]->table_def()->columns();
+
+                // Reserve more data in select list
+                select_lists.reserve(select_list.size() + columns_def.size());
+
+                // Build select list
+                uint64_t column_index = 0;
+                for(const ColumnDefinition& column_def: columns_def) {
+                    ColumnBinding column_binding(table_name_ptr,
+                                                 std::make_shared<std::string>(column_def.name()),
+                                                 0,
+                                                 column_index);
+
+                    std::shared_ptr<BoundColumnExpression> bound_column_expr_ptr
+                            = std::make_shared<BoundColumnExpression>(column_def.logical_type(), column_binding);
+                    ColumnIdentifier column_identifier(*table_name_ptr, column_def.name());
+                    select_lists.emplace_back(bound_column_expr_ptr);
+                    select_lists.back().AddColumnIdentifier(column_identifier);
+
+                    // Add the output heading of this bind context
+                    bind_context_ptr->heading_.emplace_back(column_def.name());
+                }
+
+                break;
+            }
+            default: {
+                std::shared_ptr<BaseExpression> expr = BuildExpression(*select_expr, bind_context_ptr);
+                select_lists.emplace_back(expr);
+
+                // Generator column identifier
+                // TODO: This is duplicate code from Build Expression, think about how to remove it.
+                std::optional<std::string> table_name = nullptr;
+                if(select_expr->table != nullptr) {
+                    table_name = std::optional<std::string>(std::string(select_expr->table));
+                }
+                ColumnIdentifier column_identifier(table_name, select_expr->name);
+
+                // Add column identifier
+                select_lists.back().AddColumnIdentifier(column_identifier);
+
+                // Add the output heading of this bind context
+                bind_context_ptr->heading_.emplace_back(select_expr->name);
+            }
+        }
+    }
+
     ResponseError("BuildSelectList is not implemented");
 }
 
 std::shared_ptr<LogicalOperator>
 Planner::BuildFilter(const hsql::Expr* whereClause, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    ResponseError("BuildFilter is not implemented");
-    return std::shared_ptr<LogicalOperator>();
+    std::shared_ptr<BaseExpression> where_expr = BuildExpression(*whereClause, current_bind_context_ptr_);
+    std::shared_ptr<LogicalFilter> logical_filter = std::make_shared<LogicalFilter>(where_expr);
+    return logical_filter;
 }
 
 std::shared_ptr<LogicalOperator>
@@ -735,6 +818,8 @@ Planner::BuildTable(const hsql::TableRef* from_table, const std::shared_ptr<Bind
         // Build table scan operator
         std::shared_ptr<LogicalTableScan> logical_table_scan = std::make_shared<LogicalTableScan>(table_ptr);
         this->AppendOperator(logical_table_scan, bind_context_ptr);
+
+        // Insert the table in the binding context
 
         // Handle table and column alias
         if(from_table->alias != nullptr) {

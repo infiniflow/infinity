@@ -20,7 +20,7 @@ public:
     }
     std::string ToString() const override;
     bool IsNull() const { return data_type_.GetTypeId() == LogicalTypeId::kNull; }
-    void AppendToBlock(std::vector<std::any>& values) { values.push_back(value_); }
+    void AppendToBlock(std::vector<std::any>& values) { values.emplace_back(value_); }
 
 private:
     LogicalType data_type_;

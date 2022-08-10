@@ -108,7 +108,7 @@ private:
     std::shared_ptr<LogicalOperator>
     BuildFromClause(const hsql::TableRef* fromTable, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-    void
+    std::vector<SelectListElement>
     BuildSelectList(const std::vector<hsql::Expr*>& select_list, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     std::shared_ptr<LogicalOperator>

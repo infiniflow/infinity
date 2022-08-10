@@ -9,8 +9,15 @@
 namespace infinity {
 
 struct ColumnBinding {
-    std::string table_name_;
-    std::string column_name_;
+    ColumnBinding(std::shared_ptr<std::string> table_name_ptr,
+                  std::shared_ptr<std::string> column_name_ptr,
+                  uint64_t table_id,
+                  uint64_t column_id)
+        : table_name_ptr_(table_name_ptr), column_name_ptr_(column_name_ptr), table_id_(table_id), column_id_(column_id)
+    {}
+
+    std::shared_ptr<std::string> table_name_ptr_;
+    std::shared_ptr<std::string> column_name_ptr_;
     uint64_t table_id_;
     uint64_t column_id_;
 };
