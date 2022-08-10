@@ -393,7 +393,7 @@ Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_p
     // 10. DISTINCT
     root_node_ptr = BuildGroupByHaving(statement, current_bind_context_ptr_, root_node_ptr);
 
-    // 11. SELECT
+    // 11. SELECT (including flatten subquery)
 
 
     // 12. ORDER BY
@@ -761,7 +761,7 @@ Planner::BuildSelectList(const std::vector<hsql::Expr*>& select_list, const std:
         }
     }
 
-    ResponseError("BuildSelectList is not implemented");
+    return select_lists;
 }
 
 std::shared_ptr<LogicalOperator>
@@ -820,6 +820,7 @@ Planner::BuildTable(const hsql::TableRef* from_table, const std::shared_ptr<Bind
         this->AppendOperator(logical_table_scan, bind_context_ptr);
 
         // Insert the table in the binding context
+        bind_context_ptr->AddTable(table_ptr);
 
         // Handle table and column alias
         if(from_table->alias != nullptr) {
