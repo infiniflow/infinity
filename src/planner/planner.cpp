@@ -9,6 +9,8 @@
 #include "planner/operator/logical_create_table.h"
 #include "planner/operator/logical_drop_table.h"
 #include "planner/operator/logical_chunk_scan.h"
+#include "planner/operator/logical_table_scan.h"
+#include "planner/operator/logical_view_scan.h"
 #include "planner/operator/logical_insert.h"
 
 #include "storage/table_definition.h"
@@ -56,35 +58,36 @@ std::shared_ptr<LogicalOperator>
 Planner::CreateLogicalOperator(const hsql::SQLStatement &statement) {
 
     current_bind_context_ptr_ = std::make_shared<BindContext>();
+    current_bind_context_ptr_->id_ = bind_contexts_.size();
     bind_contexts_.emplace_back(current_bind_context_ptr_);
 
     switch (statement.type()) {
         case hsql::kStmtSelect:
             return BuildSelect(static_cast<const hsql::SelectStatement &>(statement), current_bind_context_ptr_);
         case hsql::kStmtInsert:
-            return BuildInsert(static_cast<const hsql::InsertStatement&>(statement));
+            return BuildInsert(static_cast<const hsql::InsertStatement&>(statement), current_bind_context_ptr_);
         case hsql::kStmtDelete:
-            return BuildDelete(static_cast<const hsql::DeleteStatement&>(statement));
+            return BuildDelete(static_cast<const hsql::DeleteStatement&>(statement), current_bind_context_ptr_);
         case hsql::kStmtUpdate:
-            return BuildUpdate(static_cast<const hsql::UpdateStatement&>(statement));
+            return BuildUpdate(static_cast<const hsql::UpdateStatement&>(statement), current_bind_context_ptr_);
         case hsql::kStmtShow:
-            return BuildShow(static_cast<const hsql::ShowStatement&>(statement));
+            return BuildShow(static_cast<const hsql::ShowStatement&>(statement), current_bind_context_ptr_);
         case hsql::kStmtCreate:
-            return BuildCreate(static_cast<const hsql::CreateStatement &>(statement));
+            return BuildCreate(static_cast<const hsql::CreateStatement &>(statement), current_bind_context_ptr_);
         case hsql::kStmtDrop:
-            return BuildDrop(static_cast<const hsql::DropStatement &>(statement));
+            return BuildDrop(static_cast<const hsql::DropStatement &>(statement), current_bind_context_ptr_);
         case hsql::kStmtPrepare:
-            return BuildPrepare(static_cast<const hsql::PrepareStatement&>(statement));
+            return BuildPrepare(static_cast<const hsql::PrepareStatement&>(statement), current_bind_context_ptr_);
         case hsql::kStmtExecute:
-            return BuildExecute(static_cast<const hsql::ExecuteStatement&>(statement));
+            return BuildExecute(static_cast<const hsql::ExecuteStatement&>(statement), current_bind_context_ptr_);
         case hsql::kStmtImport:
-            return BuildImport(static_cast<const hsql::ImportStatement&>(statement));
+            return BuildImport(static_cast<const hsql::ImportStatement&>(statement), current_bind_context_ptr_);
         case hsql::kStmtExport:
-            return BuildExport(static_cast<const hsql::ExportStatement&>(statement));
+            return BuildExport(static_cast<const hsql::ExportStatement&>(statement), current_bind_context_ptr_);
         case hsql::kStmtTransaction:
-            return BuildTransaction(static_cast<const hsql::TransactionStatement&>(statement));
+            return BuildTransaction(static_cast<const hsql::TransactionStatement&>(statement), current_bind_context_ptr_);
         case hsql::kStmtAlter:
-            return BuildAlter(static_cast<const hsql::AlterStatement&>(statement));
+            return BuildAlter(static_cast<const hsql::AlterStatement&>(statement), current_bind_context_ptr_);
         case hsql::kStmtError:
         case hsql::kStmtRename:
             ResponseError("Statement type not supported");
@@ -96,19 +99,19 @@ Planner::CreateLogicalOperator(const hsql::SQLStatement &statement) {
 // Build create statement to logical create operator
 // Including: create table / view
 std::shared_ptr<LogicalOperator>
-Planner::BuildCreate(const hsql::CreateStatement& statement) {
+Planner::BuildCreate(const hsql::CreateStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     switch (statement.type) {
         case hsql::CreateType::kCreateTable: {
-            return BuildCreateTable(statement);
+            return BuildCreateTable(statement, bind_context_ptr);
         }
         case hsql::CreateType::kCreateView: {
-            return BuildCreateView(statement);
+            return BuildCreateView(statement, bind_context_ptr);
         }
         case hsql::CreateType::kCreateTableFromTbl: {
-            return BuildCreateTableFromTable(statement);
+            return BuildCreateTableFromTable(statement, bind_context_ptr);
         }
         case hsql::CreateType::kCreateIndex: {
-            return BuildCreateIndex(statement);;
+            return BuildCreateIndex(statement, bind_context_ptr);;
         }
         default: {
             ResponseError("Creating type isn't supported");
@@ -118,7 +121,7 @@ Planner::BuildCreate(const hsql::CreateStatement& statement) {
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildCreateTable(const hsql::CreateStatement& statement) {
+Planner::BuildCreateTable(const hsql::CreateStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     // Check if columns is given.
     std::vector<ColumnDefinition> columns;
     for(size_t idx = 0; idx < statement.columns->size(); ++ idx) {
@@ -155,9 +158,9 @@ Planner::BuildCreateTable(const hsql::CreateStatement& statement) {
     std::shared_ptr<TableDefinition> table_def_ptr
         = std::make_shared<TableDefinition>(statement.tableName, columns, statement.ifNotExists);
     std::shared_ptr<LogicalOperator> logical_create_table_operator
-        = std::make_shared<LogicalCreateTable>(LogicalOperator::get_new_id(),
-                schema_name_ptr,
-                table_def_ptr);
+        = std::make_shared<LogicalCreateTable>(schema_name_ptr, table_def_ptr);
+    this->AppendOperator(logical_create_table_operator, bind_context_ptr);
+
     if(statement.select != nullptr) {
         // TODO: build select here, bind context is needed.
 //        std::shared_ptr<LogicalOperator> select_node = BuildSelect(*statement.select);
@@ -167,36 +170,36 @@ Planner::BuildCreateTable(const hsql::CreateStatement& statement) {
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildCreateTableFromTable(const hsql::CreateStatement &statement) {
+Planner::BuildCreateTableFromTable(const hsql::CreateStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Creating table from table isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildCreateView(const hsql::CreateStatement &statement) {
+Planner::BuildCreateView(const hsql::CreateStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Creating view isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildCreateIndex(const hsql::CreateStatement &statement) {
+Planner::BuildCreateIndex(const hsql::CreateStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Creating index isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildDrop(const hsql::DropStatement &statement) {
+Planner::BuildDrop(const hsql::DropStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     switch(statement.type) {
         case hsql::kDropTable:
-            return BuildDropTable(statement);
+            return BuildDropTable(statement, bind_context_ptr);
         case hsql::kDropSchema:
-            return BuildDropSchema(statement);
+            return BuildDropSchema(statement, bind_context_ptr);
         case hsql::kDropIndex:
-            return BuildDropIndex(statement);
+            return BuildDropIndex(statement, bind_context_ptr);
         case hsql::kDropView:
-            return BuildDropView(statement);
+            return BuildDropView(statement, bind_context_ptr);
         case hsql::kDropPreparedStatement:
-            return BuildDropPreparedStatement(statement);
+            return BuildDropPreparedStatement(statement, bind_context_ptr);
         default: {
             ResponseError("Deleting type isn't supported");
         }
@@ -206,7 +209,7 @@ Planner::BuildDrop(const hsql::DropStatement &statement) {
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildDropTable(const hsql::DropStatement &statement) {
+Planner::BuildDropTable(const hsql::DropStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
 
     std::shared_ptr<std::string> schema_name_ptr = std::make_shared<std::string>("Default");
     if(statement.schema != nullptr) {
@@ -214,44 +217,44 @@ Planner::BuildDropTable(const hsql::DropStatement &statement) {
     }
 
     std::shared_ptr<LogicalOperator> logical_drop_table
-        = std::make_shared<LogicalDropTable>(LogicalOperator::get_new_id(),
-                                             schema_name_ptr,
+        = std::make_shared<LogicalDropTable>(schema_name_ptr,
                                              std::make_shared<std::string>(statement.name));
+    this->AppendOperator(logical_drop_table, bind_context_ptr);
 
     return logical_drop_table;
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildDropSchema(const hsql::DropStatement &statement) {
+Planner::BuildDropSchema(const hsql::DropStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Dropping schema isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildDropIndex(const hsql::DropStatement &statement) {
+Planner::BuildDropIndex(const hsql::DropStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Dropping index isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildDropView(const hsql::DropStatement &statement) {
+Planner::BuildDropView(const hsql::DropStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Dropping view isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildDropPreparedStatement(const hsql::DropStatement &statement) {
+Planner::BuildDropPreparedStatement(const hsql::DropStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Dropping prepared statement isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildInsert(const hsql::InsertStatement &statement) {
+Planner::BuildInsert(const hsql::InsertStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     switch(statement.type) {
         case hsql::kInsertValues:
-            return BuildInsertValue(statement);
+            return BuildInsertValue(statement, bind_context_ptr);
         case hsql::kInsertSelect:
-            return BuildInsertSelect(statement);
+            return BuildInsertSelect(statement, bind_context_ptr);
         default:
             ResponseError("Inserting type isn't supported");
     }
@@ -259,7 +262,7 @@ Planner::BuildInsert(const hsql::InsertStatement &statement) {
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildInsertValue(const hsql::InsertStatement &statement) {
+Planner::BuildInsertValue(const hsql::InsertStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     // Get schema name
     std::string schema_name = statement.schema == nullptr? "Default" : statement.schema;
 
@@ -315,25 +318,26 @@ Planner::BuildInsertValue(const hsql::InsertStatement &statement) {
 
     // Create logical insert node.
     std::shared_ptr<LogicalOperator> logical_insert =
-            std::make_shared<LogicalInsert>(LogicalOperator::get_new_id(), table_ptr, value_list);
+            std::make_shared<LogicalInsert>(table_ptr, value_list);
+    this->AppendOperator(logical_insert, bind_context_ptr);
 
     return logical_insert;
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildInsertSelect(const hsql::InsertStatement &statement) {
+Planner::BuildInsertSelect(const hsql::InsertStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Inserting select isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildDelete(const hsql::DeleteStatement &statement) {
+Planner::BuildDelete(const hsql::DeleteStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Delete isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildUpdate(const hsql::UpdateStatement &statement) {
+Planner::BuildUpdate(const hsql::UpdateStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Update isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
@@ -419,13 +423,13 @@ Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_p
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildShow(const hsql::ShowStatement &statement) {
+Planner::BuildShow(const hsql::ShowStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     switch(statement.type) {
         case hsql::kShowTables : {
-            return BuildShowTables(statement);
+            return BuildShowTables(statement, bind_context_ptr);
         }
         case hsql::kShowColumns : {
-            return BuildShowColumns(statement);
+            return BuildShowColumns(statement, bind_context_ptr);
         }
         default:
             ResponseError("Don't support show type.");
@@ -434,13 +438,13 @@ Planner::BuildShow(const hsql::ShowStatement &statement) {
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildShowColumns(const hsql::ShowStatement &statement) {
+Planner::BuildShowColumns(const hsql::ShowStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Show columns isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildShowTables(const hsql::ShowStatement &statement) {
+Planner::BuildShowTables(const hsql::ShowStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     std::vector<ColumnDefinition> column_defs = {
             {"table_name", 0, LogicalType(LogicalTypeId::kVarchar), false, std::set<ConstrainType>()},
             {"column_count", 1, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
@@ -455,7 +459,8 @@ Planner::BuildShowTables(const hsql::ShowStatement &statement) {
     // TODO: Insert tables into table
 
     std::shared_ptr<LogicalOperator> logical_chunk_scan =
-            std::make_shared<LogicalChunkScan>(table_ptr, LogicalOperator::get_new_id());
+            std::make_shared<LogicalChunkScan>(table_ptr);
+    this->AppendOperator(logical_chunk_scan, bind_context_ptr);
 
     return logical_chunk_scan;
 
@@ -467,141 +472,141 @@ Planner::BuildShowTables(const hsql::ShowStatement &statement) {
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildImport(const hsql::ImportStatement &statement) {
+Planner::BuildImport(const hsql::ImportStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     switch(statement.type) {
         case hsql::kImportCSV:
-            return BuildImportCsv(statement);
+            return BuildImportCsv(statement, bind_context_ptr);
         case hsql::kImportTbl:
-            return BuildImportTbl(statement);
+            return BuildImportTbl(statement, bind_context_ptr);
         case hsql::kImportBinary:
-            return BuildImportBinary(statement);
+            return BuildImportBinary(statement, bind_context_ptr);
         case hsql::kImportAuto:
-            return BuildImportAuto(statement);
+            return BuildImportAuto(statement, bind_context_ptr);
     }
     ResponseError("Invalid import type.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildImportCsv(const hsql::ImportStatement &statement) {
+Planner::BuildImportCsv(const hsql::ImportStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Import from CSV file isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildImportTbl(const hsql::ImportStatement &statement) {
+Planner::BuildImportTbl(const hsql::ImportStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Import from other table file isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildImportBinary(const hsql::ImportStatement &statement) {
+Planner::BuildImportBinary(const hsql::ImportStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Import from binary file isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildImportAuto(const hsql::ImportStatement &statement) {
+Planner::BuildImportAuto(const hsql::ImportStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Import from automatically identified format isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildExport(const hsql::ExportStatement &statement) {
+Planner::BuildExport(const hsql::ExportStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     switch(statement.type) {
         case hsql::kImportCSV:
-            return BuildExportCsv(statement);
+            return BuildExportCsv(statement, bind_context_ptr);
         case hsql::kImportTbl:
-            return BuildExportTbl(statement);
+            return BuildExportTbl(statement, bind_context_ptr);
         case hsql::kImportBinary:
-            return BuildExportBinary(statement);
+            return BuildExportBinary(statement, bind_context_ptr);
         case hsql::kImportAuto:
-            return BuildExportAuto(statement);
+            return BuildExportAuto(statement, bind_context_ptr);
     }
     ResponseError("Invalid export type.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildExportCsv(const hsql::ExportStatement &statement) {
+Planner::BuildExportCsv(const hsql::ExportStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Exporting to CSV file isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildExportTbl(const hsql::ExportStatement &statement) {
+Planner::BuildExportTbl(const hsql::ExportStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Exporting to table file isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildExportBinary(const hsql::ExportStatement &statement) {
+Planner::BuildExportBinary(const hsql::ExportStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Exporting to binary file isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildExportAuto(const hsql::ExportStatement &statement) {
+Planner::BuildExportAuto(const hsql::ExportStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Exporting in auto mode isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildTransaction(const hsql::TransactionStatement &statement) {
+Planner::BuildTransaction(const hsql::TransactionStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     switch(statement.command) {
         case hsql::kBeginTransaction:
-            return BuildTransactionBegin(statement);
+            return BuildTransactionBegin(statement, bind_context_ptr);
         case hsql::kCommitTransaction:
-            return BuildTransactionCommit(statement);
+            return BuildTransactionCommit(statement, bind_context_ptr);
         case hsql::kRollbackTransaction:
-            return BuildTransactionRollback(statement);
+            return BuildTransactionRollback(statement, bind_context_ptr);
     }
     ResponseError("Invalid transaction command");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildTransactionBegin(const hsql::TransactionStatement &statement) {
+Planner::BuildTransactionBegin(const hsql::TransactionStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Transaction command: BEGIN isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildTransactionCommit(const hsql::TransactionStatement &statement) {
+Planner::BuildTransactionCommit(const hsql::TransactionStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Transaction command: COMMIT isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildTransactionRollback(const hsql::TransactionStatement &statement) {
+Planner::BuildTransactionRollback(const hsql::TransactionStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Transaction command: ROLLBACK isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildAlter(const hsql::AlterStatement &statement) {
+Planner::BuildAlter(const hsql::AlterStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     switch(statement.action->type) {
         case hsql::DropColumn:
-            return BuildAlterDropColumn(statement);
+            return BuildAlterDropColumn(statement, bind_context_ptr);
     }
     ResponseError("Invalid ALTER command");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildAlterDropColumn(const hsql::AlterStatement &statement) {
+Planner::BuildAlterDropColumn(const hsql::AlterStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Alter: DROP COLUMN isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildPrepare(const hsql::PrepareStatement &statement) {
+Planner::BuildPrepare(const hsql::PrepareStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Prepare statement isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildExecute(const hsql::ExecuteStatement &statement) {
+Planner::BuildExecute(const hsql::ExecuteStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("Execute statement isn't supported.");
     return std::shared_ptr<LogicalOperator>();
 }
@@ -727,16 +732,27 @@ Planner::BuildTable(const hsql::TableRef* from_table, const std::shared_ptr<Bind
 
     std::shared_ptr<Table> table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, name);
     if(table_ptr != nullptr) {
-        //
+        // Build table scan operator
+        std::shared_ptr<LogicalOperator> logical_table_scan = std::make_shared<LogicalTableScan>(table_ptr);
+        this->AppendOperator(logical_table_scan, bind_context_ptr);
     }
 
     std::shared_ptr<View> view_ptr = Infinity::instance().catalog()->GetViewByName(schema_name, name);
     if(view_ptr != nullptr) {
-        //
+        // Build view scan operator
+        std::shared_ptr<LogicalOperator> logical_view_scan = std::make_shared<LogicalViewScan>(view_ptr);
+        this->AppendOperator(logical_view_scan, bind_context_ptr);
     }
 
     ResponseError("BuildTable is not implemented");
     return std::shared_ptr<LogicalOperator>();
+}
+
+uint64_t Planner::AppendOperator(std::shared_ptr<LogicalOperator> op, const std::shared_ptr<BindContext>& bind_context) {
+    uint64_t node_id = operator_array_.size();
+    op->set_node_id(node_id);
+    operator_array_.emplace_back(OperatorContext {std::move(op), bind_context->id_});
+    return node_id;
 }
 
 }

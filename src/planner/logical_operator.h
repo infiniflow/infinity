@@ -16,7 +16,7 @@ namespace infinity {
 
 class LogicalOperator {
 public:
-    explicit LogicalOperator(LogicalOperatorType node_type, uint64_t node_id) ;
+    explicit LogicalOperator(LogicalOperatorType node_type) ;
     virtual ~LogicalOperator() = default;
 
     [[nodiscard]] std::shared_ptr<LogicalOperator> left_node() const { return left_node_; }
@@ -30,8 +30,8 @@ public:
     [[nodiscard]] std::vector<std::shared_ptr<LogicalOperator>> outputs() const { return outputs_; }
 
     virtual std::string ToString(uint64_t space) = 0;
-    static uint64_t get_new_id() { return ++ node_id_count_; }
     [[nodiscard]] uint64_t node_id() const { return node_id_; }
+    void set_node_id(uint64_t node_id) { node_id_ = node_id; }
 
     [[nodiscard]] LogicalOperatorType operator_type() const {return operator_type_; }
 
@@ -44,7 +44,6 @@ protected:
 
     // Each node has an id which is unique in this plan tree.
     uint64_t node_id_{0};
-    static uint64_t node_id_count_;
 
 };
 

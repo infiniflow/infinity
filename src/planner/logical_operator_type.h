@@ -36,6 +36,7 @@ enum class LogicalOperatorType: uint8_t {
     // Scan
     kChunkScan,
     kTableScan,
+    kViewScan,
     // ?
     kAlias,
     kMock,

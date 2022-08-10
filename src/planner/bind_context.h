@@ -11,6 +11,8 @@
 
 namespace infinity {
 
+class LogicalOperator;
+
 struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(std::string alias, hsql::SelectStatement* select_stmt)
         : alias_(std::move(alias)), select_statement_(select_stmt) {}
@@ -22,7 +24,8 @@ struct CommonTableExpressionInfo {
 class BindContext {
 public:
     std::unordered_map<std::string, std::shared_ptr<CommonTableExpressionInfo>> CTE_map_;
-private:
+    std::vector<std::shared_ptr<LogicalOperator>> operators_;
+    uint64_t id_{0};
 };
 
 }

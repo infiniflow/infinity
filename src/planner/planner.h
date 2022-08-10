@@ -36,68 +36,68 @@ public:
     std::shared_ptr<LogicalOperator> CreateLogicalOperator(const hsql::SQLStatement &statement);
 private:
     // Create operator
-    std::shared_ptr<LogicalOperator> BuildCreate(const hsql::CreateStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildCreateTable(const hsql::CreateStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildCreateTableFromTable(const hsql::CreateStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildCreateView(const hsql::CreateStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildCreateIndex(const hsql::CreateStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildCreate(const hsql::CreateStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildCreateTable(const hsql::CreateStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildCreateTableFromTable(const hsql::CreateStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildCreateView(const hsql::CreateStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildCreateIndex(const hsql::CreateStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Drop operator
-    std::shared_ptr<LogicalOperator> BuildDrop(const hsql::DropStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildDropTable(const hsql::DropStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildDropSchema(const hsql::DropStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildDropIndex(const hsql::DropStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildDropView(const hsql::DropStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildDropPreparedStatement(const hsql::DropStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildDrop(const hsql::DropStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildDropTable(const hsql::DropStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildDropSchema(const hsql::DropStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildDropIndex(const hsql::DropStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildDropView(const hsql::DropStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildDropPreparedStatement(const hsql::DropStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Insert operator
-    std::shared_ptr<LogicalOperator> BuildInsert(const hsql::InsertStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildInsertValue(const hsql::InsertStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildInsertSelect(const hsql::InsertStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildInsert(const hsql::InsertStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildInsertValue(const hsql::InsertStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildInsertSelect(const hsql::InsertStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Delete operator
-    std::shared_ptr<LogicalOperator> BuildDelete(const hsql::DeleteStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildDelete(const hsql::DeleteStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Update operator
-    std::shared_ptr<LogicalOperator> BuildUpdate(const hsql::UpdateStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildUpdate(const hsql::UpdateStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Select operator
     std::shared_ptr<LogicalOperator> BuildSelect(const hsql::SelectStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Show operator
-    std::shared_ptr<LogicalOperator> BuildShow(const hsql::ShowStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildShowColumns(const hsql::ShowStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildShowTables(const hsql::ShowStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildShow(const hsql::ShowStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildShowColumns(const hsql::ShowStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildShowTables(const hsql::ShowStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Import operator
-    std::shared_ptr<LogicalOperator> BuildImport(const hsql::ImportStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildImportCsv(const hsql::ImportStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildImportTbl(const hsql::ImportStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildImportBinary(const hsql::ImportStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildImportAuto(const hsql::ImportStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildImport(const hsql::ImportStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildImportCsv(const hsql::ImportStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildImportTbl(const hsql::ImportStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildImportBinary(const hsql::ImportStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildImportAuto(const hsql::ImportStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Export operator
-    std::shared_ptr<LogicalOperator> BuildExport(const hsql::ExportStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildExportCsv(const hsql::ExportStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildExportTbl(const hsql::ExportStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildExportBinary(const hsql::ExportStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildExportAuto(const hsql::ExportStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildExport(const hsql::ExportStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildExportCsv(const hsql::ExportStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildExportTbl(const hsql::ExportStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildExportBinary(const hsql::ExportStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildExportAuto(const hsql::ExportStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Transaction operator
-    std::shared_ptr<LogicalOperator> BuildTransaction(const hsql::TransactionStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildTransactionBegin(const hsql::TransactionStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildTransactionCommit(const hsql::TransactionStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildTransactionRollback(const hsql::TransactionStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildTransaction(const hsql::TransactionStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildTransactionBegin(const hsql::TransactionStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildTransactionCommit(const hsql::TransactionStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildTransactionRollback(const hsql::TransactionStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Alter operator
-    std::shared_ptr<LogicalOperator> BuildAlter(const hsql::AlterStatement& statement);
-    std::shared_ptr<LogicalOperator> BuildAlterDropColumn(const hsql::AlterStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildAlter(const hsql::AlterStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<LogicalOperator> BuildAlterDropColumn(const hsql::AlterStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Prepare operator
-    std::shared_ptr<LogicalOperator> BuildPrepare(const hsql::PrepareStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildPrepare(const hsql::PrepareStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Execute operator
-    std::shared_ptr<LogicalOperator> BuildExecute(const hsql::ExecuteStatement& statement);
+    std::shared_ptr<LogicalOperator> BuildExecute(const hsql::ExecuteStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
 
     // Expression
@@ -133,9 +133,16 @@ private:
 
     std::shared_ptr<LogicalOperator>
     BuildTable(const hsql::TableRef* from_table, const std::shared_ptr<BindContext>& bind_context_ptr);
+
+    uint64_t AppendOperator(std::shared_ptr<LogicalOperator> op, const std::shared_ptr<BindContext>& bind_context);
 private:
+    struct OperatorContext {
+        std::shared_ptr<LogicalOperator> operator_{nullptr};
+        uint64_t context_id_{0};
+    };
+
     // All operators
-    std::vector<LogicalOperator> operators_;
+    std::vector<OperatorContext> operator_array_;
 
     // Bind Contexts
     std::vector<std::shared_ptr<BindContext>> bind_contexts_;

@@ -6,10 +6,8 @@
 
 namespace infinity {
 
-uint64_t LogicalOperator::node_id_count_{0};
-
-LogicalOperator::LogicalOperator(LogicalOperatorType node_type, uint64_t node_id)
-        : operator_type_(node_type), node_id_(node_id) {}
+LogicalOperator::LogicalOperator(LogicalOperatorType node_type)
+        : operator_type_(node_type) {}
 
 void
 LogicalOperator::AddOutputNode(const std::shared_ptr<LogicalOperator> &output) {

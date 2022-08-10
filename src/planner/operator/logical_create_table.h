@@ -13,10 +13,9 @@ namespace infinity {
 
 class LogicalCreateTable : public LogicalOperator {
 public:
-    LogicalCreateTable(uint64_t node_id,
-            std::shared_ptr<std::string> schema_name,
+    LogicalCreateTable(std::shared_ptr<std::string> schema_name,
             std::shared_ptr<TableDefinition> table_def_ptr)
-        : LogicalOperator(LogicalOperatorType::kCreateTable, node_id),
+        : LogicalOperator(LogicalOperatorType::kCreateTable),
         schema_name_(std::move(schema_name)),
         table_definitions_(std::move(table_def_ptr)) {}
 

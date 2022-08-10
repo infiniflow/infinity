@@ -1,5 +1,5 @@
 //
-// Created by JinHai on 2022/7/30.
+// Created by JinHai on 2022/8/10.
 //
 
 #pragma once
@@ -10,10 +10,10 @@
 
 namespace infinity {
 
-class LogicalChunkScan: public LogicalOperator {
+class LogicalTableScan : public LogicalOperator {
 public:
-    explicit LogicalChunkScan(std::shared_ptr<Table> table_ptr)
-        : LogicalOperator(LogicalOperatorType::kChunkScan), table_ptr_(std::move(table_ptr)) {}
+    explicit LogicalTableScan(std::shared_ptr<Table> table_ptr)
+    : LogicalOperator(LogicalOperatorType::kTableScan), table_ptr_(std::move(table_ptr)) {}
 
     [[nodiscard]] std::shared_ptr<Table> table_ptr() const { return table_ptr_; }
     std::string ToString(uint64_t space) final;
@@ -23,3 +23,4 @@ private:
 };
 
 }
+

@@ -13,8 +13,8 @@ namespace infinity {
 
 class LogicalFilter : public LogicalOperator {
 public:
-    LogicalFilter(uint64_t node_id, std::shared_ptr<BaseExpression> expression)
-        : LogicalOperator(LogicalOperatorType::kFilter, node_id), expression_(std::move(expression)) {}
+    LogicalFilter(std::shared_ptr<BaseExpression> expression)
+        : LogicalOperator(LogicalOperatorType::kFilter), expression_(std::move(expression)) {}
 
     std::string ToString(uint64_t space) final;
 

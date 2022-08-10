@@ -14,8 +14,8 @@ namespace infinity {
 
 class LogicalInsert : public LogicalOperator {
 public:
-    explicit LogicalInsert(uint64_t node_id, std::shared_ptr<Table> table_ptr, std::vector<std::shared_ptr<BaseExpression>> value_list)
-            : LogicalOperator(LogicalOperatorType::kInsert, node_id),
+    explicit LogicalInsert(std::shared_ptr<Table> table_ptr, std::vector<std::shared_ptr<BaseExpression>> value_list)
+            : LogicalOperator(LogicalOperatorType::kInsert),
               table_ptr_(std::move(table_ptr)), value_list_(std::move(value_list)) {};
 
     std::string ToString(uint64_t space) final;
