@@ -130,6 +130,9 @@ private:
     BuildTop(const std::vector<hsql::OrderDescription*>& order_by_clause,
              const hsql::LimitDescription& limit_description,
              const std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalOperator>
+    BuildTable(const hsql::TableRef* from_table, const std::shared_ptr<BindContext>& bind_context_ptr);
 private:
     // All operators
     std::vector<LogicalOperator> operators_;

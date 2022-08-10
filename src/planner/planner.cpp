@@ -270,8 +270,7 @@ Planner::BuildInsertValue(const hsql::InsertStatement &statement) {
     std::string table_name = std::string{statement.tableName};
     // Check schema and table in the catalog
     std::shared_ptr<Table> table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, table_name);
-
-
+    if(table_ptr == nullptr) { ResponseError(schema_name + "." + table_name + " not exists.")}
 
     // Create value list
     std::vector<std::shared_ptr<BaseExpression>> value_list;
@@ -343,7 +342,7 @@ std::shared_ptr<LogicalOperator>
 Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
 
     Assert(statement.selectList != nullptr, "SELECT list is needed");
-    Assert(statement.selectList->empty(), "SELECT list can't be empty");
+    Assert(!statement.selectList->empty(), "SELECT list can't be empty");
 
 
     std::shared_ptr<LogicalOperator> root_node_ptr;
@@ -643,7 +642,32 @@ Planner::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindConte
 }
 
 std::shared_ptr<LogicalOperator>
-Planner::BuildFromClause(const hsql::TableRef* fromTable, const std::shared_ptr<BindContext>& bind_context_ptr) {
+Planner::BuildFromClause(const hsql::TableRef* from_table, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    switch(from_table->type) {
+        case hsql::kTableName: {
+            // Only one table: select * from t1;
+            return BuildTable(from_table, bind_context_ptr);
+//            ResponseError("BuildFromClause: Only one table");
+//            break;
+        }
+        case hsql::kTableSelect: {
+            // select t1.a from (select * from t2 as t1);
+            ResponseError("BuildFromClause: Table select");
+            break;
+        }
+        case hsql::kTableJoin: {
+            // select t1.b, t2.c from t1 join t2 on t1.a = t2.a
+            ResponseError("BuildFromClause: Table join");
+            break;
+        }
+        case hsql::kTableCrossProduct: {
+            // select t1.b, t2.c from t1, t2;
+            ResponseError("BuildFromClause: Cross product");
+            break;
+        }
+    }
+
+
     ResponseError("BuildFromClause is not implemented");
     return std::shared_ptr<LogicalOperator>();
 }
@@ -689,6 +713,29 @@ Planner::BuildTop(const std::vector<hsql::OrderDescription*>& order_by_clause,
          const hsql::LimitDescription& limit_description,
          const std::shared_ptr<BindContext>& bind_context_ptr) {
     ResponseError("BuildTop is not implemented");
+    return std::shared_ptr<LogicalOperator>();
+}
+
+std::shared_ptr<LogicalOperator>
+Planner::BuildTable(const hsql::TableRef* from_table, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    std::string name = from_table->name;
+    std::string schema_name = from_table->schema == nullptr ? "Default" : std::string(from_table->schema);
+    if(bind_context_ptr->CTE_map_.contains(name)) {
+        // Table is from CTE
+        ResponseError("Table can't be CTE table now.");
+    }
+
+    std::shared_ptr<Table> table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, name);
+    if(table_ptr != nullptr) {
+        //
+    }
+
+    std::shared_ptr<View> view_ptr = Infinity::instance().catalog()->GetViewByName(schema_name, name);
+    if(view_ptr != nullptr) {
+        //
+    }
+
+    ResponseError("BuildTable is not implemented");
     return std::shared_ptr<LogicalOperator>();
 }
 

@@ -5,9 +5,12 @@
 #pragma once
 
 #include "logical_operator_type.h"
+#include "expression/base_expression.h"
+
 #include <string>
 #include <vector>
 #include <memory>
+#include <optional>
 
 namespace infinity {
 
@@ -44,6 +47,30 @@ protected:
     static uint64_t node_id_count_;
 
 };
+
+struct ColumnId {
+public:
+    [[nodiscard]] std::string ToString() const {
+        if(table_name_) return *table_name_ + "." + column_name_;
+        else return column_name_;
+    }
+
+    [[nodiscard]] bool operator==(const ColumnId& other) const {
+        return column_name_ == other.column_name_ && table_name_ == other.table_name_;
+    }
+
+    std::string column_name_;
+    std::optional<std::string> table_name_;
+};
+
+struct SelectListElement {
+    explicit SelectListElement(std::shared_ptr<BaseExpression> expr) : expression_(std::move(expr)) {};
+    void AddColumnId(const ColumnId& column_id) { identifiers_.push_back(column_id); }
+
+    std::shared_ptr<BaseExpression> expression_;
+    std::vector<ColumnId> identifiers_;
+};
+
 
 
 }

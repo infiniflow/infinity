@@ -51,4 +51,28 @@ Catalog::DeleteTable(const std::string &schema_name, const std::string &table_na
     schemas_[schema_name]->DeleteTable(table_name);
 }
 
+std::shared_ptr<View>
+Catalog::GetViewByName(const std::string& schema_name, const std::string& view_name) {
+    if(schemas_.find(schema_name) == schemas_.end()) {
+        ResponseError("Schema not found: " + schema_name);
+    }
+    return schemas_[schema_name]->GetViewByName(view_name);
+}
+
+void
+Catalog::AddView(const std::string& schema_name, const std::shared_ptr<View>& view) {
+    if(schemas_.find(schema_name) == schemas_.end()) {
+        ResponseError("Schema not found, view can't be created: " + schema_name);
+    }
+    schemas_[schema_name]->AddView(view);
+}
+
+void
+Catalog::DeleteView(const std::string& schema_name, const std::string& view_name) {
+    if(schemas_.find(schema_name) == schemas_.end()) {
+        ResponseError("Schema not found, view can't be deleted: " + schema_name);
+    }
+    schemas_[schema_name]->DeleteView(view_name);
+}
+
 }
