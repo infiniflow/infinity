@@ -733,19 +733,30 @@ Planner::BuildTable(const hsql::TableRef* from_table, const std::shared_ptr<Bind
     std::shared_ptr<Table> table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, name);
     if(table_ptr != nullptr) {
         // Build table scan operator
-        std::shared_ptr<LogicalOperator> logical_table_scan = std::make_shared<LogicalTableScan>(table_ptr);
+        std::shared_ptr<LogicalTableScan> logical_table_scan = std::make_shared<LogicalTableScan>(table_ptr);
         this->AppendOperator(logical_table_scan, bind_context_ptr);
+
+        // Handle table and column alias
+        if(from_table->alias != nullptr) {
+            logical_table_scan->table_alias_ = from_table->alias->name;
+            logical_table_scan->column_aliases_.reserve((from_table->alias->columns)->size());
+            for(const char* column_alias: *(from_table->alias->columns)) {
+                logical_table_scan->column_aliases_.emplace_back(column_alias);
+            }
+        }
+
+        return logical_table_scan;
     }
 
     std::shared_ptr<View> view_ptr = Infinity::instance().catalog()->GetViewByName(schema_name, name);
     if(view_ptr != nullptr) {
         // Build view scan operator
-        std::shared_ptr<LogicalOperator> logical_view_scan = std::make_shared<LogicalViewScan>(view_ptr);
+        std::shared_ptr<LogicalViewScan> logical_view_scan = std::make_shared<LogicalViewScan>(view_ptr);
         this->AppendOperator(logical_view_scan, bind_context_ptr);
+        return logical_view_scan;
     }
 
-    ResponseError("BuildTable is not implemented");
-    return std::shared_ptr<LogicalOperator>();
+    ResponseError("BuildTable: trying to build an supported table");
 }
 
 uint64_t Planner::AppendOperator(std::shared_ptr<LogicalOperator> op, const std::shared_ptr<BindContext>& bind_context) {
