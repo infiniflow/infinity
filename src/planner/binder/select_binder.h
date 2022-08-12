@@ -1,5 +1,5 @@
 //
-// Created by JinHai on 2022/8/11.
+// Created by JinHai on 2022/8/12.
 //
 
 #pragma once
@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class GroupByBinder : public ExpressionBinder {
+class SelectBinder : public ExpressionBinder {
 public:
     std::shared_ptr<BaseExpression>
     BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) override;
