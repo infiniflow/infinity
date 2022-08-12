@@ -2,13 +2,11 @@
 // Created by JinHai on 2022/8/12.
 //
 
-#pragma once
-
 #include "planner/expression_binder.h"
 
 namespace infinity {
 
-class AggregateBinder : public ExpressionBinder {
+class InsertBinder : public ExpressionBinder {
 public:
     // Bind expression entry
     std::shared_ptr<BaseExpression>

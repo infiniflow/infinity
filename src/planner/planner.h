@@ -100,9 +100,9 @@ private:
     std::shared_ptr<LogicalOperator> BuildExecute(const hsql::ExecuteStatement& statement, const std::shared_ptr<BindContext>& bind_context_ptr);
 
 
-    // Expression
-    std::shared_ptr<BaseExpression>
-    BuildExpression(const hsql::Expr& expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+//    // Expression
+//    std::shared_ptr<BaseExpression>
+//    BuildExpression(const hsql::Expr& expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Build From clause
     std::shared_ptr<LogicalOperator>

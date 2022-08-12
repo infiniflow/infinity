@@ -14,6 +14,13 @@
 #include "planner/operator/logical_insert.h"
 #include "planner/operator/logical_filter.h"
 
+#include "binder/aggregate_binder.h"
+#include "binder/group_binder.h"
+#include "binder/having_binder.h"
+#include "binder/insert_binder.h"
+#include "binder/select_binder.h"
+#include "binder/where_binder.h"
+
 #include "storage/table_definition.h"
 #include "storage/column_definition.h"
 #include "storage/table_with_fix_row.h"
@@ -252,9 +259,11 @@ Planner::BuildDropPreparedStatement(const hsql::DropStatement &statement, const 
 
 std::shared_ptr<LogicalOperator>
 Planner::BuildInsert(const hsql::InsertStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    bind_context_ptr->binder_ = std::make_shared<InsertBinder>();
     switch(statement.type) {
-        case hsql::kInsertValues:
+        case hsql::kInsertValues:{
             return BuildInsertValue(statement, bind_context_ptr);
+        }
         case hsql::kInsertSelect:
             return BuildInsertSelect(statement, bind_context_ptr);
         default:
@@ -281,7 +290,8 @@ Planner::BuildInsertValue(const hsql::InsertStatement &statement, const std::sha
     std::vector<std::shared_ptr<BaseExpression>> value_list;
     value_list.reserve(statement.values->size());
     for (const auto* expr : *statement.values) {
-        std::shared_ptr<BaseExpression> value_expr = BuildExpression(*expr, current_bind_context_ptr_);
+        std::shared_ptr<BaseExpression> value_expr
+            = bind_context_ptr->binder_->BuildExpression(*expr, current_bind_context_ptr_);
         value_list.emplace_back(value_expr);
     }
 
@@ -376,6 +386,8 @@ Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_p
     } else {
         // No table reference, just evaluate the expr of the select list.
     }
+
+    current_bind_context_ptr_->binder_ = std::make_shared<WhereBinder>();
 
     // 5. SELECT list (aliases)
     BuildSelectList(*statement.selectList, current_bind_context_ptr_);
@@ -611,51 +623,6 @@ Planner::BuildExecute(const hsql::ExecuteStatement &statement, const std::shared
     return std::shared_ptr<LogicalOperator>();
 }
 
-std::shared_ptr<BaseExpression>
-Planner::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-
-    std::string expr_name = expr.name ? std::string(expr.name) : std::string();
-
-    std::shared_ptr<BaseExpression> left = expr.expr ? BuildExpression(*expr.expr, bind_context_ptr) : nullptr;
-    std::shared_ptr<BaseExpression> right = expr.expr2 ? BuildExpression(*expr.expr2, bind_context_ptr) : nullptr;
-
-    LogicalType logical_type(LogicalTypeId::kNull);
-    switch(expr.type) {
-        case hsql::kExprLiteralFloat: {
-            logical_type = LogicalType(LogicalTypeId::kDouble);
-            return std::make_shared<ValueExpression>(logical_type, expr.fval);
-        }
-        case hsql::kExprLiteralInt: {
-            // TODO: int16/int8 also can be found out.
-            logical_type = static_cast<int32_t>(expr.ival) == expr.ival ?
-                           LogicalType(LogicalTypeId::kInteger): LogicalType(LogicalTypeId::kBigInt);
-            return std::make_shared<ValueExpression>(logical_type, expr.ival);
-        }
-        case hsql::kExprLiteralString: {
-            logical_type = LogicalType(LogicalTypeId::kVarchar);
-            return std::make_shared<ValueExpression>(logical_type, expr_name);
-        }
-        case hsql::kExprLiteralNull: {
-            logical_type = LogicalType(LogicalTypeId::kNull);
-            return std::make_shared<ValueExpression>(logical_type);
-        }
-        case hsql::kExprColumnRef: {
-            // Resolve column
-            std::optional<std::string> table_name = nullptr;
-            if(expr.table != nullptr) {
-                table_name = std::optional<std::string>(std::string(expr.table));
-            }
-            ColumnIdentifier column_identifier(table_name, expr_name);
-            std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnIdentifier(column_identifier);
-            return column_expr;
-        }
-        default:
-            ResponseError("Unsupported expr type");
-    }
-
-    return std::shared_ptr<BaseExpression>();
-}
-
 std::shared_ptr<LogicalOperator>
 Planner::BuildFromClause(const hsql::TableRef* from_table, const std::shared_ptr<BindContext>& bind_context_ptr) {
     switch(from_table->type) {
@@ -741,7 +708,9 @@ Planner::BuildSelectList(const std::vector<hsql::Expr*>& select_list, const std:
                 break;
             }
             default: {
-                std::shared_ptr<BaseExpression> expr = BuildExpression(*select_expr, bind_context_ptr);
+                std::shared_ptr<BaseExpression> expr
+                    = bind_context_ptr->binder_->BuildExpression(*select_expr, bind_context_ptr);
+
                 select_lists.emplace_back(expr);
 
                 // Generator column identifier
@@ -766,7 +735,8 @@ Planner::BuildSelectList(const std::vector<hsql::Expr*>& select_list, const std:
 
 std::shared_ptr<LogicalOperator>
 Planner::BuildFilter(const hsql::Expr* whereClause, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    std::shared_ptr<BaseExpression> where_expr = BuildExpression(*whereClause, current_bind_context_ptr_);
+    std::shared_ptr<BaseExpression> where_expr =
+            bind_context_ptr->binder_->BuildExpression(*whereClause, current_bind_context_ptr_);
     std::shared_ptr<LogicalFilter> logical_filter = std::make_shared<LogicalFilter>(where_expr);
     return logical_filter;
 }
@@ -778,21 +748,26 @@ Planner::BuildGroupByHaving(
         const std::shared_ptr<LogicalOperator>& root_operator) {
 
     if(select.groupBy != nullptr) {
-        // bind GROUP BY clause
+        // Start to bind GROUP BY clause
+        // Set group binder
+        bind_context_ptr->binder_ = std::make_shared<GroupBinder>();
+
         bind_context_ptr->groups_.reserve(select.groupBy->columns->size());
         for (const hsql::Expr* expr: *select.groupBy->columns) {
-            std::shared_ptr<BaseExpression> group_by_expr = BuildExpression(*expr, bind_context_ptr);
-            bind_context_ptr->groups_.emplace_back(group_by_expr);
 
-            std::string group_by_name = group_by_expr->ToString();
-            if(bind_context_ptr->groups_by_expr_.contains(group_by_name)) {
-                ResponseError("Duplicate group by expression");
-            }
-            bind_context_ptr->groups_by_expr_[group_by_name] = group_by_expr;
+            // Call GroupBinder BuildExpression
+            std::shared_ptr<BaseExpression> group_by_expr =
+                    bind_context_ptr->binder_->BuildExpression(*expr, bind_context_ptr);
         }
+    }
 
-        if(select.groupBy->having != nullptr) {
-
+    // All having expr must appear in group by list or aggregate function list.
+    if(select.groupBy != nullptr && select.groupBy->having != nullptr) {
+        // Start to bind Having clause
+        // Set having binder
+        bind_context_ptr->binder_ = std::make_shared<GroupBinder>();
+        for (const hsql::Expr* expr: *select.groupBy->having->exprList) {
+            bind_context_ptr->binder_->BuildExpression(*expr, bind_context_ptr);
         }
     }
 

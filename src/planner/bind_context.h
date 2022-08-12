@@ -8,6 +8,7 @@
 #include "expression/base_expression.h"
 #include "logical_operator.h"
 
+
 #include <unordered_map>
 #include <utility>
 
@@ -15,6 +16,7 @@ namespace infinity {
 
 class LogicalOperator;
 class Table;
+class ExpressionBinder;
 
 struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(std::string alias, hsql::SelectStatement* select_stmt)
@@ -48,6 +50,13 @@ public:
     // Bind group by expr
     std::vector<std::shared_ptr<BaseExpression>> groups_;
     std::unordered_map<std::string, std::shared_ptr<BaseExpression>> groups_by_expr_;
+
+    // Bind aggregate function by expr
+    std::vector<std::shared_ptr<BaseExpression>> aggregates_;
+    std::unordered_map<std::string, std::shared_ptr<BaseExpression>> aggregates_by_expr_;
+
+    // Binder, different binder have different expression build behavior.
+    std::shared_ptr<ExpressionBinder> binder_{nullptr};
 };
 
 }

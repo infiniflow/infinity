@@ -10,7 +10,6 @@ namespace infinity {
 
 std::shared_ptr<BaseExpression>
 ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext> &bind_context_ptr) {
-    std::string expr_name = expr.name ? std::string(expr.name) : std::string();
 
     std::shared_ptr<BaseExpression> left = expr.expr ? BuildExpression(*expr.expr, bind_context_ptr) : nullptr;
     std::shared_ptr<BaseExpression> right = expr.expr2 ? BuildExpression(*expr.expr2, bind_context_ptr) : nullptr;
@@ -29,7 +28,7 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
         }
         case hsql::kExprLiteralString: {
             logical_type = LogicalType(LogicalTypeId::kVarchar);
-            return std::make_shared<ValueExpression>(logical_type, expr_name);
+            return std::make_shared<ValueExpression>(logical_type, expr.getName());
         }
         case hsql::kExprLiteralNull: {
             logical_type = LogicalType(LogicalTypeId::kNull);
@@ -37,18 +36,39 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
         }
         case hsql::kExprColumnRef: {
             // Resolve column
-            std::optional<std::string> table_name = nullptr;
-            if(expr.table != nullptr) {
-                table_name = std::optional<std::string>(std::string(expr.table));
-            }
-            ColumnIdentifier column_identifier(table_name, expr_name);
-            std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnIdentifier(column_identifier);
-            return column_expr;
+            return BuildColRefExpr(expr, bind_context_ptr);
+        }
+        case hsql::kExprFunctionRef: {
+            // Check the function alias
+
+            // Check if the function is aggregate function
+
+            // Normal function
+            ResponseError("Function reference");
         }
         default:
             ResponseError("Unsupported expr type");
     }
 
+    return std::shared_ptr<BaseExpression>();
+}
+
+std::shared_ptr<BaseExpression>
+ExpressionBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    std::string expr_name = std::string(expr.getName());
+    std::optional<std::string> table_name = nullptr;
+    if(expr.table != nullptr) {
+        table_name = std::optional<std::string>(expr_name);
+    }
+    ColumnIdentifier column_identifier(table_name, expr_name);
+    std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnIdentifier(column_identifier);
+    return column_expr;
+}
+
+// Bind aggregate function.
+std::shared_ptr<BaseExpression>
+ExpressionBinder::BuildAggFunc(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    ResponseError("ExpressionBinder::BuildAggFunc");
     return std::shared_ptr<BaseExpression>();
 }
 
