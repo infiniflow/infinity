@@ -776,6 +776,26 @@ Planner::BuildGroupByHaving(
         const hsql::SelectStatement& select,
         const std::shared_ptr<BindContext>& bind_context_ptr,
         const std::shared_ptr<LogicalOperator>& root_operator) {
+
+    if(select.groupBy != nullptr) {
+        // bind GROUP BY clause
+        bind_context_ptr->groups_.reserve(select.groupBy->columns->size());
+        for (const hsql::Expr* expr: *select.groupBy->columns) {
+            std::shared_ptr<BaseExpression> group_by_expr = BuildExpression(*expr, bind_context_ptr);
+            bind_context_ptr->groups_.emplace_back(group_by_expr);
+
+            std::string group_by_name = group_by_expr->ToString();
+            if(bind_context_ptr->groups_by_expr_.contains(group_by_name)) {
+                ResponseError("Duplicate group by expression");
+            }
+            bind_context_ptr->groups_by_expr_[group_by_name] = group_by_expr;
+        }
+
+        if(select.groupBy->having != nullptr) {
+
+        }
+    }
+
     ResponseError("BuildGroupByHaving is not implemented");
     return std::shared_ptr<LogicalOperator>();
 }

@@ -29,14 +29,25 @@ public:
     std::shared_ptr<BaseExpression> ResolveColumnIdentifier(const ColumnIdentifier& column_identifier);
     void AddTable(const std::shared_ptr<Table>& table_ptr);
 
+    // CTE from CTE alias -> CTE statement
     std::unordered_map<std::string, std::shared_ptr<CommonTableExpressionInfo>> CTE_map_;
+
+    // All logical operator
     std::vector<std::shared_ptr<LogicalOperator>> operators_;
+
+    // An sequence id
     uint64_t id_{0};
 
+    // Output heading of this context
     std::vector<std::string> heading_;
 
+    // Binding Table
     std::vector<std::shared_ptr<Table>> tables_;
     std::unordered_map<std::string, std::shared_ptr<Table>> tables_by_name_;
+
+    // Bind group by expr
+    std::vector<std::shared_ptr<BaseExpression>> groups_;
+    std::unordered_map<std::string, std::shared_ptr<BaseExpression>> groups_by_expr_;
 };
 
 }
