@@ -390,7 +390,8 @@ Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_p
     current_bind_context_ptr_->binder_ = std::make_shared<WhereBinder>();
 
     // 5. SELECT list (aliases)
-    BuildSelectList(*statement.selectList, current_bind_context_ptr_);
+    std::vector<SelectListElement> select_list
+        = BuildSelectList(*statement.selectList, current_bind_context_ptr_);
 
     // 6. WHERE
     if (statement.whereClause) {
@@ -405,7 +406,15 @@ Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_p
     // 10. DISTINCT
     root_node_ptr = BuildGroupByHaving(statement, current_bind_context_ptr_, root_node_ptr);
 
-    // 11. SELECT (including flatten subquery)
+    // 11. SELECT (not flatten subquery)
+    current_bind_context_ptr_->binder_ = std::make_shared<SelectBinder>();
+    for (const SelectListElement& select_element : select_list) {
+        // Make up the column identifier to: table.column_name;
+
+        // Bind the expr use SelectBinder
+
+        // Set project alias to the project list index.
+    }
 
 
     // 12. ORDER BY
@@ -430,6 +439,8 @@ Planner::BuildSelect(const hsql::SelectStatement &statement, const std::shared_p
     // 16. LIMIT
     // 17. ORDER BY
     // 18. TOP
+
+    // Append projection node, also flatten subquery.
     ResponseError("Select isn't supported.");
     return root_node_ptr;
 }
