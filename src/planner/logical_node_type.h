@@ -7,7 +7,7 @@
 #include <cstdint>
 
 // Logical operator types used in logical plan
-enum class LogicalOperatorType: uint8_t {
+enum class LogicalNodeType: uint8_t {
     kInvalid = 0,
     kAggregate,
     kExcept,

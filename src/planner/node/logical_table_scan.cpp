@@ -9,7 +9,7 @@
 namespace infinity {
 
 LogicalTableScan::LogicalTableScan(std::shared_ptr<Table> table_ptr)
-    : LogicalOperator(LogicalOperatorType::kTableScan), table_ptr_(std::move(table_ptr)) {
+    : LogicalNode(LogicalNodeType::kTableScan), table_ptr_(std::move(table_ptr)) {
     uint64_t column_count = table_ptr_->table_def()->column_count();
     columns_.reserve(column_count);
     for(uint64_t idx = 0; idx < column_count; ++ idx) {

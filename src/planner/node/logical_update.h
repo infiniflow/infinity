@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include "planner/logical_operator.h"
+#include "planner/logical_node.h"
 
 namespace infinity {
 
-class LogicalUpdate : public LogicalOperator {
+class LogicalUpdate : public LogicalNode {
 
 };
 

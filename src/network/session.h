@@ -5,7 +5,7 @@
 #pragma once
 #include "pg_protocol_handler.h"
 #include "storage/table.h"
-#include "planner/logical_operator_type.h"
+#include "planner/logical_node_type.h"
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -40,7 +40,7 @@ private:
 
     void SendTableDescription(const std::shared_ptr<Table>& result_table);
     void SendQueryResponse(const std::shared_ptr<Table>& result_table);
-    void SendComplete(LogicalOperatorType operator_type, uint64_t row_count);
+    void SendComplete(LogicalNodeType operator_type, uint64_t row_count);
 
 };
 

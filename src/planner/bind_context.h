@@ -6,7 +6,7 @@
 
 #include "SQLParserResult.h"
 #include "expression/base_expression.h"
-#include "logical_operator.h"
+#include "logical_node.h"
 
 
 #include <unordered_map>
@@ -14,7 +14,7 @@
 
 namespace infinity {
 
-class LogicalOperator;
+class LogicalNode;
 class Table;
 class ExpressionBinder;
 
@@ -35,7 +35,7 @@ public:
     std::unordered_map<std::string, std::shared_ptr<CommonTableExpressionInfo>> CTE_map_;
 
     // All logical operator
-    std::vector<std::shared_ptr<LogicalOperator>> operators_;
+    std::vector<std::shared_ptr<LogicalNode>> operators_;
 
     // An sequence id
     uint64_t id_{0};

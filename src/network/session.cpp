@@ -198,18 +198,18 @@ Session::SendQueryResponse(const std::shared_ptr<Table>& result_table) {
 }
 
 void
-Session::SendComplete(LogicalOperatorType root_operator_type, uint64_t row_count) {
+Session::SendComplete(LogicalNodeType root_operator_type, uint64_t row_count) {
     std::string message;
     switch (root_operator_type) {
-        case LogicalOperatorType::kInsert: {
+        case LogicalNodeType::kInsert: {
             message = "INSERT 0 1";
             break;
         }
-        case LogicalOperatorType::kUpdate: {
+        case LogicalNodeType::kUpdate: {
             message = "UPDATE -1";
             break;
         }
-        case LogicalOperatorType::kDelete: {
+        case LogicalNodeType::kDelete: {
             message = "DELETE -1";
             break;
         }

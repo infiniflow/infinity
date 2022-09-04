@@ -4,17 +4,17 @@
 
 #pragma once
 
-#include "planner/logical_operator.h"
+#include "planner/logical_node.h"
 
 #include "storage/view.h"
 
 namespace infinity {
 
-class LogicalViewScan: public LogicalOperator {
+class LogicalViewScan: public LogicalNode {
 
 public:
     explicit LogicalViewScan(std::shared_ptr<View> view_ptr)
-    : LogicalOperator(LogicalOperatorType::kViewScan), view_ptr_(std::move(view_ptr)) {}
+    : LogicalNode(LogicalNodeType::kViewScan), view_ptr_(std::move(view_ptr)) {}
 
     [[nodiscard]] std::shared_ptr<View> view_ptr() const { return view_ptr_; }
     std::string ToString(uint64_t space) final;

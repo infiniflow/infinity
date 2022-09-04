@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "logical_operator.h"
+#include "logical_node.h"
 #include "optimizer_rule.h"
 #include <memory>
 #include <vector>
@@ -16,7 +16,7 @@ public:
     Optimizer() = default;
     void AddRule(std::unique_ptr<OptimizerRule> rule);
 
-    std::shared_ptr<LogicalOperator> optimize(const std::shared_ptr<LogicalOperator>& unoptimized_plan);
+    std::shared_ptr<LogicalNode> optimize(const std::shared_ptr<LogicalNode>& unoptimized_plan);
 
 public:
     std::vector<std::unique_ptr<OptimizerRule>> rules_;

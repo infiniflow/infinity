@@ -35,16 +35,18 @@ infinity::QueryHandler::ExecuteQuery(const std::string &query) {
     Assert(parse_result.getStatements().size() == 1, "Not support more statements");
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {
         // Build unoptimized logical plan for each SQL statement.
-        std::shared_ptr<LogicalOperator> unoptimized_plan = logical_planner.CreateLogicalOperator(*statement);
+        std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.CreateLogicalOperator(*statement);
 
         // Apply optimized rule to the logical plan
-        std::shared_ptr<LogicalOperator> optimized_plan = optimizer.optimize(unoptimized_plan);
+        std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
 
         // Build physical plan
         std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
+        // Create execution pipeline
         std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
 
+        // Schedule the query pipeline
         Infinity::instance().scheduler()->Schedule(pipeline);
 
         QueryResult query_result;

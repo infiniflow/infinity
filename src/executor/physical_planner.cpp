@@ -3,9 +3,9 @@
 //
 
 #include "physical_planner.h"
-#include "planner/operator/logical_create_table.h"
-#include "planner/operator/logical_drop_table.h"
-#include "planner/operator/logical_insert.h"
+#include "planner/node/logical_create_table.h"
+#include "planner/node/logical_drop_table.h"
+#include "planner/node/logical_insert.h"
 
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_aggregate.h"
@@ -38,33 +38,33 @@
 namespace infinity {
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildPhysicalOperator(const std::shared_ptr<LogicalOperator>& logical_operator) const {
+PhysicalPlanner::BuildPhysicalOperator(const std::shared_ptr<LogicalNode>& logical_operator) const {
 
     switch(logical_operator->operator_type()) {
         // DDL
-        case LogicalOperatorType::kCreateTable: return BuildCreateTable(logical_operator);
-        case LogicalOperatorType::kDropTable: return BuildDropTable(logical_operator);
-        case LogicalOperatorType::kCreateView: return BuildCreateView(logical_operator);
-        case LogicalOperatorType::kDropView: return BuildDropView(logical_operator);
-        case LogicalOperatorType::kAlter: return BuildAlter(logical_operator);
+        case LogicalNodeType::kCreateTable: return BuildCreateTable(logical_operator);
+        case LogicalNodeType::kDropTable: return BuildDropTable(logical_operator);
+        case LogicalNodeType::kCreateView: return BuildCreateView(logical_operator);
+        case LogicalNodeType::kDropView: return BuildDropView(logical_operator);
+        case LogicalNodeType::kAlter: return BuildAlter(logical_operator);
 
         // DML
-        case LogicalOperatorType::kInsert: return BuildInsert(logical_operator);
-        case LogicalOperatorType::kDelete: return BuildDelete(logical_operator);
-        case LogicalOperatorType::kUpdate: return BuildUpdate(logical_operator);
-        case LogicalOperatorType::kImport: return BuildImport(logical_operator);
-        case LogicalOperatorType::kExport: return BuildExcept(logical_operator);
+        case LogicalNodeType::kInsert: return BuildInsert(logical_operator);
+        case LogicalNodeType::kDelete: return BuildDelete(logical_operator);
+        case LogicalNodeType::kUpdate: return BuildUpdate(logical_operator);
+        case LogicalNodeType::kImport: return BuildImport(logical_operator);
+        case LogicalNodeType::kExport: return BuildExcept(logical_operator);
 
         // SELECT
-        case LogicalOperatorType::kAggregate: return BuildAggregate(logical_operator);
-        case LogicalOperatorType::kJoin: return BuildJoin(logical_operator);
-        case LogicalOperatorType::kSort: return BuildSort(logical_operator);
-        case LogicalOperatorType::kLimit: return BuildLimit(logical_operator);
-        case LogicalOperatorType::kFilter: return BuildFilter(logical_operator);
-        case LogicalOperatorType::kProjection: return BuildProjection(logical_operator);
-        case LogicalOperatorType::kUnion: return BuildUnion(logical_operator);
-        case LogicalOperatorType::kExcept: return BuildExcept(logical_operator);
-        case LogicalOperatorType::kIntersect: return BuildIntersect(logical_operator);
+        case LogicalNodeType::kAggregate: return BuildAggregate(logical_operator);
+        case LogicalNodeType::kJoin: return BuildJoin(logical_operator);
+        case LogicalNodeType::kSort: return BuildSort(logical_operator);
+        case LogicalNodeType::kLimit: return BuildLimit(logical_operator);
+        case LogicalNodeType::kFilter: return BuildFilter(logical_operator);
+        case LogicalNodeType::kProjection: return BuildProjection(logical_operator);
+        case LogicalNodeType::kUnion: return BuildUnion(logical_operator);
+        case LogicalNodeType::kExcept: return BuildExcept(logical_operator);
+        case LogicalNodeType::kIntersect: return BuildIntersect(logical_operator);
         default:
             break;
     }
@@ -72,7 +72,7 @@ PhysicalPlanner::BuildPhysicalOperator(const std::shared_ptr<LogicalOperator>& l
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildCreateTable(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildCreateTable(const std::shared_ptr<LogicalNode> &logical_operator) const {
     std::shared_ptr<LogicalCreateTable> logical_create_table =
             std::static_pointer_cast<LogicalCreateTable>(logical_operator);
     return std::make_shared<PhysicalCreateTable>(
@@ -82,17 +82,17 @@ PhysicalPlanner::BuildCreateTable(const std::shared_ptr<LogicalOperator> &logica
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildPreparedPlan(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildPreparedPlan(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalPreparedPlan>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildCreateView(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildCreateView(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalCreateView>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildDropTable(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildDropTable(const std::shared_ptr<LogicalNode> &logical_operator) const {
     std::shared_ptr<LogicalDropTable> logical_drop_table =
             std::static_pointer_cast<LogicalDropTable>(logical_operator);
     return std::make_shared<PhysicalDropTable>(
@@ -102,84 +102,84 @@ PhysicalPlanner::BuildDropTable(const std::shared_ptr<LogicalOperator> &logical_
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildDropView(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildDropView(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalDropView>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildInsert(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildInsert(const std::shared_ptr<LogicalNode> &logical_operator) const {
 
     std::shared_ptr<LogicalInsert> logical_insert_ptr = std::dynamic_pointer_cast<LogicalInsert>(logical_operator);
     return std::make_shared<PhysicalInsert>(logical_operator->node_id(), logical_insert_ptr->table_ptr(), logical_insert_ptr->value_list());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildDelete(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildDelete(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalDelete>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildUpdate(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildUpdate(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalUpdate>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildImport(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildImport(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalImport>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildExport(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildExport(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalExport>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildAlter(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildAlter(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalAlter>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildAggregate(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildAggregate(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalAggregate>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildJoin(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildJoin(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalHashJoin>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildSort(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildSort(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalSort>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildLimit(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildLimit(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalLimit>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildProjection(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildProjection(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalProject>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildFilter(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildFilter(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalFilter>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildIntersect(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildIntersect(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalHashJoin>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildUnion(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildUnion(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalUnionAll>(logical_operator->node_id());
 }
 
 std::shared_ptr<PhysicalOperator>
-PhysicalPlanner::BuildExcept(const std::shared_ptr<LogicalOperator> &logical_operator) const {
+PhysicalPlanner::BuildExcept(const std::shared_ptr<LogicalNode> &logical_operator) const {
     return std::make_shared<PhysicalHashJoin>(logical_operator->node_id());
 }
 

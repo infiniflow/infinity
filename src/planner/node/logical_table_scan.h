@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include "planner/logical_operator.h"
+#include "planner/logical_node.h"
 
 #include "storage/table.h"
 
 namespace infinity {
 
-class LogicalTableScan : public LogicalOperator {
+class LogicalTableScan : public LogicalNode {
 public:
     explicit LogicalTableScan(std::shared_ptr<Table> table_ptr);
 

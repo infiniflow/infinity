@@ -4,17 +4,17 @@
 
 #pragma once
 
-#include "planner/logical_operator.h"
+#include "planner/logical_node.h"
 
 namespace infinity {
 
-class LogicalDropTable : public LogicalOperator {
+class LogicalDropTable : public LogicalNode {
 public:
     LogicalDropTable(std::shared_ptr<std::string> schema_name,
                      std::shared_ptr<std::string> table_name)
-        : LogicalOperator(LogicalOperatorType::kDropTable),
-        schema_name_(std::move(schema_name)),
-        table_name_(std::move(table_name)) {}
+        : LogicalNode(LogicalNodeType::kDropTable),
+          schema_name_(std::move(schema_name)),
+          table_name_(std::move(table_name)) {}
 
     std::string ToString(uint64_t space) final;
     [[nodiscard]] std::shared_ptr<std::string> table_name() const { return table_name_; }

@@ -11,8 +11,8 @@ Optimizer::AddRule(std::unique_ptr<OptimizerRule> rule) {
     rules_.emplace_back(std::move(rule));
 }
 
-std::shared_ptr<LogicalOperator>
-Optimizer::optimize(const std::shared_ptr<LogicalOperator>& unoptimized_plan) {
+std::shared_ptr<LogicalNode>
+Optimizer::optimize(const std::shared_ptr<LogicalNode>& unoptimized_plan) {
     for(const auto& rule : rules_) {
         rule->ApplyToPlan(unoptimized_plan);
     }

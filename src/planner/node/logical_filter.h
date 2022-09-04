@@ -6,15 +6,15 @@
 
 #include <utility>
 
-#include "planner/logical_operator.h"
+#include "planner/logical_node.h"
 #include "expression/base_expression.h"
 
 namespace infinity {
 
-class LogicalFilter : public LogicalOperator {
+class LogicalFilter : public LogicalNode {
 public:
     LogicalFilter(std::shared_ptr<BaseExpression> expression)
-        : LogicalOperator(LogicalOperatorType::kFilter), expression_(std::move(expression)) {}
+        : LogicalNode(LogicalNodeType::kFilter), expression_(std::move(expression)) {}
 
     std::string ToString(uint64_t space) final;
 

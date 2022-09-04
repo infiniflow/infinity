@@ -5,7 +5,7 @@
 #pragma once
 
 #include "storage/table.h"
-#include "planner/logical_operator_type.h"
+#include "planner/logical_node_type.h"
 
 #include <string>
 
@@ -13,7 +13,7 @@ namespace infinity {
 
 struct QueryResult {
     std::shared_ptr<Table> result_;
-    LogicalOperatorType root_operator_type_;
+    LogicalNodeType root_operator_type_;
 };
 
 class QueryHandler {

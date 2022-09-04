@@ -8,14 +8,14 @@
 
 #include "expression/base_expression.h"
 #include "storage/table.h"
-#include "planner/logical_operator.h"
+#include "planner/logical_node.h"
 
 namespace infinity {
 
-class LogicalInsert : public LogicalOperator {
+class LogicalInsert : public LogicalNode {
 public:
     explicit LogicalInsert(std::shared_ptr<Table> table_ptr, std::vector<std::shared_ptr<BaseExpression>> value_list)
-            : LogicalOperator(LogicalOperatorType::kInsert),
+            : LogicalNode(LogicalNodeType::kInsert),
               table_ptr_(std::move(table_ptr)), value_list_(std::move(value_list)) {};
 
     std::string ToString(uint64_t space) final;
