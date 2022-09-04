@@ -42,7 +42,7 @@ BufferWriter::send_string(const std::string &value, NullTerminator null_terminat
 
 void
 BufferWriter::flush(size_t bytes) {
-    Assert(bytes <= size(), "Can't flush more bytes than available");
+    NetworkAssert(bytes <= size(), "Can't flush more bytes than available");
     const auto bytes_to_send = bytes ? bytes : size();
     size_t bytes_sent;
 
@@ -61,10 +61,10 @@ BufferWriter::flush(size_t bytes) {
     }
 
     if(boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_sent == 0) {
-        Assert(false, "Write failed. Client close connection.");
+        NetworkAssert(false, "Write failed. Client close connection.");
     }
 
-    Assert(!boost_error, boost_error.message());
+    NetworkAssert(!boost_error, boost_error.message());
     std::advance(start_pos_, bytes_sent);
 }
 

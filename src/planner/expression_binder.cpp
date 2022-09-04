@@ -4,7 +4,7 @@
 
 #include "expression_binder.h"
 #include "expression/value_expression.h"
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -44,10 +44,10 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
             // Check if the function is aggregate function
 
             // Normal function
-            ResponseError("Function reference");
+            PlannerError("Function reference");
         }
         default:
-            ResponseError("Unsupported expr type");
+            PlannerError("Unsupported expr type");
     }
 
     return std::shared_ptr<BaseExpression>();
@@ -68,7 +68,7 @@ ExpressionBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<
 // Bind aggregate function.
 std::shared_ptr<BaseExpression>
 ExpressionBinder::BuildAggFunc(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    ResponseError("ExpressionBinder::BuildAggFunc");
+    PlannerError("ExpressionBinder::BuildAggFunc");
     return std::shared_ptr<BaseExpression>();
 }
 

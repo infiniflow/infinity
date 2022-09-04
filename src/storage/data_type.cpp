@@ -4,7 +4,7 @@
 
 
 #include "data_type.h"
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 
 #include <string>
 
@@ -53,7 +53,7 @@ LogicalType::ToString() const {
         case LogicalTypeId::kVarchar: return "Varchar";
         case LogicalTypeId::kText: return "Text";
         default:
-            ResponseError("Invalid logical data type.");
+            StorageError("Invalid logical data type.");
     }
 }
 

@@ -3,14 +3,14 @@
 //
 
 #include "bind_context.h"
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 #include "storage/table.h"
 
 namespace infinity {
 
 std::shared_ptr<BaseExpression>
 BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier) {
-    ResponseError("Not implement: BindContext::resolve_column_identifier");
+    PlannerError("Not implement: BindContext::resolve_column_identifier");
     return std::shared_ptr<BaseExpression>();
 }
 
@@ -18,7 +18,7 @@ void
 BindContext::AddTable(const std::shared_ptr<Table>& table_ptr) {
     std::string table_name = table_ptr->table_def()->name();
     if(tables_by_name_.contains(table_name)) {
-        ResponseError("Duplicate table when binding.")
+        PlannerError("Duplicate table when binding.")
     }
 
     // Add table into binding table arrays

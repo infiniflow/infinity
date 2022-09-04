@@ -4,7 +4,7 @@
 
 #pragma once
 #include "common/utility/str.h"
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 #include "pg_message.h"
 #include "ring_buffer_iterator.h"
 
@@ -44,7 +44,7 @@ public:
         if constexpr(std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>) {
             return ntohll(network_value);
         }
-        Assert(false, "Try to read invalid type of data from the buffer.");
+        NetworkAssert(false, "Try to read invalid type of data from the buffer.");
     }
 
     std::string read_string(const size_t string_length, NullTerminator null_terminator = NullTerminator::kYes);

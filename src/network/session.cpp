@@ -79,7 +79,7 @@ Session::HandleRequest() {
             break;
         }
         default: {
-            Assert(false, "Unknown command type");
+            NetworkAssert(false, "Unknown command type");
         }
     }
 }
@@ -180,7 +180,7 @@ Session::SendTableDescription(const std::shared_ptr<Table>& result_table) {
                 object_width = 16;
                 break;
             default:
-                ResponseError("Not supported type.");
+                NetworkError("Not supported type.");
         }
 
         pg_handler_->SendDescription(column.name(), object_id, object_width);

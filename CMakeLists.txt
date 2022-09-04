@@ -3,6 +3,8 @@ project(infinity)
 
 set(CMAKE_CXX_STANDARD 20)
 
+ADD_DEFINITIONS(-D INFINITY_DEBUG)
+
 include_directories(
         src
         third_party/cxxopts/include

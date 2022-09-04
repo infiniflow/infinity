@@ -5,7 +5,7 @@
 #pragma once
 #include <array>
 #include "pg_message.h"
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 #include "ring_buffer_iterator.h"
 #include <boost/asio/ip/tcp.hpp>
 

@@ -54,7 +54,7 @@ std::string BufferReader::read_string(const size_t string_length, NullTerminator
     }
 
     if(null_terminator == NullTerminator::kYes) {
-        Assert(result.back() == NULL_END, "Last character isn't null.");
+        NetworkAssert(result.back() == NULL_END, "Last character isn't null.");
         result.pop_back();
     }
 
@@ -91,10 +91,10 @@ void BufferReader::receive_more(size_t bytes) {
     }
 
     if(boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_read == 0) {
-        Assert(false, "Client close the connection.");
+        NetworkAssert(false, "Client close the connection.");
     }
 
-    Assert(!boost_error, boost_error.message());
+    NetworkAssert(!boost_error, boost_error.message());
 
     std::advance(current_pos_, bytes_read);
 }

@@ -3,7 +3,7 @@
 //
 
 #include "block.h"
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -69,7 +69,7 @@ Block::Block(const std::shared_ptr<TableDefinition>& table_def, TableType type, 
                 break;
             }
             default:
-                ResponseError("Wrong column type");
+                StorageError("Wrong column type");
         }
     }
 }
@@ -77,7 +77,7 @@ Block::Block(const std::shared_ptr<TableDefinition>& table_def, TableType type, 
 
 void Block::Append(const std::vector<std::any>& values, uint64_t start_idx) {
     uint64_t column_count = columns_.size();
-    Assert(values.size() == column_count, "Wrong column data are appended to the row group");
+    StorageAssert(values.size() == column_count, "Wrong column data are appended to the row group");
 
     for(uint64_t i = 0; i < column_count; ++ i) {
         switch(column_defs_[i].logical_type().GetTypeId()) {
@@ -166,7 +166,7 @@ void Block::Append(const std::vector<std::any>& values, uint64_t start_idx) {
                 break;
             }
             default:
-                ResponseError("Wrong column type");
+                StorageError("Wrong column type");
         }
     }
 }

@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+//#include "common/utility/infinity_asserter.h"
 #include "network/db_server.h"
 #include "cxxopts.hpp"
 
@@ -25,7 +26,7 @@ void ParseArguments(int argc, char** argv, infinity::StartupParameter& parameter
     boost::system::error_code error;
     parameters.address = boost::asio::ip::make_address(result["address"].as<std::string>(), error);
 
-    Assert(!error, "Not a valid IPv4 address: " + result["address"].as<std::string>() + ", panic!");
+    GeneralAssert(!error, "Not a valid IPv4 address: " + result["address"].as<std::string>() + ", panic!");
 
     parameters.port = result["port"].as<uint16_t>();
 }

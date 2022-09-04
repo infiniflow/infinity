@@ -5,7 +5,7 @@
 #include "storage/table_with_fix_row.h"
 #include "physical_insert.h"
 #include "expression/value_expression.h"
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -15,7 +15,7 @@ PhysicalInsert::Execute() {
     uint64_t value_count = value_list_.size();
     for(uint64_t idx = 0; idx < value_count; ++ idx) {
         if (value_list_[idx]->type() != ExpressionType::kValue) {
-            ResponseError("Execute: Not value expression.");
+            ExecutorError("Not value expression.");
         }
     }
 

@@ -2,7 +2,7 @@
 // Created by JinHai on 2022/8/11.
 //
 
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 #include "having_binder.h"
 
 namespace infinity {
@@ -23,7 +23,7 @@ HavingBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<Bind
             return bind_context_ptr->aggregates_by_expr_[expr_name];
         } else {
             // in an aggregate function, which means aggregate function nested, which is error.
-            ResponseError("HavingBinder::BuildExpression: Aggregate function is nested in another aggregate function.");
+            PlannerError("HavingBinder::BuildExpression: Aggregate function is nested in another aggregate function.");
         }
     }
 
@@ -34,7 +34,7 @@ std::shared_ptr<BaseExpression>
 HavingBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
     std::shared_ptr<BaseExpression> column_expr = ExpressionBinder::BuildColRefExpr(expr, bind_context_ptr);
 
-    ResponseError("HavingBinder::BuildColRefExpr");
+    PlannerError("HavingBinder::BuildColRefExpr");
     return column_expr;
 }
 

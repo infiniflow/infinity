@@ -2,7 +2,7 @@
 // Created by JinHai on 2022/8/12.
 //
 
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 #include "select_binder.h"
 
 namespace infinity {
@@ -15,7 +15,7 @@ SelectBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<Bind
 
 std::shared_ptr<BaseExpression>
 SelectBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    ResponseError("SelectBinder::BuildColRefExpr");
+    PlannerError("SelectBinder::BuildColRefExpr");
 }
 
 }

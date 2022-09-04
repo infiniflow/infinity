@@ -5,7 +5,7 @@
 #pragma once
 
 #include "pg_message.h"
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 
 #include <array>
 #include <boost/iterator/iterator_facade.hpp>
@@ -18,7 +18,7 @@ public:
             : data_(data), position_(position) {}
 
     RingBufferIterator& operator=(const RingBufferIterator& other) {
-        Assert(&data_ == &other.data_, "The two iterators are from different arrays");
+        NetworkAssert(&data_ == &other.data_, "The two iterators are from different arrays");
         position_ = other.position_;
         return *this;
     }

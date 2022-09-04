@@ -10,6 +10,8 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         common/*.cpp
         common/*.h
+        common/utility/*.cpp
+        common/utility/*.h
         )
 
 file(GLOB_RECURSE
@@ -56,8 +58,8 @@ file(GLOB_RECURSE
         storage/*.cpp
         )
 
-add_executable(infinity_main
-        ${bin_src}
+set(
+        INFINITY_CORE_SOURCE
         ${common_src}
         ${executor_src}
         ${expression_src}
@@ -66,6 +68,11 @@ add_executable(infinity_main
         ${planner_src}
         ${scheduler_src}
         ${storage_src}
+)
+
+add_executable(infinity_main
+        ${bin_src}
+        ${INFINITY_CORE_SOURCE}
         )
 
 target_link_libraries(

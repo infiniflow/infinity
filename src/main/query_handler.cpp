@@ -8,7 +8,7 @@
 #include "planner/optimizer.h"
 #include "executor/physical_planner.h"
 #include "executor/physical_operator.h"
-#include "common/utility/asserter.h"
+#include "common/utility/infinity_assert.h"
 #include "scheduler/operator_pipeline.h"
 
 #include "SQLParser.h"
@@ -25,14 +25,14 @@ infinity::QueryHandler::ExecuteQuery(const std::string &query) {
     // Parse sql
     hsql::SQLParser::parse(query, &parse_result);
     if(!parse_result.isValid()) {
-        ResponseError(parse_result.errorMsg())
+        ParserError(parse_result.errorMsg())
     }
 
     Planner logical_planner;
     Optimizer optimizer;
     PhysicalPlanner physical_planner;
 
-    Assert(parse_result.getStatements().size() == 1, "Not support more statements");
+    PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {
         // Build unoptimized logical plan for each SQL statement.
         std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.CreateLogicalOperator(*statement);
@@ -57,7 +57,7 @@ infinity::QueryHandler::ExecuteQuery(const std::string &query) {
 //        ResponseError(optimized_plan->ToString(0));
     }
 
-    ResponseError("Can't reach here.")
+    NetworkError("Can't reach here.")
 //    return QueryResult();
 }
 

@@ -20,6 +20,7 @@ add_executable(test_main
         main.cpp
         ${common_src}
         ${common_test_src}
+#        ${INFINITY_CORE_SOURCE}
         )
 
 target_link_libraries(test_main
