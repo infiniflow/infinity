@@ -3,12 +3,6 @@ include_directories(../third_party/googletest/googlemock/include)
 include_directories(./)
 
 
-file(GLOB_RECURSE
-        common_src
-        CONFIGURE_DEPENDS
-        ${PROJECT_SOURCE_DIR}/src/common/*.cpp
-        ${PROJECT_SOURCE_DIR}/src/common/*.h
-        )
 
 file(GLOB_RECURSE
         common_test_src
@@ -18,9 +12,7 @@ file(GLOB_RECURSE
 
 add_executable(test_main
         main.cpp
-        ${common_src}
         ${common_test_src}
-#        ${INFINITY_CORE_SOURCE}
         )
 
 target_link_libraries(test_main
@@ -28,4 +20,5 @@ target_link_libraries(test_main
         gtest_main
         gmock
         gmock_main
+        infinity_core
         )

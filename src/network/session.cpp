@@ -24,7 +24,7 @@ Session::Run() {
         } catch (const std::exception& e) {
             std::map<PGMessageType, std::string> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();
-            std::cout << "Error: " << e.what() << std::endl;
+            std::cout << e.what() << std::endl;
             pg_handler_->send_error_response(error_message_map);
             pg_handler_->send_ready_for_query();
         }

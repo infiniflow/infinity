@@ -58,8 +58,7 @@ file(GLOB_RECURSE
         storage/*.cpp
         )
 
-set(
-        INFINITY_CORE_SOURCE
+set(INFINITY_CORE_SOURCE
         ${common_src}
         ${executor_src}
         ${expression_src}
@@ -70,13 +69,14 @@ set(
         ${storage_src}
 )
 
+add_library(infinity_core STATIC ${INFINITY_CORE_SOURCE})
+
 add_executable(infinity_main
         ${bin_src}
-        ${INFINITY_CORE_SOURCE}
         )
 
 target_link_libraries(
         infinity_main
+        infinity_core
         sql-parser
-        #        pqxx_static
 )

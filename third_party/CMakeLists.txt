@@ -26,13 +26,6 @@ add_library(
         ${PARSER_DIR}/src/util/sqlhelper.cpp
 )
 
-target_include_directories(
-        sql-parser
-
-        INTERFACE
-        ${PARSER_DIR}/src
-)
-
 target_compile_options(
         sql-parser
         PRIVATE
