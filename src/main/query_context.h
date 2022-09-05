@@ -6,6 +6,8 @@
 
 #include "storage/table.h"
 #include "planner/logical_node_type.h"
+#include "transaction_context.h"
+#include "query_metrics.h"
 
 #include <string>
 
@@ -16,10 +18,13 @@ struct QueryResult {
     LogicalNodeType root_operator_type_;
 };
 
-class QueryHandler {
+class QueryContext {
 public:
-    static QueryResult ExecuteQuery(const std::string& query);
+    static QueryResult Execute(const std::string& query);
 private:
+    // transaction context
+    std::unique_ptr<TransactionContext> transaction_;
+    std::unique_ptr<QueryMetrics> query_metrics_;
 };
 
 }

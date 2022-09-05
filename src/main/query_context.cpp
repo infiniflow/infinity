@@ -2,7 +2,7 @@
 // Created by JinHai on 2022/7/22.
 //
 
-#include "query_handler.h"
+#include "query_context.h"
 #include "infinity.h"
 #include "planner/planner.h"
 #include "planner/optimizer.h"
@@ -19,7 +19,7 @@ namespace infinity {
 class Pipeline;
 
 QueryResult
-infinity::QueryHandler::ExecuteQuery(const std::string &query) {
+infinity::QueryContext::Execute(const std::string &query) {
     hsql::SQLParserResult parse_result;
 
     // Parse sql

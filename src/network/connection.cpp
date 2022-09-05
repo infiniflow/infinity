@@ -3,7 +3,7 @@
 //
 
 #include "connection.h"
-#include "main/query_handler.h"
+#include "main/query_context.h"
 
 #include <iostream>
 
@@ -11,7 +11,8 @@ namespace infinity {
 
 Connection::Connection(boost::asio::io_service& io_service)
     : socket_(std::make_shared<boost::asio::ip::tcp::socket>(io_service)),
-      pg_handler_(std::make_shared<PGProtocolHandler>(socket())){}
+      pg_handler_(std::make_shared<PGProtocolHandler>(socket())),
+      session_ptr_(std::make_unique<Session>()){}
 
 void
 Connection::Run() {
@@ -90,7 +91,7 @@ Connection::HandlerSimpleQuery() {
     std::cout << "Query: " << query << std::endl;
 
     // Start to execute the query.
-    QueryResult result = QueryHandler::ExecuteQuery(query);
+    QueryResult result = QueryContext::Execute(query);
 
     // Response to the result message to client
     if(result.result_ == nullptr) {

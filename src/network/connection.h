@@ -6,6 +6,7 @@
 #include "pg_protocol_handler.h"
 #include "storage/table.h"
 #include "planner/logical_node_type.h"
+#include "main/session.h"
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -42,6 +43,8 @@ private:
     void SendQueryResponse(const std::shared_ptr<Table>& result_table);
     void SendComplete(LogicalNodeType operator_type, uint64_t row_count);
 
+private:
+    std::unique_ptr<Session> session_ptr_;
 };
 
 }
