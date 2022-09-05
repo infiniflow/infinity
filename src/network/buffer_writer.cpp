@@ -3,7 +3,7 @@
 //
 
 #include "buffer_writer.h"
-#include "session.h"
+#include "connection.h"
 
 #include <boost/asio/write.hpp>
 

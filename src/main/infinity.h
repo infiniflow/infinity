@@ -5,7 +5,7 @@
 #pragma once
 
 #include "common/singleton.h"
-#include "network/session.h"
+#include "network/connection.h"
 #include "scheduler/naive_scheduler.h"
 #include "storage/catalog.h"
 #include "config.h"

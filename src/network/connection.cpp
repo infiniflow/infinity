@@ -2,23 +2,23 @@
 // Created by JinHai on 2022/7/20.
 //
 
-#include "session.h"
+#include "connection.h"
 #include "main/query_handler.h"
 
 #include <iostream>
 
 namespace infinity {
 
-Session::Session(boost::asio::io_service& io_service)
+Connection::Connection(boost::asio::io_service& io_service)
     : socket_(std::make_shared<boost::asio::ip::tcp::socket>(io_service)),
       pg_handler_(std::make_shared<PGProtocolHandler>(socket())){}
 
 void
-Session::Run() {
+Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
     HandleConnection();
-    while(!terminate_session_) {
+    while(!terminate_connection_) {
         try {
             HandleRequest();
         } catch (const std::exception& e) {
@@ -33,7 +33,7 @@ Session::Run() {
 }
 
 void
-Session::HandleConnection() {
+Connection::HandleConnection() {
     const auto body_length = pg_handler_->read_startup_header();
 
     pg_handler_->read_startup_body(body_length);
@@ -46,7 +46,7 @@ Session::HandleConnection() {
 }
 
 void
-Session::HandleRequest() {
+Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
     switch (cmd_type) {
@@ -75,7 +75,7 @@ Session::HandleRequest() {
             break;
         }
         case PGMessageType::kTerminateCommand: {
-            terminate_session_ = true;
+            terminate_connection_ = true;
             break;
         }
         default: {
@@ -85,7 +85,7 @@ Session::HandleRequest() {
 }
 
 void
-Session::HandlerSimpleQuery() {
+Connection::HandlerSimpleQuery() {
     const std::string& query = pg_handler_->read_command_body();
     std::cout << "Query: " << query << std::endl;
 
@@ -111,7 +111,7 @@ Session::HandlerSimpleQuery() {
 }
 
 void
-Session::SendTableDescription(const std::shared_ptr<Table>& result_table) {
+Connection::SendTableDescription(const std::shared_ptr<Table>& result_table) {
     uint32_t column_name_length_sum = 0;
     for(auto& column: result_table->table_def()->columns()) {
         column_name_length_sum += column.name().size();
@@ -188,7 +188,7 @@ Session::SendTableDescription(const std::shared_ptr<Table>& result_table) {
 }
 
 void
-Session::SendQueryResponse(const std::shared_ptr<Table>& result_table) {
+Connection::SendQueryResponse(const std::shared_ptr<Table>& result_table) {
     uint64_t column_count = result_table->table_def()->column_count();
     auto values_as_strings = std::vector<std::optional<std::string>>(column_count);
     uint64_t row_group_count = result_table->block_count();
@@ -198,7 +198,7 @@ Session::SendQueryResponse(const std::shared_ptr<Table>& result_table) {
 }
 
 void
-Session::SendComplete(LogicalNodeType root_operator_type, uint64_t row_count) {
+Connection::SendComplete(LogicalNodeType root_operator_type, uint64_t row_count) {
     std::string message;
     switch (root_operator_type) {
         case LogicalNodeType::kInsert: {

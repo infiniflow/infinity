@@ -12,16 +12,16 @@
 
 namespace infinity {
 
-enum class SessionStatus : char {
+enum class ConnectionStatus : char {
     kIdle,
     kRunning,
     kSuspend,
     kTerminated
 };
 
-class Session {
+class Connection {
 public:
-    explicit Session(boost::asio::io_service& io_service);
+    explicit Connection(boost::asio::io_service& io_service);
     void Run();
 
     std::shared_ptr<boost::asio::ip::tcp::socket> socket() { return socket_; }
@@ -36,7 +36,7 @@ private:
 
     const std::shared_ptr<PGProtocolHandler> pg_handler_;
 
-    bool terminate_session_ = false;
+    bool terminate_connection_ = false;
 
     void SendTableDescription(const std::shared_ptr<Table>& result_table);
     void SendQueryResponse(const std::shared_ptr<Table>& result_table);

@@ -14,13 +14,13 @@ DBServer::DBServer(const StartupParameter &parameter)
 void DBServer::Run() {
     initialized = true;
 
-    CreateSession();
+    CreateConnection();
     io_service_.run();
 }
 
 void DBServer::Shutdown() {
-    while(running_session_count_ > 0) {
-        // Running session exists.
+    while(running_connection_count_ > 0) {
+        // Running connection exists.
         std::this_thread::yield();
     }
     io_service_.stop();
@@ -29,25 +29,25 @@ void DBServer::Shutdown() {
 }
 
 void
-DBServer::CreateSession() {
-    std::shared_ptr<Session> session_ptr = std::make_shared<Session>(io_service_);
-    acceptor_.async_accept(*(session_ptr->socket()), boost::bind(&DBServer::StartSession, this, session_ptr));
+DBServer::CreateConnection() {
+    std::shared_ptr<Connection> connection_ptr = std::make_shared<Connection>(io_service_);
+    acceptor_.async_accept(*(connection_ptr->socket()), boost::bind(&DBServer::StartConnection, this, connection_ptr));
 }
 
 
 void
-DBServer::StartSession(std::shared_ptr<Session>& session) {
-    std::thread session_thread ([session = session, &num_running_sessions = this->running_session_count_]() mutable {
-        ++ num_running_sessions;
-        session->Run();
+DBServer::StartConnection(std::shared_ptr<Connection>& connection) {
+    std::thread connection_thread ([connection = connection, &num_running_connections = this->running_connection_count_]() mutable {
+        ++ num_running_connections;
+        connection->Run();
 
         // User disconnected
-        session.reset();
-        -- num_running_sessions;
+        connection.reset();
+        -- num_running_connections;
     });
 
-    session_thread.detach();
-    CreateSession();
+    connection_thread.detach();
+    CreateConnection();
 }
 
 }
