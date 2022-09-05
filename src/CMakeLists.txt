@@ -1,4 +1,8 @@
 #add_subdirectory(bin)
+
+# Configure the version file
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h)
+
 file(GLOB_RECURSE
         bin_src
         CONFIGURE_DEPENDS

@@ -6,6 +6,7 @@
 //#include "common/utility/infinity_asserter.h"
 #include "network/db_server.h"
 #include "cxxopts.hpp"
+#include "compilation_config.h"
 
 void ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
     cxxopts::Options options("./infinity_server", "");
@@ -32,6 +33,13 @@ void ParseArguments(int argc, char** argv, infinity::StartupParameter& parameter
 }
 
 int main(int argc, char** argv) {
+    std::cout << "Startup Infinity database, version: "
+              << VERSION_MAJOR << "."
+              << VERSION_MINOR << "."
+              << VERSION_PATCH << " built on "
+              << BUILD_TIME << " from branch: "
+              << GIT_BRANCH_NAME << std::endl;
+
     infinity::StartupParameter parameters;
     ParseArguments(argc, argv, parameters);
 

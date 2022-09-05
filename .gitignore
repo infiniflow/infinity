@@ -43,3 +43,6 @@ cmake-build-debug/**
 *.zip
 
 build
+
+# ignore compilation configure file
+src/bin/compilation_config.h
