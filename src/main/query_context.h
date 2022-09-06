@@ -7,7 +7,7 @@
 #include "storage/table.h"
 #include "planner/logical_node_type.h"
 #include "transaction_context.h"
-#include "query_metrics.h"
+#include "query_profiler.h"
 
 #include <string>
 
@@ -24,7 +24,7 @@ public:
 private:
     // transaction context
     std::unique_ptr<TransactionContext> transaction_;
-    std::unique_ptr<QueryMetrics> query_metrics_;
+    std::unique_ptr<QueryProfiler> query_metrics_;
 };
 
 }

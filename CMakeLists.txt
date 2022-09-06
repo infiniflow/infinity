@@ -22,6 +22,7 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 include_directories(
         src
         third_party/cxxopts/include
+        third_party/magic_enum/include
         third_party/spdlog/include
         third_party/sql-parser/src
         ${CMAKE_CURRENT_BINARY_DIR}/third_party/libhv/include

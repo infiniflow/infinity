@@ -10,9 +10,16 @@ file(GLOB_RECURSE
         common/utility/*.cpp
         )
 
+file(GLOB_RECURSE
+        main_test_src
+        CONFIGURE_DEPENDS
+        main/*.cpp
+        )
+
 add_executable(test_main
         main.cpp
         ${common_test_src}
+        ${main_test_src}
         )
 
 target_link_libraries(test_main

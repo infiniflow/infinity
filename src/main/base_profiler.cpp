@@ -4,30 +4,31 @@
 
 #include <sstream>
 
-#include "profiler.h"
+#include "base_profiler.h"
 
 namespace infinity {
 
 void
-Profiler::Begin() {
+BaseProfiler::Begin() {
     finished_ = false;
     begin_ts_ = Now();
 }
 
 void
-Profiler::End() {
+BaseProfiler::End() {
+    if(finished_) return;
     end_ts_ = Now();
     finished_ = true;
 }
 
 std::chrono::nanoseconds
-Profiler::ElapsedInternal() const {
+BaseProfiler::ElapsedInternal() const {
     auto now = finished_ ? end_ts_ : Now();
     return now - begin_ts_;
 }
 
 std::string
-Profiler::ElapsedToString() const {
+BaseProfiler::ElapsedToString() const {
     auto duration = this->ElapsedInternal();
     std::stringstream ss;
     if(duration.count() <= 1000) {

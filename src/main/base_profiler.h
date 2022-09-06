@@ -9,9 +9,10 @@
 
 namespace infinity {
 
-class Profiler {
+class BaseProfiler {
 public:
-    Profiler() = default;
+    BaseProfiler() = default;
+    explicit BaseProfiler(std::string name) :name_(std::move(name)) {}
 
     // Start the profiler
     void Begin();
@@ -23,6 +24,9 @@ public:
 
     // Return the elapsed time from begin, if the profiler is ended, it will return total elapsed time.
     [[nodiscard]] inline int64_t Elapsed() const { return ElapsedInternal().count(); }
+
+    [[nodiscard]] const std::string& name() const { return name_; }
+    void set_name(const std::string& name) { name_ = name; }
 
 private:
     [[nodiscard]] static inline std::chrono::time_point<std::chrono::high_resolution_clock>
@@ -37,6 +41,7 @@ private:
     std::chrono::time_point<std::chrono::high_resolution_clock> end_ts_{};
 
     bool finished_ = false;
+    std::string name_{};
 };
 
 
