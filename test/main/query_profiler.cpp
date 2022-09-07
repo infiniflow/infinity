@@ -20,7 +20,9 @@ TEST_F(QueryProfilerTest, test1) {
     try {
         infinity::QueryProfiler::QueryPhaseToString(infinity::QueryPhase::kInvalid);
     } catch (std::exception& e) {
-        EXPECT_STRCASEEQ(e.what(), "Invalid query phase in query profiler @src/main/query_profiler.cpp:43");
+        std::string result(e.what());
+        std::string sub = result.substr(0, result.find_first_of('@', 0) - 1);
+        EXPECT_EQ(sub, "Invalid query phase in query profiler");
     }
 
 }
@@ -31,7 +33,9 @@ TEST_F(QueryProfilerTest, test2) {
     try {
         profiler.StopPhase(infinity::QueryPhase::kParser);
     } catch (std::exception& e) {
-        EXPECT_STRCASEEQ(e.what(), "Query phase isn't started, yet @src/main/query_profiler.cpp:66");
+        std::string result(e.what());
+        std::string sub = result.substr(0, result.find_first_of('@', 0) - 1);
+        EXPECT_EQ(sub, "Query phase isn't started, yet");
     }
 
     try {
@@ -39,7 +43,9 @@ TEST_F(QueryProfilerTest, test2) {
         profiler.StartPhase(infinity::QueryPhase::kLogicalPlan);
 
     } catch (std::exception& e) {
-        EXPECT_STRCASEEQ(e.what(), "Can't start new query phase before current phase(Parser) is finished @src/main/query_profiler.cpp:55");
+        std::string result(e.what());
+        std::string sub = result.substr(0, result.find_first_of('@', 0) - 1);
+        EXPECT_EQ(sub, "Can't start new query phase before current phase(Parser) is finished");
     }
 }
 

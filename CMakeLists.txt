@@ -34,4 +34,10 @@ include_directories(
 
 add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
+
+# set parameters for unit test coverage
+# TODO: issue error "cannot merge previous GCDA file" when turn following switch.
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
+
+# Compile the unit test
 add_subdirectory(test)
