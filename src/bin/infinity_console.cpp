@@ -3,23 +3,217 @@
 //
 
 #include "compilation_config.h"
-
+#include "common/utility/str.h"
+#include "common/utility/infinity_assert.h"
 #include "linenoise.h"
 
+// Parser header
+#include "SQLParser.h"
+#include "SQLParserResult.h"
+
+// SQL compile
+#include "parser/statement.h"
+#include "planner/planner.h"
+#include "planner/optimizer.h"
+#include "executor/physical_planner.h"
+
 #include <iostream>
+#include <algorithm>
+#include <unordered_map>
 
 namespace infinity {
 
 class Console {
 public:
-    Console() = default;
+    explicit Console();
 
-    bool ReadLine();
+    void HandleCommand(const char* command);
+
+    [[nodiscard]] const std::string& history_file() const { return history_file_; }
+
+private:
+    void Execute(const std::string& command);
+    void Register(const std::string& name, const std::function<void(const std::string&)>& func);
+
+    // Command functions
+    void Exit(const std::string& arguments);
+    void Explain(const std::string& arguments);
+    void Visualize(const std::string& arguments);
+    void VerifyScript(const std::string& arguments);
+    void RunScript(const std::string& arguments);
+
+    void ExecuteSQL(const std::string& sql_text);
+
+private:
+    std::string history_file_{"command_history.log"};
+
+    std::unordered_map<std::string, std::function<void(const std::string&)>> commands_;
 };
+
+Console::Console() {
+    Register("exit", [this](auto && placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("explain", [this](auto && placeholder) { Explain(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("visualize", [this](auto && placeholder) { Visualize(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("verify", [this](auto && placeholder) { VerifyScript(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("run", [this](auto && placeholder) { RunScript(std::forward<decltype(placeholder)>(placeholder)); });
+}
+
+void
+Console::Register(const std::string& name, const std::function<void(const std::string&)>& func) { commands_[name] = func; }
+
+void
+Console::HandleCommand(const char* command) {
+
+    std::string input(command);
+    trim(input);
+
+    while(!input.empty() && input.back() == ';') {
+        input = input.substr(0, input.size() - 1);
+    }
+
+    // Empty input string, return directly.
+    if (input.empty()) return;
+
+    // Add input command into history
+    linenoiseHistoryAdd(input.c_str());
+
+    // Flush the persist the history file.
+    linenoiseHistorySave(history_file_.c_str());
+
+    Execute(input);
+}
+
+void
+Console::Execute(const std::string& command) {
+    if (command.empty()) return;
+
+    std::unordered_map<std::string, std::function<void(const std::string&)>>::iterator iter;
+    if ((iter = commands_.find(command.substr(0, command.find_first_of(' ')))) != std::end(commands_)) {
+        std::string args = command.substr(command.find_first_of(' ') + 1, command.size());
+        // To upper case
+        std::transform(args.begin(),args.end(), args.begin(), toupper);
+        std::cout << "Args: << " << args << std::endl;
+        iter->second(args);
+    }
+
+    GeneralError("Invalid syntax: " + command);
+}
+
+void
+Console::Exit(const std::string& command) {
+    if(command == "EXIT") {
+        std::cout << "Bye!" << std::endl;
+        std::exit(0);
+    }
+    GeneralError("Invalid syntax: " + command);
+}
+
+void
+Console::Explain(const std::string& arguments) {
+    hsql::SQLParserResult parse_result;
+    Planner logical_planner;
+    Optimizer optimizer;
+    PhysicalPlanner physical_planner;
+
+    size_t option_pos = arguments.find_first_of(' ');
+    std::string option = arguments.substr(0, option_pos);
+    std::string query = arguments.substr(option_pos + 1, arguments.size());
+
+    // Parse sql
+    hsql::SQLParser::parse(query, &parse_result);
+    if(!parse_result.isValid()) {
+        ParserError(parse_result.errorMsg())
+    }
+
+    PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
+
+    if(option == "AST") {
+        Statement statement(parse_result.getStatements()[0]);
+        statement.ToString();
+        std::cout << "Explain AST: " << query << std::endl;
+        return ;
+    }
+
+    if(option == "LOGICAL") {
+        std::cout << "Explain LOGICAL" << std::endl;
+        return ;
+    }
+
+    if(option == "PHYSICAL") {
+        std::cout << "Explain PHYSICAL" << std::endl;
+        return ;
+    }
+
+    if(option == "PIPELINE") {
+        std::cout << "Explain PIPELINE" << std::endl;
+        return ;
+    }
+
+    GeneralError("Invalid Explain syntax: " + arguments);
+}
+
+void
+Console::Visualize(const std::string& arguments) {
+    hsql::SQLParserResult parse_result;
+    Planner logical_planner;
+    Optimizer optimizer;
+    PhysicalPlanner physical_planner;
+
+    size_t option_pos = arguments.find_first_of(' ');
+    std::string option = arguments.substr(0, option_pos);
+    std::string query = arguments.substr(option_pos + 1, arguments.size());
+
+    // Parse sql
+    hsql::SQLParser::parse(query, &parse_result);
+    if(!parse_result.isValid()) {
+        ParserError(parse_result.errorMsg())
+    }
+
+    PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
+
+    if(option == "AST") {
+        std::cout << "Visualize AST: " << query << std::endl;
+        return ;
+    }
+
+    if(option == "LOGICAL") {
+        std::cout << "Visualize LOGICAL" << std::endl;
+        return ;
+    }
+
+    if(option == "PHYSICAL") {
+        std::cout << "Visualize PHYSICAL" << std::endl;
+        return ;
+    }
+
+    if(option == "PIPELINE") {
+        std::cout << "Visualize PIPELINE" << std::endl;
+        return ;
+    }
+
+    GeneralError("Invalid VISUALIZE syntax: " + arguments);
+}
+
+void
+Console::VerifyScript(const std::string& arguments) {
+    GeneralError("Verify script not supported now.");
+}
+
+void
+Console::RunScript(const std::string& arguments) {
+    GeneralError("Run script not supported now.");
+}
+
+void
+Console::ExecuteSQL(const std::string& sql_text) {
+    GeneralError("Execute SQL supported now.");
+}
 
 }
 
 int main(int argc, char** argv) {
+    infinity::Console console;
+
     std::cout << "Startup Infinity database console, version: "
               << VERSION_MAJOR << "."
               << VERSION_MINOR << "."
@@ -34,24 +228,13 @@ int main(int argc, char** argv) {
     linenoiseHistoryLoad("command_history.log");
 
     char *line = nullptr;
-    while((line = linenoise("infinity> ")) != NULL) {
-        /* Do something with the string. */
-        std::cout << line << std::endl;
-//        if (line[0] != '\0' && line[0] != '/') {
-//            printf("echo: '%s'\n", line);
-//            linenoiseHistoryAdd(line); /* Add to the history. */
-//            linenoiseHistorySave("history.txt"); /* Save the history on disk. */
-//        } else if (!strncmp(line,"/historylen",11)) {
-//            /* The "/historylen" command will change the history len. */
-//            int len = atoi(line+11);
-//            linenoiseHistorySetMaxLen(len);
-//        } else if (!strncmp(line, "/mask", 5)) {
-//            linenoiseMaskModeEnable();
-//        } else if (!strncmp(line, "/unmask", 7)) {
-//            linenoiseMaskModeDisable();
-//        } else if (line[0] == '/') {
-//            printf("Unreconized command: %s\n", line);
-//        }
+    while((line = linenoise("infinity> ")) != nullptr) {
+//        std::cout << line << std::endl;
+        try {
+            console.HandleCommand(line);
+        } catch (std::exception& e) {
+            std::cout << e.what() << std::endl;
+        }
         free(line);
     }
 }

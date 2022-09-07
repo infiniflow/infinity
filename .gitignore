@@ -46,3 +46,6 @@ build
 
 # ignore compilation configure file
 src/bin/compilation_config.h
+
+# log file
+*.log

@@ -45,6 +45,12 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        parser_src
+        CONFIGURE_DEPENDS
+        parser/*.cpp
+        )
+
+file(GLOB_RECURSE
         planner_src
         CONFIGURE_DEPENDS
         planner/*.cpp
@@ -74,6 +80,7 @@ set(INFINITY_CORE_SOURCE
         ${expression_src}
         ${infinity_src}
         ${network_src}
+        ${parser_src}
         ${planner_src}
         ${scheduler_src}
         ${storage_src}
