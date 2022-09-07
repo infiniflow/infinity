@@ -19,7 +19,7 @@ namespace infinity {
 class Pipeline;
 
 QueryResult
-infinity::QueryContext::Execute(const std::string &query) {
+QueryContext::Execute(const std::string &query) {
     hsql::SQLParserResult parse_result;
 
     // Parse sql

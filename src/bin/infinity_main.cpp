@@ -2,11 +2,12 @@
 // Created by JinHai on 2022/7/18.
 //
 
-#include <iostream>
 //#include "common/utility/infinity_asserter.h"
 #include "network/db_server.h"
 #include "cxxopts.hpp"
 #include "compilation_config.h"
+
+#include <iostream>
 
 void ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
     cxxopts::Options options("./infinity_server", "");

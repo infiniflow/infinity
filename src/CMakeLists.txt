@@ -4,9 +4,15 @@
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h)
 
 file(GLOB_RECURSE
-        bin_src
+        infinity_main_src
         CONFIGURE_DEPENDS
-        bin/*.cpp
+        bin/infinity_main.cpp
+        )
+
+file(GLOB_RECURSE
+        infinity_console_src
+        CONFIGURE_DEPENDS
+        bin/infinity_console.cpp
         )
 
 file(GLOB_RECURSE
@@ -76,11 +82,22 @@ set(INFINITY_CORE_SOURCE
 add_library(infinity_core STATIC ${INFINITY_CORE_SOURCE})
 
 add_executable(infinity_main
-        ${bin_src}
+        ${infinity_main_src}
+        )
+
+add_executable(infinity_console
+        ${infinity_console_src}
         )
 
 target_link_libraries(
         infinity_main
         infinity_core
         sql-parser
+)
+
+target_link_libraries(
+        infinity_console
+        infinity_core
+        sql-parser
+        linenoise
 )

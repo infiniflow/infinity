@@ -25,7 +25,7 @@ include_directories(
         third_party/magic_enum/include
         third_party/spdlog/include
         third_party/sql-parser/src
-        ${CMAKE_CURRENT_BINARY_DIR}/third_party/libhv/include
+        third_party/linenoise
         /usr/local/include
 )
 
