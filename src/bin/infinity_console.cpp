@@ -10,6 +10,7 @@
 // Parser header
 #include "SQLParser.h"
 #include "SQLParserResult.h"
+#include "util/sqlhelper.h"
 
 // SQL compile
 #include "parser/statement.h"
@@ -92,8 +93,9 @@ Console::Execute(const std::string& command) {
         std::string args = command.substr(command.find_first_of(' ') + 1, command.size());
         // To upper case
         std::transform(args.begin(),args.end(), args.begin(), toupper);
-        std::cout << "Args: << " << args << std::endl;
+//        std::cout << "Args: << " << args << std::endl;
         iter->second(args);
+        return ;
     }
 
     GeneralError("Invalid syntax: " + command);
@@ -128,24 +130,23 @@ Console::Explain(const std::string& arguments) {
     PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
 
     if(option == "AST") {
-        Statement statement(parse_result.getStatements()[0]);
-        statement.ToString();
         std::cout << "Explain AST: " << query << std::endl;
+        hsql::printStatementInfo(parse_result.getStatements()[0]);
         return ;
     }
 
     if(option == "LOGICAL") {
-        std::cout << "Explain LOGICAL" << std::endl;
+        std::cout << "Explain LOGICAL: " << query << std::endl;
         return ;
     }
 
     if(option == "PHYSICAL") {
-        std::cout << "Explain PHYSICAL" << std::endl;
+        std::cout << "Explain PHYSICAL: " << query << std::endl;
         return ;
     }
 
     if(option == "PIPELINE") {
-        std::cout << "Explain PIPELINE" << std::endl;
+        std::cout << "Explain PIPELINE: " << query << std::endl;
         return ;
     }
 
@@ -177,17 +178,17 @@ Console::Visualize(const std::string& arguments) {
     }
 
     if(option == "LOGICAL") {
-        std::cout << "Visualize LOGICAL" << std::endl;
+        std::cout << "Visualize LOGICAL: " << query << std::endl;
         return ;
     }
 
     if(option == "PHYSICAL") {
-        std::cout << "Visualize PHYSICAL" << std::endl;
+        std::cout << "Visualize PHYSICAL: " << query << std::endl;
         return ;
     }
 
     if(option == "PIPELINE") {
-        std::cout << "Visualize PIPELINE" << std::endl;
+        std::cout << "Visualize PIPELINE: " << query << std::endl;
         return ;
     }
 
