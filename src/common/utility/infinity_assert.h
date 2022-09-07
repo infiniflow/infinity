@@ -123,6 +123,12 @@ if(!(is_true)) {                                                            \
 //    throw std::logic_error(errmsg);                                       \
 //}
 
+#define GeneralAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = std::string(message);                            \
+    throw std::logic_error(errmsg);                                       \
+}
+
 #endif
 
 #define NetworkError(message) NetworkAssert(false, message)
@@ -132,6 +138,6 @@ if(!(is_true)) {                                                            \
 #define ExecutorError(message) ExecutorAssert(false, message)
 #define SchedulerError(message) SchedulerAssert(false, message)
 #define CatalogError(message) CatalogAssert(false, message)
-#define StorageError(message) CatalogAssert(false, message)
-#define ResponseError(message) Assert(false, message)
+#define StorageError(message) StorageAssert(false, message)
+#define GeneralError(message) GeneralAssert(false, message)
 }

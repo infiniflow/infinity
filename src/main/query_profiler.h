@@ -19,13 +19,14 @@ enum class QueryPhase : size_t {
     kPhysicalPlan,
     kPipelineBuild,
     kExecution,
+    kInvalid,
 };
 
 class OptimizerProfiler {
 public:
     void StartRule(const std::string& rule_name);
     void StopRule();
-    [[nodiscard]] std::string ToString() const;
+    [[nodiscard]] std::string ToString(size_t intent = 0) const;
 private:
     std::vector<BaseProfiler> profilers_;
 };
@@ -38,12 +39,12 @@ public:
     OptimizerProfiler& optimizer() { return optimizer_; }
     [[nodiscard]] std::string ToString() const;
 
-private:
     static std::string QueryPhaseToString(QueryPhase phase);
 
 private:
-    std::vector<BaseProfiler> profilers_{magic_enum::enum_count<QueryPhase>()};
+    std::vector<BaseProfiler> profilers_{magic_enum::enum_integer(QueryPhase::kInvalid)};
     OptimizerProfiler optimizer_;
+    QueryPhase current_phase_{QueryPhase::kInvalid};
 };
 
 }
