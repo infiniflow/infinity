@@ -59,9 +59,8 @@ PhysicalChunkScan::Execute() {
                 chunk_count->AppendToBlock(transient_block.columns_);
 
                 // Append block size
-                // FIXME: fixed block size
                 std::shared_ptr<ValueExpression> block_size
-                    = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(1024));
+                    = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(ROW_LIMIT));
                 block_size->AppendToBlock(transient_block.columns_);
 
                 transient_block.row_count_ = 1;
