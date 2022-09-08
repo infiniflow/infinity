@@ -51,6 +51,20 @@ Catalog::DeleteTable(const std::string &schema_name, const std::string &table_na
     schemas_[schema_name]->DeleteTable(table_name);
 }
 
+std::vector<std::shared_ptr<Table>>
+Catalog::GetTables(const std::string& schema_name) {
+    if(schemas_.find(schema_name) == schemas_.end()) {
+        CatalogError("No schema: " + schema_name);
+    }
+
+    std::vector<std::shared_ptr<Table>> output;
+    for(auto& elem: schemas_[schema_name]->tables()) {
+        output.emplace_back(elem.second);
+    }
+
+    return output;
+}
+
 std::shared_ptr<View>
 Catalog::GetViewByName(const std::string& schema_name, const std::string& view_name) {
     if(schemas_.find(schema_name) == schemas_.end()) {

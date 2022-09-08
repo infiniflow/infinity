@@ -27,6 +27,7 @@
 #include "executor/operator/physical_sort.h"
 #include "executor/operator/physical_limit.h"
 #include "executor/operator/physical_table_scan.h"
+#include "executor/operator/physical_chunk_scan.h"
 #include "executor/operator/physical_top.h"
 #include "executor/operator/physical_union_all.h"
 #include "executor/operator/physical_update.h"
@@ -54,6 +55,10 @@ PhysicalPlanner::BuildPhysicalOperator(const std::shared_ptr<LogicalNode>& logic
         case LogicalNodeType::kUpdate: return BuildUpdate(logical_operator);
         case LogicalNodeType::kImport: return BuildImport(logical_operator);
         case LogicalNodeType::kExport: return BuildExcept(logical_operator);
+
+        // Scan
+        case LogicalNodeType::kChunkScan: return BuildChunkScan(logical_operator);
+        case LogicalNodeType::kTableScan: return BuildTableScan(logical_operator);
 
         // SELECT
         case LogicalNodeType::kAggregate: return BuildAggregate(logical_operator);
@@ -183,7 +188,18 @@ PhysicalPlanner::BuildExcept(const std::shared_ptr<LogicalNode> &logical_operato
     return std::make_shared<PhysicalHashJoin>(logical_operator->node_id());
 }
 
+std::shared_ptr<PhysicalOperator>
+PhysicalPlanner::BuildChunkScan(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalChunkScan> logical_chunk_scan =
+            std::static_pointer_cast<LogicalChunkScan>(logical_operator);
+    return std::make_shared<PhysicalChunkScan>(logical_chunk_scan->node_id(),
+                                               logical_chunk_scan->scan_type());
+}
 
+std::shared_ptr<PhysicalOperator>
+PhysicalPlanner::BuildTableScan(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    return std::make_shared<PhysicalTableScan>(logical_operator->node_id());
+}
 
 
 

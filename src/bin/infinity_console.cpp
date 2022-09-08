@@ -57,6 +57,7 @@ private:
 };
 
 Console::Console() {
+    Register("quit", [this](auto && placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
     Register("exit", [this](auto && placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
     Register("explain", [this](auto && placeholder) { Explain(std::forward<decltype(placeholder)>(placeholder)); });
     Register("visualize", [this](auto && placeholder) { Visualize(std::forward<decltype(placeholder)>(placeholder)); });
@@ -103,12 +104,12 @@ Console::Execute(const std::string& command) {
         return ;
     }
 
-    GeneralError("Invalid syntax: " + command);
+    ExecuteSQL(command);
 }
 
 void
 Console::Exit(const std::string& command) {
-    if(command == "EXIT") {
+    if(command == "EXIT" || command == "QUIT") {
         std::cout << "Bye!" << std::endl;
         std::exit(0);
     }
@@ -285,7 +286,11 @@ Console::ExecuteSQL(const std::string& sql_text) {
         query_result.result_ = pipeline->GetResult();
         query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
-        std::cout << query_result.ToString() << std::endl;
+        if(query_result.result_ == nullptr) {
+            std::cout << "No result." << std::endl;
+        } else{
+            std::cout << query_result.ToString() << std::endl;
+        }
     }
 }
 

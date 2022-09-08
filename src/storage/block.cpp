@@ -172,6 +172,8 @@ Block::Append(const std::vector<std::any>& values, uint64_t start_idx) {
                 StorageError("Wrong column type");
         }
     }
+
+    ++ row_count_;
 }
 
 std::string
@@ -192,49 +194,49 @@ Block::AsStringRow() const {
 
             switch(chunk_type.GetTypeId()) {
                 case LogicalTypeId::kBoolean: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<BooleanT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<BooleanT>>>(columns_[column_id]);
                     bool value = chunk->data()[row_id];
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kTinyInt: {
 
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<TinyIntT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<TinyIntT>>>(columns_[column_id]);
                     int8_t value = chunk->data()[row_id];
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kSmallInt: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<SmallIntT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<SmallIntT>>>(columns_[column_id]);
                     int16_t value = chunk->data()[row_id];
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kInteger: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<IntegerT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<IntegerT>>>(columns_[column_id]);
                     int32_t value = chunk->data()[row_id];
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kBigInt: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<BigIntT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<BigIntT>>>(columns_[column_id]);
                     int64_t value = chunk->data()[row_id];
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kFloat: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<FloatT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<FloatT>>>(columns_[column_id]);
                     float value = chunk->data()[row_id];
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kDouble: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DoubleT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DoubleT>>>(columns_[column_id]);
                     double value = chunk->data()[row_id];
                     break;
                 }
                 case LogicalTypeId::kDecimal: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DecimalT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DecimalT>>>(columns_[column_id]);
                     DecimalT value = chunk->data()[row_id];
 
                     // TODO: Decimal type to string
@@ -242,37 +244,37 @@ Block::AsStringRow() const {
                     break;
                 }
                 case LogicalTypeId::kDate: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DateT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DateT>>>(columns_[column_id]);
                     int32_t value = chunk->data()[row_id]; // DateT is int32_t
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kTime: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<TimeT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<TimeT>>>(columns_[column_id]);
                     int32_t value = chunk->data()[row_id]; // TimeT is int32_t
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kDateTime: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DateTimeT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DateTimeT>>>(columns_[column_id]);
                     int64_t value = chunk->data()[row_id]; // DateTimeT is int64_t
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kInterval: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<IntervalT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<IntervalT>>>(columns_[column_id]);
                     int64_t value = chunk->data()[row_id]; // IntervalT is int64_t
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kVarchar: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<VarcharT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<VarcharT>>>(columns_[column_id]);
                     std::string value = chunk->data()[row_id]; // VarcharT is string
                     ss << value << " ";
                     break;
                 }
                 case LogicalTypeId::kText: {
-                    auto chunk = std::any_cast<std::shared_ptr<Chunk<TextT>>>(column_defs_[column_id]);
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<TextT>>>(columns_[column_id]);
                     std::string value = chunk->data()[row_id]; // TextT is string
                     ss << value << " ";
                     break;

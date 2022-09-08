@@ -19,6 +19,7 @@ public:
     std::shared_ptr<Table> GetTableByName(const std::string& schema_name, const std::string& table_name);
     void AddTable(const std::string& schema_name, const std::shared_ptr<Table>& table_def);
     void DeleteTable(const std::string& schema_name, const std::string& table_name);
+    std::vector<std::shared_ptr<Table>> GetTables(const std::string& schema_name);
 
     // View related functions
     std::shared_ptr<View> GetViewByName(const std::string& schema_name, const std::string& view_name);

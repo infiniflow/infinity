@@ -52,6 +52,10 @@ private:
     std::shared_ptr<PhysicalOperator> BuildIntersect(const std::shared_ptr<LogicalNode> &logical_operator) const;
     std::shared_ptr<PhysicalOperator> BuildUnion(const std::shared_ptr<LogicalNode> &logical_operator) const;
     std::shared_ptr<PhysicalOperator> BuildExcept(const std::shared_ptr<LogicalNode> &logical_operator) const;
+
+    // Scan
+    std::shared_ptr<PhysicalOperator> BuildChunkScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
+    std::shared_ptr<PhysicalOperator> BuildTableScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
 };
 
 

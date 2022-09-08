@@ -10,6 +10,7 @@ enum class PhysicalOperatorType: uint8_t {
     kInvalid = 0,
     kAggregate,
     kUnionAll,
+    kChunkScan,
     kTableScan,
     kFilter,
     kIndexScan,

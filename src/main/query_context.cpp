@@ -40,6 +40,13 @@ QueryResult::ToString() const {
         }
     }
 
+
+    size_t column_count = result_->table_def()->column_count();
+    for(size_t column_id = 0; column_id < column_count; ++ column_id) {
+        ss << result_->table_def()->columns()[column_id].name() << " ";
+    }
+    ss << std::endl;
+
     // Get Block count
     uint64_t block_count = result_->block_count();
 

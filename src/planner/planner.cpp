@@ -470,30 +470,11 @@ Planner::BuildShowColumns(const hsql::ShowStatement &statement, const std::share
 
 std::shared_ptr<LogicalNode>
 Planner::BuildShowTables(const hsql::ShowStatement &statement, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    std::vector<ColumnDefinition> column_defs = {
-            {"table_name", 0, LogicalType(LogicalTypeId::kVarchar), false, std::set<ConstrainType>()},
-            {"column_count", 1, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
-            {"row_count", 2, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
-            {"chunk_count", 3, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
-            {"chunk_size", 4, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
-    };
-
-    std::shared_ptr<TableDefinition> table_def_ptr = std::make_shared<TableDefinition>("Tables", column_defs, false);
-
-    std::shared_ptr<Table> table_ptr = std::make_shared<FixedRowCountTable>(table_def_ptr);
-    // TODO: Insert tables into table
-
     std::shared_ptr<LogicalNode> logical_chunk_scan =
-            std::make_shared<LogicalChunkScan>(table_ptr);
+            std::make_shared<LogicalChunkScan>(ChunkScanType::kShowTables);
     this->AppendOperator(logical_chunk_scan, bind_context_ptr);
 
     return logical_chunk_scan;
-
-//    TableDefinition table_def =
-
-//    Infinity::instance().catalog()->
-    PlannerError("Show tables isn't supported.");
-    return std::shared_ptr<LogicalNode>();
 }
 
 std::shared_ptr<LogicalNode>

@@ -10,15 +10,22 @@
 
 namespace infinity {
 
+enum class ChunkScanType {
+    kInvalid,
+    kShowTables,
+    kShowColumn,
+    kIntermediate,
+};
+
 class LogicalChunkScan: public LogicalNode {
 public:
-    explicit LogicalChunkScan(std::shared_ptr<Table> table_ptr)
-        : LogicalNode(LogicalNodeType::kChunkScan), table_ptr_(std::move(table_ptr)) {}
+    explicit LogicalChunkScan(ChunkScanType type)
+        : LogicalNode(LogicalNodeType::kChunkScan), scan_type_(type) {}
 
-    [[nodiscard]] std::shared_ptr<Table> table_ptr() const { return table_ptr_; }
     std::string ToString(uint64_t space) final;
+    [[nodiscard]] ChunkScanType scan_type() const { return scan_type_; }
 private:
-    std::shared_ptr<Table> table_ptr_{nullptr};
+    ChunkScanType scan_type_{ChunkScanType::kInvalid};
 
 };
 

@@ -27,6 +27,7 @@ public:
     void DeleteView(const std::string& table_name);
 
     [[nodiscard]] uint64_t schema_id() const { return schema_id_; };
+    std::unordered_map<std::string, std::shared_ptr<Table>>& tables() { return tables_; }
 
 private:
     std::unordered_map<std::string, std::shared_ptr<Table>> tables_;

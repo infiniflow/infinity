@@ -10,7 +10,7 @@ namespace infinity {
 std::string
 LogicalChunkScan::ToString(uint64_t space) {
     std::stringstream ss;
-    ss << std::string(space, ' ') << "ChunkScan: " << table_ptr_->table_def()->name() << std::endl;
+    ss << std::string(space, ' ') << "ChunkScan: " << std::endl;
     return ss.str();
 }
 
