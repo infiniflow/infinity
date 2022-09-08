@@ -5,6 +5,8 @@
 #include "block.h"
 #include "common/utility/infinity_assert.h"
 
+#include <sstream>
+
 namespace infinity {
 
 Block::Block(const std::shared_ptr<TableDefinition>& table_def, TableType type, uint64_t limit)
@@ -75,7 +77,8 @@ Block::Block(const std::shared_ptr<TableDefinition>& table_def, TableType type, 
 }
 
 
-void Block::Append(const std::vector<std::any>& values, uint64_t start_idx) {
+void
+Block::Append(const std::vector<std::any>& values, uint64_t start_idx) {
     uint64_t column_count = columns_.size();
     StorageAssert(values.size() == column_count, "Wrong column data are appended to the row group");
 
@@ -101,7 +104,7 @@ void Block::Append(const std::vector<std::any>& values, uint64_t start_idx) {
             }
             case LogicalTypeId::kInteger: {
                 auto column = std::any_cast<std::shared_ptr<Chunk<IntegerT>>>(columns_[i]);
-                auto value = std::any_cast<IntervalT>(values[i]);
+                auto value = std::any_cast<IntegerT>(values[i]);
                 column->Append(value);
                 break;
             }
@@ -169,5 +172,120 @@ void Block::Append(const std::vector<std::any>& values, uint64_t start_idx) {
                 StorageError("Wrong column type");
         }
     }
+}
+
+std::string
+Block::AsStringRow() const {
+    std::stringstream ss;
+
+    uint64_t column_count = column_defs_.size();
+
+    // Iterator all row of the blocks
+    for(int64_t row_id = 0; row_id < row_count_; ++ row_id) {
+
+        // Iterate all column of this block
+        for(uint64_t column_id = 0; column_id < column_count; ++ column_id) {
+
+            // Get the chunk type
+            const LogicalType& chunk_type = column_defs_[column_id].logical_type();
+
+
+            switch(chunk_type.GetTypeId()) {
+                case LogicalTypeId::kBoolean: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<BooleanT>>>(column_defs_[column_id]);
+                    bool value = chunk->data()[row_id];
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kTinyInt: {
+
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<TinyIntT>>>(column_defs_[column_id]);
+                    int8_t value = chunk->data()[row_id];
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kSmallInt: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<SmallIntT>>>(column_defs_[column_id]);
+                    int16_t value = chunk->data()[row_id];
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kInteger: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<IntegerT>>>(column_defs_[column_id]);
+                    int32_t value = chunk->data()[row_id];
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kBigInt: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<BigIntT>>>(column_defs_[column_id]);
+                    int64_t value = chunk->data()[row_id];
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kFloat: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<FloatT>>>(column_defs_[column_id]);
+                    float value = chunk->data()[row_id];
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kDouble: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DoubleT>>>(column_defs_[column_id]);
+                    double value = chunk->data()[row_id];
+                    break;
+                }
+                case LogicalTypeId::kDecimal: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DecimalT>>>(column_defs_[column_id]);
+                    DecimalT value = chunk->data()[row_id];
+
+                    // TODO: Decimal type to string
+                    ss << "Decimal Value" << " ";
+                    break;
+                }
+                case LogicalTypeId::kDate: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DateT>>>(column_defs_[column_id]);
+                    int32_t value = chunk->data()[row_id]; // DateT is int32_t
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kTime: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<TimeT>>>(column_defs_[column_id]);
+                    int32_t value = chunk->data()[row_id]; // TimeT is int32_t
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kDateTime: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<DateTimeT>>>(column_defs_[column_id]);
+                    int64_t value = chunk->data()[row_id]; // DateTimeT is int64_t
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kInterval: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<IntervalT>>>(column_defs_[column_id]);
+                    int64_t value = chunk->data()[row_id]; // IntervalT is int64_t
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kVarchar: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<VarcharT>>>(column_defs_[column_id]);
+                    std::string value = chunk->data()[row_id]; // VarcharT is string
+                    ss << value << " ";
+                    break;
+                }
+                case LogicalTypeId::kText: {
+                    auto chunk = std::any_cast<std::shared_ptr<Chunk<TextT>>>(column_defs_[column_id]);
+                    std::string value = chunk->data()[row_id]; // TextT is string
+                    ss << value << " ";
+                    break;
+                }
+                default: {
+                    StorageError("Wrong column type");
+                }
+            }
+        }
+
+        ss << std::endl;
+    }
+
+    return ss.str();
 }
 }

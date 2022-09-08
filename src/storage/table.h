@@ -20,6 +20,7 @@ public:
     [[nodiscard]] std::shared_ptr<TableDefinition> table_def() const { return table_def_; }
     [[nodiscard]] uint64_t row_count() const { return row_count_; }
     [[nodiscard]] uint64_t block_count() const { return blocks_.size(); }
+    std::vector<std::shared_ptr<Block>>& blocks() { return blocks_; }
     [[nodiscard]] TableType table_type() const { return table_type_; }
     virtual void Append(const TransientBlock& block) = 0;
 

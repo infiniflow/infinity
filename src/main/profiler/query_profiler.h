@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "base_profiler.h"
+#include "main/profiler/base_profiler.h"
 #include "magic_enum.hpp"
 
 #include <string>

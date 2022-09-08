@@ -7,7 +7,7 @@
 #include "storage/table.h"
 #include "planner/logical_node_type.h"
 #include "transaction_context.h"
-#include "query_profiler.h"
+#include "main/profiler/query_profiler.h"
 
 #include <string>
 
@@ -16,6 +16,8 @@ namespace infinity {
 struct QueryResult {
     std::shared_ptr<Table> result_;
     LogicalNodeType root_operator_type_;
+
+    std::string ToString() const;
 };
 
 class QueryContext {

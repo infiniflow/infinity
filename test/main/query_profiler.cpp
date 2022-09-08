@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "base_test.h"
-#include "main/query_profiler.h"
+#include "main/profiler/query_profiler.h"
 
 class QueryProfilerTest : public BaseTest {
 

@@ -25,7 +25,7 @@ public:
 
     [[nodiscard]] std::string ToString() const;
     [[nodiscard]] std::string name() const { return name_; }
-    [[nodiscard]] LogicalType logical_type() const { return logical_type_; }
+    [[nodiscard]] const LogicalType& logical_type() const { return logical_type_; }
 private:
     std::string name_;
     uint64_t column_id_;

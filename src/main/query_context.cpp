@@ -14,9 +14,45 @@
 #include "SQLParser.h"
 #include "SQLParserResult.h"
 
+#include <sstream>
+
 namespace infinity {
 
 class Pipeline;
+
+std::string
+QueryResult::ToString() const {
+    std::stringstream ss;
+
+    switch (root_operator_type_) {
+        case LogicalNodeType::kInsert: {
+            return "INSERT 0 1";
+        }
+        case LogicalNodeType::kUpdate: {
+            return "UPDATE 0 1";
+            break;
+        }
+        case LogicalNodeType::kDelete: {
+            return "DELETE 0 1";
+        }
+        default: {
+            ;
+        }
+    }
+
+    // Get Block count
+    uint64_t block_count = result_->block_count();
+
+    // Iterate all blocks
+    for(uint64_t block_id = 0; block_id < block_count; ++ block_id) {
+        // Get current block
+        std::shared_ptr<Block>& current_block = result_->blocks()[block_id];
+
+        ss << current_block->AsStringRow();
+    }
+
+    return ss.str();
+}
 
 QueryResult
 QueryContext::Execute(const std::string &query) {

@@ -7,6 +7,8 @@
 #include "common/utility/infinity_assert.h"
 #include "linenoise.h"
 
+#include "main/profiler/show_logical_plan.h"
+
 // Parser header
 #include "SQLParser.h"
 #include "SQLParserResult.h"
@@ -17,6 +19,9 @@
 #include "planner/planner.h"
 #include "planner/optimizer.h"
 #include "executor/physical_planner.h"
+#include "scheduler/operator_pipeline.h"
+#include "main/infinity.h"
+#include "main/query_context.h"
 
 #include <iostream>
 #include <algorithm>
@@ -135,15 +140,38 @@ Console::Explain(const std::string& arguments) {
         return ;
     }
 
+    // Build unoptimized logical plan for each SQL statement.
+    std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.CreateLogicalOperator(*parse_result.getStatements()[0]);
+
     if(option == "LOGICAL") {
         std::cout << "Explain LOGICAL: " << query << std::endl;
+
+        ShowLogicalPlan show_logical_plan(unoptimized_plan);
+        std::cout << show_logical_plan.ToString() << std::endl;
         return ;
     }
+
+    // Apply optimized rule to the logical plan
+    std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
+
+    if(option == "OPT") {
+        std::cout << "Explain OPTIMIZED LOGICAL: " << query << std::endl;
+
+        ShowLogicalPlan show_logical_plan(optimized_plan);
+        std::cout << show_logical_plan.ToString() << std::endl;
+        return ;
+    }
+
+    // Build physical plan
+    std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
     if(option == "PHYSICAL") {
         std::cout << "Explain PHYSICAL: " << query << std::endl;
         return ;
     }
+
+    // Create execution pipeline
+    std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
 
     if(option == "PIPELINE") {
         std::cout << "Explain PIPELINE: " << query << std::endl;
@@ -177,15 +205,32 @@ Console::Visualize(const std::string& arguments) {
         return ;
     }
 
+    // Build unoptimized logical plan for each SQL statement.
+    std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.CreateLogicalOperator(*parse_result.getStatements()[0]);
+
     if(option == "LOGICAL") {
         std::cout << "Visualize LOGICAL: " << query << std::endl;
         return ;
     }
 
+    // Apply optimized rule to the logical plan
+    std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
+
+    if(option == "OPT") {
+        std::cout << "Visualize OPTIMIZED LOGICAL: " << query << std::endl;
+        return ;
+    }
+
+    // Build physical plan
+    std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
+
     if(option == "PHYSICAL") {
         std::cout << "Visualize PHYSICAL: " << query << std::endl;
         return ;
     }
+
+    // Create execution pipeline
+    std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
 
     if(option == "PIPELINE") {
         std::cout << "Visualize PIPELINE: " << query << std::endl;
@@ -207,7 +252,41 @@ Console::RunScript(const std::string& arguments) {
 
 void
 Console::ExecuteSQL(const std::string& sql_text) {
-    GeneralError("Execute SQL supported now.");
+    hsql::SQLParserResult parse_result;
+
+    // Parse sql
+    hsql::SQLParser::parse(sql_text, &parse_result);
+    if(!parse_result.isValid()) {
+        ParserError(parse_result.errorMsg())
+    }
+
+    Planner logical_planner;
+    Optimizer optimizer;
+    PhysicalPlanner physical_planner;
+
+    PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
+    for (hsql::SQLStatement *statement : parse_result.getStatements()) {
+        // Build unoptimized logical plan for each SQL statement.
+        std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.CreateLogicalOperator(*statement);
+
+        // Apply optimized rule to the logical plan
+        std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
+
+        // Build physical plan
+        std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
+
+        // Create execution pipeline
+        std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
+
+        // Schedule the query pipeline
+        Infinity::instance().scheduler()->Schedule(pipeline);
+
+        QueryResult query_result;
+        query_result.result_ = pipeline->GetResult();
+        query_result.root_operator_type_ = unoptimized_plan->operator_type();
+
+        std::cout << query_result.ToString() << std::endl;
+    }
 }
 
 }

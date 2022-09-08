@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "base_test.h"
-#include "main/base_profiler.h"
+#include "main/profiler/base_profiler.h"
 
 class BaseProfilerTest : public BaseTest {
 

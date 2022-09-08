@@ -29,6 +29,8 @@ public:
     void Append(const Chunk<T>& chunk, uint64_t start_idx);
     void Append(const T& value);
 
+    std::vector<T>& data() { return data_; }
+
 protected:
     TableType type_;
     LogicalType data_type_;

@@ -17,6 +17,10 @@ class Block {
 public:
     explicit Block(const std::shared_ptr<TableDefinition>& table_def, TableType type, uint64_t limit);
     void Append(const std::vector<std::any>& chunks, uint64_t start_idx);
+    std::vector<std::any>& columns() { return columns_; }
+    [[nodiscard]] uint64_t row_count() const { return row_count_; }
+
+    std::string AsStringRow() const;
 
 private:
     const uint64_t start_row_{0};
