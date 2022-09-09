@@ -61,6 +61,12 @@ if(!(is_true)) {                                                            \
     throw StorageException(errmsg);                                       \
 }
 
+#define TypeAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
+    throw TypeException(errmsg);                                       \
+}
+
 #define GeneralAssert(is_true, message)                                              \
 if(!(is_true)) {                                                            \
     std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
@@ -117,6 +123,12 @@ if(!(is_true)) {                                                            \
     throw StorageException(errmsg);                                       \
 }
 
+#define TypeAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = (message);                                         \
+    throw TypeException(errmsg);                                       \
+}
+
 //#define Assert(is_true, message)                                              \
 //if(!(is_true)) {                                                            \
 //    std::string errmsg = (message);                                         \
@@ -139,5 +151,6 @@ if(!(is_true)) {                                                            \
 #define SchedulerError(message) SchedulerAssert(false, message)
 #define CatalogError(message) CatalogAssert(false, message)
 #define StorageError(message) StorageAssert(false, message)
+#define TypeError(message) TypeAssert(false, message)
 #define GeneralError(message) GeneralAssert(false, message)
 }

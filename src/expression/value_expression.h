@@ -5,6 +5,7 @@
 #pragma once
 
 #include "base_expression.h"
+#include "storage/chunk.h"
 
 #include <any>
 
@@ -20,7 +21,7 @@ public:
     }
     std::string ToString() const override;
     bool IsNull() const { return data_type_.GetTypeId() == LogicalTypeId::kNull; }
-    void AppendToBlock(std::vector<std::any>& values) { values.emplace_back(value_); }
+    void AppendToChunk(Chunk& chunk);
 
 private:
     LogicalType data_type_;

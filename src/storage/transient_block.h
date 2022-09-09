@@ -4,15 +4,21 @@
 
 #pragma once
 
+#include "chunk.h"
+
 #include <any>
 
 namespace infinity {
 
-// This is not a block, but a row.
-// FIXME: Use real block style to store the transient block
 struct TransientBlock {
-    uint64_t row_count_{0};
-    std::vector<std::any> columns_;
+    TransientBlock() = default;
+    explicit TransientBlock(const std::vector<LogicalType>& types) {
+        for(auto& type: types) {
+            chunks_.emplace_back(type);
+        }
+    }
+    int64_t row_count_{0};
+    std::vector<Chunk> chunks_;
 };
 }
 

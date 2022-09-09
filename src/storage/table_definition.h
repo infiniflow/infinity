@@ -17,7 +17,7 @@ public:
 
     void set_table_id(uint64_t table_id) { table_id_ = table_id; }
     [[nodiscard]] const std::vector<ColumnDefinition>& columns() const { return columns_; }
-    [[nodiscard]] uint64_t column_count() const { return columns_.size(); }
+    [[nodiscard]] int64_t column_count() const { return columns_.size(); }
     [[nodiscard]] const std::string& name() const { return name_; }
     [[nodiscard]] size_t GetIdByName(const std::string& name) const;
 private:

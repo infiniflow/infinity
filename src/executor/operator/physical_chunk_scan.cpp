@@ -38,30 +38,40 @@ PhysicalChunkScan::Execute() {
             for(std::shared_ptr<Table>& table: tables) {
                 TransientBlock transient_block;
 
+                size_t column_id = 0;
+                transient_block.chunks_.emplace_back(varchar_type);
                 // Append table name
                 std::shared_ptr<ValueExpression> table_name
                     = std::make_shared<ValueExpression>(varchar_type, table->table_def()->name());
-                table_name->AppendToBlock(transient_block.columns_);
+                table_name->AppendToChunk(transient_block.chunks_[column_id]);
 
+                ++ column_id;
+                transient_block.chunks_.emplace_back(bigint_type);
                 // Append column count
                 std::shared_ptr<ValueExpression> column_count
                     = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(table->table_def()->column_count()));
-                column_count->AppendToBlock(transient_block.columns_);
+                column_count->AppendToChunk(transient_block.chunks_[column_id]);
 
+                ++ column_id;
+                transient_block.chunks_.emplace_back(bigint_type);
                 // Append row count
                 std::shared_ptr<ValueExpression> row_count
                     = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(table->row_count()));
-                row_count->AppendToBlock(transient_block.columns_);
+                row_count->AppendToChunk(transient_block.chunks_[column_id]);
 
+                ++ column_id;
+                transient_block.chunks_.emplace_back(bigint_type);
                 // Append block count
                 std::shared_ptr<ValueExpression> chunk_count
                     = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(table->block_count()));
-                chunk_count->AppendToBlock(transient_block.columns_);
+                chunk_count->AppendToChunk(transient_block.chunks_[column_id]);
 
+                ++ column_id;
+                transient_block.chunks_.emplace_back(bigint_type);
                 // Append block size
                 std::shared_ptr<ValueExpression> block_size
-                    = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(ROW_LIMIT));
-                block_size->AppendToBlock(transient_block.columns_);
+                    = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(Infinity::instance().config()->option_.default_row_count_));
+                block_size->AppendToChunk(transient_block.chunks_[column_id]);
 
                 transient_block.row_count_ = 1;
 

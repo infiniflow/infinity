@@ -22,6 +22,9 @@ enum class ExceptionType {
     kScheduler,
     kCatalog,
 
+    // Type exception
+    kType,
+
     // Other exception reason
     kNotImplemented,
 };
@@ -112,6 +115,13 @@ public:
     template<typename... Args>
     explicit StorageException(Args... params) : Exception(BuildMessage(std::string("Storage Error:"), params...)) {}
 };
+
+class TypeException: public Exception {
+public:
+    template<typename... Args>
+    explicit TypeException(Args... params) : Exception(BuildMessage(std::string("Storage Error:"), params...)) {}
+};
+
 }
 
 

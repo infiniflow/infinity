@@ -57,10 +57,41 @@ LogicalType::ToString() const {
     }
 }
 
-bool
-LogicalType::operator==(const LogicalType& other) const {
-    if(this->logical_type_ == other.logical_type_) return true;
-    else return false;
+size_t
+LogicalType::Size() const {
+    switch(logical_type_) {
+        case LogicalTypeId::kBoolean:
+            return sizeof(BooleanT);
+        case LogicalTypeId::kTinyInt:
+            return sizeof(TinyIntT);
+        case LogicalTypeId::kSmallInt:
+            return sizeof(SmallIntT);
+        case LogicalTypeId::kInteger:
+            return sizeof(IntegerT);
+        case LogicalTypeId::kBigInt:
+            return sizeof(BigIntT);
+        case LogicalTypeId::kFloat:
+            return sizeof(FloatT);
+        case LogicalTypeId::kDouble:
+            return sizeof(DoubleT);
+        case LogicalTypeId::kDecimal:
+            return sizeof(DecimalT);
+        case LogicalTypeId::kDate:
+            return sizeof(DateT);
+        case LogicalTypeId::kTime:
+            return sizeof(TimeT);
+        case LogicalTypeId::kDateTime:
+            return sizeof(DateTimeT);
+        case LogicalTypeId::kInterval:
+            return sizeof(IntervalT);
+        case LogicalTypeId::kVarchar:
+            return sizeof(VarcharT);
+        case LogicalTypeId::kText:
+            return sizeof(TextT);
+        default:
+            ;
+    }
+    TypeError("Invalid type of LogicalType.")
 }
 
 }

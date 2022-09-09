@@ -26,7 +26,7 @@ public:
 
 protected:
     std::shared_ptr<TableDefinition> table_def_;
-    uint64_t row_count_{0};
+    int64_t row_count_{0};
     TableType table_type_{TableType::kInvalid};
     std::vector<std::shared_ptr<Block>> blocks_;
 };

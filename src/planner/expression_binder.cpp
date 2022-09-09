@@ -22,8 +22,9 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
         }
         case hsql::kExprLiteralInt: {
             // TODO: int16/int8 also can be found out.
-            logical_type = static_cast<int32_t>(expr.ival) == expr.ival ?
-                           LogicalType(LogicalTypeId::kInteger): LogicalType(LogicalTypeId::kBigInt);
+//            logical_type = static_cast<int32_t>(expr.ival) == expr.ival ?
+//                           LogicalType(LogicalTypeId::kInteger): LogicalType(LogicalTypeId::kBigInt);
+            logical_type = LogicalType(LogicalTypeId::kBigInt);
             return std::make_shared<ValueExpression>(logical_type, expr.ival);
         }
         case hsql::kExprLiteralString: {

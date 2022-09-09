@@ -20,20 +20,20 @@ FixedRowCountTable::FixedRowCountTable(std::shared_ptr<TableDefinition> table_de
 
 void
 FixedRowCountTable::Append(const TransientBlock& tblock) {
-    uint64_t column_count = table_def_->column_count();
-    StorageAssert(tblock.columns_.size() == column_count, "Wrong column data are appended to the table");
-    uint64_t insert_row_count = tblock.row_count_;
-    uint64_t start_idx = 0;
+    int64_t column_count = table_def_->column_count();
+    StorageAssert(tblock.chunks_.size() == column_count, "Wrong column data are appended to the table");
+    int64_t insert_row_count = tblock.row_count_;
+    int64_t start_idx = 0;
     while(insert_row_count > 0) {
 
-        uint64_t row_capacity = row_count_ % row_count_limit_;
+        int64_t row_capacity = row_count_ % row_count_limit_;
         if(row_capacity == 0) {
             // Last row group have no space, new row group is needed.
             blocks_.emplace_back(std::make_shared<Block>(table_def_, table_type_, row_count_limit_));
             row_capacity = row_count_limit_;
         }
 
-        blocks_.back()->Append(tblock.columns_, start_idx);
+        blocks_.back()->Append(tblock.chunks_, start_idx);
 
         if(insert_row_count <= row_capacity) {
             insert_row_count = 0;

@@ -88,10 +88,13 @@ class LogicalType {
 public:
     explicit LogicalType(LogicalTypeId logical_type_id);
     LogicalType(LogicalTypeId logical_type_id, int64_t length, int64_t precision, int64_t scale);
-    bool operator==(const LogicalType& other) const;
+
+    inline bool operator==(const LogicalType& other) const { return this->logical_type_ == other.logical_type_; }
+    inline bool operator!=(const LogicalType& other) const { return this->logical_type_ != other.logical_type_; }
 
     [[nodiscard]] std::string ToString() const;
     [[nodiscard]] LogicalTypeId GetTypeId() const { return logical_type_; }
+    size_t Size() const;
 private:
     int64_t length_;
     int64_t precision_;
