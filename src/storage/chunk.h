@@ -24,12 +24,15 @@ public:
     [[nodiscard]] LogicalType DataType() const { return data_type_; }
 
     [[nodiscard]] int64_t row_count() const { return row_count_; }
-    [[nodiscard]] int64_t memory_size() const { return row_count_ * data_type_.Size(); }
+    [[nodiscard]] int64_t memory_size() const { return row_count_ * static_cast<int64_t>(data_type_.Size()); }
 
     void Append(const Chunk& chunk, int64_t start_idx);
     void Append(const std::any& value);
 
     std::vector<std::any>& data() { return data_; }
+    [[nodiscard]] const std::vector<std::any>& data() const { return data_; }
+
+    std::string ToString();
 
 protected:
     LogicalType data_type_;

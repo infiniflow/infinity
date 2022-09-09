@@ -67,6 +67,18 @@ if(!(is_true)) {                                                            \
     throw TypeException(errmsg);                                       \
 }
 
+#define TypeAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
+    throw TypeException(errmsg);                                       \
+}
+
+#define NotImplementAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
+    throw NotImplementException(errmsg);                                       \
+}
+
 #define GeneralAssert(is_true, message)                                              \
 if(!(is_true)) {                                                            \
     std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
@@ -141,6 +153,12 @@ if(!(is_true)) {                                                            \
     throw std::logic_error(errmsg);                                       \
 }
 
+#define NotImplementAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = (message);                                         \
+    throw NotImplementException(errmsg);                                       \
+}
+
 #endif
 
 #define NetworkError(message) NetworkAssert(false, message)
@@ -152,5 +170,6 @@ if(!(is_true)) {                                                            \
 #define CatalogError(message) CatalogAssert(false, message)
 #define StorageError(message) StorageAssert(false, message)
 #define TypeError(message) TypeAssert(false, message)
+#define NotImplementError(message) NotImplementAssert(false, message)
 #define GeneralError(message) GeneralAssert(false, message)
 }

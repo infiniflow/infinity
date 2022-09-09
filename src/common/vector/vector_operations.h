@@ -11,7 +11,7 @@ namespace infinity {
 
 class VectorOperation {
 public:
-    static Chunk VectorCast(LogicalType src, LogicalType dst);
+    static void VectorCast(const Chunk& source, Chunk& target);
 };
 
 }

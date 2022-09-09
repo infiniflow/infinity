@@ -12,8 +12,8 @@
 namespace infinity {
 
 struct Options {
-    uint64_t default_row_count_ = 8192u;
-    uint64_t default_chunk_size = 65536u;
+    int64_t default_row_count_ = 8192u;
+    int64_t default_chunk_size = 65536u;
     TableType table_type_ = TableType::kFixedRowCount;
 };
 

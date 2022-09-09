@@ -119,7 +119,13 @@ public:
 class TypeException: public Exception {
 public:
     template<typename... Args>
-    explicit TypeException(Args... params) : Exception(BuildMessage(std::string("Storage Error:"), params...)) {}
+    explicit TypeException(Args... params) : Exception(BuildMessage(std::string("Type Error:"), params...)) {}
+};
+
+class NotImplementException: public Exception {
+public:
+    template<typename... Args>
+    explicit NotImplementException(Args... params) : Exception(BuildMessage(std::string("NotImplement Error:"), params...)) {}
 };
 
 }

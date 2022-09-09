@@ -7,7 +7,7 @@ include_directories(./)
 file(GLOB_RECURSE
         common_test_src
         CONFIGURE_DEPENDS
-        common/utility/*.cpp
+        common/*.cpp
         )
 
 file(GLOB_RECURSE
