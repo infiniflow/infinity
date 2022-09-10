@@ -57,12 +57,12 @@ private:
 };
 
 Console::Console() {
-    Register("quit", [this](auto && placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
-    Register("exit", [this](auto && placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
-    Register("explain", [this](auto && placeholder) { Explain(std::forward<decltype(placeholder)>(placeholder)); });
-    Register("visualize", [this](auto && placeholder) { Visualize(std::forward<decltype(placeholder)>(placeholder)); });
-    Register("verify", [this](auto && placeholder) { VerifyScript(std::forward<decltype(placeholder)>(placeholder)); });
-    Register("run", [this](auto && placeholder) { RunScript(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("QUIT", [this](auto && placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("EXIT", [this](auto && placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("EXPLAIN", [this](auto && placeholder) { Explain(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("VISUALIZE", [this](auto && placeholder) { Visualize(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("VERFIY", [this](auto && placeholder) { VerifyScript(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("RUN", [this](auto && placeholder) { RunScript(std::forward<decltype(placeholder)>(placeholder)); });
 }
 
 void
@@ -91,20 +91,22 @@ Console::HandleCommand(const char* command) {
 }
 
 void
-Console::Execute(const std::string& command) {
-    if (command.empty()) return;
+Console::Execute(const std::string& statement) {
+    if (statement.empty()) return;
 
     std::unordered_map<std::string, std::function<void(const std::string&)>>::iterator iter;
-    if ((iter = commands_.find(command.substr(0, command.find_first_of(' ')))) != std::end(commands_)) {
-        std::string args = command.substr(command.find_first_of(' ') + 1, command.size());
-        // To upper case
-        std::transform(args.begin(),args.end(), args.begin(), toupper);
-//        std::cout << "Args: << " << args << std::endl;
+
+    std::string command = statement.substr(0, statement.find_first_of(' '));
+
+    // Transfer command to upper case
+    std::transform(command.begin(),command.end(), command.begin(), toupper);
+    if ((iter = commands_.find(command)) != std::end(commands_)) {
+        std::string args = statement.substr(statement.find_first_of(' ') + 1, statement.size());
         iter->second(args);
         return ;
     }
 
-    ExecuteSQL(command);
+    ExecuteSQL(statement);
 }
 
 void
@@ -123,9 +125,12 @@ Console::Explain(const std::string& arguments) {
     Optimizer optimizer;
     PhysicalPlanner physical_planner;
 
-    size_t option_pos = arguments.find_first_of(' ');
-    std::string option = arguments.substr(0, option_pos);
-    std::string query = arguments.substr(option_pos + 1, arguments.size());
+    size_t parameter_pos = arguments.find_first_of(' ');
+    std::string parameter = arguments.substr(0, parameter_pos);
+    // Transfer second parameter to upper case
+    std::transform(parameter.begin(),parameter.end(), parameter.begin(), toupper);
+
+    std::string query = arguments.substr(parameter_pos + 1, arguments.size());
 
     // Parse sql
     hsql::SQLParser::parse(query, &parse_result);
@@ -135,7 +140,7 @@ Console::Explain(const std::string& arguments) {
 
     PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
 
-    if(option == "AST") {
+    if(parameter == "AST") {
         std::cout << "Explain AST: " << query << std::endl;
         hsql::printStatementInfo(parse_result.getStatements()[0]);
         return ;
@@ -144,29 +149,29 @@ Console::Explain(const std::string& arguments) {
     // Build unoptimized logical plan for each SQL statement.
     std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.CreateLogicalOperator(*parse_result.getStatements()[0]);
 
-    if(option == "LOGICAL") {
+    if(parameter == "LOGICAL") {
         std::cout << "Explain LOGICAL: " << query << std::endl;
 
         ShowLogicalPlan show_logical_plan(unoptimized_plan);
-        std::cout << show_logical_plan.ToString() << std::endl;
+        std::cout << show_logical_plan.ToString();
         return ;
     }
 
     // Apply optimized rule to the logical plan
     std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
 
-    if(option == "OPT") {
+    if(parameter == "OPT") {
         std::cout << "Explain OPTIMIZED LOGICAL: " << query << std::endl;
 
         ShowLogicalPlan show_logical_plan(optimized_plan);
-        std::cout << show_logical_plan.ToString() << std::endl;
+        std::cout << show_logical_plan.ToString();
         return ;
     }
 
     // Build physical plan
     std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
-    if(option == "PHYSICAL") {
+    if(parameter == "PHYSICAL") {
         std::cout << "Explain PHYSICAL: " << query << std::endl;
         return ;
     }
@@ -174,7 +179,7 @@ Console::Explain(const std::string& arguments) {
     // Create execution pipeline
     std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
 
-    if(option == "PIPELINE") {
+    if(parameter == "PIPELINE") {
         std::cout << "Explain PIPELINE: " << query << std::endl;
         return ;
     }
