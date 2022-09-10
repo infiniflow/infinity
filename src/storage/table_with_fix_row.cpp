@@ -36,12 +36,12 @@ FixedRowCountTable::Append(const TransientBlock& tblock) {
         blocks_.back()->Append(tblock.chunks_, start_idx);
 
         if(insert_row_count <= row_capacity) {
-            insert_row_count = 0;
             row_count_ += insert_row_count;
+            insert_row_count = 0;
             start_idx += insert_row_count;
         } else {
-            insert_row_count -= row_capacity;
             row_count_ += row_capacity;
+            insert_row_count -= row_capacity;
             start_idx += row_capacity;
         }
     }

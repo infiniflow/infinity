@@ -4,6 +4,7 @@
 
 #include "block.h"
 #include "common/utility/infinity_assert.h"
+#include "common/vector/vector_operations.h"
 
 #include <sstream>
 
@@ -22,17 +23,27 @@ Block::Append(const std::vector<Chunk>& input_chunks, int64_t start_idx)
 {
     uint64_t column_count = columns_.size();
     StorageAssert(input_chunks.size() == column_count, "Wrong column data are appended to the row group");
+    StorageAssert(!input_chunks.empty(), "Column count shouldn't be 0.")
+    uint64_t input_row_count = input_chunks.size();
 
+    // row count of input chunk should be copied
+    int64_t source_length = input_chunks[0].row_count() - start_idx;
+
+    // block available row count
+    int64_t block_available_length = block_limit_ - row_count_;
+
+    // Copied length
+    int64_t copied_length = std::min(source_length, block_available_length);
     for(uint64_t i = 0; i < column_count; ++ i) {
         // TODO: check the chunk type, if not try to cast it.
         if(columns_[i].DataType() != input_chunks[i].DataType()) {
-
+            VectorOperation::VectorCast(input_chunks[i], start_idx, copied_length, columns_[i]);
         } else {
             columns_[i].Append(input_chunks[i], start_idx);
         }
     }
 
-    ++ row_count_;
+    row_count_ += copied_length;
 }
 
 std::string
