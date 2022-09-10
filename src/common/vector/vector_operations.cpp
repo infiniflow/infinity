@@ -20,7 +20,27 @@ struct VectorCopy {
 
 template<typename SType>
 struct VectorCopy<SType, std::string> {
-    static void Loop(const std::vector<std::any>& source_data, std::vector<std::any>& target_data) {}
+    static void Loop(const std::vector<std::any>& source_data, std::vector<std::any>& target_data) {
+        size_t row_count = source_data.size();
+        for(size_t i = 0; i < row_count; ++ i) {
+            auto s = std::any_cast<SType>(source_data[i]);
+            target_data.push_back(std::to_string(s));
+        }
+    }
+};
+
+template<>
+struct VectorCopy<bool, std::string> {
+    static void Loop(const std::vector<std::any>& source_data, std::vector<std::any>& target_data) {
+        size_t row_count = source_data.size();
+        for(size_t i = 0; i < row_count; ++ i) {
+            if(std::any_cast<bool>(source_data[i])) {
+                target_data.emplace_back(std::string("true"));
+            } else {
+                target_data.emplace_back(std::string("false"));
+            }
+        }
+    }
 };
 
 template<typename SType>
@@ -116,7 +136,10 @@ void
 VectorOperation::VectorCast(const Chunk& source, Chunk& target) {
 
     // Check if the type are same, if so just use the source chunk;
-    if(source.DataType() == target.DataType()) target = source;
+    if(source.DataType() == target.DataType()) {
+        target = source;
+        return ;
+    }
 
     int64_t row_count = source.row_count();
     // Prepare the target chunk memory space

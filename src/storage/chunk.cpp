@@ -52,6 +52,7 @@ Chunk::Append(const Chunk& chunk, int64_t start_idx) {
 void
 Chunk::Append(const std::any& value) {
     data_.emplace_back(value);
+    ++ row_count_;
 }
 
 std::string
