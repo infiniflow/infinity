@@ -31,7 +31,7 @@ private:
 
     void HandleRequest();
 
-    void HandlerSimpleQuery(QueryContext& query_context);
+    void HandlerSimpleQuery(std::shared_ptr<QueryContext>& query_context);
 
     const std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 

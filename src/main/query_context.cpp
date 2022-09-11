@@ -63,9 +63,8 @@ QueryResult::ToString() const {
 }
 
 // Get get
-QueryContext::QueryContext(std::weak_ptr<Session> session_ptr, std::unique_ptr<TransactionContext>& transaction)
-    : session_ptr_(std::move(session_ptr)),
-    transaction_(transaction) {}
+QueryContext::QueryContext(const std::shared_ptr<Session>& session_ptr, std::unique_ptr<TransactionContext>& transaction)
+    : transaction_(transaction) {}
 
 QueryResult
 QueryContext::Query(const std::string &query) {
@@ -77,6 +76,8 @@ QueryContext::Query(const std::string &query) {
         ParserError(parse_result.errorMsg())
     }
 
+    std::shared_ptr<QueryContext> query_context = shared_from_this();
+
     Planner logical_planner(shared_from_this());
     Optimizer optimizer(shared_from_this());
     PhysicalPlanner physical_planner(shared_from_this());
@@ -84,7 +85,7 @@ QueryContext::Query(const std::string &query) {
     PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {
         // Build unoptimized logical plan for each SQL statement.
-        std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.CreateLogicalOperator(*statement);
+        std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.BuildLogicalPlan(*statement);
 
         // Apply optimized rule to the logical plan
         std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);

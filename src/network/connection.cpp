@@ -50,8 +50,9 @@ void
 Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
-    QueryContext query_context(session_ptr_, session_ptr_->transaction());
-    query_context.set_current_schema(session_ptr_->current_schema());
+    std::shared_ptr<QueryContext> query_context_ptr
+        = std::make_shared<QueryContext>(session_ptr_, session_ptr_->transaction());
+    query_context_ptr->set_current_schema(session_ptr_->current_schema());
 
     switch (cmd_type) {
         case PGMessageType::kBindCommand: {
@@ -71,7 +72,7 @@ Connection::HandleRequest() {
             break;
         }
         case PGMessageType::kSimpleQueryCommand: {
-            HandlerSimpleQuery(query_context);
+            HandlerSimpleQuery(query_context_ptr);
             break;
         }
         case PGMessageType::kSyncCommand: {
@@ -89,12 +90,12 @@ Connection::HandleRequest() {
 }
 
 void
-Connection::HandlerSimpleQuery(QueryContext& query_context) {
+Connection::HandlerSimpleQuery(std::shared_ptr<QueryContext>& query_context) {
     const std::string& query = pg_handler_->read_command_body();
     std::cout << "Query: " << query << std::endl;
 
     // Start to execute the query.
-    QueryResult result = query_context.Query(query);
+    QueryResult result = query_context->Query(query);
 
     // Response to the result message to client
     if(result.result_ == nullptr) {
@@ -193,11 +194,25 @@ Connection::SendTableDescription(const std::shared_ptr<Table>& result_table) {
 
 void
 Connection::SendQueryResponse(const std::shared_ptr<Table>& result_table) {
-    uint64_t column_count = result_table->table_def()->column_count();
+    int64_t column_count = result_table->table_def()->column_count();
     auto values_as_strings = std::vector<std::optional<std::string>>(column_count);
     uint64_t block_count = result_table->block_count();
     for(uint64_t idx = 0; idx < block_count; ++ idx) {
-        // pg_handler_->SendData(values_as_strings, string_length_sum)
+        auto block = result_table->blocks()[idx];
+        int64_t row_count = block->row_count();
+
+        for(int64_t row_id = 0; row_id < row_count; ++ row_id) {
+            int64_t string_length_sum = 0;
+
+            // iterate each chunk of the block
+            for(int64_t chunk_id = 0; chunk_id < column_count; ++ chunk_id) {
+                auto& chunk = block->columns()[chunk_id];
+                const std::string string_value = chunk.RowToString(row_id);
+                values_as_strings[chunk_id] = string_value;
+                string_length_sum += string_value.size();
+            }
+            pg_handler_->SendData(values_as_strings, string_length_sum);
+        }
     }
 }
 

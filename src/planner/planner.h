@@ -33,6 +33,18 @@ class QueryContext;
 
 class Planner {
 public:
+    explicit Planner(std::shared_ptr<QueryContext> query_context_ptr) : query_context_ptr_(std::move(query_context_ptr)) {}
+
+    std::shared_ptr<LogicalNode> BuildLogicalPlan(const hsql::SQLStatement &statement);
+private:
+    std::shared_ptr<QueryContext> query_context_ptr_;
+};
+
+
+#if 0
+
+class Planner {
+public:
     static LogicalType TypeConversion(hsql::ColumnType type);
 
     explicit Planner(std::shared_ptr<QueryContext> query_context) : query_context_ptr_(std::move(query_context)) {}
@@ -153,5 +165,7 @@ private:
     std::vector<std::shared_ptr<BindContext>> bind_contexts_;
     std::shared_ptr<BindContext> current_bind_context_ptr_;
 };
+
+#endif
 
 }

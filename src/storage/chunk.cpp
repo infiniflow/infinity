@@ -108,4 +108,78 @@ Chunk::ToString() {
     return ss.str();
 }
 
+std::string
+Chunk::RowToString(int64_t row_id) {
+    switch(data_type_.GetTypeId()) {
+        case LogicalTypeId::kBoolean: {
+            if(std::any_cast<bool>(data_[row_id])) {
+                return "true";
+            } else {
+                return "false";
+            }
+        }
+        case LogicalTypeId::kTinyInt: {
+            int8_t value = std::any_cast<int8_t>(data_[row_id]);
+            return std::to_string(value);
+            break;
+        }
+
+        case LogicalTypeId::kSmallInt: {
+            int16_t value = std::any_cast<int16_t>(data_[row_id]);
+            return std::to_string(value);
+            break;
+        }
+        case LogicalTypeId::kInteger: {
+            int32_t value = std::any_cast<int32_t>(data_[row_id]);
+            return std::to_string(value);
+            break;
+        }
+        case LogicalTypeId::kBigInt: {
+            int64_t value = std::any_cast<int64_t>(data_[row_id]);
+            return std::to_string(value);
+            break;
+        }
+        case LogicalTypeId::kFloat: {
+            float value = std::any_cast<float>(data_[row_id]);
+            return std::to_string(value);
+            break;
+        }
+        case LogicalTypeId::kDouble: {
+            double value = std::any_cast<double>(data_[row_id]);
+            return std::to_string(value);
+            break;
+        }
+        case LogicalTypeId::kDecimal: {
+            TypeError("Decimal is not supported now.");
+            break;
+        }
+        case LogicalTypeId::kDate: {
+            int32_t value = std::any_cast<int32_t>(data_[row_id]);
+            return std::to_string(value);
+            break;
+        }
+        case LogicalTypeId::kTime: {
+            int32_t value = std::any_cast<int32_t>(data_[row_id]);
+            return std::to_string(value);
+            break;
+        }
+        case LogicalTypeId::kDateTime: {
+            int64_t value = std::any_cast<int64_t>(data_[row_id]);
+            return std::to_string(value);
+            break;
+        }
+        case LogicalTypeId::kInterval: {
+            int64_t value = std::any_cast<int64_t>(data_[row_id]);
+            return std::to_string(value);
+            break;
+        }
+        case LogicalTypeId::kVarchar:
+            return std::any_cast<std::string>(data_[row_id]);
+        case LogicalTypeId::kText:
+            return std::any_cast<std::string>(data_[row_id]);
+        default:
+            TypeError("Unsupported type");
+    }
+}
+
 }

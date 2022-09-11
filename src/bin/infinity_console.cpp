@@ -154,7 +154,7 @@ Console::Explain(const std::string& arguments) {
     }
 
     // Build unoptimized logical plan for each SQL statement.
-    std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.CreateLogicalOperator(*parse_result.getStatements()[0]);
+    std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.BuildLogicalPlan(*parse_result.getStatements()[0]);
 
     if(parameter == "LOGICAL") {
         std::cout << "Explain LOGICAL: " << query << std::endl;
@@ -225,7 +225,7 @@ Console::Visualize(const std::string& arguments) {
     }
 
     // Build unoptimized logical plan for each SQL statement.
-    std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.CreateLogicalOperator(*parse_result.getStatements()[0]);
+    std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.BuildLogicalPlan(*parse_result.getStatements()[0]);
 
     if(option == "LOGICAL") {
         std::cout << "Visualize LOGICAL: " << query << std::endl;
@@ -291,7 +291,7 @@ Console::ExecuteSQL(const std::string& sql_text) {
     PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {
         // Build unoptimized logical plan for each SQL statement.
-        std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.CreateLogicalOperator(*statement);
+        std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.BuildLogicalPlan(*statement);
 
         // Apply optimized rule to the logical plan
         std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);

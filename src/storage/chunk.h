@@ -33,7 +33,7 @@ public:
     [[nodiscard]] const std::vector<std::any>& data() const { return data_; }
 
     std::string ToString();
-
+    std::string RowToString(int64_t row_id);
 protected:
     LogicalType data_type_;
     int64_t limit_{0};
