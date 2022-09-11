@@ -721,6 +721,12 @@ PlanBuilder::BuildFromClause(const hsql::TableRef* from_table, std::shared_ptr<B
             PlannerError("BuildFromClause: Cross product");
             break;
         }
+#if 0
+        // TODO: No case currently, since parser doesn't support it.
+        case hsql::kExpressionList: {
+            break;
+        }
+#endif
     }
 
 
@@ -882,6 +888,13 @@ PlanBuilder::BuildTop(const std::vector<hsql::OrderDescription*>& order_by_claus
 
 PlanContext
 PlanBuilder::BuildTable(const hsql::TableRef* from_table, std::shared_ptr<BindContext>& bind_context_ptr) {
+    // There are five cases here:
+    // CTE, which is subquery (may include correlated expression).
+    // Recursive CTE (not supported by parser.)
+    // View, which is also a subquery (may include correlated expression).
+    // Table
+    // External Table (not supported by parser.)
+
     PlanContext res;
 
     std::string name = from_table->name;
