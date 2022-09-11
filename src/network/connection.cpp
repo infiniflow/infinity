@@ -165,7 +165,7 @@ Connection::SendTableDescription(const std::shared_ptr<Table>& result_table) {
                 object_width = -1;
                 break;
             case LogicalTypeId::kVarchar:
-                object_id = 1043;
+                object_id = 25;
                 object_width = -1;
                 break;
             case LogicalTypeId::kDate:
