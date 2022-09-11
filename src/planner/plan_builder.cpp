@@ -409,14 +409,24 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
     std::shared_ptr<LogicalNode> root_node_ptr;
     // 1. WITH clause
     if (statement.withDescriptions != nullptr) {
-        for(const auto& with_description: *statement.withDescriptions) {
-            std::string name = with_description->alias;
+
+        // Prepare to store the with statement
+        int64_t with_stmt_count = statement.withDescriptions->size();
+        bind_context_ptr->CTE_map_.reserve(with_stmt_count);
+
+        // Hash set to restrict the with statement name visibility
+        std::unordered_set<std::string> masked_name_set;
+
+        for(int64_t i = with_stmt_count - 1; i >= 0; -- i) {
+            hsql::WithDescription* with_desc = (*statement.withDescriptions)[i];
+            std::string name = with_desc->alias;
             if(bind_context_ptr->CTE_map_.contains(name)) {
                 PlannerError("WITH query name: " + name + " occurs more than once.");
             }
 
+            masked_name_set.insert(name);
             std::shared_ptr<CommonTableExpressionInfo> cte_info_ptr
-                    = std::make_shared<CommonTableExpressionInfo>(name, with_description->select);
+                    = std::make_shared<CommonTableExpressionInfo>(name, with_desc->select, masked_name_set);
 
             bind_context_ptr->CTE_map_[name] = cte_info_ptr;
         }

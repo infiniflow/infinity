@@ -10,6 +10,7 @@
 
 
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace infinity {
@@ -19,11 +20,12 @@ class Table;
 class ExpressionBinder;
 
 struct CommonTableExpressionInfo {
-    CommonTableExpressionInfo(std::string alias, hsql::SelectStatement* select_stmt)
-        : alias_(std::move(alias)), select_statement_(select_stmt) {}
+    CommonTableExpressionInfo(std::string alias, hsql::SelectStatement* select_stmt, std::unordered_set<std::string> masked_name_set)
+        : alias_(std::move(alias)), select_statement_(select_stmt), masked_name_set_(std::move(masked_name_set)) {}
 
     std::string alias_;
     hsql::SelectStatement* select_statement_;
+    std::unordered_set<std::string> masked_name_set_;
 };
 
 class BindContext {
