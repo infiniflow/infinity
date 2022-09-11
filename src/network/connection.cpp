@@ -12,7 +12,7 @@ namespace infinity {
 Connection::Connection(boost::asio::io_service& io_service)
     : socket_(std::make_shared<boost::asio::ip::tcp::socket>(io_service)),
       pg_handler_(std::make_shared<PGProtocolHandler>(socket())),
-      session_ptr_(std::make_unique<Session>()){}
+      session_ptr_(std::make_shared<Session>()){}
 
 void
 Connection::Run() {
@@ -50,6 +50,9 @@ void
 Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
+    QueryContext query_context(session_ptr_, session_ptr_->transaction());
+    query_context.set_current_schema(session_ptr_->current_schema());
+
     switch (cmd_type) {
         case PGMessageType::kBindCommand: {
             std::cout << "BindCommand" << std::endl;
@@ -68,7 +71,7 @@ Connection::HandleRequest() {
             break;
         }
         case PGMessageType::kSimpleQueryCommand: {
-            HandlerSimpleQuery();
+            HandlerSimpleQuery(query_context);
             break;
         }
         case PGMessageType::kSyncCommand: {
@@ -86,12 +89,12 @@ Connection::HandleRequest() {
 }
 
 void
-Connection::HandlerSimpleQuery() {
+Connection::HandlerSimpleQuery(QueryContext& query_context) {
     const std::string& query = pg_handler_->read_command_body();
     std::cout << "Query: " << query << std::endl;
 
     // Start to execute the query.
-    QueryResult result = QueryContext::Execute(query);
+    QueryResult result = query_context.Query(query);
 
     // Response to the result message to client
     if(result.result_ == nullptr) {

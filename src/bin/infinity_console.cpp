@@ -9,6 +9,8 @@
 
 #include "main/profiler/show_logical_plan.h"
 
+#include "main/session.h"
+
 // Parser header
 #include "SQLParser.h"
 #include "SQLParserResult.h"
@@ -121,9 +123,14 @@ Console::Exit(const std::string& command) {
 void
 Console::Explain(const std::string& arguments) {
     hsql::SQLParserResult parse_result;
-    Planner logical_planner;
-    Optimizer optimizer;
-    PhysicalPlanner physical_planner;
+
+    std::shared_ptr<Session> session_ptr = std::make_shared<Session>();
+    std::shared_ptr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
+    query_context_ptr->set_current_schema(session_ptr->current_schema());
+
+    Planner logical_planner(query_context_ptr);
+    Optimizer optimizer(query_context_ptr);
+    PhysicalPlanner physical_planner(query_context_ptr);
 
     size_t parameter_pos = arguments.find_first_of(' ');
     std::string parameter = arguments.substr(0, parameter_pos);
@@ -190,9 +197,15 @@ Console::Explain(const std::string& arguments) {
 void
 Console::Visualize(const std::string& arguments) {
     hsql::SQLParserResult parse_result;
-    Planner logical_planner;
-    Optimizer optimizer;
-    PhysicalPlanner physical_planner;
+
+    std::shared_ptr<Session> session_ptr = std::make_shared<Session>();
+    std::shared_ptr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
+    query_context_ptr->set_current_schema(session_ptr->current_schema());
+
+    Planner logical_planner(query_context_ptr);
+
+    Optimizer optimizer(query_context_ptr);
+    PhysicalPlanner physical_planner(query_context_ptr);
 
     size_t option_pos = arguments.find_first_of(' ');
     std::string option = arguments.substr(0, option_pos);
@@ -266,9 +279,14 @@ Console::ExecuteSQL(const std::string& sql_text) {
         ParserError(parse_result.errorMsg())
     }
 
-    Planner logical_planner;
-    Optimizer optimizer;
-    PhysicalPlanner physical_planner;
+    std::shared_ptr<Session> session_ptr = std::make_shared<Session>();
+    std::shared_ptr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
+    query_context_ptr->set_current_schema(session_ptr->current_schema());
+
+    Planner logical_planner(query_context_ptr);
+
+    Optimizer optimizer(query_context_ptr);
+    PhysicalPlanner physical_planner(query_context_ptr);
 
     PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {

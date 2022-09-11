@@ -15,6 +15,7 @@
 #include "SQLParserResult.h"
 
 #include <sstream>
+#include <utility>
 
 namespace infinity {
 
@@ -61,8 +62,13 @@ QueryResult::ToString() const {
     return ss.str();
 }
 
+// Get get
+QueryContext::QueryContext(std::weak_ptr<Session> session_ptr, std::unique_ptr<TransactionContext>& transaction)
+    : session_ptr_(std::move(session_ptr)),
+    transaction_(transaction) {}
+
 QueryResult
-QueryContext::Execute(const std::string &query) {
+QueryContext::Query(const std::string &query) {
     hsql::SQLParserResult parse_result;
 
     // Parse sql
@@ -71,9 +77,9 @@ QueryContext::Execute(const std::string &query) {
         ParserError(parse_result.errorMsg())
     }
 
-    Planner logical_planner;
-    Optimizer optimizer;
-    PhysicalPlanner physical_planner;
+    Planner logical_planner(shared_from_this());
+    Optimizer optimizer(shared_from_this());
+    PhysicalPlanner physical_planner(shared_from_this());
 
     PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {

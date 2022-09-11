@@ -31,7 +31,7 @@ private:
 
     void HandleRequest();
 
-    void HandlerSimpleQuery();
+    void HandlerSimpleQuery(QueryContext& query_context);
 
     const std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 
@@ -44,7 +44,7 @@ private:
     void SendComplete(LogicalNodeType operator_type, uint64_t row_count);
 
 private:
-    std::unique_ptr<Session> session_ptr_;
+    std::shared_ptr<Session> session_ptr_;
 };
 
 }

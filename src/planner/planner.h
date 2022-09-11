@@ -29,10 +29,13 @@
 
 namespace infinity {
 
+class QueryContext;
+
 class Planner {
 public:
     static LogicalType TypeConversion(hsql::ColumnType type);
 
+    explicit Planner(std::shared_ptr<QueryContext> query_context) : query_context_ptr_(std::move(query_context)) {}
     std::shared_ptr<LogicalNode> CreateLogicalOperator(const hsql::SQLStatement &statement);
 private:
     // Create operator
@@ -136,6 +139,8 @@ private:
 
     uint64_t AppendOperator(std::shared_ptr<LogicalNode> op, const std::shared_ptr<BindContext>& bind_context);
 private:
+    std::shared_ptr<QueryContext> query_context_ptr_;
+
     struct OperatorContext {
         std::shared_ptr<LogicalNode> operator_{nullptr};
         uint64_t context_id_{0};

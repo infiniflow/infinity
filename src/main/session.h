@@ -16,7 +16,17 @@ class Session {
 public:
     explicit Session();
 
+    [[nodiscard]] inline std::string& current_schema() { return current_schema_; }
+    [[nodiscard]] inline const std::string& tenant_name() const { return tenant_name_; }
+    [[nodiscard]] inline const std::string& user_name() const { return user_name_; }
+    [[nodiscard]] inline uint64_t tenant_id() const { return tenant_id_; }
+    [[nodiscard]] inline uint64_t user_id() const { return user_id_; }
+
+    inline std::unique_ptr<TransactionContext>& transaction() { return transaction_; };
 private:
+    // transaction context
+    std::unique_ptr<TransactionContext> transaction_;
+
     // session config such as memory limitation, concurrency limitation
 
     // query context for current query

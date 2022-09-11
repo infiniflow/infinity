@@ -9,11 +9,18 @@
 
 namespace infinity {
 
+class QueryContext;
+
 class PhysicalPlanner {
 public:
+    explicit PhysicalPlanner(std::shared_ptr<QueryContext> query_context_ptr)
+        : query_context_ptr_(std::move(query_context_ptr)) {}
+
     std::shared_ptr<PhysicalOperator> BuildPhysicalOperator(const std::shared_ptr<LogicalNode>& logical_operator) const;
 
 private:
+    std::shared_ptr<QueryContext> query_context_ptr_;
+
     // Create operator
     std::shared_ptr<PhysicalOperator> BuildCreateTable(const std::shared_ptr<LogicalNode>& logical_operator) const;
     std::shared_ptr<PhysicalOperator> BuildPreparedPlan(const std::shared_ptr<LogicalNode>& logical_operator) const;
