@@ -81,6 +81,9 @@ public:
                          std::shared_ptr<LogicalNode> logical_node_ptr,
                          const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
 
+    // Merge input bind context into this bind context
+    void AddBindContext(const std::shared_ptr<BindContext>& bind_context_ptr);
+
 private:
     int64_t next_table_index_{0};
     int64_t next_logical_node_id_{0};

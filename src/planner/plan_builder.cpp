@@ -720,8 +720,8 @@ PlanBuilder::BuildFromClause(const hsql::TableRef* from_table, std::shared_ptr<B
         }
         case hsql::kTableSelect: {
             // select t1.a from (select * from t2 as t1);
-            PlannerError("BuildFromClause: Table select");
-            break;
+            std::string name = from_table->name != nullptr ? from_table->name : std::string();
+            return BuildSubquery(name, *(from_table->select), bind_context_ptr);
         }
         case hsql::kTableJoin: {
             // select t1.b, t2.c from t1 join t2 on t1.a = t2.a
@@ -730,8 +730,7 @@ PlanBuilder::BuildFromClause(const hsql::TableRef* from_table, std::shared_ptr<B
         }
         case hsql::kTableCrossProduct: {
             // select t1.b, t2.c from t1, t2;
-            PlannerError("BuildFromClause: Cross product");
-            break;
+            return BuildCrossProduct(from_table, bind_context_ptr);
         }
 #if 0
         // TODO: No case currently, since parser doesn't support it.
@@ -978,12 +977,14 @@ PlanBuilder::BuildSubquery(const std::string &name, const hsql::SelectStatement&
     // Get the table index of the sub query output
     int64_t table_index = bound_select_node_ptr->GetTableIndex();
 
+    std::string binding_name = name.empty() ? "subquery" + std::to_string(table_index) : name;
     // Add binding into bind context
-    bind_context_ptr->AddSubqueryBinding(name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
+    bind_context_ptr->AddSubqueryBinding(binding_name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
+
+    // TODO: Not care about the correlated expression
 
     // return subquery table reference
     return subquery_table_ref_ptr;
-
 }
 
 std::shared_ptr<TableRef>
@@ -1011,6 +1012,8 @@ PlanBuilder::BuildCTE(const std::string &name, const std::shared_ptr<CommonTable
 
     // Add binding into bind context
     bind_context_ptr->AddSubqueryBinding(name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
+
+    // TODO: Not care about the correlated expression
 
     return subquery_table_ref_ptr;
 }
@@ -1040,10 +1043,69 @@ PlanBuilder::BuildView(const std::string &view_name, const std::shared_ptr<View>
     // Add binding into bind context
     bind_context_ptr->AddViewBinding(view_name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
 
+    // TODO: Not care about the correlated expression
+
     // return subquery table reference
     return subquery_table_ref_ptr;
 }
 
+std::shared_ptr<TableRef>
+PlanBuilder::BuildCrossProduct(const hsql::TableRef* from_table, std::shared_ptr<BindContext>& bind_context_ptr) {
+    // Create left and right bind context
+    // Build left and right table with new bind context
+    // Merge two bind context into their parent context
+
+    std::shared_ptr<CrossProductTableRef> result;
+
+    const std::vector<hsql::TableRef*>& tables = *from_table->list;
+    int64_t table_count = tables.size();
+
+    hsql::TableRef* left_table_ptr = tables[0];
+    std::shared_ptr<BindContext> left_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+    AddBindContextArray(left_bind_context_ptr);
+    std::shared_ptr<TableRef> left_bound_table_ref = BuildFromClause(left_table_ptr, left_bind_context_ptr);
+
+    for(int64_t idx = 1; idx < table_count - 1; ++ idx) {
+        result = std::make_shared<CrossProductTableRef>();
+        result->left_bind_context_ = left_bind_context_ptr;
+        result->left_table_ref_ = left_bound_table_ref;
+
+        hsql::TableRef* right_table_ptr = tables[idx];
+        std::shared_ptr<BindContext> right_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+        AddBindContextArray(right_bind_context_ptr);
+        std::shared_ptr<TableRef> right_bound_table_ref = BuildFromClause(right_table_ptr, right_bind_context_ptr);
+
+        result->right_bind_context_ = right_bind_context_ptr;
+        result->right_table_ref_ = right_bound_table_ref;
+
+        std::shared_ptr<BindContext> cross_product_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+        AddBindContextArray(cross_product_bind_context_ptr);
+        cross_product_bind_context_ptr->AddBindContext(left_bind_context_ptr);
+        cross_product_bind_context_ptr->AddBindContext(right_bind_context_ptr);
+
+        left_bind_context_ptr = cross_product_bind_context_ptr;
+        left_bound_table_ref = result;
+    }
+
+    result = std::make_shared<CrossProductTableRef>();
+    result->left_bind_context_ = left_bind_context_ptr;
+    result->left_table_ref_ = left_bound_table_ref;
+
+    hsql::TableRef* right_table_ptr = tables.back();
+    std::shared_ptr<BindContext> right_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+    AddBindContextArray(right_bind_context_ptr);
+    std::shared_ptr<TableRef> right_bound_table_ref = BuildFromClause(right_table_ptr, right_bind_context_ptr);
+
+    result->right_bind_context_ = right_bind_context_ptr;
+    result->right_table_ref_ = right_bound_table_ref;
+
+    bind_context_ptr->AddBindContext(left_bind_context_ptr);
+    bind_context_ptr->AddBindContext(right_bind_context_ptr);
+
+    // TODO: Not care about the correlated expression
+
+    return result;
+}
 
 
 }

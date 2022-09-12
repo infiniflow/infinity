@@ -104,6 +104,11 @@ BindContext::AddTableBinding(const std::string& name, int64_t table_index, int64
     bindings_by_name_[name] = binding;
 }
 
+void
+BindContext::AddBindContext(const std::shared_ptr<BindContext>& bind_context_ptr) {
+    PlannerError("Not implement: BindContext::AddBindContext");
+}
+
 // !!! TODO: Below need to be refactored !!!
 
 std::shared_ptr<BaseExpression>
