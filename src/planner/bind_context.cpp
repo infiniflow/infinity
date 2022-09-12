@@ -8,6 +8,59 @@
 
 namespace infinity {
 
+std::shared_ptr<CommonTableExpressionInfo>
+BindContext::GetCTE(const std::string& name) const {
+    auto entry = CTE_map_.find(name);
+    if(entry != CTE_map_.end()) {
+        return entry->second;
+    }
+
+    if(parent_) {
+        return parent_->GetCTE(name);
+    }
+    return nullptr;
+}
+
+bool
+BindContext::IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) const {
+
+    if(bound_cte_set_.contains(cte->alias_)) {
+        return true;
+    }
+
+    if(parent_) {
+        return parent_->IsCTEBound(cte);
+    }
+
+    return false;
+}
+
+bool
+BindContext::IsViewBound(const std::string& view_name) const {
+
+    if(bound_view_set_.contains(view_name)) {
+        return true;
+    }
+
+    if(parent_) {
+        return parent_->IsViewBound(view_name);
+    }
+
+    return false;
+}
+
+int64_t
+BindContext::GetNewTableIndex() {
+    return parent_ ? parent_->GetNewTableIndex() : next_table_index_ ++;
+}
+
+int64_t
+BindContext::GetNewLogicalNodeId() {
+    return parent_ ? parent_->GetNewLogicalNodeId() : next_logical_node_id_ ++;
+}
+
+// !!! TODO: Below need to be refactored !!!
+
 std::shared_ptr<BaseExpression>
 BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier) {
     PlannerError("Not implement: BindContext::resolve_column_identifier");

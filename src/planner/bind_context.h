@@ -31,10 +31,6 @@ struct CommonTableExpressionInfo {
 
 class BindContext {
 public:
-    std::shared_ptr<BaseExpression> ResolveColumnIdentifier(const ColumnIdentifier& column_identifier);
-    void AddTable(const std::shared_ptr<Table>& table_ptr);
-
-public:
     // Parent bind context
     std::shared_ptr<BindContext> parent_;
 
@@ -49,10 +45,36 @@ public:
     std::vector<std::shared_ptr<Binding>> bindings_;
     std::unordered_map<std::string, std::shared_ptr<Binding>> bindings_by_name_;
 
-    // Bound CTE binding
+    // Bound CTE
     std::unordered_set<std::string> bound_cte_set_;
 
+    // Bound View
+    std::unordered_set<std::string> bound_view_set_;
+
+    // Bound Table (base table)
+    std::unordered_set<std::string> bound_table_set_;
+
+    // Bound subquery (TODO: How to get the subquery name?)
+    std::unordered_set<std::string> bound_subquery_set_;
+
+public:
+    std::shared_ptr<CommonTableExpressionInfo> GetCTE(const std::string& name) const;
+    [[nodiscard]] bool IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) const;
+    [[nodiscard]] bool IsViewBound(const std::string& view_name) const;
+    int64_t GetNewTableIndex();
+    int64_t GetNewLogicalNodeId();
+
+private:
+    int64_t next_table_index_{0};
+    int64_t next_logical_node_id_{0};
+
+public:
+
     // !!! TODO: Below need to be refactored !!!
+
+public:
+    std::shared_ptr<BaseExpression> ResolveColumnIdentifier(const ColumnIdentifier& column_identifier);
+    void AddTable(const std::shared_ptr<Table>& table_ptr);
 
     // All logical operator
     std::vector<std::shared_ptr<LogicalNode>> operators_;
