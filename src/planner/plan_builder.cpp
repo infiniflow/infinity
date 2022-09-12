@@ -915,73 +915,135 @@ PlanBuilder::BuildTable(const hsql::TableRef* from_table, std::shared_ptr<BindCo
     // Try to get CTE info from the cte container Query builder saved CTEs into before.
     auto cte = bind_context_ptr->GetCTE(name);
     if(cte != nullptr) {
-        // Table is from CTE
-        if(bind_context_ptr->IsCTEBound(cte)) {
-            // The CTE is bound before.
-            PlannerError("CTE can only be bound only once");
-        }
-
-        // Build CTE(subquery)
-        // 1. insert into CTE Bound in bind context
-        bind_context_ptr->BoundCTE(cte);
-        // 2. Get the name, default is subquery + bind context id, CTE always has name, but subquery may not have name
-
-        // 3. Create new bind context and add into context array;
-        std::shared_ptr<BindContext> cte_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-        this->AddBindContextArray(cte_bind_context_ptr);
-
-        // 4. Create bound select node and subquery table reference
-        auto bound_select_node_ptr = this->BuildSelect(*cte->select_statement_, cte_bind_context_ptr);
-        auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
-
-        // 5. Get the table index of the sub query output
-        int64_t table_index = bound_select_node_ptr->GetTableIndex();
-
-        // 6. Add binding into bind context
-        bind_context_ptr->AddGenericBinding(name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
-
-        // 7. return subquery table reference
-        return subquery_table_ref_ptr;
+        return BuildCTE(name, cte, bind_context_ptr);
     }
 
     // Base Table
     std::shared_ptr<Table> table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, name);
     if(table_ptr != nullptr) {
+        std::string table_name = schema_name + "." + name;
+        int64_t table_index = bind_context_ptr->GetNewTableIndex();
+        int64_t node_id = bind_context_ptr->GetNewLogicalNodeId();
         // Build table scan operator
-        std::shared_ptr<LogicalTableScan> logical_table_scan = std::make_shared<LogicalTableScan>(table_ptr);
-        // FIXME: check if we need to append operator
-//        this->AppendOperator(logical_table_scan, bind_context_ptr);
+        std::shared_ptr<LogicalTableScan> logical_table_scan =
+                std::make_shared<LogicalTableScan>(table_index, node_id, table_ptr);
 
-        // Insert the table in the binding context
-        bind_context_ptr->AddTable(table_ptr);
-
-        // Handle table and column alias
-        if(from_table->alias != nullptr) {
-            logical_table_scan->table_alias_ = from_table->alias->name;
-            logical_table_scan->column_aliases_.reserve((from_table->alias->columns)->size());
-            for(const char* column_alias: *(from_table->alias->columns)) {
-                logical_table_scan->column_aliases_.emplace_back(column_alias);
-            }
+        // TODO: Handle table and column alias
+//        if(from_table->alias != nullptr) {
+//            logical_table_scan->table_alias_ = from_table->alias->name;
+//            logical_table_scan->column_aliases_.reserve((from_table->alias->columns)->size());
+//            for(const char* column_alias: *(from_table->alias->columns)) {
+//                logical_table_scan->column_aliases_.emplace_back(column_alias);
+//            }
+//        }
+        auto& columns = table_ptr->table_def()->columns();
+        std::vector<LogicalType> types;
+        std::vector<std::string> names;
+        types.reserve(columns.size());
+        names.reserve(columns.size());
+        for(auto& column : columns) {
+            types.emplace_back(column.logical_type());
+            names.emplace_back(column.name());
         }
 
         auto table_ref = std::make_shared<BaseTableRef>(logical_table_scan);
+
+        // Insert the table in the binding context
+        bind_context_ptr->AddTableBinding(table_name, table_index, node_id, logical_table_scan, types, names);
+
         return table_ref;
     }
 
     // View
     std::shared_ptr<View> view_ptr = Infinity::instance().catalog()->GetViewByName(schema_name, name);
     if(view_ptr != nullptr) {
-        // Build view scan operator
-        std::shared_ptr<LogicalViewScan> logical_view_scan = std::make_shared<LogicalViewScan>(view_ptr);
-        // FIXME: check if we need to append operator
-//        this->AppendOperator(logical_view_scan, bind_context_ptr);
-
-//        res.plan = logical_view_scan;
-//
-//        return res;
+        // Build view statement
+        std::string view_name = schema_name + "." + name;
+        BuildView(view_name, view_ptr, bind_context_ptr);
     }
 
     PlannerError("BuildTable: trying to build an supported table");
 }
+
+std::shared_ptr<TableRef>
+PlanBuilder::BuildSubquery(const std::string &name, const hsql::SelectStatement& select_stmt, std::shared_ptr<BindContext>& bind_context_ptr) {
+    // Create new bind context and add into context array;
+    std::shared_ptr<BindContext> cte_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+    this->AddBindContextArray(cte_bind_context_ptr);
+
+    // Create bound select node and subquery table reference
+    auto bound_select_node_ptr = this->BuildSelect(select_stmt, cte_bind_context_ptr);
+    auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
+
+    // Get the table index of the sub query output
+    int64_t table_index = bound_select_node_ptr->GetTableIndex();
+
+    // Add binding into bind context
+    bind_context_ptr->AddSubqueryBinding(name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
+
+    // return subquery table reference
+    return subquery_table_ref_ptr;
+
+}
+
+std::shared_ptr<TableRef>
+PlanBuilder::BuildCTE(const std::string &name, const std::shared_ptr<CommonTableExpressionInfo>& cte, std::shared_ptr<BindContext>& bind_context_ptr) {
+    // Table is from CTE
+    if(bind_context_ptr->IsCTEBound(cte)) {
+        // The CTE is bound before.
+        PlannerError("CTE can only be bound only once");
+    }
+
+    // Build CTE(subquery)
+    // insert into CTE Bound in bind context
+    bind_context_ptr->BoundCTE(cte);
+
+    // Create new bind context and add into context array;
+    std::shared_ptr<BindContext> cte_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+    this->AddBindContextArray(cte_bind_context_ptr);
+
+    // Create bound select node and subquery table reference
+    auto bound_select_node_ptr = this->BuildSelect(*cte->select_statement_, cte_bind_context_ptr);
+    auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
+
+    // Get the table index of the sub query output
+    int64_t table_index = bound_select_node_ptr->GetTableIndex();
+
+    // Add binding into bind context
+    bind_context_ptr->AddSubqueryBinding(name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
+
+    return subquery_table_ref_ptr;
+}
+
+std::shared_ptr<TableRef>
+PlanBuilder::BuildView(const std::string &view_name, const std::shared_ptr<View>& view_ptr, std::shared_ptr<BindContext>& bind_context_ptr) {
+    // Build view scan operator
+    PlannerAssert(!(bind_context_ptr->IsViewBound(view_name)), "View: " + view_name + " is bound before!");
+    bind_context_ptr->BoundView(view_name);
+
+    const hsql::SQLStatement* sql_statement = view_ptr->GetSQLStatement();
+    PlannerAssert(sql_statement->type() != hsql::StatementType::kStmtSelect, "View related statement isn't a select statement.");
+
+    auto* select_stmt_ptr = static_cast<const hsql::SelectStatement*>(sql_statement);
+
+    // Create new bind context and add into context array;
+    std::shared_ptr<BindContext> cte_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+    this->AddBindContextArray(cte_bind_context_ptr);
+
+    // Create bound select node and subquery table reference
+    auto bound_select_node_ptr = this->BuildSelect(*select_stmt_ptr, cte_bind_context_ptr);
+    auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
+
+    // Get the table index of the sub query output
+    int64_t table_index = bound_select_node_ptr->GetTableIndex();
+
+    // Add binding into bind context
+    bind_context_ptr->AddViewBinding(view_name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
+
+    // return subquery table reference
+    return subquery_table_ref_ptr;
+}
+
+
 
 }

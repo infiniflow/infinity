@@ -12,11 +12,13 @@ namespace infinity {
 
 class LogicalTableScan : public LogicalNode {
 public:
-    explicit LogicalTableScan(std::shared_ptr<Table> table_ptr);
+    explicit LogicalTableScan(int64_t table_index, int64_t node_id, std::shared_ptr<Table> table_ptr);
 
     [[nodiscard]] std::shared_ptr<Table> table_ptr() const { return table_ptr_; }
     std::string ToString(uint64_t space) final;
 
+    int64_t table_index_{-1};
+    int64_t node_id_{-1};
     std::string table_alias_;
     std::vector<std::string> column_aliases_;
     std::vector<uint64_t> columns_;

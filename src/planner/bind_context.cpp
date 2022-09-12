@@ -35,11 +35,6 @@ BindContext::IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) c
     return false;
 }
 
-void
-BindContext::BoundCTE(const std::shared_ptr<CommonTableExpressionInfo>& cte) {
-    bound_cte_set_.insert(cte);
-}
-
 bool
 BindContext::IsViewBound(const std::string& view_name) const {
 
@@ -49,6 +44,20 @@ BindContext::IsViewBound(const std::string& view_name) const {
 
     if(parent_) {
         return parent_->IsViewBound(view_name);
+    }
+
+    return false;
+}
+
+bool
+BindContext::IsTableBound(const std::string& table_name) const {
+
+    if(bound_table_set_.contains(table_name)) {
+        return true;
+    }
+
+    if(parent_) {
+        return parent_->IsTableBound(table_name);
     }
 
     return false;
@@ -65,10 +74,33 @@ BindContext::GetNewLogicalNodeId() {
 }
 
 void
-BindContext::AddGenericBinding(const std::string& name, int64_t table_index,
+BindContext::AddSubqueryBinding(const std::string& name, int64_t table_index,
                                const std::vector<LogicalType>& column_types,
                                const std::vector<std::string>& column_names) {
-    auto binding = Binding::MakeGenericBinding(name, table_index, column_types, column_names);
+    auto binding = Binding::MakeBinding(BindingType::kSubquery, name, table_index, -1, nullptr, column_types, column_names);
+    bindings_by_name_[name] = binding;
+}
+
+void
+BindContext::AddCTEBinding(const std::string& name, int64_t table_index, const std::vector<LogicalType>& column_types,
+                           const std::vector<std::string>& column_names) {
+    auto binding = Binding::MakeBinding(BindingType::kCTE, name, table_index, -1, nullptr, column_types, column_names);
+    bindings_by_name_[name] = binding;
+}
+
+void
+BindContext::AddViewBinding(const std::string& name, int64_t table_index, const std::vector<LogicalType>& column_types,
+                            const std::vector<std::string>& column_names) {
+    auto binding = Binding::MakeBinding(BindingType::kView, name, table_index, -1, nullptr, column_types, column_names);
+    bindings_by_name_[name] = binding;
+}
+
+void
+BindContext::AddTableBinding(const std::string& name, int64_t table_index, int64_t logical_node_id,
+                             std::shared_ptr<LogicalNode> logical_node_ptr,
+                             const std::vector<LogicalType>& column_types,
+                             const std::vector<std::string>& column_names) {
+    auto binding = Binding::MakeBinding(BindingType::kTable, name, table_index, logical_node_id, std::move(logical_node_ptr), column_types, column_names);
     bindings_by_name_[name] = binding;
 }
 

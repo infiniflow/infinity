@@ -60,15 +60,26 @@ public:
     std::unordered_set<std::string> bound_subquery_set_;
 
 public:
-    std::shared_ptr<CommonTableExpressionInfo> GetCTE(const std::string& name) const;
+    [[nodiscard]] std::shared_ptr<CommonTableExpressionInfo> GetCTE(const std::string& name) const;
     [[nodiscard]] bool IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) const;
-    void BoundCTE(const std::shared_ptr<CommonTableExpressionInfo>& cte);
+    void BoundCTE(const std::shared_ptr<CommonTableExpressionInfo>& cte) { bound_cte_set_.insert(cte); }
     [[nodiscard]] bool IsViewBound(const std::string& view_name) const;
+    void BoundView(const std::string& view_name) { bound_view_set_.insert(view_name); }
+    [[nodiscard]] bool IsTableBound(const std::string& table_name) const;
+    void BoundTable(const std::string& table_name) { bound_table_set_.insert(table_name); }
+
     int64_t GetNewTableIndex();
     int64_t GetNewLogicalNodeId();
 
-    void AddGenericBinding(const std::string& name, int64_t table_index,
+    void AddSubqueryBinding(const std::string& name, int64_t table_index,
                            const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
+    void AddCTEBinding(const std::string& name, int64_t table_index,
+                            const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
+    void AddViewBinding(const std::string& name, int64_t table_index,
+                            const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
+    void AddTableBinding(const std::string& name, int64_t table_index, int64_t logical_node_id,
+                         std::shared_ptr<LogicalNode> logical_node_ptr,
+                         const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
 
 private:
     int64_t next_table_index_{0};

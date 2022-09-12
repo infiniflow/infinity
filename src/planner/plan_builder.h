@@ -29,6 +29,8 @@
 #include "bound/cross_product_table_ref.h"
 #include "bound/join_table_ref.h"
 
+#include "storage/view.h"
+
 //#include <memory>
 
 namespace infinity {
@@ -165,9 +167,16 @@ private:
     BuildTable(const hsql::TableRef* from_table, std::shared_ptr<BindContext>& bind_context_ptr);
 
     std::shared_ptr<TableRef>
-    BuildSubquery(const hsql::SelectStatement select_stmt, std::shared_ptr<BindContext>& bind_context_ptr);
+    BuildSubquery(const std::string &name, const hsql::SelectStatement& select_stmt, std::shared_ptr<BindContext>& bind_context_ptr);
 
-};
+    std::shared_ptr<TableRef>
+    BuildCTE(const std::string &name, const std::shared_ptr<CommonTableExpressionInfo>& cte, std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<TableRef>
+    BuildView(const std::string &name, const std::shared_ptr<View>& view, std::shared_ptr<BindContext>& bind_context_ptr);
+
+
+    };
 
 }
 
