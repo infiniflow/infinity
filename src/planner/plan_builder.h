@@ -22,6 +22,13 @@
 
 #include "bind_context.h"
 
+#include "bound/bound_select_node.h"
+#include "bound/table_ref.h"
+#include "bound/base_table_ref.h"
+#include "bound/subquery_table_ref.h"
+#include "bound/cross_product_table_ref.h"
+#include "bound/join_table_ref.h"
+
 //#include <memory>
 
 namespace infinity {
@@ -36,12 +43,26 @@ struct PlanContext {
     std::vector<std::string> output_names;
 };
 
-class PlanBuilder {
+class PlanBuilder : public std::enable_shared_from_this<PlanBuilder> {
 public:
-    explicit PlanBuilder(std::shared_ptr<QueryContext> query_context, std::shared_ptr<PlanBuilder> parent_ptr)
-        : query_context_(std::move(query_context)), parent_ptr_(std::move(parent_ptr)) {}
+    explicit PlanBuilder(std::shared_ptr<QueryContext> query_context)
+        : query_context_(std::move(query_context)) {}
 
     PlanContext BuildPlan(const hsql::SQLStatement &statement);
+
+private:
+    // Only return the root query builder bind context array;
+    std::vector<std::shared_ptr<BindContext>>& BindContextArray();
+
+    void AddBindContextArray(std::shared_ptr<BindContext>& bind_context_ptr);
+
+private:
+//    std::shared_ptr<PlanBuilder> parent_ptr_{nullptr};
+
+    std::shared_ptr<QueryContext> query_context_;
+
+    // Only the parent plan array will be used.
+    std::vector<std::shared_ptr<BindContext>> bind_context_array_;
 
 private:
     PlanContext BuildCreate(const hsql::CreateStatement& statement, std::shared_ptr<BindContext>& bind_context_ptr);
@@ -70,7 +91,8 @@ private:
     PlanContext BuildUpdate(const hsql::UpdateStatement& statement, std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Select operator
-    PlanContext BuildSelect(const hsql::SelectStatement& statement, std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<BoundSelectNode>
+    BuildSelect(const hsql::SelectStatement& statement, std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Show operator
     PlanContext BuildShow(const hsql::ShowStatement& statement, std::shared_ptr<BindContext>& bind_context_ptr);
@@ -113,7 +135,7 @@ private:
 //    BuildExpression(const hsql::Expr& expr, std::shared_ptr<BindContext>& bind_context_ptr);
 
         // Build From clause
-    PlanContext
+    std::shared_ptr<TableRef>
     BuildFromClause(const hsql::TableRef* fromTable, std::shared_ptr<BindContext>& bind_context_ptr);
 
     std::vector<SelectListElement>
@@ -139,21 +161,11 @@ private:
              const hsql::LimitDescription& limit_description,
              std::shared_ptr<BindContext>& bind_context_ptr);
 
-    PlanContext
+    std::shared_ptr<TableRef>
     BuildTable(const hsql::TableRef* from_table, std::shared_ptr<BindContext>& bind_context_ptr);
 
-private:
-    // Only return the root query builder bind context array;
-    std::vector<std::shared_ptr<BindContext>>& BindContextArray();
-
-private:
-    std::shared_ptr<PlanBuilder> parent_ptr_{nullptr};
-
-    std::shared_ptr<QueryContext> query_context_;
-    std::shared_ptr<BindContext> bind_context_ptr_;
-
-    // Only the parent plan array will be used.
-    std::vector<std::shared_ptr<BindContext>> bind_context_array_;
+    std::shared_ptr<TableRef>
+    BuildSubquery(const hsql::SelectStatement select_stmt, std::shared_ptr<BindContext>& bind_context_ptr);
 
 };
 

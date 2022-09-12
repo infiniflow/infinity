@@ -30,14 +30,16 @@
 namespace infinity {
 
 class QueryContext;
+class PlanBuilder;
 
 class Planner {
 public:
-    explicit Planner(std::shared_ptr<QueryContext> query_context_ptr) : query_context_ptr_(std::move(query_context_ptr)) {}
+    explicit Planner(std::shared_ptr<QueryContext> query_context_ptr);
 
     std::shared_ptr<LogicalNode> BuildLogicalPlan(const hsql::SQLStatement &statement);
 private:
     std::shared_ptr<QueryContext> query_context_ptr_;
+    std::shared_ptr<PlanBuilder> planer_builder_ptr_;
 };
 
 

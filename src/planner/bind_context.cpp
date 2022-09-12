@@ -24,7 +24,7 @@ BindContext::GetCTE(const std::string& name) const {
 bool
 BindContext::IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) const {
 
-    if(bound_cte_set_.contains(cte->alias_)) {
+    if(bound_cte_set_.contains(cte)) {
         return true;
     }
 
@@ -33,6 +33,11 @@ BindContext::IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) c
     }
 
     return false;
+}
+
+void
+BindContext::BoundCTE(const std::shared_ptr<CommonTableExpressionInfo>& cte) {
+    bound_cte_set_.insert(cte);
 }
 
 bool
@@ -57,6 +62,14 @@ BindContext::GetNewTableIndex() {
 int64_t
 BindContext::GetNewLogicalNodeId() {
     return parent_ ? parent_->GetNewLogicalNodeId() : next_logical_node_id_ ++;
+}
+
+void
+BindContext::AddGenericBinding(const std::string& name, int64_t table_index,
+                               const std::vector<LogicalType>& column_types,
+                               const std::vector<std::string>& column_names) {
+    auto binding = Binding::MakeGenericBinding(name, table_index, column_types, column_names);
+    bindings_by_name_[name] = binding;
 }
 
 // !!! TODO: Below need to be refactored !!!

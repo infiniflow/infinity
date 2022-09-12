@@ -7,6 +7,7 @@
 #include "SQLParserResult.h"
 #include "expression/base_expression.h"
 #include "logical_node.h"
+#include "binding.h"
 
 
 #include <unordered_map>
@@ -18,7 +19,6 @@ namespace infinity {
 class LogicalNode;
 class Table;
 class ExpressionBinder;
-class Binding;
 
 struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(std::string alias, hsql::SelectStatement* select_stmt, std::unordered_set<std::string> masked_name_set)
@@ -31,12 +31,14 @@ struct CommonTableExpressionInfo {
 
 class BindContext {
 public:
+    explicit BindContext(std::shared_ptr<BindContext> parent) : parent_(parent) {}
+
     // Parent bind context
     std::shared_ptr<BindContext> parent_;
 
     // Left and right child bind context
-    std::weak_ptr<BindContext> left_;
-    std::weak_ptr<BindContext> right_;
+    std::shared_ptr<BindContext> left_;
+    std::shared_ptr<BindContext> right_;
 
     // CTE from CTE alias -> CTE statement
     std::unordered_map<std::string, std::shared_ptr<CommonTableExpressionInfo>> CTE_map_;
@@ -46,7 +48,7 @@ public:
     std::unordered_map<std::string, std::shared_ptr<Binding>> bindings_by_name_;
 
     // Bound CTE
-    std::unordered_set<std::string> bound_cte_set_;
+    std::unordered_set<std::shared_ptr<CommonTableExpressionInfo>> bound_cte_set_;
 
     // Bound View
     std::unordered_set<std::string> bound_view_set_;
@@ -60,9 +62,13 @@ public:
 public:
     std::shared_ptr<CommonTableExpressionInfo> GetCTE(const std::string& name) const;
     [[nodiscard]] bool IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) const;
+    void BoundCTE(const std::shared_ptr<CommonTableExpressionInfo>& cte);
     [[nodiscard]] bool IsViewBound(const std::string& view_name) const;
     int64_t GetNewTableIndex();
     int64_t GetNewLogicalNodeId();
+
+    void AddGenericBinding(const std::string& name, int64_t table_index,
+                           const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
 
 private:
     int64_t next_table_index_{0};

@@ -18,6 +18,10 @@ public:
     Binding() = default;
     virtual ~Binding() = default;
 
+    static std::shared_ptr<Binding>
+    MakeGenericBinding(const std::string& name, int64_t table_index,
+                       const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
+
     // Binding type
     BindingType binding_type_{ BindingType::Generic };
 
@@ -25,10 +29,10 @@ public:
     std::string table_name_;
 
     // Node id of the corresponding logical node
-    int64_t logical_node_id_;
+    int64_t logical_node_id_{-1};
 
-    // Weak ptr to the corresponding logical node. In general we only need either the weak ptr or the node id.
-    std::weak_ptr<LogicalNode> logical_node_ptr_;
+    // ptr to the corresponding logical node.
+    std::shared_ptr<LogicalNode> logical_node_ptr_{nullptr};
 
     // Binding table index or some place call it tag
     int64_t table_index_;
