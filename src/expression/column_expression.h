@@ -22,9 +22,9 @@ struct ColumnBinding {
     uint64_t column_id_;
 };
 
-class BoundColumnExpression : public BaseExpression {
+class ColumnExpression : public BaseExpression {
 public:
-    BoundColumnExpression(LogicalType logical_type, ColumnBinding column_binding);
+    ColumnExpression(LogicalType logical_type, ColumnBinding column_binding);
 
     LogicalType DataType() override { return data_type_; };
     std::string ToString() const override;

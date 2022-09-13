@@ -234,6 +234,9 @@ private:
     std::shared_ptr<TableRef>
     BuildCrossProduct(const hsql::TableRef *from_table, std::shared_ptr<BindContext> &bind_context_ptr);
 
+    std::shared_ptr<TableRef>
+    BuildJoin(const hsql::TableRef *from_table, std::shared_ptr<BindContext> &bind_context_ptr);
+
 };
 
 }

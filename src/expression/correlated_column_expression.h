@@ -8,9 +8,9 @@
 
 namespace infinity {
 
-class CorrelatedParameterExpression: public BaseExpression {
+class CorrelatedColumnExpression: public BaseExpression {
 public:
-    CorrelatedParameterExpression(LogicalType logical_type, std::string column_name);
+    CorrelatedColumnExpression(LogicalType logical_type, std::string column_name);
 
     LogicalType DataType() override;
     std::string ToString() const override;

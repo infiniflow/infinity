@@ -5,6 +5,7 @@
 #pragma once
 
 #include "table_ref.h"
+#include "common/types.h"
 
 namespace infinity {
 
@@ -23,6 +24,7 @@ public:
     // Condition ???
 
     // Join Type ???
+    JoinType join_type_;
 };
 
 }

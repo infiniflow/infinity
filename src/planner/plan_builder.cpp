@@ -786,8 +786,8 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
                                                  0,
                                                  column_index);
 
-                    std::shared_ptr<BoundColumnExpression> bound_column_expr_ptr
-                            = std::make_shared<BoundColumnExpression>(column_def.logical_type(), column_binding);
+                    std::shared_ptr<ColumnExpression> bound_column_expr_ptr
+                            = std::make_shared<ColumnExpression>(column_def.logical_type(), column_binding);
                     ColumnIdentifier column_identifier(*table_name_ptr, column_def.name());
                     select_lists.emplace_back(bound_column_expr_ptr);
                     select_lists.back().AddColumnIdentifier(column_identifier);
@@ -1103,6 +1103,13 @@ PlanBuilder::BuildCrossProduct(const hsql::TableRef* from_table, std::shared_ptr
     bind_context_ptr->AddBindContext(right_bind_context_ptr);
 
     // TODO: Not care about the correlated expression
+
+    return result;
+}
+
+std::shared_ptr<TableRef>
+PlanBuilder::BuildJoin(const hsql::TableRef *from_table, std::shared_ptr<BindContext> &bind_context_ptr) {
+    std::shared_ptr<JoinTableRef> result;
 
     return result;
 }

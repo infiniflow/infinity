@@ -8,13 +8,13 @@
 
 namespace infinity {
 
-BoundColumnExpression::BoundColumnExpression(LogicalType logical_type, ColumnBinding column_binding)
-   : BaseExpression(ExpressionType::kBoundColumn, {}),
+ColumnExpression::ColumnExpression(LogicalType logical_type, ColumnBinding column_binding)
+   : BaseExpression(ExpressionType::kColumn, {}),
    data_type_(logical_type),
    column_binding_(std::move(column_binding))
    {}
 
-std::string BoundColumnExpression::ToString() const {
+std::string ColumnExpression::ToString() const {
     return *column_binding_.column_name_ptr_;
 }
 

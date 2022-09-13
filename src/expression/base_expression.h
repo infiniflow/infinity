@@ -15,6 +15,7 @@ namespace infinity {
 enum class ExpressionType {
     // Aggregate function
     kAggregate,
+    kGroupingFunction, // ??
 
     // Arithmetic operator
     kArithmetic,
@@ -30,28 +31,36 @@ enum class ExpressionType {
     kOr,
     kNot,
 
-    // Unbound column
+    // Column
     kColumn,
 
-    // Bound column
-    kBoundColumn,
+    // Correlated column expression
+    kCorrelatedColumn,
 
     // Exists
+    kExists,
 
     // Extract
+    kExtract,
+
+    // Interval
+    kInterval,
 
     // Function,
     kFunction,
 
     // List,
+    kList,
 
     // Logical,
     kEqual,
+    kNotEqual, // kNot + kEqual ?
     kLessThan,
     kGreaterThan,
     kLessThanEqual,
     kGreaterThanEqual,
     kBetween,
+    kNotBetween, // kNot + kBetween ?
 
     // Unbound subquery
     kSubQuery,
@@ -59,19 +68,26 @@ enum class ExpressionType {
     // Unary
     kUnaryMinus,
     kIsNull,
+    kIsNotNull,  // kNot + kIsNull ?
 
     // Value
     kValue,
+    kDefault, // ??
+    kParameter, // ??
 
     // IN
     kIn,
+    kNotIn, // kNot + kIn
 
     // WINDOW Function
     kWindowRank,
     kWindowRowNumber,
 
-    // Correlated parameter expression
-    kCorrelatedParam,
+    // Misc.
+    kDistinctFrom, // ??
+    kNotDistinctFrom, // ??
+    kPlaceholder,
+    kPredicate, // ?
 };
 
 class BaseExpression : public std::enable_shared_from_this<BaseExpression> {
