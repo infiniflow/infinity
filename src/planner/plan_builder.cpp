@@ -1109,7 +1109,75 @@ PlanBuilder::BuildCrossProduct(const hsql::TableRef* from_table, std::shared_ptr
 
 std::shared_ptr<TableRef>
 PlanBuilder::BuildJoin(const hsql::TableRef *from_table, std::shared_ptr<BindContext> &bind_context_ptr) {
-    std::shared_ptr<JoinTableRef> result;
+    auto result = std::make_shared<JoinTableRef>();
+
+    switch (from_table->join->type) {
+        case hsql::JoinType::kJoinCross: result->join_type_ = JoinType::kCross; break;
+        case hsql::JoinType::kJoinFull: result->join_type_ = JoinType::kFull; break;
+        case hsql::JoinType::kJoinInner: result->join_type_ = JoinType::kInner; break;
+        case hsql::JoinType::kJoinNatural: result->join_type_ = JoinType::kNatural; break;
+        case hsql::JoinType::kJoinLeft: result->join_type_ = JoinType::kLeft; break;
+        case hsql::JoinType::kJoinRight: result->join_type_ = JoinType::kRight; break;
+        default:
+            PlannerError("Unsupported join type.")
+    }
+
+    // Build left child
+    std::shared_ptr<BindContext> left_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+    AddBindContextArray(left_bind_context_ptr);
+    std::shared_ptr<TableRef> left_bound_table_ref = BuildFromClause(from_table->join->left, left_bind_context_ptr);
+
+    // Build right child
+    std::shared_ptr<BindContext> right_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+    AddBindContextArray(right_bind_context_ptr);
+    std::shared_ptr<TableRef> right_bound_table_ref = BuildFromClause(from_table->join->right, right_bind_context_ptr);
+
+    // Merge left/right bind context into current bind context
+    bind_context_ptr->AddBindContext(left_bind_context_ptr);
+    bind_context_ptr->AddBindContext(right_bind_context_ptr);
+
+    // Current parser doesn't support On using column syntax, so only consider the case of natural join.
+    if(result->join_type_ == JoinType::kNatural) {
+        PlannerError("Not implemented the natural join")
+        std::unordered_set<std::string> left_binding_column_names;
+        // TODO: Is there any way to get all_column_names size ? Collect all left binding columns numbers at very beginning?
+        for(auto& left_binding: left_bind_context_ptr->bindings_) {
+            for(auto& left_column_name: left_binding->column_names_) {
+                left_binding_column_names.emplace(left_column_name);
+            }
+        }
+
+        std::vector<std::string> using_column_names;
+        // TODO: column count of left binding tables and right binding tables is using_column_names size
+        for(auto& right_binding: right_bind_context_ptr->bindings_) {
+            for(auto& right_column_name: right_binding->column_names_) {
+                if(left_binding_column_names.contains(right_column_name)) {
+                    using_column_names.emplace_back(right_column_name);
+                }
+            }
+        }
+
+        if(using_column_names.empty()) {
+            // It is cross product, but not a natural join
+            auto cross_product_table_ref = std::make_shared<CrossProductTableRef>();
+            cross_product_table_ref->left_bind_context_ = left_bind_context_ptr;
+            cross_product_table_ref->left_table_ref_ = left_bound_table_ref;
+
+            cross_product_table_ref->right_bind_context_ = right_bind_context_ptr;
+            cross_product_table_ref->right_table_ref_ = right_bound_table_ref;
+            return cross_product_table_ref;
+        } else {
+            // It is a natural join, we only consider the inner natural join case.
+            result->join_type_ = JoinType::kInner;
+
+            // TODO: Construct join condition: left_column_expr = right_column_expr AND left_column_expr = right_column_expr;
+
+
+        }
+    }
+
+    // Inner / Full / Left / Right join
+    // TODO: Bind all join condition with where expression binder.
 
     return result;
 }

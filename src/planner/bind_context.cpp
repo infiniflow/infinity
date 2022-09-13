@@ -79,6 +79,7 @@ BindContext::AddSubqueryBinding(const std::string& name, int64_t table_index,
                                const std::vector<std::string>& column_names) {
     auto binding = Binding::MakeBinding(BindingType::kSubquery, name, table_index, -1, nullptr, column_types, column_names);
     bindings_by_name_[name] = binding;
+    bindings_.emplace_back(binding);
 }
 
 void
@@ -86,6 +87,7 @@ BindContext::AddCTEBinding(const std::string& name, int64_t table_index, const s
                            const std::vector<std::string>& column_names) {
     auto binding = Binding::MakeBinding(BindingType::kCTE, name, table_index, -1, nullptr, column_types, column_names);
     bindings_by_name_[name] = binding;
+    bindings_.emplace_back(binding);
 }
 
 void
@@ -93,6 +95,7 @@ BindContext::AddViewBinding(const std::string& name, int64_t table_index, const 
                             const std::vector<std::string>& column_names) {
     auto binding = Binding::MakeBinding(BindingType::kView, name, table_index, -1, nullptr, column_types, column_names);
     bindings_by_name_[name] = binding;
+    bindings_.emplace_back(binding);
 }
 
 void
@@ -102,6 +105,7 @@ BindContext::AddTableBinding(const std::string& name, int64_t table_index, int64
                              const std::vector<std::string>& column_names) {
     auto binding = Binding::MakeBinding(BindingType::kTable, name, table_index, logical_node_id, std::move(logical_node_ptr), column_types, column_names);
     bindings_by_name_[name] = binding;
+    bindings_.emplace_back(binding);
 }
 
 void

@@ -12,7 +12,8 @@ enum class JoinType {
     kLeft,
     kRight,
     kFull,
-    kCross
+    kCross,
+    kNatural
 };
 
 }
