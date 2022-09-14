@@ -21,6 +21,7 @@ enum class ExceptionType {
     kExecutor,
     kScheduler,
     kCatalog,
+    kFunction,
 
     // Type exception
     kType,
@@ -120,6 +121,12 @@ class TypeException: public Exception {
 public:
     template<typename... Args>
     explicit TypeException(Args... params) : Exception(BuildMessage(std::string("Type Error:"), params...)) {}
+};
+
+class FunctionException: public Exception {
+public:
+    template<typename... Args>
+    explicit FunctionException(Args... params) : Exception(BuildMessage(std::string("Function Error:"), params...)) {}
 };
 
 class NotImplementException: public Exception {

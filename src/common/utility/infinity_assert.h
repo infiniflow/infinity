@@ -67,7 +67,7 @@ if(!(is_true)) {                                                            \
     throw TypeException(errmsg);                                       \
 }
 
-#define TypeAssert(is_true, message)                                              \
+#define FunctionAssert(is_true, message)                                              \
 if(!(is_true)) {                                                            \
     std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
     throw TypeException(errmsg);                                       \
@@ -141,6 +141,12 @@ if(!(is_true)) {                                                            \
     throw TypeException(errmsg);                                       \
 }
 
+#define FunctionAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = (message);                                         \
+    throw FunctionException(errmsg);                                       \
+}
+
 //#define Assert(is_true, message)                                              \
 //if(!(is_true)) {                                                            \
 //    std::string errmsg = (message);                                         \
@@ -170,6 +176,7 @@ if(!(is_true)) {                                                            \
 #define CatalogError(message) CatalogAssert(false, message)
 #define StorageError(message) StorageAssert(false, message)
 #define TypeError(message) TypeAssert(false, message)
+#define FunctionError(message) FunctionAssert(false, message)
 #define NotImplementError(message) NotImplementAssert(false, message)
 #define GeneralError(message) GeneralAssert(false, message)
 }

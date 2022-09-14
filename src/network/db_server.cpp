@@ -5,6 +5,7 @@
 #include <boost/bind/bind.hpp>
 #include <thread>
 #include "db_server.h"
+#include "main/infinity.h"
 
 namespace infinity {
 
@@ -13,7 +14,7 @@ DBServer::DBServer(const StartupParameter &parameter)
 
 void DBServer::Run() {
     initialized = true;
-
+    Infinity::instance().Init();
     CreateConnection();
     io_service_.run();
 }
