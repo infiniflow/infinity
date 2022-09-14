@@ -36,8 +36,8 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
             return std::make_shared<ValueExpression>(logical_type);
         }
         case hsql::kExprColumnRef: {
-            // Resolve column
-            return BuildColRefExpr(expr, bind_context_ptr);
+            // TODO: Resolve column
+            return BuildColExpr(expr, bind_context_ptr);
         }
         case hsql::kExprFunctionRef: {
             // Check the function alias
@@ -55,7 +55,7 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
 }
 
 std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+ExpressionBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
     std::string expr_name = std::string(expr.getName());
     std::optional<std::string> table_name = nullptr;
     if(expr.table != nullptr) {
@@ -66,11 +66,23 @@ ExpressionBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<
     return column_expr;
 }
 
-// Bind aggregate function.
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildAggFunc(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    PlannerError("ExpressionBinder::BuildAggFunc");
-    return std::shared_ptr<BaseExpression>();
-}
+//// Bind aggregate function.
+//std::shared_ptr<BaseExpression>
+//ExpressionBinder::BuildAggFunc(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+//    PlannerError("ExpressionBinder::BuildAggFunc");
+//    return std::shared_ptr<BaseExpression>();
+//}
+//
+//// Bind subquery expression.
+//std::shared_ptr<BaseExpression>
+//ExpressionBinder::BuildSubquery(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+//    PlannerError("ExpressionBinder::BuildSubquery");
+//}
+//
+//// Bind window function.
+//std::shared_ptr<BaseExpression>
+//ExpressionBinder::BuildWindow(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+//    PlannerError("ExpressionBinder::BuildWindow");
+//}
 
 }

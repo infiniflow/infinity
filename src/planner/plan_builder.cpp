@@ -20,6 +20,7 @@
 #include "binder/insert_binder.h"
 #include "binder/select_binder.h"
 #include "binder/where_binder.h"
+#include "binder/join_binder.h"
 
 #include "storage/table_definition.h"
 #include "storage/column_definition.h"
@@ -30,6 +31,9 @@
 #include "expression/value_expression.h"
 #include "expression/cast_expression.h"
 #include "expression/column_expression.h"
+#include "expression/conjunction_expression.h"
+
+#include "expression/expression_transformer.h"
 
 
 namespace infinity {
@@ -725,19 +729,17 @@ PlanBuilder::BuildFromClause(const hsql::TableRef* from_table, std::shared_ptr<B
         }
         case hsql::kTableJoin: {
             // select t1.b, t2.c from t1 join t2 on t1.a = t2.a
-            PlannerError("BuildFromClause: Table join");
-            break;
+            return BuildJoin(from_table, bind_context_ptr);
         }
         case hsql::kTableCrossProduct: {
             // select t1.b, t2.c from t1, t2;
             return BuildCrossProduct(from_table, bind_context_ptr);
         }
-#if 0
+
         // TODO: No case currently, since parser doesn't support it.
-        case hsql::kExpressionList: {
-            break;
-        }
-#endif
+//        case hsql::kExpressionList: {
+//            break;
+//        }
     }
 
 
@@ -770,7 +772,7 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
                     }
                 }
 
-                std::shared_ptr<std::string> table_name_ptr = std::make_shared<std::string>(table_ptr->table_def()->name());
+                const std::string& table_name_ref = table_ptr->table_def()->name();
 
                 // Get corresponding column definition from binding context.
                 const std::vector<ColumnDefinition>& columns_def = bind_context_ptr->tables_[0]->table_def()->columns();
@@ -781,14 +783,14 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
                 // Build select list
                 uint64_t column_index = 0;
                 for(const ColumnDefinition& column_def: columns_def) {
-                    ColumnBinding column_binding(table_name_ptr,
-                                                 std::make_shared<std::string>(column_def.name()),
-                                                 0,
-                                                 column_index);
-
                     std::shared_ptr<ColumnExpression> bound_column_expr_ptr
-                            = std::make_shared<ColumnExpression>(column_def.logical_type(), column_binding);
-                    ColumnIdentifier column_identifier(*table_name_ptr, column_def.name());
+                            = std::make_shared<ColumnExpression>(column_def.logical_type(),
+                                                                 table_name_ref,
+                                                                 0, // TODO: need to generate a table index
+                                                                 column_def.name(),
+                                                                 column_index);
+                    ++ column_index;
+                    ColumnIdentifier column_identifier(table_name_ref, column_def.name());
                     select_lists.emplace_back(bound_column_expr_ptr);
                     select_lists.back().AddColumnIdentifier(column_identifier);
 
@@ -1138,7 +1140,6 @@ PlanBuilder::BuildJoin(const hsql::TableRef *from_table, std::shared_ptr<BindCon
 
     // Current parser doesn't support On using column syntax, so only consider the case of natural join.
     if(result->join_type_ == JoinType::kNatural) {
-        PlannerError("Not implemented the natural join")
         std::unordered_set<std::string> left_binding_column_names;
         // TODO: Is there any way to get all_column_names size ? Collect all left binding columns numbers at very beginning?
         for(auto& left_binding: left_bind_context_ptr->bindings_) {
@@ -1170,14 +1171,54 @@ PlanBuilder::BuildJoin(const hsql::TableRef *from_table, std::shared_ptr<BindCon
             // It is a natural join, we only consider the inner natural join case.
             result->join_type_ = JoinType::kInner;
 
+            // Reserve the on condition space for the expression.
+            result->on_conditions_.reserve(using_column_names.size());
+
             // TODO: Construct join condition: left_column_expr = right_column_expr AND left_column_expr = right_column_expr;
+            for(auto& column_name: using_column_names) {
+                // Create left bound column expression
+                auto& left_binding_ptr = left_bind_context_ptr->bindings_by_column_[column_name];
+                PlannerAssert(left_binding_ptr != nullptr, "Column: " + column_name + " doesn't exist in left table");
+                auto left_column_index = left_binding_ptr->name2index_[column_name];
+                auto left_column_type = left_binding_ptr->column_types_[left_column_index];
 
+                std::shared_ptr<ColumnExpression> left_column_expression_ptr =
+                        std::make_shared<ColumnExpression>(left_column_type, left_binding_ptr->table_name_, left_binding_ptr->table_index_, column_name, left_column_index);
 
+                auto& right_binding_ptr = right_bind_context_ptr->bindings_by_column_[column_name];
+                PlannerAssert(right_binding_ptr != nullptr, "Column: " + column_name + " doesn't exist in right table");
+                auto right_column_index = right_binding_ptr->name2index_[column_name];
+                auto right_column_type = right_binding_ptr->column_types_[right_column_index];
+
+                std::shared_ptr<ColumnExpression> right_column_expression_ptr =
+                        std::make_shared<ColumnExpression>(right_column_type, right_binding_ptr->table_name_, right_binding_ptr->table_index_, column_name, right_column_index);
+
+                auto condition = std::make_shared<ConjunctionExpression>(ExpressionType::kConjunction, ConjunctionType::kAnd, left_column_expression_ptr, right_column_expression_ptr);
+                result->on_conditions_.emplace_back(condition);
+
+                // For natural join, we can return now.
+                return result;
+            }
         }
     }
 
     // Inner / Full / Left / Right join
     // TODO: Bind all join condition with where expression binder.
+
+    // std::shared_ptr<JoinBinder> join_binder
+    auto join_binder = std::make_shared<JoinBinder>();
+
+    // std::shared_ptr<BaseExpression> on_condition_ptr
+    auto on_condition_ptr = join_binder->BuildExpression(*from_table->join->condition, bind_context_ptr);
+//    std::shared_ptr<BaseExpression> where_expr =
+//            bind_context_ptr->binder_->BuildExpression(*whereClause, bind_context_ptr);
+//
+//    std::shared_ptr<BaseExpression> condition_ptr =
+//    from_table->join->condition
+//    for(hsql::Expr* expr: from_table->join->condition) {
+//
+//    }
+    result->on_conditions_ = SplitExpressionByDelimiter(on_condition_ptr, ConjunctionType::kAnd);
 
     return result;
 }

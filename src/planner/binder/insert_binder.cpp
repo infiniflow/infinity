@@ -13,9 +13,9 @@ InsertBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<Bind
     return result;
 }
 
-std::shared_ptr<BaseExpression>
-InsertBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    PlannerError("HavingBinder::BuildColRefExpr");
-}
+//std::shared_ptr<BaseExpression>
+//InsertBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+//    PlannerError("HavingBinder::BuildColRefExpr");
+//}
 
 }

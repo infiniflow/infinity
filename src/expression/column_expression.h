@@ -8,28 +8,21 @@
 
 namespace infinity {
 
-struct ColumnBinding {
-    ColumnBinding(std::shared_ptr<std::string> table_name_ptr,
-                  std::shared_ptr<std::string> column_name_ptr,
-                  uint64_t table_id,
-                  uint64_t column_id)
-        : table_name_ptr_(table_name_ptr), column_name_ptr_(column_name_ptr), table_id_(table_id), column_id_(column_id)
-    {}
-
-    std::shared_ptr<std::string> table_name_ptr_;
-    std::shared_ptr<std::string> column_name_ptr_;
-    uint64_t table_id_;
-    uint64_t column_id_;
-};
 
 class ColumnExpression : public BaseExpression {
 public:
-    ColumnExpression(LogicalType logical_type, ColumnBinding column_binding);
+    ColumnExpression(LogicalType logical_type, std::string table_name, int64_t table_index,
+                     std::string column_name, int64_t column_index);
 
     LogicalType DataType() override { return data_type_; };
     std::string ToString() const override;
 private:
-    ColumnBinding column_binding_;
+    std::string table_name_;
+    int64_t table_index_;
+
+    std::string column_name_;
+    int64_t column_index_;
+
     LogicalType data_type_;
 };
 

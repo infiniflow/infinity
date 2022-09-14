@@ -1,5 +1,5 @@
 //
-// Created by JinHai on 2022/8/12.
+// Created by JinHai on 2022/9/14.
 //
 
 #pragma once
@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class WhereBinder : public ExpressionBinder {
+class JoinBinder : public ExpressionBinder {
 public:
     // Bind expression entry
     std::shared_ptr<BaseExpression>
@@ -21,3 +21,4 @@ private:
 };
 
 }
+

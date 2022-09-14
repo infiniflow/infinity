@@ -30,12 +30,12 @@ HavingBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<Bind
     return ExpressionBinder::BuildExpression(expr, bind_context_ptr);
 }
 
-std::shared_ptr<BaseExpression>
-HavingBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    std::shared_ptr<BaseExpression> column_expr = ExpressionBinder::BuildColRefExpr(expr, bind_context_ptr);
-
-    PlannerError("HavingBinder::BuildColRefExpr");
-    return column_expr;
-}
+//std::shared_ptr<BaseExpression>
+//HavingBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+//    std::shared_ptr<BaseExpression> column_expr = ExpressionBinder::BuildColRefExpr(expr, bind_context_ptr);
+//
+//    PlannerError("HavingBinder::BuildColRefExpr");
+//    return column_expr;
+//}
 
 }

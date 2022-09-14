@@ -28,6 +28,7 @@ enum class ExpressionType {
 
     // Conjunction operator
     kAnd,
+    kConjunction,
     kOr,
     kNot,
 
@@ -53,6 +54,7 @@ enum class ExpressionType {
     kList,
 
     // Logical,
+    kLogical,
     kEqual,
     kNotEqual, // kNot + kEqual ?
     kLessThan,
@@ -99,6 +101,7 @@ public:
     [[nodiscard]] virtual std::string ToString() const = 0;
     virtual LogicalType DataType() = 0;
     [[nodiscard]] ExpressionType type() const { return type_; }
+    std::vector<std::shared_ptr<BaseExpression>>& arguments() { return arguments_; }
 
 protected:
     ExpressionType type_;

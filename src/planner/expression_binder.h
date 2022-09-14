@@ -21,12 +21,21 @@ public:
     BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Bind column reference expression also include correlated column reference.
-    virtual std::shared_ptr<BaseExpression>
-    BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<BaseExpression>
+    BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+//
+//    // Bind aggregate function.
+//    virtual std::shared_ptr<BaseExpression>
+//    BuildAggFunc(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+//
+//    // Bind subquery expression.
+//    virtual std::shared_ptr<BaseExpression>
+//    BuildSubquery(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+//
+//    // Bind window function.
+//    virtual std::shared_ptr<BaseExpression>
+//    BuildWindow(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-    // Bind aggregate function.
-    virtual std::shared_ptr<BaseExpression>
-    BuildAggFunc(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 private:
 };
 

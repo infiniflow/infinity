@@ -46,6 +46,8 @@ public:
     // Binding, all bindings include subquery, cte, view, table ...
     std::vector<std::shared_ptr<Binding>> bindings_;
     std::unordered_map<std::string, std::shared_ptr<Binding>> bindings_by_name_;
+    std::unordered_map<std::string, std::shared_ptr<Binding>> bindings_by_column_;
+    std::unordered_map<int64_t, std::shared_ptr<Binding>> bindings_by_table_index_;
 
     // Bound CTE
     std::unordered_set<std::shared_ptr<CommonTableExpressionInfo>> bound_cte_set_;

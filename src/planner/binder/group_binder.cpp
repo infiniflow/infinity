@@ -26,12 +26,12 @@ GroupBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindC
     return result;
 }
 
-std::shared_ptr<BaseExpression>
-GroupBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    std::shared_ptr<BaseExpression> column_expr = ExpressionBinder::BuildColRefExpr(expr, bind_context_ptr);
-
-    PlannerError("GroupBinder::BuildColRefExpr");
-    return column_expr;
-}
+//std::shared_ptr<BaseExpression>
+//GroupBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+//    std::shared_ptr<BaseExpression> column_expr = ExpressionBinder::BuildColRefExpr(expr, bind_context_ptr);
+//
+//    PlannerError("GroupBinder::BuildColRefExpr");
+//    return column_expr;
+//}
 
 }

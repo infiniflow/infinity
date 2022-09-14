@@ -19,6 +19,7 @@ public:
     LogicalType DataType() override {
         return data_type_;
     }
+
     std::string ToString() const override;
     bool IsNull() const { return data_type_.GetTypeId() == LogicalTypeId::kNull; }
     void AppendToChunk(Chunk& chunk);
