@@ -5,12 +5,13 @@
 #pragma once
 #include "function.h"
 #include "storage/data_type.h"
+#include <vector>
 
 namespace infinity {
 class TableFunction : public Function {
 public:
     explicit TableFunction(std::string name,
-                            const std::vector<LogicalType>& argument_types);
+                           std::vector<LogicalType> argument_types);
 
 private:
     std::vector<LogicalType> argument_types_;

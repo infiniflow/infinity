@@ -12,7 +12,7 @@ class PhysicalExport : public PhysicalOperator {
 public:
     explicit PhysicalExport(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id) {}
-    ~PhysicalExport() = default;
+    ~PhysicalExport() override = default;
 
     void Execute() override;
 };

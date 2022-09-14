@@ -14,7 +14,7 @@ namespace infinity {
 template<typename Func>
 class FunctionSet {
 public:
-    explicit FunctionSet(std::string name): name_(name) {}
+    explicit FunctionSet(std::string name): name_(std::move(name)) {}
 
     void AddFunction(Func function) {
         FunctionAssert(function.name == name_, "Mismatch the function name: " + function.name + " with: " + name_);

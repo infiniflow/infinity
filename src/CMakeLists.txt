@@ -39,6 +39,13 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        function_src
+        CONFIGURE_DEPENDS
+        function/*.cpp
+        function/*.h
+        )
+
+file(GLOB_RECURSE
         network_src
         CONFIGURE_DEPENDS
         network/*.cpp
@@ -78,6 +85,7 @@ set(INFINITY_CORE_SOURCE
         ${common_src}
         ${executor_src}
         ${expression_src}
+        ${function_src}
         ${infinity_src}
         ${network_src}
         ${parser_src}

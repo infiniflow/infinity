@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include "storage/catalog.h"
-#include "function_set.h"
+
 
 #include <string>
 
@@ -20,33 +19,15 @@ enum class FunctionType {
 
 class Function {
 public:
-    explicit Function(std::string name) : name_(std::move(name)) {}
+    explicit Function(std::string name, FunctionType type) : name_(std::move(name)), type_(type) {}
     virtual ~Function() = default;
-    FunctionType type() const { return type_; }
-    const std::string& name() const { return name_; }
+    [[nodiscard]] FunctionType type() const { return type_; }
+    [[nodiscard]] const std::string& name() const { return name_; }
 
 private:
     std::string name_;
-    FunctionType type_;
+    FunctionType type_{FunctionType::kInvalid};
 
-};
-
-class BuiltinFunctions : public std::enable_shared_from_this<BuiltinFunctions> {
-public:
-    explicit BuiltinFunctions(const std::unique_ptr<Catalog>& catalog_ptr);
-
-    void Init();
-
-
-private:
-    std::unique_ptr<Catalog>& catalog_ptr_;
-
-private:
-    void AddFunctionSet(FunctionSet& function_set);
-
-    void RegisterAggregateFunction();
-    void RegisterScalarFunction();
-    void RegisterTableFunction();
 };
 
 

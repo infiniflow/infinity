@@ -3,15 +3,18 @@
 //
 
 #pragma once
-#include "function.h"
+
 #include "storage/data_type.h"
+#include "function.h"
+#include <vector>
 
 namespace infinity {
-class AggregateFunction : public Function {
+
+class AggregateFunction: public Function {
 public:
     explicit AggregateFunction(std::string name,
-                               const std::vector<LogicalType>& argument_types,
-                               LogicalType& return_type);
+                               const std::vector<LogicalType> argument_types,
+                               LogicalType return_type);
 
 private:
     std::vector<LogicalType> argument_types_;

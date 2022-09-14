@@ -3,15 +3,18 @@
 //
 
 #pragma once
+
 #include "function.h"
 #include "storage/data_type.h"
+#include <vector>
 
 namespace infinity {
+
 class ScalarFunction : public Function {
 public:
     explicit ScalarFunction(std::string name,
-                            const std::vector<LogicalType>& argument_types,
-                            LogicalType& return_type);
+                            std::vector<LogicalType> argument_types,
+                            LogicalType return_type);
 
 private:
     std::vector<LogicalType> argument_types_;
