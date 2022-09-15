@@ -15,7 +15,7 @@ LogicalType::LogicalType(LogicalTypeId logical_type_id)
 
 
 LogicalType::LogicalType(infinity::LogicalTypeId logical_type_id, int64_t length, int64_t precision, int64_t scale)
-    : logical_type_(logical_type_id), length_(length), precision_(precision), scale_(scale) {
+    : logical_type_(logical_type_id) {
     switch(logical_type_) {
         case LogicalTypeId::kBoolean: physical_type_ = PhysicalType::kBool; break;
         case LogicalTypeId::kTinyInt: physical_type_ = PhysicalType::kInt8; break;

@@ -96,9 +96,9 @@ public:
     [[nodiscard]] LogicalTypeId GetTypeId() const { return logical_type_; }
     size_t Size() const;
 private:
-    int64_t length_;
-    int64_t precision_;
-    int64_t scale_;
+//    int64_t length_;
+//    int64_t precision_;
+//    int64_t scale_;
 
     LogicalTypeId logical_type_;
     PhysicalType physical_type_;

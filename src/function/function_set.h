@@ -11,34 +11,46 @@
 
 namespace infinity {
 
-template<typename Func>
+
 class FunctionSet {
 public:
-    explicit FunctionSet(std::string name): name_(std::move(name)) {}
+    explicit FunctionSet(std::string name, FunctionType type): name_(std::move(name)), type_(type) {}
 
-    void AddFunction(Func function) {
-        FunctionAssert(function.name == name_, "Mismatch the function name: " + function.name + " with: " + name_);
-        functions_.template emplace_back(function);
-    }
+    [[nodiscard]] const std::string& name() const { return name_; }
 
     std::string name_;
-
-    std::vector<Func> functions_;
+    FunctionType type_;
 };
 
-class ScalarFunctionSet: public FunctionSet<ScalarFunction> {
+class AggregateFunctionSet: public FunctionSet {
 public:
-    explicit ScalarFunctionSet(std::string name): FunctionSet(std::move(name)) {}
+    explicit AggregateFunctionSet(std::string name): FunctionSet(std::move(name), FunctionType::kAggregate) {}
+
+    void AddFunction(const AggregateFunction& func);
+
+private:
+    std::vector<AggregateFunction> functions_;
 };
 
-class AggregateFunctionSet: public FunctionSet<AggregateFunction> {
+
+class ScalarFunctionSet: public FunctionSet {
 public:
-    explicit AggregateFunctionSet(std::string name): FunctionSet(std::move(name)) {}
+    explicit ScalarFunctionSet(std::string name): FunctionSet(std::move(name), FunctionType::kScalar) {}
+
+    void AddFunction(const ScalarFunction& func);
+
+private:
+    std::vector<ScalarFunction> functions_;
 };
 
-class TableFunctionSet: public FunctionSet<TableFunction> {
+class TableFunctionSet: public FunctionSet {
 public:
-    explicit TableFunctionSet(std::string name): FunctionSet(std::move(name)) {}
+    explicit TableFunctionSet(std::string name): FunctionSet(std::move(name), FunctionType::kTable) {}
+
+    void AddFunction(const TableFunction& func);
+
+private:
+    std::vector<TableFunction> functions_;
 };
 
 }

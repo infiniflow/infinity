@@ -29,8 +29,21 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
         }
         case hsql::kExprLiteralString: {
             logical_type = LogicalType(LogicalTypeId::kVarchar);
-            return std::make_shared<ValueExpression>(logical_type, expr.getName());
+            PlannerAssert(expr.name != nullptr, "Literal string value is NULL.");
+            return std::make_shared<ValueExpression>(logical_type, std::string(expr.name));
         }
+        case hsql::kExprLiteralDate: {
+            // TODO: transfer from date string (expr.name) to date int64
+            int64_t date = 0;
+            logical_type = LogicalType(LogicalTypeId::kDate);
+            PlannerError("Date isn't supported during binding period.");
+            return std::make_shared<ValueExpression>(logical_type, date);
+        }
+        case hsql::kExprLiteralInterval:
+            // IntervalT should be a struct including the type of the value and an value of the interval
+            // It will be bound into a ValueExpression here.
+            PlannerError("Interval isn't supported during binding period.");
+            break;
         case hsql::kExprLiteralNull: {
             logical_type = LogicalType(LogicalTypeId::kNull);
             return std::make_shared<ValueExpression>(logical_type);
@@ -47,6 +60,34 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
             // Normal function
             PlannerError("Function reference");
         }
+
+        case hsql::kExprStar:
+            PlannerError("Star expression shouldn't be bound here.");
+            break;
+        case hsql::kExprParameter:
+            PlannerError("Used in prepare and execute? Not supported now.");
+            break;
+        case hsql::kExprOperator:
+            // various expression
+            break;
+        case hsql::kExprSelect:
+            // subquery expression
+            break;
+        case hsql::kExprHint:
+            PlannerError("Hint isn't supported now.");
+            break;
+        case hsql::kExprArray:
+            PlannerError("Array should be supported in IN expression.");
+            break;
+        case hsql::kExprArrayIndex:
+            PlannerError("Array index isn't supported now.");
+            break;
+        case hsql::kExprExtract:
+            // extract function expression
+            break;
+        case hsql::kExprCast:
+            // cast function expression
+            break;
         default:
             PlannerError("Unsupported expr type");
     }

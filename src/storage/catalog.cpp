@@ -89,4 +89,29 @@ Catalog::DeleteView(const std::string& schema_name, const std::string& view_name
     schemas_[schema_name]->DeleteView(view_name);
 }
 
+std::shared_ptr<FunctionSet>
+Catalog::GetFunctionSetByName(const std::string& function_name) {
+    if(!function_sets_.contains(function_name)) {
+        CatalogError("No function name: " + function_name);
+    }
+    return function_sets_[function_name];
+}
+
+void
+Catalog::AddFunction(const std::shared_ptr<FunctionSet>& function_set) {
+    const std::string& name = function_set->name();
+    if(function_sets_.contains(name)) {
+        CatalogError("Trying to add duplicated function name into catalog: " + name);
+    }
+    function_sets_.emplace(name, function_set);
+}
+
+void
+Catalog::DeleteFunction(const std::string& function_name) {
+    if(!function_sets_.contains(function_name)) {
+        CatalogError("Delete not exist function: " + function_name);
+    }
+    function_sets_.erase(function_name);
+}
+
 }

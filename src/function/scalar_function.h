@@ -7,6 +7,7 @@
 #include "function.h"
 #include "storage/data_type.h"
 #include <vector>
+#include "expression/base_expression.h"
 
 namespace infinity {
 
@@ -15,6 +16,8 @@ public:
     explicit ScalarFunction(std::string name,
                             std::vector<LogicalType> argument_types,
                             LogicalType return_type);
+
+    void CastArgumentTypes(std::vector<BaseExpression>& input_arguments);
 
 private:
     std::vector<LogicalType> argument_types_;
