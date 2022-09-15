@@ -3,6 +3,7 @@
 //
 
 #include "builtin_functions.h"
+#include "scalar/abs.h"
 
 namespace infinity {
 
@@ -17,6 +18,8 @@ void BuiltinFunctions::Init() {
 void
 BuiltinFunctions::AddFunctionSet(ScalarFunctionSet& function_set) {
     // insert the function set into catalog
+
+    RegisterAbsFunction();
 }
 
 void

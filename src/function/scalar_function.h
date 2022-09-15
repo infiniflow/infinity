@@ -17,11 +17,14 @@
 
 namespace infinity {
 
+using ScalarFunctionType = std::function<void(const TransientBlock&, Chunk &)>;
+
 class ScalarFunction : public Function {
 public:
     explicit ScalarFunction(std::string name,
                             std::vector<LogicalType> argument_types,
-                            LogicalType return_type);
+                            LogicalType return_type,
+                            ScalarFunctionType function);
 
     void CastArgumentTypes(std::vector<BaseExpression>& input_arguments);
 
@@ -31,7 +34,7 @@ public:
     template<typename InputType, typename OutputType, typename Operation>
     static void UnaryFunction(const TransientBlock& input, Chunk& output) {
         ExecutorAssert(input.ColumnCount() == 1, "Unary function: input column count isn't one.");
-        UnaryOperation::Execute<InputType, OutputType, Operation>(input, output);
+        UnaryOperation::Execute<InputType, OutputType, Operation>(input.chunks_[0], output);
     }
 
     template<typename LeftType, typename RightType, typename OutputType, typename OperationType>
@@ -43,6 +46,8 @@ public:
 private:
     std::vector<LogicalType> argument_types_;
     LogicalType return_type_;
+
+    ScalarFunctionType function_;
 
 };
 }

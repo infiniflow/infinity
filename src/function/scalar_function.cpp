@@ -3,16 +3,20 @@
 //
 
 #include "scalar_function.h"
+
+#include <utility>
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
 ScalarFunction::ScalarFunction(std::string name,
                                std::vector<LogicalType> argument_types,
-                               LogicalType return_type)
+                               LogicalType return_type,
+                               ScalarFunctionType function)
                                : Function(std::move(name), FunctionType::kScalar),
                                argument_types_(std::move(argument_types)),
-                               return_type_(return_type)
+                               return_type_(return_type),
+                               function_(std::move(function))
 {}
 
 void

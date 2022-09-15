@@ -5,8 +5,12 @@
 #pragma once
 
 #include "function/scalar_function.h"
+#include "function/function_set.h"
 
 namespace infinity {
+
+ScalarFunctionSet
+RegisterAbsFunction();
 
 class Abs : public ScalarFunction {
 public:
