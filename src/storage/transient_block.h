@@ -17,6 +17,9 @@ struct TransientBlock {
             chunks_.emplace_back(type);
         }
     }
+
+    [[nodiscard]] int64_t ColumnCount() const { return static_cast<int64_t>(chunks_.size()); }
+
     int64_t row_count_{0};
     std::vector<Chunk> chunks_;
 };

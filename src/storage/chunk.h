@@ -10,6 +10,12 @@
 
 namespace infinity {
 
+enum class ChunkType {
+    kInvalid,
+    kNormal,
+    kConstant,
+};
+
 // Chunk is an column block with a row group. A Chunk contains specific type of data and nullable flags.
 // Two types of chunk: fixed row count chunk and fixed size chunk.
 
@@ -31,6 +37,7 @@ public:
 
     std::vector<std::any>& data() { return data_; }
     [[nodiscard]] const std::vector<std::any>& data() const { return data_; }
+    const ChunkType chunk_type() const { return chunk_type_; }
 
     std::string ToString();
     std::string RowToString(int64_t row_id);
@@ -40,6 +47,7 @@ protected:
     int64_t row_count_{0};
     int64_t chunk_size_{0};
     std::vector<std::any> data_;
+    ChunkType chunk_type_;
 };
 
 }

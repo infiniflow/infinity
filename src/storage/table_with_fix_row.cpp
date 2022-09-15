@@ -21,7 +21,7 @@ FixedRowCountTable::FixedRowCountTable(std::shared_ptr<TableDefinition> table_de
 void
 FixedRowCountTable::Append(const TransientBlock& tblock) {
     int64_t column_count = table_def_->column_count();
-    StorageAssert(tblock.chunks_.size() == column_count, "Wrong column data are appended to the table");
+    StorageAssert(tblock.ColumnCount() == column_count, "Wrong column data are appended to the table");
     int64_t insert_row_count = tblock.row_count_;
     int64_t start_idx = 0;
     while(insert_row_count > 0) {
