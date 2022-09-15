@@ -24,7 +24,7 @@ public:
     [[nodiscard]] FunctionType type() const { return type_; }
     [[nodiscard]] const std::string& name() const { return name_; }
 
-private:
+protected:
     std::string name_;
     FunctionType type_{FunctionType::kInvalid};
 

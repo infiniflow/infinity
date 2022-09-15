@@ -28,6 +28,8 @@ public:
 
     void AddFunction(const AggregateFunction& func);
 
+    AggregateFunction GetMostMatchFunction(const std::vector<BaseExpression>& input_arguments);
+
 private:
     std::vector<AggregateFunction> functions_;
 };
@@ -38,6 +40,8 @@ public:
     explicit ScalarFunctionSet(std::string name): FunctionSet(std::move(name), FunctionType::kScalar) {}
 
     void AddFunction(const ScalarFunction& func);
+
+    ScalarFunction GetMostMatchFunction(const std::vector<BaseExpression>& input_arguments);
 
 private:
     std::vector<ScalarFunction> functions_;
