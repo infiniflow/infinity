@@ -1,5 +1,5 @@
 //
-// Created by JinHai on 2022/9/14.
+// Created by JinHai on 2022/9/16.
 //
 
 #pragma once
@@ -10,6 +10,6 @@
 namespace infinity {
 
 ScalarFunctionSet
-RegisterAbsFunction();
+RegisterPowFunction();
 
 }
