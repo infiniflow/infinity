@@ -49,20 +49,36 @@ protected:
 
 struct ColumnIdentifier {
 public:
-    explicit ColumnIdentifier(std::optional<std::string> table_name, std::string column_name)
-        : column_name_(std::move(column_name)), table_name_(std::move(table_name)) {}
+    explicit ColumnIdentifier(std::shared_ptr<std::string> table_name, std::shared_ptr<std::string> column_name,
+                              std::shared_ptr<std::string> alias_name)
+        : column_name_ptr_(std::move(column_name)),
+        table_name_ptr_(std::move(table_name)),
+        alias_name_ptr_(std::move(alias_name))
+        {}
 
     [[nodiscard]] std::string ToString() const {
-        if(table_name_) return *table_name_ + "." + column_name_;
-        else return column_name_;
+        if(table_name_ptr_ != nullptr) return *table_name_ptr_ + "." + *column_name_ptr_;
+        else return *column_name_ptr_;
     }
 
     [[nodiscard]] bool operator==(const ColumnIdentifier& other) const {
-        return column_name_ == other.column_name_ && table_name_ == other.table_name_;
+        if(*column_name_ptr_ != *other.column_name_ptr_) {
+            return false;
+        }
+        if(table_name_ptr_ != nullptr && other.table_name_ptr_ != nullptr) {
+            return *table_name_ptr_ == *other.table_name_ptr_;
+        }
+
+        if(table_name_ptr_ == nullptr && other.table_name_ptr_ == nullptr) {
+            return true;
+        }
+
+        return false;
     }
 
-    std::string column_name_;
-    std::optional<std::string> table_name_;
+    std::shared_ptr<std::string> column_name_ptr_;
+    std::shared_ptr<std::string> table_name_ptr_;
+    std::shared_ptr<std::string> alias_name_ptr_;
 };
 
 struct SelectListElement {

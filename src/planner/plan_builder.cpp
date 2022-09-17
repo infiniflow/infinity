@@ -772,7 +772,7 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
                     }
                 }
 
-                const std::string& table_name_ref = table_ptr->table_def()->name();
+                std::shared_ptr<std::string> table_name_ptr = std::make_shared<std::string>(table_ptr->table_def()->name());
 
                 // Get corresponding column definition from binding context.
                 const std::vector<ColumnDefinition>& columns_def = bind_context_ptr->tables_[0]->table_def()->columns();
@@ -785,12 +785,13 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
                 for(const ColumnDefinition& column_def: columns_def) {
                     std::shared_ptr<ColumnExpression> bound_column_expr_ptr
                             = std::make_shared<ColumnExpression>(column_def.logical_type(),
-                                                                 table_name_ref,
+                                                                 *table_name_ptr,
                                                                  0, // TODO: need to generate a table index
                                                                  column_def.name(),
                                                                  column_index);
                     ++ column_index;
-                    ColumnIdentifier column_identifier(table_name_ref, column_def.name());
+                    std::shared_ptr<std::string> column_name_ptr = std::make_shared<std::string>(column_def.name());
+                    ColumnIdentifier column_identifier(table_name_ptr, column_name_ptr, nullptr);
                     select_lists.emplace_back(bound_column_expr_ptr);
                     select_lists.back().AddColumnIdentifier(column_identifier);
 
@@ -808,11 +809,14 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
 
                 // Generator column identifier
                 // TODO: This is duplicate code from Build Expression, think about how to remove it.
-                std::optional<std::string> table_name = nullptr;
+
+                std::shared_ptr<std::string> table_name_ptr;
                 if(select_expr->table != nullptr) {
-                    table_name = std::optional<std::string>(std::string(select_expr->table));
+                    table_name_ptr = std::make_shared<std::string>(select_expr->table);
                 }
-                ColumnIdentifier column_identifier(table_name, select_expr->name);
+                ColumnIdentifier column_identifier(table_name_ptr,
+                                                   std::make_shared<std::string>(select_expr->name),
+                                                   nullptr);
 
                 // Add column identifier
                 select_lists.back().AddColumnIdentifier(column_identifier);

@@ -97,12 +97,16 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
 
 std::shared_ptr<BaseExpression>
 ExpressionBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    std::string expr_name = std::string(expr.getName());
-    std::optional<std::string> table_name = nullptr;
+    std::shared_ptr<std::string> column_name_ptr = std::make_shared<std::string>(expr.name);
+    std::shared_ptr<std::string> table_name_ptr = nullptr;
+    std::shared_ptr<std::string> alias_name_ptr = nullptr;
     if(expr.table != nullptr) {
-        table_name = std::optional<std::string>(expr_name);
+        table_name_ptr = std::make_shared<std::string>(expr.table);
     }
-    ColumnIdentifier column_identifier(table_name, expr_name);
+    if(expr.alias != nullptr) {
+        alias_name_ptr = std::make_shared<std::string>(expr.alias);
+    }
+    ColumnIdentifier column_identifier(table_name_ptr, column_name_ptr, alias_name_ptr);
     std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnIdentifier(column_identifier);
     return column_expr;
 }

@@ -4,6 +4,7 @@
 
 #include "bind_context.h"
 #include "common/utility/infinity_assert.h"
+#include "expression/column_expression.h"
 #include "storage/table.h"
 
 namespace infinity {
@@ -133,13 +134,31 @@ BindContext::AddBindContext(const std::shared_ptr<BindContext>& bind_context_ptr
     PlannerError("Not implement: BindContext::AddBindContext");
 }
 
-// !!! TODO: Below need to be refactored !!!
-
 std::shared_ptr<BaseExpression>
 BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier) {
+    const std::string& table_name_ref = *column_identifier.table_name_ptr_;
+    const std::string& column_name_ref = *column_identifier.column_name_ptr_;
+
+    if(column_identifier.table_name_ptr_ != nullptr) {
+        auto binding = bindings_by_name_[table_name_ref];
+        if(binding != nullptr) {
+            if(binding->name2index_.contains(column_name_ref)) {
+                int64_t column_id = binding->name2index_[column_name_ref];
+                binding->column_types_[column_id];
+//                std::shared_ptr<ColumnExpression> column_expr
+//                    = std::make_shared<ColumnExpression>()
+            }
+
+        } else {
+            PlannerError("Table isn't found: " + table_name_ref);
+        }
+    }
     PlannerError("Not implement: BindContext::resolve_column_identifier");
     return std::shared_ptr<BaseExpression>();
 }
+
+// !!! TODO: Below need to be refactored !!!
+
 
 void
 BindContext::AddTable(const std::shared_ptr<Table>& table_ptr) {
