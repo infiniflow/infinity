@@ -28,7 +28,7 @@ public:
 
     void AddFunction(const AggregateFunction& func);
 
-    AggregateFunction GetMostMatchFunction(const std::vector<BaseExpression>& input_arguments);
+    AggregateFunction GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>>& input_arguments);
 
 private:
     std::vector<AggregateFunction> functions_;
@@ -41,7 +41,7 @@ public:
 
     void AddFunction(const ScalarFunction& func);
 
-    ScalarFunction GetMostMatchFunction(const std::vector<BaseExpression>& input_arguments);
+    ScalarFunction GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>>& input_arguments);
 
 private:
     std::vector<ScalarFunction> functions_;

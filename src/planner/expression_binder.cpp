@@ -4,7 +4,10 @@
 
 #include "expression_binder.h"
 #include "expression/value_expression.h"
+#include "expression/function_expression.h"
+#include "expression/aggregate_expression.h"
 #include "common/utility/infinity_assert.h"
+#include "main/infinity.h"
 
 namespace infinity {
 
@@ -53,12 +56,7 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
             return BuildColExpr(expr, bind_context_ptr);
         }
         case hsql::kExprFunctionRef: {
-            // Check the function alias
-
-            // Check if the function is aggregate function
-
-            // Normal function
-            PlannerError("Function reference");
+            return BuildFuncExpr(expr, bind_context_ptr);
         }
 
         case hsql::kExprStar:
@@ -109,6 +107,53 @@ ExpressionBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<Bin
     ColumnIdentifier column_identifier(table_name_ptr, column_name_ptr, alias_name_ptr);
     std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnIdentifier(column_identifier, 0);
     return column_expr;
+}
+
+std::shared_ptr<BaseExpression>
+ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+
+    std::string function_name = expr.name;
+
+    // Transfer the function to upper case.
+    std::transform(function_name.begin(), function_name.end(), function_name.begin(), [](const auto c) {
+        return std::toupper(c);
+    });
+
+    // std::unique_ptr<Catalog>& catalog
+    auto& catalog = Infinity::instance().catalog();
+    std::shared_ptr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(function_name);
+
+    std::vector<std::shared_ptr<BaseExpression>> arguments;
+    std::vector<LogicalType> arg_types;
+    arguments.reserve(expr.exprList->size());
+    for(const auto* arg_expr : *expr.exprList) {
+        // std::shared_ptr<BaseExpression> expr_ptr
+        auto expr_ptr = BuildExpression(*arg_expr, bind_context_ptr);
+        arguments.emplace_back(expr_ptr);
+    }
+
+    switch(function_set_ptr->type_) {
+        case FunctionType::kScalar:{
+            // std::shared_ptr<ScalarFunctionSet> scalar_function_set_ptr
+            auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+            ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
+            std::shared_ptr<FunctionExpression> function_expr_ptr
+                = std::make_shared<FunctionExpression>(scalar_function, arguments);
+            return function_expr_ptr;
+        }
+        case FunctionType::kAggregate: {
+            // std::shared_ptr<AggregateFunctionSet> aggregate_function_set_ptr
+            auto aggregate_function_set_ptr = std::static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
+            AggregateFunction aggregate_function = aggregate_function_set_ptr->GetMostMatchFunction(arguments);
+            auto aggregate_function_ptr = std::make_shared<AggregateExpression>(aggregate_function, arguments);
+            return aggregate_function_ptr;
+        }
+        case FunctionType::kTable:
+            PlannerError("Table function shouldn't be bound here.");
+        default: {
+            PlannerError("Unknown function type: " + function_set_ptr->name());
+        }
+    }
 }
 
 //// Bind aggregate function.

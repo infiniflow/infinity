@@ -23,6 +23,9 @@ public:
     // Bind column reference expression also include correlated column reference.
     std::shared_ptr<BaseExpression>
     BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<BaseExpression>
+    BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 //
 //    // Bind aggregate function.
 //    virtual std::shared_ptr<BaseExpression>

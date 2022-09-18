@@ -4,22 +4,21 @@
 
 #pragma once
 
+#include "function/aggregate_function.h"
 #include "base_expression.h"
 
 namespace infinity {
 
-enum class AggFuncType { kMin, kMax, kSum, kAvg, kCount, kCountDistinct, kAny };
-
 class AggregateExpression : public BaseExpression {
 public:
-    AggregateExpression(AggFuncType agg_func_type, const std::shared_ptr<BaseExpression>& argument);
+    AggregateExpression(AggregateFunction aggregate_function, std::vector<std::shared_ptr<BaseExpression>> arguments);
     LogicalType DataType() override;
 
     [[nodiscard]] std::string ToString() const override;
     bool IsCountStar() const;
 
 private:
-    AggFuncType agg_func_type_;
+    AggregateFunction aggregate_function_;
 };
 
 }

@@ -27,6 +27,7 @@ public:
                             ScalarFunctionType function);
 
     void CastArgumentTypes(std::vector<BaseExpression>& input_arguments);
+    [[nodiscard]] const LogicalType& return_type() const { return return_type_; }
 
 public:
     static void NoOpFunction(const TransientBlock& input, Chunk& output);

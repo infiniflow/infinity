@@ -8,10 +8,9 @@
 
 namespace infinity {
 
-FunctionExpression::FunctionExpression(LogicalType logical_type,
-                                       std::shared_ptr<ScalarFunc> func_ptr,
+FunctionExpression::FunctionExpression(ScalarFunction function,
                                        std::vector<std::shared_ptr<BaseExpression>> arguments)
-   : BaseExpression(ExpressionType::kFunction, std::move(arguments)), func_ptr_(std::move(func_ptr)) {}
+   : BaseExpression(ExpressionType::kFunction, std::move(arguments)), func_(std::move(function)) {}
 
 std::string
 FunctionExpression::ToString() const {
@@ -20,7 +19,7 @@ FunctionExpression::ToString() const {
 
 LogicalType
 FunctionExpression::DataType() {
-    return LogicalType(LogicalTypeId::kText);
+    return func_.return_type();
 }
 
 }

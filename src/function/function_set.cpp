@@ -12,7 +12,7 @@ AggregateFunctionSet::AddFunction(const infinity::AggregateFunction& func) {
 }
 
 AggregateFunction
-AggregateFunctionSet::GetMostMatchFunction(const std::vector<BaseExpression> &input_arguments) {
+AggregateFunctionSet::GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>> &input_arguments) {
     PlannerError("not implemented.");
 }
 
@@ -22,7 +22,7 @@ ScalarFunctionSet::AddFunction(const infinity::ScalarFunction& func) {
 }
 
 ScalarFunction
-ScalarFunctionSet::GetMostMatchFunction(const std::vector<BaseExpression> &input_arguments) {
+ScalarFunctionSet::GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>> &input_arguments) {
     PlannerError("not implemented.");
 }
 

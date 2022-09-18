@@ -18,6 +18,7 @@ public:
                                LogicalType return_type);
 
     void CastArgumentTypes(std::vector<BaseExpression>& input_arguments);
+    [[nodiscard]] const LogicalType& return_type() const { return return_type_; }
 
 private:
     std::vector<LogicalType> argument_types_;

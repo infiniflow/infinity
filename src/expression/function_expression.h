@@ -5,23 +5,19 @@
 #pragma once
 
 #include "base_expression.h"
+#include "function/scalar_function.h"
 
 namespace infinity {
 
-class ScalarFunc {
-
-};
-
 class FunctionExpression: public BaseExpression {
 public:
-    FunctionExpression(LogicalType logical_type,
-                       std::shared_ptr<ScalarFunc> func_ptr,
+    FunctionExpression(ScalarFunction function,
                        std::vector<std::shared_ptr<BaseExpression>> arguments);
 
     LogicalType DataType() override;
     std::string ToString() const override;
 private:
-    std::shared_ptr<ScalarFunc> func_ptr_;
+    ScalarFunction func_;
 };
 
 }
