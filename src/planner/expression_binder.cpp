@@ -235,6 +235,29 @@ ExpressionBinder::BuildCastExpr(const hsql::Expr &expr, const std::shared_ptr<Bi
     return CastExpression::AddCastToType(source_expr_ptr, target_type);
 }
 
+std::shared_ptr<BaseExpression>
+ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    PlannerAssert(expr.exprList, "No when and then expression");
+    PlannerAssert(!expr.exprList->empty(), "No when and then expression list");
+
+    // two kinds of case statement, please check:
+    // https://docs.oracle.com/en/database/oracle/oracle-database/21/lnpls/CASE-statement.html
+
+    if(expr.expr) {
+        // Simple case
+        std::shared_ptr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr);
+
+        size_t expr_count = expr.exprList->size();
+        for(size_t idx = 0; idx < expr_count; ++ idx) {
+            // TODO: Add when expr
+        }
+
+        // TODO: Add else expr
+    }
+
+    // searched case statement
+}
+
 //// Bind subquery expression.
 //std::shared_ptr<BaseExpression>
 //ExpressionBinder::BuildSubquery(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {

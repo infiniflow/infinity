@@ -33,6 +33,9 @@ public:
     std::shared_ptr<BaseExpression>
     BuildCastExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
+    std::shared_ptr<BaseExpression>
+    BuildCaseExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+
 //    // Bind subquery expression.
 //    virtual std::shared_ptr<BaseExpression>
 //    BuildSubquery(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);

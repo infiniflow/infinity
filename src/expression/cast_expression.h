@@ -22,6 +22,8 @@ public:
 
 private:
     LogicalType data_type_;
+
+    // TODO: Cast function should be scalar function
 };
 
 }
