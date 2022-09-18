@@ -3,6 +3,7 @@
 //
 
 #include "expression/between_expression.h"
+#include "expression/cast_expression.h"
 #include "expression/value_expression.h"
 #include "expression/function_expression.h"
 #include "expression/aggregate_expression.h"
@@ -67,7 +68,7 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
             PlannerError("Used in prepare and execute? Not supported now.");
             break;
         case hsql::kExprOperator:
-            // various expression
+            BuildOperatorExpr(expr, bind_context_ptr);
             break;
         case hsql::kExprSelect:
             // subquery expression
@@ -86,6 +87,7 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
             break;
         case hsql::kExprCast:
             // cast function expression
+            BuildCastExpr(expr, bind_context_ptr);
             break;
         default:
             PlannerError("Unsupported expr type");
@@ -224,6 +226,13 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_pt
     }
 
     PlannerError("ExpressionBinder::Build Operator");
+}
+
+std::shared_ptr<BaseExpression>
+ExpressionBinder::BuildCastExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    std::shared_ptr<BaseExpression> source_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr);
+    LogicalType target_type = LogicalType::TypeConversion(expr.columnType.data_type);
+    return CastExpression::AddCastToType(source_expr_ptr, target_type);
 }
 
 //// Bind subquery expression.

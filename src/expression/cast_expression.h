@@ -15,6 +15,11 @@ public:
     LogicalType DataType() override;
     std::string ToString() const override;
 
+    static bool CanCast(const LogicalType& source, const LogicalType& target);
+
+    static std::shared_ptr<BaseExpression>
+    AddCastToType(const std::shared_ptr<BaseExpression>& expr, const LogicalType &target_type);
+
 private:
     LogicalType data_type_;
 };

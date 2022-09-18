@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "sql/ColumnType.h"
+
 #include <cstdint>
 #include <string>
 #include <memory>
@@ -94,7 +96,11 @@ public:
 
     [[nodiscard]] std::string ToString() const;
     [[nodiscard]] LogicalTypeId GetTypeId() const { return logical_type_; }
-    size_t Size() const;
+    [[nodiscard]] size_t Size() const;
+
+public:
+    static LogicalType TypeConversion(hsql::ColumnType type);
+
 private:
 //    int64_t length_;
 //    int64_t precision_;
@@ -103,6 +109,7 @@ private:
     LogicalTypeId logical_type_;
     PhysicalType physical_type_;
 };
+
 
 }
 
