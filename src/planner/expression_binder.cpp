@@ -107,7 +107,7 @@ ExpressionBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<Bin
         alias_name_ptr = std::make_shared<std::string>(expr.alias);
     }
     ColumnIdentifier column_identifier(table_name_ptr, column_name_ptr, alias_name_ptr);
-    std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnIdentifier(column_identifier);
+    std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnIdentifier(column_identifier, 0);
     return column_expr;
 }
 

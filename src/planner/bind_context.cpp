@@ -135,7 +135,7 @@ BindContext::AddBindContext(const std::shared_ptr<BindContext>& bind_context_ptr
 }
 
 std::shared_ptr<BaseExpression>
-BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier) {
+BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier, int64_t depth) {
     const std::string& table_name_ref = *column_identifier.table_name_ptr_;
     const std::string& column_name_ref = *column_identifier.column_name_ptr_;
 
@@ -143,18 +143,56 @@ BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier) 
         auto binding = bindings_by_name_[table_name_ref];
         if(binding != nullptr) {
             if(binding->name2index_.contains(column_name_ref)) {
+                // Find the table and column in the bind context.
                 int64_t column_id = binding->name2index_[column_name_ref];
-                binding->column_types_[column_id];
-//                std::shared_ptr<ColumnExpression> column_expr
-//                    = std::make_shared<ColumnExpression>()
+                std::shared_ptr<ColumnExpression> column_expr
+                    = std::make_shared<ColumnExpression>(
+                            binding->column_types_[column_id],
+                            table_name_ref,
+                            binding->table_index_,
+                            column_name_ref,
+                            column_id,
+                            depth);
+                return column_expr;
+            } else {
+                PlannerError(column_identifier.ToString() + " doesn't exist.");
             }
-
         } else {
-            PlannerError("Table isn't found: " + table_name_ref);
+            // Table isn't found in this bind context, maybe its parent has it.
+        }
+    } else {
+        // Not table name
+        // Try to find the column in current bind context;
+        if(bindings_by_column_.contains(column_name_ref)) {
+            // We find the table
+            // TODO: What will happen, when different tables have the same column name?
+
+            auto binding = bindings_by_column_[column_name_ref];
+            if(binding->name2index_.contains(column_name_ref)) {
+                int64_t column_id = binding->name2index_[column_name_ref];
+                std::shared_ptr<ColumnExpression> column_expr
+                        = std::make_shared<ColumnExpression>(
+                                binding->column_types_[column_id],
+                                table_name_ref,
+                                binding->table_index_,
+                                column_name_ref,
+                                column_id,
+                                depth);
+                return column_expr;
+            } else {
+                // Found the binding, but the binding don't have the column, which should happen.
+                PlannerError(column_identifier.ToString() + " doesn't exist.");
+            }
+        } else {
+            // Bind isn't found in this bind context, try to find in parent_
         }
     }
-    PlannerError("Not implement: BindContext::resolve_column_identifier");
-    return std::shared_ptr<BaseExpression>();
+
+    if(parent_ != nullptr) {
+        return parent_->ResolveColumnIdentifier(column_identifier, depth + 1);
+    }
+
+    PlannerError(column_identifier.ToString() + " isn't found.");
 }
 
 // !!! TODO: Below need to be refactored !!!

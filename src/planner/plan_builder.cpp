@@ -788,7 +788,8 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
                                                                  *table_name_ptr,
                                                                  0, // TODO: need to generate a table index
                                                                  column_def.name(),
-                                                                 column_index);
+                                                                 column_index,
+                                                                 0);
                     ++ column_index;
                     std::shared_ptr<std::string> column_name_ptr = std::make_shared<std::string>(column_def.name());
                     ColumnIdentifier column_identifier(table_name_ptr, column_name_ptr, nullptr);
@@ -1187,7 +1188,7 @@ PlanBuilder::BuildJoin(const hsql::TableRef *from_table, std::shared_ptr<BindCon
                 auto left_column_type = left_binding_ptr->column_types_[left_column_index];
 
                 std::shared_ptr<ColumnExpression> left_column_expression_ptr =
-                        std::make_shared<ColumnExpression>(left_column_type, left_binding_ptr->table_name_, left_binding_ptr->table_index_, column_name, left_column_index);
+                        std::make_shared<ColumnExpression>(left_column_type, left_binding_ptr->table_name_, left_binding_ptr->table_index_, column_name, left_column_index, 0);
 
                 auto& right_binding_ptr = right_bind_context_ptr->bindings_by_column_[column_name];
                 PlannerAssert(right_binding_ptr != nullptr, "Column: " + column_name + " doesn't exist in right table");
@@ -1195,7 +1196,7 @@ PlanBuilder::BuildJoin(const hsql::TableRef *from_table, std::shared_ptr<BindCon
                 auto right_column_type = right_binding_ptr->column_types_[right_column_index];
 
                 std::shared_ptr<ColumnExpression> right_column_expression_ptr =
-                        std::make_shared<ColumnExpression>(right_column_type, right_binding_ptr->table_name_, right_binding_ptr->table_index_, column_name, right_column_index);
+                        std::make_shared<ColumnExpression>(right_column_type, right_binding_ptr->table_name_, right_binding_ptr->table_index_, column_name, right_column_index, 0);
 
                 auto condition = std::make_shared<ConjunctionExpression>(ExpressionType::kConjunction, ConjunctionType::kAnd, left_column_expression_ptr, right_column_expression_ptr);
                 result->on_conditions_.emplace_back(condition);

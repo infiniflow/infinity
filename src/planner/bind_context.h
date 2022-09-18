@@ -95,7 +95,7 @@ public:
     // !!! TODO: Below need to be refactored !!!
 
 public:
-    std::shared_ptr<BaseExpression> ResolveColumnIdentifier(const ColumnIdentifier& column_identifier);
+    std::shared_ptr<BaseExpression> ResolveColumnIdentifier(const ColumnIdentifier& column_identifier, int64_t depth);
     void AddTable(const std::shared_ptr<Table>& table_ptr);
 
     // All logical operator
