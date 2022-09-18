@@ -2,12 +2,14 @@
 // Created by JinHai on 2022/8/11.
 //
 
-#include "expression_binder.h"
+#include "expression/between_expression.h"
 #include "expression/value_expression.h"
 #include "expression/function_expression.h"
 #include "expression/aggregate_expression.h"
+
 #include "common/utility/infinity_assert.h"
 #include "main/infinity.h"
+#include "expression_binder.h"
 
 namespace infinity {
 
@@ -58,7 +60,6 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
         case hsql::kExprFunctionRef: {
             return BuildFuncExpr(expr, bind_context_ptr);
         }
-
         case hsql::kExprStar:
             PlannerError("Star expression shouldn't be bound here.");
             break;
@@ -156,13 +157,75 @@ ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<Bi
     }
 }
 
-//// Bind aggregate function.
-//std::shared_ptr<BaseExpression>
-//ExpressionBinder::BuildAggFunc(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-//    PlannerError("ExpressionBinder::BuildAggFunc");
-//    return std::shared_ptr<BaseExpression>();
-//}
-//
+std::shared_ptr<BaseExpression>
+ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+
+    switch (expr.opType) {
+            case hsql::kOpBetween: {
+                std::shared_ptr<BaseExpression> value = BuildExpression(*expr.expr, bind_context_ptr);
+                std::shared_ptr<BaseExpression> left_bound = BuildExpression(*(*expr.exprList)[0], bind_context_ptr);
+                std::shared_ptr<BaseExpression> right_bound = BuildExpression(*(*expr.exprList)[1], bind_context_ptr);
+                return std::make_shared<BetweenExpression>(value, left_bound, right_bound, true, true);
+            }
+            case hsql::kOpCase: {
+                break;
+            }
+            case hsql::kOpCaseListElement:
+                PlannerError("Unexpected expression type");
+            case hsql::kOpPlus: // +
+                break;
+            case hsql::kOpMinus: // -
+                break;
+            case hsql::kOpAsterisk: // *
+                break;
+            case hsql::kOpSlash: // /
+                break;
+            case hsql::kOpPercentage: // %
+                break;
+            case hsql::kOpCaret: // ^
+                break;
+            case hsql::kOpEquals: // =
+                break;
+            case hsql::kOpNotEquals: // <>
+                break;
+            case hsql::kOpLess: // <
+                break;
+            case hsql::kOpLessEq: // <=
+                break;
+            case hsql::kOpGreater: // >
+                break;
+            case hsql::kOpGreaterEq: // >=
+                break;
+            case hsql::kOpLike: // like
+                break;
+            case hsql::kOpNotLike: // not like
+                break;
+            case hsql::kOpILike: // ilike
+                break;
+            case hsql::kOpAnd: // AND
+                break;
+            case hsql::kOpOr: // OR
+                break;
+            case hsql::kOpIn: // IN
+                break;
+            case hsql::kOpConcat: // Concat
+                break;
+            case hsql::kOpNot: // Not
+                break;
+            case hsql::kOpUnaryMinus: // -
+                break;
+            case hsql::kOpIsNull: // IsNull
+                break;
+            case hsql::kOpExists: // Exists
+                break;
+            default: {
+
+            }
+    }
+
+    PlannerError("ExpressionBinder::Build Operator");
+}
+
 //// Bind subquery expression.
 //std::shared_ptr<BaseExpression>
 //ExpressionBinder::BuildSubquery(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
