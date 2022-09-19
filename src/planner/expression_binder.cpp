@@ -13,6 +13,7 @@
 #include "common/utility/infinity_assert.h"
 #include "main/infinity.h"
 #include "expression_binder.h"
+#include "plan_builder.h"
 
 namespace infinity {
 
@@ -73,8 +74,7 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
             return BuildOperatorExpr(expr, bind_context_ptr);
         case hsql::kExprSelect:
             // subquery expression
-            BuildSubquery(*expr.select, bind_context_ptr);
-            PlannerError("Used in prepare and execute? Not supported now.");
+            return BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kScalar);
         case hsql::kExprHint:
             PlannerError("Hint isn't supported now.");
             break;
@@ -212,8 +212,10 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_pt
             case hsql::kOpIn: { // IN
                 if(expr.select != nullptr) {
                     // In subquery
-                    PlannerError("In subquery isn't implemented");
-                    break;
+                    PlannerAssert(expr.select, "No select statement in IN statement");
+                    auto subquery = BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kIn);
+                    subquery->left_ = BuildExpression(*expr.expr, bind_context_ptr);
+                    return subquery;
                 } else {
                     PlannerAssert(expr.exprList && !expr.exprList->empty(), "IN operation with emtpy list");
 
@@ -238,11 +240,15 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_pt
                 return BuildUnaryScalarExpr("-", expr.expr, bind_context_ptr);
             case hsql::kOpIsNull: // IsNull
                 return BuildUnaryScalarExpr("isnull", expr.expr, bind_context_ptr);
-            case hsql::kOpExists: // Exists
-                PlannerError("Exists subquery isn't implemented");
-                break;
+            case hsql::kOpExists: {
+                // Exists
+                PlannerAssert(expr.select, "No select statement in Exists");
+                auto subquery = BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kExists);
+                subquery->left_ = BuildExpression(*expr.expr, bind_context_ptr);
+                return subquery;
+            }
             default: {
-
+                PlannerError("Unknown operator type");
             }
     }
 
@@ -356,15 +362,17 @@ ExpressionBinder::BuildUnaryScalarExpr(const std::string& op, const hsql::Expr* 
 }
 
 // Bind subquery expression.
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr) {
+std::shared_ptr<SubqueryExpression>
+ExpressionBinder::BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr, SubqueryType subquery_type) {
 
     std::shared_ptr<BindContext> subquery_binding_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-//    plan_builder_ptr_->BuildSelect();
-//    plan_builder_.AddBindContextArray(subquery_binding_context_ptr);
-//    std::shared_ptr<> plan_building_context_ptr = BuildSelect
+    std::shared_ptr<BoundSelectNode> select_node_ptr
+        = PlanBuilder::BuildSelect(select, subquery_binding_context_ptr);
 
-    PlannerError("ExpressionBinder::BuildSubquery");
+    std::shared_ptr<SubqueryExpression> subquery_expr
+        = std::make_shared<SubqueryExpression>(select_node_ptr, subquery_type);
+
+    return subquery_expr;
 }
 //
 //// Bind window function.

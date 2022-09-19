@@ -32,12 +32,12 @@
 namespace infinity {
 
 Planner::Planner(std::shared_ptr<QueryContext> query_context_ptr) : query_context_ptr_(std::move(query_context_ptr)) {
-    planer_builder_ptr_ = std::make_shared<PlanBuilder>(query_context_ptr_);
+//    planer_builder_ptr_ = std::make_shared<PlanBuilder>(query_context_ptr_);
 }
 
 std::shared_ptr<LogicalNode>
 Planner::BuildLogicalPlan(const hsql::SQLStatement &statement) {
-    auto built_result = planer_builder_ptr_->BuildPlan(statement);
+    auto built_result = PlanBuilder::BuildPlan(statement);
     return built_result.plan;
 }
 

@@ -3,16 +3,33 @@
 //
 
 #include "base_expression.h"
-#include "planner/plan_builder.h"
+#include "planner/bound/bound_select_node.h"
 
 namespace infinity {
 
+enum class SubqueryType {
+    kInvalid,
+    kScalar,
+    kExists,
+    kNotExists,
+    kIn,
+    kNotIn,
+    kAny,
+};
+
 class SubqueryExpression : public BaseExpression {
 public:
-    explicit SubqueryExpression(std::shared_ptr<PlanBuildingContext> plan_building_context);
+    explicit SubqueryExpression(std::shared_ptr<BoundSelectNode> select_node, SubqueryType subquery_type);
 
-    std::shared_ptr<PlanBuildingContext> plan_building_context_;
+    std::string ToString() const override;
+    LogicalType DataType() override;
+
+    std::shared_ptr<BoundSelectNode> select_node_ptr_;
+    SubqueryType subquery_type_;
+    ExpressionType operator_type_;
+    std::shared_ptr<BaseExpression> left_;
 private:
+
 };
 
 }

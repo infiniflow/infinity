@@ -4,8 +4,10 @@
 
 #pragma once
 
-#include "expression/base_expression.h"
 #include "bind_context.h"
+
+#include "expression/base_expression.h"
+#include "expression/subquery_expression.h"
 
 #include <memory>
 
@@ -45,8 +47,8 @@ public:
     BuildUnaryScalarExpr(const std::string& op, const hsql::Expr* expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Bind subquery expression.
-    std::shared_ptr<BaseExpression>
-    BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr);
+    std::shared_ptr<SubqueryExpression>
+    BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr, SubqueryType subquery_type);
 
 //    // Bind window function.
 //    virtual std::shared_ptr<BaseExpression>

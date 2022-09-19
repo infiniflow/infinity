@@ -952,7 +952,7 @@ PlanBuilder::BuildSubquery(const std::string &name, const hsql::SelectStatement&
 //    this->AddBindContextArray(cte_bind_context_ptr);
 
     // Create bound select node and subquery table reference
-    auto bound_select_node_ptr = this->BuildSelect(select_stmt, cte_bind_context_ptr);
+    auto bound_select_node_ptr = PlanBuilder::BuildSelect(select_stmt, cte_bind_context_ptr);
     auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
 
     // Get the table index of the sub query output
@@ -986,7 +986,7 @@ PlanBuilder::BuildCTE(const std::string &name, const std::shared_ptr<CommonTable
 //    this->AddBindContextArray(cte_bind_context_ptr);
 
     // Create bound select node and subquery table reference
-    auto bound_select_node_ptr = this->BuildSelect(*cte->select_statement_, cte_bind_context_ptr);
+    auto bound_select_node_ptr = PlanBuilder::BuildSelect(*cte->select_statement_, cte_bind_context_ptr);
     auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
 
     // Get the table index of the sub query output
@@ -1017,7 +1017,7 @@ PlanBuilder::BuildView(const std::string &view_name, const std::shared_ptr<View>
 //    this->AddBindContextArray(cte_bind_context_ptr);
 
     // Create bound select node and subquery table reference
-    auto bound_select_node_ptr = this->BuildSelect(*select_stmt_ptr, cte_bind_context_ptr);
+    auto bound_select_node_ptr = PlanBuilder::BuildSelect(*select_stmt_ptr, cte_bind_context_ptr);
     auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
 
     // Get the table index of the sub query output
