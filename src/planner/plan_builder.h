@@ -58,12 +58,14 @@ private:
 //    std::vector<std::shared_ptr<BindContext>> bind_context_array_;
 
 private:
-    PlanBuildingContext BuildCreate(const hsql::CreateStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildCreate(const hsql::CreateStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     PlanBuildingContext
     BuildCreateTable(const hsql::CreateStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
-    PlanBuildingContext BuildCreateTableFromTable(const hsql::CreateStatement &statement,
+    PlanBuildingContext
+    BuildCreateTableFromTable(const hsql::CreateStatement &statement,
                                                   std::shared_ptr<BindContext> &bind_context_ptr);
 
     PlanBuildingContext
@@ -73,7 +75,8 @@ private:
     BuildCreateIndex(const hsql::CreateStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     // Drop operator
-    PlanBuildingContext BuildDrop(const hsql::DropStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildDrop(const hsql::DropStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     PlanBuildingContext
     BuildDropTable(const hsql::DropStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
@@ -84,13 +87,15 @@ private:
     PlanBuildingContext
     BuildDropIndex(const hsql::DropStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
-    PlanBuildingContext BuildDropView(const hsql::DropStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildDropView(const hsql::DropStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
-    PlanBuildingContext BuildDropPreparedStatement(const hsql::DropStatement &statement,
-                                                   std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildDropPreparedStatement(const hsql::DropStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     // Insert operator
-    PlanBuildingContext BuildInsert(const hsql::InsertStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildInsert(const hsql::InsertStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     PlanBuildingContext
     BuildInsertValue(const hsql::InsertStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
@@ -99,17 +104,20 @@ private:
     BuildInsertSelect(const hsql::InsertStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     // Delete operator
-    PlanBuildingContext BuildDelete(const hsql::DeleteStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildDelete(const hsql::DeleteStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     // Update operator
-    PlanBuildingContext BuildUpdate(const hsql::UpdateStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildUpdate(const hsql::UpdateStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     // Select operator
     std::shared_ptr<BoundSelectNode>
     BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     // Show operator
-    PlanBuildingContext BuildShow(const hsql::ShowStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildShow(const hsql::ShowStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     PlanBuildingContext
     BuildShowColumns(const hsql::ShowStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
@@ -118,7 +126,8 @@ private:
     BuildShowTables(const hsql::ShowStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     // Import operator
-    PlanBuildingContext BuildImport(const hsql::ImportStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildImport(const hsql::ImportStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     PlanBuildingContext
     BuildImportCsv(const hsql::ImportStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
@@ -133,7 +142,8 @@ private:
     BuildImportAuto(const hsql::ImportStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     // Export operator
-    PlanBuildingContext BuildExport(const hsql::ExportStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildExport(const hsql::ExportStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     PlanBuildingContext
     BuildExportCsv(const hsql::ExportStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
@@ -151,17 +161,21 @@ private:
     PlanBuildingContext
     BuildTransaction(const hsql::TransactionStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
-    PlanBuildingContext BuildTransactionBegin(const hsql::TransactionStatement &statement,
+    PlanBuildingContext
+    BuildTransactionBegin(const hsql::TransactionStatement &statement,
                                               std::shared_ptr<BindContext> &bind_context_ptr);
 
-    PlanBuildingContext BuildTransactionCommit(const hsql::TransactionStatement &statement,
+    PlanBuildingContext
+    BuildTransactionCommit(const hsql::TransactionStatement &statement,
                                                std::shared_ptr<BindContext> &bind_context_ptr);
 
-    PlanBuildingContext BuildTransactionRollback(const hsql::TransactionStatement &statement,
+    PlanBuildingContext
+    BuildTransactionRollback(const hsql::TransactionStatement &statement,
                                                  std::shared_ptr<BindContext> &bind_context_ptr);
 
     // Alter operator
-    PlanBuildingContext BuildAlter(const hsql::AlterStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
+    PlanBuildingContext
+    BuildAlter(const hsql::AlterStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);
 
     PlanBuildingContext
     BuildAlterDropColumn(const hsql::AlterStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);

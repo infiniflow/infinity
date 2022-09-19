@@ -360,6 +360,7 @@ std::shared_ptr<BaseExpression>
 ExpressionBinder::BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr) {
 
     std::shared_ptr<BindContext> subquery_binding_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+//    plan_builder_ptr_->BuildSelect();
 //    plan_builder_.AddBindContextArray(subquery_binding_context_ptr);
 //    std::shared_ptr<> plan_building_context_ptr = BuildSelect
 

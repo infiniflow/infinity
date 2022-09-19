@@ -10,10 +10,12 @@
 #include <memory>
 
 namespace infinity {
+//class PlanBuilder;
 
 class ExpressionBinder {
 public:
-//    explicit ExpressionBinder(PlanBuilder& plan_builder) : plan_builder_(plan_builder) {};
+//    explicit ExpressionBinder(std::shared_ptr<PlanBuilder> plan_builder_ptr)
+//        : plan_builder_ptr_(std::move(plan_builder_ptr)) {};
     virtual ~ExpressionBinder() = default;
 
     // Bind expression entry
@@ -50,7 +52,7 @@ public:
 //    virtual std::shared_ptr<BaseExpression>
 //    BuildWindow(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-//    PlanBuilder& plan_builder_;
+//    std::shared_ptr<PlanBuilder> plan_builder_ptr_;
 private:
 };
 
