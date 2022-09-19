@@ -4,6 +4,7 @@
 
 #include "expression/between_expression.h"
 #include "expression/cast_expression.h"
+#include "expression/case_expression.h"
 #include "expression/value_expression.h"
 #include "expression/function_expression.h"
 #include "expression/aggregate_expression.h"
@@ -127,7 +128,6 @@ ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<Bi
     std::shared_ptr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(function_name);
 
     std::vector<std::shared_ptr<BaseExpression>> arguments;
-    std::vector<LogicalType> arg_types;
     arguments.reserve(expr.exprList->size());
     for(const auto* arg_expr : *expr.exprList) {
         // std::shared_ptr<BaseExpression> expr_ptr
@@ -170,7 +170,7 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_pt
                 return std::make_shared<BetweenExpression>(value, left_bound, right_bound, true, true);
             }
             case hsql::kOpCase: {
-                break;
+                return BuildCaseExpr(expr, bind_context_ptr);
             }
             case hsql::kOpCaseListElement:
                 PlannerError("Unexpected expression type");
@@ -240,6 +240,7 @@ ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const std::shared_ptr<Bi
     PlannerAssert(expr.exprList, "No when and then expression");
     PlannerAssert(!expr.exprList->empty(), "No when and then expression list");
 
+    std::shared_ptr<CaseExpression> case_expression_ptr;
     // two kinds of case statement, please check:
     // https://docs.oracle.com/en/database/oracle/oracle-database/21/lnpls/CASE-statement.html
 
@@ -247,15 +248,51 @@ ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const std::shared_ptr<Bi
         // Simple case
         std::shared_ptr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr);
 
-        size_t expr_count = expr.exprList->size();
-        for(size_t idx = 0; idx < expr_count; ++ idx) {
-            // TODO: Add when expr
+        std::string function_name = "=";
+        auto &catalog = Infinity::instance().catalog();
+        std::shared_ptr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(function_name);
+        auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+
+        for (const auto *case_when_expr : *expr.exprList) {
+            // Construct when expression: left_expr = value_expr
+            std::vector<std::shared_ptr<BaseExpression>> arguments;
+            arguments.reserve(2);
+            // std::shared_ptr<BaseExpression> value_expr
+            auto value_expr = BuildExpression(*case_when_expr->expr, bind_context_ptr);
+            arguments.emplace_back(left_expr_ptr);
+            arguments.emplace_back(value_expr);
+            ScalarFunction equal_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
+            std::shared_ptr<FunctionExpression> when_expr_ptr
+                    = std::make_shared<FunctionExpression>(equal_function, arguments);
+
+            // Construct then expression
+            // std::shared_ptr<BaseExpression> then_expr
+            std::shared_ptr<BaseExpression> then_expr_ptr = BuildExpression(*case_when_expr->expr2, bind_context_ptr);
+            case_expression_ptr->AddCaseCheck(when_expr_ptr, then_expr_ptr);
         }
+    } else {
+        // Searched case
+        for (const auto *case_when_expr : *expr.exprList) {
+            // Construct when expression: left_expr = value_expr
+            // std::shared_ptr<BaseExpression> when_expr
+            auto when_expr_ptr = BuildExpression(*case_when_expr->expr, bind_context_ptr);
 
-        // TODO: Add else expr
+            // Construct then expression
+            // std::shared_ptr<BaseExpression> then_expr
+            std::shared_ptr<BaseExpression> then_expr_ptr = BuildExpression(*case_when_expr->expr2, bind_context_ptr);
+            case_expression_ptr->AddCaseCheck(when_expr_ptr, then_expr_ptr);
+        }
     }
+    // Construct else expression
+    std::shared_ptr<BaseExpression> else_expr_ptr;
+    if (expr.expr2 != nullptr) {
+        else_expr_ptr = BuildExpression(*expr.expr2, bind_context_ptr);
+    } else {
+        else_expr_ptr = std::make_shared<ValueExpression>(LogicalType(LogicalTypeId::kNull));
+    }
+    case_expression_ptr->AddElseExpr(else_expr_ptr);
 
-    // searched case statement
+    return case_expression_ptr;
 }
 
 //// Bind subquery expression.
