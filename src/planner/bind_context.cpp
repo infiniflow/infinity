@@ -74,6 +74,11 @@ BindContext::GetNewLogicalNodeId() {
     return parent_ ? parent_->GetNewLogicalNodeId() : next_logical_node_id_ ++;
 }
 
+int64_t
+BindContext::GenerateBindingContextIndex() {
+    return parent_ ? parent_->GenerateBindingContextIndex() : next_bind_context_index_ ++;
+}
+
 void
 BindContext::AddSubqueryBinding(const std::string& name, int64_t table_index,
                                const std::vector<LogicalType>& column_types,
@@ -193,6 +198,12 @@ BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier, 
     }
 
     PlannerError(column_identifier.ToString() + " isn't found.");
+}
+
+void
+BindContext::AddChild(const std::shared_ptr<BindContext>& child) {
+    child->id_ = GenerateBindingContextIndex();
+    children_.emplace_back(child);
 }
 
 // !!! TODO: Below need to be refactored !!!

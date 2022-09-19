@@ -45,17 +45,17 @@ public:
 
     PlanBuildingContext BuildPlan(const hsql::SQLStatement &statement);
 
-    std::vector<std::shared_ptr<BindContext>> &BindContextArray();
+//    std::vector<std::shared_ptr<BindContext>> &BindContextArray();
 
-    void AddBindContextArray(std::shared_ptr<BindContext> &bind_context_ptr);
+//    void AddBindContextArray(std::shared_ptr<BindContext> &bind_context_ptr);
 
 private:
 //    std::shared_ptr<PlanBuilder> parent_ptr_{nullptr};
 
     std::shared_ptr<QueryContext> query_context_;
 
-    // Only the parent plan array will be used.
-    std::vector<std::shared_ptr<BindContext>> bind_context_array_;
+//    // Only the parent plan array will be used.
+//    std::vector<std::shared_ptr<BindContext>> bind_context_array_;
 
 private:
     PlanBuildingContext BuildCreate(const hsql::CreateStatement &statement, std::shared_ptr<BindContext> &bind_context_ptr);

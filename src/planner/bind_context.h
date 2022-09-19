@@ -39,8 +39,7 @@ public:
     std::shared_ptr<BindContext> parent_;
 
     // Left and right child bind context
-    std::shared_ptr<BindContext> left_;
-    std::shared_ptr<BindContext> right_;
+    std::vector<std::shared_ptr<BindContext>> children_;
 
     // CTE from CTE alias -> CTE statement
     std::unordered_map<std::string, std::shared_ptr<CommonTableExpressionInfo>> CTE_map_;
@@ -64,6 +63,8 @@ public:
     std::unordered_set<std::string> bound_subquery_set_;
 
 public:
+    void AddChild(const std::shared_ptr<BindContext>& child);
+    int64_t GenerateBindingContextIndex();
     [[nodiscard]] std::shared_ptr<CommonTableExpressionInfo> GetCTE(const std::string& name) const;
     [[nodiscard]] bool IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) const;
     void BoundCTE(const std::shared_ptr<CommonTableExpressionInfo>& cte) { bound_cte_set_.insert(cte); }
@@ -89,8 +90,9 @@ public:
     void AddBindContext(const std::shared_ptr<BindContext>& bind_context_ptr);
 
 private:
-    int64_t next_table_index_{0};
-    int64_t next_logical_node_id_{0};
+    int64_t next_table_index_{1};
+    int64_t next_logical_node_id_{1};
+    int64_t next_bind_context_index_{1};
 
 public:
 
