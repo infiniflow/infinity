@@ -22,6 +22,7 @@
 
 #include "bind_context.h"
 #include "plan_building_context.h"
+#include "planner/node/logical_filter.h"
 
 #include "bound/bound_select_node.h"
 #include "bound/table_ref.h"
@@ -201,7 +202,7 @@ private:
     static std::vector<SelectListElement>
     BuildSelectList(const std::vector<hsql::Expr *> &select_list, std::shared_ptr<BindContext> &bind_context_ptr);
 
-    static PlanBuildingContext
+    static std::shared_ptr<LogicalFilter>
     BuildFilter(const hsql::Expr *where_clause, std::shared_ptr<BindContext> &bind_context_ptr);
 
     static PlanBuildingContext

@@ -435,7 +435,7 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
         // No table reference, just evaluate the expr of the select list.
     }
 
-    bind_context_ptr->binder_ = std::make_shared<WhereBinder>();
+    bind_context_ptr->binder_ = std::make_shared<SelectBinder>();
 
     // 5. SELECT list (aliases)
     // Check all select list items to transfer all columns into table.column_name style.
@@ -444,8 +444,9 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
             = BuildSelectList(*statement.selectList, bind_context_ptr);
 
     // 6. WHERE
+    bind_context_ptr->binder_ = std::make_shared<WhereBinder>();
     if (statement.whereClause) {
-        std::shared_ptr<LogicalNode> filter_operator = BuildFilter(statement.whereClause, bind_context_ptr).plan;
+        std::shared_ptr<LogicalNode> filter_operator = BuildFilter(statement.whereClause, bind_context_ptr);
         filter_operator->set_left_node(root_node_ptr);
         root_node_ptr = filter_operator;
     }
@@ -729,17 +730,23 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
         switch(select_expr->type) {
             case hsql::kExprStar: {
                 std::shared_ptr<Table> table_ptr;
+                int64_t table_index = -1;
                 if(select_expr->table == nullptr) {
                     // select * from t1;
                     PlannerAssert(!bind_context_ptr->tables_.empty(), "No table is bound.");
 
                     // Use first table as the default table: select * from t1, t2; means select t1.* from t1, t2;
                     table_ptr = bind_context_ptr->tables_[0];
+                    const std::string& table_name = table_ptr->table_def()->name();
+                    auto& binding = bind_context_ptr->bindings_by_name_[table_name];
+                    table_index = binding->table_index_;
                 } else {
                     // select t1.* from t1;
                     std::string table_name(select_expr->table);
                     if (bind_context_ptr->tables_by_name_.contains(table_name)) {
                         table_ptr = bind_context_ptr->tables_by_name_[table_name];
+                        auto& binding = bind_context_ptr->bindings_by_name_[table_name];
+                        table_index = binding->table_index_;
                     } else {
                         PlannerAssert(!bind_context_ptr->tables_.empty(), "Table: '" + table_name + "' not found in select list.");
                     }
@@ -759,18 +766,20 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
                     std::shared_ptr<ColumnExpression> bound_column_expr_ptr
                             = std::make_shared<ColumnExpression>(column_def.logical_type(),
                                                                  *table_name_ptr,
-                                                                 0, // TODO: need to generate a table index
+                                                                 table_index,
                                                                  column_def.name(),
                                                                  column_index,
                                                                  0);
-                    ++ column_index;
-                    std::shared_ptr<std::string> column_name_ptr = std::make_shared<std::string>(column_def.name());
-                    ColumnIdentifier column_identifier(table_name_ptr, column_name_ptr, nullptr);
                     select_lists.emplace_back(bound_column_expr_ptr);
-                    select_lists.back().AddColumnIdentifier(column_identifier);
 
                     // Add the output heading of this bind context
                     bind_context_ptr->heading_.emplace_back(column_def.name());
+                    ++ column_index;
+
+                    // TODO: Do we really need column identifier in select list?
+                    std::shared_ptr<std::string> column_name_ptr = std::make_shared<std::string>(column_def.name());
+                    ColumnIdentifier column_identifier(table_name_ptr, column_name_ptr, nullptr);
+                    select_lists.back().AddColumnIdentifier(column_identifier);
                 }
 
                 break;
@@ -781,9 +790,12 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
 
                 select_lists.emplace_back(expr);
 
+                // Add the output heading of this bind context
+                bind_context_ptr->heading_.emplace_back(select_expr->name);
+
                 // Generator column identifier
                 // TODO: This is duplicate code from Build Expression, think about how to remove it.
-
+                // TODO: Do we really need column identifier in select list?
                 std::shared_ptr<std::string> table_name_ptr;
                 if(select_expr->table != nullptr) {
                     table_name_ptr = std::make_shared<std::string>(select_expr->table);
@@ -794,9 +806,6 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
 
                 // Add column identifier
                 select_lists.back().AddColumnIdentifier(column_identifier);
-
-                // Add the output heading of this bind context
-                bind_context_ptr->heading_.emplace_back(select_expr->name);
             }
         }
     }
@@ -804,14 +813,12 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
     return select_lists;
 }
 
-PlanBuildingContext
+std::shared_ptr<LogicalFilter>
 PlanBuilder::BuildFilter(const hsql::Expr* whereClause, std::shared_ptr<BindContext>& bind_context_ptr) {
     std::shared_ptr<BaseExpression> where_expr =
             bind_context_ptr->binder_->BuildExpression(*whereClause, bind_context_ptr);
     std::shared_ptr<LogicalFilter> logical_filter = std::make_shared<LogicalFilter>(where_expr);
-    PlanBuildingContext res;
-    res.plan = logical_filter;
-    return res;
+    return logical_filter;
 }
 
 PlanBuildingContext

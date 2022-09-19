@@ -58,7 +58,6 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
             return std::make_shared<ValueExpression>(logical_type);
         }
         case hsql::kExprColumnRef: {
-            // TODO: Resolve column
             return BuildColExpr(expr, bind_context_ptr);
         }
         case hsql::kExprFunctionRef: {

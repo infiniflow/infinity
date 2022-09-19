@@ -164,6 +164,7 @@ BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier, 
             }
         } else {
             // Table isn't found in this bind context, maybe its parent has it.
+            // Following code will proceed this case.
         }
     } else {
         // Not table name
