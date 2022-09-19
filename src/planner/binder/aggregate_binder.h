@@ -10,6 +10,8 @@ namespace infinity {
 
 class AggregateBinder : public ExpressionBinder {
 public:
+//    explicit AggregateBinder(PlanBuilder& plan_builder) : ExpressionBinder(plan_builder) {}
+
     // Bind expression entry
     std::shared_ptr<BaseExpression>
     BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) override;

@@ -19,6 +19,7 @@ namespace infinity {
 class LogicalNode;
 class Table;
 class ExpressionBinder;
+class QueryContext;
 
 struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(std::string alias, hsql::SelectStatement* select_stmt, std::unordered_set<std::string> masked_name_set)
@@ -31,7 +32,8 @@ struct CommonTableExpressionInfo {
 
 class BindContext {
 public:
-    explicit BindContext(std::shared_ptr<BindContext> parent) : parent_(parent) {}
+    explicit BindContext(std::shared_ptr<BindContext> parent)
+        : parent_(std::move(parent)) {}
 
     // Parent bind context
     std::shared_ptr<BindContext> parent_;

@@ -14,12 +14,12 @@
 #include "planner/node/logical_insert.h"
 #include "planner/node/logical_filter.h"
 
-#include "binder/aggregate_binder.h"
-#include "binder/group_binder.h"
-#include "binder/having_binder.h"
-#include "binder/insert_binder.h"
-#include "binder/select_binder.h"
-#include "binder/where_binder.h"
+//#include "binder/aggregate_binder.h"
+//#include "binder/group_binder.h"
+//#include "binder/having_binder.h"
+//#include "binder/insert_binder.h"
+//#include "binder/select_binder.h"
+//#include "binder/where_binder.h"
 
 #include "storage/table_definition.h"
 #include "storage/column_definition.h"

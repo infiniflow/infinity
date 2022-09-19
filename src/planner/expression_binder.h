@@ -13,7 +13,7 @@ namespace infinity {
 
 class ExpressionBinder {
 public:
-    ExpressionBinder() = default;
+//    explicit ExpressionBinder(PlanBuilder& plan_builder) : plan_builder_(plan_builder) {};
     virtual ~ExpressionBinder() = default;
 
     // Bind expression entry
@@ -42,14 +42,15 @@ public:
     std::shared_ptr<BaseExpression>
     BuildUnaryScalarExpr(const std::string& op, const hsql::Expr* expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-//    // Bind subquery expression.
-//    virtual std::shared_ptr<BaseExpression>
-//    BuildSubquery(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
-//
+    // Bind subquery expression.
+    std::shared_ptr<BaseExpression>
+    BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr);
+
 //    // Bind window function.
 //    virtual std::shared_ptr<BaseExpression>
 //    BuildWindow(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
+//    PlanBuilder& plan_builder_;
 private:
 };
 

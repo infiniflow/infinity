@@ -70,11 +70,11 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
             PlannerError("Used in prepare and execute? Not supported now.");
             break;
         case hsql::kExprOperator:
-            BuildOperatorExpr(expr, bind_context_ptr);
-            break;
+            return BuildOperatorExpr(expr, bind_context_ptr);
         case hsql::kExprSelect:
             // subquery expression
-            break;
+            BuildSubquery(*expr.select, bind_context_ptr);
+            PlannerError("Used in prepare and execute? Not supported now.");
         case hsql::kExprHint:
             PlannerError("Hint isn't supported now.");
             break;
@@ -212,6 +212,7 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_pt
             case hsql::kOpIn: { // IN
                 if(expr.select != nullptr) {
                     // In subquery
+                    PlannerError("In subquery isn't implemented");
                     break;
                 } else {
                     PlannerAssert(expr.exprList && !expr.exprList->empty(), "IN operation with emtpy list");
@@ -238,6 +239,7 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_pt
             case hsql::kOpIsNull: // IsNull
                 return BuildUnaryScalarExpr("isnull", expr.expr, bind_context_ptr);
             case hsql::kOpExists: // Exists
+                PlannerError("Exists subquery isn't implemented");
                 break;
             default: {
 
@@ -352,11 +354,17 @@ ExpressionBinder::BuildUnaryScalarExpr(const std::string& op, const hsql::Expr* 
 
     return result;
 }
-//// Bind subquery expression.
-//std::shared_ptr<BaseExpression>
-//ExpressionBinder::BuildSubquery(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-//    PlannerError("ExpressionBinder::BuildSubquery");
-//}
+
+// Bind subquery expression.
+std::shared_ptr<BaseExpression>
+ExpressionBinder::BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr) {
+
+    std::shared_ptr<BindContext> subquery_binding_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+//    plan_builder_.AddBindContextArray(subquery_binding_context_ptr);
+//    std::shared_ptr<> plan_building_context_ptr = BuildSelect
+
+    PlannerError("ExpressionBinder::BuildSubquery");
+}
 //
 //// Bind window function.
 //std::shared_ptr<BaseExpression>
