@@ -9,6 +9,16 @@
 
 namespace infinity {
 
+BindContext::~BindContext() {
+    Destroy();
+}
+
+void
+BindContext::Destroy() {
+    // TODO: Bind context need to release the resource carefully.
+    parent_ = nullptr;
+}
+
 std::shared_ptr<CommonTableExpressionInfo>
 BindContext::GetCTE(const std::string& name) const {
     auto entry = CTE_map_.find(name);

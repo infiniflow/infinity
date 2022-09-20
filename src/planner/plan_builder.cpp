@@ -286,7 +286,7 @@ PlanBuilder::BuildDropPreparedStatement(const hsql::DropStatement &statement, st
 
 PlanBuildingContext
 PlanBuilder::BuildInsert(const hsql::InsertStatement &statement, std::shared_ptr<BindContext>& bind_context_ptr) {
-    bind_context_ptr->binder_ = std::make_shared<InsertBinder>();
+    bind_context_ptr->expression_binder_ = std::make_shared<InsertBinder>();
     switch(statement.type) {
         case hsql::kInsertValues:{
             return BuildInsertValue(statement, bind_context_ptr);
@@ -319,7 +319,7 @@ PlanBuilder::BuildInsertValue(const hsql::InsertStatement &statement, std::share
     value_list.reserve(statement.values->size());
     for (const auto* expr : *statement.values) {
         std::shared_ptr<BaseExpression> value_expr
-                = bind_context_ptr->binder_->BuildExpression(*expr, bind_context_ptr);
+                = bind_context_ptr->expression_binder_->BuildExpression(*expr, bind_context_ptr);
         value_list.emplace_back(value_expr);
     }
 
@@ -435,7 +435,7 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
         // No table reference, just evaluate the expr of the select list.
     }
 
-    bind_context_ptr->binder_ = std::make_shared<SelectBinder>();
+    bind_context_ptr->expression_binder_ = std::make_shared<SelectBinder>();
 
     // 5. SELECT list (aliases)
     // Check all select list items to transfer all columns into table.column_name style.
@@ -444,7 +444,7 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
             = BuildSelectList(*statement.selectList, bind_context_ptr);
 
     // 6. WHERE
-    bind_context_ptr->binder_ = std::make_shared<WhereBinder>();
+    bind_context_ptr->expression_binder_ = std::make_shared<WhereBinder>();
     if (statement.whereClause) {
         std::shared_ptr<LogicalNode> filter_operator = BuildFilter(statement.whereClause, bind_context_ptr);
         filter_operator->set_left_node(root_node_ptr);
@@ -458,7 +458,7 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
     root_node_ptr = BuildGroupByHaving(statement, bind_context_ptr, root_node_ptr).plan;
 
     // 11. SELECT (not flatten subquery)
-    bind_context_ptr->binder_ = std::make_shared<SelectBinder>();
+    bind_context_ptr->expression_binder_ = std::make_shared<SelectBinder>();
     for (const SelectListElement& select_element : select_list) {
         // Make up the column identifier to: table.column_name;
 
@@ -786,7 +786,7 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
             }
             default: {
                 std::shared_ptr<BaseExpression> expr
-                        = bind_context_ptr->binder_->BuildExpression(*select_expr, bind_context_ptr);
+                        = bind_context_ptr->expression_binder_->BuildExpression(*select_expr, bind_context_ptr);
 
                 select_lists.emplace_back(expr);
 
@@ -816,7 +816,7 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
 std::shared_ptr<LogicalFilter>
 PlanBuilder::BuildFilter(const hsql::Expr* whereClause, std::shared_ptr<BindContext>& bind_context_ptr) {
     std::shared_ptr<BaseExpression> where_expr =
-            bind_context_ptr->binder_->BuildExpression(*whereClause, bind_context_ptr);
+            bind_context_ptr->expression_binder_->BuildExpression(*whereClause, bind_context_ptr);
     std::shared_ptr<LogicalFilter> logical_filter = std::make_shared<LogicalFilter>(where_expr);
     return logical_filter;
 }
@@ -830,14 +830,14 @@ PlanBuilder::BuildGroupByHaving(
     if(select.groupBy != nullptr) {
         // Start to bind GROUP BY clause
         // Set group binder
-        bind_context_ptr->binder_ = std::make_shared<GroupBinder>();
+        bind_context_ptr->expression_binder_ = std::make_shared<GroupBinder>();
 
         bind_context_ptr->groups_.reserve(select.groupBy->columns->size());
         for (const hsql::Expr* expr: *select.groupBy->columns) {
 
             // Call GroupBinder BuildExpression
             std::shared_ptr<BaseExpression> group_by_expr =
-                    bind_context_ptr->binder_->BuildExpression(*expr, bind_context_ptr);
+                    bind_context_ptr->expression_binder_->BuildExpression(*expr, bind_context_ptr);
         }
     }
 
@@ -845,9 +845,9 @@ PlanBuilder::BuildGroupByHaving(
     if(select.groupBy != nullptr && select.groupBy->having != nullptr) {
         // Start to bind Having clause
         // Set having binder
-        bind_context_ptr->binder_ = std::make_shared<GroupBinder>();
+        bind_context_ptr->expression_binder_ = std::make_shared<GroupBinder>();
         for (const hsql::Expr* expr: *select.groupBy->having->exprList) {
-            bind_context_ptr->binder_->BuildExpression(*expr, bind_context_ptr);
+            bind_context_ptr->expression_binder_->BuildExpression(*expr, bind_context_ptr);
         }
     }
 

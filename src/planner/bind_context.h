@@ -35,6 +35,10 @@ public:
     explicit BindContext(std::shared_ptr<BindContext> parent)
         : parent_(std::move(parent)) {}
 
+    virtual ~BindContext();
+
+    void Destroy();
+
     // Parent bind context
     std::shared_ptr<BindContext> parent_;
 
@@ -124,7 +128,7 @@ public:
     std::unordered_map<std::string, std::shared_ptr<BaseExpression>> aggregates_by_expr_;
 
     // Binder, different binder have different expression build behavior.
-    std::shared_ptr<ExpressionBinder> binder_{nullptr};
+    std::shared_ptr<ExpressionBinder> expression_binder_{nullptr};
 };
 
 }
