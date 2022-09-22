@@ -9,7 +9,19 @@ namespace infinity {
 
 std::shared_ptr<BaseExpression>
 GroupBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext> &bind_context_ptr) {
-    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
+    std::shared_ptr<BaseExpression> result;
+
+    switch(expr.type) {
+        case hsql::kExprColumnRef : {
+            result = BuildColExpr(expr, bind_context_ptr);
+            break;
+        }
+        default: {
+            result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
+        }
+    }
+
+//    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
 
     // if(root_expression) {  } why we need root expression flag?
     {
@@ -26,12 +38,24 @@ GroupBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindC
     return result;
 }
 
-//std::shared_ptr<BaseExpression>
-//GroupBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-//    std::shared_ptr<BaseExpression> column_expr = ExpressionBinder::BuildColRefExpr(expr, bind_context_ptr);
-//
-//    PlannerError("GroupBinder::BuildColRefExpr");
+std::shared_ptr<BaseExpression>
+GroupBinder::BuildColRef (const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    // Bind order:
+    // - try to find the column in current bind context bindings.
+    // - try to find the column in current select list.
+    // - try to find the column in outer bind context bindings.
+    // ExpressionBinder::BuildColExpr will bind current context bindings and outer bind context.
+    // So can't call ExpressionBinder::BuildColExpr directly.
+    // TODO: need to split ExpressionBinder::BuildColExpr into 3 parts
+    // - construct ColumnIdentifier
+    // - build col expr in current bind context
+    // - build col expr in parent bind context
+    // All above 3 parts can be composed at will.
+
+    // std::shared_ptr<BaseExpression> column_expr = ExpressionBinder::BuildColExpr(expr, bind_context_ptr);
+
+    PlannerError("GroupBinder::BuildColRefExpr");
 //    return column_expr;
-//}
+}
 
 }

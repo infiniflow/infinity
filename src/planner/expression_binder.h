@@ -13,6 +13,13 @@
 
 namespace infinity {
 //class PlanBuilder;
+struct ExprBindResult {
+    std::shared_ptr<BaseExpression> bound_expression_ptr_;
+    std::string err_msg_;
+
+    inline bool IsOk() { return err_msg_.empty(); }
+};
+
 
 class ExpressionBinder {
 public:
