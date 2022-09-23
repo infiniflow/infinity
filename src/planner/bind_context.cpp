@@ -74,12 +74,6 @@ BindContext::IsTableBound(const std::string& table_name) const {
     return false;
 }
 
-// TODO: DELETE
-//int64_t
-//BindContext::GetNewTableIndex() {
-//    return parent_ ? parent_->GetNewTableIndex() : next_table_index_ ++;
-//}
-
 int64_t
 BindContext::GetNewLogicalNodeId() {
     return parent_ ? parent_->GetNewLogicalNodeId() : next_logical_node_id_ ++;

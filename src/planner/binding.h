@@ -28,20 +28,6 @@ public:
                 std::shared_ptr<LogicalNode> logical_node_ptr, int64_t logical_node_id,
                 const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
 
-    static std::shared_ptr<Binding>
-    MakeTableBinding(const std::string& name, int64_t table_index, int64_t logical_node_id,
-                     std::shared_ptr<LogicalNode> logical_node_ptr,
-                     const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
-
-
-    static std::shared_ptr<Binding>
-    MakeViewBinding(const std::string& name, int64_t table_index,
-                     const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
-
-    static std::shared_ptr<Binding>
-    MakeCTEBinding(const std::string& name, int64_t table_index,
-                    const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
-
     // Binding type
     BindingType binding_type_{ BindingType::kInvalid };
 
@@ -56,9 +42,6 @@ public:
 
     // if the binding is table, this is the table_ptr
     std::shared_ptr<Table> table_ptr_{nullptr};
-
-    // Binding table index or some place call it tag
-    // TODO: DELETE int64_t table_index_;
 
     // Column types of the binding
     std::vector<LogicalType> column_types_;
