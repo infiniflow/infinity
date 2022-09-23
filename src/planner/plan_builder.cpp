@@ -729,44 +729,39 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
     for(const hsql::Expr* select_expr: select_list) {
         switch(select_expr->type) {
             case hsql::kExprStar: {
-                std::shared_ptr<Table> table_ptr;
-                int64_t table_index = -1;
+                std::shared_ptr<Binding> binding;
+                std::string table_name;
                 if(select_expr->table == nullptr) {
                     // select * from t1;
-                    PlannerAssert(!bind_context_ptr->tables_.empty(), "No table is bound.");
+                    PlannerAssert(!bind_context_ptr->table_names_.empty(), "No table is bound.");
 
                     // Use first table as the default table: select * from t1, t2; means select t1.* from t1, t2;
-                    table_ptr = bind_context_ptr->tables_[0];
-                    const std::string& table_name = table_ptr->table_def()->name();
-                    auto& binding = bind_context_ptr->bindings_by_name_[table_name];
-                    table_index = binding->table_index_;
+                    table_name = bind_context_ptr->table_names_[0];
+                    binding = bind_context_ptr->binding_by_name_[table_name];
                 } else {
                     // select t1.* from t1;
-                    std::string table_name(select_expr->table);
-                    if (bind_context_ptr->tables_by_name_.contains(table_name)) {
-                        table_ptr = bind_context_ptr->tables_by_name_[table_name];
-                        auto& binding = bind_context_ptr->bindings_by_name_[table_name];
-                        table_index = binding->table_index_;
+                    if (bind_context_ptr->binding_by_name_.contains(table_name)) {
+                        binding = bind_context_ptr->binding_by_name_[table_name];
                     } else {
-                        PlannerAssert(!bind_context_ptr->tables_.empty(), "Table: '" + table_name + "' not found in select list.");
+                        PlannerAssert(!bind_context_ptr->table_names_.empty(), "Table: '" + table_name + "' not found in select list.");
                     }
                 }
 
-                std::shared_ptr<std::string> table_name_ptr = std::make_shared<std::string>(table_ptr->table_def()->name());
+
 
                 // Get corresponding column definition from binding context.
-                const std::vector<ColumnDefinition>& columns_def = bind_context_ptr->tables_[0]->table_def()->columns();
+                const std::vector<ColumnDefinition>& columns_def = binding->table_ptr_->table_def()->columns();
 
                 // Reserve more data in select list
                 select_lists.reserve(select_list.size() + columns_def.size());
 
                 // Build select list
                 uint64_t column_index = 0;
+                std::shared_ptr<std::string> table_name_ptr = std::make_shared<std::string>(table_name);
                 for(const ColumnDefinition& column_def: columns_def) {
                     std::shared_ptr<ColumnExpression> bound_column_expr_ptr
                             = std::make_shared<ColumnExpression>(column_def.logical_type(),
-                                                                 *table_name_ptr,
-                                                                 table_index,
+                                                                 table_name,
                                                                  column_def.name(),
                                                                  column_index,
                                                                  0);
@@ -832,7 +827,8 @@ PlanBuilder::BuildGroupByHaving(
         // Set group binder
         auto group_binder = std::make_shared<GroupBinder>();
 
-        bind_context_ptr->groups_.reserve(select.groupBy->columns->size());
+        // Reserve the group names used in GroupBinder::BuildExpression
+        bind_context_ptr->group_names_.reserve(select.groupBy->columns->size());
         for (const hsql::Expr* expr: *select.groupBy->columns) {
 
             // Call GroupBinder BuildExpression
@@ -909,11 +905,9 @@ PlanBuilder::BuildTable(const hsql::TableRef* from_table, std::shared_ptr<BindCo
     std::shared_ptr<Table> table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, name);
     if(table_ptr != nullptr) {
         std::string table_name = schema_name + "." + name;
-        int64_t table_index = bind_context_ptr->GetNewTableIndex();
         int64_t node_id = bind_context_ptr->GetNewLogicalNodeId();
         // Build table scan operator
-        std::shared_ptr<LogicalTableScan> logical_table_scan =
-                std::make_shared<LogicalTableScan>(table_index, node_id, table_ptr);
+        std::shared_ptr<LogicalTableScan> logical_table_scan = std::make_shared<LogicalTableScan>(node_id, table_ptr);
 
         // TODO: Handle table and column alias
 //        if(from_table->alias != nullptr) {
@@ -936,7 +930,7 @@ PlanBuilder::BuildTable(const hsql::TableRef* from_table, std::shared_ptr<BindCo
         auto table_ref = std::make_shared<BaseTableRef>(logical_table_scan);
 
         // Insert the table in the binding context
-        bind_context_ptr->AddTableBinding(table_name, table_index, node_id, logical_table_scan, types, names);
+        bind_context_ptr->AddTableBinding(table_name, table_ptr, node_id, logical_table_scan, types, names);
 
         return table_ref;
     }
@@ -968,7 +962,7 @@ PlanBuilder::BuildSubquery(const std::string &name, const hsql::SelectStatement&
 
     std::string binding_name = name.empty() ? "subquery" + std::to_string(table_index) : name;
     // Add binding into bind context
-    bind_context_ptr->AddSubqueryBinding(binding_name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
+    bind_context_ptr->AddSubqueryBinding(binding_name, bound_select_node_ptr->types, bound_select_node_ptr->names);
 
     // TODO: Not care about the correlated expression
 
@@ -997,11 +991,8 @@ PlanBuilder::BuildCTE(const std::string &name, const std::shared_ptr<CommonTable
     auto bound_select_node_ptr = PlanBuilder::BuildSelect(*cte->select_statement_, cte_bind_context_ptr);
     auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
 
-    // Get the table index of the sub query output
-    int64_t table_index = bound_select_node_ptr->GetTableIndex();
-
     // Add binding into bind context
-    bind_context_ptr->AddSubqueryBinding(name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
+    bind_context_ptr->AddSubqueryBinding(name, bound_select_node_ptr->types, bound_select_node_ptr->names);
 
     // TODO: Not care about the correlated expression
 
@@ -1028,11 +1019,8 @@ PlanBuilder::BuildView(const std::string &view_name, const std::shared_ptr<View>
     auto bound_select_node_ptr = PlanBuilder::BuildSelect(*select_stmt_ptr, cte_bind_context_ptr);
     auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
 
-    // Get the table index of the sub query output
-    int64_t table_index = bound_select_node_ptr->GetTableIndex();
-
     // Add binding into bind context
-    bind_context_ptr->AddViewBinding(view_name, table_index, bound_select_node_ptr->types, bound_select_node_ptr->names);
+    bind_context_ptr->AddViewBinding(view_name, bound_select_node_ptr->types, bound_select_node_ptr->names);
 
     // TODO: Not care about the correlated expression
 
@@ -1137,16 +1125,16 @@ PlanBuilder::BuildJoin(const hsql::TableRef *from_table, std::shared_ptr<BindCon
     if(result->join_type_ == JoinType::kNatural) {
         std::unordered_set<std::string> left_binding_column_names;
         // TODO: Is there any way to get all_column_names size ? Collect all left binding columns numbers at very beginning?
-        for(auto& left_binding: left_bind_context_ptr->bindings_) {
-            for(auto& left_column_name: left_binding->column_names_) {
+        for(auto& left_binding_pair: left_bind_context_ptr->binding_by_name_) {
+            for(auto& left_column_name: left_binding_pair.second->column_names_) {
                 left_binding_column_names.emplace(left_column_name);
             }
         }
 
         std::vector<std::string> using_column_names;
         // TODO: column count of left binding tables and right binding tables is using_column_names size
-        for(auto& right_binding: right_bind_context_ptr->bindings_) {
-            for(auto& right_column_name: right_binding->column_names_) {
+        for(auto& right_binding_pair: right_bind_context_ptr->binding_by_name_) {
+            for(auto& right_column_name: right_binding_pair.second->column_names_) {
                 if(left_binding_column_names.contains(right_column_name)) {
                     using_column_names.emplace_back(right_column_name);
                 }
@@ -1172,21 +1160,35 @@ PlanBuilder::BuildJoin(const hsql::TableRef *from_table, std::shared_ptr<BindCon
             // TODO: Construct join condition: left_column_expr = right_column_expr AND left_column_expr = right_column_expr;
             for(auto& column_name: using_column_names) {
                 // Create left bound column expression
-                auto& left_binding_ptr = left_bind_context_ptr->bindings_by_column_[column_name];
-                PlannerAssert(left_binding_ptr != nullptr, "Column: " + column_name + " doesn't exist in left table");
+                PlannerAssert(left_bind_context_ptr->binding_names_by_column_.contains(column_name), "Column: " + column_name + " doesn't exist in left table");
+
+                auto& left_column_binding_names = left_bind_context_ptr->binding_names_by_column_[column_name];
+
+                PlannerAssert(left_column_binding_names.size() == 1, "Ambiguous column name: " + column_name + " in left table");
+
+                auto& left_binding_name = left_column_binding_names[0];
+                auto& left_binding_ptr = left_bind_context_ptr->binding_by_name_[left_binding_name];
                 auto left_column_index = left_binding_ptr->name2index_[column_name];
                 auto left_column_type = left_binding_ptr->column_types_[left_column_index];
 
                 std::shared_ptr<ColumnExpression> left_column_expression_ptr =
-                        std::make_shared<ColumnExpression>(left_column_type, left_binding_ptr->table_name_, left_binding_ptr->table_index_, column_name, left_column_index, 0);
+                        std::make_shared<ColumnExpression>(left_column_type, left_binding_ptr->table_name_, column_name, left_column_index, 0);
 
-                auto& right_binding_ptr = right_bind_context_ptr->bindings_by_column_[column_name];
+                PlannerAssert(right_bind_context_ptr->binding_names_by_column_.contains(column_name), "Column: " + column_name + " doesn't exist in right table");
+
+                auto& right_column_binding_names = right_bind_context_ptr->binding_names_by_column_[column_name];
+
+                PlannerAssert(right_column_binding_names.size() == 1, "Ambiguous column name: " + column_name + " in right table");
+
+
+                auto& right_binding_name = right_column_binding_names[0];
+                auto& right_binding_ptr = right_bind_context_ptr->binding_by_name_[left_binding_name];
                 PlannerAssert(right_binding_ptr != nullptr, "Column: " + column_name + " doesn't exist in right table");
                 auto right_column_index = right_binding_ptr->name2index_[column_name];
                 auto right_column_type = right_binding_ptr->column_types_[right_column_index];
 
                 std::shared_ptr<ColumnExpression> right_column_expression_ptr =
-                        std::make_shared<ColumnExpression>(right_column_type, right_binding_ptr->table_name_, right_binding_ptr->table_index_, column_name, right_column_index, 0);
+                        std::make_shared<ColumnExpression>(right_column_type, right_binding_ptr->table_name_, column_name, right_column_index, 0);
 
                 auto condition = std::make_shared<ConjunctionExpression>(ExpressionType::kConjunction, ConjunctionType::kAnd, left_column_expression_ptr, right_column_expression_ptr);
                 result->on_conditions_.emplace_back(condition);

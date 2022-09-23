@@ -92,6 +92,24 @@ enum class ExpressionType {
     kPredicate, // ?
 };
 
+enum class ExprSourceType {
+    kInvalid,
+    kAggregate,
+    kGroupBy,
+    kProjection,
+    kBinding,
+};
+
+struct SourcePosition {
+    SourcePosition() = default;
+    explicit SourcePosition(int64_t bind_context_id, ExprSourceType source_type)
+        : bind_context_id_(bind_context_id), source_type_(source_type) {}
+
+    int64_t bind_context_id_{-1};
+    ExprSourceType source_type_{ExprSourceType::kInvalid};
+    std::string binding_name_;
+};
+
 class BaseExpression : public std::enable_shared_from_this<BaseExpression> {
 public:
     explicit BaseExpression(ExpressionType type, std::vector<std::shared_ptr<BaseExpression>> arguments)
@@ -102,6 +120,8 @@ public:
     virtual LogicalType DataType() = 0;
     [[nodiscard]] ExpressionType type() const { return type_; }
     std::vector<std::shared_ptr<BaseExpression>>& arguments() { return arguments_; }
+
+    SourcePosition source_position_;
 
 protected:
     ExpressionType type_;

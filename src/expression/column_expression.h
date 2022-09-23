@@ -11,7 +11,7 @@ namespace infinity {
 
 class ColumnExpression : public BaseExpression {
 public:
-    ColumnExpression(LogicalType logical_type, std::string table_name, int64_t table_index,
+    ColumnExpression(LogicalType logical_type, std::string table_name,
                      std::string column_name, int64_t column_index, int64_t depth);
 
     LogicalType DataType() override { return data_type_; };
@@ -21,7 +21,6 @@ private:
     std::string table_name_;
     std::string column_name_;
 
-    int64_t table_index_;
     int64_t column_index_;
     int64_t depth_;
 };

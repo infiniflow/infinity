@@ -15,13 +15,13 @@ GroupBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindC
     // if(root_expression) {  } why we need root expression flag?
     {
         std::string expr_name = expr.getName();
-        if(bind_context_ptr->groups_by_expr_.contains(expr_name)) {
+        if(bind_context_ptr->group_by_name_.contains(expr_name)) {
             PlannerError("Duplicated group by expression: " + expr_name);
         }
 
         // Add the group by expression into bind context
-        bind_context_ptr->groups_by_expr_[expr_name] = result;
-        bind_context_ptr->groups_.emplace_back(result);
+        bind_context_ptr->group_names_.emplace_back(expr_name);
+        bind_context_ptr->group_by_name_[expr_name] = result;
     }
 
     return result;

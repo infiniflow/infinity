@@ -5,6 +5,7 @@
 #pragma once
 
 #include "storage/data_type.h"
+#include "storage/table.h"
 #include "logical_node.h"
 
 #include <unordered_map>
@@ -19,8 +20,12 @@ public:
     virtual ~Binding() = default;
 
     static std::shared_ptr<Binding>
-    MakeBinding(BindingType binding_type, const std::string& name, int64_t table_index, int64_t logical_node_id,
-                std::shared_ptr<LogicalNode> logical_node_ptr,
+    MakeBinding(BindingType binding_type, const std::string& name,
+                const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
+
+    static std::shared_ptr<Binding>
+    MakeBinding(BindingType binding_type, const std::string& name, std::shared_ptr<Table> table_ptr,
+                std::shared_ptr<LogicalNode> logical_node_ptr, int64_t logical_node_id,
                 const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
 
     static std::shared_ptr<Binding>
@@ -49,8 +54,11 @@ public:
     // ptr to the corresponding logical node.
     std::shared_ptr<LogicalNode> logical_node_ptr_{nullptr};
 
+    // if the binding is table, this is the table_ptr
+    std::shared_ptr<Table> table_ptr_{nullptr};
+
     // Binding table index or some place call it tag
-    int64_t table_index_;
+    // TODO: DELETE int64_t table_index_;
 
     // Column types of the binding
     std::vector<LogicalType> column_types_;

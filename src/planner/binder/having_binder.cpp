@@ -13,15 +13,25 @@ HavingBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<Bind
 
     std::string expr_name = expr.getName();
     if(!this->binding_agg_func_) {
-        if (bind_context_ptr->groups_by_expr_.contains(expr_name)) {
-            return bind_context_ptr->groups_by_expr_[expr_name];
+        if (bind_context_ptr->group_by_name_.contains(expr_name)) {
+            auto group_by_expr_ptr = bind_context_ptr->group_by_name_[expr_name];
+
+            group_by_expr_ptr->source_position_
+                = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kGroupBy);
+
+            return group_by_expr_ptr;
         }
     }
 
-    if(bind_context_ptr->aggregates_by_expr_.contains(expr_name)) {
+    if(bind_context_ptr->aggregate_by_name_.contains(expr_name)) {
         if(!this->binding_agg_func_) {
             // not in an aggregate function
-            return bind_context_ptr->aggregates_by_expr_[expr_name];
+            auto agg_expr_ptr = bind_context_ptr->aggregate_by_name_[expr_name];
+
+            agg_expr_ptr->source_position_
+                = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+
+            return agg_expr_ptr;
         } else {
             // in an aggregate function, which means aggregate function nested, which is error.
             PlannerError("Aggregate function is called in another aggregate function.");
@@ -47,16 +57,17 @@ HavingBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindCo
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
         this->binding_agg_func_ = true;
     }
-    auto result = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
+    auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
 
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
         std::string expr_name = expr.getName();
-        bind_context_ptr->aggregates_by_expr_.emplace(expr_name, result);
+
+        bind_context_ptr->aggregate_by_name_[expr_name] = func_expr_ptr;
 
         this->binding_agg_func_ = false;
     }
 
-    return result;
+    return func_expr_ptr;
 }
 
 }
