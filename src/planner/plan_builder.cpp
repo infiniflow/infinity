@@ -830,14 +830,13 @@ PlanBuilder::BuildGroupByHaving(
     if(select.groupBy != nullptr) {
         // Start to bind GROUP BY clause
         // Set group binder
-        bind_context_ptr->expression_binder_ = std::make_shared<GroupBinder>();
+        auto group_binder = std::make_shared<GroupBinder>();
 
         bind_context_ptr->groups_.reserve(select.groupBy->columns->size());
         for (const hsql::Expr* expr: *select.groupBy->columns) {
 
             // Call GroupBinder BuildExpression
-            std::shared_ptr<BaseExpression> group_by_expr =
-                    bind_context_ptr->expression_binder_->BuildExpression(*expr, bind_context_ptr);
+            std::shared_ptr<BaseExpression> group_by_expr = group_binder->BuildExpression(*expr, bind_context_ptr);
         }
     }
 

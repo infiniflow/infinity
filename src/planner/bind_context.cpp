@@ -150,7 +150,21 @@ BindContext::AddBindContext(const std::shared_ptr<BindContext>& bind_context_ptr
 }
 
 std::shared_ptr<BaseExpression>
-BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier, int64_t depth) {
+BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t depth) {
+
+    std::shared_ptr<BaseExpression> bound_column_expr = ResolveColumnIdCurrentContext(column_identifier, depth);
+
+    if(bound_column_expr != nullptr) return bound_column_expr;
+
+    if(parent_ != nullptr) {
+        return parent_->ResolveColumnId(column_identifier, depth + 1);
+    }
+
+    PlannerError(column_identifier.ToString() + " isn't found.");
+}
+
+std::shared_ptr<BaseExpression>
+BindContext::ResolveColumnIdCurrentContext(const ColumnIdentifier& column_identifier, int64_t depth) {
     const std::string& table_name_ref = *column_identifier.table_name_ptr_;
     const std::string& column_name_ref = *column_identifier.column_name_ptr_;
 
@@ -161,20 +175,20 @@ BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier, 
                 // Find the table and column in the bind context.
                 int64_t column_id = binding->name2index_[column_name_ref];
                 std::shared_ptr<ColumnExpression> column_expr
-                    = std::make_shared<ColumnExpression>(
-                            binding->column_types_[column_id],
-                            table_name_ref,
-                            binding->table_index_,
-                            column_name_ref,
-                            column_id,
-                            depth);
+                        = std::make_shared<ColumnExpression>(
+                                binding->column_types_[column_id],
+                                table_name_ref,
+                                binding->table_index_,
+                                column_name_ref,
+                                column_id,
+                                depth);
                 return column_expr;
             } else {
                 PlannerError(column_identifier.ToString() + " doesn't exist.");
             }
         } else {
-            // Table isn't found in this bind context, maybe its parent has it.
-            // Following code will proceed this case.
+            // Table isn't found in current bind context, maybe its parent has it.
+            return nullptr;
         }
     } else {
         // Not table name
@@ -200,15 +214,11 @@ BindContext::ResolveColumnIdentifier(const ColumnIdentifier& column_identifier, 
                 PlannerError(column_identifier.ToString() + " doesn't exist.");
             }
         } else {
-            // Bind isn't found in this bind context, try to find in parent_
+            // Table isn't found in current bind context, maybe its parent has it.
+
+            return nullptr;
         }
     }
-
-    if(parent_ != nullptr) {
-        return parent_->ResolveColumnIdentifier(column_identifier, depth + 1);
-    }
-
-    PlannerError(column_identifier.ToString() + " isn't found.");
 }
 
 void

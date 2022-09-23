@@ -99,33 +99,15 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
 
 std::shared_ptr<BaseExpression>
 ExpressionBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    std::shared_ptr<std::string> column_name_ptr = std::make_shared<std::string>(expr.name);
-    std::shared_ptr<std::string> table_name_ptr = nullptr;
-    std::shared_ptr<std::string> alias_name_ptr = nullptr;
-    if(expr.table != nullptr) {
-        table_name_ptr = std::make_shared<std::string>(expr.table);
-    }
-    if(expr.alias != nullptr) {
-        alias_name_ptr = std::make_shared<std::string>(expr.alias);
-    }
-    ColumnIdentifier column_identifier(table_name_ptr, column_name_ptr, alias_name_ptr);
-    std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnIdentifier(column_identifier, 0);
+    ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(expr);
+    std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, 0);
     return column_expr;
 }
 
 std::shared_ptr<BaseExpression>
 ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
 
-    std::string function_name = expr.name;
-
-    // Transfer the function to upper case.
-    std::transform(function_name.begin(), function_name.end(), function_name.begin(), [](const auto c) {
-        return std::toupper(c);
-    });
-
-    // std::unique_ptr<Catalog>& catalog
-    auto& catalog = Infinity::instance().catalog();
-    std::shared_ptr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(function_name);
+    std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
 
     std::vector<std::shared_ptr<BaseExpression>> arguments;
     arguments.reserve(expr.exprList->size());

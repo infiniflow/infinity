@@ -5,6 +5,7 @@
 #pragma once
 
 #include "logical_node_type.h"
+#include "column_identifier.h"
 #include "expression/base_expression.h"
 
 #include <string>
@@ -45,40 +46,6 @@ protected:
     // Each node has an id which is unique in this plan tree.
     uint64_t node_id_{0};
 
-};
-
-struct ColumnIdentifier {
-public:
-    explicit ColumnIdentifier(std::shared_ptr<std::string> table_name, std::shared_ptr<std::string> column_name,
-                              std::shared_ptr<std::string> alias_name)
-        : column_name_ptr_(std::move(column_name)),
-        table_name_ptr_(std::move(table_name)),
-        alias_name_ptr_(std::move(alias_name))
-        {}
-
-    [[nodiscard]] std::string ToString() const {
-        if(table_name_ptr_ != nullptr) return *table_name_ptr_ + "." + *column_name_ptr_;
-        else return *column_name_ptr_;
-    }
-
-    [[nodiscard]] bool operator==(const ColumnIdentifier& other) const {
-        if(*column_name_ptr_ != *other.column_name_ptr_) {
-            return false;
-        }
-        if(table_name_ptr_ != nullptr && other.table_name_ptr_ != nullptr) {
-            return *table_name_ptr_ == *other.table_name_ptr_;
-        }
-
-        if(table_name_ptr_ == nullptr && other.table_name_ptr_ == nullptr) {
-            return true;
-        }
-
-        return false;
-    }
-
-    std::shared_ptr<std::string> column_name_ptr_;
-    std::shared_ptr<std::string> table_name_ptr_;
-    std::shared_ptr<std::string> alias_name_ptr_;
 };
 
 struct SelectListElement {

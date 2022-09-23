@@ -3,6 +3,7 @@
 //
 
 #include "common/utility/infinity_assert.h"
+#include "function/function_set.h"
 #include "group_binder.h"
 
 namespace infinity {
@@ -12,16 +13,19 @@ GroupBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindC
     std::shared_ptr<BaseExpression> result;
 
     switch(expr.type) {
-        case hsql::kExprColumnRef : {
-            result = BuildColExpr(expr, bind_context_ptr);
-            break;
+        case hsql::kExprFunctionRef: {
+            std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
+            if(function_set_ptr->type_ != FunctionType::kScalar) {
+                PlannerError("Only scalar function is supported in group by list.");
+            }
+        }
+        case hsql::kExprSelect: {
+            PlannerError("Subquery isn't supported in group by list.");
         }
         default: {
             result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
         }
     }
-
-//    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
 
     // if(root_expression) {  } why we need root expression flag?
     {
@@ -36,26 +40,6 @@ GroupBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindC
     }
 
     return result;
-}
-
-std::shared_ptr<BaseExpression>
-GroupBinder::BuildColRef (const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    // Bind order:
-    // - try to find the column in current bind context bindings.
-    // - try to find the column in current select list.
-    // - try to find the column in outer bind context bindings.
-    // ExpressionBinder::BuildColExpr will bind current context bindings and outer bind context.
-    // So can't call ExpressionBinder::BuildColExpr directly.
-    // TODO: need to split ExpressionBinder::BuildColExpr into 3 parts
-    // - construct ColumnIdentifier
-    // - build col expr in current bind context
-    // - build col expr in parent bind context
-    // All above 3 parts can be composed at will.
-
-    // std::shared_ptr<BaseExpression> column_expr = ExpressionBinder::BuildColExpr(expr, bind_context_ptr);
-
-    PlannerError("GroupBinder::BuildColRefExpr");
-//    return column_expr;
 }
 
 }

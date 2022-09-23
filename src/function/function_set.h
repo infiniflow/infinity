@@ -9,11 +9,15 @@
 #include "scalar_function.h"
 #include "table_function.h"
 
+#include "sql/Expr.h"
+
 namespace infinity {
 
 
 class FunctionSet {
 public:
+    static std::shared_ptr<FunctionSet> GetFunctionSet(const hsql::Expr &expr);
+
     explicit FunctionSet(std::string name, FunctionType type): name_(std::move(name)), type_(type) {}
 
     [[nodiscard]] const std::string& name() const { return name_; }

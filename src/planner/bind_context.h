@@ -93,6 +93,11 @@ public:
     // Merge input bind context into this bind context
     void AddBindContext(const std::shared_ptr<BindContext>& bind_context_ptr);
 
+    std::shared_ptr<BaseExpression>
+    ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t depth);
+
+    std::shared_ptr<BaseExpression>
+    ResolveColumnIdCurrentContext(const ColumnIdentifier& column_identifier, int64_t depth);
 private:
     int64_t next_table_index_{1};
     int64_t next_logical_node_id_{1};
@@ -103,7 +108,6 @@ public:
     // !!! TODO: Below need to be refactored !!!
 
 public:
-    std::shared_ptr<BaseExpression> ResolveColumnIdentifier(const ColumnIdentifier& column_identifier, int64_t depth);
     void AddTable(const std::shared_ptr<Table>& table_ptr);
 
     // All logical operator
