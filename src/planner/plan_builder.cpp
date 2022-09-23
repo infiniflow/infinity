@@ -404,7 +404,7 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
     if (statement.withDescriptions != nullptr) {
 
         // Prepare to store the with statement
-        int64_t with_stmt_count = statement.withDescriptions->size();
+        size_t with_stmt_count = statement.withDescriptions->size();
         bind_context_ptr->CTE_map_.reserve(with_stmt_count);
 
         // Hash set to restrict the with statement name visibility
@@ -455,7 +455,7 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
     // 8. WITH CUBE / WITH ROLLUP
     // 9. HAVING
     // 10. DISTINCT
-    root_node_ptr = BuildGroupByHaving(statement, bind_context_ptr, root_node_ptr).plan;
+    BuildGroupByHaving(statement, bind_context_ptr, bound_select_node);
 
     // 11. SELECT (not flatten subquery)
     bind_context_ptr->expression_binder_ = std::make_shared<SelectBinder>();
@@ -821,11 +821,11 @@ PlanBuilder::BuildFilter(const hsql::Expr* whereClause, std::shared_ptr<BindCont
     return logical_filter;
 }
 
-PlanBuildingContext
+void
 PlanBuilder::BuildGroupByHaving(
         const hsql::SelectStatement& select,
         std::shared_ptr<BindContext>& bind_context_ptr,
-        const std::shared_ptr<LogicalNode>& root_operator) {
+        std::shared_ptr<BoundSelectNode>& root_operator) {
 
     if(select.groupBy != nullptr) {
         // Start to bind GROUP BY clause
@@ -837,6 +837,8 @@ PlanBuilder::BuildGroupByHaving(
 
             // Call GroupBinder BuildExpression
             std::shared_ptr<BaseExpression> group_by_expr = group_binder->BuildExpression(*expr, bind_context_ptr);
+            root_operator->group_by_expressions_.emplace_back(group_by_expr);
+
         }
     }
 
@@ -844,15 +846,15 @@ PlanBuilder::BuildGroupByHaving(
     if(select.groupBy != nullptr && select.groupBy->having != nullptr) {
         // Start to bind Having clause
         // Set having binder
-        bind_context_ptr->expression_binder_ = std::make_shared<GroupBinder>();
+        auto having_binder = std::make_shared<HavingBinder>();
         for (const hsql::Expr* expr: *select.groupBy->having->exprList) {
-            bind_context_ptr->expression_binder_->BuildExpression(*expr, bind_context_ptr);
+
+            // Call HavingBinder BuildExpression
+            std::shared_ptr<BaseExpression> having_expr = having_binder->BuildExpression(*expr, bind_context_ptr);
+            root_operator->having_expressions_.emplace_back(having_expr);
+
         }
     }
-
-    PlannerError("BuildGroupByHaving is not implemented");
-    PlanBuildingContext res;
-    return res;
 }
 
 PlanBuildingContext

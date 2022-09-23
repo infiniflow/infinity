@@ -5,6 +5,7 @@
 #pragma once
 
 #include "planner/bound_node.h"
+#include "expression/base_expression.h"
 
 namespace infinity {
 
@@ -20,6 +21,12 @@ public:
 
     // From clause
     std::shared_ptr<TableRef> table_ref_ptr_;
+
+    // Group by expression list
+    std::vector<std::shared_ptr<BaseExpression>> group_by_expressions_;
+
+    // Having expression list
+    std::vector<std::shared_ptr<BaseExpression>> having_expressions_;
 
     int64_t GetTableIndex() override { return 0; };
 

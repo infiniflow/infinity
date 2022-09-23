@@ -205,11 +205,10 @@ private:
     static std::shared_ptr<LogicalFilter>
     BuildFilter(const hsql::Expr *where_clause, std::shared_ptr<BindContext> &bind_context_ptr);
 
-    static PlanBuildingContext
-    BuildGroupByHaving(
-            const hsql::SelectStatement &select,
-            std::shared_ptr<BindContext> &bind_context_ptr,
-            const std::shared_ptr<LogicalNode> &root_operator);
+    static void
+    BuildGroupByHaving(const hsql::SelectStatement& select,
+            std::shared_ptr<BindContext>& bind_context_ptr,
+            std::shared_ptr<BoundSelectNode>& root_operator);
 
     static PlanBuildingContext
     BuildOrderBy(const std::vector<hsql::OrderDescription *> &order_by_clause,

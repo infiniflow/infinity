@@ -31,30 +31,33 @@ public:
     virtual std::shared_ptr<BaseExpression>
     BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
+    virtual std::shared_ptr<BaseExpression>
+    BuildValueExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+
     // Bind column reference expression also include correlated column reference.
-    std::shared_ptr<BaseExpression>
+    virtual std::shared_ptr<BaseExpression>
     BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-    std::shared_ptr<BaseExpression>
+    virtual std::shared_ptr<BaseExpression>
     BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-    std::shared_ptr<BaseExpression>
+    virtual std::shared_ptr<BaseExpression>
     BuildOperatorExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-    std::shared_ptr<BaseExpression>
+    virtual std::shared_ptr<BaseExpression>
     BuildCastExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-    std::shared_ptr<BaseExpression>
+    virtual std::shared_ptr<BaseExpression>
     BuildCaseExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-    std::shared_ptr<BaseExpression>
+    virtual std::shared_ptr<BaseExpression>
     BuildBinaryScalarExpr(const std::string& op, const hsql::Expr* left, const hsql::Expr* right, const std::shared_ptr<BindContext>& bind_context_ptr);
 
-    std::shared_ptr<BaseExpression>
+    virtual std::shared_ptr<BaseExpression>
     BuildUnaryScalarExpr(const std::string& op, const hsql::Expr* expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Bind subquery expression.
-    std::shared_ptr<SubqueryExpression>
+    virtual std::shared_ptr<SubqueryExpression>
     BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr, SubqueryType subquery_type);
 
 //    // Bind window function.

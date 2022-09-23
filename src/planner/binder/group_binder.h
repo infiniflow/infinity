@@ -13,6 +13,12 @@ public:
     // Bind expression entry
     std::shared_ptr<BaseExpression>
     BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) override;
+
+    std::shared_ptr<BaseExpression>
+    BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) override;
+
+    std::shared_ptr<SubqueryExpression>
+    BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr, SubqueryType subquery_type) override;
 private:
 };
 

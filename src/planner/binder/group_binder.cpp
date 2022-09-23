@@ -10,22 +10,7 @@ namespace infinity {
 
 std::shared_ptr<BaseExpression>
 GroupBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext> &bind_context_ptr) {
-    std::shared_ptr<BaseExpression> result;
-
-    switch(expr.type) {
-        case hsql::kExprFunctionRef: {
-            std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
-            if(function_set_ptr->type_ != FunctionType::kScalar) {
-                PlannerError("Only scalar function is supported in group by list.");
-            }
-        }
-        case hsql::kExprSelect: {
-            PlannerError("Subquery isn't supported in group by list.");
-        }
-        default: {
-            result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
-        }
-    }
+    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
 
     // if(root_expression) {  } why we need root expression flag?
     {
@@ -40,6 +25,20 @@ GroupBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindC
     }
 
     return result;
+}
+
+std::shared_ptr<BaseExpression>
+GroupBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
+    if(function_set_ptr->type_ != FunctionType::kScalar) {
+        PlannerError("Only scalar function is supported in group by list.");
+    }
+    return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
+}
+
+std::shared_ptr<SubqueryExpression>
+GroupBinder::BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr, SubqueryType subquery_type) {
+    PlannerError("Subquery isn't supported in group by list.");
 }
 
 }
