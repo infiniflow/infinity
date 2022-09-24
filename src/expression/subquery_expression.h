@@ -2,6 +2,8 @@
 // Created by JinHai on 2022/9/19.
 //
 
+#pragma once
+
 #include "base_expression.h"
 #include "planner/bound/bound_select_node.h"
 

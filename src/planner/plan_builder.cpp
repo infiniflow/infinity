@@ -406,7 +406,6 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
     // TODO: Move constructing bind context here ?
     auto bound_select_node = std::make_shared<BoundSelectNode>(bind_context_ptr);
 
-    std::shared_ptr<LogicalNode> root_node_ptr;
     // 1. WITH clause
     if (statement.withDescriptions != nullptr) {
 
@@ -465,9 +464,12 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
 
     // 6. WHERE
     if (statement.whereClause) {
-        std::shared_ptr<LogicalNode> filter_operator = BuildFilter(statement.whereClause, bind_alias_proxy, bind_context_ptr);
-        filter_operator->set_left_node(root_node_ptr);
-        root_node_ptr = filter_operator;
+        auto where_binder = std::make_shared<WhereBinder>(bind_alias_proxy);
+        std::shared_ptr<BaseExpression> where_expr =
+                where_binder->BuildExpression(*statement.whereClause, bind_context_ptr);
+
+        bound_select_node->where_conditions_ =
+                SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
     }
 
     // 7. GROUP BY
@@ -850,6 +852,9 @@ PlanBuilder::BuildFilter(const hsql::Expr* whereClause,
     auto where_binder = std::make_shared<WhereBinder>(bind_alias_proxy);
     std::shared_ptr<BaseExpression> where_expr =
             where_binder->BuildExpression(*whereClause, bind_context_ptr);
+
+    SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
+
     std::shared_ptr<LogicalFilter> logical_filter = std::make_shared<LogicalFilter>(where_expr);
     return logical_filter;
 }

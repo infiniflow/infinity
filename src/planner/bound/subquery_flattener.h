@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "expression/subquery_expression.h"
 #include "bound_select_node.h"
 
 namespace infinity {
@@ -17,13 +18,19 @@ public:
     GetResult();
 private:
     void
-    FlattenProjectList();
-
-    void
     FlattenWhereClause();
 
     void
     FlattenHavingList();
+
+    void
+    FlattenProjectList();
+
+    std::shared_ptr<BaseExpression>
+    TryToFlatten(std::shared_ptr<BaseExpression>& expr);
+
+    std::shared_ptr<BaseExpression>
+    FlattenSubquery(std::shared_ptr<SubqueryExpression>& subquery);
 
     std::shared_ptr<BoundSelectNode>& bound_select_node_;
     std::shared_ptr<BindContext> &bind_context_ptr_;

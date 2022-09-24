@@ -29,6 +29,9 @@ public:
     // From clause
     std::shared_ptr<TableRef> table_ref_ptr_;
 
+    // Where conditions
+    std::vector<std::shared_ptr<BaseExpression>> where_conditions_;
+
     // Group by expression list
     std::vector<std::shared_ptr<BaseExpression>> group_by_expressions_;
 
