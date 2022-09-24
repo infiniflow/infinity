@@ -14,6 +14,8 @@
 #include "planner/node/logical_insert.h"
 #include "planner/node/logical_filter.h"
 
+#include "planner/bound/subquery_flattener.h"
+
 #include "binder/aggregate_binder.h"
 #include "binder/group_binder.h"
 #include "binder/having_binder.h"
@@ -54,6 +56,8 @@ PlanBuilder::BuildPlan(const hsql::SQLStatement &statement) {
         case hsql::kStmtSelect: {
             auto bound_select_node = BuildSelect(static_cast<const hsql::SelectStatement &>(statement), bind_context_ptr);
 
+            SubqueryFlattener flattner(bound_select_node,  bind_context_ptr);
+            bound_select_node = flattner.GetResult();
             // Need to create plan and construct the plan context;
             break;
         }
