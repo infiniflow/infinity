@@ -12,10 +12,16 @@ WhereBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindC
     return result;
 }
 
-//std::shared_ptr<BaseExpression>
-//WhereBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-//    std::shared_ptr<BaseExpression> column_expr = ExpressionBinder::BuildColRefExpr(expr, bind_context_ptr);
-//    return column_expr;
-//}
+std::shared_ptr<BaseExpression>
+WhereBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    // Check if the column is using an alias from select list.
+    auto result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr);
+
+    if(result == nullptr) {
+        result = ExpressionBinder::BuildColExpr(expr, bind_context_ptr);
+    }
+
+    return result;
+}
 
 }

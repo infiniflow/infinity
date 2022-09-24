@@ -55,12 +55,16 @@ public:
     // Binding Table
     std::vector<std::string> table_names_;
 
-    // Bind group by expr
+    // Bound expr in group by list
     std::vector<std::string> group_names_;
     std::unordered_map<std::string, std::shared_ptr<BaseExpression>> group_by_name_;
 
-    // Bind aggregate function by expr
+    // Bound aggregate function expr
     std::unordered_map<std::string, std::shared_ptr<BaseExpression>> aggregate_by_name_;
+
+    // Bound expr in select list
+    std::vector<std::string> project_names_;
+    std::unordered_map<std::string, std::shared_ptr<BaseExpression>> project_by_name_;
 
     // Bound CTE
     std::unordered_set<std::shared_ptr<CommonTableExpressionInfo>> bound_cte_set_;
@@ -112,9 +116,6 @@ public:
 
     std::shared_ptr<BaseExpression>
     ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t depth);
-
-    std::shared_ptr<BaseExpression>
-    ResolveColumnIdCurrentContext(const ColumnIdentifier& column_identifier, int64_t depth);
 
 private:
     void

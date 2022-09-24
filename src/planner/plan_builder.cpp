@@ -18,9 +18,10 @@
 #include "binder/group_binder.h"
 #include "binder/having_binder.h"
 #include "binder/insert_binder.h"
-#include "binder/select_binder.h"
+#include "binder/project_binder.h"
 #include "binder/where_binder.h"
 #include "binder/join_binder.h"
+#include "binder/bind_alias_proxy.h"
 
 #include "storage/table_definition.h"
 #include "storage/column_definition.h"
@@ -435,18 +436,30 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
         // No table reference, just evaluate the expr of the select list.
     }
 
-    bind_context_ptr->expression_binder_ = std::make_shared<SelectBinder>();
+    bind_context_ptr->expression_binder_ = std::make_shared<ProjectBinder>();
 
     // 5. SELECT list (aliases)
-    // Check all select list items to transfer all columns into table.column_name style.
-    // Can we also bind them all?
-    std::vector<SelectListElement> select_list
-            = BuildSelectList(*statement.selectList, bind_context_ptr);
+    // Unfold the star expression in the select list.
+    // Star expression will be unfold and bound as column expressions.
+    std::vector<SelectItem> select_list = BuildSelectList(*statement.selectList, bind_context_ptr);
+
+    std::unordered_map<std::string, const hsql::Expr *> alias2expr;
+    for (const SelectItem& select_item : select_list) {
+
+        // Bound column expression is bound due to the star expression, which won't be referenced in other place.
+        // Only consider the Raw Expression case.
+        if(select_item.type_ == SelectItemType::kRawExpr) {
+            if(select_item.expr_->hasAlias()) {
+                alias2expr.emplace(select_item.expr_->getName(), select_item.expr_);
+            }
+        }
+    }
+
+    std::shared_ptr<BindAliasProxy> bind_alias_proxy = std::make_shared<BindAliasProxy>(alias2expr);
 
     // 6. WHERE
-    bind_context_ptr->expression_binder_ = std::make_shared<WhereBinder>();
     if (statement.whereClause) {
-        std::shared_ptr<LogicalNode> filter_operator = BuildFilter(statement.whereClause, bind_context_ptr);
+        std::shared_ptr<LogicalNode> filter_operator = BuildFilter(statement.whereClause, bind_alias_proxy, bind_context_ptr);
         filter_operator->set_left_node(root_node_ptr);
         root_node_ptr = filter_operator;
     }
@@ -455,37 +468,58 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
     // 8. WITH CUBE / WITH ROLLUP
     // 9. HAVING
     // 10. DISTINCT
-    BuildGroupByHaving(statement, bind_context_ptr, bound_select_node);
+    BuildGroupByHaving(statement, bind_alias_proxy, bind_context_ptr, bound_select_node);
 
     // 11. SELECT (not flatten subquery)
-    bind_context_ptr->expression_binder_ = std::make_shared<SelectBinder>();
-    for (const SelectListElement& select_element : select_list) {
-        // Make up the column identifier to: table.column_name;
+    auto project_binder = std::make_shared<ProjectBinder>();
+    bind_context_ptr->project_names_.reserve(select_list.size());
+    bound_select_node->projection_expressions_.reserve(select_list.size());
+    for (const SelectItem& select_item : select_list) {
+        switch(select_item.type_) {
+            case SelectItemType::kBoundColumnExpr: {
+                // This part is from unfold star expression, no alias
+                const std::string& expr_name_ref = select_item.column_expr_->ToString();
+                if(!bind_context_ptr->project_by_name_.contains(expr_name_ref)) {
+                    bind_context_ptr->project_by_name_.emplace(expr_name_ref, select_item.column_expr_);
+                }
+                bind_context_ptr->project_names_.emplace_back(expr_name_ref);
 
-        // Bind the expr use SelectBinder
+                // Insert the bound expression into projection expressions of select node.
+                bound_select_node->projection_expressions_.emplace_back(select_item.column_expr_);
+                break;
+            }
+            case SelectItemType::kRawExpr: {
+                const std::string expr_name = select_item.expr_->getName();
+                auto bound_expr = bind_context_ptr->project_by_name_[expr_name];
+                if(bound_expr == nullptr) {
+                    bound_expr = project_binder->BuildExpression(*select_item.expr_, bind_context_ptr);
+                    bind_context_ptr->project_by_name_.emplace(expr_name, bound_expr);
+                }
+                bind_context_ptr->project_names_.emplace_back(expr_name);
 
-        // Set project alias to the project list index.
+                // Insert the bound expression into projection expressions of select node.
+                bound_select_node->projection_expressions_.emplace_back(bound_expr);
+                break;
+            }
+            default:
+                PlannerError("Invalid type in select list.")
+        }
     }
 
-
     // 12. ORDER BY
-    if(statement.order != nullptr && statement.limit == nullptr) {
+    if(statement.order != nullptr) {
         std::shared_ptr<LogicalNode> order_operator = BuildOrderBy(*statement.order, bind_context_ptr).plan;
         order_operator->set_left_node(root_node_ptr);
         root_node_ptr = order_operator;
     }
     // 13. LIMIT
-    if(statement.limit !=nullptr && statement.order == nullptr) {
+    if(statement.limit !=nullptr) {
         std::shared_ptr<LogicalNode> limit_operator = BuildLimit(*statement.limit, bind_context_ptr).plan;
         limit_operator->set_left_node(root_node_ptr);
         root_node_ptr = limit_operator;
     }
+
     // 14. TOP
-    if(statement.limit != nullptr && statement.order != nullptr) {
-        std::shared_ptr<LogicalNode> top_operator = BuildTop(*statement.order, *statement.limit, bind_context_ptr).plan;
-        top_operator->set_left_node(root_node_ptr);
-        root_node_ptr = top_operator;
-    }
     // 15. UNION/INTERSECT/EXCEPT
     // 16. LIMIT
     // 17. ORDER BY
@@ -716,22 +750,20 @@ PlanBuilder::BuildFromClause(const hsql::TableRef* from_table, std::shared_ptr<B
 //        }
     }
 
-
     PlannerError("BuildFromClause is not implemented");
     return std::make_shared<TableRef>(TableRefType::kInvalid);
 }
 
-std::vector<SelectListElement>
-PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::shared_ptr<BindContext>& bind_context_ptr) {
-
-    std::vector<SelectListElement> select_lists;
-    select_lists.reserve(select_list.size());
+std::vector<SelectItem>
+PlanBuilder::BuildSelectList(const std::vector<hsql::Expr *> &select_list, std::shared_ptr<BindContext> &bind_context_ptr) {
+    std::vector<SelectItem> unfold_select_list;
+    unfold_select_list.reserve(select_list.size());
     for(const hsql::Expr* select_expr: select_list) {
-        switch(select_expr->type) {
+        switch (select_expr->type) {
             case hsql::kExprStar: {
                 std::shared_ptr<Binding> binding;
                 std::string table_name;
-                if(select_expr->table == nullptr) {
+                if (select_expr->table == nullptr) {
                     // select * from t1;
                     PlannerAssert(!bind_context_ptr->table_names_.empty(), "No table is bound.");
 
@@ -743,75 +775,52 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr*>& select_list, std::s
                     if (bind_context_ptr->binding_by_name_.contains(table_name)) {
                         binding = bind_context_ptr->binding_by_name_[table_name];
                     } else {
-                        PlannerAssert(!bind_context_ptr->table_names_.empty(), "Table: '" + table_name + "' not found in select list.");
+                        PlannerAssert(!bind_context_ptr->table_names_.empty(),
+                                      "Table: '" + table_name + "' not found in select list.");
                     }
                 }
 
-
-
                 // Get corresponding column definition from binding context.
-                const std::vector<ColumnDefinition>& columns_def = binding->table_ptr_->table_def()->columns();
+                const std::vector<ColumnDefinition> &columns_def = binding->table_ptr_->table_def()->columns();
 
                 // Reserve more data in select list
-                select_lists.reserve(select_list.size() + columns_def.size());
+                unfold_select_list.reserve(select_list.size() + columns_def.size());
 
                 // Build select list
                 uint64_t column_index = 0;
                 std::shared_ptr<std::string> table_name_ptr = std::make_shared<std::string>(table_name);
-                for(const ColumnDefinition& column_def: columns_def) {
+                for (const ColumnDefinition &column_def: columns_def) {
                     std::shared_ptr<ColumnExpression> bound_column_expr_ptr
                             = std::make_shared<ColumnExpression>(column_def.logical_type(),
                                                                  table_name,
                                                                  column_def.name(),
                                                                  column_index,
                                                                  0);
-                    select_lists.emplace_back(bound_column_expr_ptr);
+                    unfold_select_list.emplace_back(bound_column_expr_ptr);
 
                     // Add the output heading of this bind context
                     bind_context_ptr->heading_.emplace_back(column_def.name());
-                    ++ column_index;
-
-                    // TODO: Do we really need column identifier in select list?
-                    std::shared_ptr<std::string> column_name_ptr = std::make_shared<std::string>(column_def.name());
-                    ColumnIdentifier column_identifier(table_name_ptr, column_name_ptr, nullptr);
-                    select_lists.back().AddColumnIdentifier(column_identifier);
+                    ++column_index;
                 }
-
                 break;
             }
             default: {
-                std::shared_ptr<BaseExpression> expr
-                        = bind_context_ptr->expression_binder_->BuildExpression(*select_expr, bind_context_ptr);
-
-                select_lists.emplace_back(expr);
-
-                // Add the output heading of this bind context
-                bind_context_ptr->heading_.emplace_back(select_expr->name);
-
-                // Generator column identifier
-                // TODO: This is duplicate code from Build Expression, think about how to remove it.
-                // TODO: Do we really need column identifier in select list?
-                std::shared_ptr<std::string> table_name_ptr;
-                if(select_expr->table != nullptr) {
-                    table_name_ptr = std::make_shared<std::string>(select_expr->table);
-                }
-                ColumnIdentifier column_identifier(table_name_ptr,
-                                                   std::make_shared<std::string>(select_expr->name),
-                                                   nullptr);
-
-                // Add column identifier
-                select_lists.back().AddColumnIdentifier(column_identifier);
+                unfold_select_list.emplace_back(select_expr);
             }
         }
     }
-
-    return select_lists;
+    return unfold_select_list;
 }
 
 std::shared_ptr<LogicalFilter>
-PlanBuilder::BuildFilter(const hsql::Expr* whereClause, std::shared_ptr<BindContext>& bind_context_ptr) {
+PlanBuilder::BuildFilter(const hsql::Expr* whereClause,
+                         const std::shared_ptr<BindAliasProxy>& bind_alias_proxy,
+                         std::shared_ptr<BindContext>& bind_context_ptr) {
+
+    // std::shared_ptr<WhereBinder> where_binder
+    auto where_binder = std::make_shared<WhereBinder>(bind_alias_proxy);
     std::shared_ptr<BaseExpression> where_expr =
-            bind_context_ptr->expression_binder_->BuildExpression(*whereClause, bind_context_ptr);
+            where_binder->BuildExpression(*whereClause, bind_context_ptr);
     std::shared_ptr<LogicalFilter> logical_filter = std::make_shared<LogicalFilter>(where_expr);
     return logical_filter;
 }
@@ -819,13 +828,14 @@ PlanBuilder::BuildFilter(const hsql::Expr* whereClause, std::shared_ptr<BindCont
 void
 PlanBuilder::BuildGroupByHaving(
         const hsql::SelectStatement& select,
+        const std::shared_ptr<BindAliasProxy>& bind_alias_proxy,
         std::shared_ptr<BindContext>& bind_context_ptr,
         std::shared_ptr<BoundSelectNode>& root_operator) {
 
     if(select.groupBy != nullptr) {
         // Start to bind GROUP BY clause
         // Set group binder
-        auto group_binder = std::make_shared<GroupBinder>();
+        auto group_binder = std::make_shared<GroupBinder>(bind_alias_proxy);
 
         // Reserve the group names used in GroupBinder::BuildExpression
         bind_context_ptr->group_names_.reserve(select.groupBy->columns->size());
@@ -842,7 +852,7 @@ PlanBuilder::BuildGroupByHaving(
     if(select.groupBy != nullptr && select.groupBy->having != nullptr) {
         // Start to bind Having clause
         // Set having binder
-        auto having_binder = std::make_shared<HavingBinder>();
+        auto having_binder = std::make_shared<HavingBinder>(bind_alias_proxy);
         for (const hsql::Expr* expr: *select.groupBy->having->exprList) {
 
             // Call HavingBinder BuildExpression

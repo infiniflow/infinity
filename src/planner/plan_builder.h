@@ -4,7 +4,6 @@
 
 #pragma ocne
 
-#include "logical_node.h"
 #include "SQLParserResult.h"
 #include "sql/CreateStatement.h"
 #include "sql/DropStatement.h"
@@ -21,8 +20,11 @@
 #include "sql/ExecuteStatement.h"
 
 #include "bind_context.h"
+#include "logical_node.h"
 #include "plan_building_context.h"
 #include "planner/node/logical_filter.h"
+
+#include "binder/bind_alias_proxy.h"
 
 #include "bound/bound_select_node.h"
 #include "bound/table_ref.h"
@@ -199,16 +201,20 @@ private:
     static std::shared_ptr<TableRef>
     BuildFromClause(const hsql::TableRef *fromTable, std::shared_ptr<BindContext> &bind_context_ptr);
 
-    static std::vector<SelectListElement>
+    static std::vector<SelectItem>
     BuildSelectList(const std::vector<hsql::Expr *> &select_list, std::shared_ptr<BindContext> &bind_context_ptr);
 
+
     static std::shared_ptr<LogicalFilter>
-    BuildFilter(const hsql::Expr *where_clause, std::shared_ptr<BindContext> &bind_context_ptr);
+    BuildFilter(const hsql::Expr *where_clause,
+                const std::shared_ptr<BindAliasProxy>& bind_alias_proxy,
+                std::shared_ptr<BindContext> &bind_context_ptr);
 
     static void
     BuildGroupByHaving(const hsql::SelectStatement& select,
-            std::shared_ptr<BindContext>& bind_context_ptr,
-            std::shared_ptr<BoundSelectNode>& root_operator);
+                       const std::shared_ptr<BindAliasProxy>& bind_alias_proxy,
+                       std::shared_ptr<BindContext>& bind_context_ptr,
+                       std::shared_ptr<BoundSelectNode>& root_operator);
 
     static PlanBuildingContext
     BuildOrderBy(const std::vector<hsql::OrderDescription *> &order_by_clause,

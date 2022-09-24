@@ -5,7 +5,8 @@
 #pragma once
 
 #include "planner/bound_node.h"
-#include "expression/base_expression.h"
+#include "expression/column_expression.h"
+#include "sql/Expr.h"
 
 namespace infinity {
 
@@ -28,8 +29,31 @@ public:
     // Having expression list
     std::vector<std::shared_ptr<BaseExpression>> having_expressions_;
 
+    // Project expression list
+    std::vector<std::shared_ptr<BaseExpression>> projection_expressions_;
+
     int64_t GetTableIndex() override { return 0; };
 
+};
+
+enum class SelectItemType {
+    kInvalid,
+    kRawExpr,
+    kBoundColumnExpr,
+};
+
+struct SelectItem {
+    explicit SelectItem(const hsql::Expr* expr)
+        : expr_(expr), type_(SelectItemType::kRawExpr)
+        {}
+
+    explicit SelectItem(std::shared_ptr<ColumnExpression> column_expr)
+            : column_expr_(column_expr), type_(SelectItemType::kBoundColumnExpr)
+            {}
+
+    SelectItemType type_{SelectItemType::kInvalid};
+    const hsql::Expr* expr_; // Unbound expression
+    std::shared_ptr<ColumnExpression> column_expr_; // Bound Column expression
 };
 
 }

@@ -5,12 +5,13 @@
 #pragma once
 
 #include "planner/expression_binder.h"
+#include "bind_alias_proxy.h"
 
 namespace infinity {
 
 class HavingBinder : public ExpressionBinder {
 public:
-//    explicit HavingBinder(PlanBuilder& plan_builder) : ExpressionBinder(plan_builder) {}
+    explicit HavingBinder(const std::shared_ptr<BindAliasProxy>& bind_alias_proxy) : bind_alias_proxy_(bind_alias_proxy) {}
 
     // Bind expression entry
     std::shared_ptr<BaseExpression>
@@ -27,6 +28,7 @@ public:
 //    BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) override;
 private:
 
+    const std::shared_ptr<BindAliasProxy>& bind_alias_proxy_;
     bool binding_agg_func_ = false;
 };
 

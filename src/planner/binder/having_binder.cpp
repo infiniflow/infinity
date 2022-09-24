@@ -44,7 +44,16 @@ HavingBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<Bind
 std::shared_ptr<BaseExpression>
 HavingBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
     if(this->binding_agg_func_) {
-        return ExpressionBinder::BuildColExpr(expr, bind_context_ptr);
+
+        // Check if the column is using an alias from select list.
+        auto result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr);
+
+        if(result == nullptr) {
+            result = ExpressionBinder::BuildColExpr(expr, bind_context_ptr);
+        }
+
+        return result;
+
     } else {
         PlannerError("Column " + std::string(expr.getName()) + " must appear in the GROUP BY clause or be used in an aggregate function");
     }
@@ -55,15 +64,19 @@ HavingBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindCo
 
     std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
-        this->binding_agg_func_ = true;
+        if(this->binding_agg_func_) {
+            PlannerError("Aggregate function is called in another aggregate function.");
+        } else {
+            this->binding_agg_func_ = true;
+        }
     }
     auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
 
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
         std::string expr_name = expr.getName();
-
         bind_context_ptr->aggregate_by_name_[expr_name] = func_expr_ptr;
-
+        func_expr_ptr->source_position_
+                = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
         this->binding_agg_func_ = false;
     }
 

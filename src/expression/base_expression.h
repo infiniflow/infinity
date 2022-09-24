@@ -122,6 +122,7 @@ public:
     std::vector<std::shared_ptr<BaseExpression>>& arguments() { return arguments_; }
 
     SourcePosition source_position_;
+    std::string alias_;
 
 protected:
     ExpressionType type_;

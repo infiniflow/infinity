@@ -48,15 +48,4 @@ protected:
 
 };
 
-struct SelectListElement {
-    explicit SelectListElement(std::shared_ptr<BaseExpression> expr) : expression_(std::move(expr)) {};
-    void AddColumnIdentifier(const ColumnIdentifier& column_identifier) { identifiers_.emplace_back(column_identifier); }
-
-    std::shared_ptr<BaseExpression> expression_;
-    std::vector<ColumnIdentifier> identifiers_{};
-};
-
-
-
 }
-
