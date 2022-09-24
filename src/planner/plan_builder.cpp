@@ -21,6 +21,8 @@
 #include "binder/project_binder.h"
 #include "binder/where_binder.h"
 #include "binder/join_binder.h"
+#include "binder/order_binder.h"
+#include "binder/limit_binder.h"
 #include "binder/bind_alias_proxy.h"
 
 #include "storage/table_definition.h"
@@ -490,6 +492,8 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
             }
             case SelectItemType::kRawExpr: {
                 const std::string expr_name = select_item.expr_->getName();
+
+                // Alias already been bound and insert into project_by_name_ of bind context;
                 auto bound_expr = bind_context_ptr->project_by_name_[expr_name];
                 if(bound_expr == nullptr) {
                     bound_expr = project_binder->BuildExpression(*select_item.expr_, bind_context_ptr);
@@ -506,17 +510,37 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
         }
     }
 
+    if(!bound_select_node->having_expressions_.empty() || !bound_select_node->group_by_expressions_.empty()) {
+        if(!project_binder->BoundColumn().empty()) {
+            PlannerError("Column: " + project_binder->BoundColumn() + " must appear in the GROUP BY clause or be used in an aggregate function");
+        }
+    }
+
     // 12. ORDER BY
     if(statement.order != nullptr) {
-        std::shared_ptr<LogicalNode> order_operator = BuildOrderBy(*statement.order, bind_context_ptr).plan;
-        order_operator->set_left_node(root_node_ptr);
-        root_node_ptr = order_operator;
+        auto order_binder = std::make_shared<OrderBinder>();
+        size_t order_by_count = statement.order->size();
+        bound_select_node->order_by_expressions_.reserve(order_by_count);
+        bound_select_node->order_by_types_.reserve(order_by_count);
+        for(const hsql::OrderDescription* order_desc: *statement.order) {
+            switch (order_desc->type) {
+                case hsql::kOrderAsc:
+                    bound_select_node->order_by_types_.emplace_back(OrderByType::kAscending);
+                    break;
+                case hsql::kOrderDesc:
+                    bound_select_node->order_by_types_.emplace_back(OrderByType::kDescending);
+                    break;
+            }
+            auto bound_order_expr = order_binder->BuildExpression(*order_desc->expr, bind_context_ptr);
+            bound_select_node->order_by_expressions_.emplace_back(bound_order_expr);
+        }
     }
+
     // 13. LIMIT
     if(statement.limit !=nullptr) {
-        std::shared_ptr<LogicalNode> limit_operator = BuildLimit(*statement.limit, bind_context_ptr).plan;
-        limit_operator->set_left_node(root_node_ptr);
-        root_node_ptr = limit_operator;
+        auto limit_binder = std::make_shared<LimitBinder>();
+        bound_select_node->limit_expression_ = limit_binder->BuildExpression(*statement.limit->limit, bind_context_ptr);
+        bound_select_node->offset_expression_ = limit_binder->BuildExpression(*statement.limit->offset, bind_context_ptr);
     }
 
     // 14. TOP
@@ -525,8 +549,6 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
     // 17. ORDER BY
     // 18. TOP
 
-    // Append projection node, also flatten subquery.
-    PlannerError("Select isn't supported.");
     return bound_select_node;
 }
 
@@ -790,13 +812,16 @@ PlanBuilder::BuildSelectList(const std::vector<hsql::Expr *> &select_list, std::
                 uint64_t column_index = 0;
                 std::shared_ptr<std::string> table_name_ptr = std::make_shared<std::string>(table_name);
                 for (const ColumnDefinition &column_def: columns_def) {
-                    std::shared_ptr<ColumnExpression> bound_column_expr_ptr
+                    std::shared_ptr<ColumnExpression> bound_column_expr
                             = std::make_shared<ColumnExpression>(column_def.logical_type(),
                                                                  table_name,
                                                                  column_def.name(),
                                                                  column_index,
                                                                  0);
-                    unfold_select_list.emplace_back(bound_column_expr_ptr);
+                    bound_column_expr->source_position_
+                            = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kBinding);
+                    bound_column_expr->source_position_.binding_name_ = binding->table_name_;
+                    unfold_select_list.emplace_back(bound_column_expr);
 
                     // Add the output heading of this bind context
                     bind_context_ptr->heading_.emplace_back(column_def.name());

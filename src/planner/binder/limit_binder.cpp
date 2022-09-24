@@ -3,19 +3,39 @@
 //
 
 #include "limit_binder.h"
+#include "function/function_set.h"
 
 namespace infinity {
 
 std::shared_ptr<BaseExpression>
 LimitBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext> &bind_context_ptr) {
-    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
-    return result;
+    switch(expr.type) {
+        case hsql::kExprStar:
+            PlannerError("Star expression isn't allowed in limit expression.");
+        case hsql::kExprParameter:
+            PlannerError("Parameter expression isn't allowed in limit expression.");
+        case hsql::kExprColumnRef:
+            PlannerError("Column expression isn't allowed in limit expression.");
+        case hsql::kExprSelect:
+            PlannerError("Subquery isn't allowed in limit expression.");
+        case hsql::kExprHint:
+            PlannerError("Hint expression isn't allowed in limit expression.");
+        case hsql::kExprArray:
+            PlannerError("Array expression isn't allowed in limit expression.");
+        case hsql::kExprArrayIndex:
+            PlannerError("Array Index expression isn't allowed in limit expression.");
+        default:
+            return ExpressionBinder::BuildExpression(expr, bind_context_ptr);
+    }
 }
 
-//std::shared_ptr<BaseExpression>
-//LimitBinder::BuildColRefExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-//    std::shared_ptr<BaseExpression> column_expr = ExpressionBinder::BuildColRefExpr(expr, bind_context_ptr);
-//    return column_expr;
-//}
+std::shared_ptr<BaseExpression>
+LimitBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
+    if(function_set_ptr->type_ != FunctionType::kScalar) {
+        PlannerError("Only scalar function is supported in limit clause.");
+    }
+    return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
+}
 
 }

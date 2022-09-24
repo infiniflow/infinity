@@ -59,4 +59,13 @@ ProjectBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindC
     return func_expr_ptr;
 }
 
+std::shared_ptr<BaseExpression>
+ProjectBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+    auto bound_column_expr = ExpressionBinder::BuildColExpr(expr, bind_context_ptr);
+    if(bound_column_expr != nullptr && bound_column_name_.empty()) {
+        bound_column_name_ = bound_column_expr->ToString();
+    }
+    return bound_column_expr;
+}
+
 }

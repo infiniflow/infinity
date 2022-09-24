@@ -13,6 +13,12 @@ namespace infinity {
 class TableRef;
 class BindContext;
 
+enum class OrderByType {
+    kAscending,
+    kDescending
+    // Default order by type also should be given.
+};
+
 class BoundSelectNode : public BoundNode {
 public:
     BoundSelectNode(std::shared_ptr<BindContext> bind_context_ptr)
@@ -31,6 +37,14 @@ public:
 
     // Project expression list
     std::vector<std::shared_ptr<BaseExpression>> projection_expressions_;
+
+    // Order by expression list
+    std::vector<std::shared_ptr<BaseExpression>> order_by_expressions_;
+    std::vector<OrderByType> order_by_types_;
+
+    // limit expression
+    std::shared_ptr<BaseExpression> limit_expression_;
+    std::shared_ptr<BaseExpression> offset_expression_;
 
     int64_t GetTableIndex() override { return 0; };
 
