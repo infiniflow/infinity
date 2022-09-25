@@ -27,12 +27,11 @@ Binding::MakeBinding(BindingType binding_type, const std::string& name,
 
 std::shared_ptr<Binding>
 Binding::MakeBinding(BindingType binding_type, const std::string& name, std::shared_ptr<Table> table_ptr,
-            std::shared_ptr<LogicalNode> logical_node_ptr, int64_t logical_node_id,
             const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names) {
     auto binding = MakeBinding(binding_type, name, column_types, column_names);
     binding->table_ptr_ = std::move(table_ptr);
-    binding->logical_node_ptr_ = std::move(logical_node_ptr);
-    binding->logical_node_id_ = logical_node_id;
+//    binding->logical_node_ptr_ = std::move(logical_node_ptr);
+//    binding->logical_node_id_ = logical_node_id;
     return binding;
 }
 

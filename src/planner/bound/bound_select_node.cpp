@@ -43,7 +43,10 @@ std::shared_ptr<LogicalNode>
 BoundSelectNode::BuildBaseTable(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr) {
     // std::shared_ptr<BaseTableRef> base_table_ref
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
-    return base_table_ref->logical_table_scan_;
+
+    std::shared_ptr<LogicalTableScan> table_scan_node
+        = std::make_shared<LogicalTableScan>(base_table_ref->table_ptr_, bind_context_ptr);
+    return table_scan_node;
 }
 
 std::shared_ptr<LogicalNode>
@@ -59,13 +62,13 @@ BoundSelectNode::BuildCrossProductTable(std::shared_ptr<TableRef>& table_ref, st
     // std::shared_ptr<CrossProductTableRef> cross_product_table_ref
     auto cross_product_table_ref = std::static_pointer_cast<CrossProductTableRef>(table_ref);
 
-    int64_t logical_node_id = bind_context_ptr->GetNewLogicalNodeId();
-
     auto left_node = BuildFrom(cross_product_table_ref->left_table_ref_, bind_context_ptr->children_[0]);
     auto right_node = BuildFrom(cross_product_table_ref->right_table_ref_, bind_context_ptr->children_[1]);
 
+    // TODO: Merge bind context ?
+
     std::shared_ptr<LogicalCrossProduct> logical_cross_product_node =
-            std::make_shared<LogicalCrossProduct>(logical_node_id, left_node, right_node);
+            std::make_shared<LogicalCrossProduct>(left_node, right_node, bind_context_ptr);
     return logical_cross_product_node;
 }
 
@@ -74,19 +77,20 @@ BoundSelectNode::BuildJoinTable(std::shared_ptr<TableRef>& table_ref, std::share
     // std::shared_ptr<JoinTableRef> join_table_ref
     auto join_table_ref = std::static_pointer_cast<JoinTableRef>(table_ref);
 
-    int64_t logical_node_id = bind_context_ptr->GetNewLogicalNodeId();
-
     auto left_node = BuildFrom(join_table_ref->left_table_ref_, bind_context_ptr->children_[0]);
     auto right_node = BuildFrom(join_table_ref->right_table_ref_, bind_context_ptr->children_[1]);
 
+    // TODO: Merge bind context ?
+
     std::shared_ptr<LogicalJoin> logical_join_node =
-            std::make_shared<LogicalJoin>(logical_node_id, join_table_ref->join_type_, join_table_ref->on_conditions_,
-                                          left_node, right_node);
+            std::make_shared<LogicalJoin>(join_table_ref->join_type_, join_table_ref->on_conditions_,
+                                          left_node, right_node, bind_context_ptr);
     return logical_join_node;
 }
 
 std::shared_ptr<LogicalNode>
-BoundSelectNode::BuildFilter(std::vector<std::shared_ptr<BaseExpression>>& conditions, std::shared_ptr<BindContext>& bind_context_ptr) {
+BoundSelectNode::BuildFilter(std::vector<std::shared_ptr<BaseExpression>>& conditions,
+                             std::shared_ptr<BindContext>& bind_context_ptr) {
     return nullptr;
 }
 

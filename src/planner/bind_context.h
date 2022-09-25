@@ -6,7 +6,7 @@
 
 #include "SQLParserResult.h"
 #include "expression/base_expression.h"
-#include "logical_node.h"
+#include "column_identifier.h"
 #include "binding.h"
 
 
@@ -107,9 +107,10 @@ public:
     AddViewBinding(const std::string& name, const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
 
     void
-    AddTableBinding(const std::string& name, std::shared_ptr<Table> table_ptr, int64_t logical_node_id,
-                         std::shared_ptr<LogicalNode> logical_node_ptr,
-                         const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
+    AddTableBinding(const std::string& name, std::shared_ptr<Table> table_ptr,
+//                    int64_t logical_node_id,
+//                    std::shared_ptr<LogicalNode> logical_node_ptr,
+                    const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
 
     // Merge input bind context into this bind context
     void AddBindContext(const std::shared_ptr<BindContext>& bind_context_ptr);

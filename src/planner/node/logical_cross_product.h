@@ -11,9 +11,9 @@ namespace infinity {
 class LogicalCrossProduct: public LogicalNode {
 public:
     explicit
-    LogicalCrossProduct(int64_t node_id,
-                        const std::shared_ptr<LogicalNode>& left,
-                        const std::shared_ptr<LogicalNode>& right);
+    LogicalCrossProduct(const std::shared_ptr<LogicalNode>& left,
+                        const std::shared_ptr<LogicalNode>& right,
+                        std::shared_ptr<BindContext>& bind_context);
 
     std::string ToString(uint64_t space) final;
 };

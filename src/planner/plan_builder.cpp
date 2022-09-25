@@ -183,9 +183,8 @@ PlanBuilder::BuildCreateTable(const hsql::CreateStatement& statement, std::share
     std::shared_ptr<TableDefinition> table_def_ptr
             = std::make_shared<TableDefinition>(statement.tableName, columns, statement.ifNotExists);
 
-    int64_t logical_node_id = bind_context_ptr->GetNewLogicalNodeId();
     std::shared_ptr<LogicalNode> logical_create_table_operator
-            = std::make_shared<LogicalCreateTable>(logical_node_id, schema_name_ptr, table_def_ptr);
+            = std::make_shared<LogicalCreateTable>(schema_name_ptr, table_def_ptr, bind_context_ptr);
 
     // FIXME: check if we need to append operator
 //    this->AppendOperator(logical_create_table_operator, bind_context_ptr);
@@ -253,11 +252,9 @@ PlanBuilder::BuildDropTable(const hsql::DropStatement &statement, std::shared_pt
         schema_name_ptr = std::make_shared<std::string>(statement.schema);
     }
 
-    int64_t logical_node_id = bind_context_ptr->GetNewLogicalNodeId();
-
     std::shared_ptr<LogicalNode> logical_drop_table
-            = std::make_shared<LogicalDropTable>(logical_node_id, schema_name_ptr,
-                                                 std::make_shared<std::string>(statement.name));
+            = std::make_shared<LogicalDropTable>(schema_name_ptr,
+                                                 std::make_shared<std::string>(statement.name), bind_context_ptr);
     // FIXME: check if we need to append operator
     //    this->AppendOperator(logical_drop_table, bind_context_ptr);
 
@@ -367,11 +364,9 @@ PlanBuilder::BuildInsertValue(const hsql::InsertStatement &statement, std::share
         value_list = rewrite_value_list;
     }
 
-    int64_t logical_node_id = bind_context_ptr->GetNewLogicalNodeId();
-
     // Create logical insert node.
     std::shared_ptr<LogicalNode> logical_insert =
-            std::make_shared<LogicalInsert>(logical_node_id, table_ptr, value_list);
+            std::make_shared<LogicalInsert>(table_ptr, value_list, bind_context_ptr);
 
     // FIXME: check if we need to append operator
 //    this->AppendOperator(logical_insert, bind_context_ptr);
@@ -590,10 +585,8 @@ PlanBuilder::BuildShowColumns(const hsql::ShowStatement &statement, std::shared_
 
 PlanBuildingContext
 PlanBuilder::BuildShowTables(const hsql::ShowStatement &statement, std::shared_ptr<BindContext>& bind_context_ptr) {
-    int64_t logical_node_id = bind_context_ptr->GetNewLogicalNodeId();
-
     std::shared_ptr<LogicalNode> logical_chunk_scan =
-            std::make_shared<LogicalChunkScan>(logical_node_id, ChunkScanType::kShowTables);
+            std::make_shared<LogicalChunkScan>(ChunkScanType::kShowTables, bind_context_ptr);
 
     // FIXME: check if we need to append operator
 //    this->AppendOperator(logical_chunk_scan, bind_context_ptr);
@@ -864,9 +857,7 @@ PlanBuilder::BuildFilter(const hsql::Expr* whereClause,
 
     SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
 
-    int64_t logical_node_id = bind_context_ptr->GetNewLogicalNodeId();
-
-    std::shared_ptr<LogicalFilter> logical_filter = std::make_shared<LogicalFilter>(logical_node_id, where_expr);
+    std::shared_ptr<LogicalFilter> logical_filter = std::make_shared<LogicalFilter>(where_expr, bind_context_ptr);
     return logical_filter;
 }
 
@@ -960,9 +951,6 @@ PlanBuilder::BuildTable(const hsql::TableRef* from_table, std::shared_ptr<BindCo
     std::shared_ptr<Table> table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, name);
     if(table_ptr != nullptr) {
         std::string table_name = schema_name + "." + name;
-        int64_t logical_node_id = bind_context_ptr->GetNewLogicalNodeId();
-        // Build table scan operator
-        std::shared_ptr<LogicalTableScan> logical_table_scan = std::make_shared<LogicalTableScan>(logical_node_id, table_ptr);
 
         // TODO: Handle table and column alias
 //        if(from_table->alias != nullptr) {
@@ -982,10 +970,10 @@ PlanBuilder::BuildTable(const hsql::TableRef* from_table, std::shared_ptr<BindCo
             names.emplace_back(column.name());
         }
 
-        auto table_ref = std::make_shared<BaseTableRef>(logical_table_scan);
+        auto table_ref = std::make_shared<BaseTableRef>(table_ptr);
 
         // Insert the table in the binding context
-        bind_context_ptr->AddTableBinding(table_name, table_ptr, logical_node_id, logical_table_scan, types, names);
+        bind_context_ptr->AddTableBinding(table_name, table_ptr, types, names);
 
         return table_ref;
     }

@@ -7,6 +7,7 @@
 #include "logical_node_type.h"
 #include "column_identifier.h"
 #include "expression/base_expression.h"
+#include "bind_context.h"
 
 #include <string>
 #include <vector>
@@ -17,7 +18,9 @@ namespace infinity {
 
 class LogicalNode {
 public:
-    explicit LogicalNode(int64_t node_id, LogicalNodeType node_type) ;
+    explicit
+    LogicalNode(LogicalNodeType node_type, std::shared_ptr<BindContext>& bind_context_ptr);
+
     virtual ~LogicalNode() = default;
 
     [[nodiscard]] std::shared_ptr<LogicalNode> left_node() const { return left_node_; }
@@ -46,6 +49,8 @@ protected:
     // Each node has an id which is unique in this plan tree.
     int64_t node_id_{0};
 
+    // bind_context_
+    std::shared_ptr<BindContext>& bind_context_ptr_;
 };
 
 }

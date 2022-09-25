@@ -14,8 +14,10 @@ namespace infinity {
 
 class LogicalInsert : public LogicalNode {
 public:
-    explicit LogicalInsert(int64_t node_id, std::shared_ptr<Table> table_ptr, std::vector<std::shared_ptr<BaseExpression>> value_list)
-            : LogicalNode(node_id, LogicalNodeType::kInsert),
+    explicit LogicalInsert(std::shared_ptr<Table> table_ptr,
+                           std::vector<std::shared_ptr<BaseExpression>> value_list,
+                           std::shared_ptr<BindContext>& bind_context)
+            : LogicalNode(LogicalNodeType::kInsert, bind_context),
               table_ptr_(std::move(table_ptr)), value_list_(std::move(value_list)) {};
 
     std::string ToString(uint64_t space) final;

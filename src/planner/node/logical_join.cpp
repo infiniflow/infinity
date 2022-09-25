@@ -8,9 +8,10 @@
 
 namespace infinity {
 
-LogicalJoin::LogicalJoin(int64_t node_id, JoinType join_type, std::vector<std::shared_ptr<BaseExpression>> conditions,
-                         const std::shared_ptr<LogicalNode>& left, const std::shared_ptr<LogicalNode>& right)
-                         : LogicalNode(node_id, LogicalNodeType::kJoin),
+LogicalJoin::LogicalJoin(JoinType join_type, std::vector<std::shared_ptr<BaseExpression>> conditions,
+                         const std::shared_ptr<LogicalNode>& left, const std::shared_ptr<LogicalNode>& right,
+                         std::shared_ptr<BindContext>& bind_context)
+                         : LogicalNode(LogicalNodeType::kJoin, bind_context),
                          join_type_(join_type), conditions_(std::move(conditions)){
     this->set_left_node(left);
     this->set_right_node(right);

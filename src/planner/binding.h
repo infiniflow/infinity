@@ -6,7 +6,6 @@
 
 #include "storage/data_type.h"
 #include "storage/table.h"
-#include "logical_node.h"
 
 #include <unordered_map>
 
@@ -25,7 +24,6 @@ public:
 
     static std::shared_ptr<Binding>
     MakeBinding(BindingType binding_type, const std::string& name, std::shared_ptr<Table> table_ptr,
-                std::shared_ptr<LogicalNode> logical_node_ptr, int64_t logical_node_id,
                 const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
 
     // Binding type
@@ -35,10 +33,10 @@ public:
     std::string table_name_;
 
     // Node id of the corresponding logical node
-    int64_t logical_node_id_{-1};
+//    int64_t logical_node_id_{-1};
 
     // ptr to the corresponding logical node.
-    std::shared_ptr<LogicalNode> logical_node_ptr_{nullptr};
+//    std::shared_ptr<LogicalNode> logical_node_ptr_{nullptr};
 
     // if the binding is table, this is the table_ptr
     std::shared_ptr<Table> table_ptr_{nullptr};

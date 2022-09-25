@@ -13,10 +13,10 @@ namespace infinity {
 
 class BaseTableRef: public TableRef {
 public:
-    explicit BaseTableRef(std::shared_ptr<LogicalTableScan>  logical_table_scan)
-        : TableRef(TableRefType::kBaseTable), logical_table_scan_(std::move(logical_table_scan)) {}
+    explicit BaseTableRef(std::shared_ptr<Table> table_ptr_)
+        : TableRef(TableRefType::kBaseTable), table_ptr_(std::move(table_ptr_)) {}
 
-    std::shared_ptr<LogicalTableScan> logical_table_scan_;
+    std::shared_ptr<Table> table_ptr_;
 };
 
 }

@@ -12,7 +12,8 @@ namespace infinity {
 
 class LogicalTableScan : public LogicalNode {
 public:
-    explicit LogicalTableScan(int64_t node_id, std::shared_ptr<Table> table_ptr);
+    explicit
+    LogicalTableScan(std::shared_ptr<Table> table_ptr, std::shared_ptr<BindContext>& bind_context);
 
     [[nodiscard]] std::shared_ptr<Table> table_ptr() const { return table_ptr_; }
     std::string ToString(uint64_t space) final;

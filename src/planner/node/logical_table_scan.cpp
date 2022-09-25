@@ -8,8 +8,9 @@
 
 namespace infinity {
 
-LogicalTableScan::LogicalTableScan(int64_t node_id, std::shared_ptr<Table> table_ptr)
-    : LogicalNode(node_id, LogicalNodeType::kTableScan),
+LogicalTableScan::LogicalTableScan(std::shared_ptr<Table> table_ptr,
+                                   std::shared_ptr<BindContext>& bind_context)
+    : LogicalNode(LogicalNodeType::kTableScan, bind_context),
     table_ptr_(std::move(table_ptr)) {
     uint64_t column_count = table_ptr_->table_def()->column_count();
     columns_.reserve(column_count);

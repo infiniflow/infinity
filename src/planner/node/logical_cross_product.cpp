@@ -9,10 +9,11 @@
 
 namespace infinity {
 
-LogicalCrossProduct::LogicalCrossProduct(int64_t node_id,
-                                         const std::shared_ptr<LogicalNode>& left,
-                                         const std::shared_ptr<LogicalNode>& right)
-                                         : LogicalNode(node_id, LogicalNodeType::kCrossProduct) {
+LogicalCrossProduct::LogicalCrossProduct(const std::shared_ptr<LogicalNode>& left,
+                                         const std::shared_ptr<LogicalNode>& right,
+                                         std::shared_ptr<BindContext>& bind_context)
+                                         : LogicalNode(LogicalNodeType::kCrossProduct, bind_context)
+                                         {
     this->set_left_node(left);
     this->set_right_node(right);
 }

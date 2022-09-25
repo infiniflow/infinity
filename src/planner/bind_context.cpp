@@ -119,12 +119,15 @@ BindContext::AddViewBinding(const std::string& name, const std::vector<LogicalTy
 }
 
 void
-BindContext::AddTableBinding(const std::string& name, std::shared_ptr<Table> table_ptr, int64_t logical_node_id,
-                             std::shared_ptr<LogicalNode> logical_node_ptr,
+BindContext::AddTableBinding(const std::string& name, std::shared_ptr<Table> table_ptr,
+//                             int64_t logical_node_id,
+//                             std::shared_ptr<LogicalNode> logical_node_ptr,
                              const std::vector<LogicalType>& column_types,
                              const std::vector<std::string>& column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kTable, name, std::move(table_ptr), std::move(logical_node_ptr),
-                                        logical_node_id, column_types, column_names);
+    auto binding = Binding::MakeBinding(BindingType::kTable, name, std::move(table_ptr),
+//                                        std::move(logical_node_ptr),
+//                                        logical_node_id,
+                                        column_types, column_names);
     AddBinding(binding);
     table_names_.emplace_back(name);
 }
