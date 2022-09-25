@@ -48,7 +48,7 @@ public:
     BuildJoinTable(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr);
 
     std::shared_ptr<LogicalNode>
-    BuildFilter();
+    BuildFilter(std::vector<std::shared_ptr<BaseExpression>>& conditions, std::shared_ptr<BindContext>& bind_context_ptr);
 
     std::shared_ptr<BindContext> bind_context_ptr_;
 

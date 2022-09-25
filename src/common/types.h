@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 namespace infinity {
 
 enum class JoinType {
@@ -15,5 +17,8 @@ enum class JoinType {
     kCross,
     kNatural
 };
+
+std::string
+ToString(JoinType type);
 
 }

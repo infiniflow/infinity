@@ -5,10 +5,18 @@
 #include "bound_select_node.h"
 #include "common/utility/infinity_assert.h"
 #include "planner/node/logical_cross_product.h"
+#include "planner/node/logical_join.h"
 
 namespace infinity {
 std::shared_ptr<LogicalNode>
 BoundSelectNode::BuildPlan() {
+
+    std::shared_ptr<LogicalNode> root = BuildFrom(table_ref_ptr_, bind_context_ptr_);
+    if(!where_conditions_.empty()) {
+        std::shared_ptr<LogicalNode> filter = BuildFilter(where_conditions_, bind_context_ptr_);
+        filter->set_left_node(root);
+        root = filter;
+    }
 
     return nullptr;
 }
@@ -65,11 +73,20 @@ std::shared_ptr<LogicalNode>
 BoundSelectNode::BuildJoinTable(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr) {
     // std::shared_ptr<JoinTableRef> join_table_ref
     auto join_table_ref = std::static_pointer_cast<JoinTableRef>(table_ref);
-    return nullptr;
+
+    int64_t logical_node_id = bind_context_ptr->GetNewLogicalNodeId();
+
+    auto left_node = BuildFrom(join_table_ref->left_table_ref_, bind_context_ptr->children_[0]);
+    auto right_node = BuildFrom(join_table_ref->right_table_ref_, bind_context_ptr->children_[1]);
+
+    std::shared_ptr<LogicalJoin> logical_join_node =
+            std::make_shared<LogicalJoin>(logical_node_id, join_table_ref->join_type_, join_table_ref->on_conditions_,
+                                          left_node, right_node);
+    return logical_join_node;
 }
 
 std::shared_ptr<LogicalNode>
-BoundSelectNode::BuildFilter() {
+BoundSelectNode::BuildFilter(std::vector<std::shared_ptr<BaseExpression>>& conditions, std::shared_ptr<BindContext>& bind_context_ptr) {
     return nullptr;
 }
 
