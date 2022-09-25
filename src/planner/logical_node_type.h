@@ -14,6 +14,7 @@ enum class LogicalNodeType: uint8_t {
     kUnion,
     kIntersect,
     kJoin,
+    kCrossProduct,
     kLimit,
     kFilter,
     kProjection,

@@ -17,7 +17,7 @@ namespace infinity {
 
 class LogicalNode {
 public:
-    explicit LogicalNode(LogicalNodeType node_type) ;
+    explicit LogicalNode(int64_t node_id, LogicalNodeType node_type) ;
     virtual ~LogicalNode() = default;
 
     [[nodiscard]] std::shared_ptr<LogicalNode> left_node() const { return left_node_; }
@@ -44,7 +44,7 @@ protected:
     std::vector<std::shared_ptr<LogicalNode>> outputs_;
 
     // Each node has an id which is unique in this plan tree.
-    uint64_t node_id_{0};
+    int64_t node_id_{0};
 
 };
 

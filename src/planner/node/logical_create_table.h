@@ -13,9 +13,9 @@ namespace infinity {
 
 class LogicalCreateTable : public LogicalNode {
 public:
-    LogicalCreateTable(std::shared_ptr<std::string> schema_name,
+    LogicalCreateTable(int64_t node_id, std::shared_ptr<std::string> schema_name,
             std::shared_ptr<TableDefinition> table_def_ptr)
-        : LogicalNode(LogicalNodeType::kCreateTable),
+        : LogicalNode(node_id, LogicalNodeType::kCreateTable),
           schema_name_(std::move(schema_name)),
           table_definitions_(std::move(table_def_ptr)) {}
 

@@ -4,14 +4,19 @@
 
 #pragma once
 
+#include "planner/logical_node.h"
 #include "planner/bound_node.h"
 #include "expression/column_expression.h"
+#include "planner/bind_context.h"
+
 #include "sql/Expr.h"
+#include "table_ref.h"
+#include "base_table_ref.h"
+#include "join_table_ref.h"
+#include "subquery_table_ref.h"
+#include "cross_product_table_ref.h"
 
 namespace infinity {
-
-class TableRef;
-class BindContext;
 
 enum class OrderByType {
     kAscending,
@@ -23,6 +28,27 @@ class BoundSelectNode : public BoundNode {
 public:
     BoundSelectNode(std::shared_ptr<BindContext> bind_context_ptr)
         : BoundNode(BoundNodeType::kSelect), bind_context_ptr_(std::move(bind_context_ptr)) {}
+
+    std::shared_ptr<LogicalNode>
+    BuildPlan() override;
+
+    std::shared_ptr<LogicalNode>
+    BuildFrom(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalNode>
+    BuildBaseTable(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalNode>
+    BuildSubqueryTable(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalNode>
+    BuildCrossProductTable(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalNode>
+    BuildJoinTable(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalNode>
+    BuildFilter();
 
     std::shared_ptr<BindContext> bind_context_ptr_;
 

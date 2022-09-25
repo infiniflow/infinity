@@ -5,12 +5,11 @@
 #pragma once
 
 #include "table_ref.h"
+#include "planner/node/logical_table_scan.h"
 
 #include <utility>
 
 namespace infinity {
-
-class LogicalTableScan;
 
 class BaseTableRef: public TableRef {
 public:

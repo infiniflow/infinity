@@ -20,6 +20,9 @@ public:
     explicit BoundNode(BoundNodeType type) : type_(type) {}
     virtual ~BoundNode() = default;
 
+    virtual std::shared_ptr<LogicalNode>
+    BuildPlan() = 0;
+
     std::vector<std::string> names;
     std::vector<LogicalType> types;
 

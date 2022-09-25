@@ -24,7 +24,7 @@ SubqueryFlattener::GetResult() {
 void
 SubqueryFlattener::FlattenWhereClause() {
     for(auto& condition: bound_select_node_->where_conditions_) {
-
+        TryToFlatten(condition);
     }
 }
 
@@ -56,7 +56,6 @@ SubqueryFlattener::TryToFlatten(std::shared_ptr<BaseExpression>& expression) {
             break;
         }
         case ExpressionType::kSubQuery: {
-            PlannerError("Flatten subquery expression .");
             std::shared_ptr<SubqueryExpression> subquery_expr = std::static_pointer_cast<SubqueryExpression>(expression);
             return FlattenSubquery(subquery_expr);
         }
@@ -72,6 +71,8 @@ SubqueryFlattener::TryToFlatten(std::shared_ptr<BaseExpression>& expression) {
 
 std::shared_ptr<BaseExpression>
 SubqueryFlattener::FlattenSubquery(std::shared_ptr<SubqueryExpression>& subquery) {
+
+    // Pull up the correlated predicate
     PlannerError("Not implemented, yet.");
 }
 
