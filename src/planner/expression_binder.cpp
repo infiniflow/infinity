@@ -158,92 +158,92 @@ std::shared_ptr<BaseExpression>
 ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
 
     switch (expr.opType) {
-            case hsql::kOpBetween: {
-                std::shared_ptr<BaseExpression> value = BuildExpression(*expr.expr, bind_context_ptr);
-                std::shared_ptr<BaseExpression> left_bound = BuildExpression(*(*expr.exprList)[0], bind_context_ptr);
-                std::shared_ptr<BaseExpression> right_bound = BuildExpression(*(*expr.exprList)[1], bind_context_ptr);
-                return std::make_shared<BetweenExpression>(value, left_bound, right_bound, true, true);
-            }
-            case hsql::kOpCase: {
-                return BuildCaseExpr(expr, bind_context_ptr);
-            }
-            case hsql::kOpCaseListElement:
-                PlannerError("Unexpected expression type");
-            case hsql::kOpPlus: // +
-                return BuildBinaryScalarExpr("+", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpMinus: // -
-                return BuildBinaryScalarExpr("-", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpAsterisk: // *
-                return BuildBinaryScalarExpr("*", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpSlash: // /
-                return BuildBinaryScalarExpr("/", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpPercentage: // %
-                return BuildBinaryScalarExpr("%", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpCaret: // ^
-                return BuildBinaryScalarExpr("^", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpEquals: // =
-                return BuildBinaryScalarExpr("=", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpNotEquals: // <>
-                return BuildBinaryScalarExpr("<>", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpLess: // <
-                return BuildBinaryScalarExpr("<", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpLessEq: // <=
-                return BuildBinaryScalarExpr("<=", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpGreater: // >
-                return BuildBinaryScalarExpr(">", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpGreaterEq: // >=
-                return BuildBinaryScalarExpr(">=", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpLike: // like
-                return BuildBinaryScalarExpr("like", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpNotLike: // not like
-                return BuildBinaryScalarExpr("not like", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpILike: // ilike
-                return BuildBinaryScalarExpr("ilike", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpAnd: // AND
-                return BuildBinaryScalarExpr("and", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpOr: // OR
-                return BuildBinaryScalarExpr("or", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpIn: { // IN
-                if(expr.select != nullptr) {
-                    // In subquery
-                    PlannerAssert(expr.select, "No select statement in IN statement");
-                    auto subquery = BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kIn);
-                    subquery->left_ = BuildExpression(*expr.expr, bind_context_ptr);
-                    return subquery;
-                } else {
-                    PlannerAssert(expr.exprList && !expr.exprList->empty(), "IN operation with emtpy list");
-
-                    std::shared_ptr<BaseExpression> left_operand_ptr = BuildExpression(*expr.expr, bind_context_ptr);
-
-                    std::vector<std::shared_ptr<BaseExpression>> arguments;
-                    arguments.reserve(expr.exprList->size());
-
-                    for (const auto* arg : *expr.exprList) {
-                        auto arg_expr_ptr = BuildExpression(*arg, bind_context_ptr);
-                        arguments.emplace_back(arg_expr_ptr);
-                    }
-
-                    return std::make_shared<InExpression>(InType::kIn, left_operand_ptr, arguments);
-                }
-            }
-            case hsql::kOpConcat: // Concat
-                return BuildBinaryScalarExpr("concat", expr.expr, expr.expr2, bind_context_ptr);
-            case hsql::kOpNot: // Not
-                return BuildUnaryScalarExpr("not", expr.expr, bind_context_ptr);
-            case hsql::kOpUnaryMinus: // -
-                return BuildUnaryScalarExpr("-", expr.expr, bind_context_ptr);
-            case hsql::kOpIsNull: // IsNull
-                return BuildUnaryScalarExpr("isnull", expr.expr, bind_context_ptr);
-            case hsql::kOpExists: {
-                // Exists
-                PlannerAssert(expr.select, "No select statement in Exists");
-                auto subquery = BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kExists);
+        case hsql::kOpBetween: {
+            std::shared_ptr<BaseExpression> value = BuildExpression(*expr.expr, bind_context_ptr);
+            std::shared_ptr<BaseExpression> left_bound = BuildExpression(*(*expr.exprList)[0], bind_context_ptr);
+            std::shared_ptr<BaseExpression> right_bound = BuildExpression(*(*expr.exprList)[1], bind_context_ptr);
+            return std::make_shared<BetweenExpression>(value, left_bound, right_bound, true, true);
+        }
+        case hsql::kOpCase: {
+            return BuildCaseExpr(expr, bind_context_ptr);
+        }
+        case hsql::kOpCaseListElement:
+            PlannerError("Unexpected expression type");
+        case hsql::kOpPlus: // +
+            return BuildBinaryScalarExpr("+", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpMinus: // -
+            return BuildBinaryScalarExpr("-", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpAsterisk: // *
+            return BuildBinaryScalarExpr("*", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpSlash: // /
+            return BuildBinaryScalarExpr("/", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpPercentage: // %
+            return BuildBinaryScalarExpr("%", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpCaret: // ^
+            return BuildBinaryScalarExpr("^", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpEquals: // =
+            return BuildBinaryScalarExpr("=", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpNotEquals: // <>
+            return BuildBinaryScalarExpr("<>", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpLess: // <
+            return BuildBinaryScalarExpr("<", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpLessEq: // <=
+            return BuildBinaryScalarExpr("<=", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpGreater: // >
+            return BuildBinaryScalarExpr(">", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpGreaterEq: // >=
+            return BuildBinaryScalarExpr(">=", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpLike: // like
+            return BuildBinaryScalarExpr("like", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpNotLike: // not like
+            return BuildBinaryScalarExpr("not like", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpILike: // ilike
+            return BuildBinaryScalarExpr("ilike", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpAnd: // AND
+            return BuildBinaryScalarExpr("and", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpOr: // OR
+            return BuildBinaryScalarExpr("or", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpIn: { // IN
+            if(expr.select != nullptr) {
+                // In subquery
+                PlannerAssert(expr.select, "No select statement in IN statement");
+                auto subquery = BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kIn);
                 subquery->left_ = BuildExpression(*expr.expr, bind_context_ptr);
                 return subquery;
+            } else {
+                PlannerAssert(expr.exprList && !expr.exprList->empty(), "IN operation with emtpy list");
+
+                std::shared_ptr<BaseExpression> left_operand_ptr = BuildExpression(*expr.expr, bind_context_ptr);
+
+                std::vector<std::shared_ptr<BaseExpression>> arguments;
+                arguments.reserve(expr.exprList->size());
+
+                for (const auto* arg : *expr.exprList) {
+                    auto arg_expr_ptr = BuildExpression(*arg, bind_context_ptr);
+                    arguments.emplace_back(arg_expr_ptr);
+                }
+
+                return std::make_shared<InExpression>(InType::kIn, left_operand_ptr, arguments);
             }
-            default: {
-                PlannerError("Unknown operator type");
-            }
+        }
+        case hsql::kOpConcat: // Concat
+            return BuildBinaryScalarExpr("concat", expr.expr, expr.expr2, bind_context_ptr);
+        case hsql::kOpNot: // Not
+            return BuildUnaryScalarExpr("not", expr.expr, bind_context_ptr);
+        case hsql::kOpUnaryMinus: // -
+            return BuildUnaryScalarExpr("-", expr.expr, bind_context_ptr);
+        case hsql::kOpIsNull: // IsNull
+            return BuildUnaryScalarExpr("isnull", expr.expr, bind_context_ptr);
+        case hsql::kOpExists: {
+            // Exists
+            PlannerAssert(expr.select, "No select statement in Exists");
+            auto subquery = BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kExists);
+            subquery->left_ = BuildExpression(*expr.expr, bind_context_ptr);
+            return subquery;
+        }
+        default: {
+            PlannerError("Unknown operator type");
+        }
     }
 
     PlannerError("ExpressionBinder::Build Operator");

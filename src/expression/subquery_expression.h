@@ -29,7 +29,9 @@ public:
     std::shared_ptr<BoundSelectNode> select_node_ptr_;
     SubqueryType subquery_type_;
     ExpressionType operator_type_;
-    std::shared_ptr<BaseExpression> left_;
+
+    // Used in IN subquery, EXISTS won't use it.
+    std::shared_ptr<BaseExpression> left_{nullptr};
 private:
 
 };
