@@ -8,9 +8,15 @@
 
 namespace infinity {
 
-std::string LogicalCreateTable::ToString(uint64_t space) {
+std::string LogicalCreateTable::ToString(int64_t& space) {
     std::stringstream ss;
-    ss << std::string(space, ' ') << "create table: " << *schema_name_ << "." << table_definitions_->name() << std::endl;
+    std::string arrow_str;
+    if(space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << std::string(space, ' ') << arrow_str << "Create Table: " << *schema_name_ << "." << table_definitions_->name() << std::endl;
+    space += arrow_str.size();
     return ss.str();
 }
 

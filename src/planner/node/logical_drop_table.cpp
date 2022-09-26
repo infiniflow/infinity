@@ -8,9 +8,15 @@
 namespace infinity {
 
 std::string
-LogicalDropTable::ToString(uint64_t space) {
+LogicalDropTable::ToString(int64_t& space) {
     std::stringstream ss;
-    ss << std::string(space, ' ') << "drop table: " << *schema_name_<< "." << *table_name_ << std::endl;
+    std::string arrow_str;
+    if(space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << std::string(space, ' ') << arrow_str << "Drop Table: " << *schema_name_<< "." << *table_name_ << std::endl;
+    space += arrow_str.size();
     return ss.str();
 }
 

@@ -24,6 +24,14 @@ BoundSelectNode::BuildPlan() {
     project->set_left_node(root);
     root = project;
 
+    if(!order_by_expressions_.empty()) {
+        PlannerAssert(order_by_expressions_.size() == order_by_types_.size(), "Unknown error on order by expression");
+        std::shared_ptr<LogicalNode> sort
+            = std::make_shared<LogicalSort>(order_by_expressions_, order_by_types_, bind_context_ptr_);
+        sort->set_left_node(root);
+        root = sort;
+    }
+
     return root;
 }
 

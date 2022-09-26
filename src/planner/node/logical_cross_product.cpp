@@ -18,11 +18,17 @@ LogicalCrossProduct::LogicalCrossProduct(const std::shared_ptr<LogicalNode>& lef
     this->set_right_node(right);
 }
 
-std::string LogicalCrossProduct::ToString(uint64_t space) {
+std::string LogicalCrossProduct::ToString(int64_t& space) {
     std::stringstream ss;
-    ss << std::string(space, ' ') << "CrossProduct: " << std::endl;
-    ss << left_node_->ToString(space + TAB);
-    ss << right_node_->ToString(space + TAB);
+    std::string arrow_str;
+    if(space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << std::string(space, ' ') << arrow_str << "Cross Product: " << std::endl;
+    space += arrow_str.size();
+//    ss << left_node_->ToString(space + TAB);
+//    ss << right_node_->ToString(space + TAB);
     return ss.str();
 }
 

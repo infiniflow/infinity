@@ -5,6 +5,7 @@
 #pragma once
 
 #include "planner/logical_node.h"
+#include "planner/node/logical_sort.h"
 #include "planner/bound_node.h"
 #include "expression/column_expression.h"
 #include "planner/bind_context.h"
@@ -17,12 +18,6 @@
 #include "cross_product_table_ref.h"
 
 namespace infinity {
-
-enum class OrderByType {
-    kAscending,
-    kDescending
-    // Default order by type also should be given.
-};
 
 class BoundSelectNode : public BoundNode {
 public:

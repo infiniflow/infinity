@@ -15,17 +15,16 @@ ShowLogicalPlan::ToString() const {
     std::stack<std::shared_ptr<LogicalNode>> stack;
     std::shared_ptr<LogicalNode> root = logical_node_;
 
-    uint64_t intent = 4;
-    uint64_t level = -1;
+    int64_t intent = -4;
 
     while(root != nullptr || !stack.empty()) {
         if(root != nullptr) {
-            ++ level;
-            ss << root->ToString(level * intent);
+            intent += 4;
+            ss << root->ToString(intent);
             stack.push(root);
             root = root->left_node();
         } else {
-            -- level;
+            intent -= 4;
             root = stack.top()->right_node();
             stack.pop();
         }

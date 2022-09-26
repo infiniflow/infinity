@@ -22,14 +22,20 @@ LogicalTableScan::LogicalTableScan(std::shared_ptr<Table> table_ptr,
 }
 
 std::string
-LogicalTableScan::ToString(uint64_t space) {
+LogicalTableScan::ToString(int64_t& space) {
     std::stringstream ss;
-    ss << std::string(space, ' ') << "TableScan: " << table_ptr_->table_def()->name() << ", on: ";
+    std::string arrow_str;
+    if(space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << std::string(space, ' ') << arrow_str << "TableScan: " << table_ptr_->table_def()->name() << ", on: ";
     size_t column_count = table_ptr_->table_def()->column_count();
     for(size_t i = 0; i < column_count - 1; ++ i) {
         ss << column_aliases_[i] << " ";
     }
     ss << column_aliases_.back() << std::endl;
+    space += arrow_str.size();
     return ss.str();
 }
 

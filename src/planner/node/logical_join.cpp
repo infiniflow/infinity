@@ -18,15 +18,21 @@ LogicalJoin::LogicalJoin(JoinType join_type, std::vector<std::shared_ptr<BaseExp
 }
 
 std::string
-LogicalJoin::ToString(uint64_t space) {
+LogicalJoin::ToString(int64_t& space) {
     std::stringstream ss;
-    ss << std::string(space, ' ') << infinity::ToString(join_type_) << " on ";
+    std::string arrow_str;
+    if(space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << std::string(space, ' ') << arrow_str << infinity::ToString(join_type_) << " on ";
     for(auto& condition: conditions_) {
         ss << condition->ToString() << " ";
     }
     ss << std::endl;
-    ss << left_node_->ToString(space + TAB);
-    ss << right_node_->ToString(space + TAB);
+//    ss << left_node_->ToString(space + TAB);
+//    ss << right_node_->ToString(space + TAB);
+    space += arrow_str.size();
     return ss.str();
 }
 

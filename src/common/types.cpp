@@ -19,4 +19,12 @@ ToString(JoinType type) {
     }
 }
 
+std::string
+ToString(OrderByType type) {
+    switch(type) {
+        case OrderByType::kAscending: return "ASC";
+        case OrderByType::kDescending: return "DESC";
+    }
+}
+
 }

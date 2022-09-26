@@ -33,7 +33,7 @@ public:
     void ClearOutputs();
     [[nodiscard]] std::vector<std::shared_ptr<LogicalNode>> outputs() const { return outputs_; }
 
-    virtual std::string ToString(uint64_t space) = 0;
+    virtual std::string ToString(int64_t& space) = 0;
     [[nodiscard]] uint64_t node_id() const { return node_id_; }
     void set_node_id(uint64_t node_id) { node_id_ = node_id; }
 

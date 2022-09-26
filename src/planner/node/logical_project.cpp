@@ -8,14 +8,20 @@
 namespace infinity {
 
 std::string
-LogicalProject::ToString(uint64_t space) {
+LogicalProject::ToString(int64_t& space) {
     std::stringstream ss;
-    ss << std::string(space, ' ') << "Project on: ";
+    std::string arrow_str;
+    if(space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << std::string(space, ' ') << arrow_str << "Project on: ";
     size_t expression_count = expressions_.size();
     for(size_t i = 0; i < expression_count - 1; ++ i) {
         ss << expressions_[i]->ToString() << ", ";
     }
     ss << expressions_.back()->ToString() << std::endl;
+    space += arrow_str.size();
     return ss.str();
 }
 

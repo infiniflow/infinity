@@ -16,7 +16,7 @@ public:
           schema_name_(std::move(schema_name)),
           table_name_(std::move(table_name)) {}
 
-    std::string ToString(uint64_t space) final;
+    std::string ToString(int64_t& space) final;
     [[nodiscard]] std::shared_ptr<std::string> table_name() const { return table_name_; }
     [[nodiscard]] std::shared_ptr<std::string> schema_name() const { return schema_name_; }
 private:

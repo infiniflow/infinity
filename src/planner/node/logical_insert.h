@@ -20,7 +20,7 @@ public:
             : LogicalNode(LogicalNodeType::kInsert, bind_context),
               table_ptr_(std::move(table_ptr)), value_list_(std::move(value_list)) {};
 
-    std::string ToString(uint64_t space) final;
+    std::string ToString(int64_t& space) final;
     void set_value_list(const std::vector<std::shared_ptr<BaseExpression>>& value_list) {
         value_list_ = value_list;
     }

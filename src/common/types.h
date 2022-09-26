@@ -21,4 +21,13 @@ enum class JoinType {
 std::string
 ToString(JoinType type);
 
+enum class OrderByType {
+    kAscending,
+    kDescending
+    // Default order by type also should be given.
+};
+
+std::string
+ToString(OrderByType type);
+
 }

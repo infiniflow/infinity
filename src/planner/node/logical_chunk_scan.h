@@ -22,7 +22,7 @@ public:
     explicit LogicalChunkScan(ChunkScanType type, std::shared_ptr<BindContext>& bind_context)
         : LogicalNode(LogicalNodeType::kChunkScan, bind_context), scan_type_(type) {}
 
-    std::string ToString(uint64_t space) final;
+    std::string ToString(int64_t& space) final;
     [[nodiscard]] ChunkScanType scan_type() const { return scan_type_; }
 private:
     ChunkScanType scan_type_{ChunkScanType::kInvalid};

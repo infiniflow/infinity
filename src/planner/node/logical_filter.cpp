@@ -8,9 +8,15 @@
 
 namespace infinity {
 
-std::string LogicalFilter::ToString(uint64_t space) {
+std::string LogicalFilter::ToString(int64_t& space) {
     std::stringstream ss;
-    ss << std::string(space, ' ') << "Logical Filter: " << expression_->ToString() << std::endl;
+    std::string arrow_str;
+    if(space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << std::string(space, ' ') << arrow_str << "Logical Filter: " << expression_->ToString() << std::endl;
+    space += arrow_str.size();
     return ss.str();
 }
 

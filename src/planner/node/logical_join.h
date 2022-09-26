@@ -16,7 +16,7 @@ public:
                 const std::shared_ptr<LogicalNode>& left, const std::shared_ptr<LogicalNode>& right,
                 std::shared_ptr<BindContext>& bind_context);
 
-    std::string ToString(uint64_t space) final;
+    std::string ToString(int64_t& space) final;
 private:
 
     JoinType join_type_{JoinType::kInvalid};

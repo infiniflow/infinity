@@ -19,7 +19,7 @@ public:
           schema_name_(std::move(schema_name)),
           table_definitions_(std::move(table_def_ptr)) {}
 
-    std::string ToString(uint64_t space) final;
+    std::string ToString(int64_t& space) final;
 
     [[nodiscard]] std::shared_ptr<TableDefinition> table_definitions() const { return table_definitions_; }
     [[nodiscard]] std::shared_ptr<std::string> schema_name() const { return schema_name_; }

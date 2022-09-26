@@ -17,7 +17,7 @@ public:
     : LogicalNode(LogicalNodeType::kViewScan, bind_context), view_ptr_(std::move(view_ptr)) {}
 
     [[nodiscard]] std::shared_ptr<View> view_ptr() const { return view_ptr_; }
-    std::string ToString(uint64_t space) final;
+    std::string ToString(int64_t& space) final;
 private:
     std::shared_ptr<View> view_ptr_{nullptr};
 
