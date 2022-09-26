@@ -560,7 +560,10 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
     if(statement.limit !=nullptr) {
         auto limit_binder = std::make_shared<LimitBinder>();
         bound_select_node->limit_expression_ = limit_binder->BuildExpression(*statement.limit->limit, bind_context_ptr);
-        bound_select_node->offset_expression_ = limit_binder->BuildExpression(*statement.limit->offset, bind_context_ptr);
+
+        if(statement.limit->offset != nullptr) {
+            bound_select_node->offset_expression_ = limit_binder->BuildExpression(*statement.limit->offset, bind_context_ptr);
+        }
     }
 
     // 14. TOP

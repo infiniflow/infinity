@@ -6,6 +6,7 @@
 #include "common/utility/infinity_assert.h"
 #include "planner/node/logical_cross_product.h"
 #include "planner/node/logical_join.h"
+#include "planner/node/logical_limit.h"
 #include "planner/node/logical_project.h"
 #include "subquery_unnest.h"
 
@@ -30,6 +31,13 @@ BoundSelectNode::BuildPlan() {
             = std::make_shared<LogicalSort>(order_by_expressions_, order_by_types_, bind_context_ptr_);
         sort->set_left_node(root);
         root = sort;
+    }
+
+    if(limit_expression_ != nullptr) {
+        std::shared_ptr<LogicalLimit> limit
+            = std::make_shared<LogicalLimit>(limit_expression_, offset_expression_, bind_context_ptr_);
+        limit->set_left_node(root);
+        root = limit;
     }
 
     return root;
