@@ -12,17 +12,24 @@ LogicalTableScan::LogicalTableScan(std::shared_ptr<Table> table_ptr,
                                    std::shared_ptr<BindContext>& bind_context)
     : LogicalNode(LogicalNodeType::kTableScan, bind_context),
     table_ptr_(std::move(table_ptr)) {
-    uint64_t column_count = table_ptr_->table_def()->column_count();
+    size_t column_count = table_ptr_->table_def()->column_count();
     columns_.reserve(column_count);
-    for(uint64_t idx = 0; idx < column_count; ++ idx) {
+    column_aliases_.reserve(column_count);
+    for(size_t idx = 0; idx < column_count; ++ idx) {
         columns_.emplace_back(idx);
+        column_aliases_.emplace_back(table_ptr_->table_def()->columns()[idx].name());
     }
 }
 
 std::string
 LogicalTableScan::ToString(uint64_t space) {
     std::stringstream ss;
-    ss << std::string(space, ' ') << "TableScan: " << table_ptr_->table_def()->name() << std::endl;
+    ss << std::string(space, ' ') << "TableScan: " << table_ptr_->table_def()->name() << ", on: ";
+    size_t column_count = table_ptr_->table_def()->column_count();
+    for(size_t i = 0; i < column_count - 1; ++ i) {
+        ss << column_aliases_[i] << " ";
+    }
+    ss << column_aliases_.back() << std::endl;
     return ss.str();
 }
 

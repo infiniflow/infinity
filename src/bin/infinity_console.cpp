@@ -329,6 +329,8 @@ int main(int argc, char** argv) {
               << BUILD_TIME << " from branch: "
               << GIT_BRANCH_NAME << std::endl;
 
+    infinity::Infinity::instance().Init();
+
     // Use multiple line mode
     linenoiseSetMultiLine(1);
 

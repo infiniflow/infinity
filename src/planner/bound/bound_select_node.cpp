@@ -6,6 +6,7 @@
 #include "common/utility/infinity_assert.h"
 #include "planner/node/logical_cross_product.h"
 #include "planner/node/logical_join.h"
+#include "planner/node/logical_project.h"
 #include "subquery_unnest.h"
 
 namespace infinity {
@@ -19,7 +20,11 @@ BoundSelectNode::BuildPlan() {
         root = filter;
     }
 
-    return nullptr;
+    auto project = std::make_shared<LogicalProject>(projection_expressions_, bind_context_ptr_);
+    project->set_left_node(root);
+    root = project;
+
+    return root;
 }
 
 std::shared_ptr<LogicalNode>

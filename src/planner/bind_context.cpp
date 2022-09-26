@@ -88,10 +88,12 @@ void
 BindContext::AddBinding(const std::shared_ptr<Binding>& binding) {
     binding_by_name_.emplace(binding->table_name_, binding);
     for(auto& column_name: binding->column_names_) {
-        if(binding_names_by_column_.contains(column_name)) {
+        auto iter = binding_names_by_column_.find(column_name);
+        if(iter == binding_names_by_column_.end()) {
+            binding_names_by_column_.emplace(column_name, std::vector<std::string>());
             binding_names_by_column_[column_name].emplace_back(binding->table_name_);
         } else {
-            binding_names_by_column_.emplace(column_name, std::vector<std::string>());
+            iter->second.emplace_back(binding->table_name_);
         }
     }
 }
@@ -142,32 +144,9 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t 
 
     std::shared_ptr<BaseExpression> bound_column_expr;
 
-    const std::string& table_name_ref = *column_identifier.table_name_ptr_;
     const std::string& column_name_ref = *column_identifier.column_name_ptr_;
 
-    if(column_identifier.table_name_ptr_ != nullptr) {
-        auto binding = binding_by_name_[table_name_ref];
-        if(binding != nullptr) {
-            if(binding->name2index_.contains(column_name_ref)) {
-                // Find the table and column in the bind context.
-                int64_t column_id = binding->name2index_[column_name_ref];
-                bound_column_expr = std::make_shared<ColumnExpression>(
-                                binding->column_types_[column_id],
-                                table_name_ref,
-                                column_name_ref,
-                                column_id,
-                                depth);
-                bound_column_expr->source_position_
-                        = SourcePosition(binding_context_id_, ExprSourceType::kBinding);
-                bound_column_expr->source_position_.binding_name_ = binding->table_name_;
-            } else {
-                PlannerError(column_identifier.ToString() + " doesn't exist.");
-            }
-        } else {
-            // Table isn't found in current bind context, maybe its parent has it.
-            bound_column_expr = nullptr;
-        }
-    } else {
+    if(column_identifier.table_name_ptr_ == nullptr) {
         // Not table name
         // Try to find the column in current bind context;
         if(binding_names_by_column_.contains(column_name_ref)) {
@@ -184,16 +163,39 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t 
             if(binding->name2index_.contains(column_name_ref)) {
                 int64_t column_id = binding->name2index_[column_name_ref];
                 bound_column_expr = std::make_shared<ColumnExpression>(
-                                binding->column_types_[column_id],
-                                table_name_ref,
-                                column_name_ref,
-                                column_id,
-                                depth);
+                        binding->column_types_[column_id],
+                        binding_name,
+                        column_name_ref,
+                        column_id,
+                        depth);
                 bound_column_expr->source_position_
                         = SourcePosition(binding_context_id_, ExprSourceType::kBinding);
                 bound_column_expr->source_position_.binding_name_ = binding->table_name_;
             } else {
                 // Found the binding, but the binding don't have the column, which should happen.
+                PlannerError(column_identifier.ToString() + " doesn't exist.");
+            }
+        } else {
+            // Table isn't found in current bind context, maybe its parent has it.
+            bound_column_expr = nullptr;
+        }
+    } else {
+        const std::string& table_name_ref = *column_identifier.table_name_ptr_;
+        auto binding = binding_by_name_[table_name_ref];
+        if(binding != nullptr) {
+            if(binding->name2index_.contains(column_name_ref)) {
+                // Find the table and column in the bind context.
+                int64_t column_id = binding->name2index_[column_name_ref];
+                bound_column_expr = std::make_shared<ColumnExpression>(
+                        binding->column_types_[column_id],
+                        table_name_ref,
+                        column_name_ref,
+                        column_id,
+                        depth);
+                bound_column_expr->source_position_
+                        = SourcePosition(binding_context_id_, ExprSourceType::kBinding);
+                bound_column_expr->source_position_.binding_name_ = binding->table_name_;
+            } else {
                 PlannerError(column_identifier.ToString() + " doesn't exist.");
             }
         } else {

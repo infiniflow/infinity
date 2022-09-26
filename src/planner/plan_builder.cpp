@@ -56,8 +56,9 @@ PlanBuilder::BuildPlan(const hsql::SQLStatement &statement) {
         case hsql::kStmtSelect: {
             auto bound_select_node = BuildSelect(static_cast<const hsql::SelectStatement &>(statement), bind_context_ptr);
 
-            SubqueryFlattener flattner(bound_select_node,  bind_context_ptr);
-            bound_select_node = flattner.GetResult();
+            plan_context.plan = bound_select_node->BuildPlan();
+//            SubqueryFlattener flattner(bound_select_node,  bind_context_ptr);
+//            bound_select_node = flattner.GetResult();
             // Need to create plan and construct the plan context;
             break;
         }
@@ -986,7 +987,7 @@ PlanBuilder::BuildTable(const hsql::TableRef* from_table, std::shared_ptr<BindCo
         BuildView(view_name, view_ptr, bind_context_ptr);
     }
 
-    PlannerError("BuildTable: trying to build an supported table");
+    PlannerError("Table: " + schema_name + "." + name +" not found.");
 }
 
 std::shared_ptr<TableRef>

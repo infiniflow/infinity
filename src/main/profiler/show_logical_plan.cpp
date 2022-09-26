@@ -21,7 +21,7 @@ ShowLogicalPlan::ToString() const {
     while(root != nullptr || !stack.empty()) {
         if(root != nullptr) {
             ++ level;
-            ss << root->ToString(level * intent) << std::endl;
+            ss << root->ToString(level * intent);
             stack.push(root);
             root = root->left_node();
         } else {
