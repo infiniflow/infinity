@@ -500,14 +500,25 @@ PlanBuilder::BuildSelect(const hsql::SelectStatement &statement, std::shared_ptr
                 break;
             }
             case SelectItemType::kRawExpr: {
-                const std::string expr_name = select_item.expr_->getName();
 
-                // Alias already been bound and insert into project_by_name_ of bind context;
-                auto bound_expr = bind_context_ptr->project_by_name_[expr_name];
-                if(bound_expr == nullptr) {
-                    bound_expr = project_binder->BuildExpression(*select_item.expr_, bind_context_ptr);
+                std::string expr_name;
+                std::shared_ptr<BaseExpression> bound_expr;
+                if(select_item.expr_->getName() == nullptr) {
+                    // Constant value in select list, call build value expression directly.
+                    bound_expr = project_binder->BuildValueExpr(*select_item.expr_, bind_context_ptr);
+                    expr_name = bound_expr->ToString();
                     bind_context_ptr->project_by_name_.emplace(expr_name, bound_expr);
+                } else {
+                    expr_name = select_item.expr_->getName();
+
+                    // Alias already been bound and insert into project_by_name_ of bind context;
+                    bound_expr = bind_context_ptr->project_by_name_[expr_name];
+                    if(bound_expr == nullptr) {
+                        bound_expr = project_binder->BuildExpression(*select_item.expr_, bind_context_ptr);
+                        bind_context_ptr->project_by_name_.emplace(expr_name, bound_expr);
+                    }
                 }
+
                 bind_context_ptr->project_names_.emplace_back(expr_name);
 
                 // Insert the bound expression into projection expressions of select node.

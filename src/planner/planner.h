@@ -23,10 +23,6 @@
 
 #include "bind_context.h"
 
-#include "storage/data_type.h"
-
-#include "expression/base_expression.h"
-
 namespace infinity {
 
 class QueryContext;

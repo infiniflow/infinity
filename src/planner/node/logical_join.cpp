@@ -30,8 +30,6 @@ LogicalJoin::ToString(int64_t& space) {
         ss << condition->ToString() << " ";
     }
     ss << std::endl;
-//    ss << left_node_->ToString(space + TAB);
-//    ss << right_node_->ToString(space + TAB);
     space += arrow_str.size();
     return ss.str();
 }

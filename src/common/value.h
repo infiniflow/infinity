@@ -6,6 +6,4 @@
 
 namespace infinity {
 
-constexpr int64_t TAB = 4;
-
 }
