@@ -27,4 +27,8 @@ void
 VisitExpression(const std::shared_ptr<BaseExpression>& expression,
                 const std::function<VisitControlType(std::shared_ptr<BaseExpression> &child)>& visitor);
 
+void
+VisitExpression(const std::shared_ptr<BaseExpression>& expression,
+                const std::function<void(std::shared_ptr<BaseExpression> &child)>& visitor);
+
 }

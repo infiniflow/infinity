@@ -6,6 +6,7 @@
 #include "common/utility/infinity_assert.h"
 #include "planner/node/logical_cross_product.h"
 #include "planner/node/logical_join.h"
+#include "subquery_unnest.h"
 
 namespace infinity {
 std::shared_ptr<LogicalNode>
@@ -13,7 +14,7 @@ BoundSelectNode::BuildPlan() {
 
     std::shared_ptr<LogicalNode> root = BuildFrom(table_ref_ptr_, bind_context_ptr_);
     if(!where_conditions_.empty()) {
-        std::shared_ptr<LogicalNode> filter = BuildFilter(where_conditions_, bind_context_ptr_);
+        std::shared_ptr<LogicalNode> filter = BuildFilter(root, where_conditions_, bind_context_ptr_);
         filter->set_left_node(root);
         root = filter;
     }
@@ -89,8 +90,12 @@ BoundSelectNode::BuildJoinTable(std::shared_ptr<TableRef>& table_ref, std::share
 }
 
 std::shared_ptr<LogicalNode>
-BoundSelectNode::BuildFilter(std::vector<std::shared_ptr<BaseExpression>>& conditions,
-                             std::shared_ptr<BindContext>& bind_context_ptr) {
+BoundSelectNode::BuildFilter(std::shared_ptr<LogicalNode> root,
+                            std::vector<std::shared_ptr<BaseExpression>>& conditions,
+                            std::shared_ptr<BindContext>& bind_context_ptr) {
+    for(auto& cond: conditions) {
+        SubqueryUnnest::UnnestSubqueries(cond, root);
+    }
     return nullptr;
 }
 

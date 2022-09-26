@@ -5,6 +5,7 @@
 #pragma once
 
 #include "expression/base_expression.h"
+#include "expression/subquery_expression.h"
 #include "planner/logical_node.h"
 
 namespace infinity {
@@ -16,6 +17,11 @@ public:
 
     static std::shared_ptr<BaseExpression>
     UnnestSubquery(std::shared_ptr<BaseExpression>& expr_ptr, std::shared_ptr<LogicalNode>& root);
+
+    static std::shared_ptr<BaseExpression>
+    UnnestUncorrelated(std::shared_ptr<SubqueryExpression>& expr_ptr,
+                       std::shared_ptr<LogicalNode>& left,
+                       std::shared_ptr<LogicalNode>& right);
 };
 
 }
