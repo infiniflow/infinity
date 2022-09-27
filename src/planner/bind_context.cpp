@@ -135,8 +135,31 @@ BindContext::AddTableBinding(const std::string& name, std::shared_ptr<Table> tab
 }
 
 void
-BindContext::AddBindContext(const std::shared_ptr<BindContext>& bind_context_ptr) {
-    PlannerError("Not implement: BindContext::AddBindContext");
+BindContext::AddBindContext(const std::shared_ptr<BindContext>& other_ptr) {
+
+    std::unordered_map<std::string, std::shared_ptr<Binding>> binding_by_name_;
+    std::unordered_map<std::string, std::vector<std::string>> binding_names_by_column_;
+
+    for(auto& name_binding_pair : other_ptr->binding_by_name_) {
+        auto& binding_name = name_binding_pair.first;
+        if(this->binding_by_name_.contains(binding_name)) {
+            PlannerError("Table: " + binding_name + " has already been bound before.");
+        }
+        this->binding_by_name_.emplace(name_binding_pair);
+    }
+
+    for(auto& column_name_binding_pair: other_ptr->binding_names_by_column_) {
+        auto& column_name = column_name_binding_pair.first;
+        auto& bindings_names = column_name_binding_pair.second;
+
+        if(this->binding_names_by_column_.contains(column_name)) {
+            for(auto& binding_name: bindings_names) {
+                this->binding_names_by_column_[column_name].emplace_back(binding_name);
+            }
+        } else {
+            this->binding_names_by_column_.emplace(column_name, bindings_names);
+        }
+    }
 }
 
 std::shared_ptr<BaseExpression>

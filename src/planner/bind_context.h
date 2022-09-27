@@ -113,7 +113,7 @@ public:
                     const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names);
 
     // Merge input bind context into this bind context
-    void AddBindContext(const std::shared_ptr<BindContext>& bind_context_ptr);
+    void AddBindContext(const std::shared_ptr<BindContext>& other_ptr);
 
     std::shared_ptr<BaseExpression>
     ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t depth);
