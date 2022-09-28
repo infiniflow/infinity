@@ -10,7 +10,7 @@ namespace infinity {
 
 class JoinBinder : public ExpressionBinder {
 public:
-//    explicit JoinBinder(PlanBuilder& plan_builder) : ExpressionBinder(plan_builder) {}
+    explicit JoinBinder(std::shared_ptr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
     std::shared_ptr<BaseExpression>

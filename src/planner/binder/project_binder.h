@@ -10,6 +10,8 @@ namespace infinity {
 
 class ProjectBinder : public ExpressionBinder {
 public:
+    explicit ProjectBinder(std::shared_ptr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
+
     // Bind expression entry
     std::shared_ptr<BaseExpression>
     BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) override;

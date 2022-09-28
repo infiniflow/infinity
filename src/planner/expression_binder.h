@@ -23,8 +23,8 @@ struct ExprBindResult {
 
 class ExpressionBinder {
 public:
-//    explicit ExpressionBinder(std::shared_ptr<PlanBuilder> plan_builder_ptr)
-//        : plan_builder_ptr_(std::move(plan_builder_ptr)) {};
+    explicit ExpressionBinder(std::shared_ptr<QueryContext>& query_context) : query_context_(query_context) {}
+
     virtual ~ExpressionBinder() = default;
 
     // Bind expression entry
@@ -51,21 +51,29 @@ public:
     BuildCaseExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
     virtual std::shared_ptr<BaseExpression>
-    BuildBinaryScalarExpr(const std::string& op, const hsql::Expr* left, const hsql::Expr* right, const std::shared_ptr<BindContext>& bind_context_ptr);
+    BuildBinaryScalarExpr(const std::string& op,
+                          const hsql::Expr* left,
+                          const hsql::Expr* right,
+                          const std::shared_ptr<BindContext>& bind_context_ptr);
 
     virtual std::shared_ptr<BaseExpression>
-    BuildUnaryScalarExpr(const std::string& op, const hsql::Expr* expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+    BuildUnaryScalarExpr(const std::string& op,
+                         const hsql::Expr* expr,
+                         const std::shared_ptr<BindContext>& bind_context_ptr);
 
     // Bind subquery expression.
     virtual std::shared_ptr<SubqueryExpression>
-    BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr, SubqueryType subquery_type);
+    BuildSubquery(const hsql::SelectStatement& select,
+                  const std::shared_ptr<BindContext>& bind_context_ptr, SubqueryType subquery_type);
 
 //    // Bind window function.
 //    virtual std::shared_ptr<BaseExpression>
 //    BuildWindow(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr);
 
 //    std::shared_ptr<PlanBuilder> plan_builder_ptr_;
-private:
+protected:
+    std::shared_ptr<QueryContext>& query_context_;
+
 };
 
 }

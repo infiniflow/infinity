@@ -8,7 +8,7 @@ namespace infinity {
 
 class InsertBinder : public ExpressionBinder {
 public:
-//    explicit InsertBinder(PlanBuilder& plan_builder) : ExpressionBinder(plan_builder) {}
+    explicit InsertBinder(std::shared_ptr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
     std::shared_ptr<BaseExpression>

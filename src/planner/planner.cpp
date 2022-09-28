@@ -37,7 +37,7 @@ Planner::Planner(std::shared_ptr<QueryContext> query_context_ptr) : query_contex
 
 std::shared_ptr<LogicalNode>
 Planner::BuildLogicalPlan(const hsql::SQLStatement &statement) {
-    auto built_result = PlanBuilder::BuildPlan(statement);
+    auto built_result = PlanBuilder::BuildPlan(query_context_ptr_, statement);
     return built_result.plan;
 }
 

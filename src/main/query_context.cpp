@@ -78,9 +78,9 @@ QueryContext::Query(const std::string &query) {
 
     std::shared_ptr<QueryContext> query_context = shared_from_this();
 
-    Planner logical_planner(shared_from_this());
-    Optimizer optimizer(shared_from_this());
-    PhysicalPlanner physical_planner(shared_from_this());
+    Planner logical_planner(query_context);
+    Optimizer optimizer(query_context);
+    PhysicalPlanner physical_planner(query_context);
 
     PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {

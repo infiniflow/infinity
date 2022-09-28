@@ -112,7 +112,7 @@ ExpressionBinder::BuildValueExpr(const hsql::Expr &expr, const std::shared_ptr<B
 
 std::shared_ptr<BaseExpression>
 ExpressionBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(expr);
+    ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, expr);
     std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, 0);
     return column_expr;
 }
@@ -338,7 +338,9 @@ ExpressionBinder::BuildBinaryScalarExpr(const std::string& op, const hsql::Expr*
 
 
 std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildUnaryScalarExpr(const std::string& op, const hsql::Expr* expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+ExpressionBinder::BuildUnaryScalarExpr(const std::string& op,
+                                       const hsql::Expr* expr,
+                                       const std::shared_ptr<BindContext>& bind_context_ptr) {
 
     auto &catalog = Infinity::instance().catalog();
     std::shared_ptr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(op);
@@ -357,11 +359,13 @@ ExpressionBinder::BuildUnaryScalarExpr(const std::string& op, const hsql::Expr* 
 
 // Bind subquery expression.
 std::shared_ptr<SubqueryExpression>
-ExpressionBinder::BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr, SubqueryType subquery_type) {
+ExpressionBinder::BuildSubquery(const hsql::SelectStatement& select,
+                                const std::shared_ptr<BindContext>& bind_context_ptr,
+                                SubqueryType subquery_type) {
 
     std::shared_ptr<BindContext> subquery_binding_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
     std::shared_ptr<BoundSelectNode> select_node_ptr
-        = PlanBuilder::BuildSelect(select, subquery_binding_context_ptr);
+        = PlanBuilder::BuildSelect(query_context_, select, subquery_binding_context_ptr);
 
     std::shared_ptr<SubqueryExpression> subquery_expr
         = std::make_shared<SubqueryExpression>(select_node_ptr, subquery_type);

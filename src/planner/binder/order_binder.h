@@ -10,7 +10,7 @@ namespace infinity {
 
 class OrderBinder : public ExpressionBinder {
 public:
-//    explicit OrderBinder(PlanBuilder& plan_builder) : ExpressionBinder(plan_builder) {}
+    explicit OrderBinder(std::shared_ptr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
     std::shared_ptr<BaseExpression>

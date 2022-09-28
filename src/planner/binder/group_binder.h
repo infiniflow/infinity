@@ -11,7 +11,10 @@ namespace infinity {
 
 class GroupBinder : public ExpressionBinder {
 public:
-    explicit GroupBinder(const std::shared_ptr<BindAliasProxy>& bind_alias_proxy) : bind_alias_proxy_(bind_alias_proxy) {}
+    explicit GroupBinder(std::shared_ptr<QueryContext>& query_context,
+                         const std::shared_ptr<BindAliasProxy>& bind_alias_proxy)
+                         : ExpressionBinder(query_context),
+                         bind_alias_proxy_(bind_alias_proxy) {}
 
     // Bind expression entry
     std::shared_ptr<BaseExpression>

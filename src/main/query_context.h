@@ -30,6 +30,8 @@ public:
 
     inline void set_current_schema(const std::string& current_schema) { current_schema_ = current_schema; }
     inline std::unique_ptr<TransactionContext>& transaction() { return transaction_; }
+
+    const std::string& schema_name() const { return current_schema_; }
 private:
     std::unique_ptr<TransactionContext>& transaction_;
     std::unique_ptr<QueryProfiler> query_metrics_;
