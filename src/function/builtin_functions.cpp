@@ -3,7 +3,14 @@
 //
 
 #include "builtin_functions.h"
+// Arithmetic
+#include "scalar/add.h"
+
 #include "scalar/abs.h"
+#include "scalar/sub.h"
+#include "scalar/mul.h"
+#include "scalar/div.h"
+
 #include "scalar/pow.h"
 #include "scalar/equals.h"
 #include "scalar/notequals.h"
@@ -31,6 +38,12 @@ BuiltinFunctions::RegisterAggregateFunction() {
 void
 BuiltinFunctions::RegisterScalarFunction() {
     // Insert the function set into catalog
+
+    // Arithmetic functions
+    RegisterAddFunction(catalog_ptr_);
+    RegisterSubFunction(catalog_ptr_);
+    RegisterMulFunction(catalog_ptr_);
+    RegisterDivFunction(catalog_ptr_);
 
     // Math functions
     RegisterAbsFunction(catalog_ptr_);
