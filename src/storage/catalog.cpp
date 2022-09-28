@@ -98,7 +98,7 @@ Catalog::GetFunctionSetByName(const std::string& function_name) {
 }
 
 void
-Catalog::AddFunction(const std::shared_ptr<FunctionSet>& function_set) {
+Catalog::AddFunctionSet(const std::shared_ptr<FunctionSet>& function_set) {
     const std::string& name = function_set->name();
     if(function_sets_.contains(name)) {
         CatalogError("Trying to add duplicated function name into catalog: " + name);
@@ -107,7 +107,7 @@ Catalog::AddFunction(const std::shared_ptr<FunctionSet>& function_set) {
 }
 
 void
-Catalog::DeleteFunction(const std::string& function_name) {
+Catalog::DeleteFunctionSet(const std::string& function_name) {
     if(!function_sets_.contains(function_name)) {
         CatalogError("Delete not exist function: " + function_name);
     }

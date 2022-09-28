@@ -16,7 +16,7 @@ struct PowFunction {
 };
 
 ScalarFunctionSet
-RegisterPowFunction() {
+RegisterPowFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     ScalarFunctionSet function_set("pow");
 
     ScalarFunction pow_function(

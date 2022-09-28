@@ -1,5 +1,5 @@
 //
-// Created by JinHai on 2022/9/16.
+// Created by JinHai on 2022/9/28.
 //
 
 #pragma once
@@ -10,7 +10,7 @@
 
 namespace infinity {
 
-ScalarFunctionSet
-RegisterPowFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+void
+RegisterEqualsFunction(const std::unique_ptr<Catalog> &catalog_ptr);
 
 }

@@ -6,10 +6,11 @@
 
 #include "function/scalar_function.h"
 #include "function/function_set.h"
+#include "storage/catalog.h"
 
 namespace infinity {
 
-ScalarFunctionSet
-RegisterAbsFunction();
+void
+RegisterAbsFunction(const std::unique_ptr<Catalog> &catalog_ptr);
 
 }

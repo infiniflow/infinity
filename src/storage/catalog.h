@@ -29,8 +29,8 @@ public:
 
     // Function related methods
     std::shared_ptr<FunctionSet> GetFunctionSetByName(const std::string& function_name);
-    void AddFunction(const std::shared_ptr<FunctionSet>& function_set);
-    void DeleteFunction(const std::string& function_name);
+    void AddFunctionSet(const std::shared_ptr<FunctionSet>& function_set);
+    void DeleteFunctionSet(const std::string& function_name);
 
     ~Catalog() override = default;
 

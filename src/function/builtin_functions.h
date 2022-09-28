@@ -20,9 +20,6 @@ private:
     std::unique_ptr<Catalog>& catalog_ptr_;
 
 private:
-    void AddFunctionSet(ScalarFunctionSet& function_set);
-    void AddFunctionSet(TableFunctionSet& function_set);
-    void AddFunctionSet(AggregateFunctionSet& function_set);
 
     void RegisterAggregateFunction();
     void RegisterScalarFunction();
