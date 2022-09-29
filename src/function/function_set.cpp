@@ -32,7 +32,7 @@ FunctionSet::ToString(const std::string& name, const std::vector<std::shared_ptr
     ss << name;
     auto argument_count = arguments.size();
     if(argument_count == 0) {
-        ss << "()" << std::endl;
+        ss << "()";
 
     } else {
         ss << "(";
@@ -40,7 +40,7 @@ FunctionSet::ToString(const std::string& name, const std::vector<std::shared_ptr
             ss << arguments[i]->DataType().ToString() << ", ";
         }
         ss << arguments.back()->DataType().ToString();
-        ss << ")" << std::endl;
+        ss << ")";
     }
 
     return ss.str();
@@ -80,6 +80,7 @@ ScalarFunctionSet::GetMostMatchFunction(const std::vector<std::shared_ptr<BaseEx
             }
             lowest_cost = cost;
             candidates_index.clear();
+            candidates_index.emplace_back(i);
         }
     }
 

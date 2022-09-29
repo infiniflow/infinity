@@ -36,7 +36,7 @@ AggregateFunction::ToString() {
     ss << name_;
     auto parameter_count = parameter_types_.size();
     if(parameter_count == 0) {
-        ss << "()" << std::endl;
+        ss << "()";
 
     } else {
         ss << "(";
@@ -44,7 +44,7 @@ AggregateFunction::ToString() {
             ss << parameter_types_[i].ToString() << ", ";
         }
         ss << parameter_types_.back().ToString();
-        ss << ")" << std::endl;
+        ss << ")";
     }
 
     return ss.str();

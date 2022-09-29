@@ -16,7 +16,7 @@ TableFunction::TableFunction(std::string name,
 std::string
 TableFunction::ToString() {
     std::stringstream ss;
-    ss << "Table Function: " << name_ << std::endl;
+    ss << "Table Function: " << name_;
     return ss.str();
 }
 
