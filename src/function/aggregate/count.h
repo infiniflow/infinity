@@ -11,6 +11,8 @@ namespace infinity {
 class Count : public AggregateFunction {
 public:
 
+    std::string
+    ToString() override;
 private:
 
 };

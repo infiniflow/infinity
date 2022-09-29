@@ -17,6 +17,8 @@ namespace infinity {
 class FunctionSet {
 public:
     static std::shared_ptr<FunctionSet> GetFunctionSet(const hsql::Expr &expr);
+    static std::string
+    ToString(const std::string& name, const std::vector<std::shared_ptr<BaseExpression>>& arguments);
 
     explicit FunctionSet(std::string name, FunctionType type): name_(std::move(name)), type_(type) {}
 
@@ -48,6 +50,9 @@ public:
     ScalarFunction GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>>& input_arguments);
 
 private:
+    int64_t
+    MatchFunctionCost(const ScalarFunction& func,  const std::vector<std::shared_ptr<BaseExpression>>& arguments);
+
     std::vector<ScalarFunction> functions_;
 };
 

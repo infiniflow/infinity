@@ -3,3 +3,15 @@
 //
 
 #include "count.h"
+#include <sstream>
+
+
+namespace infinity {
+
+std::string
+Count::ToString() {
+    std::stringstream ss;
+    ss << "count()" << std::endl;
+    return ss.str();
+}
+}

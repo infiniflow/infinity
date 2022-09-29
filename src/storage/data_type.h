@@ -100,6 +100,7 @@ public:
 
 public:
     static LogicalType TypeConversion(hsql::ColumnType type);
+    static int64_t CastRule(const LogicalTypeId& from, const LogicalTypeId& to);
 
 private:
 //    int64_t length_;

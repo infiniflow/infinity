@@ -13,8 +13,11 @@ public:
     explicit TableFunction(std::string name,
                            std::vector<LogicalType> argument_types);
 
+    std::string
+    ToString() override;
+
 private:
-    std::vector<LogicalType> argument_types_;
+    std::vector<LogicalType> parameter_types_;
 };
 }
 

@@ -20,8 +20,11 @@ public:
     void CastArgumentTypes(std::vector<BaseExpression>& input_arguments);
     [[nodiscard]] const LogicalType& return_type() const { return return_type_; }
 
+    std::string
+    ToString() override;
+
 private:
-    std::vector<LogicalType> argument_types_;
+    std::vector<LogicalType> parameter_types_;
     LogicalType return_type_;
 
 };

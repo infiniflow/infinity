@@ -3,14 +3,22 @@
 //
 
 #include "table_function.h"
+#include <sstream>
 
 namespace infinity {
 
 TableFunction::TableFunction(std::string name,
                                std::vector<LogicalType> argument_types)
                                : Function(std::move(name), FunctionType::kTable),
-                               argument_types_(std::move(argument_types))
+                                 parameter_types_(std::move(argument_types))
 {}
+
+std::string
+TableFunction::ToString() {
+    std::stringstream ss;
+    ss << "Table Function: " << name_ << std::endl;
+    return ss.str();
+}
 
 
 }

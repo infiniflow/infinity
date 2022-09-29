@@ -29,6 +29,8 @@ public:
     void CastArgumentTypes(std::vector<BaseExpression>& input_arguments);
     [[nodiscard]] const LogicalType& return_type() const { return return_type_; }
 
+    std::string
+    ToString() override;
 public:
     static void NoOpFunction(const TransientBlock& input, Chunk& output);
 
@@ -44,8 +46,8 @@ public:
         ExecutorAssert(input.chunks_[0].row_count() == input.chunks_[1].row_count(), "Two input chunk row count are mismatched.");
         BinaryOperation::Execute<LeftType, RightType, OutputType, OperationType>(input.chunks_[0], input.chunks_[1], output);
     }
-private:
-    std::vector<LogicalType> argument_types_;
+
+    std::vector<LogicalType> parameter_types_;
     LogicalType return_type_;
 
     ScalarFunctionType function_;
