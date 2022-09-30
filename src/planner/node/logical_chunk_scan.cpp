@@ -15,7 +15,7 @@ LogicalChunkScan::ToString(int64_t& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << "-> " << "ChunkScan: " << std::endl;
+    ss << std::string(space, ' ') << "-> " << "ChunkScan: ";
     space += arrow_str.size();
     return ss.str();
 }

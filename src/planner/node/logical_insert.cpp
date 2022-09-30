@@ -14,7 +14,7 @@ std::string LogicalInsert::ToString(int64_t& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "Insert Table: " << table_ptr_->table_def()->name() << std::endl;
+    ss << std::string(space, ' ') << arrow_str << "Insert Table: " << table_ptr_->table_def()->name();
     space += arrow_str.size();
     return ss.str();
 }

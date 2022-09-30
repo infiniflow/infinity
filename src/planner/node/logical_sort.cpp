@@ -28,7 +28,7 @@ LogicalSort::ToString(int64_t& space) {
     for(size_t i = 0; i < expression_count - 1; ++ i) {
         ss << expressions_[i]->ToString() << " " << infinity::ToString(order_by_types_[i]) << ", ";
     }
-    ss << expressions_.back()->ToString() << " " << infinity::ToString(order_by_types_.back()) << std::endl;
+    ss << expressions_.back()->ToString() << " " << infinity::ToString(order_by_types_.back());
     space += arrow_str.size();
     return ss.str();
 }

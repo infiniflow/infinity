@@ -29,8 +29,8 @@ public:
     void CastArgumentTypes(std::vector<BaseExpression>& input_arguments);
     [[nodiscard]] const LogicalType& return_type() const { return return_type_; }
 
-    std::string
-    ToString() override;
+    [[nodiscard]] std::string
+    ToString() const override;
 public:
     static void NoOpFunction(const TransientBlock& input, Chunk& output);
 

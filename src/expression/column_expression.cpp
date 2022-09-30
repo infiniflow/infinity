@@ -5,6 +5,7 @@
 #include "column_expression.h"
 
 #include <utility>
+#include <sstream>
 
 namespace infinity {
 
@@ -20,7 +21,12 @@ ColumnExpression::ColumnExpression(LogicalType logical_type, std::string table_n
 
 std::string
 ColumnExpression::ToString() const {
-    return column_name_;
+    std::stringstream ss;
+    if(!table_name_.empty()) {
+        ss << table_name_ << '.';
+    }
+    ss << column_name_;
+    return ss.str();
 }
 
 }

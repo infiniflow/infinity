@@ -25,7 +25,7 @@ std::string LogicalCrossProduct::ToString(int64_t& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "Cross Product: " << std::endl;
+    ss << std::string(space, ' ') << arrow_str << "Cross Product: ";
     space += arrow_str.size();
     return ss.str();
 }

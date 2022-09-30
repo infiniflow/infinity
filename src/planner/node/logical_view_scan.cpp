@@ -16,7 +16,7 @@ LogicalViewScan::ToString(int64_t& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "ViewScan: " << view_ptr_->name() << std::endl;
+    ss << std::string(space, ' ') << arrow_str << "ViewScan: " << view_ptr_->name();
     space += arrow_str.size();
     return ss.str();
 }

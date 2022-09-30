@@ -14,7 +14,7 @@ TableFunction::TableFunction(std::string name,
 {}
 
 std::string
-TableFunction::ToString() {
+TableFunction::ToString() const {
     std::stringstream ss;
     ss << "Table Function: " << name_;
     return ss.str();

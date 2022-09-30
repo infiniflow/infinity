@@ -20,12 +20,14 @@ ShowLogicalPlan::ToString() const {
     while(root != nullptr || !stack.empty()) {
         if(root != nullptr) {
             intent += 4;
-            ss << root->ToString(intent);
+            ss << root->ToString(intent) << std::endl;
             stack.push(root);
             root = root->left_node();
         } else {
-            intent -= 4;
             root = stack.top()->right_node();
+            if(root != nullptr) {
+                intent -= 4;
+            }
             stack.pop();
         }
     }

@@ -34,7 +34,7 @@ LogicalTableScan::ToString(int64_t& space) {
     for(size_t i = 0; i < column_count - 1; ++ i) {
         ss << column_aliases_[i] << " ";
     }
-    ss << column_aliases_.back() << std::endl;
+    ss << column_aliases_.back();
     space += arrow_str.size();
     return ss.str();
 }

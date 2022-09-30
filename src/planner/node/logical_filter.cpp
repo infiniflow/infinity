@@ -15,7 +15,7 @@ std::string LogicalFilter::ToString(int64_t& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "Logical Filter: " << expression_->ToString() << std::endl;
+    ss << std::string(space, ' ') << arrow_str << "Logical Filter: " << expression_->ToString();
     space += arrow_str.size();
     return ss.str();
 }

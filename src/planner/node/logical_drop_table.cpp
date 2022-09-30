@@ -15,7 +15,7 @@ LogicalDropTable::ToString(int64_t& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "Drop Table: " << *schema_name_<< "." << *table_name_ << std::endl;
+    ss << std::string(space, ' ') << arrow_str << "Drop Table: " << *schema_name_<< "." << *table_name_;
     space += arrow_str.size();
     return ss.str();
 }

@@ -30,7 +30,7 @@ AggregateFunction::CastArgumentTypes(std::vector<BaseExpression>& input_argument
 }
 
 std::string
-AggregateFunction::ToString() {
+AggregateFunction::ToString() const {
 
     std::stringstream ss;
     ss << name_;

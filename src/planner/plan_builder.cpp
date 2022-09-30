@@ -1306,6 +1306,12 @@ PlanBuilder::BuildJoin(std::shared_ptr<QueryContext>& query_context,
     bind_context_ptr->AddBindContext(left_bind_context_ptr);
     bind_context_ptr->AddBindContext(right_bind_context_ptr);
 
+    result->left_table_ref_ = left_bound_table_ref;
+    result->left_bind_context_ = left_bind_context_ptr;
+
+    result->right_table_ref_ = right_bound_table_ref;
+    result->right_bind_context_ = right_bind_context_ptr;
+
     // Current parser doesn't support On using column syntax, so only consider the case of natural join.
     if(result->join_type_ == JoinType::kNatural) {
         std::unordered_set<std::string> left_binding_column_names;

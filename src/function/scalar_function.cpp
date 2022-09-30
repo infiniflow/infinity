@@ -38,7 +38,7 @@ ScalarFunction::NoOpFunction(const TransientBlock &input, Chunk &output) {
 }
 
 std::string
-ScalarFunction::ToString() {
+ScalarFunction::ToString() const {
 
     std::stringstream ss;
     ss << name_;

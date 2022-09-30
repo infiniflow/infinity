@@ -9,7 +9,7 @@
 namespace infinity {
 
 std::string
-Count::ToString() {
+Count::ToString() const {
     std::stringstream ss;
     ss << "count()" << std::endl;
     return ss.str();

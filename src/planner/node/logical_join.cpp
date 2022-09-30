@@ -29,7 +29,6 @@ LogicalJoin::ToString(int64_t& space) {
     for(auto& condition: conditions_) {
         ss << condition->ToString() << " ";
     }
-    ss << std::endl;
     space += arrow_str.size();
     return ss.str();
 }

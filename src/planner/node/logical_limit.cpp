@@ -20,7 +20,7 @@ LogicalLimit::ToString(int64_t &space) {
     if(offset_expression_ != nullptr) {
         ss << ", offset: " << offset_expression_->ToString();
     }
-    ss << ")" << std::endl;
+    ss << ")";
     space += arrow_str.size();
 
     return ss.str();

@@ -20,7 +20,7 @@ LogicalProject::ToString(int64_t& space) {
     for(size_t i = 0; i < expression_count - 1; ++ i) {
         ss << expressions_[i]->ToString() << ", ";
     }
-    ss << expressions_.back()->ToString() << std::endl;
+    ss << expressions_.back()->ToString();
     space += arrow_str.size();
     return ss.str();
 }

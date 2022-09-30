@@ -3,6 +3,7 @@
 //
 
 #include "function_expression.h"
+#include <sstream>
 
 #include <utility>
 
@@ -14,7 +15,18 @@ FunctionExpression::FunctionExpression(ScalarFunction function,
 
 std::string
 FunctionExpression::ToString() const {
-    return std::string();
+    std::stringstream ss;
+    ss << func_.name()<< "(";
+    if(arguments_.empty()) {
+        ss << ")";
+    } else {
+        auto arguments_count = arguments_.size();
+        for(auto i = 0; i < arguments_count - 1; ++ i) {
+            ss << arguments_[i]->ToString() << ", ";
+        }
+        ss << arguments_.back()->ToString() << ")";
+    }
+    return ss.str();
 }
 
 LogicalType
