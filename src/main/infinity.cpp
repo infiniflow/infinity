@@ -3,6 +3,7 @@
 //
 
 #include "infinity.h"
+#include "logger.h"
 
 namespace infinity {
 
@@ -15,6 +16,7 @@ Infinity::Infinity()
 void
 Infinity::Init() {
     storage_->Init();
+    Logger::Initialize();
 
 }
 

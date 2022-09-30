@@ -4,6 +4,7 @@
 
 #include "connection.h"
 #include "main/query_context.h"
+#include "main/logger.h"
 
 #include <iostream>
 
@@ -25,7 +26,7 @@ Connection::Run() {
         } catch (const std::exception& e) {
             std::map<PGMessageType, std::string> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();
-            std::cout << e.what() << std::endl;
+            LOG_ERROR(e.what());
             pg_handler_->send_error_response(error_message_map);
             pg_handler_->send_ready_for_query();
         }
@@ -56,19 +57,19 @@ Connection::HandleRequest() {
 
     switch (cmd_type) {
         case PGMessageType::kBindCommand: {
-            std::cout << "BindCommand" << std::endl;
+            LOG_DEBUG("BindCommand");
             break;
         }
         case PGMessageType::kDescribeCommand: {
-            std::cout << "DescribeCommand" << std::endl;
+            LOG_DEBUG("DescribeCommand");
             break;
         }
         case PGMessageType::kExecuteCommand: {
-            std::cout << "ExecuteCommand" << std::endl;
+            LOG_DEBUG("ExecuteCommand");
             break;
         }
         case PGMessageType::kParseCommand: {
-            std::cout << "ParseCommand" << std::endl;
+            LOG_DEBUG("ParseCommand");
             break;
         }
         case PGMessageType::kSimpleQueryCommand: {
@@ -76,7 +77,7 @@ Connection::HandleRequest() {
             break;
         }
         case PGMessageType::kSyncCommand: {
-            std::cout << "SyncCommand" << std::endl;
+            LOG_DEBUG("SyncCommand");
             break;
         }
         case PGMessageType::kTerminateCommand: {
@@ -92,7 +93,7 @@ Connection::HandleRequest() {
 void
 Connection::HandlerSimpleQuery(std::shared_ptr<QueryContext>& query_context) {
     const std::string& query = pg_handler_->read_command_body();
-    std::cout << "Query: " << query << std::endl;
+    LOG_DEBUG("Query: {}", query);
 
     // Start to execute the query.
     QueryResult result = query_context->Query(query);
