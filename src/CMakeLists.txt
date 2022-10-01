@@ -13,6 +13,8 @@ file(GLOB_RECURSE
         infinity_console_src
         CONFIGURE_DEPENDS
         bin/infinity_console.cpp
+        bin/console.cpp
+        bin/console.h
         )
 
 file(GLOB_RECURSE

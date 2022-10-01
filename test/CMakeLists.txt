@@ -16,10 +16,17 @@ file(GLOB_RECURSE
         main/*.cpp
         )
 
+file(GLOB_RECURSE
+        bin_src
+        CONFIGURE_DEPENDS
+        bin/*.cpp
+        )
+
 add_executable(test_main
         main.cpp
         ${common_test_src}
         ${main_test_src}
+        ${bin_src}
         )
 
 target_link_libraries(test_main
