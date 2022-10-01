@@ -51,6 +51,8 @@ RegisterLessFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     // TODO: need to review following function
     GenerateLessFunction<std::string>(function_set_ptr, LogicalTypeId::kVarchar);
     GenerateLessFunction<std::string>(function_set_ptr, LogicalTypeId::kText);
+
+    catalog_ptr->AddFunctionSet(function_set_ptr);
 }
 
 }

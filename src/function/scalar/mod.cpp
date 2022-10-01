@@ -48,6 +48,7 @@ RegisterModFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     function_set_ptr->AddFunction(mod_function_int64);
 
     // TODO: other type modulo need to be given.
+    catalog_ptr->AddFunctionSet(function_set_ptr);
 }
 
 }

@@ -25,6 +25,20 @@ SplitExpressionByDelimiter(const std::shared_ptr<BaseExpression> &expression, Co
     return result;
 }
 
+std::shared_ptr<BaseExpression>
+ComposeExpressionWithDelimiter(const std::vector<std::shared_ptr<BaseExpression>>& expressions,
+                             ConjunctionType conjunction_type) {
+    auto expr_count = expressions.size();
+    if(expr_count == 0) {
+        return nullptr;
+    }
+    std::shared_ptr<BaseExpression> result = expressions[0];
+    for(auto i = 1; i < expr_count; ++ i) {
+        result = std::make_shared<ConjunctionExpression>(conjunction_type, result, expressions[i]);
+    }
+    return result;
+}
+
 void
 VisitExpression(const std::shared_ptr<BaseExpression>& expression,
                 const std::function<VisitControlType(std::shared_ptr<BaseExpression> &child)>& visitor) {

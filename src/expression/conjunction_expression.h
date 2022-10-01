@@ -16,7 +16,7 @@ enum class ConjunctionType {
 
 class ConjunctionExpression: public BaseExpression {
 public:
-    ConjunctionExpression(ExpressionType expression_type, ConjunctionType conjunction_type,
+    ConjunctionExpression(ConjunctionType conjunction_type,
                           const std::shared_ptr<BaseExpression>& left_operand,
                           const std::shared_ptr<BaseExpression>& right_operand);
 

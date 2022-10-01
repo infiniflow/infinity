@@ -33,7 +33,9 @@ struct CommonTableExpressionInfo {
 class BindContext {
 public:
     explicit BindContext(std::shared_ptr<BindContext> parent)
-        : parent_(std::move(parent)) {}
+        : parent_(std::move(parent)) {
+        binding_context_id_ = GenerateBindingContextIndex();
+    }
 
     virtual ~BindContext();
 
@@ -43,7 +45,10 @@ public:
     std::shared_ptr<BindContext> parent_;
 
     // Left and right child bind context
-    std::vector<std::shared_ptr<BindContext>> children_;
+    std::shared_ptr<BindContext> left_child_;
+    std::shared_ptr<BindContext> right_child_;
+
+    std::vector<std::shared_ptr<BindContext>> subquery_children_;
 
     // CTE from CTE alias -> CTE statement
     std::unordered_map<std::string, std::shared_ptr<CommonTableExpressionInfo>> CTE_map_;
@@ -85,7 +90,9 @@ public:
     std::vector<std::string> heading_;
 
 public:
-    void AddChild(const std::shared_ptr<BindContext>& child);
+    void AddSubQueryChild(const std::shared_ptr<BindContext>& child);
+    void AddLeftChild(const std::shared_ptr<BindContext>& left_child);
+    void AddRightChild(const std::shared_ptr<BindContext>& right_child);
     size_t GenerateBindingContextIndex();
     [[nodiscard]] std::shared_ptr<CommonTableExpressionInfo> GetCTE(const std::string& name) const;
     [[nodiscard]] bool IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) const;

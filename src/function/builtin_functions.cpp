@@ -19,6 +19,9 @@
 #include "scalar/greater.h"
 #include "scalar/greater_equals.h"
 
+#include "scalar/or.h"
+#include "scalar/and.h"
+
 namespace infinity {
 
 BuiltinFunctions::BuiltinFunctions(std::unique_ptr<Catalog> &catalog_ptr) : catalog_ptr_(catalog_ptr) {}
@@ -44,6 +47,10 @@ BuiltinFunctions::RegisterScalarFunction() {
     RegisterSubFunction(catalog_ptr_);
     RegisterMulFunction(catalog_ptr_);
     RegisterDivFunction(catalog_ptr_);
+
+    // Logic functions
+    RegisterAndFunction(catalog_ptr_);
+    RegisterOrFunction(catalog_ptr_);
 
     // Math functions
     RegisterAbsFunction(catalog_ptr_);

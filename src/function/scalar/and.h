@@ -1,5 +1,5 @@
 //
-// Created by JinHai on 2022/9/16.
+// Created by JinHai on 2022/9/28.
 //
 
 #pragma once
@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterPowFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+RegisterAndFunction(const std::unique_ptr<Catalog> &catalog_ptr);
 
 }

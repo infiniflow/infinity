@@ -34,6 +34,7 @@ RegisterMulFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     function_set_ptr->AddFunction(mul_function_double);
 
     // TODO: other type multiply need to be given.
+    catalog_ptr->AddFunctionSet(function_set_ptr);
 }
 
 }

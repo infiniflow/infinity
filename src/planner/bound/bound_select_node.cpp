@@ -8,6 +8,8 @@
 #include "planner/node/logical_join.h"
 #include "planner/node/logical_limit.h"
 #include "planner/node/logical_project.h"
+#include "planner/node/logical_filter.h"
+#include "expression/expression_transformer.h"
 #include "subquery_unnest.h"
 
 namespace infinity {
@@ -84,8 +86,8 @@ BoundSelectNode::BuildCrossProductTable(std::shared_ptr<TableRef>& table_ref, st
     // std::shared_ptr<CrossProductTableRef> cross_product_table_ref
     auto cross_product_table_ref = std::static_pointer_cast<CrossProductTableRef>(table_ref);
 
-    auto left_node = BuildFrom(cross_product_table_ref->left_table_ref_, bind_context_ptr->children_[0]);
-    auto right_node = BuildFrom(cross_product_table_ref->right_table_ref_, bind_context_ptr->children_[1]);
+    auto left_node = BuildFrom(cross_product_table_ref->left_table_ref_, bind_context_ptr->left_child_);
+    auto right_node = BuildFrom(cross_product_table_ref->right_table_ref_, bind_context_ptr->right_child_);
 
     // TODO: Merge bind context ?
 
@@ -99,8 +101,8 @@ BoundSelectNode::BuildJoinTable(std::shared_ptr<TableRef>& table_ref, std::share
     // std::shared_ptr<JoinTableRef> join_table_ref
     auto join_table_ref = std::static_pointer_cast<JoinTableRef>(table_ref);
 
-    auto left_node = BuildFrom(join_table_ref->left_table_ref_, bind_context_ptr->children_[0]);
-    auto right_node = BuildFrom(join_table_ref->right_table_ref_, bind_context_ptr->children_[1]);
+    auto left_node = BuildFrom(join_table_ref->left_table_ref_, bind_context_ptr->left_child_);
+    auto right_node = BuildFrom(join_table_ref->right_table_ref_, bind_context_ptr->right_child_);
 
     // TODO: Merge bind context ?
 
@@ -115,9 +117,20 @@ BoundSelectNode::BuildFilter(std::shared_ptr<LogicalNode> root,
                             std::vector<std::shared_ptr<BaseExpression>>& conditions,
                             std::shared_ptr<BindContext>& bind_context_ptr) {
     for(auto& cond: conditions) {
-        SubqueryUnnest::UnnestSubqueries(cond, root);
+        // 1. Go through all the expression to find subquery
+        VisitExpression(cond,
+                        [&](std::shared_ptr<BaseExpression> &expr) {
+                            SubqueryUnnest::UnnestSubqueries(expr, root);
+                        });
     }
-    return nullptr;
+
+    // std::shared_ptr<BaseExpression> filter_expr
+    auto filter_expr = ComposeExpressionWithDelimiter(conditions, ConjunctionType::kAnd);
+
+    // std::shared_ptr<LogicalFilter> filter
+    auto filter = std::make_shared<LogicalFilter>(filter_expr, bind_context_ptr);
+
+    return filter;
 }
 
 }

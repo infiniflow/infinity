@@ -63,6 +63,8 @@ RegisterSubFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     function_set_ptr->AddFunction(sub_function_double);
 
     // TODO: other type sub need to be given.
+
+    catalog_ptr->AddFunctionSet(function_set_ptr);
 }
 
 }

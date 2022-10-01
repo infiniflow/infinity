@@ -63,6 +63,7 @@ RegisterAddFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     function_set_ptr->AddFunction(add_function_double);
 
     // TODO: other type add need to be given.
+    catalog_ptr->AddFunctionSet(function_set_ptr);
 }
 
 }

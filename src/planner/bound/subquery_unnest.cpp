@@ -11,11 +11,6 @@ namespace infinity {
 
 void
 SubqueryUnnest::UnnestSubqueries(std::shared_ptr<BaseExpression> &expr_ptr, std::shared_ptr<LogicalNode> &root) {
-    // 1. Go through all the expression to find subquery
-    VisitExpression(expr_ptr,
-                    [&](std::shared_ptr<BaseExpression> &expr) {
-                        UnnestSubqueries(expr, root);
-                    });
     // 2. Call Unnest Subquery to resolve subquery
     if (expr_ptr->type() == ExpressionType::kSubQuery) {
         // Subquery, need to be unnested.

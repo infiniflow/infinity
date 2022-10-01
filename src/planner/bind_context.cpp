@@ -135,10 +135,25 @@ BindContext::AddTableBinding(const std::string& name, std::shared_ptr<Table> tab
 }
 
 void
-BindContext::AddBindContext(const std::shared_ptr<BindContext>& other_ptr) {
+BindContext::AddLeftChild(const std::shared_ptr<BindContext>& left_child) {
+    this->left_child_ = left_child;
+    this->AddBindContext(left_child);
+}
 
-    std::unordered_map<std::string, std::shared_ptr<Binding>> binding_by_name_;
-    std::unordered_map<std::string, std::vector<std::string>> binding_names_by_column_;
+void
+BindContext::AddRightChild(const std::shared_ptr<BindContext>& right_child) {
+    this->right_child_ = right_child;
+    this->AddBindContext(right_child);
+}
+
+void
+BindContext::AddSubQueryChild(const std::shared_ptr<BindContext>& child) {
+    this->subquery_children_.emplace_back(child);
+    // TODO: need merge bind context?
+}
+
+void
+BindContext::AddBindContext(const std::shared_ptr<BindContext>& other_ptr) {
 
     for(auto& name_binding_pair : other_ptr->binding_by_name_) {
         auto& binding_name = name_binding_pair.first;
@@ -236,10 +251,10 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t 
     PlannerError(column_identifier.ToString() + " isn't found.");
 }
 
-void
-BindContext::AddChild(const std::shared_ptr<BindContext>& child) {
-    child->binding_context_id_ = GenerateBindingContextIndex();
-    children_.emplace_back(child);
-}
+//void
+//BindContext::AddChild(const std::shared_ptr<BindContext>& child) {
+//    child->binding_context_id_ = GenerateBindingContextIndex();
+//    children_.emplace_back(child);
+//}
 
 }

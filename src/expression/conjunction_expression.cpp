@@ -6,10 +6,10 @@
 
 namespace infinity {
 
-ConjunctionExpression::ConjunctionExpression(ExpressionType expression_type, ConjunctionType type,
+ConjunctionExpression::ConjunctionExpression(ConjunctionType type,
                                              const std::shared_ptr<BaseExpression> &left_operand,
                                              const std::shared_ptr<BaseExpression> &right_operand)
-     : BaseExpression(expression_type, {left_operand, right_operand}), conjunction_type_(type) {}
+     : BaseExpression(ExpressionType::kConjunction, {left_operand, right_operand}), conjunction_type_(type) {}
 
 LogicalType
 ConjunctionExpression::DataType() {

@@ -15,18 +15,18 @@ struct PowFunction {
     }
 };
 
-ScalarFunctionSet
+void
 RegisterPowFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
-    ScalarFunctionSet function_set("pow");
+    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("pow");
 
     ScalarFunction pow_function(
             "pow",
             { LogicalType(LogicalTypeId::kDouble), LogicalType(LogicalTypeId::kDouble) },
             { LogicalType(LogicalTypeId::kDouble) },
             &ScalarFunction::BinaryFunction<double, double, double, PowFunction>);
-    function_set.AddFunction(pow_function);
+    function_set_ptr->AddFunction(pow_function);
 
-    return function_set;
+    catalog_ptr->AddFunctionSet(function_set_ptr);
 }
 
 }

@@ -51,6 +51,8 @@ RegisterNotEqualsFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     // TODO: need to review following function
     GenerateNotEqualsFunction<std::string>(function_set_ptr, LogicalTypeId::kVarchar);
     GenerateNotEqualsFunction<std::string>(function_set_ptr, LogicalTypeId::kText);
+
+    catalog_ptr->AddFunctionSet(function_set_ptr);
 }
 
 }

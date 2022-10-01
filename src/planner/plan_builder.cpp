@@ -1120,12 +1120,14 @@ PlanBuilder::BuildSubquery(std::shared_ptr<QueryContext>& query_context,
                            const hsql::SelectStatement& select_stmt,
                            std::shared_ptr<BindContext>& bind_context_ptr) {
     // Create new bind context and add into context array;
-    std::shared_ptr<BindContext> cte_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-    bind_context_ptr->AddChild(cte_bind_context_ptr);
+    std::shared_ptr<BindContext> subquery_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
+
 //    this->AddBindContextArray(cte_bind_context_ptr);
 
     // Create bound select node and subquery table reference
-    auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, select_stmt, cte_bind_context_ptr);
+    auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, select_stmt, subquery_bind_context_ptr);
+    bind_context_ptr->AddSubQueryChild(subquery_bind_context_ptr);
+
     auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
 
     // Get the table index of the sub query output
@@ -1158,11 +1160,10 @@ PlanBuilder::BuildCTE(std::shared_ptr<QueryContext>& query_context,
 
     // Create new bind context and add into context array;
     std::shared_ptr<BindContext> cte_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-    bind_context_ptr->AddChild(cte_bind_context_ptr);
-//    this->AddBindContextArray(cte_bind_context_ptr);
 
     // Create bound select node and subquery table reference
     auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, *cte->select_statement_, cte_bind_context_ptr);
+    bind_context_ptr->AddSubQueryChild(cte_bind_context_ptr);
     auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
 
     // Add binding into bind context
@@ -1188,12 +1189,12 @@ PlanBuilder::BuildView(std::shared_ptr<QueryContext>& query_context,
     auto* select_stmt_ptr = static_cast<const hsql::SelectStatement*>(sql_statement);
 
     // Create new bind context and add into context array;
-    std::shared_ptr<BindContext> cte_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-    bind_context_ptr->AddChild(cte_bind_context_ptr);
-//    this->AddBindContextArray(cte_bind_context_ptr);
+    std::shared_ptr<BindContext> view_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
 
     // Create bound select node and subquery table reference
-    auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, *select_stmt_ptr, cte_bind_context_ptr);
+    auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, *select_stmt_ptr, view_bind_context_ptr);
+    bind_context_ptr->AddSubQueryChild(view_bind_context_ptr);
+
     auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
 
     // Add binding into bind context
@@ -1213,62 +1214,52 @@ PlanBuilder::BuildCrossProduct(std::shared_ptr<QueryContext>& query_context,
     // Build left and right table with new bind context
     // Merge two bind context into their parent context
 
-    std::shared_ptr<CrossProductTableRef> result;
+    std::vector<std::shared_ptr<BindContext>> stack;
+    std::shared_ptr<BindContext> left_context_ptr = bind_context_ptr;
+    stack.emplace_back(left_context_ptr);
 
+    std::shared_ptr<BindContext> cross_product_bind_context_ptr = nullptr;
     const std::vector<hsql::TableRef*>& tables = *from_table->list;
-    int64_t table_count = tables.size();
+    auto table_count = tables.size();
+    for(auto i = 0; i < table_count - 1; ++ i) {
+        auto right_context_ptr = std::make_shared<BindContext>(left_context_ptr);
+        stack.emplace_back(right_context_ptr);
 
-    hsql::TableRef* left_table_ptr = tables[0];
-    std::shared_ptr<BindContext> left_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-    bind_context_ptr->AddChild(left_bind_context_ptr);
-    // AddBindContextArray(left_bind_context_ptr);
-    // std::shared_ptr<TableRef> left_bound_table_ref
-    auto left_bound_table_ref = BuildFromClause(query_context, left_table_ptr, left_bind_context_ptr);
-
-    for(int64_t idx = 1; idx < table_count - 1; ++ idx) {
-        result = std::make_shared<CrossProductTableRef>();
-        result->left_bind_context_ = left_bind_context_ptr;
-        result->left_table_ref_ = left_bound_table_ref;
-
-        hsql::TableRef* right_table_ptr = tables[idx];
-        std::shared_ptr<BindContext> right_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-        bind_context_ptr->AddChild(right_bind_context_ptr);
-//        AddBindContextArray(right_bind_context_ptr);
-        std::shared_ptr<TableRef> right_bound_table_ref = BuildFromClause(query_context, right_table_ptr, right_bind_context_ptr);
-
-        result->right_bind_context_ = right_bind_context_ptr;
-        result->right_table_ref_ = right_bound_table_ref;
-
-        std::shared_ptr<BindContext> cross_product_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-        bind_context_ptr->AddChild(cross_product_bind_context_ptr);
-        // AddBindContextArray(cross_product_bind_context_ptr);
-        cross_product_bind_context_ptr->AddBindContext(left_bind_context_ptr);
-        cross_product_bind_context_ptr->AddBindContext(right_bind_context_ptr);
-
-        left_bind_context_ptr = cross_product_bind_context_ptr;
-        left_bound_table_ref = result;
+        cross_product_bind_context_ptr = std::make_shared<BindContext>(left_context_ptr);
+        left_context_ptr = cross_product_bind_context_ptr;
+        stack.emplace_back(left_context_ptr);
     }
 
-    result = std::make_shared<CrossProductTableRef>();
-    result->left_bind_context_ = left_bind_context_ptr;
-    result->left_table_ref_ = left_bound_table_ref;
+    left_context_ptr = stack.back();
+    stack.pop_back();
+    hsql::TableRef* left_table_ptr = tables[0];
+    std::shared_ptr<TableRef> left_bound_table_ref = BuildFromClause(query_context, left_table_ptr, left_context_ptr);
 
-    hsql::TableRef* right_table_ptr = tables.back();
-    std::shared_ptr<BindContext> right_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-    bind_context_ptr->AddChild(right_bind_context_ptr);
-    // AddBindContextArray(right_bind_context_ptr);
-    // std::shared_ptr<TableRef> right_bound_table_ref
-    auto right_bound_table_ref = BuildFromClause(query_context, right_table_ptr, right_bind_context_ptr);
+    for(auto i = 1; i < table_count; ++ i) {
+        // Right node
+        auto right_context_ptr = stack.back();
+        stack.pop_back();
+        hsql::TableRef* right_table_ptr = tables[i];
+        std::shared_ptr<TableRef> right_bound_table_ref = BuildFromClause(query_context, right_table_ptr, right_context_ptr);
 
-    result->right_bind_context_ = right_bind_context_ptr;
-    result->right_table_ref_ = right_bound_table_ref;
+        // Cross product node
+        auto cross_product_table_ref = std::make_shared<CrossProductTableRef>();
+        cross_product_table_ref->left_bind_context_ = left_context_ptr;
+        cross_product_table_ref->left_table_ref_ = left_bound_table_ref;
+        cross_product_table_ref->right_bind_context_ = right_context_ptr;
+        cross_product_table_ref->right_table_ref_ = right_bound_table_ref;
 
-    bind_context_ptr->AddBindContext(left_bind_context_ptr);
-    bind_context_ptr->AddBindContext(right_bind_context_ptr);
+        cross_product_bind_context_ptr = stack.back();
+        stack.pop_back();
+        cross_product_bind_context_ptr->AddLeftChild(left_context_ptr);
+        cross_product_bind_context_ptr->AddRightChild(right_context_ptr);
 
-    // TODO: Not care about the correlated expression
+        left_context_ptr = cross_product_bind_context_ptr;
+        left_bound_table_ref = cross_product_table_ref;
+    }
 
-    return result;
+    bind_context_ptr = left_context_ptr;
+    return left_bound_table_ref;
 }
 
 std::shared_ptr<TableRef>
@@ -1290,21 +1281,17 @@ PlanBuilder::BuildJoin(std::shared_ptr<QueryContext>& query_context,
 
     // Build left child
     std::shared_ptr<BindContext> left_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-    bind_context_ptr->AddChild(left_bind_context_ptr);
     // AddBindContextArray(left_bind_context_ptr);
     // std::shared_ptr<TableRef> left_bound_table_ref
     auto left_bound_table_ref = BuildFromClause(query_context, from_table->join->left, left_bind_context_ptr);
+    bind_context_ptr->AddLeftChild(left_bind_context_ptr);
 
     // Build right child
     std::shared_ptr<BindContext> right_bind_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-    bind_context_ptr->AddChild(right_bind_context_ptr);
     // AddBindContextArray(right_bind_context_ptr);
     // std::shared_ptr<TableRef> right_bound_table_ref
     auto right_bound_table_ref = BuildFromClause(query_context, from_table->join->right, right_bind_context_ptr);
-
-    // Merge left/right bind context into current bind context
-    bind_context_ptr->AddBindContext(left_bind_context_ptr);
-    bind_context_ptr->AddBindContext(right_bind_context_ptr);
+    bind_context_ptr->AddRightChild(right_bind_context_ptr);
 
     result->left_table_ref_ = left_bound_table_ref;
     result->left_bind_context_ = left_bind_context_ptr;
@@ -1381,7 +1368,7 @@ PlanBuilder::BuildJoin(std::shared_ptr<QueryContext>& query_context,
                 std::shared_ptr<ColumnExpression> right_column_expression_ptr =
                         std::make_shared<ColumnExpression>(right_column_type, right_binding_ptr->table_name_, column_name, right_column_index, 0);
 
-                auto condition = std::make_shared<ConjunctionExpression>(ExpressionType::kConjunction, ConjunctionType::kAnd, left_column_expression_ptr, right_column_expression_ptr);
+                auto condition = std::make_shared<ConjunctionExpression>(ConjunctionType::kAnd, left_column_expression_ptr, right_column_expression_ptr);
                 result->on_conditions_.emplace_back(condition);
 
                 // For natural join, we can return now.
