@@ -15,9 +15,12 @@ Infinity::Infinity()
 
 void
 Infinity::Init() {
-    storage_->Init();
-    Logger::Initialize();
-
+    if(initialized_false_) {
+        return ;
+    } else {
+        storage_->Init();
+        Logger::Initialize();
+    }
 }
 
 }

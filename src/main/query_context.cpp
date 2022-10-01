@@ -31,7 +31,6 @@ QueryResult::ToString() const {
         }
         case LogicalNodeType::kUpdate: {
             return "UPDATE 0 1";
-            break;
         }
         case LogicalNodeType::kDelete: {
             return "DELETE 0 1";

@@ -13,6 +13,11 @@ file(GLOB_RECURSE
         infinity_console_src
         CONFIGURE_DEPENDS
         bin/infinity_console.cpp
+        )
+
+file(GLOB_RECURSE
+        console_src
+        CONFIGURE_DEPENDS
         bin/console.cpp
         bin/console.h
         )
@@ -84,6 +89,7 @@ file(GLOB_RECURSE
         )
 
 set(INFINITY_CORE_SOURCE
+        ${console_src}
         ${common_src}
         ${executor_src}
         ${expression_src}

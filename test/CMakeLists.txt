@@ -35,4 +35,5 @@ target_link_libraries(test_main
         gmock
         gmock_main
         infinity_core
+        sql-parser
         )

@@ -30,6 +30,8 @@ private:
     std::unique_ptr<Scheduler> scheduler_;
     std::unique_ptr<Config> config_;
     std::unique_ptr<Storage> storage_;
+
+    bool initialized_false_{false};
 };
 
 }
