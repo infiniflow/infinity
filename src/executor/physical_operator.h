@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "main/query_context.h"
 #include "physical_operator_type.h"
 #include "storage/table.h"
 
@@ -34,7 +35,9 @@ public:
     std::shared_ptr<PhysicalOperator> right() const { return right_; }
     uint64_t operator_id() const { return operator_id_; }
 
-    virtual void Execute() = 0;
+    virtual void
+    Execute(std::shared_ptr<QueryContext>& query_context) = 0;
+
     std::shared_ptr<Table> output() const { return output_; }
 protected:
     uint64_t operator_id_;

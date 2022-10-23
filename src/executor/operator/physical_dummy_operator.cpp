@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalDummyOperator::Execute() {
+PhysicalDummyOperator::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

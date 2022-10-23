@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalAggregate::Execute() {
+PhysicalAggregate::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

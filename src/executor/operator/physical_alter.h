@@ -13,7 +13,8 @@ public:
     explicit PhysicalAlter(uint64_t id) : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id) {}
     ~PhysicalAlter() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

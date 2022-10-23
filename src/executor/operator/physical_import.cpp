@@ -6,7 +6,8 @@
 
 namespace infinity {
 
-void PhysicalImport::Execute() {
+void
+PhysicalImport::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

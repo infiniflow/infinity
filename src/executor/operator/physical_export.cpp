@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalExport::Execute() {
+PhysicalExport::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

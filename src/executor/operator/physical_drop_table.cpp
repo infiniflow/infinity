@@ -8,7 +8,8 @@
 
 namespace infinity {
 
-void PhysicalDropTable::Execute() {
+void
+PhysicalDropTable::Execute(std::shared_ptr<QueryContext>& query_context) {
     Infinity::instance().catalog()->DeleteTable(*schema_name_, *table_name_);
 }
 

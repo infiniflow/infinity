@@ -19,7 +19,7 @@ FixedRowCountTable::FixedRowCountTable(std::shared_ptr<TableDefinition> table_de
 }
 
 void
-FixedRowCountTable::Append(const TransientBlock& tblock) {
+FixedRowCountTable::Append(const TransBlock& tblock) {
     int64_t column_count = table_def_->column_count();
     StorageAssert(tblock.ColumnCount() == column_count, "Wrong column data are appended to the table");
     int64_t insert_row_count = tblock.row_count_;

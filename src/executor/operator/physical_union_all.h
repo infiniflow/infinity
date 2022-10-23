@@ -14,7 +14,8 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kUnionAll, nullptr, nullptr, id) {}
     ~PhysicalUnionAll() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

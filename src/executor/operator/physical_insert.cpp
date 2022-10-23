@@ -10,7 +10,7 @@
 namespace infinity {
 
 void
-PhysicalInsert::Execute() {
+PhysicalInsert::Execute(std::shared_ptr<QueryContext>& query_context) {
 
     // TODO: execute insert into table;
     std::vector<LogicalType> chunk_types;
@@ -22,7 +22,7 @@ PhysicalInsert::Execute() {
         chunk_types.emplace_back(value_list_[idx]->DataType());
     }
 
-    TransientBlock transient_block(chunk_types);
+    TransBlock transient_block(chunk_types);
     for(uint64_t idx = 0; idx < value_count; ++ idx) {
         std::shared_ptr<ValueExpression> value_expr_ptr = std::static_pointer_cast<ValueExpression>(value_list_[idx]);
         value_expr_ptr->AppendToChunk(transient_block.chunks_[idx]);

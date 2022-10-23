@@ -14,7 +14,8 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kJoinSortMerge, nullptr, nullptr, id) {}
     ~PhysicalSortMergeJoin() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

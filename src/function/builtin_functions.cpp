@@ -3,15 +3,19 @@
 //
 
 #include "builtin_functions.h"
-// Arithmetic
+
+// Arithmetic scalar function
 #include "scalar/add.h"
 
-#include "scalar/abs.h"
 #include "scalar/sub.h"
 #include "scalar/mul.h"
 #include "scalar/div.h"
 
+// Match scalar function
+#include "scalar/abs.h"
 #include "scalar/pow.h"
+
+// Match comparison function
 #include "scalar/equals.h"
 #include "scalar/notequals.h"
 #include "scalar/less.h"
@@ -19,8 +23,15 @@
 #include "scalar/greater.h"
 #include "scalar/greater_equals.h"
 
+// Logical scalar function
+
 #include "scalar/or.h"
 #include "scalar/and.h"
+
+// Aggregate function
+
+// Table function
+#include "table/table_scan.h"
 
 namespace infinity {
 
@@ -69,6 +80,7 @@ BuiltinFunctions::RegisterScalarFunction() {
 void
 BuiltinFunctions::RegisterTableFunction() {
 
+    RegisterTableScanFunction(catalog_ptr_);
 }
 
 }

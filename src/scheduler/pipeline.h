@@ -5,6 +5,7 @@
 #pragma once
 
 #include "storage/table.h"
+#include "main/query_context.h"
 
 #include <atomic>
 #include <memory>
@@ -34,14 +35,15 @@ public:
     const std::vector<std::shared_ptr<Pipeline>>& successors() const { return successors_; }
 
     void Schedule();
-    void Execute();
+    void Execute(std::shared_ptr<QueryContext>& query_context);
 
     TaskState state() const { return state_; }
     uint64_t Id() const { return id_; }
     virtual std::shared_ptr<Table> GetResult() = 0;
 
 protected:
-    virtual void OnExecute() = 0;
+    virtual void
+    OnExecute(std::shared_ptr<QueryContext>& query_context) = 0;
 
 private:
     void OnPredecessorDone();

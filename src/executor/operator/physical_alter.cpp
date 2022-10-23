@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalAlter::Execute() {
+PhysicalAlter::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

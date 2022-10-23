@@ -114,4 +114,29 @@ Catalog::DeleteFunctionSet(const std::string& function_name) {
     function_sets_.erase(function_name);
 }
 
+std::shared_ptr<TableFunction>
+Catalog::GetTableFunctionByName(const std::string& function_name) {
+    if(!table_functions_.contains(function_name)) {
+        CatalogError("No table function name: " + function_name);
+    }
+    return table_functions_[function_name];
+}
+
+void
+Catalog::AddTableFunction(const std::shared_ptr<TableFunction>& table_function) {
+    const std::string& name = table_function->name();
+    if(table_functions_.contains(name)) {
+        CatalogError("Trying to add duplicated table function name into catalog: " + name);
+    }
+    table_functions_.emplace(name, table_function);
+}
+
+void
+Catalog::DeleteTableFunction(const std::string& function_name) {
+    if(!table_functions_.contains(function_name)) {
+        CatalogError("Delete not exist table function: " + function_name);
+    }
+    table_functions_.erase(function_name);
+}
+
 }

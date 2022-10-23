@@ -18,7 +18,9 @@ public:
           table_ptr_(std::move(table_ptr)),
           value_list_(std::move(value_list)) {}
     ~PhysicalInsert() override = default;
-    void Execute() override;
+
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 
 private:
     std::shared_ptr<Table> table_ptr_;

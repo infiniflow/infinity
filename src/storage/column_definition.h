@@ -6,7 +6,7 @@
 
 #include <string>
 #include <set>
-#include "data_type.h"
+#include "column_base.h"
 
 namespace infinity {
 
@@ -19,13 +19,12 @@ enum class ConstrainType {
 };
 
 
-class ColumnDefinition {
+class ColumnDefinition : public ColumnBase {
 public:
     ColumnDefinition(std::string column_name, uint64_t column_id, LogicalType logical_type, bool nullable, std::set<ConstrainType> constrains);
 
     [[nodiscard]] std::string ToString() const;
-    [[nodiscard]] std::string name() const { return name_; }
-    [[nodiscard]] const LogicalType& logical_type() const { return logical_type_; }
+
 private:
     std::string name_;
     uint64_t column_id_;

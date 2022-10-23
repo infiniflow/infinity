@@ -11,7 +11,7 @@
 namespace infinity {
 
 void
-PhysicalChunkScan::Execute() {
+PhysicalChunkScan::Execute(std::shared_ptr<QueryContext>& query_context) {
 
     switch(scan_type_) {
         case ChunkScanType::kShowTables: {
@@ -36,7 +36,7 @@ PhysicalChunkScan::Execute() {
             LogicalType bigint_type = LogicalType(LogicalTypeId::kBigInt);
 
             for(std::shared_ptr<Table>& table: tables) {
-                TransientBlock transient_block;
+                TransBlock transient_block;
 
                 size_t column_id = 0;
                 transient_block.chunks_.emplace_back(varchar_type);

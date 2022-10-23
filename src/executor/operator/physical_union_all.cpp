@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalUnionAll::Execute() {
+PhysicalUnionAll::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

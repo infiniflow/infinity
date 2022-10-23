@@ -20,7 +20,8 @@ public:
 
     std::shared_ptr<Table> GetResult() override;
 protected:
-    void OnExecute() final;
+    void
+    OnExecute(std::shared_ptr<QueryContext>& query_context) final;
 
 private:
     std::shared_ptr<PhysicalOperator> operator_;

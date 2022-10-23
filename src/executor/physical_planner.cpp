@@ -6,6 +6,7 @@
 #include "planner/node/logical_create_table.h"
 #include "planner/node/logical_drop_table.h"
 #include "planner/node/logical_insert.h"
+#include "planner/node/logical_table_scan.h"
 
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_aggregate.h"
@@ -198,7 +199,15 @@ PhysicalPlanner::BuildChunkScan(const std::shared_ptr<LogicalNode> &logical_oper
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildTableScan(const std::shared_ptr<LogicalNode> &logical_operator) const {
-    return std::make_shared<PhysicalTableScan>(logical_operator->node_id());
+    std::shared_ptr<LogicalTableScan> logical_table_scan =
+            std::static_pointer_cast<LogicalTableScan>(logical_operator);
+
+    return std::make_shared<PhysicalTableScan>(logical_operator->node_id(),
+                                               logical_table_scan->table_alias_,
+                                               logical_table_scan->column_names_,
+                                               logical_table_scan->column_types_,
+                                               logical_table_scan->columns_,
+                                               logical_table_scan->table_scan_func_ptr_);
 }
 
 

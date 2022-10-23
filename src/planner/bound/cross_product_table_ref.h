@@ -12,7 +12,7 @@ class BindContext;
 
 class CrossProductTableRef: public TableRef {
 public:
-    explicit CrossProductTableRef() : TableRef(TableRefType::kCrossProduct) {}
+    explicit CrossProductTableRef(std::string alias) : TableRef(TableRefType::kCrossProduct, alias) {}
 
     std::shared_ptr<BindContext> left_bind_context_;
     std::shared_ptr<BindContext> right_bind_context_;

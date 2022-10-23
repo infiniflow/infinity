@@ -13,7 +13,9 @@ public:
     explicit PhysicalUpdate(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kUpdate, nullptr, nullptr, id) {}
     ~PhysicalUpdate() override = default;
-    void Execute() override;
+
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

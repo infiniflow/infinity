@@ -30,7 +30,7 @@ PhysicalCreateTable::PhysicalCreateTable(std::shared_ptr<std::string> schema_nam
 }
 
 void
-PhysicalCreateTable::Execute() {
+PhysicalCreateTable::Execute(std::shared_ptr<QueryContext>& query_context) {
 //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
     std::shared_ptr<Table> table_ptr = std::make_shared<FixedRowCountTable>(table_def_ptr_);
     Infinity::instance().catalog()->AddTable(*schema_name_, table_ptr);

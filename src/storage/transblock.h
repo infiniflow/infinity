@@ -10,9 +10,9 @@
 
 namespace infinity {
 
-struct TransientBlock {
-    TransientBlock() = default;
-    explicit TransientBlock(const std::vector<LogicalType>& types) {
+struct TransBlock {
+    TransBlock() = default;
+    explicit TransBlock(const std::vector<LogicalType>& types) {
         for(auto& type: types) {
             chunks_.emplace_back(type);
         }

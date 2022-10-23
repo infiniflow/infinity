@@ -15,7 +15,8 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id) {}
     ~PhysicalImport() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 

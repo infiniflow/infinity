@@ -18,7 +18,9 @@ public:
             scan_type_(type) {}
 
     ~PhysicalChunkScan() override = default;
-    void Execute() override;
+
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 
 private:
     ChunkScanType scan_type_;

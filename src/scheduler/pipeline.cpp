@@ -30,8 +30,8 @@ Pipeline::Schedule() {
 }
 
 void
-Pipeline::Execute() {
-    OnExecute();
+Pipeline::Execute(std::shared_ptr<QueryContext>& query_context) {
+    OnExecute(query_context);
 }
 
 void

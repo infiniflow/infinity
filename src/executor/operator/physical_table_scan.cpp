@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalTableScan::Execute() {
+PhysicalTableScan::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

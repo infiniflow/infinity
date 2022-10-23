@@ -16,9 +16,10 @@ enum class TableRefType {
 
 class TableRef {
 public:
-    explicit TableRef(TableRefType type): type_(type) {}
+    explicit TableRef(TableRefType type, std::string alias): type_(type), alias_(std::move(alias)) {}
 
     TableRefType type_{TableRefType::kInvalid};
+    std::string alias_;
 };
 
 }

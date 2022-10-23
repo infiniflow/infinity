@@ -13,7 +13,8 @@ public:
     explicit PhysicalTop(uint64_t id): PhysicalOperator(PhysicalOperatorType::kTop, nullptr, nullptr, id) {}
     ~PhysicalTop() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

@@ -32,7 +32,7 @@ ScalarFunction::CastArgumentTypes(std::vector<BaseExpression>& input_arguments) 
 }
 
 void
-ScalarFunction::NoOpFunction(const TransientBlock &input, Chunk &output) {
+ScalarFunction::NoOpFunction(const TransBlock &input, Chunk &output) {
     // TODO: this should be the pointer copy from input to output.
     output.data() = input.chunks_[0].data();
 }

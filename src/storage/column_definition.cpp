@@ -15,9 +15,8 @@ ColumnDefinition::ColumnDefinition(
         infinity::LogicalType logical_type,
         bool nullable,
         std::set<ConstrainType> constrains)
-    : name_(std::move(column_name)),
+    : ColumnBase(std::move(column_name), logical_type),
     column_id_(column_id),
-    logical_type_(logical_type),
     nullable_(nullable),
     constrains_(std::move(constrains)) {}
 

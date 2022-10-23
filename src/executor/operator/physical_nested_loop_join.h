@@ -14,7 +14,8 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, nullptr, nullptr, id) {}
     ~PhysicalNestedLoopJoin() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

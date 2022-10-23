@@ -12,7 +12,9 @@ class NaiveScheduler : public Scheduler {
 public:
     ~NaiveScheduler() override = default;
 
-    void Schedule(const std::shared_ptr<Pipeline>& pipeline) override;
+    void
+    Schedule(std::shared_ptr<QueryContext>& query_context,
+             const std::shared_ptr<Pipeline>& pipeline) override;
 };
 
 }

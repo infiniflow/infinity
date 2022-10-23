@@ -32,11 +32,17 @@ public:
     void AddFunctionSet(const std::shared_ptr<FunctionSet>& function_set);
     void DeleteFunctionSet(const std::string& function_name);
 
+    // Table Function related methods
+    std::shared_ptr<TableFunction> GetTableFunctionByName(const std::string& function_name);
+    void AddTableFunction(const std::shared_ptr<TableFunction>& table_function);
+    void DeleteTableFunction(const std::string& function_name);
+
     ~Catalog() override = default;
 
 private:
     std::unordered_map<std::string, std::shared_ptr<Schema>> schemas_;
     std::unordered_map<std::string, std::shared_ptr<FunctionSet>> function_sets_;
+    std::unordered_map<std::string, std::shared_ptr<TableFunction>> table_functions_;
 
     uint64_t schema_id_counter_{0};
 };

@@ -4,13 +4,16 @@
 
 #include "table_function.h"
 #include <sstream>
+#include <utility>
 
 namespace infinity {
 
 TableFunction::TableFunction(std::string name,
-                               std::vector<LogicalType> argument_types)
-                               : Function(std::move(name), FunctionType::kTable),
-                                 parameter_types_(std::move(argument_types))
+                             std::vector<LogicalType> argument_types,
+                             TableFunctionType function)
+                           : Function(std::move(name), FunctionType::kTable),
+                             parameter_types_(std::move(argument_types)),
+                             main_function_(std::move(function))
 {}
 
 std::string

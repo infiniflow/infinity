@@ -22,7 +22,8 @@ public:
 
     ~PhysicalCreateTable() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 
 private:
     std::shared_ptr<TableDefinition> table_def_ptr_;

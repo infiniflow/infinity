@@ -14,7 +14,8 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr, id) {}
     ~PhysicalCreateView() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

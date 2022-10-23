@@ -5,8 +5,9 @@
 #include "physical_prepared_plan.h"
 
 namespace infinity {
+
 void
-PhysicalPreparedPlan::Execute() {
+PhysicalPreparedPlan::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

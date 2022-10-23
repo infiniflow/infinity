@@ -2,6 +2,7 @@
 // Created by JinHai on 2022/9/12.
 //
 
+#include "main/infinity.h"
 #include "bound_select_node.h"
 #include "common/utility/infinity_assert.h"
 #include "planner/node/logical_cross_product.h"
@@ -68,8 +69,16 @@ BoundSelectNode::BuildBaseTable(std::shared_ptr<TableRef>& table_ref, std::share
     // std::shared_ptr<BaseTableRef> base_table_ref
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
 
+    std::shared_ptr<TableFunction> table_func = Infinity::instance().catalog()->GetTableFunctionByName("seq_scan");
+    std::shared_ptr<TableScanFunction> table_scan_func = std::static_pointer_cast<TableScanFunction>(table_func);
+
     std::shared_ptr<LogicalTableScan> table_scan_node
-        = std::make_shared<LogicalTableScan>(base_table_ref->table_ptr_, bind_context_ptr);
+        = std::make_shared<LogicalTableScan>(base_table_ref->table_ptr_,
+                                             bind_context_ptr,
+                                             table_scan_func,
+                                             base_table_ref->alias_,
+                                             base_table_ref->column_names_,
+                                             base_table_ref->column_types_);
     return table_scan_node;
 }
 

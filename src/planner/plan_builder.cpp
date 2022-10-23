@@ -900,7 +900,6 @@ PlanBuilder::BuildFromClause(std::shared_ptr<QueryContext>& query_context,
     }
 
     PlannerError("BuildFromClause is not implemented");
-    return std::make_shared<TableRef>(TableRefType::kInvalid);
 }
 
 std::vector<SelectItem>
@@ -1095,7 +1094,9 @@ PlanBuilder::BuildTable(std::shared_ptr<QueryContext>& query_context,
             names.emplace_back(column.name());
         }
 
-        auto table_ref = std::make_shared<BaseTableRef>(table_ptr);
+        std::string alias = from_table->getName();
+
+        auto table_ref = std::make_shared<BaseTableRef>(table_ptr, alias, names, types);
 
         // Insert the table in the binding context
         bind_context_ptr->AddTableBinding(table_name, table_ptr, types, names);
@@ -1128,14 +1129,15 @@ PlanBuilder::BuildSubquery(std::shared_ptr<QueryContext>& query_context,
     auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, select_stmt, subquery_bind_context_ptr);
     bind_context_ptr->AddSubQueryChild(subquery_bind_context_ptr);
 
-    auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
-
     // Get the table index of the sub query output
     int64_t table_index = bound_select_node_ptr->GetTableIndex();
 
     std::string binding_name = name.empty() ? "subquery" + std::to_string(table_index) : name;
     // Add binding into bind context
     bind_context_ptr->AddSubqueryBinding(binding_name, bound_select_node_ptr->types, bound_select_node_ptr->names);
+
+    // Use binding name as the subquery table reference name
+    auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr, binding_name);
 
     // TODO: Not care about the correlated expression
 
@@ -1164,10 +1166,12 @@ PlanBuilder::BuildCTE(std::shared_ptr<QueryContext>& query_context,
     // Create bound select node and subquery table reference
     auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, *cte->select_statement_, cte_bind_context_ptr);
     bind_context_ptr->AddSubQueryChild(cte_bind_context_ptr);
-    auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
 
     // Add binding into bind context
     bind_context_ptr->AddSubqueryBinding(name, bound_select_node_ptr->types, bound_select_node_ptr->names);
+
+    // Use CTE name as the subquery table reference name
+    auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr, name);
 
     // TODO: Not care about the correlated expression
 
@@ -1195,10 +1199,11 @@ PlanBuilder::BuildView(std::shared_ptr<QueryContext>& query_context,
     auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, *select_stmt_ptr, view_bind_context_ptr);
     bind_context_ptr->AddSubQueryChild(view_bind_context_ptr);
 
-    auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr);
-
     // Add binding into bind context
     bind_context_ptr->AddViewBinding(view_name, bound_select_node_ptr->types, bound_select_node_ptr->names);
+
+    // Use view name as the subquery table reference name
+    auto subquery_table_ref_ptr = std::make_shared<SubqueryTableRef>(bound_select_node_ptr, view_name);
 
     // TODO: Not care about the correlated expression
 
@@ -1242,8 +1247,8 @@ PlanBuilder::BuildCrossProduct(std::shared_ptr<QueryContext>& query_context,
         hsql::TableRef* right_table_ptr = tables[i];
         std::shared_ptr<TableRef> right_bound_table_ref = BuildFromClause(query_context, right_table_ptr, right_context_ptr);
 
-        // Cross product node
-        auto cross_product_table_ref = std::make_shared<CrossProductTableRef>();
+        // Cross product node with dummy name
+        auto cross_product_table_ref = std::make_shared<CrossProductTableRef>(std::string());
         cross_product_table_ref->left_bind_context_ = left_context_ptr;
         cross_product_table_ref->left_table_ref_ = left_bound_table_ref;
         cross_product_table_ref->right_bind_context_ = right_context_ptr;
@@ -1266,7 +1271,9 @@ std::shared_ptr<TableRef>
 PlanBuilder::BuildJoin(std::shared_ptr<QueryContext>& query_context,
                        const hsql::TableRef *from_table,
                        std::shared_ptr<BindContext> &bind_context_ptr) {
-    auto result = std::make_shared<JoinTableRef>();
+    //
+    std::string alias = from_table->getName();
+    auto result = std::make_shared<JoinTableRef>(alias);
 
     switch (from_table->join->type) {
         case hsql::JoinType::kJoinCross: result->join_type_ = JoinType::kCross; break;
@@ -1320,8 +1327,8 @@ PlanBuilder::BuildJoin(std::shared_ptr<QueryContext>& query_context,
         }
 
         if(using_column_names.empty()) {
-            // It is cross product, but not a natural join
-            auto cross_product_table_ref = std::make_shared<CrossProductTableRef>();
+            // It is cross product, but not a natural join with dummy name
+            auto cross_product_table_ref = std::make_shared<CrossProductTableRef>(std::string());
             cross_product_table_ref->left_bind_context_ = left_bind_context_ptr;
             cross_product_table_ref->left_table_ref_ = left_bound_table_ref;
 

@@ -14,7 +14,8 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kInvalid, nullptr, nullptr, id) {}
     ~PhysicalDummyOperator() override = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

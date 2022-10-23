@@ -13,7 +13,9 @@ public:
     explicit PhysicalPreparedPlan(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kPreparedPlan, nullptr, nullptr, id) {}
     ~PhysicalPreparedPlan() = default;
-    void Execute() override;
+
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

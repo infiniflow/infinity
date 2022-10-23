@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalTop::Execute() {
+PhysicalTop::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

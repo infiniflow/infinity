@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "main/query_context.h"
 #include "pipeline.h"
 
 namespace infinity {
@@ -13,7 +14,8 @@ public:
     Scheduler() = default;
     virtual ~Scheduler() = 0;
 
-    virtual void Schedule(const std::shared_ptr<Pipeline>& pipeline) = 0;
+    virtual void Schedule(std::shared_ptr<QueryContext>& query_context,
+                          const std::shared_ptr<Pipeline>& pipeline) = 0;
 };
 
 }

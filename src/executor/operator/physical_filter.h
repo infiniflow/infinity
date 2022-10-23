@@ -12,7 +12,9 @@ class PhysicalFilter : public PhysicalOperator {
 public:
     explicit PhysicalFilter(uint64_t id): PhysicalOperator(PhysicalOperatorType::kFilter, nullptr, nullptr, id) {}
     ~PhysicalFilter() = default;
-    void Execute() override;
+
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 

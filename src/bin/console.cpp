@@ -276,7 +276,7 @@ Console::ExecuteSQL(const std::string& sql_text) {
         std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
 
         // Schedule the query pipeline
-        Infinity::instance().scheduler()->Schedule(pipeline);
+        Infinity::instance().scheduler()->Schedule(query_context_ptr, pipeline);
 
         QueryResult query_result;
         query_result.result_ = pipeline->GetResult();

@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalProduct::Execute() {
+PhysicalProduct::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

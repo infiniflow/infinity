@@ -6,6 +6,7 @@
 #include "base_test.h"
 #include "bin/console.h"
 #include "main/infinity.h"
+#include "common/utility/str.h"
 
 #include <filesystem>
 #include <fstream>
@@ -29,12 +30,17 @@ execute_sql(infinity::Console& console, const std::string& filename) {
     std::string string_line;
     std::ifstream input_file(filename);
     while(std::getline(input_file, string_line)) {
-        if(string_line.empty()) {
+        // Get the command line from head to '#'
+        std::string cmd_line = string_line.substr(0, string_line.find_first_of('#'));
+
+        // Trim the command line
+        infinity::trim(cmd_line);
+        if(cmd_line.empty()) {
             continue;;
         }
         try {
-            std::cout << "[SQL]: " << string_line << std::endl;
-            auto result = console.HandleCommand(string_line.c_str());
+            std::cout << "[SQL]: " << cmd_line << std::endl;
+            auto result = console.HandleCommand(cmd_line.c_str());
         } catch (std::exception& e) {
             std::cout << e.what() << std::endl;
         }

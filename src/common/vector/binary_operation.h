@@ -2,7 +2,7 @@
 // Created by JinHai on 2022/9/15.
 //
 
-#include "storage/transient_block.h"
+#include "storage/transblock.h"
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {

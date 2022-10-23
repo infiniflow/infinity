@@ -14,7 +14,8 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kLimit, nullptr, nullptr, id) {}
     ~PhysicalLimit() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

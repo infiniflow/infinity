@@ -13,7 +13,8 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kDropView, nullptr, nullptr, id) {}
     ~PhysicalDropView() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

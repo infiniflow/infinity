@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalLimit::Execute() {
+PhysicalLimit::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

@@ -5,7 +5,7 @@
 #pragma once
 
 #include "table_definition.h"
-#include "transient_block.h"
+#include "transblock.h"
 #include "block.h"
 
 #include <any>
@@ -22,7 +22,7 @@ public:
     [[nodiscard]] uint64_t block_count() const { return blocks_.size(); }
     std::vector<std::shared_ptr<Block>>& blocks() { return blocks_; }
     [[nodiscard]] TableType table_type() const { return table_type_; }
-    virtual void Append(const TransientBlock& block) = 0;
+    virtual void Append(const TransBlock& block) = 0;
 
 protected:
     std::shared_ptr<TableDefinition> table_def_;

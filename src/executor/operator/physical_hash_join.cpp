@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalHashJoin::Execute() {
+PhysicalHashJoin::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

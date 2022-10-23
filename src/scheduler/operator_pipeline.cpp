@@ -28,8 +28,8 @@ OperatorPipeline::OperatorPipeline(std::shared_ptr<PhysicalOperator> op)
     : Pipeline(op->operator_id()), operator_(std::move(op)) {}
 
 void
-OperatorPipeline::OnExecute() {
-    operator_->Execute();
+OperatorPipeline::OnExecute(std::shared_ptr<QueryContext>& query_context) {
+    operator_->Execute(query_context);
 }
 
 std::shared_ptr<Table>

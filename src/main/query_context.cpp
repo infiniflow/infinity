@@ -96,7 +96,7 @@ QueryContext::Query(const std::string &query) {
         std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
 
         // Schedule the query pipeline
-        Infinity::instance().scheduler()->Schedule(pipeline);
+        Infinity::instance().scheduler()->Schedule(query_context, pipeline);
 
         QueryResult query_result;
         query_result.result_ = pipeline->GetResult();

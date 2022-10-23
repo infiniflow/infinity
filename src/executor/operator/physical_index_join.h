@@ -14,7 +14,8 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr, id) {}
     ~PhysicalIndexJoin() = default;
 
-    void Execute() override;
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

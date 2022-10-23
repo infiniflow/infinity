@@ -14,7 +14,7 @@ Optimizer::AddRule(std::unique_ptr<OptimizerRule> rule) {
 std::shared_ptr<LogicalNode>
 Optimizer::optimize(const std::shared_ptr<LogicalNode>& unoptimized_plan) {
     for(const auto& rule : rules_) {
-        rule->ApplyToPlan(unoptimized_plan);
+        rule->ApplyToPlan(query_context_ptr_, unoptimized_plan);
     }
     return unoptimized_plan;
 }

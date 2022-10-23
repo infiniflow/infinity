@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-PhysicalUpdate::Execute() {
+PhysicalUpdate::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 

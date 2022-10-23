@@ -13,7 +13,9 @@ public:
     explicit PhysicalProduct(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kProduct, nullptr, nullptr, id) {}
     ~PhysicalProduct() = default;
-    void Execute() override;
+
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 };
 
 }

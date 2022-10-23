@@ -18,7 +18,9 @@ public:
         table_name_(std::move(tbl_name)) {}
 
     ~PhysicalDropTable() = default;
-    void Execute() override;
+
+    void
+    Execute(std::shared_ptr<QueryContext>& query_context) override;
 
 private:
     std::shared_ptr<std::string> schema_name_;
