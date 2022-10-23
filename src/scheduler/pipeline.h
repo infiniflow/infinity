@@ -53,7 +53,10 @@ private:
 
     // Task dependencies
     std::atomic<uint64_t> pending_predecessors_{0};
+
+    // TODO: leaf node will be freed due to weak ptr;
     std::vector<std::weak_ptr<Pipeline>> predecessors_;
+
     std::vector<std::shared_ptr<Pipeline>> successors_;
 
     uint64_t id_{0};

@@ -28,10 +28,10 @@ public:
     void set_left_node(const std::shared_ptr<LogicalNode>& left) { left_node_ = left; }
     void set_right_node(const std::shared_ptr<LogicalNode>& right) { right_node_ = right; };
 
-    void AddOutputNode(const std::shared_ptr<LogicalNode>& output);
-    void RemoveOutputNode(const std::shared_ptr<LogicalNode>& output);
-    void ClearOutputs();
-    [[nodiscard]] std::vector<std::shared_ptr<LogicalNode>> outputs() const { return outputs_; }
+//    void AddOutputNode(const std::shared_ptr<LogicalNode>& output);
+//    void RemoveOutputNode(const std::shared_ptr<LogicalNode>& output);
+//    void ClearOutputs();
+//    [[nodiscard]] std::vector<std::shared_ptr<LogicalNode>> outputs() const { return outputs_; }
 
     virtual std::string ToString(int64_t& space) = 0;
     [[nodiscard]] uint64_t node_id() const { return node_id_; }
@@ -44,7 +44,7 @@ protected:
 
     std::shared_ptr<LogicalNode> left_node_;
     std::shared_ptr<LogicalNode> right_node_;
-    std::vector<std::shared_ptr<LogicalNode>> outputs_;
+//    std::vector<std::shared_ptr<LogicalNode>> outputs_;
 
     // Each node has an id which is unique in this plan tree.
     int64_t node_id_{0};

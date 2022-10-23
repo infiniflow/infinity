@@ -6,6 +6,7 @@
 #include "planner/node/logical_create_table.h"
 #include "planner/node/logical_drop_table.h"
 #include "planner/node/logical_insert.h"
+#include "planner/node/logical_project.h"
 #include "planner/node/logical_table_scan.h"
 
 #include "executor/operator/physcial_drop_view.h"
@@ -166,7 +167,18 @@ PhysicalPlanner::BuildLimit(const std::shared_ptr<LogicalNode> &logical_operator
 
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildProjection(const std::shared_ptr<LogicalNode> &logical_operator) const {
-    return std::make_shared<PhysicalProject>(logical_operator->node_id());
+    auto input_logical_node = logical_operator->left_node();
+    PlannerAssert(input_logical_node != nullptr, "Logical project node has no input node.");
+    PlannerAssert(logical_operator->right_node() == nullptr,
+                  "Logical project node shouldn't have right child.");
+
+    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
+
+    std::shared_ptr<LogicalProject> logical_project = std::static_pointer_cast<LogicalProject>(logical_operator);
+
+    return std::make_shared<PhysicalProject>(logical_operator->node_id(),
+                                             input_physical_operator,
+                                             logical_project->expressions_);
 }
 
 std::shared_ptr<PhysicalOperator>

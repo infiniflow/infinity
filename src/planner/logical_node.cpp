@@ -11,19 +11,19 @@ LogicalNode::LogicalNode(LogicalNodeType node_type, std::shared_ptr<BindContext>
     node_id_ = bind_context_ptr->GetNewLogicalNodeId();
 }
 
-void
-LogicalNode::AddOutputNode(const std::shared_ptr<LogicalNode> &output) {
-
-}
-
-void
-LogicalNode::RemoveOutputNode(const std::shared_ptr<LogicalNode> &output) {
-
-}
-
-void
-LogicalNode::ClearOutputs() {
-
-}
+//void
+//LogicalNode::AddOutputNode(const std::shared_ptr<LogicalNode> &output) {
+//
+//}
+//
+//void
+//LogicalNode::RemoveOutputNode(const std::shared_ptr<LogicalNode> &output) {
+//
+//}
+//
+//void
+//LogicalNode::ClearOutputs() {
+//
+//}
 
 }

@@ -8,7 +8,12 @@ namespace infinity {
 
 void
 PhysicalProject::Execute(std::shared_ptr<QueryContext>& query_context) {
+    // Get input from left child
+    auto input_table = left_->output();
 
+    // Execute the expression on the input table
+
+    // Generate the output
 }
 
 }

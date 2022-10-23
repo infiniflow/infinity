@@ -16,7 +16,6 @@ public:
     std::string
     ToString(int64_t& space) final;
 
-private:
     std::vector<std::shared_ptr<BaseExpression>> expressions_;
 };
 

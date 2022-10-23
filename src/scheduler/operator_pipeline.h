@@ -5,11 +5,11 @@
 #pragma once
 
 #include "pipeline.h"
-//#include "executor/physical_operator.h"
+#include "executor/physical_operator.h"
 
 namespace infinity {
 
-class PhysicalOperator;
+//class PhysicalOperator;
 
 class OperatorPipeline: public Pipeline {
 public:

@@ -11,7 +11,7 @@
 
 namespace infinity {
 
-class PhysicalChunkScan : public PhysicalOperator{
+class PhysicalChunkScan : public PhysicalOperator {
 public:
     explicit PhysicalChunkScan(uint64_t id, ChunkScanType type)
             : PhysicalOperator(PhysicalOperatorType::kChunkScan, nullptr, nullptr,id),

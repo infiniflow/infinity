@@ -13,12 +13,11 @@ TableScanFunc(std::shared_ptr<QueryContext>& query_context, TableFunctionData &d
 
 void
 RegisterTableScanFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
-    std::shared_ptr<TableFunctionSet> function_set_ptr = std::make_shared<TableFunctionSet>("seq_scan");
 
-    TableScanFunction seq_scan("seq_scan", TableScanFunc);
-    function_set_ptr->AddFunction(seq_scan);
+    std::shared_ptr<TableScanFunction> seq_scan_ptr = std::make_shared<TableScanFunction>("seq_scan", TableScanFunc);
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    catalog_ptr->AddTableFunction(seq_scan_ptr);
+
 }
 
 }
