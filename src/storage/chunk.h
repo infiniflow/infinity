@@ -45,7 +45,7 @@ protected:
     LogicalType data_type_;
     int64_t limit_{0};
     int64_t row_count_{0};
-    int64_t chunk_size_{0};
+//    int64_t chunk_size_{0};
     std::vector<std::any> data_;
     ChunkType chunk_type_;
 };

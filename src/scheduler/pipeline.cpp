@@ -3,6 +3,7 @@
 //
 
 #include "pipeline.h"
+#include "main/logger.h"
 
 #include <algorithm>
 
@@ -14,7 +15,7 @@ void
 Pipeline::SetPredecessorOf(const std::shared_ptr<Pipeline> &successor) {
     // Prevents add a duplicated successor.
     if(std::find(successors_.cbegin(), successors_.cend(), &*successor) != successors_.cend()) {
-
+        LOG_WARN("Trying to insert a duplicated pipeline id: {}", successor->Id());
         return ;
     }
     successors_.emplace_back(&*successor);

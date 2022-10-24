@@ -44,8 +44,10 @@ Chunk::Append(const Chunk& chunk, int64_t start_idx) {
     size_t insert_size = chunk.data_.size() - start_idx;
     if(available_size >= insert_size) {
         data_.insert(data_.begin() + row_count_, chunk.data_.begin() + start_idx, chunk.data_.end());
+        row_count_ += insert_size;
     } else {
         data_.insert(data_.begin() + row_count_, chunk.data_.begin() + start_idx, chunk.data_.begin() + available_size);
+        row_count_ += available_size;
     }
 }
 

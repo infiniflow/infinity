@@ -13,11 +13,12 @@
 namespace infinity {
 
 class TableFunctionData : public FunctionData {
+public:
 
 };
 
 using TableFunctionType
-    = std::function<void(std::shared_ptr<QueryContext>& query_context, TableFunctionData &data, TransBlock &output)>;
+    = std::function<void(std::shared_ptr<QueryContext>& query_context, std::shared_ptr<TableFunctionData> data, TransBlock &output)>;
 
 
 class TableFunction : public Function {

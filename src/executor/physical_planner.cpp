@@ -214,11 +214,31 @@ PhysicalPlanner::BuildTableScan(const std::shared_ptr<LogicalNode> &logical_oper
     std::shared_ptr<LogicalTableScan> logical_table_scan =
             std::static_pointer_cast<LogicalTableScan>(logical_operator);
 
+    std::unordered_map<std::string, int64_t> name2index;
+    int64_t column_count = logical_table_scan->table_ptr()->table_def()->column_count();
+    for(int64_t i = 0; i < column_count; ++ i) {
+        name2index.emplace(logical_table_scan->table_ptr()->table_def()->columns()[i].name(), i);
+    }
+
+    std::vector<int64_t> column_ids;
+    column_ids.reserve(logical_table_scan->column_names_.size());
+    for(const auto& column_name: logical_table_scan->column_names_) {
+        if(name2index.contains(column_name)) {
+            column_ids.emplace_back(name2index[column_name]);
+        } else {
+            PlannerError("Unknown column name: " + column_name + " when building physical plan.");
+        }
+    }
+
+    std::shared_ptr<TableScanFunctionData> table_scan_function_data_ptr
+        = std::make_shared<TableScanFunctionData>(logical_table_scan->table_ptr(), column_ids);
+
     return std::make_shared<PhysicalTableScan>(logical_operator->node_id(),
                                                logical_table_scan->table_alias_,
                                                logical_table_scan->column_names_,
                                                logical_table_scan->column_types_,
-                                               logical_table_scan->table_scan_func_ptr_);
+                                               logical_table_scan->table_scan_func_ptr_,
+                                               table_scan_function_data_ptr);
 }
 
 }

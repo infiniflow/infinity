@@ -16,10 +16,16 @@ RegisterTableScanFunction(const std::unique_ptr<Catalog> &catalog_ptr);
 
 class TableScanFunctionData: public TableFunctionData {
 public:
+    TableScanFunctionData(std::shared_ptr<Table> table_ptr, std::vector<int64_t> column_ids)
+        : table_ptr_(table_ptr),
+        column_ids_(column_ids)
+    {}
 
-private:
-    // How many chunk is scanned.
-    int64_t chunk_count_{0};
+    std::shared_ptr<Table> table_ptr_;
+    std::vector<int64_t> column_ids_;
+
+    // How many block is scanned.
+    int64_t block_count_{0};
 };
 
 class TableScanFunction : public TableFunction {
