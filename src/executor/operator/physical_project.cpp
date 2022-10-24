@@ -14,6 +14,7 @@ PhysicalProject::Execute(std::shared_ptr<QueryContext>& query_context) {
     // Execute the expression on the input table
 
     // Generate the output
+    output_ = input_table;
 }
 
 }

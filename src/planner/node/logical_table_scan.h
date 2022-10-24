@@ -28,7 +28,6 @@ public:
     std::string table_alias_;
     std::vector<std::string> column_names_;
     std::vector<LogicalType> column_types_;
-    std::vector<int64_t> columns_;
 
     std::shared_ptr<TableScanFunction> table_scan_func_ptr_;
 private:

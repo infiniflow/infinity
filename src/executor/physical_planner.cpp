@@ -218,10 +218,7 @@ PhysicalPlanner::BuildTableScan(const std::shared_ptr<LogicalNode> &logical_oper
                                                logical_table_scan->table_alias_,
                                                logical_table_scan->column_names_,
                                                logical_table_scan->column_types_,
-                                               logical_table_scan->columns_,
                                                logical_table_scan->table_scan_func_ptr_);
 }
-
-
 
 }

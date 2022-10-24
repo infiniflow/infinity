@@ -15,13 +15,11 @@ public:
                                std::string table_alias,
                                std::vector<std::string> column_names,
                                std::vector<LogicalType> column_types,
-                               std::vector<int64_t> columns,
                                std::shared_ptr<TableScanFunction> table_scan_function_ptr)
         : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr,id),
           table_alias_(std::move(table_alias)),
           column_names_(std::move(column_names)),
           column_types_(std::move(column_types)),
-          columns_(std::move(columns)),
           table_scan_func_ptr_(table_scan_function_ptr)
           {}
     ~PhysicalTableScan() = default;
@@ -33,7 +31,6 @@ private:
     std::string table_alias_;
     std::vector<std::string> column_names_;
     std::vector<LogicalType> column_types_;
-    std::vector<int64_t> columns_;
     std::shared_ptr<TableScanFunction> table_scan_func_ptr_{nullptr};
 
     TableFunctionData table_function_data_;

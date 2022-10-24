@@ -26,7 +26,6 @@ public:
     [[nodiscard]] std::string ToString() const;
 
 private:
-    std::string name_;
     uint64_t column_id_;
     LogicalType logical_type_{LogicalTypeId::kInvalid, -1, -1, -1};
     bool nullable_{false};
