@@ -278,6 +278,7 @@ Console::ExecuteSQL(const std::string& sql_text) {
         // Schedule the query pipeline
         Infinity::instance().scheduler()->Schedule(query_context_ptr, pipeline);
 
+        // Initialize query result
         QueryResult query_result;
         query_result.result_ = pipeline->GetResult();
         query_result.root_operator_type_ = unoptimized_plan->operator_type();

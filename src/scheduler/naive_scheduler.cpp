@@ -23,9 +23,8 @@ NaiveScheduler::Schedule(std::shared_ptr<QueryContext>& query_context, const std
 
         if( !current_pipeline->predecessors().empty() ) {
             // this pipeline has predecessors
-            const std::vector<std::weak_ptr<Pipeline>>& childs = current_pipeline->predecessors();
-            for(const std::weak_ptr<Pipeline>& weak_child: childs) {
-                auto shared_child = weak_child.lock();
+            const std::vector<std::shared_ptr<Pipeline>>& children = current_pipeline->predecessors();
+            for(const std::shared_ptr<Pipeline>& shared_child: children) {
                 pipeline_stack.push(shared_child);
             }
         } else {
