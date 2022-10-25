@@ -8,6 +8,7 @@
 #include "planner/node/logical_insert.h"
 #include "planner/node/logical_project.h"
 #include "planner/node/logical_table_scan.h"
+#include "planner/node/logical_dummy_scan.h"
 
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_aggregate.h"
@@ -35,6 +36,7 @@
 #include "executor/operator/physical_update.h"
 #include "executor/operator/physical_prepared_plan.h"
 #include "executor/operator/physical_dummy_operator.h"
+#include "executor/operator/physical_dummy_scan.h"
 
 #include <limits>
 
@@ -61,6 +63,7 @@ PhysicalPlanner::BuildPhysicalOperator(const std::shared_ptr<LogicalNode>& logic
         // Scan
         case LogicalNodeType::kChunkScan: return BuildChunkScan(logical_operator);
         case LogicalNodeType::kTableScan: return BuildTableScan(logical_operator);
+        case LogicalNodeType::kDummyScan: return BuildDummyScan(logical_operator);
 
         // SELECT
         case LogicalNodeType::kAggregate: return BuildAggregate(logical_operator);
@@ -239,6 +242,13 @@ PhysicalPlanner::BuildTableScan(const std::shared_ptr<LogicalNode> &logical_oper
                                                logical_table_scan->column_types_,
                                                logical_table_scan->table_scan_func_ptr_,
                                                table_scan_function_data_ptr);
+}
+
+std::shared_ptr<PhysicalOperator>
+PhysicalPlanner::BuildDummyScan(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    std::shared_ptr<LogicalDummyScan> logical_chunk_scan =
+            std::static_pointer_cast<LogicalDummyScan>(logical_operator);
+    return std::make_shared<PhysicalDummyScan>(logical_chunk_scan->node_id());
 }
 
 }

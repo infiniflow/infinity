@@ -63,6 +63,7 @@ private:
     // Scan
     std::shared_ptr<PhysicalOperator> BuildChunkScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
     std::shared_ptr<PhysicalOperator> BuildTableScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
+    std::shared_ptr<PhysicalOperator> BuildDummyScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
 };
 
 

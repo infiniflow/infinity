@@ -11,7 +11,7 @@
 
 namespace infinity {
 
-class PhysicalTableScan : public PhysicalOperator{
+class PhysicalTableScan : public PhysicalOperator {
 public:
     explicit PhysicalTableScan(uint64_t id,
                                std::string table_alias,

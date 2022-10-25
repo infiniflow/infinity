@@ -12,6 +12,7 @@ enum class TableRefType {
     kSubquery,
     kCrossProduct,
     kJoin,
+    kDummy,
 };
 
 class TableRef {

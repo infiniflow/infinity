@@ -12,10 +12,6 @@
 
 #include "sql/Expr.h"
 #include "table_ref.h"
-#include "base_table_ref.h"
-#include "join_table_ref.h"
-#include "subquery_table_ref.h"
-#include "cross_product_table_ref.h"
 
 namespace infinity {
 
@@ -41,6 +37,9 @@ public:
 
     std::shared_ptr<LogicalNode>
     BuildJoinTable(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr);
+
+    std::shared_ptr<LogicalNode>
+    BuildDummyTable(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr);
 
     std::shared_ptr<LogicalNode>
     BuildFilter(std::shared_ptr<LogicalNode> root,

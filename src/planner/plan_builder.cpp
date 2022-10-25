@@ -6,15 +6,21 @@
 
 #include "main/infinity.h"
 
-#include "planner/node/logical_create_table.h"
-#include "planner/node/logical_drop_table.h"
-#include "planner/node/logical_chunk_scan.h"
-#include "planner/node/logical_table_scan.h"
-#include "planner/node/logical_view_scan.h"
-#include "planner/node/logical_insert.h"
-#include "planner/node/logical_filter.h"
+#include "node/logical_create_table.h"
+#include "node/logical_drop_table.h"
+#include "node/logical_chunk_scan.h"
+#include "node/logical_table_scan.h"
+#include "node/logical_view_scan.h"
+#include "node/logical_insert.h"
+#include "node/logical_filter.h"
 
-#include "planner/bound/subquery_flattener.h"
+#include "bound/subquery_flattener.h"
+
+#include "bound/base_table_ref.h"
+#include "bound/subquery_table_ref.h"
+#include "bound/cross_product_table_ref.h"
+#include "bound/join_table_ref.h"
+#include "bound/dummy_table_ref.h"
 
 #include "binder/aggregate_binder.h"
 #include "binder/group_binder.h"
@@ -501,6 +507,7 @@ PlanBuilder::BuildSelect(std::shared_ptr<QueryContext>& query_context,
         bound_select_node->table_ref_ptr_ = BuildFromClause(query_context, statement.fromTable, bind_context_ptr);
     } else {
         // No table reference, just evaluate the expr of the select list.
+        bound_select_node->table_ref_ptr_ = BuildDummyTable(query_context, bind_context_ptr);
     }
 
     // TODO: Check if we need to create expression_binder here.
@@ -1046,6 +1053,12 @@ PlanBuilder::BuildTop(std::shared_ptr<QueryContext>& query_context,
     PlannerError("BuildTop is not implemented");
     PlanBuildingContext res;
     return res;
+}
+
+std::shared_ptr<TableRef>
+PlanBuilder::BuildDummyTable(std::shared_ptr<QueryContext>& query_context,
+                std::shared_ptr<BindContext> &bind_context_ptr) {
+    return std::make_shared<DummyTableRef>();
 }
 
 std::shared_ptr<TableRef>

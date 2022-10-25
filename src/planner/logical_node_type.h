@@ -38,6 +38,8 @@ enum class LogicalNodeType: uint8_t {
     kChunkScan,
     kTableScan,
     kViewScan,
+    kDummyScan,
+
     // ?
     kAlias,
     kMock,
@@ -45,6 +47,5 @@ enum class LogicalNodeType: uint8_t {
     kStoredTable,
     kStaticTable,
     kRoot,
-    kDummyTable,
     kPrepare,
 };

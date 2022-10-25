@@ -28,14 +28,8 @@
 
 #include "bound/bound_select_node.h"
 #include "bound/table_ref.h"
-#include "bound/base_table_ref.h"
-#include "bound/subquery_table_ref.h"
-#include "bound/cross_product_table_ref.h"
-#include "bound/join_table_ref.h"
 
 #include "storage/view.h"
-
-//#include <memory>
 
 namespace infinity {
 
@@ -310,6 +304,10 @@ private:
              const std::vector<hsql::OrderDescription *> &order_by_clause,
              const hsql::LimitDescription &limit_description,
              std::shared_ptr<BindContext> &bind_context_ptr);
+
+    static std::shared_ptr<TableRef>
+    BuildDummyTable(std::shared_ptr<QueryContext>& query_context,
+                    std::shared_ptr<BindContext> &bind_context_ptr);
 
     static std::shared_ptr<TableRef>
     BuildTable(std::shared_ptr<QueryContext>& query_context,

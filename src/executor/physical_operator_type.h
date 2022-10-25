@@ -14,6 +14,7 @@ enum class PhysicalOperatorType: uint8_t {
     kTableScan,
     kFilter,
     kIndexScan,
+    kDummyScan,
 
     // Join
     kJoinHash,

@@ -4,14 +4,21 @@
 
 #include "main/infinity.h"
 #include "bound_select_node.h"
+#include "subquery_unnest.h"
+#include "base_table_ref.h"
+#include "join_table_ref.h"
+#include "subquery_table_ref.h"
+#include "cross_product_table_ref.h"
+#include "dummy_table_ref.h"
+
 #include "common/utility/infinity_assert.h"
 #include "planner/node/logical_cross_product.h"
 #include "planner/node/logical_join.h"
 #include "planner/node/logical_limit.h"
 #include "planner/node/logical_project.h"
 #include "planner/node/logical_filter.h"
+#include "planner/node/logical_dummy_scan.h"
 #include "expression/expression_transformer.h"
-#include "subquery_unnest.h"
 
 namespace infinity {
 std::shared_ptr<LogicalNode>
@@ -54,6 +61,7 @@ BoundSelectNode::BuildFrom(std::shared_ptr<TableRef>& table_ref, std::shared_ptr
             case TableRefType::kSubquery: return BuildSubqueryTable(table_ref, bind_context_ptr);
             case TableRefType::kCrossProduct: return BuildCrossProductTable(table_ref, bind_context_ptr);
             case TableRefType::kJoin: return BuildJoinTable(table_ref, bind_context_ptr);
+            case TableRefType::kDummy: return BuildDummyTable(table_ref, bind_context_ptr);
             default:
                 PlannerError("Unknown table reference type.");
         }
@@ -119,6 +127,13 @@ BoundSelectNode::BuildJoinTable(std::shared_ptr<TableRef>& table_ref, std::share
             std::make_shared<LogicalJoin>(join_table_ref->join_type_, join_table_ref->on_conditions_,
                                           left_node, right_node, bind_context_ptr);
     return logical_join_node;
+}
+
+std::shared_ptr<LogicalNode>
+BoundSelectNode::BuildDummyTable(std::shared_ptr<TableRef>& table_ref, std::shared_ptr<BindContext>& bind_context_ptr) {
+//    auto dummy_table_ref = std::static_pointer_cast<DummyTableRef>(table_ref);
+    std::shared_ptr<LogicalDummyScan> dummy_scan_node = std::make_shared<LogicalDummyScan>(bind_context_ptr);
+    return dummy_scan_node;
 }
 
 std::shared_ptr<LogicalNode>

@@ -37,7 +37,7 @@ public:
 
 private:
     std::shared_ptr<QueryContext> query_context_ptr_;
-    std::shared_ptr<PlanBuilder> planer_builder_ptr_;
+    std::shared_ptr<PlanBuilder> planner_builder_ptr_;
 };
 
 
