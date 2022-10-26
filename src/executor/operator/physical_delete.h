@@ -12,7 +12,10 @@ class PhysicalDelete : public PhysicalOperator {
 public:
     explicit PhysicalDelete(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kDelete, nullptr, nullptr, id) {}
-    ~PhysicalDelete() = default;
+    ~PhysicalDelete() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

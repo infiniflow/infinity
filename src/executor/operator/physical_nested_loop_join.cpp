@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalNestedLoopJoin::Init() {
+
+}
+
+void
 PhysicalNestedLoopJoin::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

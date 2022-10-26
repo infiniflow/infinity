@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalLimit::Init() {
+
+}
+
+void
 PhysicalLimit::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

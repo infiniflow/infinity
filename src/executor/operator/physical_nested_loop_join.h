@@ -12,7 +12,10 @@ class PhysicalNestedLoopJoin : public PhysicalOperator {
 public:
     explicit PhysicalNestedLoopJoin(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, nullptr, nullptr, id) {}
-    ~PhysicalNestedLoopJoin() = default;
+    ~PhysicalNestedLoopJoin() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

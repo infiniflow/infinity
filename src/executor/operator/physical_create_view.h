@@ -12,7 +12,10 @@ class PhysicalCreateView : public PhysicalOperator {
 public:
     explicit PhysicalCreateView(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr, id) {}
-    ~PhysicalCreateView() = default;
+    ~PhysicalCreateView() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

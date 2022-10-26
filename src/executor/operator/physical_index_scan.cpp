@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalIndexScan::Init() {
+
+}
+
+void
 PhysicalIndexScan::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

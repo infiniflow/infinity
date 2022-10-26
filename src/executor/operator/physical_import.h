@@ -13,7 +13,10 @@ class PhysicalImport : public PhysicalOperator {
 public:
     explicit PhysicalImport(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id) {}
-    ~PhysicalImport() = default;
+    ~PhysicalImport() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

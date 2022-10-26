@@ -12,7 +12,10 @@ class PhysicalProduct : public PhysicalOperator {
 public:
     explicit PhysicalProduct(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kProduct, nullptr, nullptr, id) {}
-    ~PhysicalProduct() = default;
+    ~PhysicalProduct() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

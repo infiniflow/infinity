@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalProduct::Init() {
+
+}
+
+void
 PhysicalProduct::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

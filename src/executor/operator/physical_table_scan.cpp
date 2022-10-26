@@ -8,6 +8,11 @@
 namespace infinity {
 
 void
+PhysicalTableScan::Init() {
+
+}
+
+void
 PhysicalTableScan::Execute(std::shared_ptr<QueryContext>& query_context) {
 
     // Generate the result table definition

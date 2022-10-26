@@ -7,10 +7,13 @@
 namespace infinity {
 
 void
+PhysicalImport::Init() {
+
+}
+
+void
 PhysicalImport::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 
 }
-
-

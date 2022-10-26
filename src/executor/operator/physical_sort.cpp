@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalSort::Init() {
+
+}
+
+void
 PhysicalSort::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

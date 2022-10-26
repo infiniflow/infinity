@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalProject::Init() {
+    executor.Init(expressions_);
+}
+
+void
 PhysicalProject::Execute(std::shared_ptr<QueryContext>& query_context) {
     // Get input from left child
     auto input_table = left_->output();

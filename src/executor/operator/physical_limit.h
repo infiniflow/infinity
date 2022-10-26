@@ -12,7 +12,10 @@ class PhysicalLimit : public PhysicalOperator {
 public:
     explicit PhysicalLimit(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kLimit, nullptr, nullptr, id) {}
-    ~PhysicalLimit() = default;
+    ~PhysicalLimit() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

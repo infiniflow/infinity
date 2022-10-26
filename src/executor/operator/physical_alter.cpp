@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalAlter::Init() {
+
+}
+
+void
 PhysicalAlter::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

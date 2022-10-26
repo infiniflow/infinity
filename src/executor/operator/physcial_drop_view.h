@@ -11,7 +11,10 @@ class PhysicalDropView : public PhysicalOperator {
 public:
     explicit PhysicalDropView(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kDropView, nullptr, nullptr, id) {}
-    ~PhysicalDropView() = default;
+    ~PhysicalDropView() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

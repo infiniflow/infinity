@@ -20,6 +20,9 @@ public:
     ~PhysicalInsert() override = default;
 
     void
+    Init() override;
+
+    void
     Execute(std::shared_ptr<QueryContext>& query_context) override;
 
 private:

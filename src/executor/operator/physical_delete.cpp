@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalDelete::Init() {
+
+}
+
+void
 PhysicalDelete::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

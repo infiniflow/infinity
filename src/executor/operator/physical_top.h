@@ -11,7 +11,10 @@ namespace infinity {
 class PhysicalTop : public PhysicalOperator {
 public:
     explicit PhysicalTop(uint64_t id): PhysicalOperator(PhysicalOperatorType::kTop, nullptr, nullptr, id) {}
-    ~PhysicalTop() = default;
+    ~PhysicalTop() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

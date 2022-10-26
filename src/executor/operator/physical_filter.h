@@ -11,7 +11,10 @@ namespace infinity {
 class PhysicalFilter : public PhysicalOperator {
 public:
     explicit PhysicalFilter(uint64_t id): PhysicalOperator(PhysicalOperatorType::kFilter, nullptr, nullptr, id) {}
-    ~PhysicalFilter() = default;
+    ~PhysicalFilter() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

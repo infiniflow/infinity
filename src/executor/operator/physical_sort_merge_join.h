@@ -12,7 +12,10 @@ class PhysicalSortMergeJoin : public PhysicalOperator {
 public:
     explicit PhysicalSortMergeJoin(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kJoinSortMerge, nullptr, nullptr, id) {}
-    ~PhysicalSortMergeJoin() = default;
+    ~PhysicalSortMergeJoin() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

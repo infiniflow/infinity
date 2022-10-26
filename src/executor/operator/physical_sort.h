@@ -12,7 +12,10 @@ class PhysicalSort : public PhysicalOperator {
 public:
     explicit PhysicalSort(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kSort, nullptr, nullptr, id) {}
-    ~PhysicalSort() = default;
+    ~PhysicalSort() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

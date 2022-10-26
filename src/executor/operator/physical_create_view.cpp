@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalCreateView::Init() {
+
+}
+
+void
 PhysicalCreateView::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

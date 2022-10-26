@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalDummyScan::Init() {
+
+}
+
+void
 PhysicalDummyScan::Execute(std::shared_ptr<QueryContext> &query_context) {
 
 }

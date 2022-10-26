@@ -11,7 +11,10 @@ namespace infinity {
 class PhysicalAggregate : public PhysicalOperator{
 public:
     explicit PhysicalAggregate(uint64_t id) : PhysicalOperator(PhysicalOperatorType::kAggregate, nullptr, nullptr, id) {}
-    ~PhysicalAggregate() = default;
+    ~PhysicalAggregate() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

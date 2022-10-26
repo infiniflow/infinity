@@ -12,7 +12,10 @@ class PhysicalIndexScan : public PhysicalOperator {
 public:
     explicit PhysicalIndexScan(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id) {}
-    ~PhysicalIndexScan() = default;
+    ~PhysicalIndexScan() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

@@ -45,40 +45,111 @@ namespace infinity {
 std::shared_ptr<PhysicalOperator>
 PhysicalPlanner::BuildPhysicalOperator(const std::shared_ptr<LogicalNode>& logical_operator) const {
 
+    std::shared_ptr<PhysicalOperator> result;
     switch(logical_operator->operator_type()) {
         // DDL
-        case LogicalNodeType::kCreateTable: return BuildCreateTable(logical_operator);
-        case LogicalNodeType::kDropTable: return BuildDropTable(logical_operator);
-        case LogicalNodeType::kCreateView: return BuildCreateView(logical_operator);
-        case LogicalNodeType::kDropView: return BuildDropView(logical_operator);
-        case LogicalNodeType::kAlter: return BuildAlter(logical_operator);
+        case LogicalNodeType::kCreateTable: {
+            result = BuildCreateTable(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kDropTable: {
+            result = BuildDropTable(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCreateView: {
+            result = BuildCreateView(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kDropView: {
+            result = BuildDropView(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kAlter: {
+            result = BuildAlter(logical_operator);
+            break;
+        }
 
         // DML
-        case LogicalNodeType::kInsert: return BuildInsert(logical_operator);
-        case LogicalNodeType::kDelete: return BuildDelete(logical_operator);
-        case LogicalNodeType::kUpdate: return BuildUpdate(logical_operator);
-        case LogicalNodeType::kImport: return BuildImport(logical_operator);
-        case LogicalNodeType::kExport: return BuildExcept(logical_operator);
+        case LogicalNodeType::kInsert: {
+            result = BuildInsert(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kDelete: {
+            result = BuildDelete(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kUpdate: {
+            result = BuildUpdate(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kImport: {
+            result = BuildImport(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kExport: {
+            result = BuildExcept(logical_operator);
+            break;
+        }
 
         // Scan
-        case LogicalNodeType::kChunkScan: return BuildChunkScan(logical_operator);
-        case LogicalNodeType::kTableScan: return BuildTableScan(logical_operator);
-        case LogicalNodeType::kDummyScan: return BuildDummyScan(logical_operator);
+        case LogicalNodeType::kChunkScan: {
+            result = BuildChunkScan(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kTableScan: {
+            result = BuildTableScan(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kDummyScan: {
+            result = BuildDummyScan(logical_operator);
+            break;
+        }
 
         // SELECT
-        case LogicalNodeType::kAggregate: return BuildAggregate(logical_operator);
-        case LogicalNodeType::kJoin: return BuildJoin(logical_operator);
-        case LogicalNodeType::kSort: return BuildSort(logical_operator);
-        case LogicalNodeType::kLimit: return BuildLimit(logical_operator);
-        case LogicalNodeType::kFilter: return BuildFilter(logical_operator);
-        case LogicalNodeType::kProjection: return BuildProjection(logical_operator);
-        case LogicalNodeType::kUnion: return BuildUnion(logical_operator);
-        case LogicalNodeType::kExcept: return BuildExcept(logical_operator);
-        case LogicalNodeType::kIntersect: return BuildIntersect(logical_operator);
-        default:
+        case LogicalNodeType::kAggregate: {
+            result = BuildAggregate(logical_operator);
             break;
+        }
+        case LogicalNodeType::kJoin: {
+            result = BuildJoin(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kSort: {
+            result = BuildSort(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kLimit: {
+            result = BuildLimit(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kFilter: {
+            result = BuildFilter(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kProjection: {
+            result = BuildProjection(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kUnion: {
+            result = BuildUnion(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kExcept: {
+            result = BuildExcept(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kIntersect: {
+            result = BuildIntersect(logical_operator);
+            break;
+        }
+        default: {
+            result = std::make_shared<PhysicalDummyOperator>(std::numeric_limits<uint64_t>::max());
+        }
     }
-    return std::make_shared<PhysicalDummyOperator>(std::numeric_limits<uint64_t>::max());
+    // Initialize the physical plan node
+    result->Init();
+
+    return result;
 }
 
 std::shared_ptr<PhysicalOperator>

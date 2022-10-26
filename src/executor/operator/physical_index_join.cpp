@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalIndexJoin::Init() {
+
+}
+
+void
 PhysicalIndexJoin::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

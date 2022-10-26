@@ -20,7 +20,10 @@ public:
                                  const std::shared_ptr<PhysicalOperator>& input,
                                  uint64_t id);
 
-    ~PhysicalCreateTable() = default;
+    ~PhysicalCreateTable() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

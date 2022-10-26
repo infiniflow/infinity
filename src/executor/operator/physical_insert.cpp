@@ -10,6 +10,11 @@
 namespace infinity {
 
 void
+PhysicalInsert::Init() {
+
+}
+
+void
 PhysicalInsert::Execute(std::shared_ptr<QueryContext>& query_context) {
 
     // TODO: execute insert into table;

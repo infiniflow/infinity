@@ -12,7 +12,10 @@ class PhysicalIndexJoin : public PhysicalOperator {
 public:
     explicit PhysicalIndexJoin(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr, id) {}
-    ~PhysicalIndexJoin() = default;
+    ~PhysicalIndexJoin() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

@@ -12,7 +12,10 @@ class PhysicalHashJoin : public PhysicalOperator {
 public:
     explicit PhysicalHashJoin(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kJoinHash, nullptr, nullptr, id) {}
-    ~PhysicalHashJoin() = default;
+    ~PhysicalHashJoin() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

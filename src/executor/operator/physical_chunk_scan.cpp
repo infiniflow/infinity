@@ -11,6 +11,11 @@
 namespace infinity {
 
 void
+PhysicalChunkScan::Init() {
+
+}
+
+void
 PhysicalChunkScan::Execute(std::shared_ptr<QueryContext>& query_context) {
 
     switch(scan_type_) {

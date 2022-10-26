@@ -12,7 +12,10 @@ class PhysicalUnionAll : public PhysicalOperator {
 public:
     explicit PhysicalUnionAll(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kUnionAll, nullptr, nullptr, id) {}
-    ~PhysicalUnionAll() = default;
+    ~PhysicalUnionAll() override = default;
+
+    void
+    Init() override;
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;

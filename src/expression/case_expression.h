@@ -26,6 +26,9 @@ public:
 
     LogicalType DataType() override;
     std::string ToString() const override;
+
+    std::vector<CaseCheck>& CaseExpr() { return case_check_; }
+    std::shared_ptr<BaseExpression>& ElseExpr() { return else_expr_; }
 private:
     std::vector<CaseCheck> case_check_;
     std::shared_ptr<BaseExpression> else_expr_;

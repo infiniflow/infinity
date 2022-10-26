@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalSortMergeJoin::Init() {
+
+}
+
+void
 PhysicalSortMergeJoin::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

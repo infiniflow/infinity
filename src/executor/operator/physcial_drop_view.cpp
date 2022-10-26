@@ -7,6 +7,11 @@
 namespace infinity {
 
 void
+PhysicalDropView::Init() {
+
+}
+
+void
 PhysicalDropView::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }

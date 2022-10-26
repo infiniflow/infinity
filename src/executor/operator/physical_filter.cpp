@@ -7,9 +7,13 @@
 namespace infinity {
 
 void
+PhysicalFilter::Init() {
+
+}
+
+void
 PhysicalFilter::Execute(std::shared_ptr<QueryContext>& query_context) {
 
 }
 
 }
-

@@ -29,6 +29,9 @@ public:
             right_(std::move(right)) {}
     virtual ~PhysicalOperator() = 0;
 
+    virtual void
+    Init() = 0;
+
     std::shared_ptr<OperatorPipeline> GenerateOperatorPipeline();
 
     std::shared_ptr<PhysicalOperator> left() const { return left_; }
