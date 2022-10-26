@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "storage/table.h"
 #include "expression/base_expression.h"
 #include "expression_state.h"
 
@@ -16,6 +17,66 @@ public:
     void
     Init(const std::vector<std::shared_ptr<BaseExpression>>& expressions);
 
+    // Evaluate all expressions
+    void
+    Execute(std::shared_ptr<Table>& input, std::shared_ptr<Table>& output);
+
+    // Method to evaluate each expression recursively
+    void
+    Execute(std::shared_ptr<BaseExpression>& expr,
+            std::shared_ptr<ExpressionState>& state,
+            Chunk& output_column,
+            size_t count);
+
+    void
+    Execute(const std::shared_ptr<AggregateExpression>& expr,
+            std::shared_ptr<ExpressionState>& state,
+            Chunk& output_column,
+            size_t count);
+
+    void
+    Execute(const std::shared_ptr<CastExpression>& expr,
+            std::shared_ptr<ExpressionState>& state,
+            Chunk& output_column,
+            size_t count);
+
+    void
+    Execute(const std::shared_ptr<CaseExpression>& expr,
+            std::shared_ptr<ExpressionState>& state,
+            Chunk& output_column,
+            size_t count);
+
+    void
+    Execute(const std::shared_ptr<ConjunctionExpression>& expr,
+            std::shared_ptr<ExpressionState>& state,
+            Chunk& output_column,
+            size_t count);
+
+    void
+    Execute(const std::shared_ptr<ColumnExpression>& expr,
+            std::shared_ptr<ExpressionState>& state,
+            Chunk& output_column,
+            size_t count);
+
+    void
+    Execute(const std::shared_ptr<FunctionExpression>& expr,
+            std::shared_ptr<ExpressionState>& state,
+            Chunk& output_column,
+            size_t count);
+
+    void
+    Execute(const std::shared_ptr<BetweenExpression>& expr,
+            std::shared_ptr<ExpressionState>& state,
+            Chunk& output_column,
+            size_t count);
+
+    void
+    Execute(const std::shared_ptr<ValueExpression>& expr,
+            std::shared_ptr<ExpressionState>& state,
+            Chunk& output_column,
+            size_t count);
+
+private:
     std::vector<std::shared_ptr<BaseExpression>> expressions;
     std::vector<std::shared_ptr<ExpressionState>> states;
 };

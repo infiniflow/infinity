@@ -67,6 +67,8 @@ public:
 public:
     void
     AddChild(const std::shared_ptr<BaseExpression>& expression);
+
+    std::vector<std::shared_ptr<ExpressionState>>& Children() { return children_; }
 private:
     std::vector<std::shared_ptr<ExpressionState>> children_;
     std::string name_;
