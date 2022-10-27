@@ -39,6 +39,7 @@ ExpressionState::CreateState(const std::shared_ptr<AggregateExpression>& agg_exp
 
     std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
     result->AddChild(agg_expr->arguments()[0]);
+    result->output_block_.Init({agg_expr->DataType()});
     return result;
 }
 
@@ -57,6 +58,7 @@ ExpressionState::CreateState(const std::shared_ptr<BetweenExpression>& between_e
     // upper expression
     result->AddChild(between_expr->arguments()[2]);
 
+    result->output_block_.Init({between_expr->DataType()});
     return result;
 }
 
@@ -71,6 +73,8 @@ ExpressionState::CreateState(const std::shared_ptr<CaseExpression>& case_expr) {
         result->AddChild(case_check.then_expr_);
     }
     result->AddChild(case_expr->ElseExpr());
+
+    result->output_block_.Init({case_expr->DataType()});
     return result;
 }
 
@@ -81,12 +85,15 @@ ExpressionState::CreateState(const std::shared_ptr<CastExpression>& cast_expr) {
     std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
     result->AddChild(cast_expr->arguments()[0]);
 
+    result->output_block_.Init({cast_expr->DataType()});
     return result;
 }
 
 std::shared_ptr<ExpressionState>
 ExpressionState::CreateState(const std::shared_ptr<ColumnExpression>& column_expr) {
     std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
+
+    // TODO: output_block
     return result;
 }
 
@@ -97,6 +104,8 @@ ExpressionState::CreateState(const std::shared_ptr<ConjunctionExpression>& conju
 
     result->AddChild(conjunction_expr->arguments()[0]);
     result->AddChild(conjunction_expr->arguments()[1]);
+
+    result->output_block_.Init({conjunction_expr->DataType()});
     return result;
 }
 
@@ -106,12 +115,16 @@ ExpressionState::CreateState(const std::shared_ptr<FunctionExpression>& function
     for(auto& arg : function_expr->arguments()) {
         result->AddChild(arg);
     }
+
+    result->output_block_.Init({function_expr->DataType()});
     return result;
 }
 
 std::shared_ptr<ExpressionState>
 ExpressionState::CreateState(const std::shared_ptr<ValueExpression>& value_expr) {
     std::shared_ptr<ExpressionState> result = std::shared_ptr<ExpressionState>();
+
+    // TODO: output_block, initialized here?
     return result;
 }
 

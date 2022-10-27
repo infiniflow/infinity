@@ -69,9 +69,12 @@ public:
     AddChild(const std::shared_ptr<BaseExpression>& expression);
 
     std::vector<std::shared_ptr<ExpressionState>>& Children() { return children_; }
+
+    Chunk& OutputChunk() { return output_block_.chunks_[0]; }
 private:
     std::vector<std::shared_ptr<ExpressionState>> children_;
     std::string name_;
+    TransBlock output_block_;
 };
 
 }

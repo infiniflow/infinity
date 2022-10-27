@@ -16,6 +16,10 @@ public:
 
     LogicalType DataType() override { return data_type_; };
     std::string ToString() const override;
+
+    const std::string& table_name() const { return table_name_; }
+    const std::string& column_name() const { return column_name_; }
+    int64_t column_index() const { return column_index_; }
 private:
     LogicalType data_type_;
     std::string table_name_;

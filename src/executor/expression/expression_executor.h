@@ -8,6 +8,8 @@
 #include "expression/base_expression.h"
 #include "expression_state.h"
 
+#include <unordered_map>
+
 namespace infinity {
 
 class ExpressionExecutor {
@@ -79,6 +81,7 @@ public:
 private:
     std::vector<std::shared_ptr<BaseExpression>> expressions;
     std::vector<std::shared_ptr<ExpressionState>> states;
+    std::unordered_map<std::string, std::shared_ptr<Table>> table_map_;
 };
 
 }

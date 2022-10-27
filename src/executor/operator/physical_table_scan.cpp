@@ -33,7 +33,8 @@ PhysicalTableScan::Execute(std::shared_ptr<QueryContext>& query_context) {
             = std::make_shared<TableDefinition>(table_alias_, column_defs, false);
     output_ = std::make_shared<FixedRowCountTable>(table_def_ptr);
 
-    TransBlock output_block(column_types_);
+    TransBlock output_block;
+    output_block.Init(column_types_);
     while(true) {
          table_scan_func_ptr_->main_function_(
                  query_context,

@@ -8,25 +8,24 @@
 
 #include <any>
 
+#define DEFAULT_CHUNK_SIZE 8192
+
 namespace infinity {
 
 struct TransBlock {
     TransBlock() = default;
-    explicit TransBlock(const std::vector<LogicalType>& types) {
-        for(auto& type: types) {
-            chunks_.emplace_back(type, 8192);
-        }
-    }
 
-    void Reset() {
-        chunks_.clear();
-        row_count_ = 0;
-    }
+    void
+    Init(const std::vector<LogicalType>& types);
+
+    void
+    Reset();
 
     [[nodiscard]] int64_t ColumnCount() const { return static_cast<int64_t>(chunks_.size()); }
 
     int64_t row_count_{0};
     std::vector<Chunk> chunks_;
 };
+
 }
 

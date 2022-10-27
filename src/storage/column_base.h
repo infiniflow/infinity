@@ -14,7 +14,7 @@ class ColumnBase {
 public:
     ColumnBase(std::string column_name, LogicalType logical_type) : name_(std::move(column_name)), type_(logical_type) {}
 
-    [[nodiscard]] std::string name() const { return name_; }
+    [[nodiscard]] const std::string& name() const { return name_; }
     [[nodiscard]] const LogicalType& logical_type() const { return type_; }
 
     std::string name_;
