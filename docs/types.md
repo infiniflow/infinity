@@ -28,6 +28,7 @@
 - Time
 - Timestamp
 - Timestamp_TZ
+- Interval
 
 ## Geography
 - Point
@@ -44,3 +45,4 @@
 - UUID
 - BYTES - binary / varbinary
 - NULL
+- Vector - Fix number with same type of int or float
