@@ -9,7 +9,11 @@
 namespace infinity {
 
 class VarcharInfo : public TypeInfo {
+public:
 
+    VarcharInfo() : TypeInfo(TypeInfoType::kVarchar) {}
+
+private:
 };
 
 }

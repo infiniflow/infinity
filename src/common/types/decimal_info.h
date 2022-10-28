@@ -8,8 +8,11 @@
 
 namespace infinity {
 
-class DecimalInfo {
+class DecimalInfo : public TypeInfo {
 public:
+
+    DecimalInfo() : TypeInfo(TypeInfoType::kDecimal) {}
+
 private:
 };
 

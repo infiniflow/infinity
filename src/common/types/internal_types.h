@@ -20,7 +20,7 @@ template<typename T>
 using UniquePtr = std::unique_ptr<T>;
 
 template <class T, typename... Args>
-inline SharedPtr<T> MakeUnique(Args &&...args) {
+inline UniquePtr<T> MakeUnique(Args &&...args) {
     return std::make_unique<T>(std::forward<Args>(args)...);
 }
 

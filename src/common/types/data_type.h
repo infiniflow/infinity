@@ -4,12 +4,66 @@
 
 #pragma once
 
+#include "sql/ColumnType.h"
+
 #include "internal_types.h"
 #include "type_info.h"
+
+#include "decimal_type.h"
+#include "huge_int.h"
+#include "varchar_type.h"
+#include "datetime_type.h"
+#include "interval_type.h"
 
 #include <string>
 
 namespace infinity {
+
+// Bool
+using BooleanT = bool;
+
+// Numeric
+using TinyIntT = i8;
+using SmallIntT = i16;
+using IntegerT = i32;
+using BigIntT = i64;
+using HugeIntT = HugeInt;
+
+using FloatT = float;
+using DoubleT = double;
+
+using DecimalT = DecimalType;
+
+// String
+using VarcharT = VarcharType;
+
+// Date and Time
+using DateT = i32;
+using TimeT = i32;
+using DateTimeT = DateTimeType;
+using TimestampT = TimestampType;
+using TimestampTZT = TimestampTZType;
+using IntervalT = IntervalType;
+
+// Nest types
+// using ArrayT = ;
+// using ObjectT = ;
+
+// Geography
+// using PointT = ;
+// using LineT
+// using LineSegT
+// using BoxT
+// using PathT
+// using PolygonT
+// using CircleT
+
+// Other
+// using BitmapT
+// using UuidT
+// using BlobT
+// using VectorT
+// using NullT
 
 enum class LogicalType {
     kInvalid = 0,
@@ -55,13 +109,16 @@ enum class LogicalType {
 
     // Other
     kBitmap,
-    kUUID,
+    kUuid,
     kBlob,
     kVector,
     kNull,
 
-    // Used for function?
-    kAny,
+    // kAny, // Used for function?
+};
+
+enum class TypeFamily {
+
 };
 
 class DataType {
@@ -69,7 +126,6 @@ public:
     explicit
     DataType(LogicalType logical_type) : type_(logical_type) {};
 
-    explicit
     DataType(LogicalType logical_type, UniquePtr<TypeInfo> type_info_ptr) :
         type_(logical_type), type_info_(std::move(type_info_ptr)) {}
 
@@ -83,7 +139,7 @@ public:
     ToString() const;
 
     [[nodiscard]] size_t
-    Size() const;
+    Width() const;
 
     [[nodiscard]] LogicalType
     type() const { return type_; }
@@ -92,6 +148,15 @@ private:
 
     LogicalType type_;
     UniquePtr<TypeInfo> type_info_;
+
+    // Static method
+public:
+    static int64_t
+    CastRule(const DataType& from, const DataType& to);
+
+    static DataType
+    ConvertType(hsql::ColumnType type);
+
 
 };
 
