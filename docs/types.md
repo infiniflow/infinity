@@ -33,7 +33,7 @@
 ## Geography
 - Point
 - Line
-- LSegment
+- Line Segment
 - Box
 - Path
 - Polygon
