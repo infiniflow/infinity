@@ -6,14 +6,29 @@
 
 #include "sql/ColumnType.h"
 
-#include "internal_types.h"
+#include "logical_type.h"
 #include "type_info.h"
+
+#include "internal_types.h"
 
 #include "decimal_type.h"
 #include "huge_int.h"
 #include "varchar_type.h"
 #include "datetime_type.h"
 #include "interval_type.h"
+#include "array_type.h"
+#include "object_type.h"
+#include "embedding_type.h"
+#include "point_type.h"
+#include "line_type.h"
+#include "line_segment_type.h"
+#include "box_type.h"
+#include "path_type.h"
+#include "polygon_type.h"
+#include "circle_type.h"
+#include "blob_type.h"
+#include "uuid.h"
+#include "bitmap_type.h"
 
 #include <string>
 
@@ -46,83 +61,27 @@ using TimestampTZT = TimestampTZType;
 using IntervalT = IntervalType;
 
 // Nest types
-// using ArrayT = ;
-// using ObjectT = ;
+ using ArrayT = ArrayType;
+ using ObjectT = ObjectType;
 
 // Geography
-// using PointT = ;
-// using LineT
-// using LineSegT
-// using BoxT
-// using PathT
-// using PolygonT
-// using CircleT
+ using PointT = PointType;
+ using LineT = LineType;
+ using LineSegT = LineSegmentType;
+ using BoxT = BoxType;
+ using PathT = PathType;
+ using PolygonT = PolygonType;
+ using CircleT = CircleType;
 
 // Other
-// using BitmapT
-// using UuidT
-// using BlobT
-// using VectorT
+ using BitmapT = BitmapType;
+ using UuidT = UuidType;
+ using BlobT = BlobType;
+ using EmbeddingT = EmbeddingType;
 // using NullT
 
-// 31 types in total now.
-enum LogicalType: i8 {
-    // Bool
-    kBoolean = 0,
 
-    // Numeric
-    kTinyInt,
-    kSmallInt,
-    kInteger,
-    kBigInt,
-    kHugeInt,
-
-    kFloat,
-    kDouble,
-
-    kDecimal,
-
-    // String
-    kVarchar,
-
-    // Date and Time
-    kDate,
-    kTime,
-    kDateTime,
-    kTimestamp,
-    kTimestampTZ,
-    kInterval,
-
-    // Nested types
-    kArray,
-    kObject,
-
-    // Geography
-    kPoint,
-    kLine,
-    kLineSeg,
-    kBox,
-    kPath,
-    kPolygon,
-    kCircle,
-
-    // Other
-    kBitmap,
-    kUuid,
-    kBlob,
-    kVector,
-    kNull,
-    kMissing,
-
-    kInvalid,
-    // kAny, // Used for function?
-};
-
-enum class TypeFamily {
-
-};
-
-class DataType {
+    class DataType {
 public:
     explicit
     DataType(LogicalType logical_type) : type_(logical_type) {};

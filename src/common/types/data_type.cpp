@@ -46,7 +46,7 @@ static std::string type2name[] = {
     "Bitmap",
     "UUID",
     "Blob",
-    "Vector",
+    "Embedding",
     "Null",
     "Missing",
 };

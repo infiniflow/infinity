@@ -68,8 +68,8 @@ TEST_F(DataTypeTest, GetTypeName) {
     EXPECT_EQ(uuid_type.ToString(), "UUID");
     DataType blob_type(LogicalType::kBlob);
     EXPECT_EQ(blob_type.ToString(), "Blob");
-    DataType vector_type(LogicalType::kVector);
-    EXPECT_EQ(vector_type.ToString(), "Vector");
+    DataType vector_type(LogicalType::kEmbedding);
+    EXPECT_EQ(vector_type.ToString(), "Embedding");
     DataType null_type(LogicalType::kNull);
     EXPECT_EQ(null_type.ToString(), "Null");
     DataType missing_type(LogicalType::kMissing);
