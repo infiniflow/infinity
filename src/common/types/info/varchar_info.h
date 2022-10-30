@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "type_info.h"
+#include "common/types/type_info.h"
 
 namespace infinity {
 
@@ -12,7 +12,7 @@ class VarcharInfo : public TypeInfo {
 public:
 
     VarcharInfo() : TypeInfo(TypeInfoType::kVarchar) {}
-
+    ~VarcharInfo() override = default;
 private:
 };
 

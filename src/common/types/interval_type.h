@@ -8,8 +8,8 @@
 
 namespace infinity {
 
-enum class TimeUnit : i8 {
-    kYear,
+enum TimeUnit : i8 {
+    kYear = 0,
     kMonth,
     kDay,
     kHour,
@@ -18,8 +18,8 @@ enum class TimeUnit : i8 {
 };
 
 struct IntervalType {
-    i8 unit;
-    i64 value;
+    i32 unit;
+    i32 value;
 };
 
 }

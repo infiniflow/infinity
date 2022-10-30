@@ -65,11 +65,10 @@ using IntervalT = IntervalType;
 // using VectorT
 // using NullT
 
-enum class LogicalType {
-    kInvalid = 0,
-
+// 31 types in total now.
+enum LogicalType: i8 {
     // Bool
-    kBoolean,
+    kBoolean = 0,
 
     // Numeric
     kTinyInt,
@@ -113,7 +112,9 @@ enum class LogicalType {
     kBlob,
     kVector,
     kNull,
+    kMissing,
 
+    kInvalid,
     // kAny, // Used for function?
 };
 

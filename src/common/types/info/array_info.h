@@ -4,13 +4,11 @@
 
 #pragma once
 
-#include "type_info.h"
+#include "common/types/type_info.h"
 
 namespace infinity {
 
-class VectorInfo {
-public:
-private:
-};
+class ArrayInfo : public TypeInfo {
 
+};
 }

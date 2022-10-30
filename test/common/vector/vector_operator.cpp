@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "base_test.h"
-#include "common/vector/vector_operations.h"
+#include "common/column_vector/vector_operations.h"
 #include "main/infinity.h"
 
 class VectorOperationTest : public BaseTest {

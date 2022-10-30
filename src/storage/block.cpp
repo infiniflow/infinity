@@ -4,7 +4,7 @@
 
 #include "block.h"
 #include "common/utility/infinity_assert.h"
-#include "common/vector/vector_operations.h"
+#include "common/column_vector/vector_operations.h"
 
 #include <sstream>
 

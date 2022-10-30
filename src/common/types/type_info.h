@@ -41,7 +41,7 @@ public:
     TypeInfo(TypeInfoType type) : type_(type) {};
 
     virtual
-    ~TypeInfo() = 0;
+    ~TypeInfo() = default;
 
     bool
     operator==(const TypeInfo& other) const;

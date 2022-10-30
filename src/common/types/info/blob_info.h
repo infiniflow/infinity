@@ -4,12 +4,13 @@
 
 #pragma once
 
-#include "type_info.h"
+#include "common/types/type_info.h"
 
 namespace infinity {
 
 class BlobInfo : public TypeInfo {
 public:
+    ~BlobInfo() override = default;
 private:
 };
 

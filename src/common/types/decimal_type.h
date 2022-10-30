@@ -6,7 +6,7 @@
 
 namespace infinity {
 
-class DecimalType {
+struct DecimalType {
 public:
 private:
 };

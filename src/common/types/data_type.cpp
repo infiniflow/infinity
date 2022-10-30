@@ -5,48 +5,94 @@
 #include "data_type.h"
 #include "common/utility/infinity_assert.h"
 
-#include "decimal_info.h"
-#include "varchar_info.h"
+#include "common/types/info/decimal_info.h"
+#include "common/types/info/varchar_info.h"
 
 namespace infinity {
 
+static std::string type2name[] = {
+    // Bool
+    "Boolean",
+    // Numeric
+    "TinyInt",
+    "SmallInt",
+    "Integer",
+    "BigInt",
+    "HugeInt",
+    "Float",
+    "Double",
+    "Decimal",
+    // String
+    "Varchar",
+    // Date and Time
+    "Date",
+    "Time",
+    "DateTime",
+    "Timestamp",
+    "TimestampTZ",
+    "Interval",
+    // Nested types
+    "Array",
+    "Object",
+    // Geography
+    "Point",
+    "Line",
+    "LineSegment",
+    "Box",
+    "Path",
+    "Polygon",
+    "Circle",
+    // Other
+    "Bitmap",
+    "UUID",
+    "Blob",
+    "Vector",
+    "Null",
+    "Missing",
+};
+
 std::string
 DataType::ToString() const {
-    switch(type_) {
-
-        case LogicalType::kBoolean: return "Boolean";
-        case LogicalType::kTinyInt: return "TinyInt";
-        case LogicalType::kSmallInt: return "SmallInt";
-        case LogicalType::kInteger: return "Integer";
-        case LogicalType::kBigInt: return "BigInt";
-        case LogicalType::kHugeInt: return "HugeInt";
-        case LogicalType::kFloat: return "Float";
-        case LogicalType::kDouble: return "Double";
-        case LogicalType::kDecimal: return "Decimal";
-        case LogicalType::kVarchar: return "Varchar";
-        case LogicalType::kDate: return "Date";
-        case LogicalType::kTime: return "Time";
-        case LogicalType::kDateTime: return "DateTime";
-        case LogicalType::kTimestamp: return "Timestamp";
-        case LogicalType::kTimestampTZ: return "TimestampTZ";
-        case LogicalType::kInterval: return "Interval";
-        case LogicalType::kArray: return "Array";
-        case LogicalType::kObject: return "Object";
-        case LogicalType::kPoint: return "Point";
-        case LogicalType::kLine: return "Line";
-        case LogicalType::kLineSeg: return "LineSegment";
-        case LogicalType::kBox: return "Box";
-        case LogicalType::kPath: return "Path";
-        case LogicalType::kPolygon: return "Polygon";
-        case LogicalType::kCircle: return "Circle";
-        case LogicalType::kBitmap: return "Bitmap";
-        case LogicalType::kUuid: return "UUID";
-        case LogicalType::kBlob: return "Blob";
-        case LogicalType::kVector: return "Vector";
-        default:
-            StorageError("Invalid logical data type.");
-
+    if(type_ > kInvalid) {
+        StorageError("Invalid logical data type.");
     }
+    return type2name[type_];
+
+//    switch(type_) {
+//
+//        case LogicalType::kBoolean: return "Boolean";
+//        case LogicalType::kTinyInt: return "TinyInt";
+//        case LogicalType::kSmallInt: return "SmallInt";
+//        case LogicalType::kInteger: return "Integer";
+//        case LogicalType::kBigInt: return "BigInt";
+//        case LogicalType::kHugeInt: return "HugeInt";
+//        case LogicalType::kFloat: return "Float";
+//        case LogicalType::kDouble: return "Double";
+//        case LogicalType::kDecimal: return "Decimal";
+//        case LogicalType::kVarchar: return "Varchar";
+//        case LogicalType::kDate: return "Date";
+//        case LogicalType::kTime: return "Time";
+//        case LogicalType::kDateTime: return "DateTime";
+//        case LogicalType::kTimestamp: return "Timestamp";
+//        case LogicalType::kTimestampTZ: return "TimestampTZ";
+//        case LogicalType::kInterval: return "Interval";
+//        case LogicalType::kArray: return "Array";
+//        case LogicalType::kObject: return "Object";
+//        case LogicalType::kPoint: return "Point";
+//        case LogicalType::kLine: return "Line";
+//        case LogicalType::kLineSeg: return "LineSegment";
+//        case LogicalType::kBox: return "Box";
+//        case LogicalType::kPath: return "Path";
+//        case LogicalType::kPolygon: return "Polygon";
+//        case LogicalType::kCircle: return "Circle";
+//        case LogicalType::kBitmap: return "Bitmap";
+//        case LogicalType::kUuid: return "UUID";
+//        case LogicalType::kBlob: return "Blob";
+//        case LogicalType::kVector: return "Vector";
+//        default:
+//            StorageError("Invalid logical data type.");
+//
+//    }
 }
 
 bool

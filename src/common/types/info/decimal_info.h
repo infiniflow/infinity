@@ -4,7 +4,7 @@
 
 #pragma
 
-#include "type_info.h"
+#include "common/types/type_info.h"
 
 namespace infinity {
 
@@ -12,7 +12,7 @@ class DecimalInfo : public TypeInfo {
 public:
 
     DecimalInfo() : TypeInfo(TypeInfoType::kDecimal) {}
-
+    ~DecimalInfo() override = default;
 private:
 };
 
