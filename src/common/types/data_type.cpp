@@ -51,6 +51,47 @@ static std::string type2name[] = {
     "Missing",
 };
 
+static i64 type_size[] = {
+        // Bool
+        1, // Boolean
+        // Numeric
+        1, // TinyInt
+        2, // SmallInt
+        4, // Integer
+        8, // BigInt
+        16, // HugeInt
+        4, // Float
+        8, // Double
+//        "Decimal", // Decimal
+//        // String
+//        "Varchar", // Varchar
+//        // Date and Time
+//        "Date", // Date
+//        "Time", // Time
+//        "DateTime", // DateTime
+//        "Timestamp", // Timestamp
+//        "TimestampTZ", // TimestampTZ
+//        "Interval", // Interval
+//        // Nested types
+//        "Array", // Array
+//        "Object", // Object
+//        // Geography
+//        "Point", // Point
+//        "Line", // Line
+//        "LineSegment", // LineSegment
+//        "Box", // Box
+//        "Path", // Path
+//        "Polygon", // Polygon
+//        "Circle", // Circle
+//        // Other
+//        "Bitmap", // Bitmap
+//        "UUID", // UUID
+//        "Blob", // Blob
+//        "Embedding", // Embedding
+//        "Null", // Null
+//        "Missing", // Missing
+};
+
 std::string
 DataType::ToString() const {
     if(type_ > kInvalid) {
@@ -184,6 +225,11 @@ DataType::ConvertType(hsql::ColumnType type) {
             TypeError("Unknown date type.");
         }
     }
+}
+
+i64
+DataType::TypeSize(LogicalType logical_type) {
+    return type_size[logical_type];
 }
 
 }

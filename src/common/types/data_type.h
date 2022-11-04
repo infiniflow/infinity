@@ -111,11 +111,14 @@ private:
 
     // Static method
 public:
-    static int64_t
+    static i64
     CastRule(const DataType& from, const DataType& to);
 
     static DataType
     ConvertType(hsql::ColumnType type);
+
+    static i64
+    TypeSize(LogicalType logical_type);
 };
 
 }

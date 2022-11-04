@@ -8,6 +8,7 @@
 
 namespace infinity {
 
+// ax + by + c = 0 to represent a line
 struct LineType {
     f64 a;
     f64 b;

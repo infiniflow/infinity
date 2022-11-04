@@ -3,13 +3,14 @@
 //
 
 #include "internal_types.h"
+#include "point_type.h"
 
 namespace infinity {
 
+// A circle is specified by a center point and radius
 struct CircleType {
-    f64 x;
-    f64 y;
-    f64 r;
+    PointType center;
+    f64 radius;
 };
 
 }

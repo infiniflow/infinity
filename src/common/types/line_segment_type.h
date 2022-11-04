@@ -5,14 +5,14 @@
 #pragma once
 
 #include "internal_types.h"
+#include "point_type.h"
 
 namespace infinity {
 
+// A line segment is specified by two endpoints.
 struct LineSegmentType {
-    f64 x1;
-    f64 y1;
-    f64 x2;
-    f64 y2;
+    PointType point1;
+    PointType point2;
 };
 
 }

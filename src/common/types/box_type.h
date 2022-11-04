@@ -5,14 +5,14 @@
 #pragma once
 
 #include "internal_types.h"
+#include "point_type.h"
 
 namespace infinity {
 
+// A box is specified by two points: upper left  point and lower right point.
 struct BoxType {
-    f64 x1;
-    f64 y1;
-    f64 x2;
-    f64 y2;
+    PointType upper_left;
+    PointType lower_right;
 };
 
 }
