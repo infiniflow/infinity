@@ -57,7 +57,7 @@ enum LogicalType: i8 {
 
     kNull,
     kMissing,
-    kHeterogeneous,
+    kMixed,
     kInvalid,
     // kAny, // Used for function?
 };

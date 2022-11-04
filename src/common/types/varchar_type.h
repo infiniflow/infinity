@@ -4,9 +4,11 @@
 
 #pragma once
 
+#include "varlen_type.h"
+
 namespace infinity {
 
-struct VarcharType {
+struct VarcharType : public VarlenType {
 
 };
 

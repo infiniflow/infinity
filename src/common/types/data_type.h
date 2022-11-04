@@ -81,7 +81,7 @@ using IntervalT = IntervalType;
 // using NullT
 
 
-    class DataType {
+class DataType {
 public:
     explicit
     DataType(LogicalType logical_type) : type_(logical_type) {};
@@ -116,8 +116,6 @@ public:
 
     static DataType
     ConvertType(hsql::ColumnType type);
-
-
 };
 
 }
