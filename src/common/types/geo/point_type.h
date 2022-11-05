@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include "internal_types.h"
+#include "common/types/internal_types.h"
 
 namespace infinity {
 
 struct PointType {
-    f64 x;
-    f64 y;
+    f64 x {0};
+    f64 y {0};
 };
 
 }

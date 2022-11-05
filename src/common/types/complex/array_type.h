@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include "varlen_type.h"
-#include "logical_type.h"
+#include "common/types/varlen_type.h"
+#include "common/types/logical_type.h"
 
 
 namespace infinity {
 
-struct ArrayType : public VarlenType {
+struct ArrayType {
     LogicalType elem_type;
     i16 count;
     ptr_t ptr;

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "internal_types.h"
+#include "common/types/internal_types.h"
 
 namespace infinity {
 

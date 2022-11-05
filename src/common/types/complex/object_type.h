@@ -4,12 +4,12 @@
 
 #pragma once
 
-#include "varlen_type.h"
+#include "common/types/varlen_type.h"
 
 namespace infinity {
 
-struct EmbeddingType {
+// Represent a tuple.
+struct ObjectType {
 };
 
 }
-
