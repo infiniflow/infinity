@@ -81,7 +81,7 @@ using BlobT = BlobType;
 using EmbeddingT = EmbeddingType;
 
 // Heterogeneous
-using MixedT = DummyMixedType;
+using MixedT = MixedType;
 
 
 class DataType {

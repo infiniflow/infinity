@@ -38,8 +38,8 @@ struct BaseMixedType {
 };
 
 // Not nested data type
-struct __attribute__((packed)) DummyMixedType : public BaseMixedType {
-    DummyMixedType() : BaseMixedType(MixedValueType::kDummy) {}
+struct __attribute__((packed)) MixedType : public BaseMixedType {
+    MixedType() : BaseMixedType(MixedValueType::kDummy) {}
 
     char_t ptr[15] {};
 };

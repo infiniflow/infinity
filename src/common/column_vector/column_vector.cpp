@@ -3,6 +3,7 @@
 //
 
 #include "column_vector.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -23,7 +24,7 @@ ColumnVector::ToString() const {
 
 Value
 ColumnVector::GetValue(idx_t index) const {
-//    return Value();
+    TypeError("Not implemented");
 }
 
 void
