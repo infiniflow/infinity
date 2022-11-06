@@ -4,6 +4,12 @@
 
 #pragma once
 
+#include "data_type.h"
+
 namespace infinity {
+
+struct Value {
+    DataType type_;
+};
 
 }

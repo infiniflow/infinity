@@ -86,6 +86,8 @@ public:
     explicit
     DataType(LogicalType logical_type) : type_(logical_type) {};
 
+    DataType(DataType&& other_type) : type_(other_type.type_), type_info_(std::move(other_type.type_info_)) {}
+
     DataType(LogicalType logical_type, UniquePtr<TypeInfo> type_info_ptr) :
         type_(logical_type), type_info_(std::move(type_info_ptr)) {}
 

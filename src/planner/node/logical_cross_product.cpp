@@ -3,7 +3,6 @@
 //
 
 #include "logical_cross_product.h"
-#include "common/value.h"
 
 #include <sstream>
 

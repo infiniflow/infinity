@@ -3,7 +3,6 @@
 //
 
 #include "logical_join.h"
-#include "common/value.h"
 #include <sstream>
 
 namespace infinity {
