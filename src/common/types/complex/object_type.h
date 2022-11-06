@@ -9,7 +9,7 @@
 namespace infinity {
 
 // Represent a tuple.
-struct ObjectType {
+struct TupleType {
 };
 
 }

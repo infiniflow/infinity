@@ -15,11 +15,11 @@ enum class EmbeddingDataType {
     kInt32,
     kInt64,
     kFloat,
-    kDouble
+    kDouble,
+    kInvalid
 };
 
-struct EmbeddingType {
-};
+using EmbeddingType = ptr_t;
 
 }
 

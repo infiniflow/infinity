@@ -27,8 +27,9 @@
 #include "common/types/geo/polygon_type.h"
 #include "common/types/geo/circle_type.h"
 #include "common/types/complex/blob_type.h"
-#include "uuid.h"
+#include "common/types/complex/uuid.h"
 #include "common/types/complex/bitmap_type.h"
+#include "common/types/heterogenous/mixed_type.h"
 
 #include <string>
 
@@ -61,24 +62,26 @@ using TimestampTZT = TimestampTZType;
 using IntervalT = IntervalType;
 
 // Nest types
- using ArrayT = ArrayType;
- using ObjectT = ObjectType;
+using ArrayT = ArrayType;
+using TupleT = TupleType;
 
 // Geography
- using PointT = PointType;
- using LineT = LineType;
- using LineSegT = LineSegmentType;
- using BoxT = BoxType;
- using PathT = PathType;
- using PolygonT = PolygonType;
- using CircleT = CircleType;
+using PointT = PointType;
+using LineT = LineType;
+using LineSegT = LineSegmentType;
+using BoxT = BoxType;
+using PathT = PathType;
+using PolygonT = PolygonType;
+using CircleT = CircleType;
 
 // Other
- using BitmapT = BitmapType;
- using UuidT = UuidType;
- using BlobT = BlobType;
- using EmbeddingT = EmbeddingType;
-// using NullT
+using BitmapT = BitmapType;
+using UuidT = UuidType;
+using BlobT = BlobType;
+using EmbeddingT = EmbeddingType;
+
+// Heterogeneous
+using MixedT = DummyMixedType;
 
 
 class DataType {
@@ -86,7 +89,7 @@ public:
     explicit
     DataType(LogicalType logical_type) : type_(logical_type) {};
 
-    DataType(DataType&& other_type) : type_(other_type.type_), type_info_(std::move(other_type.type_info_)) {}
+    DataType(DataType&& other_type)  noexcept : type_(other_type.type_), type_info_(std::move(other_type.type_info_)) {}
 
     DataType(LogicalType logical_type, UniquePtr<TypeInfo> type_info_ptr) :
         type_(logical_type), type_info_(std::move(type_info_ptr)) {}

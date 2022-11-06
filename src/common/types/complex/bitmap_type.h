@@ -8,9 +8,8 @@
 
 namespace infinity {
 
-// bitmap is a fix length array, even look like vector with bit
 struct BitmapType {
-    i16 count; // bit count of the bitmap
+    i64 count; // bit count of the bitmap
     ptr_t ptr;
 };
 

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "varlen_type.h"
+#include "common/types/internal_types.h"
 
 namespace infinity {
 

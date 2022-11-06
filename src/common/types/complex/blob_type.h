@@ -10,8 +10,7 @@ namespace infinity {
 
 struct BlobType {
     ptr_t pos;
-    i32 length;  // 4GB will be the limitation.
-    i32 _dummy;  // padding to align with 8 bytes.
+    i64 length;  // 4GB will be the limitation.
 };
 
 }

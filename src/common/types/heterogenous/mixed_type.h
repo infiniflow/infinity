@@ -6,7 +6,7 @@
 
 namespace infinity {
 
-enum MixedValueType : i8 {
+enum class MixedValueType : i8 {
     // Not nested data type
     kInteger,
     kFloat,
@@ -26,6 +26,8 @@ enum MixedValueType : i8 {
     kNestedObject,
     kNestedArray,
     kNestedNull,
+
+    kDummy,
 };
 
 struct BaseMixedType {
@@ -34,6 +36,14 @@ struct BaseMixedType {
 
     MixedValueType type;
 };
+
+// Not nested data type
+struct __attribute__((packed)) DummyMixedType : public BaseMixedType {
+    DummyMixedType() : BaseMixedType(MixedValueType::kDummy) {}
+
+    char_t ptr[15] {};
+};
+
 
 // Not nested data type
 struct __attribute__((packed)) IntegerMixedType : public BaseMixedType {

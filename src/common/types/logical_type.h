@@ -38,7 +38,7 @@ enum LogicalType: i8 {
 
     // Nested types
     kArray,
-    kObject,
+    kTuple,
 
     // Geography
     kPoint,

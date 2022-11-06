@@ -30,7 +30,7 @@ enum class TypeInfoType {
     kBitmap,
     kUUID,
     kBlob,
-    kVector,
+    kEmbedding,
 
 };
 
