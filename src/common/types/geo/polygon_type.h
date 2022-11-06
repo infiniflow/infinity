@@ -8,8 +8,8 @@
 namespace infinity {
 
 struct PolygonType {
-    ptr_t ptr {0};
-    i32 point_count {0}; // 65535 point are the max point count
+    ptr_t ptr;
+    i32 point_count; // 65535 point are the max point count
     BoxType bounding_box;
 };
 

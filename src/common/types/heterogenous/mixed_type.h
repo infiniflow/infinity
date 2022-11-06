@@ -31,6 +31,8 @@ enum class MixedValueType : i8 {
 };
 
 struct BaseMixedType {
+    BaseMixedType() = default;
+
     explicit
     BaseMixedType(MixedValueType value_type): type(value_type) {}
 
@@ -39,9 +41,9 @@ struct BaseMixedType {
 
 // Not nested data type
 struct __attribute__((packed)) MixedType : public BaseMixedType {
-    MixedType() : BaseMixedType(MixedValueType::kDummy) {}
+    MixedType() = default;
 
-    char_t ptr[15] {};
+    char_t ptr[15];
 };
 
 

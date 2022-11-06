@@ -9,8 +9,8 @@
 namespace infinity {
 
 struct HugeInt {
-    i64 upper {0};
-    i64 lower {0};
+    i64 upper;
+    i64 lower;
 };
 
 }

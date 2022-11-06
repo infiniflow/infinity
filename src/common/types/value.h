@@ -27,7 +27,7 @@ public:
     MakeBigInt(i64 input);
 
     static Value
-    MakeHugeInt(i64 low, i64 high);
+    MakeHugeInt(i64 lower, i64 upper);
 
     static Value
     MakeFloat(float input);
@@ -94,6 +94,11 @@ public:
 
     static Value
     MakeMixedData(MixedT blob);
+
+// Member method
+public:
+//    Value() = default;
+    explicit Value(LogicalType type): type_(type) {}
 
 public:
     DataType type_;

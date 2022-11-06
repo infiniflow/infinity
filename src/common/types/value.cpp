@@ -8,35 +8,60 @@
 namespace infinity {
 
 Value Value::MakeBool(bool input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kBoolean);
+    value.value_.boolean = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeTinyInt(i8 input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kTinyInt);
+    value.value_.tiny_int = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeSmallInt(i16 input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kSmallInt);
+    value.value_.small_int = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeInt(i32 input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kInteger);
+    value.value_.integer = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeBigInt(i64 input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kBigInt);
+    value.value_.big_int = input;
+    value.null_ = false;
+    return value;
 }
 
-Value Value::MakeHugeInt(i64 low, i64 high) {
-    TypeError("Not implemented");
+Value Value::MakeHugeInt(i64 lower, i64 upper) {
+    Value value(LogicalType::kHugeInt);
+    value.value_.huge_int.upper = upper;
+    value.value_.huge_int.lower = lower;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeFloat(float input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kFloat);
+    value.value_.real32 = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeDouble(double input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kDouble);
+    value.value_.real64 = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeDecimal(i64 low, i64 high, i8 precision, i8 scale) {
