@@ -47,6 +47,6 @@ using idx_t = u64;
 using f32 = float;
 using f64 = double;
 
-using ptr_t = void *;
-using char_t = char *;
+using ptr_t = int8_t *;
+using char_t = char;
 }

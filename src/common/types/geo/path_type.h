@@ -9,7 +9,7 @@ namespace infinity {
 
 // Path type is a variable length type
 struct PathType {
-    ptr_t ptr {0};
+    ptr_t ptr {nullptr};
     i32 point_count {0}; // 65535 point are the max point count
     i32 closed {0}; // Is a closed polygon?
 };

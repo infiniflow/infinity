@@ -21,7 +21,7 @@
 #include "common/types/datetime/timestamp_type.h"
 #include "common/types/datetime/timestamp_tz_type.h"
 #include "common/types/complex/array_type.h"
-#include "common/types/complex/object_type.h"
+#include "common/types/complex/tuple_type.h"
 #include "common/types/complex/embedding_type.h"
 #include "common/types/geo/point_type.h"
 #include "common/types/geo/line_type.h"
@@ -90,12 +90,10 @@ using MixedT = MixedType;
 
 class DataType {
 public:
-    explicit
-    DataType(LogicalType logical_type) : type_(logical_type) {};
-
     DataType(DataType&& other_type)  noexcept : type_(other_type.type_), type_info_(std::move(other_type.type_info_)) {}
 
-    DataType(LogicalType logical_type, UniquePtr<TypeInfo> type_info_ptr) :
+    explicit
+    DataType(LogicalType logical_type, UniquePtr<TypeInfo> type_info_ptr = nullptr) :
         type_(logical_type), type_info_(std::move(type_info_ptr)) {}
 
     bool
@@ -108,7 +106,7 @@ public:
     ToString() const;
 
     [[nodiscard]] size_t
-    Width() const;
+    Size() const;
 
     [[nodiscard]] LogicalType
     type() const { return type_; }

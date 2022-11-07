@@ -55,11 +55,14 @@ enum LogicalType: i8 {
     kBlob,
     kEmbedding,
 
+    // Heterogeneous type
+    kMixed,
+
+    // only used in heterogeneous type
     kNull,
     kMissing,
-    kMixed,
+
     kInvalid,
-    // kAny, // Used for function?
 };
 
 enum class TypeFamily {

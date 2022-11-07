@@ -13,6 +13,7 @@ namespace infinity {
 static std::string type2name[] = {
     // Bool
     "Boolean",
+
     // Numeric
     "TinyInt",
     "SmallInt",
@@ -22,8 +23,10 @@ static std::string type2name[] = {
     "Float",
     "Double",
     "Decimal",
+
     // String
     "Varchar",
+
     // Date and Time
     "Date",
     "Time",
@@ -31,9 +34,11 @@ static std::string type2name[] = {
     "Timestamp",
     "TimestampTZ",
     "Interval",
+
     // Nested types
     "Array",
-    "Object",
+    "Tuple",
+
     // Geography
     "Point",
     "Line",
@@ -42,18 +47,27 @@ static std::string type2name[] = {
     "Path",
     "Polygon",
     "Circle",
+
     // Other
     "Bitmap",
     "UUID",
     "Blob",
     "Embedding",
+
+    // Heterogeneous type
+    "Heterogeneous",
+
+    // only used in heterogeneous type
     "Null",
     "Missing",
+
+    "Invalid",
 };
 
 static i64 type_size[] = {
         // Bool
         1, // Boolean
+
         // Numeric
         1, // TinyInt
         2, // SmallInt
@@ -62,34 +76,45 @@ static i64 type_size[] = {
         16, // HugeInt
         4, // Float
         8, // Double
-//        "Decimal", // Decimal
-//        // String
-//        "Varchar", // Varchar
-//        // Date and Time
-//        "Date", // Date
-//        "Time", // Time
-//        "DateTime", // DateTime
-//        "Timestamp", // Timestamp
-//        "TimestampTZ", // TimestampTZ
-//        "Interval", // Interval
-//        // Nested types
-//        "Array", // Array
-//        "Object", // Object
-//        // Geography
-//        "Point", // Point
-//        "Line", // Line
-//        "LineSegment", // LineSegment
-//        "Box", // Box
-//        "Path", // Path
-//        "Polygon", // Polygon
-//        "Circle", // Circle
-//        // Other
-//        "Bitmap", // Bitmap
-//        "UUID", // UUID
-//        "Blob", // Blob
-//        "Embedding", // Embedding
-//        "Null", // Null
-//        "Missing", // Missing
+        16, // Decimal
+
+        // String
+        16, // Varchar
+
+        // Date and Time
+        4, // Date
+        4, // Time
+        8, // DateTime
+        8, // Timestamp
+        8, // TimestampTZ
+        8, // Interval
+
+        // Nested types
+        8, // Array
+        4, // Tuple
+
+        // Geography
+        16, // Point
+        24, // Line
+        32, // LineSegment
+        32, // Box
+        16, // Path
+        46, // Polygon
+        24, // Circle
+
+        // Other
+        16, // Bitmap
+        16, // UUID
+        16, // Blob
+        8, // Embedding
+
+        // Heterogeneous
+        16, // Mixed
+
+        // only used in heterogeneous type
+        0, // Null
+        0, // Missing
+        0, // Invalid
 };
 
 std::string
@@ -98,42 +123,6 @@ DataType::ToString() const {
         StorageError("Invalid logical data type.");
     }
     return type2name[type_];
-
-//    switch(type_) {
-//
-//        case LogicalType::kBoolean: return "Boolean";
-//        case LogicalType::kTinyInt: return "TinyInt";
-//        case LogicalType::kSmallInt: return "SmallInt";
-//        case LogicalType::kInteger: return "Integer";
-//        case LogicalType::kBigInt: return "BigInt";
-//        case LogicalType::kHugeInt: return "HugeInt";
-//        case LogicalType::kFloat: return "Float";
-//        case LogicalType::kDouble: return "Double";
-//        case LogicalType::kDecimal: return "Decimal";
-//        case LogicalType::kVarchar: return "Varchar";
-//        case LogicalType::kDate: return "Date";
-//        case LogicalType::kTime: return "Time";
-//        case LogicalType::kDateTime: return "DateTime";
-//        case LogicalType::kTimestamp: return "Timestamp";
-//        case LogicalType::kTimestampTZ: return "TimestampTZ";
-//        case LogicalType::kInterval: return "Interval";
-//        case LogicalType::kArray: return "Array";
-//        case LogicalType::kObject: return "Object";
-//        case LogicalType::kPoint: return "Point";
-//        case LogicalType::kLine: return "Line";
-//        case LogicalType::kLineSeg: return "LineSegment";
-//        case LogicalType::kBox: return "Box";
-//        case LogicalType::kPath: return "Path";
-//        case LogicalType::kPolygon: return "Polygon";
-//        case LogicalType::kCircle: return "Circle";
-//        case LogicalType::kBitmap: return "Bitmap";
-//        case LogicalType::kUuid: return "UUID";
-//        case LogicalType::kBlob: return "Blob";
-//        case LogicalType::kVector: return "Vector";
-//        default:
-//            StorageError("Invalid logical data type.");
-//
-//    }
 }
 
 bool
@@ -149,42 +138,11 @@ DataType::operator!=(const DataType& other) const {
 }
 
 size_t
-DataType::Width() const {
-    switch(type_) {
-
-        case LogicalType::kBoolean: return sizeof(BooleanT);
-        case LogicalType::kTinyInt: return sizeof(TinyIntT);
-        case LogicalType::kSmallInt: return sizeof(SmallIntT);
-        case LogicalType::kInteger: return sizeof(IntervalT);
-        case LogicalType::kBigInt: return sizeof(BigIntT);
-        case LogicalType::kHugeInt: return sizeof(HugeIntT);
-        case LogicalType::kFloat: return sizeof(FloatT);
-        case LogicalType::kDouble: return sizeof(DoubleT);
-        case LogicalType::kDecimal: return sizeof(DecimalT);
-        case LogicalType::kVarchar: return sizeof(VarcharT);
-        case LogicalType::kDate: return sizeof(DateT);
-        case LogicalType::kTime: return sizeof(TimeT);
-        case LogicalType::kDateTime: return sizeof(DateTimeT);
-        case LogicalType::kTimestamp: return sizeof(TimestampT);
-        case LogicalType::kTimestampTZ: return sizeof(TimestampTZT);
-        case LogicalType::kInterval: return sizeof(IntervalT);
-//        case LogicalType::kArray: return sizeof(ArrayT);
-//        case LogicalType::kObject: return "Object";
-//        case LogicalType::kPoint: return "Point";
-//        case LogicalType::kLine: return "Line";
-//        case LogicalType::kLineSeg: return "LineSegment";
-//        case LogicalType::kBox: return "Box";
-//        case LogicalType::kPath: return "Path";
-//        case LogicalType::kPolygon: return "Polygon";
-//        case LogicalType::kCircle: return "Circle";
-//        case LogicalType::kBitmap: return "Bitmap";
-//        case LogicalType::kUUID: return "UUID";
-//        case LogicalType::kBlob: return "Blob";
-//        case LogicalType::kVector: return "Vector";
-        default:
-            StorageError("Invalid data type.");
-
+DataType::Size() const {
+    if(type_ > kInvalid) {
+        StorageError("Invalid logical data type.");
     }
+    return type_size[type_];
 }
 
 int64_t
