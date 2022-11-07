@@ -29,7 +29,7 @@ enum class ColumnVectorType : i8 {
 
 // Basic unit of column data vector
 struct ColumnVector {
-
+public:
     // Member variable
     ColumnVectorType vector_type_ {ColumnVectorType::kInvalid};
     DataType data_type_;
@@ -56,8 +56,7 @@ public:
 
     void
     Initialize(bool fill_zero = false);
-    // Member method
-public:
+
     [[nodiscard]] String
     ToString() const;
 
@@ -70,7 +69,7 @@ public:
     SetValue(idx_t index, const Value &Value);
 
     void
-    ShallowCopy(ColumnVector &other);
+    ShallowCopy(const ColumnVector &other);
 
     // Getter
     [[nodiscard]] const inline ColumnVectorType&

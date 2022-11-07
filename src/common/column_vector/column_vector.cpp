@@ -33,7 +33,7 @@ ColumnVector::SetValue(idx_t index, const Value &Value) {
 }
 
 void
-ColumnVector::ShallowCopy(ColumnVector &other) {
+ColumnVector::ShallowCopy(const ColumnVector &other) {
 
 }
 

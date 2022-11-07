@@ -19,9 +19,11 @@ public:
 
     ~EmbeddingInfo() override = default;
 
+    size_t
+    Size() const;
 private:
-    EmbeddingDataType embedding_type_{EmbeddingDataType::kInvalid};
-    i64 dimension_;
+    EmbeddingDataType embedding_type_{EmbeddingDataType::kElemInvalid};
+    size_t dimension_;
 };
 
 }

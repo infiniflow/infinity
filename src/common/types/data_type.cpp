@@ -7,10 +7,11 @@
 
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/varchar_info.h"
+#include "common/types/info/embedding_info.h"
 
 namespace infinity {
 
-static std::string type2name[] = {
+static const char* type2name[] = {
     // Bool
     "Boolean",
 
@@ -65,56 +66,56 @@ static std::string type2name[] = {
 };
 
 static i64 type_size[] = {
-        // Bool
-        1, // Boolean
+    // Bool
+    1, // Boolean
 
-        // Numeric
-        1, // TinyInt
-        2, // SmallInt
-        4, // Integer
-        8, // BigInt
-        16, // HugeInt
-        4, // Float
-        8, // Double
-        16, // Decimal
+    // Numeric
+    1, // TinyInt
+    2, // SmallInt
+    4, // Integer
+    8, // BigInt
+    16, // HugeInt
+    4, // Float
+    8, // Double
+    16, // Decimal
 
-        // String
-        16, // Varchar
+    // String
+    16, // Varchar
 
-        // Date and Time
-        4, // Date
-        4, // Time
-        8, // DateTime
-        8, // Timestamp
-        8, // TimestampTZ
-        8, // Interval
+    // Date and Time
+    4, // Date
+    4, // Time
+    8, // DateTime
+    8, // Timestamp
+    8, // TimestampTZ
+    8, // Interval
 
-        // Nested types
-        8, // Array
-        4, // Tuple
+    // Nested types
+    8, // Array
+    4, // Tuple
 
-        // Geography
-        16, // Point
-        24, // Line
-        32, // LineSegment
-        32, // Box
-        16, // Path
-        46, // Polygon
-        24, // Circle
+    // Geography
+    16, // Point
+    24, // Line
+    32, // LineSegment
+    32, // Box
+    16, // Path
+    46, // Polygon
+    24, // Circle
 
-        // Other
-        16, // Bitmap
-        16, // UUID
-        16, // Blob
-        8, // Embedding
+    // Other
+    16, // Bitmap
+    16, // UUID
+    16, // Blob
+    8, // Embedding
 
-        // Heterogeneous
-        16, // Mixed
+    // Heterogeneous
+    16, // Mixed
 
-        // only used in heterogeneous type
-        0, // Null
-        0, // Missing
-        0, // Invalid
+    // only used in heterogeneous type
+    0, // Null
+    0, // Missing
+    0, // Invalid
 };
 
 std::string
@@ -141,6 +142,10 @@ size_t
 DataType::Size() const {
     if(type_ > kInvalid) {
         StorageError("Invalid logical data type.");
+    }
+    if(type_ == LogicalType::kEmbedding) {
+        size_t embedding_data_size = ((EmbeddingInfo*)&(*type_info_))->Size();
+        return embedding_data_size;
     }
     return type_size[type_];
 }
@@ -183,11 +188,6 @@ DataType::ConvertType(hsql::ColumnType type) {
             TypeError("Unknown date type.");
         }
     }
-}
-
-i64
-DataType::TypeSize(LogicalType logical_type) {
-    return type_size[logical_type];
 }
 
 }

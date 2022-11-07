@@ -123,9 +123,6 @@ public:
 
     static DataType
     ConvertType(hsql::ColumnType type);
-
-    static i64
-    TypeSize(LogicalType logical_type);
 };
 
 }

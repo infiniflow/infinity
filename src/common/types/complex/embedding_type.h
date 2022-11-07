@@ -8,16 +8,19 @@
 
 namespace infinity {
 
-enum class EmbeddingDataType {
-    kBit,
-    kInt8,
-    kInt16,
-    kInt32,
-    kInt64,
-    kFloat,
-    kDouble,
-    kInvalid
+enum EmbeddingDataType : i8 {
+    kElemBit,
+    kElemInt8,
+    kElemInt16,
+    kElemInt32,
+    kElemInt64,
+    kElemFloat,
+    kElemDouble,
+    kElemInvalid
 };
+
+size_t
+EmbeddingDataBitWidth(EmbeddingDataType type_index);
 
 using EmbeddingType = ptr_t;
 
