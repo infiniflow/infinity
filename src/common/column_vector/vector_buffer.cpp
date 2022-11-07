@@ -8,19 +8,27 @@
 namespace infinity {
 
 SharedPtr<VectorBuffer>
-VectorBuffer::MakeVectorBuffer(DataType data_type, infinity::u64 capacity) {
+VectorBuffer::MakeVectorBuffer(size_t data_type_size, size_t capacity) {
     SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
-    buffer_ptr->Initialize(data_type.Size() * capacity);
+    buffer_ptr->Initialize(data_type_size * capacity);
     return buffer_ptr;
 }
 
 void
-VectorBuffer::Initialize(u64 data_size) {
-    TypeAssert(!initialized_, "Vector buffer is already initialized.");
+VectorBuffer::Initialize(size_t data_size) {
+    GeneralAssert(!initialized_, "Vector buffer is already initialized.");
     if(data_size > 0) {
         data_ = MakeUnique<i8[]>(data_size);
     }
     initialized_ = true;
+    data_size_ = data_size;
+}
+
+void
+VectorBuffer::Copy(ptr_t input, size_t size) {
+    GeneralAssert(data_size_ >= size,
+                  "Attempt to copy an amount of data that cannot currently be accommodated");
+    memcpy(data_.get(), input, size);
 }
 
 }

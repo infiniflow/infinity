@@ -79,6 +79,9 @@ public:
     MakeBox(BoxT input);
 
     static Value
+    MakePath(PathT input);
+
+    static Value
     MakePolygon(PolygonT input);
 
     static Value
@@ -110,6 +113,9 @@ public:
     T GetValue() const {
         TypeError("Not implemented value getter.");
     }
+
+    [[nodiscard]] const DataType& type() const { return type_; }
+    [[nodiscard]] bool is_null() const { return is_null_; }
 
 // Member method
 public:
@@ -146,6 +152,7 @@ public:
         LineT      line;
         LineSegT   line_segment;
         BoxT       box;
+        PathT      path;
         PolygonT   polygon;
         CircleT    circle;
 
@@ -155,8 +162,8 @@ public:
         EmbeddingT embedding;
 
         MixedT     mixed_value;
-    } value_;
-    bool null_{false};
+    } value_ = {};
+    bool is_null_{false};
 };
 
 // Value maker
@@ -181,6 +188,7 @@ template <> Value Value::MakeValue(PointT input) { return MakePoint(input); }
 template <> Value Value::MakeValue(LineT input) { return MakeLine(input); }
 template <> Value Value::MakeValue(LineSegT input) { return MakeLineSegment(input); }
 template <> Value Value::MakeValue(BoxT input) { return MakeBox(input); }
+template <> Value Value::MakeValue(PathT input) { return MakePath(input); }
 template <> Value Value::MakeValue(PolygonT input) { return MakePolygon(input); }
 template <> Value Value::MakeValue(CircleT input) { return MakeCircle(input); }
 template <> Value Value::MakeValue(BitmapT input) { return MakeBitmap(input); }
@@ -211,6 +219,7 @@ template <> PointT Value::GetValue() const;
 template <> LineT Value::GetValue() const;
 template <> LineSegT Value::GetValue() const;
 template <> BoxT Value::GetValue() const;
+template <> PathT Value::GetValue() const;
 template <> PolygonT Value::GetValue() const;
 template <> CircleT Value::GetValue() const;
 template <> BitmapT Value::GetValue() const;

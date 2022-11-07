@@ -9,13 +9,16 @@ namespace infinity {
 class VectorBuffer {
 public:
     static SharedPtr<VectorBuffer>
-    MakeVectorBuffer(DataType data_type, u64 capacity);
+    MakeVectorBuffer(size_t data_type_size, size_t capacity);
 
 public:
     explicit VectorBuffer() = default;
 
     void
-    Initialize(u64 data_size);
+    Initialize(size_t data_size);
+
+    void
+    Copy(ptr_t input, size_t size);
 
     ptr_t
     GetData() { return data_.get(); }
@@ -23,6 +26,7 @@ public:
 private:
     bool initialized_ {false};
     UniquePtr<i8[]> data_ {nullptr};
+    size_t data_size_ {0};
 };
 
 }

@@ -90,8 +90,6 @@ using MixedT = MixedType;
 
 class DataType {
 public:
-    DataType(DataType&& other_type)  noexcept : type_(other_type.type_), type_info_(std::move(other_type.type_info_)) {}
-
     explicit
     DataType(LogicalType logical_type, UniquePtr<TypeInfo> type_info_ptr = nullptr) :
         type_(logical_type), type_info_(std::move(type_info_ptr)) {}
@@ -114,7 +112,7 @@ public:
 private:
 
     LogicalType type_;
-    UniquePtr<TypeInfo> type_info_;
+    SharedPtr<TypeInfo> type_info_;
 
     // Static method
 public:

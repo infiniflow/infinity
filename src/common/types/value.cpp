@@ -9,199 +9,235 @@ namespace infinity {
 
 // Value maker
 
-Value Value::MakeBool(bool input) {
+Value
+Value::MakeBool(bool input) {
     Value value(LogicalType::kBoolean);
     value.value_.boolean = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeTinyInt(i8 input) {
+Value
+Value::MakeTinyInt(i8 input) {
     Value value(LogicalType::kTinyInt);
     value.value_.tiny_int = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeSmallInt(i16 input) {
+Value
+Value::MakeSmallInt(i16 input) {
     Value value(LogicalType::kSmallInt);
     value.value_.small_int = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeInt(i32 input) {
+Value
+Value::MakeInt(i32 input) {
     Value value(LogicalType::kInteger);
     value.value_.integer = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeBigInt(i64 input) {
+Value
+Value::MakeBigInt(i64 input) {
     Value value(LogicalType::kBigInt);
     value.value_.big_int = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeHugeInt(HugeIntT input) {
+Value
+Value::MakeHugeInt(HugeIntT input) {
     Value value(LogicalType::kHugeInt);
     value.value_.huge_int = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeFloat(float input) {
+Value
+Value::MakeFloat(float input) {
     Value value(LogicalType::kFloat);
     value.value_.real32 = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeDouble(double input) {
+Value
+Value::MakeDouble(double input) {
     Value value(LogicalType::kDouble);
     value.value_.real64 = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeDecimal(DecimalType input) {
+Value
+Value::MakeDecimal(DecimalType input) {
     Value value(LogicalType::kDecimal);
     value.value_.decimal = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeVarchar(VarcharT input) {
+Value
+Value::MakeVarchar(VarcharT input) {
     Value value(LogicalType::kVarchar);
     value.value_.varchar = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeDate(DateT input) {
+Value
+Value::MakeDate(DateT input) {
     Value value(LogicalType::kDate);
     value.value_.date = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeTime(TimeT input) {
+Value
+Value::MakeTime(TimeT input) {
     Value value(LogicalType::kTime);
     value.value_.time = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeDateTime(DateTimeT input) {
+Value
+Value::MakeDateTime(DateTimeT input) {
     Value value(LogicalType::kDateTime);
     value.value_.datetime = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeTimestamp(TimestampT input) {
+Value
+Value::MakeTimestamp(TimestampT input) {
     Value value(LogicalType::kTimestamp);
     value.value_.timestamp = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeTimestampTz(TimestampTZT input) {
+Value
+Value::MakeTimestampTz(TimestampTZT input) {
     Value value(LogicalType::kTimestampTZ);
     value.value_.timestamp_tz = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeInterval(IntervalT input) {
+Value
+Value::MakeInterval(IntervalT input) {
     Value value(LogicalType::kInterval);
     value.value_.interval = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeArray(ArrayT input) {
+Value
+Value::MakeArray(ArrayT input) {
     Value value(LogicalType::kArray);
     value.value_.array = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakePoint(PointT input) {
+Value
+Value::MakePoint(PointT input) {
     Value value(LogicalType::kPoint);
     value.value_.point = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeLine(LineT input) {
+Value
+Value::MakeLine(LineT input) {
     Value value(LogicalType::kLine);
     value.value_.line = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeLineSegment(LineSegT input) {
+Value
+Value::MakeLineSegment(LineSegT input) {
     Value value(LogicalType::kLineSeg);
     value.value_.line_segment = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeBox(BoxT input) {
+Value
+Value::MakeBox(BoxT input) {
     Value value(LogicalType::kBox);
     value.value_.box = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakePolygon(PolygonT input) {
+Value
+Value::MakePath(PathT input) {
+    Value value(LogicalType::kPath);
+    value.value_.path = input;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakePolygon(PolygonT input) {
     Value value(LogicalType::kPolygon);
     value.value_.polygon = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeCircle(CircleT input) {
+Value
+Value::MakeCircle(CircleT input) {
     Value value(LogicalType::kCircle);
     value.value_.circle = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeBitmap(BitmapT input) {
+Value
+Value::MakeBitmap(BitmapT input) {
     Value value(LogicalType::kBitmap);
     value.value_.bitmap = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeUuid(UuidT input) {
+Value
+Value::MakeUuid(UuidT input) {
     Value value(LogicalType::kUuid);
     value.value_.uuid = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeBlob(BlobT input) {
+Value
+Value::MakeBlob(BlobT input) {
     Value value(LogicalType::kBlob);
     value.value_.blob = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeEmbedding(EmbeddingT input) {
+Value
+Value::MakeEmbedding(EmbeddingT input) {
     Value value(LogicalType::kEmbedding);
     value.value_.embedding = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeMixedData(MixedT input) {
+Value
+Value::MakeMixedData(MixedT input) {
     Value value(LogicalType::kMixed);
     value.value_.mixed_value = input;
-    value.null_ = false;
+    value.is_null_ = false;
     return value;
 }
 
@@ -329,6 +365,12 @@ template <> BoxT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kBox, "Not matched type: " + type_.ToString());
     return value_.box;
+}
+
+template <> PathT
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kPath, "Not matched type: " + type_.ToString());
+    return value_.path;
 }
 
 template <> PolygonT

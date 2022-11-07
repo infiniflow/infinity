@@ -30,14 +30,18 @@ enum class ColumnVectorType : i8 {
 // Basic unit of column data vector
 struct ColumnVector {
 public:
-    // Member variable
     ColumnVectorType vector_type_ {ColumnVectorType::kInvalid};
+
     DataType data_type_;
 
-    i64  capacity_{0};
+    size_t capacity_{0};
+
+    size_t tail_index_ {0};
+
+    size_t data_type_size_{0};
 
     // Only a pointer to the real data in vector buffer
-    ptr_t data_ptr_;
+    ptr_t data_ptr_ {nullptr};
 
     // A bitmap to indicate the null information
     UniquePtr<Bitmap> nulls_ptr_;
@@ -45,33 +49,40 @@ public:
     // this buffer is holding the data
     SharedPtr<VectorBuffer> buffer_;
 
+    bool initialized {false};
+
 public:
     // Construct a column vector without initialization;
     explicit
-    ColumnVector(DataType type, i64 capacity = DEFAULT_VECTOR_SIZE);
-
-    // Construct a column vector from a value;
-    explicit
-    ColumnVector(Value& value);
+    ColumnVector(DataType data_type, ColumnVectorType vector_type);
 
     void
-    Initialize(bool fill_zero = false);
+    Initialize(size_t capacity = DEFAULT_VECTOR_SIZE);
 
     [[nodiscard]] String
     ToString() const;
 
-    // Return the <index> of the vector.
+    // Return the <index> of the vector
+    // Since it will construct a new Value object, this function shouldn't be used in vectorized computation.
+    // Directly uses data_ptr in vectorized computation.
     [[nodiscard]] Value
     GetValue(idx_t index) const;
 
     // Set the <index> element of the vector to the specified value.
     void
-    SetValue(idx_t index, const Value &Value);
+    SetValue(idx_t index, const Value& Value);
+
+    void
+    AppendValue(const Value& value);
 
     void
     ShallowCopy(const ColumnVector &other);
 
-    // Getter
+    // Enlarge the column vector capacity.
+    void
+    Reserve(size_t new_capacity);
+
+public:
     [[nodiscard]] const inline ColumnVectorType&
     vector_type() const {
         return vector_type_;
@@ -84,6 +95,14 @@ public:
 
     [[nodiscard]] inline ptr_t data() const {
         return data_ptr_;
+    }
+
+    [[nodiscard]] inline size_t capacity() const {
+        return capacity_;
+    }
+
+    [[nodiscard]] inline size_t Size() const {
+        return tail_index_;
     }
 };
 
