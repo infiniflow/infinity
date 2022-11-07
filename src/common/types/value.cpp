@@ -66,223 +66,311 @@ Value Value::MakeDouble(double input) {
 }
 
 Value Value::MakeDecimal(DecimalType input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kDecimal);
+    value.value_.decimal = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeVarchar(VarcharT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kVarchar);
+    value.value_.varchar = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeDate(DateT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kDate);
+    value.value_.date = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeTime(TimeT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kTime);
+    value.value_.time = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeDateTime(DateTimeT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kDateTime);
+    value.value_.datetime = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeTimestamp(TimestampT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kTimestamp);
+    value.value_.timestamp = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeTimestampTz(TimestampTZT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kTimestampTZ);
+    value.value_.timestamp_tz = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeInterval(IntervalT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kInterval);
+    value.value_.interval = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeArray(ArrayT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kArray);
+    value.value_.array = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakePoint(PointT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kPoint);
+    value.value_.point = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeLine(LineT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kLine);
+    value.value_.line = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeLineSegment(LineSegT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kLineSeg);
+    value.value_.line_segment = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeBox(BoxT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kBox);
+    value.value_.box = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakePolygon(PolygonT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kPolygon);
+    value.value_.polygon = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeCircle(CircleT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kCircle);
+    value.value_.circle = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeBitmap(BitmapT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kBitmap);
+    value.value_.bitmap = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeUuid(UuidT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kUuid);
+    value.value_.uuid = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeBlob(BlobT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kBlob);
+    value.value_.blob = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeEmbedding(EmbeddingT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kEmbedding);
+    value.value_.embedding = input;
+    value.null_ = false;
+    return value;
 }
 
 Value Value::MakeMixedData(MixedT input) {
-    TypeError("Not implemented");
+    Value value(LogicalType::kMixed);
+    value.value_.mixed_value = input;
+    value.null_ = false;
+    return value;
 }
 
 // Value getter
 template <> BooleanT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kBoolean, "Not matched type: " + type_.ToString());
+    return value_.boolean;
 }
 template <> TinyIntT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kTinyInt, "Not matched type: " + type_.ToString());
+    return value_.tiny_int;
 }
 
 template <> SmallIntT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kSmallInt, "Not matched type: " + type_.ToString());
+    return value_.small_int;
 }
 
 template <> IntegerT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kInteger, "Not matched type: " + type_.ToString());
+    return value_.integer;
 }
 
 template <> BigIntT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kBigInt, "Not matched type: " + type_.ToString());
+    return value_.big_int;
 }
 
 template <> HugeIntT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kHugeInt, "Not matched type: " + type_.ToString());
+    return value_.huge_int;
 }
 
 template <> FloatT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kFloat, "Not matched type: " + type_.ToString());
+    return value_.real32;
 }
 
 template <> DoubleT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kDouble, "Not matched type: " + type_.ToString());
+    return value_.real64;
 }
 
 template <> DecimalT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kDecimal, "Not matched type: " + type_.ToString());
+    return value_.decimal;
 }
 
 template <> VarcharT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kVarchar, "Not matched type: " + type_.ToString());
+    return value_.varchar;
 }
 
 template <> DateT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kDate, "Not matched type: " + type_.ToString());
+    return value_.date;
 }
 
 template <> TimeT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kTime, "Not matched type: " + type_.ToString());
+    return value_.time;
 }
 
 template <> DateTimeT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kDateTime, "Not matched type: " + type_.ToString());
+    return value_.datetime;
 }
 
 template <> TimestampT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kTimestamp, "Not matched type: " + type_.ToString());
+    return value_.timestamp;
 }
 
 template <> TimestampTZT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kTimestampTZ, "Not matched type: " + type_.ToString());
+    return value_.timestamp_tz;
 }
 
 template <> IntervalT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kInterval, "Not matched type: " + type_.ToString());
+    return value_.interval;
 }
 
 template <> ArrayT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kArray, "Not matched type: " + type_.ToString());
+    return value_.array;
 }
 
 template <> PointT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kPoint, "Not matched type: " + type_.ToString());
+    return value_.point;
 }
 
 template <> LineT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kLine, "Not matched type: " + type_.ToString());
+    return value_.line;
 }
 
 template <> LineSegT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kLineSeg, "Not matched type: " + type_.ToString());
+    return value_.line_segment;
 }
 
 template <> BoxT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kBox, "Not matched type: " + type_.ToString());
+    return value_.box;
 }
 
 template <> PolygonT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kPolygon, "Not matched type: " + type_.ToString());
+    return value_.polygon;
 }
 
 template <> CircleT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kCircle, "Not matched type: " + type_.ToString());
+    return value_.circle;
 }
 
 template <> BitmapT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kBitmap, "Not matched type: " + type_.ToString());
+    return value_.bitmap;
 }
 
 template <> UuidT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kUuid, "Not matched type: " + type_.ToString());
+    return value_.uuid;
 }
 
 template <> BlobT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kBlob, "Not matched type: " + type_.ToString());
+    return value_.blob;
 }
 
 template <> EmbeddingT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kEmbedding, "Not matched type: " + type_.ToString());
+    return value_.embedding;
 }
 
 template <> MixedT
 Value::GetValue() const {
-    TypeError("Not implemented");
+    TypeAssert(type_.type() == LogicalType::kMixed, "Not matched type: " + type_.ToString());
+    return value_.mixed_value;
 }
 
 
