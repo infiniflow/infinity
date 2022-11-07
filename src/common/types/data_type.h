@@ -14,8 +14,12 @@
 #include "common/types/number/decimal_type.h"
 #include "common/types/number/huge_int.h"
 #include "common/types/complex/varchar_type.h"
-#include "common/types/time/datetime_type.h"
-#include "common/types/time/interval_type.h"
+#include "common/types/datetime/datetime_type.h"
+#include "common/types/datetime/interval_type.h"
+#include "common/types/datetime/date_type.h"
+#include "common/types/datetime/time_type.h"
+#include "common/types/datetime/timestamp_type.h"
+#include "common/types/datetime/timestamp_tz_type.h"
 #include "common/types/complex/array_type.h"
 #include "common/types/complex/object_type.h"
 #include "common/types/complex/embedding_type.h"
@@ -54,8 +58,8 @@ using DecimalT = DecimalType;
 using VarcharT = VarcharType;
 
 // Date and Time
-using DateT = i32;
-using TimeT = i32;
+using DateT = DateType;
+using TimeT = TimeType;
 using DateTimeT = DateTimeType;
 using TimestampT = TimestampType;
 using TimestampTZT = TimestampTZType;

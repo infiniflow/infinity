@@ -7,6 +7,8 @@
 
 namespace infinity {
 
+// Value maker
+
 Value Value::MakeBool(bool input) {
     Value value(LogicalType::kBoolean);
     value.value_.boolean = input;
@@ -42,10 +44,9 @@ Value Value::MakeBigInt(i64 input) {
     return value;
 }
 
-Value Value::MakeHugeInt(i64 lower, i64 upper) {
+Value Value::MakeHugeInt(HugeIntT input) {
     Value value(LogicalType::kHugeInt);
-    value.value_.huge_int.upper = upper;
-    value.value_.huge_int.lower = lower;
+    value.value_.huge_int = input;
     value.null_ = false;
     return value;
 }
@@ -64,84 +65,225 @@ Value Value::MakeDouble(double input) {
     return value;
 }
 
-Value Value::MakeDecimal(i64 low, i64 high, i8 precision, i8 scale) {
+Value Value::MakeDecimal(DecimalType input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeVarchar(const String &str_ref) {
+Value Value::MakeVarchar(VarcharT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeDate(i32 input) {
+Value Value::MakeDate(DateT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeTime(i32 input) {
+Value Value::MakeTime(TimeT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeDateTime(i32 date, i32 time) {
+Value Value::MakeDateTime(DateTimeT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeTimestamp(i64 input) {
+Value Value::MakeTimestamp(TimestampT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeTimestampTz(i64 input) {
+Value Value::MakeTimestampTz(TimestampTZT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeInterval(i64 input) {
+Value Value::MakeInterval(IntervalT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeArray(const ArrayType &array_ref) {
+Value Value::MakeArray(ArrayT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakePoint(PointType point) {
+Value Value::MakePoint(PointT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeLine(LineType line) {
+Value Value::MakeLine(LineT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeLineSegment(LineSegmentType line) {
+Value Value::MakeLineSegment(LineSegT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeBox(BoxType box) {
+Value Value::MakeBox(BoxT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakePolygon(PolygonType polygon) {
+Value Value::MakePolygon(PolygonT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeCircle(CircleType circle) {
+Value Value::MakeCircle(CircleT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeBitmap(BitmapType bitmap) {
+Value Value::MakeBitmap(BitmapT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeUuid(UuidType uuid) {
+Value Value::MakeUuid(UuidT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeBlob(BlobType blob) {
+Value Value::MakeBlob(BlobT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeEmbedding(EmbeddingType blob) {
+Value Value::MakeEmbedding(EmbeddingT input) {
     TypeError("Not implemented");
 }
 
-Value Value::MakeMixedData(MixedT blob) {
+Value Value::MakeMixedData(MixedT input) {
     TypeError("Not implemented");
 }
+
+// Value getter
+template <> BooleanT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+template <> TinyIntT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> SmallIntT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> IntegerT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> BigIntT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> HugeIntT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> FloatT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> DoubleT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> DecimalT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> VarcharT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> DateT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> TimeT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> DateTimeT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> TimestampT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> TimestampTZT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> IntervalT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> ArrayT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> PointT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> LineT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> LineSegT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> BoxT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> PolygonT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> CircleT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> BitmapT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> UuidT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> BlobT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> EmbeddingT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
+template <> MixedT
+Value::GetValue() const {
+    TypeError("Not implemented");
+}
+
 
 }

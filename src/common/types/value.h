@@ -6,94 +6,110 @@
 
 #include "data_type.h"
 
+#include "common/utility/infinity_assert.h"
+
 namespace infinity {
 
 struct Value {
 // static method
 public:
-    static Value
-    MakeBool(bool input);
+    // Value creator from different type of input
 
     static Value
-    MakeTinyInt(i8 input);
+    MakeBool(BooleanT input);
 
     static Value
-    MakeSmallInt(i16 input);
+    MakeTinyInt(TinyIntT input);
 
     static Value
-    MakeInt(i32 input);
+    MakeSmallInt(SmallIntT input);
 
     static Value
-    MakeBigInt(i64 input);
+    MakeInt(IntegerT input);
 
     static Value
-    MakeHugeInt(i64 lower, i64 upper);
+    MakeBigInt(BigIntT input);
 
     static Value
-    MakeFloat(float input);
+    MakeHugeInt(HugeIntT input);
 
     static Value
-    MakeDouble(double input);
+    MakeFloat(FloatT input);
 
     static Value
-    MakeDecimal(i64 low, i64 high, i8 precision, i8 scale);
+    MakeDouble(DoubleT input);
 
     static Value
-    MakeVarchar(const String& str_ref);
+    MakeDecimal(DecimalT input);
 
     static Value
-    MakeDate(i32 input);
+    MakeVarchar(VarcharT input_ref);
 
     static Value
-    MakeTime(i32 input);
+    MakeDate(DateT input);
 
     static Value
-    MakeDateTime(i32 date, i32 time);
+    MakeTime(TimeT input);
 
     static Value
-    MakeTimestamp(i64 input);
+    MakeDateTime(DateTimeT input);
 
     static Value
-    MakeTimestampTz(i64 input);
+    MakeTimestamp(TimestampT input);
 
     static Value
-    MakeInterval(i64 input);
+    MakeTimestampTz(TimestampTZT input);
 
     static Value
-    MakeArray(const ArrayType& array_ref);
+    MakeInterval(IntervalT input);
 
     static Value
-    MakePoint(PointType point);
+    MakeArray(ArrayT input);
 
     static Value
-    MakeLine(LineType line);
+    MakePoint(PointT input);
 
     static Value
-    MakeLineSegment(LineSegmentType line);
+    MakeLine(LineT input);
 
     static Value
-    MakeBox(BoxType box);
+    MakeLineSegment(LineSegT input);
 
     static Value
-    MakePolygon(PolygonType polygon);
+    MakeBox(BoxT input);
 
     static Value
-    MakeCircle(CircleType circle);
+    MakePolygon(PolygonT input);
 
     static Value
-    MakeBitmap(BitmapType bitmap);
+    MakeCircle(CircleT input);
 
     static Value
-    MakeUuid(UuidType uuid);
+    MakeBitmap(BitmapT input);
 
     static Value
-    MakeBlob(BlobType blob);
+    MakeUuid(UuidT input);
 
     static Value
-    MakeEmbedding(EmbeddingType blob);
+    MakeBlob(BlobT input);
 
     static Value
-    MakeMixedData(MixedT blob);
+    MakeEmbedding(EmbeddingT input);
+
+    static Value
+    MakeMixedData(MixedT input);
+
+    // Value maker template
+    template <class T>
+    static Value MakeValue(T value) {
+        TypeError("Not implemented value maker.");
+    }
+
+    // Value getter template
+    template <class T>
+    T GetValue() const {
+        TypeError("Not implemented value getter.");
+    }
 
 // Member method
 public:
@@ -143,4 +159,63 @@ public:
     bool null_{false};
 };
 
+// Value maker
+template <> Value Value::MakeValue(BooleanT input) { return MakeBool(input); }
+template <> Value Value::MakeValue(TinyIntT input) { return MakeBool(input); }
+template <> Value Value::MakeValue(SmallIntT input) { return MakeBool(input); }
+template <> Value Value::MakeValue(IntegerT input) { return MakeBool(input); }
+template <> Value Value::MakeValue(BigIntT input) { return MakeBool(input); }
+template <> Value Value::MakeValue(HugeIntT input) { return MakeHugeInt(input); }
+template <> Value Value::MakeValue(FloatT input) { return MakeFloat(input); }
+template <> Value Value::MakeValue(DoubleT input) { return MakeDouble(input); }
+template <> Value Value::MakeValue(DecimalT input) { return MakeDecimal(input); }
+template <> Value Value::MakeValue(VarcharT input) { return MakeVarchar(input); }
+template <> Value Value::MakeValue(DateT input) { return MakeDate(input); }
+template <> Value Value::MakeValue(TimeT input) { return MakeTime(input); }
+template <> Value Value::MakeValue(DateTimeT input) { return MakeDateTime(input); }
+template <> Value Value::MakeValue(TimestampT input) { return MakeTimestamp(input); }
+template <> Value Value::MakeValue(TimestampTZT input) { return MakeTimestampTz(input); }
+template <> Value Value::MakeValue(IntervalT input) { return MakeInterval(input); }
+template <> Value Value::MakeValue(ArrayT input) { return MakeArray(input); }
+template <> Value Value::MakeValue(PointT input) { return MakePoint(input); }
+template <> Value Value::MakeValue(LineT input) { return MakeLine(input); }
+template <> Value Value::MakeValue(LineSegT input) { return MakeLineSegment(input); }
+template <> Value Value::MakeValue(BoxT input) { return MakeBox(input); }
+template <> Value Value::MakeValue(PolygonT input) { return MakePolygon(input); }
+template <> Value Value::MakeValue(CircleT input) { return MakeCircle(input); }
+template <> Value Value::MakeValue(BitmapT input) { return MakeBitmap(input); }
+template <> Value Value::MakeValue(UuidT input) { return MakeUuid(input); }
+template <> Value Value::MakeValue(BlobT input) { return MakeBlob(input); }
+template <> Value Value::MakeValue(EmbeddingT input) { return MakeEmbedding(input); }
+template <> Value Value::MakeValue(MixedT input) { return MakeMixedData(input); }
+
+// Value getter
+template <> BooleanT Value::GetValue() const;
+template <> TinyIntT Value::GetValue() const;
+template <> SmallIntT Value::GetValue() const;
+template <> IntegerT Value::GetValue() const;
+template <> BigIntT Value::GetValue() const;
+template <> HugeIntT Value::GetValue() const;
+template <> FloatT Value::GetValue() const;
+template <> DoubleT Value::GetValue() const;
+template <> DecimalT Value::GetValue() const;
+template <> VarcharT Value::GetValue() const;
+template <> DateT Value::GetValue() const;
+template <> TimeT Value::GetValue() const;
+template <> DateTimeT Value::GetValue() const;
+template <> TimestampT Value::GetValue() const;
+template <> TimestampTZT Value::GetValue() const;
+template <> IntervalT Value::GetValue() const;
+template <> ArrayT Value::GetValue() const;
+template <> PointT Value::GetValue() const;
+template <> LineT Value::GetValue() const;
+template <> LineSegT Value::GetValue() const;
+template <> BoxT Value::GetValue() const;
+template <> PolygonT Value::GetValue() const;
+template <> CircleT Value::GetValue() const;
+template <> BitmapT Value::GetValue() const;
+template <> UuidT Value::GetValue() const;
+template <> BlobT Value::GetValue() const;
+template <> EmbeddingT Value::GetValue() const;
+template <> MixedT Value::GetValue() const;
 }

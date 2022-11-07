@@ -13,7 +13,4 @@ struct DateTimeType {
     i32 time;
 };
 
-using TimestampType = DateTimeType;
-using TimestampTZType = DateTimeType;
-
 }
