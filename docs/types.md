@@ -41,7 +41,7 @@
 
 ## Other
 - HLL - HyperLogLog
-- Bitmap
+- Bitmask
 - UUID
 - BYTES - binary / varbinary
 - NULL

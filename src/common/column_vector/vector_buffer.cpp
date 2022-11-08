@@ -8,7 +8,7 @@
 namespace infinity {
 
 SharedPtr<VectorBuffer>
-VectorBuffer::MakeVectorBuffer(size_t data_type_size, size_t capacity) {
+VectorBuffer::Make(size_t data_type_size, size_t capacity) {
     SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
     buffer_ptr->Initialize(data_type_size * capacity);
     return buffer_ptr;

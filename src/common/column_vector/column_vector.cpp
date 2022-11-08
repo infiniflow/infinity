@@ -16,7 +16,7 @@ void ColumnVector::Initialize(size_t capacity) {
     GeneralAssert(!initialized, "Column vector is already initialized.")
     capacity_ = capacity;
     data_type_size_ = data_type_.Size();
-    buffer_ = VectorBuffer::MakeVectorBuffer(data_type_size_, capacity_);
+    buffer_ = VectorBuffer::Make(data_type_size_, capacity_);
     data_ptr_ = buffer_->GetData();
     initialized = true;
 }
@@ -284,7 +284,7 @@ ColumnVector::ShallowCopy(const ColumnVector &other) {
 
 void
 ColumnVector::Reserve(size_t new_capacity) {
-    SharedPtr<VectorBuffer> new_buffer = VectorBuffer::MakeVectorBuffer(data_type_size_, new_capacity);
+    SharedPtr<VectorBuffer> new_buffer = VectorBuffer::Make(data_type_size_, new_capacity);
     new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
     capacity_ = new_capacity;
     buffer_ = new_buffer;

@@ -7,7 +7,7 @@
 #include "common/types/internal_types.h"
 #include "common/types/data_type.h"
 #include "vector_buffer.h"
-#include "bitmap.h"
+#include "bitmask.h"
 #include "common/types/value.h"
 #include "common/default_values.h"
 
@@ -44,7 +44,7 @@ public:
     ptr_t data_ptr_ {nullptr};
 
     // A bitmap to indicate the null information
-    UniquePtr<Bitmap> nulls_ptr_;
+    UniquePtr<Bitmask> nulls_ptr_;
 
     // this buffer is holding the data
     SharedPtr<VectorBuffer> buffer_;

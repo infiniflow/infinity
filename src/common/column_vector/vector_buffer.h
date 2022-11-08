@@ -9,7 +9,7 @@ namespace infinity {
 class VectorBuffer {
 public:
     static SharedPtr<VectorBuffer>
-    MakeVectorBuffer(size_t data_type_size, size_t capacity);
+    Make(size_t data_type_size, size_t capacity);
 
 public:
     explicit VectorBuffer() = default;
