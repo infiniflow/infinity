@@ -169,8 +169,26 @@ Bitmask::CountTrue() const {
 
 void
 Bitmask::Merge(const Bitmask &other) {
-    GeneralError("Not implemented.");
-}
+    if (other.IsAllTrue()) {
+        return ;
+    }
 
+    if(this->IsAllTrue()) {
+        // Share the same bitmask with other.
+        ShallowCopy(other);
+    }
+
+    if(data_ptr_ == other.data_ptr_) {
+        // Totally same bitmask
+        return ;
+    }
+
+    GeneralAssert(count() == other.count(), "Attempt to merge two bitmasks with different size.")
+
+    size_t u64_count = BitmaskBuffer::UnitCount(count_);
+    for(size_t i = 0; i < u64_count; ++ i) {
+        data_ptr_[i] &= other.data_ptr_[i];
+    }
+}
 
 }
