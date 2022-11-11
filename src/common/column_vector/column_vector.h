@@ -17,14 +17,14 @@ enum class ColumnVectorType : i8 {
     kInvalid,
     kFlat,  // Stand without any encode
     kConstant, // All vector has same type and value
-    kDictionary, // There is a dictionary zone
-    kRLE, // Run length encoding
-    kSequence,
-    kBias,
-
-    kCollectionFlat,
-    kCollectionDictionary,
-    kHeterogeneous,
+//    kDictionary, // There is a dictionary zone
+//    kRLE, // Run length encoding
+//    kSequence,
+//    kBias,
+//
+//    kCollectionFlat, // May have missing
+//    kCollectionDictionary, // May have missing
+    kHeterogeneous, // May have missing
 };
 
 // Basic unit of column data vector
@@ -54,7 +54,7 @@ public:
 public:
     // Construct a column vector without initialization;
     explicit
-    ColumnVector(DataType data_type, ColumnVectorType vector_type);
+    ColumnVector(DataType data_type, ColumnVectorType vector_type = ColumnVectorType::kFlat);
 
     void
     Initialize(size_t capacity = DEFAULT_VECTOR_SIZE);
@@ -81,6 +81,14 @@ public:
     // Enlarge the column vector capacity.
     void
     Reserve(size_t new_capacity);
+
+    void
+    SetVectorType(ColumnVectorType vector_type) {
+        vector_type_ = vector_type;
+    }
+
+    void
+    Reset();
 
 public:
     [[nodiscard]] const inline ColumnVectorType&

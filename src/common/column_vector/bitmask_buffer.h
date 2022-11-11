@@ -14,6 +14,7 @@ public:
 
     static constexpr const u64 UNIT_BITS = 64; // i64 bits count
     static constexpr const u64 UNIT_MAX = std::numeric_limits<u64>::max();
+    static constexpr const u64 UNIT_MIN = 0;
 
 public:
     explicit

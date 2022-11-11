@@ -290,4 +290,13 @@ ColumnVector::Reserve(size_t new_capacity) {
     buffer_ = new_buffer;
 }
 
+void
+ColumnVector::Reset() {
+    capacity_ = 0;
+    data_type_size_ = 0;
+    buffer_.reset();
+    data_ptr_ = nullptr;
+    initialized = false;
+}
+
 }

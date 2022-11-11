@@ -10,9 +10,7 @@ namespace infinity {
 struct AbsFunctionInt {
     template <typename TA, typename TB>
     static inline TA Execute(TB value) {
-        if(value == std::numeric_limits<TB>::min()) {
-            ExecutorError("Overflow on abs(" + std::to_string(value) + ").");
-        }
+        ExecutorAssert(value > std::numeric_limits<TB>::min(), "Overflow on abs(" + std::to_string(value) + ").");
         return value < 0 ? -value : value;
     }
 };

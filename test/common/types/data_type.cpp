@@ -46,8 +46,8 @@ TEST_F(DataTypeTest, GetTypeName) {
     EXPECT_EQ(interval_type.ToString(), "Interval");
     DataType array_type(LogicalType::kArray);
     EXPECT_EQ(array_type.ToString(), "Array");
-    DataType object_type(LogicalType::kObject);
-    EXPECT_EQ(object_type.ToString(), "Object");
+    DataType object_type(LogicalType::kTuple);
+    EXPECT_EQ(object_type.ToString(), "Tuple");
     DataType point_type(LogicalType::kPoint);
     EXPECT_EQ(point_type.ToString(), "Point");
     DataType line_type(LogicalType::kLine);

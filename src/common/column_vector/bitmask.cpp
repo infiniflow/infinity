@@ -138,6 +138,7 @@ Bitmask::Set(size_t row_index, bool valid) {
 
 void
 Bitmask::SetAllTrue() {
+    if(data_ptr_ == nullptr) return ;
     buffer_ptr.reset();
     data_ptr_ = nullptr;
 }

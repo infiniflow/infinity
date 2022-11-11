@@ -167,35 +167,35 @@ public:
 };
 
 // Value maker
-template <> Value Value::MakeValue(BooleanT input) { return MakeBool(input); }
-template <> Value Value::MakeValue(TinyIntT input) { return MakeBool(input); }
-template <> Value Value::MakeValue(SmallIntT input) { return MakeBool(input); }
-template <> Value Value::MakeValue(IntegerT input) { return MakeBool(input); }
-template <> Value Value::MakeValue(BigIntT input) { return MakeBool(input); }
-template <> Value Value::MakeValue(HugeIntT input) { return MakeHugeInt(input); }
-template <> Value Value::MakeValue(FloatT input) { return MakeFloat(input); }
-template <> Value Value::MakeValue(DoubleT input) { return MakeDouble(input); }
-template <> Value Value::MakeValue(DecimalT input) { return MakeDecimal(input); }
-template <> Value Value::MakeValue(VarcharT input) { return MakeVarchar(input); }
-template <> Value Value::MakeValue(DateT input) { return MakeDate(input); }
-template <> Value Value::MakeValue(TimeT input) { return MakeTime(input); }
-template <> Value Value::MakeValue(DateTimeT input) { return MakeDateTime(input); }
-template <> Value Value::MakeValue(TimestampT input) { return MakeTimestamp(input); }
-template <> Value Value::MakeValue(TimestampTZT input) { return MakeTimestampTz(input); }
-template <> Value Value::MakeValue(IntervalT input) { return MakeInterval(input); }
-template <> Value Value::MakeValue(ArrayT input) { return MakeArray(input); }
-template <> Value Value::MakeValue(PointT input) { return MakePoint(input); }
-template <> Value Value::MakeValue(LineT input) { return MakeLine(input); }
-template <> Value Value::MakeValue(LineSegT input) { return MakeLineSegment(input); }
-template <> Value Value::MakeValue(BoxT input) { return MakeBox(input); }
-template <> Value Value::MakeValue(PathT input) { return MakePath(input); }
-template <> Value Value::MakeValue(PolygonT input) { return MakePolygon(input); }
-template <> Value Value::MakeValue(CircleT input) { return MakeCircle(input); }
-template <> Value Value::MakeValue(BitmapT input) { return MakeBitmap(input); }
-template <> Value Value::MakeValue(UuidT input) { return MakeUuid(input); }
-template <> Value Value::MakeValue(BlobT input) { return MakeBlob(input); }
-template <> Value Value::MakeValue(EmbeddingT input) { return MakeEmbedding(input); }
-template <> Value Value::MakeValue(MixedT input) { return MakeMixedData(input); }
+template <> Value Value::MakeValue(BooleanT input);
+template <> Value Value::MakeValue(TinyIntT input);
+template <> Value Value::MakeValue(SmallIntT input);
+template <> Value Value::MakeValue(IntegerT input);
+template <> Value Value::MakeValue(BigIntT input);
+template <> Value Value::MakeValue(HugeIntT input);
+template <> Value Value::MakeValue(FloatT input);
+template <> Value Value::MakeValue(DoubleT input);
+template <> Value Value::MakeValue(DecimalT input);
+template <> Value Value::MakeValue(VarcharT input);
+template <> Value Value::MakeValue(DateT input);
+template <> Value Value::MakeValue(TimeT input);
+template <> Value Value::MakeValue(DateTimeT input);
+template <> Value Value::MakeValue(TimestampT input) ;
+template <> Value Value::MakeValue(TimestampTZT input);
+template <> Value Value::MakeValue(IntervalT input);
+template <> Value Value::MakeValue(ArrayT input);
+template <> Value Value::MakeValue(PointT input);
+template <> Value Value::MakeValue(LineT input);
+template <> Value Value::MakeValue(LineSegT input);
+template <> Value Value::MakeValue(BoxT input);
+template <> Value Value::MakeValue(PathT input);
+template <> Value Value::MakeValue(PolygonT input);
+template <> Value Value::MakeValue(CircleT input);
+template <> Value Value::MakeValue(BitmapT input);
+template <> Value Value::MakeValue(UuidT input);
+template <> Value Value::MakeValue(BlobT input);
+template <> Value Value::MakeValue(EmbeddingT input);
+template <> Value Value::MakeValue(MixedT input);
 
 // Value getter
 template <> BooleanT Value::GetValue() const;
