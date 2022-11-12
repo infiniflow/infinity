@@ -15,6 +15,7 @@ ColumnVector::ColumnVector(DataType data_type, ColumnVectorType vector_type)
 void ColumnVector::Initialize(size_t capacity) {
     GeneralAssert(!initialized, "Column vector is already initialized.")
     capacity_ = capacity;
+    tail_index_ = 0;
     data_type_size_ = data_type_.Size();
     buffer_ = VectorBuffer::Make(data_type_size_, capacity_);
     data_ptr_ = buffer_->GetData();
@@ -293,6 +294,7 @@ ColumnVector::Reserve(size_t new_capacity) {
 void
 ColumnVector::Reset() {
     capacity_ = 0;
+    tail_index_ = 0;
     data_type_size_ = 0;
     buffer_.reset();
     data_ptr_ = nullptr;

@@ -33,9 +33,14 @@ DataBlock::GetValue(size_t column_index, size_t row_index) const {
     return columns[column_index].GetValue(row_index);
 }
 
+//void
+//DataBlock::SetValue(size_t column_index, size_t row_index, const Value &val) {
+//    columns[column_index].SetValue(row_index, val);
+//}
+
 void
-DataBlock::SetValue(size_t column_index, size_t row_index, const Value &val) {
-    columns[column_index].SetValue(row_index, val);
+DataBlock::AppendValue(size_t column_index, const Value& value) {
+    return columns[column_index].AppendValue(value);
 }
 
 }

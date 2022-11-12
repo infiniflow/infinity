@@ -34,6 +34,7 @@
 # Clion
 .idea/**
 cmake-build-debug/**
+cmake-build-release/**
 
 # OSX dir
 .DS_Store

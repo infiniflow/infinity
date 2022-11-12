@@ -21,8 +21,11 @@ struct DataBlock {
     [[nodiscard]] Value
     GetValue(size_t column_index, size_t row_index) const;
 
+//    void
+//    SetValue(size_t column_index, size_t row_index, const Value& val);
+
     void
-    SetValue(size_t column_index, size_t row_index, const Value& val);
+    AppendValue(size_t column_index, const Value& value);
 
 public:
     [[nodiscard]] inline size_t
