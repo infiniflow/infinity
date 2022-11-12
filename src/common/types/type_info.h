@@ -10,7 +10,10 @@ enum class TypeInfoType {
     kInvalid,
 
     // Primitive
-    kDecimal,
+    kDecimal16,
+    kDecimal32,
+    kDecimal64,
+    kDecimal128,
     kVarchar,
 
     // Nested

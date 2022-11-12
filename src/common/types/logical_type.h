@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-// 32 types in total now.
+// 35 types in total now.
 enum LogicalType: i8 {
     // Bool
     kBoolean = 0,
@@ -23,7 +23,10 @@ enum LogicalType: i8 {
     kFloat,
     kDouble,
 
-    kDecimal,
+    kDecimal16,
+    kDecimal32,
+    kDecimal64,
+    kDecimal128,
 
     // String
     kVarchar,

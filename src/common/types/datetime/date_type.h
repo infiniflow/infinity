@@ -7,7 +7,7 @@
 namespace infinity {
 
 struct DateType {
-    i32 date;
+    i32 value;
 };
 
 }

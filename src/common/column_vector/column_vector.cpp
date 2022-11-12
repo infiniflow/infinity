@@ -62,8 +62,17 @@ ColumnVector::GetValue(idx_t index) const {
         case kDouble: {
             return Value::MakeDouble(((DoubleT *) data_ptr_)[index]);
         }
-        case kDecimal: {
-            return Value::MakeDecimal(((DecimalT *) data_ptr_)[index]);
+        case kDecimal16: {
+            return Value::MakeDecimal16(((Decimal16T *) data_ptr_)[index]);
+        }
+        case kDecimal32: {
+            return Value::MakeDecimal32(((Decimal32T *) data_ptr_)[index]);
+        }
+        case kDecimal64: {
+            return Value::MakeDecimal64(((Decimal64T *) data_ptr_)[index]);
+        }
+        case kDecimal128: {
+            return Value::MakeDecimal128(((Decimal128T *) data_ptr_)[index]);
         }
         case kVarchar: {
             return Value::MakeVarchar(((VarcharT *) data_ptr_)[index]);
@@ -176,8 +185,20 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             ((DoubleT *) data_ptr_)[index] = value.GetValue<DoubleT>();
             break;
         }
-        case kDecimal: {
-            ((DecimalT *) data_ptr_)[index] = value.GetValue<DecimalT>();
+        case kDecimal16: {
+            ((Decimal16T *) data_ptr_)[index] = value.GetValue<Decimal16T>();
+            break;
+        }
+        case kDecimal32: {
+            ((Decimal32T *) data_ptr_)[index] = value.GetValue<Decimal32T>();
+            break;
+        }
+        case kDecimal64: {
+            ((Decimal64T *) data_ptr_)[index] = value.GetValue<Decimal64T>();
+            break;
+        }
+        case kDecimal128: {
+            ((Decimal128T *) data_ptr_)[index] = value.GetValue<Decimal128T>();
             break;
         }
         case kVarchar: {

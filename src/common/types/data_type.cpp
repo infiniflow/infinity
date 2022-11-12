@@ -23,7 +23,10 @@ static const char* type2name[] = {
     "HugeInt",
     "Float",
     "Double",
-    "Decimal",
+    "Decimal16",
+    "Decimal32",
+    "Decimal64",
+    "Decimal128",
 
     // String
     "Varchar",
@@ -166,8 +169,9 @@ DataType::ConvertType(hsql::ColumnType type) {
         case hsql::DataType::LONG: return DataType(LogicalType::kBigInt);;
 
         case hsql::DataType::DECIMAL: {
-            UniquePtr<DecimalInfo> decimal_info = MakeUnique<DecimalInfo>();
-            return DataType(LogicalType::kDecimal, std::move(decimal_info));
+            LogicalType logical_type = DecimalType::GetLogicalType(type.precision);
+            UniquePtr<DecimalInfo> decimal_info = DecimalInfo::Make(logical_type, type.precision, type.scale);
+            return DataType(logical_type, std::move(decimal_info));
         }
 
         case hsql::DataType::REAL:

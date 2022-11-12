@@ -28,8 +28,14 @@ TEST_F(DataTypeTest, GetTypeName) {
     EXPECT_EQ(float_type.ToString(), "Float");
     DataType double_type(LogicalType::kDouble);
     EXPECT_EQ(double_type.ToString(), "Double");
-    DataType decimal_type(LogicalType::kDecimal);
-    EXPECT_EQ(decimal_type.ToString(), "Decimal");
+    DataType decimal16_type(LogicalType::kDecimal16);
+    EXPECT_EQ(decimal16_type.ToString(), "Decimal16");
+    DataType decimal32_type(LogicalType::kDecimal32);
+    EXPECT_EQ(decimal32_type.ToString(), "Decimal32");
+    DataType decimal64_type(LogicalType::kDecimal64);
+    EXPECT_EQ(decimal64_type.ToString(), "Decimal64");
+    DataType decimal128_type(LogicalType::kDecimal128);
+    EXPECT_EQ(decimal128_type.ToString(), "Decimal128");
     DataType varchar_type(LogicalType::kVarchar);
     EXPECT_EQ(varchar_type.ToString(), "Varchar");
     DataType date_type(LogicalType::kDate);

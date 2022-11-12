@@ -52,7 +52,10 @@ using HugeIntT = HugeInt;
 using FloatT = float;
 using DoubleT = double;
 
-using DecimalT = DecimalType;
+using Decimal16T = Decimal16Type;
+using Decimal32T = Decimal32Type;
+using Decimal64T = Decimal64Type;
+using Decimal128T = Decimal128Type;
 
 // String
 using VarcharT = VarcharType;

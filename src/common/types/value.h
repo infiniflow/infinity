@@ -40,7 +40,16 @@ public:
     MakeDouble(DoubleT input);
 
     static Value
-    MakeDecimal(DecimalT input);
+    MakeDecimal16(Decimal16T input);
+
+    static Value
+    MakeDecimal32(Decimal32T input);
+
+    static Value
+    MakeDecimal64(Decimal64T input);
+
+    static Value
+    MakeDecimal128(Decimal128T input);
 
     static Value
     MakeVarchar(VarcharT input_ref);
@@ -134,7 +143,10 @@ public:
         HugeIntT huge_int;
         FloatT   real32;
         DoubleT  real64;
-        DecimalT decimal;
+        Decimal16T decimal16;
+        Decimal32T decimal32;
+        Decimal64T decimal64;
+        Decimal128T decimal128;
 
         VarcharT varchar;
 
@@ -175,7 +187,10 @@ template <> Value Value::MakeValue(BigIntT input);
 template <> Value Value::MakeValue(HugeIntT input);
 template <> Value Value::MakeValue(FloatT input);
 template <> Value Value::MakeValue(DoubleT input);
-template <> Value Value::MakeValue(DecimalT input);
+template <> Value Value::MakeValue(Decimal16T input);
+template <> Value Value::MakeValue(Decimal32T input);
+template <> Value Value::MakeValue(Decimal64T input);
+template <> Value Value::MakeValue(Decimal128T input);
 template <> Value Value::MakeValue(VarcharT input);
 template <> Value Value::MakeValue(DateT input);
 template <> Value Value::MakeValue(TimeT input);
@@ -206,7 +221,10 @@ template <> BigIntT Value::GetValue() const;
 template <> HugeIntT Value::GetValue() const;
 template <> FloatT Value::GetValue() const;
 template <> DoubleT Value::GetValue() const;
-template <> DecimalT Value::GetValue() const;
+template <> Decimal16T Value::GetValue() const;
+template <> Decimal32T Value::GetValue() const;
+template <> Decimal64T Value::GetValue() const;
+template <> Decimal128T Value::GetValue() const;
 template <> VarcharT Value::GetValue() const;
 template <> DateT Value::GetValue() const;
 template <> TimeT Value::GetValue() const;

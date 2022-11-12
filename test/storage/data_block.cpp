@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include "base_test.h"
 #include "storage/data_block.h"
+#include "common/types/info/decimal_info.h"
 #include "main/profiler/base_profiler.h"
 
 class DataBlockTest : public BaseTest {
@@ -17,6 +18,17 @@ TEST_F(DataBlockTest, test1) {
     DataBlock data_block;
     std::vector<DataType> column_types;
     column_types.emplace_back(LogicalType::kBoolean);
+    column_types.emplace_back(LogicalType::kTinyInt);
+    column_types.emplace_back(LogicalType::kSmallInt);
+    column_types.emplace_back(LogicalType::kInteger);
+    column_types.emplace_back(LogicalType::kBigInt);
+    column_types.emplace_back(LogicalType::kFloat);
+    column_types.emplace_back(LogicalType::kDouble);
+
+    column_types.emplace_back(LogicalType::kDecimal16, DecimalInfo::Make(4, 2));
+    column_types.emplace_back(LogicalType::kDecimal32, DecimalInfo::Make(9, 2));
+    column_types.emplace_back(LogicalType::kDecimal32, DecimalInfo::Make(18, 2));
+    column_types.emplace_back(LogicalType::kDecimal32, DecimalInfo::Make(38, 2));
 
     size_t row_count = DEFAULT_VECTOR_SIZE;
 

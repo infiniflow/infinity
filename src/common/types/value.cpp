@@ -10,7 +10,7 @@ namespace infinity {
 // Value maker
 
 Value
-Value::MakeBool(bool input) {
+Value::MakeBool(BooleanT input) {
     Value value(LogicalType::kBoolean);
     value.value_.boolean = input;
     value.is_null_ = false;
@@ -18,7 +18,7 @@ Value::MakeBool(bool input) {
 }
 
 Value
-Value::MakeTinyInt(i8 input) {
+Value::MakeTinyInt(TinyIntT input) {
     Value value(LogicalType::kTinyInt);
     value.value_.tiny_int = input;
     value.is_null_ = false;
@@ -26,7 +26,7 @@ Value::MakeTinyInt(i8 input) {
 }
 
 Value
-Value::MakeSmallInt(i16 input) {
+Value::MakeSmallInt(SmallIntT input) {
     Value value(LogicalType::kSmallInt);
     value.value_.small_int = input;
     value.is_null_ = false;
@@ -34,7 +34,7 @@ Value::MakeSmallInt(i16 input) {
 }
 
 Value
-Value::MakeInt(i32 input) {
+Value::MakeInt(IntegerT input) {
     Value value(LogicalType::kInteger);
     value.value_.integer = input;
     value.is_null_ = false;
@@ -42,7 +42,7 @@ Value::MakeInt(i32 input) {
 }
 
 Value
-Value::MakeBigInt(i64 input) {
+Value::MakeBigInt(BigIntT input) {
     Value value(LogicalType::kBigInt);
     value.value_.big_int = input;
     value.is_null_ = false;
@@ -58,7 +58,7 @@ Value::MakeHugeInt(HugeIntT input) {
 }
 
 Value
-Value::MakeFloat(float input) {
+Value::MakeFloat(FloatT input) {
     Value value(LogicalType::kFloat);
     value.value_.real32 = input;
     value.is_null_ = false;
@@ -66,7 +66,7 @@ Value::MakeFloat(float input) {
 }
 
 Value
-Value::MakeDouble(double input) {
+Value::MakeDouble(DoubleT input) {
     Value value(LogicalType::kDouble);
     value.value_.real64 = input;
     value.is_null_ = false;
@@ -74,12 +74,37 @@ Value::MakeDouble(double input) {
 }
 
 Value
-Value::MakeDecimal(DecimalType input) {
-    Value value(LogicalType::kDecimal);
-    value.value_.decimal = input;
+Value::MakeDecimal16(Decimal16T input) {
+    Value value(LogicalType::kDecimal16);
+    value.value_.decimal16 = input;
     value.is_null_ = false;
     return value;
 }
+
+Value
+Value::MakeDecimal32(Decimal32T input) {
+    Value value(LogicalType::kDecimal32);
+    value.value_.decimal32 = input;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeDecimal64(Decimal64T input) {
+    Value value(LogicalType::kDecimal64);
+    value.value_.decimal64 = input;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeDecimal128(Decimal128T input) {
+    Value value(LogicalType::kDecimal128);
+    value.value_.decimal128 = input;
+    value.is_null_ = false;
+    return value;
+}
+
 
 Value
 Value::MakeVarchar(VarcharT input) {
@@ -289,10 +314,28 @@ Value::GetValue() const {
     return value_.real64;
 }
 
-template <> DecimalT
+template <> Decimal16T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kDecimal, "Not matched type: " + type_.ToString());
-    return value_.decimal;
+TypeAssert(type_.type() == LogicalType::kDecimal16, "Not matched type: " + type_.ToString());
+return value_.decimal16;
+}
+
+template <> Decimal32T
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kDecimal32, "Not matched type: " + type_.ToString());
+    return value_.decimal32;
+}
+
+template <> Decimal64T
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kDecimal64, "Not matched type: " + type_.ToString());
+    return value_.decimal64;
+}
+
+template <> Decimal128T
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kDecimal128, "Not matched type: " + type_.ToString());
+    return value_.decimal128;
 }
 
 template <> VarcharT
@@ -456,8 +499,23 @@ Value::MakeValue(DoubleT input) {
 }
 
 template <> Value
-Value::MakeValue(DecimalT input) {
-    return MakeDecimal(input);
+Value::MakeValue(Decimal16T input) {
+    return MakeDecimal16(input);
+}
+
+template <> Value
+Value::MakeValue(Decimal32T input) {
+    return MakeDecimal32(input);
+}
+
+template <> Value
+Value::MakeValue(Decimal64T input) {
+    return MakeDecimal64(input);
+}
+
+template <> Value
+Value::MakeValue(Decimal128T input) {
+    return MakeDecimal128(input);
 }
 
 template <> Value

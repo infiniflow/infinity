@@ -7,7 +7,7 @@
 namespace infinity {
 
 struct TimeType {
-    i32 date;
+    i32 value;
 };
 
 }
