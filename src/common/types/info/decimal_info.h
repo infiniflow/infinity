@@ -7,6 +7,7 @@
 #include "common/types/type_info.h"
 #include "common/types/logical_type.h"
 #include "common/types/internal_types.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -29,6 +30,19 @@ public:
 
     [[nodiscard]] i64
     scale() const { return scale_; }
+
+    [[nodiscard]] size_t
+    Size() const override {
+        switch (type_) {
+            case TypeInfoType::kDecimal16: return 2u;
+            case TypeInfoType::kDecimal32: return 4u;
+            case TypeInfoType::kDecimal64: return 8u;
+            case TypeInfoType::kDecimal128: return 16u;
+            default: {
+                TypeError("Unexpected error");
+            }
+        }
+    }
 
 private:
     i64 precision_;

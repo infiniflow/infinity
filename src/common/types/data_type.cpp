@@ -76,23 +76,39 @@ static const char* type2name[] = {
 };
 
 static i64 type_size[] = {
-    // Bool
+    // Bool * 1
     1, // Boolean
 
-    // Numeric
+    // Integer * 5
     1, // TinyInt
     2, // SmallInt
     4, // Integer
     8, // BigInt
     16, // HugeInt
+
+    // Float * 2
     4, // Float
     8, // Double
-    16, // Decimal
 
-    // String
+    // Decimal * 4
+    2, // Decimal16
+    4, // Decimal32
+    8, // Decimal64
+    16, // Decimal128
+
+    // Varchar * 1
     16, // Varchar
 
-    // Date and Time
+    // Char * 7
+    1, // Char1
+    2, // Char2
+    4, // Char4
+    8, // Char8
+    16, // Char16
+    32, // Char32
+    64, // Char64
+
+    // Date and Time * 6
     4, // Date
     4, // Time
     8, // DateTime
@@ -153,10 +169,11 @@ DataType::Size() const {
     if(type_ > kInvalid) {
         StorageError("Invalid logical data type.");
     }
-    if(type_ == LogicalType::kEmbedding) {
-        size_t embedding_data_size = ((EmbeddingInfo*)&(*type_info_))->Size();
-        return embedding_data_size;
+
+    if(type_info_ != nullptr) {
+        return type_info_->Size();
     }
+
     return type_size[type_];
 }
 

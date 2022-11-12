@@ -7,6 +7,8 @@
 #include "storage/data_block.h"
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/varchar_info.h"
+#include "common/types/info/array_info.h"
+#include "common/types/info/embedding_info.h"
 #include "main/profiler/base_profiler.h"
 
 class DataBlockTest : public BaseTest {
@@ -18,14 +20,21 @@ TEST_F(DataBlockTest, test1) {
 
     DataBlock data_block;
     std::vector<DataType> column_types;
+    // Bool * 1
     column_types.emplace_back(LogicalType::kBoolean);
+
+    // Integer * 5
     column_types.emplace_back(LogicalType::kTinyInt);
     column_types.emplace_back(LogicalType::kSmallInt);
     column_types.emplace_back(LogicalType::kInteger);
     column_types.emplace_back(LogicalType::kBigInt);
+    column_types.emplace_back(LogicalType::kHugeInt);
+
+    // Float * 2
     column_types.emplace_back(LogicalType::kFloat);
     column_types.emplace_back(LogicalType::kDouble);
 
+    // Decimal * 4
     column_types.emplace_back(LogicalType::kDecimal16, DecimalInfo::Make(4, 2));
     column_types.emplace_back(LogicalType::kDecimal32, DecimalInfo::Make(9, 2));
     column_types.emplace_back(LogicalType::kDecimal64, DecimalInfo::Make(18, 2));
@@ -33,7 +42,51 @@ TEST_F(DataBlockTest, test1) {
 
     EXPECT_THROW(column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(16)), TypeException);
 
+    // Varchar * 1
     column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(64));
+
+    // Char * 7
+    column_types.emplace_back(LogicalType::kChar1);
+    column_types.emplace_back(LogicalType::kChar2);
+    column_types.emplace_back(LogicalType::kChar4);
+    column_types.emplace_back(LogicalType::kChar8);
+    column_types.emplace_back(LogicalType::kChar16);
+    column_types.emplace_back(LogicalType::kChar32);
+    column_types.emplace_back(LogicalType::kChar64);
+
+    // Date and Time * 6
+    column_types.emplace_back(LogicalType::kDate);
+    column_types.emplace_back(LogicalType::kTime);
+    column_types.emplace_back(LogicalType::kDateTime);
+    column_types.emplace_back(LogicalType::kTimestamp);
+    column_types.emplace_back(LogicalType::kTimestampTZ);
+    column_types.emplace_back(LogicalType::kInterval);
+
+    // Nested types * 2
+    column_types.emplace_back(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt)));
+
+    // TODO: how to handle Tuple type?
+    // column_types.emplace_back(LogicalType::kTuple);
+
+    // Geography * 7
+    column_types.emplace_back(LogicalType::kPoint);
+    column_types.emplace_back(LogicalType::kLine);
+    column_types.emplace_back(LogicalType::kLineSeg);
+    column_types.emplace_back(LogicalType::kBox);
+    column_types.emplace_back(LogicalType::kPath);
+    column_types.emplace_back(LogicalType::kPolygon);
+    column_types.emplace_back(LogicalType::kCircle);
+
+    // Other * 4
+    column_types.emplace_back(LogicalType::kBitmap);
+    column_types.emplace_back(LogicalType::kUuid);
+    column_types.emplace_back(LogicalType::kBlob);
+
+    // 32 dimension * float vector
+    column_types.emplace_back(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32));
+
+    // Heterogeneous type * 1
+    column_types.emplace_back(LogicalType::kMixed);
 
     size_t row_count = DEFAULT_VECTOR_SIZE;
 

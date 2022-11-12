@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "common/types/internal_types.h"
+
 namespace infinity {
 
 enum class TypeInfoType {
@@ -52,7 +54,10 @@ public:
     bool
     operator!=(const TypeInfo& other) const;
 
-private:
+    [[nodiscard]] virtual size_t
+    Size() const = 0;
+
+protected:
     TypeInfoType type_ { TypeInfoType::kInvalid };
 };
 

@@ -6,23 +6,31 @@
 
 #include "common/types/complex/embedding_type.h"
 #include "common/types/type_info.h"
+#include "common/types/logical_type.h"
+//#include "common/types/internal_types.h"
 
 namespace infinity {
 
 class EmbeddingInfo : public TypeInfo {
 public:
+
+    inline static UniquePtr<EmbeddingInfo>
+    Make(EmbeddingDataType embedding_data_type, i64 dimension) {
+        return MakeUnique<EmbeddingInfo>(embedding_data_type, dimension);
+    }
+
     explicit EmbeddingInfo(EmbeddingDataType type, i64 dimension):
             TypeInfo(TypeInfoType::kEmbedding),
-            embedding_type_(type),
+            embedding_data_type_(type),
             dimension_(dimension)
             {}
 
     ~EmbeddingInfo() override = default;
 
-    size_t
-    Size() const;
+    [[nodiscard]] size_t
+    Size() const override;
 private:
-    EmbeddingDataType embedding_type_{EmbeddingDataType::kElemInvalid};
+    EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     size_t dimension_;
 };
 

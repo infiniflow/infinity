@@ -8,5 +8,6 @@
 namespace infinity {
 
 constexpr i64 DEFAULT_VECTOR_SIZE = 8192;
+constexpr i64 DEFAULT_VARCHAR_SIZE = 65535;
 
 }

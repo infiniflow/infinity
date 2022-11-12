@@ -8,28 +8,32 @@
 
 namespace infinity {
 
-// 35 types in total now.
+// 40 types in total now.
 enum LogicalType: i8 {
-    // Bool
+    // Bool * 1
     kBoolean = 0,
 
-    // Numeric
+    // Integer * 5
     kTinyInt,
     kSmallInt,
     kInteger,
     kBigInt,
     kHugeInt,
 
+    // Float * 2
     kFloat,
     kDouble,
 
+    // Decimal * 4
     kDecimal16,
     kDecimal32,
     kDecimal64,
     kDecimal128,
 
-    // String
+    // Varchar * 1
     kVarchar,
+
+    // Char * 7
     kChar1,
     kChar2,
     kChar4,
@@ -38,7 +42,7 @@ enum LogicalType: i8 {
     kChar32,
     kChar64,
 
-    // Date and Time
+    // Date and Time * 6
     kDate,
     kTime,
     kDateTime,
@@ -46,11 +50,11 @@ enum LogicalType: i8 {
     kTimestampTZ,
     kInterval,
 
-    // Nested types
+    // Nested types * 2
     kArray,
     kTuple,
 
-    // Geography
+    // Geography * 7
     kPoint,
     kLine,
     kLineSeg,
@@ -59,13 +63,13 @@ enum LogicalType: i8 {
     kPolygon,
     kCircle,
 
-    // Other
+    // Other * 4
     kBitmap,
     kUuid,
     kBlob,
     kEmbedding,
 
-    // Heterogeneous type
+    // Heterogeneous type * 1
     kMixed,
 
     // only used in heterogeneous type
