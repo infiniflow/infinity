@@ -6,6 +6,7 @@
 #include "base_test.h"
 #include "storage/data_block.h"
 #include "common/types/info/decimal_info.h"
+#include "common/types/info/varchar_info.h"
 #include "main/profiler/base_profiler.h"
 
 class DataBlockTest : public BaseTest {
@@ -27,8 +28,12 @@ TEST_F(DataBlockTest, test1) {
 
     column_types.emplace_back(LogicalType::kDecimal16, DecimalInfo::Make(4, 2));
     column_types.emplace_back(LogicalType::kDecimal32, DecimalInfo::Make(9, 2));
-    column_types.emplace_back(LogicalType::kDecimal32, DecimalInfo::Make(18, 2));
-    column_types.emplace_back(LogicalType::kDecimal32, DecimalInfo::Make(38, 2));
+    column_types.emplace_back(LogicalType::kDecimal64, DecimalInfo::Make(18, 2));
+    column_types.emplace_back(LogicalType::kDecimal128, DecimalInfo::Make(38, 2));
+
+    EXPECT_THROW(column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(16)), TypeException);
+
+    column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(64));
 
     size_t row_count = DEFAULT_VECTOR_SIZE;
 

@@ -30,6 +30,13 @@ enum LogicalType: i8 {
 
     // String
     kVarchar,
+    kChar1,
+    kChar2,
+    kChar4,
+    kChar8,
+    kChar16,
+    kChar32,
+    kChar64,
 
     // Date and Time
     kDate,

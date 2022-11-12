@@ -59,6 +59,13 @@ using Decimal128T = Decimal128Type;
 
 // String
 using VarcharT = VarcharType;
+using Char1T = Char1Type;
+using Char2T = Char2Type;
+using Char4T = Char4Type;
+using Char8T = Char8Type;
+using Char16T = Char16Type;
+using Char32T = Char32Type;
+using Char64T = Char64Type;
 
 // Date and Time
 using DateT = DateType;

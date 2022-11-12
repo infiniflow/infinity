@@ -30,6 +30,13 @@ static const char* type2name[] = {
 
     // String
     "Varchar",
+    "Char1",
+    "Char2",
+    "Char4",
+    "Char8",
+    "Char16",
+    "Char32",
+    "Char64",
 
     // Date and Time
     "Date",
@@ -181,8 +188,7 @@ DataType::ConvertType(hsql::ColumnType type) {
         case hsql::DataType::CHAR:
         case hsql::DataType::VARCHAR:
         case hsql::DataType::TEXT: {
-            UniquePtr<VarcharInfo> varchar_info = MakeUnique<VarcharInfo>();
-            return DataType(LogicalType::kVarchar, std::move(varchar_info));
+            return DataType(LogicalType::kVarchar, VarcharInfo::Make(type.length));
         }
 
         case hsql::DataType::DATE: return DataType(LogicalType::kDate);

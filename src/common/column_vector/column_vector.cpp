@@ -77,6 +77,27 @@ ColumnVector::GetValue(idx_t index) const {
         case kVarchar: {
             return Value::MakeVarchar(((VarcharT *) data_ptr_)[index]);
         }
+        case kChar1: {
+            return Value::MakeChar1(((Char1T *) data_ptr_)[index]);
+        }
+        case kChar2: {
+            return Value::MakeChar2(((Char2T *) data_ptr_)[index]);
+        }
+        case kChar4: {
+            return Value::MakeChar4(((Char4T *) data_ptr_)[index]);
+        }
+        case kChar8: {
+            return Value::MakeChar8(((Char8T *) data_ptr_)[index]);
+        }
+        case kChar16: {
+            return Value::MakeChar16(((Char16T *) data_ptr_)[index]);
+        }
+        case kChar32: {
+            return Value::MakeChar32(((Char32T *) data_ptr_)[index]);
+        }
+        case kChar64: {
+            return Value::MakeChar64(((Char64T *) data_ptr_)[index]);
+        }
         case kDate: {
             return Value::MakeDate(((DateT *) data_ptr_)[index]);
         }
@@ -204,6 +225,34 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
         case kVarchar: {
             // TODO: store string data into sequential address?
             ((VarcharT *) data_ptr_)[index] = value.GetValue<VarcharT>();
+            break;
+        }
+        case kChar1: {
+            ((Char1T *) data_ptr_)[index] = value.GetValue<Char1T>();
+            break;
+        }
+        case kChar2: {
+            ((Char2T *) data_ptr_)[index] = value.GetValue<Char2T>();
+            break;
+        }
+        case kChar4: {
+            ((Char4T *) data_ptr_)[index] = value.GetValue<Char4T>();
+            break;
+        }
+        case kChar8: {
+            ((Char8T *) data_ptr_)[index] = value.GetValue<Char8T>();
+            break;
+        }
+        case kChar16: {
+            ((Char16T *) data_ptr_)[index] = value.GetValue<Char16T>();
+            break;
+        }
+        case kChar32: {
+            ((Char32T *) data_ptr_)[index] = value.GetValue<Char32T>();
+            break;
+        }
+        case kChar64: {
+            ((Char64T *) data_ptr_)[index] = value.GetValue<Char64T>();
             break;
         }
         case kDate: {

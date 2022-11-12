@@ -115,6 +115,63 @@ Value::MakeVarchar(VarcharT input) {
 }
 
 Value
+Value::MakeChar1(Char1T input) {
+    Value value(LogicalType::kChar1);
+    value.value_.char1 = input;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeChar2(Char2T input) {
+    Value value(LogicalType::kChar2);
+    value.value_.char2 = input;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeChar4(Char4T input) {
+    Value value(LogicalType::kChar4);
+    value.value_.char4 = input;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeChar8(Char8T input) {
+    Value value(LogicalType::kChar8);
+    value.value_.char8 = input;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeChar16(Char16T input) {
+    Value value(LogicalType::kChar16);
+    value.value_.char16 = input;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeChar32(Char32T input) {
+    Value value(LogicalType::kChar32);
+    value.value_.char32 = input;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeChar64(Char64T input) {
+    Value value(LogicalType::kChar64);
+    value.value_.char64 = input;
+    value.is_null_ = false;
+    return value;
+}
+
+
+Value
 Value::MakeDate(DateT input) {
     Value value(LogicalType::kDate);
     value.value_.date = input;
@@ -344,6 +401,48 @@ Value::GetValue() const {
     return value_.varchar;
 }
 
+template <> Char1T
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kChar1, "Not matched type: " + type_.ToString());
+    return value_.char1;
+}
+
+template <> Char2T
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kChar2, "Not matched type: " + type_.ToString());
+    return value_.char2;
+}
+
+template <> Char4T
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kChar4, "Not matched type: " + type_.ToString());
+    return value_.char4;
+}
+
+template <> Char8T
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kChar8, "Not matched type: " + type_.ToString());
+    return value_.char8;
+}
+
+template <> Char16T
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kChar16, "Not matched type: " + type_.ToString());
+    return value_.char16;
+}
+
+template <> Char32T
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kChar32, "Not matched type: " + type_.ToString());
+    return value_.char32;
+}
+
+template <> Char64T
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kChar64, "Not matched type: " + type_.ToString());
+    return value_.char64;
+}
+
 template <> DateT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kDate, "Not matched type: " + type_.ToString());
@@ -521,6 +620,34 @@ Value::MakeValue(Decimal128T input) {
 template <> Value
 Value::MakeValue(VarcharT input) {
     return MakeVarchar(input);
+}
+
+template <> Value Value::MakeValue(Char1T input) {
+    return MakeChar1(input);
+}
+
+template <> Value Value::MakeValue(Char2T input) {
+    return MakeChar2(input);
+}
+
+template <> Value Value::MakeValue(Char4T input) {
+    return MakeChar4(input);
+}
+
+template <> Value Value::MakeValue(Char8T input) {
+    return MakeChar8(input);
+}
+
+template <> Value Value::MakeValue(Char16T input) {
+    return MakeChar16(input);
+}
+
+template <> Value Value::MakeValue(Char32T input) {
+    return MakeChar32(input);
+}
+
+template <> Value Value::MakeValue(Char64T input) {
+    return MakeChar64(input);
 }
 
 template <> Value
