@@ -163,14 +163,20 @@ public:
     explicit
     Value(LogicalType type): type_(type) {}
 
-//    Value(const Value& other);
-//    Value(const Value&& other);
+    Value(const Value& other);
+    Value(Value&& other) noexcept ;
+
+    Value&
+    operator=(const Value& other);
+
+    Value&
+    operator=(Value&& other) noexcept ;
 
     ~Value();
 
 public:
     DataType type_;
-    union {
+    union UnionValue {
         BooleanT boolean;
 
         TinyIntT tiny_int;
@@ -218,6 +224,11 @@ public:
         EmbeddingT embedding;
 
         MixedT     mixed_value;
+
+        ~UnionValue() {
+            // This is important for the member of union to have non-trivial destructor/copy constructor ...
+            ;
+        };
     } value_ = {};
     bool is_null_{false};
 };

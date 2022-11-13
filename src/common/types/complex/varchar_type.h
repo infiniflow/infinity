@@ -16,9 +16,20 @@ public:
 public:
     VarcharType() = default;
 
-    ~VarcharType() = default;
+    explicit
+    VarcharType(const String& str);
 
-//    VarcharType(const VarcharType& other);
+    explicit
+    VarcharType(const char* ptr);
+
+    explicit
+    VarcharType(const char* ptr, size_t len);
+
+    ~VarcharType();
+    VarcharType(const VarcharType& other);
+    VarcharType(VarcharType&& other) noexcept;
+    VarcharType& operator=(const VarcharType& other);
+    VarcharType& operator=(VarcharType&& other) noexcept;
 
     void
     DeepCopy(const VarcharType& other);
@@ -37,12 +48,8 @@ public:
         return length <= INLINE_LENGTH;
     }
 
-    // Only reset the ptr, but not free the memory
     void
     Reset();
-
-    void
-    Destroy();
 
     [[nodiscard]] String
     ToString() const;

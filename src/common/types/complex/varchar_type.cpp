@@ -7,9 +7,65 @@
 
 namespace infinity {
 
-//VarcharType::VarcharType(const VarcharType& other) {
-//    this->DeepCopy(other);
-//}
+VarcharType::VarcharType(const String& str) {
+    Initialize(str);
+}
+
+VarcharType::VarcharType(const char* ptr) {
+    Initialize(ptr);
+}
+
+VarcharType::VarcharType(const char* ptr, size_t len) {
+    Initialize(ptr, len);
+}
+
+VarcharType::~VarcharType() {
+//    LOG_TRACE("Destructor");
+    Reset();
+}
+
+VarcharType::VarcharType(const VarcharType& other) {
+//    LOG_TRACE("Copy constructor");
+    DeepCopy(other);
+}
+
+VarcharType::VarcharType(VarcharType&& other) noexcept {
+//    LOG_TRACE("Move constructor");
+    this->length = other.length;
+    if(length <= INLINE_LENGTH) {
+        memcpy(this->prefix, other.prefix, length);
+    } else {
+        memcpy(this->prefix, other.prefix, PREFIX_LENGTH);
+        this->ptr = other.ptr;
+        other.ptr = nullptr;
+    }
+    other.length = 0;
+}
+
+VarcharType&
+VarcharType::operator=(const VarcharType& other) {
+//    LOG_TRACE("Copy assignment");
+    if(this == &other) return *this;
+
+    DeepCopy(other);
+    return *this;
+}
+
+VarcharType&
+VarcharType::operator=(VarcharType&& other) noexcept {
+//    LOG_TRACE("Move assignment");
+    this->length = other.length;
+    if(length <= INLINE_LENGTH) {
+        memcpy(this->prefix, other.prefix, length);
+    } else {
+        memcpy(this->prefix, other.prefix, PREFIX_LENGTH);
+        this->ptr = other.ptr;
+        other.ptr = nullptr;
+    }
+    other.length = 0;
+    return *this;
+}
+
 
 void
 VarcharType::DeepCopy(const VarcharType &other) {
@@ -20,8 +76,9 @@ VarcharType::DeepCopy(const VarcharType &other) {
         this->length = other.length;
         memcpy(prefix, other.prefix, PREFIX_LENGTH);
 
-        LOG_DEBUG("Allocate new memory: ", ptr, length);
         ptr = new char[this->length]();
+        LOG_TRACE("DeepCopy: allocate memory: {}, {}", (void*)ptr, length);
+
         memcpy(ptr, other.ptr, this->length);
     }
 }
@@ -44,36 +101,31 @@ VarcharType::Initialize(const char* input_ptr, size_t input_len) {
                "Attempt to write string with length exceed 65535 into value");
 
     length = static_cast<i16>(input_len);
+    ptr = nullptr;
     if(IsInlined()) {
-        memcpy(prefix, input_ptr, input_len);
+        LOG_TRACE("Initialize, inline varchar: {}", length);
+        memcpy(prefix, input_ptr, length);
+        // ptr maybe also padding by the memcpy
     } else {
         ptr = new char[input_len]();
-        LOG_DEBUG("Allocate new memory: ", ptr, length);
+        LOG_TRACE("Initialize: allocate memory: {}, {}", (void*)ptr, length);
         memcpy(prefix, input_ptr, PREFIX_LENGTH);
-        memcpy(ptr, input_ptr, input_len);
+        memcpy(ptr, input_ptr, length);
     }
 }
 
-// Only reset the ptr, but not free the memory
 void
 VarcharType::Reset() {
     if(IsInlined()) {
-        return ;
+        LOG_TRACE("Reset inline varchar");
+        length = 0;
+    } else {
+        LOG_TRACE("Reset: free memory: {}, {}", (void*)ptr, length);
+        length = 0;
+        delete[] ptr;
+        ptr = nullptr;
     }
-    ptr = nullptr;
 };
-
-void
-VarcharType::Destroy() {
-    if(IsInlined()) {
-        // No heap is allocated.
-        return ;
-    }
-
-    LOG_DEBUG("Deallocate memory: ", ptr, length);
-    delete ptr;
-    ptr = nullptr;
-}
 
 String
 VarcharType::ToString() const {

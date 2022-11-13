@@ -9,15 +9,17 @@
 class LoggerTest : public BaseTest {
     void
     SetUp() override {
+        infinity::Logger::Initialize();
     }
 
     void
     TearDown() override {
+        infinity::Logger::Shutdown();
     }
 };
 
 TEST_F(LoggerTest, test1) {
-    infinity::Logger::Initialize();
+//    infinity::Logger::Initialize();
 
     LOG_TRACE("This is a trace log");
     LOG_DEBUG("This is a debug log");
@@ -25,5 +27,5 @@ TEST_F(LoggerTest, test1) {
     LOG_WARN("This is a warn log");
     LOG_ERROR("This is a error log");
 
-    infinity::Logger::Shutdown();
+//    infinity::Logger::Shutdown();
 }

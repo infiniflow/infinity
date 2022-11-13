@@ -110,10 +110,6 @@ Value
 Value::MakeVarchar(VarcharT& input) {
     Value value(LogicalType::kVarchar);
     value.value_.varchar = input;
-
-    // Remove the reference
-    input.Reset();
-
     value.is_null_ = false;
     return value;
 }
@@ -778,12 +774,31 @@ Value::MakeValue(MixedT input) {
 Value::~Value() {
     switch(type_.type()) {
         case kVarchar: {
-            value_.varchar.Destroy();
+            value_.varchar.~VarcharType();
+            break;
         }
         default: {
 
         }
     }
+}
+
+Value::Value(const Value& other) : type_(other.type_) {
+
+}
+
+Value::Value(Value&& other) noexcept : type_(std::move(other.type_)) {
+
+}
+
+Value&
+Value::operator=(const Value& other) {
+    return *this;
+}
+
+Value&
+Value::operator=(Value&& other)  noexcept {
+    return *this;
 }
 
 //Value::Value(const Value& other) : type_(other.type_), value_(other.value_)  {

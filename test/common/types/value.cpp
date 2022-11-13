@@ -10,12 +10,12 @@
 class ValueTest : public BaseTest {
     void
     SetUp() override {
-//        infinity::Logger::Initialize(false);
+        infinity::Logger::Initialize();
     }
 
     void
     TearDown() override {
-//        infinity::Logger::Shutdown();
+        infinity::Logger::Shutdown();
     }
 };
 
@@ -110,8 +110,8 @@ TEST_F(ValueTest, MakeAndGet) {
     EXPECT_EQ(value.GetValue<VarcharT>().ToString(), "Hello World!");
 
     // Varchar (heap allocation)
-//    value = Value::MakeVarchar("Hello World, Hello World");
-//    EXPECT_EQ(value.GetValue<VarcharT>().IsInlined(), false);
+    value = Value::MakeVarchar("Hello World, Hello World");
+    EXPECT_EQ(value.GetValue<VarcharT>().IsInlined(), false);
 //    EXPECT_EQ(value.GetValue<VarcharT>().ToString(), "Hello World, Hello World");
 
 
