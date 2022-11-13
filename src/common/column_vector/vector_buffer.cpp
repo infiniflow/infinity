@@ -18,7 +18,7 @@ void
 VectorBuffer::Initialize(size_t data_size) {
     GeneralAssert(!initialized_, "Vector buffer is already initialized.");
     if(data_size > 0) {
-        data_ = MakeUnique<i8[]>(data_size);
+        data_ = MakeUnique<char[]>(data_size);
     }
     initialized_ = true;
     data_size_ = data_size;

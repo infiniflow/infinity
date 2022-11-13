@@ -107,9 +107,29 @@ Value::MakeDecimal128(Decimal128T input) {
 
 
 Value
-Value::MakeVarchar(VarcharT input) {
+Value::MakeVarchar(VarcharT& input) {
     Value value(LogicalType::kVarchar);
     value.value_.varchar = input;
+
+    // Remove the reference
+    input.Reset();
+
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeVarchar(const String& str) {
+    Value value(LogicalType::kVarchar);
+    value.value_.varchar.Initialize(str);
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeVarchar(const char* ptr) {
+    Value value(LogicalType::kVarchar);
+    value.value_.varchar.Initialize(ptr);
     value.is_null_ = false;
     return value;
 }
@@ -618,8 +638,18 @@ Value::MakeValue(Decimal128T input) {
 }
 
 template <> Value
-Value::MakeValue(VarcharT input) {
+Value::MakeValue(VarcharT& input) {
     return MakeVarchar(input);
+}
+
+template <> Value
+Value::MakeValue(const String& input_str_ref) {
+    return MakeVarchar(input_str_ref);
+}
+
+template <> Value
+Value::MakeValue(const char_t* input_ptr) {
+    return MakeVarchar(input_ptr);
 }
 
 template <> Value Value::MakeValue(Char1T input) {
@@ -744,6 +774,41 @@ template <> Value
 Value::MakeValue(MixedT input) {
     return MakeMixedData(input);
 }
+
+Value::~Value() {
+    switch(type_.type()) {
+        case kVarchar: {
+            value_.varchar.Destroy();
+        }
+        default: {
+
+        }
+    }
+}
+
+//Value::Value(const Value& other) : type_(other.type_), value_(other.value_)  {
+//    LOG_DEBUG("Value copy constructor");
+//    switch(type_.type()) {
+//        case kVarchar: {
+//            value_.varchar.DeepCopy(other.value_.varchar);
+//        }
+//        default: {
+//
+//        }
+//    }
+//}
+//
+//Value::Value(const Value&& other) : type_(other.type_), value_(other.value_)  {
+//    LOG_DEBUG("Value move constructor");
+//    switch(type_.type()) {
+//        case kVarchar: {
+//            value_.varchar.DeepCopy(other.value_.varchar);
+//        }
+//        default: {
+//
+//        }
+//    }
+//}
 
 String
 Value::ToString() const {

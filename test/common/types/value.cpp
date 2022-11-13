@@ -5,14 +5,17 @@
 #include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/types/value.h"
+#include "main/logger.h"
 
 class ValueTest : public BaseTest {
     void
     SetUp() override {
+//        infinity::Logger::Initialize(false);
     }
 
     void
     TearDown() override {
+//        infinity::Logger::Shutdown();
     }
 };
 
@@ -91,14 +94,25 @@ TEST_F(ValueTest, MakeAndGet) {
     value = Value::MakeDecimal32(decimal_32);
     EXPECT_EQ(value.GetValue<Decimal32T>(), decimal_32);
 
-    // Decimal16
+    // Decimal64
     Decimal64T decimal_64(10000);
     value = Value::MakeDecimal64(decimal_64);
     EXPECT_EQ(value.GetValue<Decimal64T>(), decimal_64);
 
-    // Decimal16
+    // Decimal128
     Decimal128T decimal_128(10000, 10001);
     value = Value::MakeDecimal128(decimal_128);
     EXPECT_EQ(value.GetValue<Decimal128T>(), decimal_128);
+
+    // Varchar (inline)
+    value = Value::MakeVarchar("Hello World!");
+    EXPECT_EQ(value.GetValue<VarcharT>().IsInlined(), true);
+    EXPECT_EQ(value.GetValue<VarcharT>().ToString(), "Hello World!");
+
+    // Varchar (heap allocation)
+//    value = Value::MakeVarchar("Hello World, Hello World");
+//    EXPECT_EQ(value.GetValue<VarcharT>().IsInlined(), false);
+//    EXPECT_EQ(value.GetValue<VarcharT>().ToString(), "Hello World, Hello World");
+
 
 }

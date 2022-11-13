@@ -52,7 +52,13 @@ public:
     MakeDecimal128(Decimal128T input);
 
     static Value
-    MakeVarchar(VarcharT input_ref);
+    MakeVarchar(VarcharT& input_ref);
+
+    static Value
+    MakeVarchar(const String& str);
+
+    static Value
+    MakeVarchar(const char* ptr);
 
     static Value
     MakeChar1(Char1T input_ref);
@@ -149,12 +155,18 @@ public:
     [[nodiscard]] const DataType& type() const { return type_; }
     [[nodiscard]] bool is_null() const { return is_null_; }
 
-    String
+    [[nodiscard]] String
     ToString() const;
     // Member method
 public:
-    //    Value() = default;
-    explicit Value(LogicalType type): type_(type) {}
+//    Value() = default;
+    explicit
+    Value(LogicalType type): type_(type) {}
+
+//    Value(const Value& other);
+//    Value(const Value&& other);
+
+    ~Value();
 
 public:
     DataType type_;
@@ -223,7 +235,9 @@ template <> Value Value::MakeValue(Decimal16T input);
 template <> Value Value::MakeValue(Decimal32T input);
 template <> Value Value::MakeValue(Decimal64T input);
 template <> Value Value::MakeValue(Decimal128T input);
-template <> Value Value::MakeValue(VarcharT input);
+template <> Value Value::MakeValue(VarcharT& input);
+template <> Value Value::MakeValue(const String& input);
+template <> Value Value::MakeValue(const char_t* input_ptr);
 template <> Value Value::MakeValue(Char1T input);
 template <> Value Value::MakeValue(Char2T input);
 template <> Value Value::MakeValue(Char4T input);

@@ -4,14 +4,53 @@
 
 #pragma once
 
-#include "common/types/varlen_type.h"
+#include "common/types/internal_types.h"
+#include "main/logger.h"
 
 namespace infinity {
 
 struct VarcharType {
-    ptr_t ptr{nullptr};   // pointer to the varchar value buffer.
+public:
+    static constexpr size_t PREFIX_LENGTH = 6;
+    static constexpr size_t INLINE_LENGTH = 14;
+public:
+    VarcharType() = default;
+
+    ~VarcharType() = default;
+
+//    VarcharType(const VarcharType& other);
+
+    void
+    DeepCopy(const VarcharType& other);
+
+    void
+    Initialize(const String& str);
+
+    void
+    Initialize(const char* ptr);
+
+    void
+    Initialize(const char* ptr, size_t len);
+
+    [[nodiscard]] inline bool
+    IsInlined() const {
+        return length <= INLINE_LENGTH;
+    }
+
+    // Only reset the ptr, but not free the memory
+    void
+    Reset();
+
+    void
+    Destroy();
+
+    [[nodiscard]] String
+    ToString() const;
+
     i16 length{0};  // 65535 will be the limitation.
-    char_t prefix[6] {}; // prefix of the varchar
+    char_t prefix[PREFIX_LENGTH] {}; // prefix of the varchar
+    // If length <= 14, ptr will be used as prefix.
+    ptr_t ptr {nullptr};   // pointer to the varchar value buffer.
 };
 
 struct Char1Type {

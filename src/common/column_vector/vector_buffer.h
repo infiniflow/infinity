@@ -25,7 +25,7 @@ public:
 
 private:
     bool initialized_ {false};
-    UniquePtr<i8[]> data_ {nullptr};
+    UniquePtr<char[]> data_ {nullptr};
     size_t data_size_ {0};
 };
 

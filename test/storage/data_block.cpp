@@ -121,7 +121,7 @@ TEST_F(DataBlockTest, test1) {
     for(size_t i = 0; i < row_count; ++ i) {
         Value value = data_block.GetValue(TinyIntColumnIndex, i);
         EXPECT_EQ(value.type().type(), LogicalType::kTinyInt);
-        EXPECT_EQ(value.value_.tiny_int, i % 256);
+        EXPECT_EQ(value.value_.tiny_int, i8(i));
     }
 
     // Test DataBlock::Reset
