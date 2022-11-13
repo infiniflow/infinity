@@ -9,9 +9,28 @@
 namespace infinity {
 
 struct HugeInt {
+public:
+    explicit HugeInt(i64 upper, i64 lower) :
+        upper(upper), lower(lower) {}
+
+    bool
+    operator==(const HugeInt& other) const {
+        return other.upper == upper && other.lower == lower;
+    }
+
     i64 upper;
     i64 lower;
+
+public:
+    [[nodiscard]] inline String
+    ToString() const;
 };
 
+String
+HugeInt::ToString() const {
+    TypeError("Not implemented");
 }
+
+}
+
 

@@ -11,7 +11,15 @@
 #include <filesystem>
 #include <fstream>
 
-class ConsoleTest : public BaseTest {};
+class ConsoleTest : public BaseTest {
+    void
+    SetUp() override {
+    }
+
+    void
+    TearDown() override {
+    }
+};
 
 void
 recurse_dir(const std::filesystem::path& dir_name, std::vector<std::filesystem::path>& file_names) {

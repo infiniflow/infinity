@@ -7,7 +7,13 @@
 #include "common/utility/exception.h"
 
 class ExceptionTest : public BaseTest {
+    void
+    SetUp() override {
+    }
 
+    void
+    TearDown() override {
+    }
 };
 
 TEST_F(ExceptionTest, test1) {

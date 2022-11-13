@@ -60,7 +60,7 @@ Value::MakeHugeInt(HugeIntT input) {
 Value
 Value::MakeFloat(FloatT input) {
     Value value(LogicalType::kFloat);
-    value.value_.real32 = input;
+    value.value_.float32 = input;
     value.is_null_ = false;
     return value;
 }
@@ -68,7 +68,7 @@ Value::MakeFloat(FloatT input) {
 Value
 Value::MakeDouble(DoubleT input) {
     Value value(LogicalType::kDouble);
-    value.value_.real64 = input;
+    value.value_.float64 = input;
     value.is_null_ = false;
     return value;
 }
@@ -362,13 +362,13 @@ Value::GetValue() const {
 template <> FloatT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kFloat, "Not matched type: " + type_.ToString());
-    return value_.real32;
+    return value_.float32;
 }
 
 template <> DoubleT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kDouble, "Not matched type: " + type_.ToString());
-    return value_.real64;
+    return value_.float64;
 }
 
 template <> Decimal16T
@@ -743,6 +743,99 @@ Value::MakeValue(EmbeddingT input) {
 template <> Value
 Value::MakeValue(MixedT input) {
     return MakeMixedData(input);
+}
+
+String
+Value::ToString() const {
+    switch(type_.type()) {
+        case kBoolean:
+            return value_.boolean ? "true": "false";
+        case kTinyInt:
+            return std::to_string(value_.tiny_int);
+        case kSmallInt:
+            return std::to_string(value_.small_int);
+        case kInteger:
+            return std::to_string(value_.integer);
+        case kBigInt:
+            return std::to_string(value_.big_int);
+        case kHugeInt:
+            return value_.huge_int.ToString();
+        case kFloat:
+            return std::to_string(value_.float32);
+        case kDouble:
+            return std::to_string(value_.float64);
+        case kDecimal16:
+            break;
+        case kDecimal32:
+            break;
+        case kDecimal64:
+            break;
+        case kDecimal128:
+            break;
+        case kVarchar:
+            break;
+        case kChar1:
+            break;
+        case kChar2:
+            break;
+        case kChar4:
+            break;
+        case kChar8:
+            break;
+        case kChar16:
+            break;
+        case kChar32:
+            break;
+        case kChar64:
+            break;
+        case kDate:
+            break;
+        case kTime:
+            break;
+        case kDateTime:
+            break;
+        case kTimestamp:
+            break;
+        case kTimestampTZ:
+            break;
+        case kInterval:
+            break;
+        case kArray:
+            break;
+        case kTuple:
+            break;
+        case kPoint:
+            break;
+        case kLine:
+            break;
+        case kLineSeg:
+            break;
+        case kBox:
+            break;
+        case kPath:
+            break;
+        case kPolygon:
+            break;
+        case kCircle:
+            break;
+        case kBitmap:
+            break;
+        case kUuid:
+            break;
+        case kBlob:
+            break;
+        case kEmbedding:
+            break;
+        case kMixed:
+            break;
+        case kNull:
+            break;
+        case kMissing:
+            break;
+        case kInvalid:
+            break;
+    }
+    TypeError("Unexpected error.");
 }
 
 }

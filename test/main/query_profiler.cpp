@@ -7,7 +7,13 @@
 #include "main/profiler/query_profiler.h"
 
 class QueryProfilerTest : public BaseTest {
+    void
+    SetUp() override {
+    }
 
+    void
+    TearDown() override {
+    }
 };
 
 TEST_F(QueryProfilerTest, test1) {

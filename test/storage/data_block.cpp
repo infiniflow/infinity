@@ -12,7 +12,13 @@
 #include "main/profiler/base_profiler.h"
 
 class DataBlockTest : public BaseTest {
+    void
+    SetUp() override {
+    }
 
+    void
+    TearDown() override {
+    }
 };
 
 TEST_F(DataBlockTest, test1) {
@@ -92,16 +98,30 @@ TEST_F(DataBlockTest, test1) {
 
     data_block.Init(column_types);
 
-    // Test DataBlock::AppendValue
+    // Boolean: Test DataBlock::AppendValue
+    constexpr size_t BoolColumnIndex = 0;
     for(size_t i = 0; i < row_count; ++ i) {
-        data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
+        data_block.AppendValue(BoolColumnIndex, Value::MakeBool(i % 2 == 0));
+    }
+
+    // Boolean: Test DataBlock::GetValue
+    for(size_t i = 0; i < row_count; ++ i) {
+        Value value = data_block.GetValue(BoolColumnIndex, i);
+        EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
+        EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
+    }
+
+    // TinyInt: Test DataBlock::AppendValue
+    constexpr size_t TinyIntColumnIndex = 1;
+    for(size_t i = 0; i < row_count; ++ i) {
+        data_block.AppendValue(TinyIntColumnIndex, Value::MakeTinyInt(i));
     }
 
     // Test DataBlock::GetValue
     for(size_t i = 0; i < row_count; ++ i) {
-        Value value = data_block.GetValue(0, i);
-        EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
-        EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
+        Value value = data_block.GetValue(TinyIntColumnIndex, i);
+        EXPECT_EQ(value.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(value.value_.tiny_int, i % 256);
     }
 
     // Test DataBlock::Reset

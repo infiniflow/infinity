@@ -7,7 +7,13 @@
 #include "common/types/data_type.h"
 
 class DataTypeTest : public BaseTest {
+    void
+    SetUp() override {
+    }
 
+    void
+    TearDown() override {
+    }
 };
 
 TEST_F(DataTypeTest, GetTypeName) {

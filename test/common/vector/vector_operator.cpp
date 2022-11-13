@@ -8,7 +8,13 @@
 #include "main/infinity.h"
 
 class VectorOperationTest : public BaseTest {
+    void
+    SetUp() override {
+    }
 
+    void
+    TearDown() override {
+    }
 };
 
 TEST_F(VectorOperationTest, BoolToOther) {

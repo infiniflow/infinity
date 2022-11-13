@@ -7,7 +7,13 @@
 #include "main/profiler/base_profiler.h"
 
 class BaseProfilerTest : public BaseTest {
+    void
+    SetUp() override {
+    }
 
+    void
+    TearDown() override {
+    }
 };
 
 TEST_F(BaseProfilerTest, test1) {

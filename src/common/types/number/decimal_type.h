@@ -10,18 +10,49 @@
 namespace infinity {
 
 struct Decimal16Type {
+    explicit
+    Decimal16Type(i16 val) : value(val) {}
+
+    inline bool
+    operator==(const Decimal16Type& other) const {
+        return other.value == value;
+    }
+
     i16 value;
 };
 
 struct Decimal32Type {
+    explicit
+    Decimal32Type(i32 val) : value(val) {}
+
+    inline bool
+    operator==(const Decimal32Type& other) const {
+        return other.value == value;
+    }
+
     i32 value;
 };
 
 struct Decimal64Type {
+    explicit
+    Decimal64Type(i64 val) : value(val) {}
+
+    inline bool
+    operator==(const Decimal64Type& other) const {
+        return other.value == value;
+    }
+
     i64 value;
 };
 
 struct Decimal128Type {
+    Decimal128Type(i64 val1, i64 val2) : upper(val1), lower(val2) {}
+
+    bool
+    operator==(const Decimal128Type& other) const {
+        return other.upper == upper && other.lower == lower;
+    }
+
     i64 upper;
     i64 lower;
 };

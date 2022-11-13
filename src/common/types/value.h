@@ -11,7 +11,7 @@
 namespace infinity {
 
 struct Value {
-// static method
+// class member
 public:
     // Value creator from different type of input
 
@@ -132,6 +132,8 @@ public:
     static Value
     MakeMixedData(MixedT input);
 
+    // Object member
+public:
     // Value maker template
     template <class T>
     static Value MakeValue(T value) {
@@ -147,9 +149,11 @@ public:
     [[nodiscard]] const DataType& type() const { return type_; }
     [[nodiscard]] bool is_null() const { return is_null_; }
 
-// Member method
+    String
+    ToString() const;
+    // Member method
 public:
-//    Value() = default;
+    //    Value() = default;
     explicit Value(LogicalType type): type_(type) {}
 
 public:
@@ -162,8 +166,8 @@ public:
         IntegerT integer;
         BigIntT  big_int;
         HugeIntT huge_int;
-        FloatT   real32;
-        DoubleT  real64;
+        FloatT   float32;
+        DoubleT  float64;
         Decimal16T decimal16;
         Decimal32T decimal32;
         Decimal64T decimal64;

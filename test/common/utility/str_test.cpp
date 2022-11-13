@@ -7,7 +7,13 @@
 #include "common/utility/str.h"
 
 class StrTest : public BaseTest {
+    void
+    SetUp() override {
+    }
 
+    void
+    TearDown() override {
+    }
 };
 
 TEST_F(StrTest, test1) {
