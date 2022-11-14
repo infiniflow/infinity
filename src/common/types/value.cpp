@@ -952,63 +952,94 @@ Value::operator=(Value&& other)  noexcept {
             break;
         }
         case kChar1: {
-            this->value_.char1.value = other.value_.char1.value;
+            this->value_.char1.value = std::move(other.value_.char1.value);
             break;
         }
         case kChar2: {
-            this->value_.char2 = other.value_.char2;
+            this->value_.char2 = std::move(other.value_.char2);
             break;
         }
         case kChar4: {
-            this->value_.char4 = other.value_.char4;
+            this->value_.char4 = std::move(other.value_.char4);
             break;
         }
         case kChar8: {
-            this->value_.char8 = other.value_.char8;
+            this->value_.char8 = std::move(other.value_.char8);
             break;
         }
         case kChar15: {
-            this->value_.char15 = other.value_.char15;
+            this->value_.char15 = std::move(other.value_.char15);
             break;
         }
         case kChar31: {
-            this->value_.char31 = other.value_.char31;
+            this->value_.char31 = std::move(other.value_.char31);
             break;
         }
         case kChar63: {
-            this->value_.char63 = other.value_.char63;
+            this->value_.char63 = std::move(other.value_.char63);
             break;
         }
-        case kDate:
+        case kDate: {
+            this->value_.date = std::move(other.value_.date);
             break;
-        case kTime:
+        }
+        case kTime: {
+            this->value_.time = std::move(other.value_.time);
             break;
-        case kDateTime:
+        }
+        case kDateTime: {
+            this->value_.datetime = std::move(other.value_.datetime);
             break;
-        case kTimestamp:
+        }
+        case kTimestamp: {
+            this->value_.timestamp = std::move(other.value_.timestamp);
             break;
-        case kTimestampTZ:
+        }
+        case kTimestampTZ: {
+            this->value_.timestamp_tz = std::move(other.value_.timestamp_tz);
             break;
-        case kInterval:
+        }
+        case kInterval: {
+            this->value_.interval = std::move(other.value_.interval);
             break;
-        case kArray:
+        }
+        case kArray: {
+            LOG_ERROR("Not implemented");
+//            this->value_.array = std::move(other.value_.array);
             break;
-        case kTuple:
+        }
+        case kTuple: {
+            LOG_ERROR("Not implemented");
             break;
-        case kPoint:
+        }
+        case kPoint: {
+            this->value_.point = std::move(other.value_.point);
             break;
-        case kLine:
+        }
+        case kLine: {
+            this->value_.line = std::move(other.value_.line);
             break;
-        case kLineSeg:
+        }
+        case kLineSeg: {
+            this->value_.line_segment = std::move(other.value_.line_segment);
             break;
-        case kBox:
+        }
+        case kBox: {
+            this->value_.box = std::move(other.value_.box);
             break;
-        case kPath:
+        }
+        case kPath: {
+            this->value_.path = std::move(other.value_.path);
             break;
-        case kPolygon:
+        }
+        case kPolygon: {
+            // TODO
             break;
-        case kCircle:
+        }
+        case kCircle: {
+            this->value_.circle = std::move(other.value_.circle);
             break;
+        }
         case kBitmap:
             break;
         case kUuid:

@@ -217,6 +217,88 @@ TEST_F(ValueTest, MakeAndGet) {
         s.pop_back();
         EXPECT_EQ(value.GetValue<Char63T>().ToString(), s);
     }
+
+    // Date
+    {
+        DateT date;
+        for(i32 i = 0; i < 365; ++ i) {
+            date.value = i;
+            value = Value::MakeDate(date);
+            EXPECT_EQ(value.GetValue<DateT>().value, i);
+        }
+    }
+
+    // Time
+    {
+        TimeT time;
+        for(i32 i = 0; i < 3600 * 24; ++ i) {
+            time.value = i;
+            value = Value::MakeTime(time);
+            EXPECT_EQ(value.GetValue<TimeT>().value, i);
+        }
+    }
+
+    // Datetime
+    {
+        DateTimeT datetime;
+        for(i32 i = 0; i < 365; ++ i) {
+            datetime.date = i;
+            datetime.time = 3600 - i;
+            value = Value::MakeDateTime(datetime);
+            EXPECT_EQ(value.GetValue<DateTimeT>().date, i);
+            EXPECT_EQ(value.GetValue<DateTimeT>().time, 3600 - i);
+        }
+    }
+
+    // Timestamp
+    {
+        TimestampT timestamp;
+        for(i32 i = 0; i < 365; ++ i) {
+            timestamp.date = i;
+            timestamp.time = 3600 - i;
+            value = Value::MakeTimestamp(timestamp);
+            EXPECT_EQ(value.GetValue<TimestampT>().date, i);
+            EXPECT_EQ(value.GetValue<TimestampT>().time, 3600 - i);
+        }
+    }
+
+    // TimestampTz
+    {
+        TimestampTZT timestamp_tz;
+        for(i32 i = 0; i < 365; ++ i) {
+            timestamp_tz.date = i;
+            timestamp_tz.time = 3600 - i;
+            value = Value::MakeTimestampTz(timestamp_tz);
+            EXPECT_EQ(value.GetValue<TimestampTZT>().date, i);
+            EXPECT_EQ(value.GetValue<TimestampTZT>().time, 3600 - i);
+        }
+    }
+
+    // Interval
+    {
+        IntervalT interval;
+        for(i32 unit = 1; unit < 7; ++ unit) {
+            interval.unit = unit;
+            for(i32 v = 1; v < 3600; ++ v) {
+                interval.value = v;
+                value = Value::MakeInterval(interval);
+                EXPECT_EQ(value.GetValue<IntervalT>().unit, unit);
+                EXPECT_EQ(value.GetValue<IntervalT>().value, v);
+            }
+        }
+    }
+
+    // Array
+    {
+        LOG_TRACE("TODO: need array test");
+    }
+
+    // Tuple
+    {
+        LOG_TRACE("TODO: need tuple test");
+    }
+
+
 }
 
 

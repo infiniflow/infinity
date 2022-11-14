@@ -9,8 +9,13 @@
 namespace infinity {
 
 struct PointType {
-    f64 x;
-    f64 y;
+    PointType() = default;
+
+    inline
+    PointType(f64 a, f64 b): x(a), y(b) {}
+
+    f64 x{};
+    f64 y{};
 };
 
 }
