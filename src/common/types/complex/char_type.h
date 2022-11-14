@@ -58,7 +58,7 @@ public:
 };
 
 struct Char2Type {
-    static constexpr size_t CHAR2LENGTH = 2;
+    static constexpr size_t CHAR_LENGTH = 2;
 public:
     Char2Type() = default;
 
@@ -79,15 +79,16 @@ public:
 
     [[nodiscard]] inline String
     ToString() const {
-        return String(value, CHAR2LENGTH);
+        size_t len = std::min(strlen(value), CHAR_LENGTH);
+        return String(value, len);
     }
 
 public:
-    char_t value[CHAR2LENGTH]{};
+    char_t value[CHAR_LENGTH]{};
 };
 
 struct Char4Type {
-    static constexpr size_t CHAR4LENGTH = 4;
+    static constexpr size_t CHAR_LENGTH = 4;
 public:
     Char4Type() = default;
     ~Char4Type() = default;
@@ -108,16 +109,17 @@ public:
 
     [[nodiscard]] inline String
     ToString() const {
-        return String(value, CHAR4LENGTH);
+        size_t len = std::min(strlen(value), CHAR_LENGTH);
+        return String(value, len);
     }
 
 public:
-    char_t value[CHAR4LENGTH]{};
+    char_t value[CHAR_LENGTH]{};
 
 };
 
 struct Char8Type {
-    static constexpr size_t CHAR8LENGTH = 8;
+    static constexpr size_t CHAR_LENGTH = 8;
 public:
     Char8Type() = default;
     ~Char8Type() = default;
@@ -138,15 +140,16 @@ public:
 
     [[nodiscard]] inline String
     ToString() const {
-        return String(value, CHAR8LENGTH);
+        size_t len = std::min(strlen(value), CHAR_LENGTH);
+        return String(value, len);
     }
 
 public:
-    char_t value[CHAR8LENGTH]{};
+    char_t value[CHAR_LENGTH]{};
 };
 
 struct Char15Type {
-    static constexpr size_t CHAR15LENGTH = 15;
+    static constexpr size_t CHAR_LENGTH = 15;
 public:
     Char15Type() = default;
     ~Char15Type() = default;
@@ -183,11 +186,11 @@ public:
 
 public:
     i8     length{0};
-    char_t value[CHAR15LENGTH]{};
+    char_t value[CHAR_LENGTH]{};
 };
 
 struct Char31Type {
-    static constexpr size_t CHAR31LENGTH = 31;
+    static constexpr size_t CHAR_LENGTH = 31;
 public:
     Char31Type() = default;
     ~Char31Type() = default;
@@ -224,11 +227,11 @@ public:
 
 public:
     i8     length{0};
-    char_t value[CHAR31LENGTH]{};
+    char_t value[CHAR_LENGTH]{};
 };
 
 struct Char63Type {
-    static constexpr size_t CHAR63LENGTH = 63;
+    static constexpr size_t CHAR_LENGTH = 63;
 public:
     Char63Type() = default;
     ~Char63Type() = default;
@@ -265,7 +268,7 @@ public:
 
 public:
     i8     length{0};
-    char_t value[CHAR63LENGTH]{};
+    char_t value[CHAR_LENGTH]{};
 };
 
 }

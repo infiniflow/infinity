@@ -3,6 +3,7 @@
 //
 
 #include "char_type.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -215,8 +216,9 @@ Char15Type::operator=(Char15Type&& other) noexcept {
 
 void
 Char15Type::Initialize(const char* ptr, size_t len) {
-    // Assume the var won't overflow
-    length = static_cast<i8>(len);
+//    TypeAssert(len <= CHAR15LENGTH,
+//               "Attempt to insert too large string into char15 type variable: " + std::to_string(len));
+    length = (len <= CHAR_LENGTH) ? static_cast<i8>(len) : CHAR_LENGTH;
     memcpy(value, ptr, length);
 }
 
@@ -250,7 +252,7 @@ Char31Type::operator=(Char31Type&& other) noexcept {
 void
 Char31Type::Initialize(const char* ptr, size_t len) {
     // Assume the var won't overflow
-    length = static_cast<i8>(len);
+    length = (len <= CHAR_LENGTH) ? static_cast<i8>(len) : CHAR_LENGTH;
     memcpy(value, ptr, length);
 }
 
@@ -261,8 +263,8 @@ Char63Type::Char63Type(const Char63Type& other) {
 }
 
 Char63Type::Char63Type(Char63Type&& other) noexcept {
-length = std::move(other.length);
-memcpy(value, other.value, length);
+    length = std::move(other.length);
+    memcpy(value, other.value, length);
 }
 
 Char63Type&
@@ -284,7 +286,7 @@ Char63Type::operator=(Char63Type&& other) noexcept {
 void
 Char63Type::Initialize(const char* ptr, size_t len) {
     // Assume the var won't overflow
-    length = static_cast<i8>(len);
+    length = (len <= CHAR_LENGTH) ? static_cast<i8>(len) : CHAR_LENGTH;
     memcpy(value, ptr, length);
 }
 

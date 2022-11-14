@@ -121,4 +121,102 @@ TEST_F(ValueTest, MakeAndGet) {
         EXPECT_EQ(value.GetValue<Char1T>().value, input);
         if(input == std::numeric_limits<char>::max()) break;
     }
+
+    // Char2
+    {
+        String s;
+        for(size_t i = 0; i < Char2T::CHAR_LENGTH + 1; ++ i) {
+            Char2T char1(s);
+            value = Value::MakeChar2(char1);
+            EXPECT_EQ(value.GetValue<Char2T>().ToString(), s);
+            s.push_back('a');
+        }
+
+        Char2T char2(s);
+        value = Value::MakeChar2(char2);
+        s.pop_back();
+        EXPECT_EQ(value.GetValue<Char2T>().ToString(), s);
+    }
+
+    // Char4
+    {
+        String s;
+        for(size_t i = 0; i < Char4T::CHAR_LENGTH + 1; ++ i) {
+            Char4T char1(s);
+            value = Value::MakeChar4(char1);
+            EXPECT_EQ(value.GetValue<Char4T>().ToString(), s);
+            s.push_back('a');
+        }
+
+        Char4T char2(s);
+        value = Value::MakeChar4(char2);
+        s.pop_back();
+        EXPECT_EQ(value.GetValue<Char4T>().ToString(), s);
+    }
+
+    // Char8
+    {
+        String s;
+        for(size_t i = 0; i < Char8T::CHAR_LENGTH + 1; ++ i) {
+            Char8T char1(s);
+            value = Value::MakeChar8(char1);
+            EXPECT_EQ(value.GetValue<Char8T>().ToString(), s);
+            s.push_back('a');
+        }
+
+        Char8T char2(s);
+        value = Value::MakeChar8(char2);
+        s.pop_back();
+        EXPECT_EQ(value.GetValue<Char8T>().ToString(), s);
+    }
+
+    // Char15
+    {
+        String s;
+        for(size_t i = 0; i < Char15T::CHAR_LENGTH + 1; ++ i) {
+            Char15T char1(s);
+            value = Value::MakeChar15(char1);
+            EXPECT_EQ(value.GetValue<Char15T>().ToString(), s);
+            s.push_back('a');
+        }
+
+        Char15T char2(s);
+        value = Value::MakeChar15(char2);
+        s.pop_back();
+        EXPECT_EQ(value.GetValue<Char15T>().ToString(), s);
+    }
+
+    // Char31
+    {
+        String s;
+        for(size_t i = 0; i < Char31T::CHAR_LENGTH + 1; ++ i) {
+            Char31T char1(s);
+            value = Value::MakeChar31(char1);
+            EXPECT_EQ(value.GetValue<Char31T>().ToString(), s);
+            s.push_back('a');
+        }
+
+        Char31T char2(s);
+        value = Value::MakeChar31(char2);
+        s.pop_back();
+        EXPECT_EQ(value.GetValue<Char31T>().ToString(), s);
+    }
+
+    // Char63
+    {
+        String s;
+        for(size_t i = 0; i < Char63T::CHAR_LENGTH + 1; ++ i) {
+            Char63T char1(s);
+            value = Value::MakeChar63(char1);
+            EXPECT_EQ(value.GetValue<Char63T>().ToString(), s);
+            s.push_back('a');
+        }
+
+        Char63T char2(s);
+        value = Value::MakeChar63(char2);
+        s.pop_back();
+        EXPECT_EQ(value.GetValue<Char63T>().ToString(), s);
+    }
 }
+
+

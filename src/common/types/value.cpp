@@ -955,18 +955,30 @@ Value::operator=(Value&& other)  noexcept {
             this->value_.char1.value = other.value_.char1.value;
             break;
         }
-        case kChar2:
+        case kChar2: {
+            this->value_.char2 = other.value_.char2;
             break;
-        case kChar4:
+        }
+        case kChar4: {
+            this->value_.char4 = other.value_.char4;
             break;
-        case kChar8:
+        }
+        case kChar8: {
+            this->value_.char8 = other.value_.char8;
             break;
-        case kChar15:
+        }
+        case kChar15: {
+            this->value_.char15 = other.value_.char15;
             break;
-        case kChar31:
+        }
+        case kChar31: {
+            this->value_.char31 = other.value_.char31;
             break;
-        case kChar63:
+        }
+        case kChar63: {
+            this->value_.char63 = other.value_.char63;
             break;
+        }
         case kDate:
             break;
         case kTime:
