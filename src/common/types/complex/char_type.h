@@ -146,18 +146,126 @@ public:
 };
 
 struct Char15Type {
+    static constexpr size_t CHAR15LENGTH = 15;
+public:
+    Char15Type() = default;
+    ~Char15Type() = default;
+
+    explicit inline
+    Char15Type(const String& str) {
+        // we assume the string length won't exceed the limitation;
+        Initialize(str.c_str(), str.length());
+    }
+
+    explicit inline
+    Char15Type(const char* ptr) {
+        // we assume the string length won't exceed the limitation;
+        Initialize(ptr, strlen(ptr));
+    }
+
+    Char15Type(const Char15Type& other);
+    Char15Type(Char15Type&& other) noexcept;
+    Char15Type& operator=(const Char15Type& other);
+    Char15Type& operator=(Char15Type&& other) noexcept;
+
+    void
+    Initialize(const char* ptr, size_t length);
+
+    [[nodiscard]] size_t
+    Length() const {
+        return length;
+    }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        return String(value, length);
+    }
+
+public:
     i8     length{0};
-    char_t value[15]{};
+    char_t value[CHAR15LENGTH]{};
 };
 
 struct Char31Type {
+    static constexpr size_t CHAR31LENGTH = 31;
+public:
+    Char31Type() = default;
+    ~Char31Type() = default;
+
+    explicit inline
+    Char31Type(const String& str) {
+        // we assume the string length won't exceed the limitation;
+        Initialize(str.c_str(), str.length());
+    }
+
+    explicit inline
+    Char31Type(const char* ptr) {
+        // we assume the string length won't exceed the limitation;
+        Initialize(ptr, strlen(ptr));
+    }
+
+    Char31Type(const Char31Type& other);
+    Char31Type(Char31Type&& other) noexcept;
+    Char31Type& operator=(const Char31Type& other);
+    Char31Type& operator=(Char31Type&& other) noexcept;
+
+    void
+    Initialize(const char* ptr, size_t length);
+
+    [[nodiscard]] size_t
+    Length() const {
+        return length;
+    }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        return String(value, length);
+    }
+
+public:
     i8     length{0};
-    char_t value[31]{};
+    char_t value[CHAR31LENGTH]{};
 };
 
 struct Char63Type {
+    static constexpr size_t CHAR63LENGTH = 63;
+public:
+    Char63Type() = default;
+    ~Char63Type() = default;
+
+    explicit inline
+    Char63Type(const String& str) {
+        // we assume the string length won't exceed the limitation;
+        Initialize(str.c_str(), str.length());
+    }
+
+    explicit inline
+    Char63Type(const char* ptr) {
+        // we assume the string length won't exceed the limitation;
+        Initialize(ptr, strlen(ptr));
+    }
+
+    Char63Type(const Char63Type& other);
+    Char63Type(Char63Type&& other) noexcept;
+    Char63Type& operator=(const Char63Type& other);
+    Char63Type& operator=(Char63Type&& other) noexcept;
+
+    void
+    Initialize(const char* ptr, size_t length);
+
+    [[nodiscard]] size_t
+    Length() const {
+        return length;
+    }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        return String(value, length);
+    }
+
+public:
     i8     length{0};
-    char_t value[63]{};
+    char_t value[CHAR63LENGTH]{};
 };
 
 }

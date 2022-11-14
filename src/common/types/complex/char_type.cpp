@@ -187,4 +187,105 @@ Char8Type::Initialize(const char* ptr) {
     value[7] = ptr[7];
 }
 
+// Char15Type
+Char15Type::Char15Type(const Char15Type& other) {
+    length = other.length;
+    memcpy(value, other.value, length);
+}
+
+Char15Type::Char15Type(Char15Type&& other) noexcept {
+    length = std::move(other.length);
+    memcpy(value, other.value, length);
+}
+
+Char15Type&
+Char15Type::operator=(const Char15Type& other) {
+    if(this == &other) return *this;
+    length = other.length;
+    memcpy(value, other.value, length);
+    return *this;
+}
+Char15Type&
+Char15Type::operator=(Char15Type&& other) noexcept {
+    if(this == &other) return *this;
+    length = std::move(other.length);
+    memcpy(value, other.value, length);
+    return *this;
+}
+
+void
+Char15Type::Initialize(const char* ptr, size_t len) {
+    // Assume the var won't overflow
+    length = static_cast<i8>(len);
+    memcpy(value, ptr, length);
+}
+
+// Char31Type
+Char31Type::Char31Type(const Char31Type& other) {
+    length = other.length;
+    memcpy(value, other.value, length);
+}
+
+Char31Type::Char31Type(Char31Type&& other) noexcept {
+    length = std::move(other.length);
+    memcpy(value, other.value, length);
+}
+
+Char31Type&
+Char31Type::operator=(const Char31Type& other) {
+    if(this == &other) return *this;
+    length = other.length;
+    memcpy(value, other.value, length);
+    return *this;
+}
+
+Char31Type&
+Char31Type::operator=(Char31Type&& other) noexcept {
+    if(this == &other) return *this;
+    length = std::move(other.length);
+    memcpy(value, other.value, length);
+    return *this;
+}
+
+void
+Char31Type::Initialize(const char* ptr, size_t len) {
+    // Assume the var won't overflow
+    length = static_cast<i8>(len);
+    memcpy(value, ptr, length);
+}
+
+// Char63Type
+Char63Type::Char63Type(const Char63Type& other) {
+    length = other.length;
+    memcpy(value, other.value, length);
+}
+
+Char63Type::Char63Type(Char63Type&& other) noexcept {
+length = std::move(other.length);
+memcpy(value, other.value, length);
+}
+
+Char63Type&
+Char63Type::operator=(const Char63Type& other) {
+    if(this == &other) return *this;
+    length = other.length;
+    memcpy(value, other.value, length);
+    return *this;
+}
+
+Char63Type&
+Char63Type::operator=(Char63Type&& other) noexcept {
+    if(this == &other) return *this;
+    length = std::move(other.length);
+    memcpy(value, other.value, length);
+    return *this;
+}
+
+void
+Char63Type::Initialize(const char* ptr, size_t len) {
+    // Assume the var won't overflow
+    length = static_cast<i8>(len);
+    memcpy(value, ptr, length);
+}
+
 }
