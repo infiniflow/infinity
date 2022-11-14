@@ -164,10 +164,11 @@ public:
     Value(LogicalType type): type_(type) {}
 
     Value(const Value& other);
-    Value(Value&& other) noexcept ;
-
-    Value&
-    operator=(const Value& other);
+//
+//    Value(Value&& other) noexcept ;
+//
+//    Value&
+//    operator=(const Value& other);
 
     Value&
     operator=(Value&& other) noexcept ;
@@ -229,7 +230,27 @@ public:
             // This is important for the member of union to have non-trivial destructor/copy constructor ...
             ;
         };
-    } value_ = {};
+
+        UnionValue() {
+
+        }
+
+        UnionValue(const UnionValue& other) {
+            ;
+        };
+//
+//        UnionValue(UnionValue&& other) noexcept {
+//            ;
+//        };
+//
+//        UnionValue& operator=(const UnionValue& other) {
+//            return *this;
+//        };
+
+        UnionValue& operator=(UnionValue&& other) noexcept {
+            return *this;
+        };
+    } value_;
     bool is_null_{false};
 };
 

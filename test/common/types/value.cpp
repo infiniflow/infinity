@@ -64,9 +64,9 @@ TEST_F(ValueTest, MakeAndGet) {
     EXPECT_EQ(value.GetValue<BigIntT>(), std::numeric_limits<i64>::max());
 
     // Huge Integer
-    HugeInt huge_int(std::numeric_limits<i64>::min(), std::numeric_limits<i64>::min());
+    HugeInt huge_int(std::numeric_limits<i64>::min(), std::numeric_limits<i64>::max());
     value = Value::MakeHugeInt(huge_int);
-    EXPECT_EQ(value.GetValue<HugeIntT>(), HugeInt(std::numeric_limits<i64>::min(), std::numeric_limits<i64>::min()));
+    EXPECT_EQ(value.GetValue<HugeIntT>(), HugeInt(std::numeric_limits<i64>::min(), std::numeric_limits<i64>::max()));
 
     // Float32
     value = Value::MakeFloat(0);
@@ -112,7 +112,6 @@ TEST_F(ValueTest, MakeAndGet) {
     // Varchar (heap allocation)
     value = Value::MakeVarchar("Hello World, Hello World");
     EXPECT_EQ(value.GetValue<VarcharT>().IsInlined(), false);
-//    EXPECT_EQ(value.GetValue<VarcharT>().ToString(), "Hello World, Hello World");
-
+    EXPECT_EQ(value.GetValue<VarcharT>().ToString(), "Hello World, Hello World");
 
 }

@@ -784,20 +784,235 @@ Value::~Value() {
 }
 
 Value::Value(const Value& other) : type_(other.type_) {
+    switch(type_.type()) {
 
+        case kBoolean:
+            value_.boolean = other.value_.boolean;
+            break;
+        case kTinyInt:
+            break;
+        case kSmallInt:
+            break;
+        case kInteger:
+            break;
+        case kBigInt:
+            break;
+        case kHugeInt:
+            break;
+        case kFloat:
+            break;
+        case kDouble:
+            break;
+        case kDecimal16:
+            break;
+        case kDecimal32:
+            break;
+        case kDecimal64:
+            break;
+        case kDecimal128:
+            break;
+        case kVarchar:
+            break;
+        case kChar1:
+            break;
+        case kChar2:
+            break;
+        case kChar4:
+            break;
+        case kChar8:
+            break;
+        case kChar16:
+            break;
+        case kChar32:
+            break;
+        case kChar64:
+            break;
+        case kDate:
+            break;
+        case kTime:
+            break;
+        case kDateTime:
+            break;
+        case kTimestamp:
+            break;
+        case kTimestampTZ:
+            break;
+        case kInterval:
+            break;
+        case kArray:
+            break;
+        case kTuple:
+            break;
+        case kPoint:
+            break;
+        case kLine:
+            break;
+        case kLineSeg:
+            break;
+        case kBox:
+            break;
+        case kPath:
+            break;
+        case kPolygon:
+            break;
+        case kCircle:
+            break;
+        case kBitmap:
+            break;
+        case kUuid:
+            break;
+        case kBlob:
+            break;
+        case kEmbedding:
+            break;
+        case kMixed:
+            break;
+        case kNull:
+            break;
+        case kMissing:
+            break;
+        case kInvalid:
+            break;
+    }
 }
 
-Value::Value(Value&& other) noexcept : type_(std::move(other.type_)) {
-
-}
-
-Value&
-Value::operator=(const Value& other) {
-    return *this;
-}
+//Value::Value(Value&& other) noexcept :
+//    type_(std::move(other.type_)),
+//    value_(std::move(other.value_)),
+//    is_null_(std::move(other.is_null_)) {
+//}
+//
+//Value&
+//Value::operator=(const Value& other) {
+//    if(this == &other) return *this;
+//    this->type_ = other.type_;
+//    this->is_null_ = other.is_null_;
+//    switch(this->type_.type()) {
+//    }
+//
+//    return *this;
+//}
 
 Value&
 Value::operator=(Value&& other)  noexcept {
+    this->type_ = std::move(other.type_);
+    this->is_null_ = std::move(other.is_null_);
+//    this->value_ = std::move(other.value_);
+    switch(this->type_.type()) {
+        case kBoolean: {
+            this->value_.boolean = std::move(other.value_.boolean);
+            break;
+        }
+        case kTinyInt: {
+            this->value_.tiny_int = std::move(other.value_.tiny_int);
+            break;
+        }
+        case kSmallInt: {
+            this->value_.small_int = std::move(other.value_.small_int);
+            break;
+        }
+        case kInteger: {
+            this->value_.integer = std::move(other.value_.integer);
+            break;
+        }
+        case kBigInt: {
+            this->value_.big_int = std::move(other.value_.big_int);
+            break;
+        }
+        case kHugeInt: {
+            this->value_.huge_int = std::move(other.value_.huge_int);
+            break;
+        }
+        case kFloat: {
+            this->value_.float32 = std::move(other.value_.float32);
+            break;
+        }
+        case kDouble: {
+            this->value_.float64 = std::move(other.value_.float64);
+            break;
+        }
+        case kDecimal16: {
+            this->value_.decimal16 = std::move(other.value_.decimal16);
+            break;
+        }
+        case kDecimal32: {
+            this->value_.decimal32 = std::move(other.value_.decimal32);
+            break;
+        }
+        case kDecimal64: {
+            this->value_.decimal64 = std::move(other.value_.decimal64);
+            break;
+        }
+        case kDecimal128: {
+            this->value_.decimal128 = std::move(other.value_.decimal128);
+            break;
+        }
+        case kVarchar: {
+            this->value_.varchar = std::move(other.value_.varchar);
+            break;
+        }
+        case kChar1:
+            break;
+        case kChar2:
+            break;
+        case kChar4:
+            break;
+        case kChar8:
+            break;
+        case kChar16:
+            break;
+        case kChar32:
+            break;
+        case kChar64:
+            break;
+        case kDate:
+            break;
+        case kTime:
+            break;
+        case kDateTime:
+            break;
+        case kTimestamp:
+            break;
+        case kTimestampTZ:
+            break;
+        case kInterval:
+            break;
+        case kArray:
+            break;
+        case kTuple:
+            break;
+        case kPoint:
+            break;
+        case kLine:
+            break;
+        case kLineSeg:
+            break;
+        case kBox:
+            break;
+        case kPath:
+            break;
+        case kPolygon:
+            break;
+        case kCircle:
+            break;
+        case kBitmap:
+            break;
+        case kUuid:
+            break;
+        case kBlob:
+            break;
+        case kEmbedding:
+            break;
+        case kMixed:
+            break;
+        case kNull:
+            break;
+        case kMissing:
+            break;
+        case kInvalid:
+            break;
+    }
+
     return *this;
 }
 

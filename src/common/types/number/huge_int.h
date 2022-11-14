@@ -10,6 +10,8 @@ namespace infinity {
 
 struct HugeInt {
 public:
+    HugeInt() = default;
+
     explicit HugeInt(i64 upper, i64 lower) :
         upper(upper), lower(lower) {}
 
@@ -18,8 +20,8 @@ public:
         return other.upper == upper && other.lower == lower;
     }
 
-    i64 upper;
-    i64 lower;
+    i64 upper{};
+    i64 lower{};
 
 public:
     [[nodiscard]] inline String
