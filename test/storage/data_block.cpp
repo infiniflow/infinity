@@ -56,9 +56,9 @@ TEST_F(DataBlockTest, test1) {
     column_types.emplace_back(LogicalType::kChar2);
     column_types.emplace_back(LogicalType::kChar4);
     column_types.emplace_back(LogicalType::kChar8);
-    column_types.emplace_back(LogicalType::kChar16);
-    column_types.emplace_back(LogicalType::kChar32);
-    column_types.emplace_back(LogicalType::kChar64);
+    column_types.emplace_back(LogicalType::kChar15);
+    column_types.emplace_back(LogicalType::kChar31);
+    column_types.emplace_back(LogicalType::kChar63);
 
     // Date and Time * 6
     column_types.emplace_back(LogicalType::kDate);

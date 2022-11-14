@@ -142,21 +142,22 @@ public:
     }
 
 public:
-    char_t value[8]{};
+    char_t value[CHAR8LENGTH]{};
 };
 
-struct Char16Type {
+struct Char15Type {
     i8     length{0};
     char_t value[15]{};
 };
 
-struct Char32Type {
+struct Char31Type {
     i8     length{0};
     char_t value[31]{};
 };
 
-struct Char64Type {
+struct Char63Type {
     i8     length{0};
     char_t value[63]{};
 };
+
 }

@@ -34,9 +34,9 @@ static const char* type2name[] = {
     "Char2",
     "Char4",
     "Char8",
-    "Char16",
-    "Char32",
-    "Char64",
+    "Char15",
+    "Char31",
+    "Char63",
 
     // Date and Time
     "Date",
@@ -104,9 +104,9 @@ static i64 type_size[] = {
     2, // Char2
     4, // Char4
     8, // Char8
-    16, // Char16
-    32, // Char32
-    64, // Char64
+    16, // Char15
+    32, // Char31
+    64, // Char63
 
     // Date and Time * 6
     4, // Date

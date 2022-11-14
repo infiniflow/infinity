@@ -52,12 +52,12 @@ TEST_F(DataTypeTest, GetTypeName) {
     EXPECT_EQ(char4_type.ToString(), "Char4");
     DataType char8_type(LogicalType::kChar8);
     EXPECT_EQ(char8_type.ToString(), "Char8");
-    DataType char16_type(LogicalType::kChar16);
-    EXPECT_EQ(char16_type.ToString(), "Char16");
-    DataType char32_type(LogicalType::kChar32);
-    EXPECT_EQ(char32_type.ToString(), "Char32");
-    DataType char64_type(LogicalType::kChar64);
-    EXPECT_EQ(char64_type.ToString(), "Char64");
+    DataType char15_type(LogicalType::kChar15);
+    EXPECT_EQ(char15_type.ToString(), "Char15");
+    DataType char31_type(LogicalType::kChar31);
+    EXPECT_EQ(char31_type.ToString(), "Char31");
+    DataType char63_type(LogicalType::kChar63);
+    EXPECT_EQ(char63_type.ToString(), "Char63");
     DataType date_type(LogicalType::kDate);
     EXPECT_EQ(date_type.ToString(), "Date");
     DataType time_type(LogicalType::kTime);

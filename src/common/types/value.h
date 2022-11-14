@@ -73,13 +73,13 @@ public:
     MakeChar8(Char8T input_ref);
 
     static Value
-    MakeChar16(Char16T input_ref);
+    MakeChar15(Char15T input_ref);
 
     static Value
-    MakeChar32(Char32T input_ref);
+    MakeChar31(Char31T input_ref);
 
     static Value
-    MakeChar64(Char64T input_ref);
+    MakeChar63(Char63T input_ref);
 
     static Value
     MakeDate(DateT input);
@@ -197,9 +197,9 @@ public:
         Char2T char2;
         Char4T char4;
         Char8T char8;
-        Char16T char16;
-        Char32T char32;
-        Char64T char64;
+        Char15T char15;
+        Char31T char31;
+        Char63T char63;
 
         DateT    date;
         TimeT    time;
@@ -274,9 +274,9 @@ template <> Value Value::MakeValue(Char1T input);
 template <> Value Value::MakeValue(Char2T input);
 template <> Value Value::MakeValue(Char4T input);
 template <> Value Value::MakeValue(Char8T input);
-template <> Value Value::MakeValue(Char16T input);
-template <> Value Value::MakeValue(Char32T input);
-template <> Value Value::MakeValue(Char64T input);
+template <> Value Value::MakeValue(Char15T input);
+template <> Value Value::MakeValue(Char31T input);
+template <> Value Value::MakeValue(Char63T input);
 
 template <> Value Value::MakeValue(DateT input);
 template <> Value Value::MakeValue(TimeT input);
@@ -316,9 +316,9 @@ template <> Char1T Value::GetValue() const;
 template <> Char2T Value::GetValue() const;
 template <> Char4T Value::GetValue() const;
 template <> Char8T Value::GetValue() const;
-template <> Char16T Value::GetValue() const;
-template <> Char32T Value::GetValue() const;
-template <> Char64T Value::GetValue() const;
+template <> Char15T Value::GetValue() const;
+template <> Char31T Value::GetValue() const;
+template <> Char63T Value::GetValue() const;
 template <> DateT Value::GetValue() const;
 template <> TimeT Value::GetValue() const;
 template <> DateTimeT Value::GetValue() const;

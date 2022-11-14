@@ -163,25 +163,25 @@ Value::MakeChar8(Char8T input) {
 }
 
 Value
-Value::MakeChar16(Char16T input) {
-    Value value(LogicalType::kChar16);
-    value.value_.char16 = input;
+Value::MakeChar15(Char15T input) {
+    Value value(LogicalType::kChar15);
+    value.value_.char15 = input;
     value.is_null_ = false;
     return value;
 }
 
 Value
-Value::MakeChar32(Char32T input) {
-    Value value(LogicalType::kChar32);
-    value.value_.char32 = input;
+Value::MakeChar31(Char31T input) {
+    Value value(LogicalType::kChar31);
+    value.value_.char31 = input;
     value.is_null_ = false;
     return value;
 }
 
 Value
-Value::MakeChar64(Char64T input) {
-    Value value(LogicalType::kChar64);
-    value.value_.char64 = input;
+Value::MakeChar63(Char63T input) {
+    Value value(LogicalType::kChar63);
+    value.value_.char63 = input;
     value.is_null_ = false;
     return value;
 }
@@ -441,22 +441,22 @@ Value::GetValue() const {
     return value_.char8;
 }
 
-template <> Char16T
+template <> Char15T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar16, "Not matched type: " + type_.ToString());
-    return value_.char16;
+    TypeAssert(type_.type() == LogicalType::kChar15, "Not matched type: " + type_.ToString());
+    return value_.char15;
 }
 
-template <> Char32T
+template <> Char31T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar32, "Not matched type: " + type_.ToString());
-    return value_.char32;
+    TypeAssert(type_.type() == LogicalType::kChar31, "Not matched type: " + type_.ToString());
+    return value_.char31;
 }
 
-template <> Char64T
+template <> Char63T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar64, "Not matched type: " + type_.ToString());
-    return value_.char64;
+    TypeAssert(type_.type() == LogicalType::kChar63, "Not matched type: " + type_.ToString());
+    return value_.char63;
 }
 
 template <> DateT
@@ -664,16 +664,16 @@ template <> Value Value::MakeValue(Char8T input) {
     return MakeChar8(input);
 }
 
-template <> Value Value::MakeValue(Char16T input) {
-    return MakeChar16(input);
+template <> Value Value::MakeValue(Char15T input) {
+    return MakeChar15(input);
 }
 
-template <> Value Value::MakeValue(Char32T input) {
-    return MakeChar32(input);
+template <> Value Value::MakeValue(Char31T input) {
+    return MakeChar31(input);
 }
 
-template <> Value Value::MakeValue(Char64T input) {
-    return MakeChar64(input);
+template <> Value Value::MakeValue(Char63T input) {
+    return MakeChar63(input);
 }
 
 template <> Value
@@ -821,11 +821,11 @@ Value::Value(const Value& other) : type_(other.type_) {
             break;
         case kChar8:
             break;
-        case kChar16:
+        case kChar15:
             break;
-        case kChar32:
+        case kChar31:
             break;
-        case kChar64:
+        case kChar63:
             break;
         case kDate:
             break;
@@ -961,11 +961,11 @@ Value::operator=(Value&& other)  noexcept {
             break;
         case kChar8:
             break;
-        case kChar16:
+        case kChar15:
             break;
-        case kChar32:
+        case kChar31:
             break;
-        case kChar64:
+        case kChar63:
             break;
         case kDate:
             break;
@@ -1079,11 +1079,11 @@ Value::ToString() const {
             break;
         case kChar8:
             break;
-        case kChar16:
+        case kChar15:
             break;
-        case kChar32:
+        case kChar31:
             break;
-        case kChar64:
+        case kChar63:
             break;
         case kDate:
             break;
