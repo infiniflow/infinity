@@ -14,6 +14,7 @@
 #include "common/types/number/decimal_type.h"
 #include "common/types/number/huge_int.h"
 #include "common/types/complex/varchar_type.h"
+#include "common/types/complex/char_type.h"
 #include "common/types/datetime/datetime_type.h"
 #include "common/types/datetime/interval_type.h"
 #include "common/types/datetime/date_type.h"

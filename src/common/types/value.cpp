@@ -951,8 +951,10 @@ Value::operator=(Value&& other)  noexcept {
             this->value_.varchar = std::move(other.value_.varchar);
             break;
         }
-        case kChar1:
+        case kChar1: {
+            this->value_.char1.value = other.value_.char1.value;
             break;
+        }
         case kChar2:
             break;
         case kChar4:

@@ -114,4 +114,11 @@ TEST_F(ValueTest, MakeAndGet) {
     EXPECT_EQ(value.GetValue<VarcharT>().IsInlined(), false);
     EXPECT_EQ(value.GetValue<VarcharT>().ToString(), "Hello World, Hello World");
 
+    // Char1
+    for(char input = std::numeric_limits<char>::min(); ; input += std::numeric_limits<char>::max()) {
+        Char1T char1(input);
+        value = Value::MakeChar1(char1);
+        EXPECT_EQ(value.GetValue<Char1T>().value, input);
+        if(input == std::numeric_limits<char>::max()) break;
+    }
 }

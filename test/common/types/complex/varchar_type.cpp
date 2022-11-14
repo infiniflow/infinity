@@ -58,13 +58,6 @@ TEST_F(VarcharTypeTest, TestInit) {
         v1.Reset();
 
     }
-
-
-
-
-
-
-
 }
 
 TEST_F(VarcharTypeTest, TestConstructor1) {
