@@ -11,8 +11,16 @@ namespace infinity {
 
 // A box is specified by two points: upper left  point and lower right point.
 struct BoxType {
+    BoxType() = default;
+    BoxType(PointType ul, PointType lr) : upper_left(ul), lower_right(lr) {};
+
     PointType upper_left;
     PointType lower_right;
+
+    void Reset() {
+        upper_left.Reset();
+        lower_right.Reset();
+    }
 };
 
 }

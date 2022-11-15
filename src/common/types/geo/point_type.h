@@ -14,6 +14,12 @@ struct PointType {
     inline
     PointType(f64 a, f64 b): x(a), y(b) {}
 
+    inline void
+    Reset() {
+        x = 0;
+        y = 0;
+    }
+
     f64 x{};
     f64 y{};
 };
