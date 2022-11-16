@@ -32,7 +32,7 @@
 #include "common/types/geo/polygon_type.h"
 #include "common/types/geo/circle_type.h"
 #include "common/types/complex/blob_type.h"
-#include "common/types/complex/uuid.h"
+#include "common/types/complex/uuid_type.h"
 #include "common/types/complex/bitmap_type.h"
 #include "common/types/heterogenous/mixed_type.h"
 
