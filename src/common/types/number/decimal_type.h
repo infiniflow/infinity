@@ -46,11 +46,18 @@ struct Decimal64Type {
 };
 
 struct Decimal128Type {
+public:
     Decimal128Type(i64 val1, i64 val2) : upper(val1), lower(val2) {}
 
     bool
     operator==(const Decimal128Type& other) const {
         return other.upper == upper && other.lower == lower;
+    }
+
+    inline void
+    Reset() {
+        upper = 0;
+        lower = 0;
     }
 
     i64 upper;

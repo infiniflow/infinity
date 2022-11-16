@@ -9,8 +9,17 @@
 namespace infinity {
 
 struct BlobType {
-    ptr_t pos;
+    ptr_t ptr;
     i64 length;  // 4GB will be the limitation.
+
+    inline void
+    Reset() {
+        if(length != 0) {
+            length = 0;
+            delete[] ptr;
+        }
+    }
+
 };
 
 }

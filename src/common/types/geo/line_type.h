@@ -13,6 +13,13 @@ struct LineType {
     f64 a;
     f64 b;
     f64 c;
+
+    inline void
+    Reset() {
+        a = 0;
+        b = 0;
+        c = 0;
+    }
 };
 
 }

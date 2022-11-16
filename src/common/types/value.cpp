@@ -783,6 +783,179 @@ Value::~Value() {
     }
 }
 
+Value::Value(LogicalType type): type_(type) {
+    switch(type_.type()) {
+        case kBoolean: {
+            value_.boolean = false;
+            break;
+        }
+        case kTinyInt: {
+            value_.tiny_int = 0;
+            break;
+        }
+        case kSmallInt: {
+            value_.small_int = 0;
+            break;
+        }
+        case kInteger: {
+            value_.integer = 0;
+            break;
+        }
+        case kBigInt: {
+            value_.big_int = 0;
+            break;
+        }
+        case kHugeInt: {
+            value_.huge_int.Reset();
+            break;
+        }
+        case kFloat: {
+            value_.float32 = 0;
+            break;
+        }
+        case kDouble: {
+            value_.float64 = 0;
+            break;
+        }
+        case kDecimal16: {
+            value_.decimal16.value = 0;
+            break;
+        }
+        case kDecimal32: {
+            value_.decimal32.value = 0;
+            break;
+        }
+        case kDecimal64: {
+            value_.decimal64.value = 0;
+            break;
+        }
+        case kDecimal128: {
+            value_.decimal128.Reset();
+            break;
+        }
+        case kVarchar: {
+            value_.varchar.ptr = nullptr;
+            value_.varchar.length = 0;
+            break;
+        }
+        case kChar1: {
+            value_.char1.value = 0;
+            break;
+        }
+        case kChar2: {
+            value_.char2.Reset();
+            break;
+        }
+        case kChar4: {
+            value_.char4.Reset();
+            break;
+        }
+        case kChar8: {
+            value_.char8.Reset();
+            break;
+        }
+        case kChar15: {
+            value_.char15.Reset();
+            break;
+        }
+        case kChar31: {
+            value_.char31.Reset();
+            break;
+        }
+        case kChar63: {
+            value_.char63.Reset();
+            break;
+        }
+        case kDate: {
+            value_.date.value = 0;
+            break;
+        }
+        case kTime: {
+            value_.time.value = 0;
+            break;
+        }
+        case kDateTime: {
+            value_.datetime.Reset();
+            break;
+        }
+        case kTimestamp: {
+            value_.timestamp.Reset();
+            break;
+        }
+        case kTimestampTZ: {
+            value_.timestamp_tz.Reset();
+            break;
+        }
+        case kInterval: {
+            value_.interval.Reset();
+            break;
+        }
+        case kArray: {
+            value_.array.Reset();
+            break;
+        }
+        case kTuple: {
+            // empty function
+            value_.tuple.Reset();
+            break;
+        }
+        case kPoint: {
+            value_.point.Reset();
+            break;
+        }
+        case kLine: {
+            value_.line.Reset();
+            break;
+        }
+        case kLineSeg: {
+            value_.line_segment.Reset();
+            break;
+        }
+        case kBox: {
+            value_.box.Reset();
+            break;
+        }
+        case kPath: {
+            value_.path.Reset();
+            break;
+        }
+        case kPolygon: {
+            value_.polygon.Reset();
+            break;
+        }
+        case kCircle: {
+            value_.circle.Reset();
+            break;
+        }
+        case kBitmap: {
+            value_.bitmap.ptr = nullptr;
+            value_.bitmap.count = 0;
+            break;
+        }
+        case kUuid: {
+            value_.uuid.Reset();
+            break;
+        }
+        case kBlob: {
+            value_.blob.ptr = nullptr;
+            value_.blob.length = 0;
+            break;
+        }
+        case kEmbedding: {
+            value_.embedding = nullptr;
+            break;
+        }
+        case kMixed: {
+            memset(&(value_.mixed_value), 0, sizeof(MixedT));
+            break;
+        }
+        case kNull:
+        case kMissing:
+        case kInvalid:
+            break;
+    }
+}
+
 Value::Value(const Value& other) : type_(other.type_) {
     switch(type_.type()) {
 
@@ -1084,6 +1257,180 @@ Value::operator=(Value&& other)  noexcept {
 //        }
 //    }
 //}
+
+void
+Value::Reset() {
+    switch(type_.type()) {
+        case kBoolean: {
+            value_.boolean = false;
+            break;
+        }
+        case kTinyInt: {
+            value_.tiny_int = 0;
+            break;
+        }
+        case kSmallInt: {
+            value_.small_int = 0;
+            break;
+        }
+        case kInteger: {
+            value_.integer = 0;
+            break;
+        }
+        case kBigInt: {
+            value_.big_int = 0;
+            break;
+        }
+        case kHugeInt: {
+            value_.huge_int.Reset();
+            break;
+        }
+        case kFloat: {
+            value_.float32 = 0;
+            break;
+        }
+        case kDouble: {
+            value_.float64 = 0;
+            break;
+        }
+        case kDecimal16: {
+            value_.decimal16.value = 0;
+            break;
+        }
+        case kDecimal32: {
+            value_.decimal32.value = 0;
+            break;
+        }
+        case kDecimal64: {
+            value_.decimal64.value = 0;
+            break;
+        }
+        case kDecimal128: {
+            value_.decimal128.Reset();
+            break;
+        }
+        case kVarchar: {
+            value_.varchar.Reset();
+            break;
+        }
+        case kChar1: {
+            value_.char1.value = 0;
+            break;
+        }
+        case kChar2: {
+            value_.char2.Reset();
+            break;
+        }
+        case kChar4: {
+            value_.char4.Reset();
+            break;
+        }
+        case kChar8: {
+            value_.char8.Reset();
+            break;
+        }
+        case kChar15: {
+            value_.char15.Reset();
+            break;
+        }
+        case kChar31: {
+            value_.char31.Reset();
+            break;
+        }
+        case kChar63: {
+            value_.char63.Reset();
+            break;
+        }
+        case kDate: {
+            value_.date.value = 0;
+            break;
+        }
+        case kTime: {
+            value_.time.value = 0;
+            break;
+        }
+        case kDateTime: {
+            value_.datetime.Reset();
+            break;
+        }
+        case kTimestamp: {
+            value_.timestamp.Reset();
+            break;
+        }
+        case kTimestampTZ: {
+            value_.timestamp_tz.Reset();
+            break;
+        }
+        case kInterval: {
+            value_.interval.Reset();
+            break;
+        }
+        case kArray: {
+            value_.array.Reset();
+            break;
+        }
+        case kTuple: {
+            // empty function
+            value_.tuple.Reset();
+            break;
+        }
+        case kPoint: {
+            value_.point.Reset();
+            break;
+        }
+        case kLine: {
+            value_.line.Reset();
+            break;
+        }
+        case kLineSeg: {
+            value_.line_segment.Reset();
+            break;
+        }
+        case kBox: {
+            value_.box.Reset();
+            break;
+        }
+        case kPath: {
+            value_.path.Reset();
+            break;
+        }
+        case kPolygon: {
+            value_.polygon.Reset();
+            break;
+        }
+        case kCircle: {
+            value_.circle.Reset();
+            break;
+        }
+        case kBitmap: {
+            value_.bitmap.Reset();
+            break;
+        }
+        case kUuid: {
+            value_.uuid.Reset();
+            break;
+        }
+        case kBlob: {
+            value_.blob.Reset();
+            break;
+        }
+        case kEmbedding: {
+            if(value_.embedding != nullptr) {
+                delete[] value_.embedding;
+                value_.embedding = nullptr;
+            }
+            break;
+        }
+        case kMixed: {
+            memset(&(value_.mixed_value), 0, sizeof(MixedT));
+            break;
+        }
+        case kNull:
+        case kMissing:
+        case kInvalid:
+            break;
+    }
+}
 
 String
 Value::ToString() const {

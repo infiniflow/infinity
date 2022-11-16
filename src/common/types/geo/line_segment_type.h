@@ -13,6 +13,12 @@ namespace infinity {
 struct LineSegmentType {
     PointType point1;
     PointType point2;
+
+    inline void
+    Reset() {
+        point1.Reset();
+        point2.Reset();
+    }
 };
 
 }

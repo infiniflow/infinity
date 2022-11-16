@@ -10,6 +10,8 @@ namespace infinity {
 
 // Represent a tuple.
 struct TupleType {
+    inline void
+    Reset() {}
 };
 
 }

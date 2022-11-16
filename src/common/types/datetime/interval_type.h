@@ -18,8 +18,14 @@ enum TimeUnit : i8 {
 };
 
 struct IntervalType {
-    i32 unit;
-    i32 value;
+    i32 unit {};
+    i32 value {};
+
+    inline void
+    Reset() {
+        unit = 0;
+        value = 0;
+    }
 };
 
 }

@@ -83,6 +83,11 @@ public:
         return String(value, len);
     }
 
+    inline void
+    Reset() {
+        memset(value, 0, CHAR_LENGTH);
+    }
+
 public:
     char_t value[CHAR_LENGTH]{};
 };
@@ -111,6 +116,11 @@ public:
     ToString() const {
         size_t len = std::min(strlen(value), CHAR_LENGTH);
         return String(value, len);
+    }
+
+    inline void
+    Reset() {
+        memset(value, 0, CHAR_LENGTH);
     }
 
 public:
@@ -142,6 +152,11 @@ public:
     ToString() const {
         size_t len = std::min(strlen(value), CHAR_LENGTH);
         return String(value, len);
+    }
+
+    inline void
+    Reset() {
+        memset(value, 0, CHAR_LENGTH);
     }
 
 public:
@@ -182,6 +197,11 @@ public:
     [[nodiscard]] inline String
     ToString() const {
         return String(value, length);
+    }
+
+    inline void
+    Reset() {
+        memset(value, 0, CHAR_LENGTH);
     }
 
 public:
@@ -225,6 +245,11 @@ public:
         return String(value, length);
     }
 
+    inline void
+    Reset() {
+        memset(value, 0, CHAR_LENGTH);
+    }
+
 public:
     i8     length{0};
     char_t value[CHAR_LENGTH]{};
@@ -264,6 +289,11 @@ public:
     [[nodiscard]] inline String
     ToString() const {
         return String(value, length);
+    }
+
+    inline void
+    Reset() {
+        memset(value, 0, CHAR_LENGTH);
     }
 
 public:

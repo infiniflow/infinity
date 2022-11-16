@@ -14,7 +14,10 @@ public:
     static constexpr size_t PREFIX_LENGTH = 6;
     static constexpr size_t INLINE_LENGTH = 14;
 public:
-    VarcharType() = default;
+    VarcharType() {
+        length = 0;
+        ptr = nullptr;
+    }
 
     explicit
     VarcharType(const String& str);

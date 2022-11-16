@@ -157,11 +157,14 @@ public:
 
     [[nodiscard]] String
     ToString() const;
+
+    void
+    Reset();
     // Member method
 public:
 //    Value() = default;
     explicit
-    Value(LogicalType type): type_(type) {}
+    Value(LogicalType type);
 
     Value(const Value& other);
 //
@@ -250,7 +253,7 @@ public:
         UnionValue& operator=(UnionValue&& other) noexcept {
             return *this;
         };
-    } value_;
+    } value_ = {};
     bool is_null_{false};
 };
 

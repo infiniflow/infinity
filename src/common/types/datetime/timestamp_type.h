@@ -7,8 +7,14 @@
 namespace infinity {
 
 struct TimestampType {
-    i32 date;
-    i32 time;
+    i32 date {};
+    i32 time {};
+
+    inline void
+    Reset() {
+        date = 0;
+        time = 0;
+    }
 };
 
 }

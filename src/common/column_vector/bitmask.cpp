@@ -124,7 +124,7 @@ Bitmask::SetFalse(size_t row_index) {
     size_t u64_index = BitmaskBuffer::UnitCount(row_index) - 1;
     size_t index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
 
-    data_ptr_[u64_index] &= ((~(u64(1))) << index_in_u64);
+    data_ptr_[u64_index] &= ~(((u64(1))) << index_in_u64);
 }
 
 void

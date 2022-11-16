@@ -14,6 +14,13 @@ struct ArrayType {
     LogicalType elem_type;
     i16 count;
     ptr_t ptr;
+
+    inline void
+    Reset() {
+        elem_type = LogicalType::kInvalid;
+        count = 0;
+        ptr = nullptr;
+    }
 };
 
 }

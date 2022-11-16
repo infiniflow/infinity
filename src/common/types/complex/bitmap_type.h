@@ -12,20 +12,27 @@ namespace infinity {
 struct BitmapType {
 public:
     static constexpr i8 UNIT_BITS = 64;
+
+    static inline u64
+    UnitCount(u64 bit_count) {
+        return (bit_count + (UNIT_BITS - 1)) / UNIT_BITS;
+    }
+
 public:
-    i64 count {0}; // bit count of the bitmap
-    i64* ptr {nullptr};
+    u64 count {0}; // bit count of the bitmap
+    u64* ptr {nullptr};
 public:
     inline
     BitmapType() = default;
 
     explicit inline
-    BitmapType(i64 bit_count) {
+    BitmapType(u64 bit_count) {
         Initialize(bit_count);
     }
 
+    // The bitmap_ptr will also be freed by BitmapType's destructor.
     inline
-    BitmapType(i64* bitmap_ptr, i64 bit_count): ptr(bitmap_ptr), count(bit_count) {}
+    BitmapType(u64* bitmap_ptr, u64 bit_count): ptr(bitmap_ptr), count(bit_count) {}
 
     inline
     ~BitmapType() {
@@ -37,14 +44,8 @@ public:
     BitmapType& operator=(const BitmapType& other);
     BitmapType& operator=(BitmapType&& other) noexcept;
 
-    inline void
-    Initialize(i64 bit_count) {
-        TypeAssert(count == 0,
-                   "The bitmap was already initialized. Please reset it before re-initialize it.");
-        i64 unit_count = (bit_count + UNIT_BITS - 1) / UNIT_BITS;
-        ptr = new i64[unit_count]{0};
-        count = bit_count;
-    }
+    void
+    Initialize(u64 bit_count);
 
     inline void
     Reset() {
@@ -53,6 +54,13 @@ public:
             delete[] ptr;
         }
     }
+
+    bool
+    GetBit(u64 row_index) const;
+
+    void
+    SetBit(u64 row_index, bool value);
+
 };
 
 }

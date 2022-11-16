@@ -26,6 +26,12 @@ public:
 public:
     [[nodiscard]] inline String
     ToString() const;
+
+    inline void
+    Reset() {
+        upper = 0;
+        lower = 0;
+    }
 };
 
 String

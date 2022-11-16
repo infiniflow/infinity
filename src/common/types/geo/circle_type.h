@@ -11,6 +11,12 @@ namespace infinity {
 struct CircleType {
     PointType center;
     f64 radius;
+
+    inline void
+    Reset() {
+        center.Reset();
+        radius = 0;
+    }
 };
 
 }
