@@ -21,6 +21,7 @@ VarcharType::VarcharType(const char* ptr, size_t len) {
 
 VarcharType::~VarcharType() {
 //    LOG_TRACE("Destructor");
+    if(length == 0) return ;
     Reset();
 }
 
@@ -37,7 +38,7 @@ VarcharType::VarcharType(VarcharType&& other) noexcept {
     } else {
         memcpy(this->prefix, other.prefix, PREFIX_LENGTH);
 
-        // FIXME: current ptr need to be deleted before allocate new space.
+        // Don't need to release this->ptr, since it's constructor.
         this->ptr = other.ptr;
         other.ptr = nullptr;
     }
@@ -56,13 +57,16 @@ VarcharType::operator=(const VarcharType& other) {
 VarcharType&
 VarcharType::operator=(VarcharType&& other) noexcept {
 //    LOG_TRACE("Move assignment");
+    if(this->length > 0) {
+        // To free current ptr memory.
+        Reset();
+    }
     this->length = other.length;
-    if(length <= INLINE_LENGTH) {
+    if(this->length <= INLINE_LENGTH) {
         memcpy(this->prefix, other.prefix, length);
     } else {
         memcpy(this->prefix, other.prefix, PREFIX_LENGTH);
 
-        // FIXME: current ptr need to be deleted before allocate new space.
         this->ptr = other.ptr;
         other.ptr = nullptr;
     }
@@ -73,6 +77,12 @@ VarcharType::operator=(VarcharType&& other) noexcept {
 
 void
 VarcharType::DeepCopy(const VarcharType &other) {
+    // Used in copy constructor and copy assignment
+    if(this->length > 0) {
+        // this->will will be zero in copy constructor, so now is copy assignment case
+        Reset();
+    }
+
     if(other.IsInlined()) {
         memcpy((char*)this, (char*)&other, sizeof(other));
     } else {
@@ -80,7 +90,6 @@ VarcharType::DeepCopy(const VarcharType &other) {
         this->length = other.length;
         memcpy(prefix, other.prefix, PREFIX_LENGTH);
 
-        // FIXME: current ptr need to be deleted before allocate new space.
         ptr = new char[this->length]();
         LOG_TRACE("DeepCopy: allocate memory: {}, {}", (void*)ptr, length);
 
@@ -104,8 +113,7 @@ void
 VarcharType::Initialize(const char* input_ptr, size_t input_len) {
     TypeAssert(input_len < std::numeric_limits<i16>::max(),
                "Attempt to write string with length exceed 65535 into value");
-
-    // FIXME: handle re-initialize case.
+    TypeAssert(this->length == 0, "Varchar type was already initialized.")
 
     length = static_cast<i16>(input_len);
     ptr = nullptr;

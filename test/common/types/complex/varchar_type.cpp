@@ -57,6 +57,12 @@ TEST_F(VarcharTypeTest, TestInit) {
         EXPECT_EQ(v1.ToString(), s2);
         v1.Reset();
 
+        v1.Initialize(s2.c_str(), s2.length());
+        EXPECT_EQ(v1.length, s2.length());
+        EXPECT_EQ(v1.ToString(), s2);
+        EXPECT_THROW(v1.Initialize(s1.c_str(), s1.length()), TypeException);
+        v1.Reset();
+
     }
 }
 
@@ -180,6 +186,7 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
     using namespace infinity;
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
+    String s3 = "Hello World, Php is the best programming language in the world";
 
     // Copy Assignment 1
     {
@@ -204,12 +211,32 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
         EXPECT_EQ(v2.length, s2.length());
         EXPECT_EQ(v2.ToString(), s2);
     }
+
+    // Copy Assignment 3
+    {
+        LOG_TRACE("================");
+        VarcharType v1(s1);
+        VarcharType v2(s2);
+        VarcharType v3(s3);
+
+        v2 = v1;
+
+        EXPECT_EQ(v1.length, s1.length());
+        EXPECT_EQ(v1.ToString(), s1);
+        EXPECT_EQ(v2.length, s1.length());
+        EXPECT_EQ(v2.ToString(), s1);
+
+        v2 = v3;
+        EXPECT_EQ(v2.length, s3.length());
+        EXPECT_EQ(v2.ToString(), s3);
+    }
 }
 
 TEST_F(VarcharTypeTest, TestMoveAssignment) {
     using namespace infinity;
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
+    String s3 = "Hello World, Php is the best programming language in the world";
 
     // Move constructor 1
     {
@@ -235,4 +262,26 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
         EXPECT_EQ(v2.length, s2.length());
         EXPECT_EQ(v2.ToString(), s2);
     }
+
+    // Move Assignment 3
+    {
+        LOG_TRACE("================");
+        VarcharType v1(s1);
+        VarcharType v2(s2);
+        VarcharType v3(s3);
+
+        v2 = std::move(v1);
+
+        EXPECT_EQ(v1.length, 0);
+        EXPECT_EQ(v1.ToString(), "");
+        EXPECT_EQ(v2.length, s1.length());
+        EXPECT_EQ(v2.ToString(), s1);
+
+        v2 = std::move(v3);
+        EXPECT_EQ(v2.length, s3.length());
+        EXPECT_EQ(v2.ToString(), s3);
+        EXPECT_EQ(v3.length, 0);
+        EXPECT_EQ(v3.ptr, nullptr);
+    }
 }
+
