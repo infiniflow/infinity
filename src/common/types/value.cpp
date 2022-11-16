@@ -937,8 +937,7 @@ Value::Value(LogicalType type): type_(type) {
             break;
         }
         case kBlob: {
-            value_.blob.ptr = nullptr;
-            value_.blob.length = 0;
+            value_.blob.Reset();
             break;
         }
         case kEmbedding: {
