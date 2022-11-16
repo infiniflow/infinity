@@ -1068,6 +1068,9 @@ Value::Value(const Value& other) : type_(other.type_) {
 
 Value&
 Value::operator=(Value&& other)  noexcept {
+    // Clear exist value, since some type need to free the allocated heap memory.
+    this->Reset();
+
     this->type_ = std::move(other.type_);
     this->is_null_ = std::move(other.is_null_);
 //    this->value_ = std::move(other.value_);
