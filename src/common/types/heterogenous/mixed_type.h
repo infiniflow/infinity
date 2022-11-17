@@ -62,14 +62,19 @@ struct BaseMixedType {
 // Not nested data type
 struct __attribute__((packed)) MixedType : public BaseMixedType {
 
+    // non-static member variable
 public:
     char_t ptr[15];
 
+    // static member variable
 public:
+    static constexpr i64 ELEMENT_SIZE = 16;
     static constexpr i64 SHORT_STR_LIMIT = 15;
     static constexpr i64 SHORT_NESTED_STR_LIMIT = 13;
     static constexpr i64 LONG_STR_HEADER = 5;
     static constexpr i64 LONG_NESTED_STR_HEADER = 3;
+
+    // static member method for non-nested data
 public:
     static MixedType
     MakeInteger(i64 value);
@@ -92,6 +97,31 @@ public:
     static MixedType
     MakeMissing();
 
+    // static member method for nested data
+public:
+    static void
+    InsertNestedInteger(i64 value, ptr_t position, u16 index);
+
+    static void
+    InsertNestedFloat(f64 value, ptr_t position, u16 index);
+
+    static void
+    InsertNestedString(const String& value, ptr_t position, u16 index);
+
+    // input should have map: key/value, most 65536 kv pair in one object.
+    static void
+    MakeNestedObject(u16 count, ptr_t position, u16 index);
+
+    static void
+    InsertIntoNestedObject(const String& key, MixedType value, ptr_t position, u16 index);
+
+    static void
+    InsertNestedArray(u64 count, ptr_t position, u16 index);
+
+    static void
+    InsertNestedNull(ptr_t position, u16 index);
+
+    // non-static member
 public:
     MixedType() = default;
 
@@ -136,7 +166,7 @@ struct __attribute__((packed)) LongStrMixedType : public BaseMixedType {
     LongStrMixedType() : BaseMixedType(MixedValueType::kLongStr) {}
 
     char_t header[MixedType::LONG_STR_HEADER] {}; // 5 bytes is used to store the header of the string to shortcut some computation.
-    i16 length {0};  // Max string length will be 65535
+    u16 length {0};  // Max string length will be 65535
     ptr_t ptr {nullptr};
 };
 
@@ -185,7 +215,7 @@ struct __attribute__((packed)) MissingMixedType : public BaseMixedType {
 // Nested in array data type
 struct __attribute__((packed)) NestedIntegerMixedType : public BaseMixedType {
     NestedIntegerMixedType() : BaseMixedType(MixedValueType::kNestedInteger) {}
-    i16 array_index{};
+    u16 array_index{};
 
     i8 _dummy1{};
     i32 _dummy2{};
@@ -194,7 +224,7 @@ struct __attribute__((packed)) NestedIntegerMixedType : public BaseMixedType {
 
 struct __attribute__((packed)) NestedFloatMixedType : public BaseMixedType {
     NestedFloatMixedType() : BaseMixedType(MixedValueType::kNestedFloat) {}
-    i16 array_index{};
+    u16 array_index{};
 
     i8 _dummy1{};
     i32 _dummy2{};
@@ -203,18 +233,18 @@ struct __attribute__((packed)) NestedFloatMixedType : public BaseMixedType {
 
 struct __attribute__((packed)) NestedLongStrMixedType : public BaseMixedType {
     NestedLongStrMixedType() : BaseMixedType(MixedValueType::kNestedLongStr) {}
-    i16 array_index{};
+    u16 array_index{};
 
     // 3 bytes is used to store the header of the string to shortcut some computation.
     char_t header[MixedType::LONG_NESTED_STR_HEADER] {};
 
-    i16 length {0};   // Max string length will be 65535
+    u16 length {0};   // Max string length will be 65535
     ptr_t ptr {nullptr};
 };
 
 struct __attribute__((packed)) NestedShortStrMixedType : public BaseMixedType {
     NestedShortStrMixedType() : BaseMixedType(MixedValueType::kNestedShortStr) {}
-    i16 array_index{};
+    u16 array_index{};
 
     // not more than 13 bytes string will use short string type
     char_t ptr[MixedType::SHORT_NESTED_STR_LIMIT] {};
@@ -222,16 +252,16 @@ struct __attribute__((packed)) NestedShortStrMixedType : public BaseMixedType {
 
 struct __attribute__((packed)) NestedObjectMixedType : public BaseMixedType {
     NestedObjectMixedType() : BaseMixedType(MixedValueType::kNestedObject) {}
-    i16 array_index{};
-
     i8 _dummy1{};
-    i32 _dummy2{};
-    i64 _dummy3{};
+    u16 array_index{};
+    i16 _dummy2{};
+    u16 count{0};
+    ptr_t ptr{nullptr};
 };
 
 struct __attribute__((packed)) NestedArrayMixedType : public BaseMixedType {
     NestedArrayMixedType() : BaseMixedType(MixedValueType::kNestedArray) {}
-    i16 array_index{};
+    u16 array_index{};
 
     i8 _dummy{};
     i32 count {0};
@@ -240,7 +270,7 @@ struct __attribute__((packed)) NestedArrayMixedType : public BaseMixedType {
 
 struct __attribute__((packed)) NestedNullMixedType : public BaseMixedType {
     NestedNullMixedType() : BaseMixedType(MixedValueType::kNestedNull) {}
-    i16 array_index{};
+    u16 array_index{};
 
     i8 _dummy1{};
     i32 _dummy2{};
@@ -249,7 +279,7 @@ struct __attribute__((packed)) NestedNullMixedType : public BaseMixedType {
 
 struct __attribute__((packed)) NestedMissingMixedType : public BaseMixedType {
     NestedMissingMixedType() : BaseMixedType(MixedValueType::kNestedMissing) {}
-    i16 array_index{};
+    u16 array_index{};
 
     i8 _dummy1{};
     i32 _dummy2{};
@@ -269,6 +299,21 @@ private:
 
     static MixedType&
     Get(i32 index);
+};
+
+struct NestedObject {
+public:
+    ptr_t parent_ptr;
+    MixedType array[0];
+private:
+    static ptr_t
+    Make(i32 count);
+
+    static void
+    Set(const String& key, const MixedType& mixed_value);
+
+    static MixedType&
+    Get(const String& key);
 };
 
 }
