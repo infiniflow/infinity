@@ -12,7 +12,7 @@ enum class MixedValueType : i8 {
     kFloat,
     kLongStr,
     kShortStr,
-    kObject,
+    kTuple,
     kArray,
     kNull,
     kMissing,
@@ -35,7 +35,7 @@ class IntegerMixedType;
 class FloatMixedType;
 class LongStrMixedType;
 class ShortStrMixedType;
-class ObjectMixedType;
+class TupleMixedType;
 class ArrayMixedType;
 class NullMixedType;
 class MissingMixedType;
@@ -44,7 +44,7 @@ class NestedIntegerMixedType;
 class NestedFloatMixedType;
 class NestedLongStrMixedType;
 class NestedShortStrMixedType;
-class NestedObjectMixedType;
+class NestedTupleMixedType;
 class NestedArrayMixedType;
 class NestedNullMixedType;
 class NestedMissingMixedType;
@@ -176,13 +176,14 @@ struct __attribute__((packed)) ShortStrMixedType : public BaseMixedType {
     char_t ptr[MixedType::SHORT_STR_LIMIT] {};  // not more than 15 bytes string will use short string type
 };
 
-struct __attribute__((packed)) ObjectMixedType : public BaseMixedType {
-    ObjectMixedType() : BaseMixedType(MixedValueType::kObject) {}
+struct __attribute__((packed)) TupleMixedType : public BaseMixedType {
+    TupleMixedType() : BaseMixedType(MixedValueType::kTuple) {}
 
     i8 _dummy1{};
     i16 _dummy2{};
-    i32 _dummy3{};
-    i64 _dummy4{};
+    i16 _dummy3{};
+    u16 count {0};        // count of the tuple, each tuple will have two MixedType member, one for key, another for value.
+    ptr_t ptr {nullptr};  // pointer to mixed type of tuple
 };
 
 struct __attribute__((packed)) ArrayMixedType : public BaseMixedType {
@@ -190,8 +191,9 @@ struct __attribute__((packed)) ArrayMixedType : public BaseMixedType {
 
     i8 _dummy1{};
     i16 _dummy2{};
-    i32 count {0};
-    ptr_t ptr {nullptr};
+    i16 _dummy3{};
+    u16 count {0};        // Array count, which limit is 65535;
+    ptr_t ptr {nullptr};  // pointer to child mixed type
 };
 
 struct __attribute__((packed)) NullMixedType : public BaseMixedType {
@@ -250,8 +252,8 @@ struct __attribute__((packed)) NestedShortStrMixedType : public BaseMixedType {
     char_t ptr[MixedType::SHORT_NESTED_STR_LIMIT] {};
 };
 
-struct __attribute__((packed)) NestedObjectMixedType : public BaseMixedType {
-    NestedObjectMixedType() : BaseMixedType(MixedValueType::kNestedObject) {}
+struct __attribute__((packed)) NestedTupleMixedType : public BaseMixedType {
+    NestedTupleMixedType() : BaseMixedType(MixedValueType::kNestedObject) {}
     i8 _dummy1{};
     u16 array_index{};
     i16 _dummy2{};
@@ -261,10 +263,10 @@ struct __attribute__((packed)) NestedObjectMixedType : public BaseMixedType {
 
 struct __attribute__((packed)) NestedArrayMixedType : public BaseMixedType {
     NestedArrayMixedType() : BaseMixedType(MixedValueType::kNestedArray) {}
-    u16 array_index{};
-
     i8 _dummy{};
-    i32 count {0};
+    u16 array_index{};
+    i16 _dummy1{};
+    u16 count {0};
     ptr_t ptr {nullptr};
 };
 

@@ -13,7 +13,7 @@ namespace infinity {
 struct ArrayType {
     LogicalType elem_type;
     i16 count;
-    ptr_t ptr;
+    ptr_t ptr; // pointer to value list
 
     inline void
     Reset() {

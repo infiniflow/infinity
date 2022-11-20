@@ -20,7 +20,7 @@ enum class TypeInfoType {
 
     // Nested
     kArray,
-    kObject, // Dictionary
+    kTuple, // Dictionary
 
     // Geography
     kPoint,

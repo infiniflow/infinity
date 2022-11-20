@@ -55,7 +55,7 @@ MixedType::MakeString(const String& str) {
 
 MixedType
 MixedType::MakeObject() {
-    MixedType value(MixedValueType::kObject);
+    MixedType value(MixedValueType::kTuple);
     return value;
 }
 
@@ -120,7 +120,7 @@ MixedType::InsertNestedString(const String& str, ptr_t position, u16 index) {
 // input should have map: key/value
 void
 MixedType::MakeNestedObject(u16 count, ptr_t position, u16 index) {
-    NestedObjectMixedType* object_type_ptr = (NestedObjectMixedType*)position;
+    NestedTupleMixedType* object_type_ptr = (NestedTupleMixedType*)position;
     object_type_ptr->count = count;
 
     // TODO this memory need to reallocate to hash map
@@ -162,7 +162,7 @@ MixedType::MixedType(const MixedType& other) {
         case MixedValueType::kInteger:
         case MixedValueType::kFloat:
         case MixedValueType::kShortStr:
-        case MixedValueType::kObject:
+        case MixedValueType::kTuple:
         case MixedValueType::kNull:
         case MixedValueType::kMissing:
         case MixedValueType::kNestedMissing:
