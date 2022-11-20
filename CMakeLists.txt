@@ -19,16 +19,6 @@ set(CMAKE_CXX_STANDARD 20)
 
 ADD_DEFINITIONS(-D INFINITY_DEBUG)
 
-include_directories(
-        src
-        third_party/cxxopts/include
-        third_party/magic_enum/include
-        third_party/spdlog/include
-        third_party/sql-parser/src
-        third_party/linenoise
-        /usr/local/include
-)
-
 #set(DEFAULT_LIB_DIRS $ENV{HOME}/local /opt/local /usr/local /usr)
 #find_package(Boost REQUIRED)
 

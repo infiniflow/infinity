@@ -103,14 +103,22 @@ set(INFINITY_CORE_SOURCE
 )
 
 add_library(infinity_core STATIC ${INFINITY_CORE_SOURCE})
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_include_directories(infinity_core PUBLIC "/usr/local/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/sql-parser/src")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 
 add_executable(infinity_main
         ${infinity_main_src}
         )
+target_include_directories(infinity_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cxxopts/include")
 
 add_executable(infinity_console
         ${infinity_console_src}
         )
+target_include_directories(infinity_console PUBLIC "${CMAKE_SOURCE_DIR}/third_party/linenoise")
+
 
 target_link_libraries(
         infinity_main
