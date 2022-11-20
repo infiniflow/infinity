@@ -3,6 +3,7 @@
 //
 
 #include "mixed_type.h"
+#include "mixed_array_value.h"
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {
@@ -143,7 +144,7 @@ MixedType::InsertNestedArray(u64 count, ptr_t position, u16 index) {
 
     // Allocate count * ELEMENT SIZE for array element, another point size space for the parent ptr.
     array_type_ptr->ptr = new char_t[count * ELEMENT_SIZE + sizeof(ptr_t)] {0};
-    MixedArray* nested_array_ptr = (MixedArray*)(array_type_ptr->ptr);
+    MixedArrayValue* nested_array_ptr = (MixedArrayValue*)(array_type_ptr->ptr);
 
     // Store the parent
     nested_array_ptr->parent_ptr = position;
