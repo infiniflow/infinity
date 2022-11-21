@@ -9,6 +9,22 @@
 namespace infinity {
 
 struct __attribute__((packed)) ArrayMixedType : public BaseMixedType {
+
+public:
+    inline void
+    Reset() {
+        if(ptr != nullptr) {
+            delete[] ptr;
+            ptr = nullptr;
+            count = 0;
+        }
+    }
+
+    ~ArrayMixedType() {
+        Reset();
+    }
+
+public:
     ArrayMixedType() : BaseMixedType(MixedValueType::kArray) {}
 
     i8 _dummy1{};

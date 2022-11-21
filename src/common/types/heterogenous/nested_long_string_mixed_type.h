@@ -9,6 +9,23 @@
 namespace infinity {
 
 struct __attribute__((packed)) NestedLongStrMixedType : public BaseMixedType {
+
+public:
+    inline void
+    Reset() {
+        if(ptr != nullptr) {
+            delete[] ptr;
+            ptr = nullptr;
+            length = 0;
+            array_index = 0;
+        }
+    }
+
+    ~NestedLongStrMixedType() {
+        Reset();
+    }
+
+public:
     NestedLongStrMixedType() : BaseMixedType(MixedValueType::kNestedLongStr) {}
     u16 array_index{};
 

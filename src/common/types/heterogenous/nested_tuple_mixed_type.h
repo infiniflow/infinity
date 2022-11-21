@@ -9,7 +9,24 @@
 namespace infinity {
 
 struct __attribute__((packed)) NestedTupleMixedType : public BaseMixedType {
-    NestedTupleMixedType() : BaseMixedType(MixedValueType::kNestedObject) {}
+public:
+
+    NestedTupleMixedType() : BaseMixedType(MixedValueType::kNestedTuple) {}
+    inline void
+    Reset() {
+        if(ptr != nullptr) {
+            delete[] ptr;
+            ptr = nullptr;
+            count = 0;
+            array_index = 0;
+        }
+    }
+
+    ~NestedTupleMixedType() {
+        Reset();
+    }
+
+public:
     i8 _dummy1{};
     u16 array_index{};
     i16 _dummy2{};

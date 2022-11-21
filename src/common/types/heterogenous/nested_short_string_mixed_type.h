@@ -12,6 +12,7 @@ struct __attribute__((packed)) NestedShortStrMixedType : public BaseMixedType {
     NestedShortStrMixedType() : BaseMixedType(MixedValueType::kNestedShortStr) {}
     u16 array_index{};
 
+    i8 length {};
     // not more than 13 bytes string will use short string type
     char_t ptr[BaseMixedType::SHORT_NESTED_STR_LIMIT] {};
 };

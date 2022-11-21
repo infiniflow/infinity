@@ -10,8 +10,22 @@
 namespace infinity {
 
 struct __attribute__((packed)) LongStrMixedType : public BaseMixedType {
+public:
     LongStrMixedType() : BaseMixedType(MixedValueType::kLongStr) {}
 
+    inline void
+    Reset() {
+        if(ptr != nullptr) {
+            delete[] ptr;
+            ptr = nullptr;
+            length = 0;
+        }
+    }
+
+    ~LongStrMixedType() {
+        Reset();
+    }
+public:
     char_t header[BaseMixedType::LONG_STR_HEADER]{}; // 5 bytes is used to store the header of the string to shortcut some computation.
     u16 length{0};  // Max string length will be 65535
     ptr_t ptr{nullptr};

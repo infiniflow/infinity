@@ -23,7 +23,7 @@ enum class MixedValueType : i8 {
     kNestedFloat,
     kNestedLongStr,
     kNestedShortStr,
-    kNestedObject,
+    kNestedTuple,
     kNestedArray,
     kNestedNull,
 

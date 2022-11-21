@@ -9,7 +9,23 @@
 namespace infinity {
 
 struct __attribute__((packed)) TupleMixedType : public BaseMixedType {
+
+public:
     TupleMixedType() : BaseMixedType(MixedValueType::kTuple) {}
+
+    inline void
+    Reset() {
+        if(ptr != nullptr) {
+            delete[] ptr;
+            ptr = nullptr;
+            count = 0;
+        }
+    }
+
+    ~TupleMixedType() {
+        Reset();
+    }
+public:
 
     i8 _dummy1{};
     i16 _dummy2{};

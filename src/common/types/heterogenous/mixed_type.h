@@ -25,21 +25,12 @@
 
 namespace infinity {
 
-class MixedType;
-
-class NestedLongStrMixedType;
-class NestedShortStrMixedType;
-class NestedTupleMixedType;
-class NestedArrayMixedType;
-class NestedNullMixedType;
-class NestedMissingMixedType;
-
 // Not nested data type
 struct __attribute__((packed)) MixedType : public BaseMixedType {
 
     // non-static member variable
 public:
-    char_t ptr[15];
+    char_t ptr[ELEMENT_SIZE - 1] {};
 public:
     static MixedType
     MakeInteger(i64 value);
@@ -51,10 +42,10 @@ public:
     MakeString(const String& str);
 
     static MixedType
-    MakeObject();
+    MakeTuple(u16 count);
 
     static MixedType
-    MakeArray(ptr_t ptr, i32 count);
+    MakeArray(u16 count);
 
     static MixedType
     MakeNull();
@@ -75,7 +66,7 @@ public:
 
     // input should have map: key/value, most 65536 kv pair in one object.
     static void
-    MakeNestedObject(u16 count, ptr_t position, u16 index);
+    MakeNestedTuple(u16 count, ptr_t position, u16 index);
 
     static void
     InsertIntoNestedObject(const String& key, MixedType value, ptr_t position, u16 index);
@@ -96,6 +87,7 @@ public:
 
     inline
     ~MixedType() {
+        Reset();
     }
 
     MixedType(const MixedType& other);
@@ -105,6 +97,13 @@ public:
 
     void
     Reset();
+
+private:
+    static void
+    Copy(const MixedType& from, MixedType& to);
+
+    static void
+    Move(MixedType&& from, MixedType& to);
 };
 
 
