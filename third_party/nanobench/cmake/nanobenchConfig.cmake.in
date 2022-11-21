@@ -1,0 +1,5 @@
+get_filename_component(nanobench_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+
+if(NOT TARGET nanobench::nanobench)
+  include("${nanobench_CMAKE_DIR}/nanobenchTargets.cmake")
+endif()

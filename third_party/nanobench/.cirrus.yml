@@ -1,0 +1,37 @@
+# examples from:
+# * https://github.com/bitcoin/bitcoin/blob/master/.cirrus.yml
+# * https://github.com/chux0519/pegasocks/blob/master/.cirrus.yml
+
+# global defaults
+env:
+  PACKAGE_MANAGER_INSTALL: "apt-get update && apt-get install -y"
+  CCACHE_SIZE: "50M"
+  CCACHE_DIR: "/tmp/ccache_dir"
+  CCACHE_NOHASHDIR: "1"  # Debug info might contain a stale path if the build dir changes, but this is fine
+
+linux_task:
+  container:
+    matrix:
+    - image: ubuntu:bionic
+    - image: ubuntu:focal
+    - image: debian:buster
+    - image: gcc:latest
+
+  ccache_cache:
+    folder: "/tmp/ccache_dir"
+
+  env_script:
+    - uname -a
+
+  install_script:
+    - apt update && apt upgrade -y
+    - DEBIAN_FRONTEND=noninteractive apt install -y cmake ninja-build build-essential ccache
+
+  build_script:
+    - cd build
+    - cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release 
+    - cmake --build . -- -j2
+
+  test_script:
+    - cd build
+    - ./nb

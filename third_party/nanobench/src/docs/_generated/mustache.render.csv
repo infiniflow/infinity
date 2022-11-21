@@ -1,0 +1,3 @@
+"title";"name";"unit";"batch";"elapsed";"error %";"instructions";"branches";"branch misses";"total"
+"Benchmarking std::mt19937_64 and std::knuth_b";"std::mt19937_64";"op";1;2.54441805225653e-08;0.0236579384033733;125.989678899083;16.7645714285714;0.564133016627078;0.000218811
+"Benchmarking std::mt19937_64 and std::knuth_b";"std::knuth_b";"op";1;3.19013867488444e-08;0.00091350764819687;170.013008130081;28;0.0031104199066874;0.000217248

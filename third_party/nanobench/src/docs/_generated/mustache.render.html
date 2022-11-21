@@ -1,0 +1,28 @@
+<html>
+
+<head>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+
+<body>
+    <div id="myDiv"></div>
+    <script>
+        var data = [
+            {
+                name: 'std::mt19937_64',
+                y: [2.54708571428571e-08, 2.58467243510507e-08, 2.24097693351425e-08, 2.53405963302752e-08, 2.59256594724221e-08, 2.25310880829016e-08, 2.54441805225653e-08, 2.20126262626263e-08, 2.63870541611625e-08, 2.23305882352941e-08, 2.60607235142119e-08],
+            },
+            {
+                name: 'std::knuth_b',
+                y: [3.2137323943662e-08, 3.19305555555556e-08, 3.18973561430793e-08, 3.1912013536379e-08, 3.19049034175334e-08, 3.19013867488444e-08, 3.18547854785479e-08, 3.18769230769231e-08, 3.18520325203252e-08, 3.18618307426598e-08, 3.19558599695586e-08],
+            },
+            
+        ];
+        var title = 'Benchmarking std::mt19937_64 and std::knuth_b';
+
+        data = data.map(a => Object.assign(a, { boxpoints: 'all', pointpos: 0, type: 'box' }));
+        var layout = { title: { text: title }, showlegend: false, yaxis: { title: 'time per unit', rangemode: 'tozero', autorange: true } }; Plotly.newPlot('myDiv', data, layout, {responsive: true});
+    </script>
+</body>
+
+</html>

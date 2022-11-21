@@ -1,0 +1,278 @@
+{
+    "results": [
+        {
+            "title": "Benchmarking std::mt19937_64 and std::knuth_b",
+            "name": "std::mt19937_64",
+            "unit": "op",
+            "batch": 1,
+            "complexityN": -1,
+            "epochs": 11,
+            "clockResolution": 1.8e-08,
+            "clockResolutionMultiple": 1000,
+            "maxEpochTime": 0.1,
+            "minEpochTime": 0,
+            "minEpochIterations": 1,
+            "warmup": 0,
+            "relative": 0,
+            "median(elapsed)": 2.54441805225653e-08,
+            "medianAbsolutePercentError(elapsed)": 0.0236579384033733,
+            "median(instructions)": 125.989678899083,
+            "medianAbsolutePercentError(instructions)": 0.035125448044942,
+            "median(cpucycles)": 81.3479809976247,
+            "median(contextswitches)": 0,
+            "median(pagefaults)": 0,
+            "median(branchinstructions)": 16.7645714285714,
+            "median(branchmisses)": 0.564133016627078,
+            "totalTime": 0.000218811,
+            "measurements": [
+                {
+                    "iterations": 875,
+                    "elapsed": 2.54708571428571e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 81.472,
+                    "contextswitches": 0,
+                    "instructions": 125.885714285714,
+                    "branchinstructions": 16.7645714285714,
+                    "branchmisses": 0.574857142857143
+                },
+                {
+                    "iterations": 809,
+                    "elapsed": 2.58467243510507e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 82.5290482076638,
+                    "contextswitches": 0,
+                    "instructions": 128.771322620519,
+                    "branchinstructions": 17.0296662546354,
+                    "branchmisses": 0.582200247218789
+                },
+                {
+                    "iterations": 737,
+                    "elapsed": 2.24097693351425e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 71.6431478968792,
+                    "contextswitches": 0,
+                    "instructions": 118.374491180461,
+                    "branchinstructions": 15.9470827679783,
+                    "branchmisses": 0.417910447761194
+                },
+                {
+                    "iterations": 872,
+                    "elapsed": 2.53405963302752e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 80.9896788990826,
+                    "contextswitches": 0,
+                    "instructions": 125.989678899083,
+                    "branchinstructions": 16.7580275229358,
+                    "branchmisses": 0.563073394495413
+                },
+                {
+                    "iterations": 834,
+                    "elapsed": 2.59256594724221e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 82.7661870503597,
+                    "contextswitches": 0,
+                    "instructions": 127.635491606715,
+                    "branchinstructions": 16.9352517985612,
+                    "branchmisses": 0.575539568345324
+                },
+                {
+                    "iterations": 772,
+                    "elapsed": 2.25310880829016e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 72.0129533678757,
+                    "contextswitches": 0,
+                    "instructions": 117.108808290155,
+                    "branchinstructions": 15.8341968911917,
+                    "branchmisses": 0.405440414507772
+                },
+                {
+                    "iterations": 842,
+                    "elapsed": 2.54441805225653e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 81.3479809976247,
+                    "contextswitches": 0,
+                    "instructions": 127.266033254157,
+                    "branchinstructions": 16.8859857482185,
+                    "branchmisses": 0.564133016627078
+                },
+                {
+                    "iterations": 792,
+                    "elapsed": 2.20126262626263e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 70.3623737373737,
+                    "contextswitches": 0,
+                    "instructions": 116.420454545455,
+                    "branchinstructions": 15.7588383838384,
+                    "branchmisses": 0.396464646464646
+                },
+                {
+                    "iterations": 757,
+                    "elapsed": 2.63870541611625e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 84.332892998679,
+                    "contextswitches": 0,
+                    "instructions": 131.462351387054,
+                    "branchinstructions": 17.334214002642,
+                    "branchmisses": 0.618229854689564
+                },
+                {
+                    "iterations": 850,
+                    "elapsed": 2.23305882352941e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 71.3505882352941,
+                    "contextswitches": 0,
+                    "instructions": 114.629411764706,
+                    "branchinstructions": 15.5823529411765,
+                    "branchmisses": 0.392941176470588
+                },
+                {
+                    "iterations": 774,
+                    "elapsed": 2.60607235142119e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 83.1679586563308,
+                    "contextswitches": 0,
+                    "instructions": 130.576227390181,
+                    "branchinstructions": 17.2635658914729,
+                    "branchmisses": 0.590439276485788
+                }
+            ]
+        },
+        {
+            "title": "Benchmarking std::mt19937_64 and std::knuth_b",
+            "name": "std::knuth_b",
+            "unit": "op",
+            "batch": 1,
+            "complexityN": -1,
+            "epochs": 11,
+            "clockResolution": 1.8e-08,
+            "clockResolutionMultiple": 1000,
+            "maxEpochTime": 0.1,
+            "minEpochTime": 0,
+            "minEpochIterations": 1,
+            "warmup": 0,
+            "relative": 0,
+            "median(elapsed)": 3.19013867488444e-08,
+            "medianAbsolutePercentError(elapsed)": 0.00091350764819687,
+            "median(instructions)": 170.013008130081,
+            "medianAbsolutePercentError(instructions)": 4.11992392254248e-06,
+            "median(cpucycles)": 101.973254086181,
+            "median(contextswitches)": 0,
+            "median(pagefaults)": 0,
+            "median(branchinstructions)": 28,
+            "median(branchmisses)": 0.0031104199066874,
+            "totalTime": 0.000217248,
+            "measurements": [
+                {
+                    "iterations": 568,
+                    "elapsed": 3.2137323943662e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 102.55985915493,
+                    "contextswitches": 0,
+                    "instructions": 170.014084507042,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.00528169014084507
+                },
+                {
+                    "iterations": 576,
+                    "elapsed": 3.19305555555556e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 102.059027777778,
+                    "contextswitches": 0,
+                    "instructions": 170.013888888889,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.00347222222222222
+                },
+                {
+                    "iterations": 643,
+                    "elapsed": 3.18973561430793e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 101.973561430793,
+                    "contextswitches": 0,
+                    "instructions": 170.012441679627,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.0031104199066874
+                },
+                {
+                    "iterations": 591,
+                    "elapsed": 3.1912013536379e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 101.944162436548,
+                    "contextswitches": 0,
+                    "instructions": 170.013536379019,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.00169204737732657
+                },
+                {
+                    "iterations": 673,
+                    "elapsed": 3.19049034175334e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 101.973254086181,
+                    "contextswitches": 0,
+                    "instructions": 170.011887072808,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.00297176820208024
+                },
+                {
+                    "iterations": 649,
+                    "elapsed": 3.19013867488444e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 101.850539291217,
+                    "contextswitches": 0,
+                    "instructions": 170.012326656394,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.00308166409861325
+                },
+                {
+                    "iterations": 606,
+                    "elapsed": 3.18547854785479e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 101.83498349835,
+                    "contextswitches": 0,
+                    "instructions": 170.013201320132,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.0033003300330033
+                },
+                {
+                    "iterations": 650,
+                    "elapsed": 3.18769230769231e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 101.898461538462,
+                    "contextswitches": 0,
+                    "instructions": 170.012307692308,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.00307692307692308
+                },
+                {
+                    "iterations": 615,
+                    "elapsed": 3.18520325203252e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 101.858536585366,
+                    "contextswitches": 0,
+                    "instructions": 170.013008130081,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.0032520325203252
+                },
+                {
+                    "iterations": 579,
+                    "elapsed": 3.18618307426598e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 101.989637305699,
+                    "contextswitches": 0,
+                    "instructions": 170.013816925734,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.00345423143350604
+                },
+                {
+                    "iterations": 657,
+                    "elapsed": 3.19558599695586e-08,
+                    "pagefaults": 0,
+                    "cpucycles": 102.229832572298,
+                    "contextswitches": 0,
+                    "instructions": 170.012176560122,
+                    "branchinstructions": 28,
+                    "branchmisses": 0.0030441400304414
+                }
+            ]
+        }
+    ]
+}

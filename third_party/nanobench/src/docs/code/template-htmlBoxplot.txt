@@ -1,0 +1,24 @@
+<html>
+
+<head>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+
+<body>
+    <div id="myDiv"></div>
+    <script>
+        var data = [
+            {{#result}}{
+                name: '{{name}}',
+                y: [{{#measurement}}{{elapsed}}{{^-last}}, {{/last}}{{/measurement}}],
+            },
+            {{/result}}
+        ];
+        var title = '{{title}}';
+
+        data = data.map(a => Object.assign(a, { boxpoints: 'all', pointpos: 0, type: 'box' }));
+        var layout = { title: { text: title }, showlegend: false, yaxis: { title: 'time per unit', rangemode: 'tozero', autorange: true } }; Plotly.newPlot('myDiv', data, layout, {responsive: true});
+    </script>
+</body>
+
+</html>

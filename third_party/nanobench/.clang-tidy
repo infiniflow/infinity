@@ -1,0 +1,33 @@
+---
+Checks: "*,\
+  -google-runtime-int,\
+  -google-explicit-constructor,\
+  -hicpp-no-malloc,\
+  -hicpp-vararg,\
+  -hicpp-invalid-access-moved,\
+  -hicpp-no-array-decay,\
+  -llvm-header-guard,\
+  -readability-magic-numbers,\
+  -cppcoreguidelines-avoid-magic-numbers,\
+  -cppcoreguidelines-pro-bounds-constant-array-index,\
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,\
+  -cppcoreguidelines-pro-type-reinterpret-cast,\
+  -cppcoreguidelines-no-malloc,\
+  -cppcoreguidelines-owning-memory,\
+  -cppcoreguidelines-macro-usage,\
+  -cppcoreguidelines-pro-type-vararg,\
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,\
+  -fuchsia-overloaded-operator,\
+  -fuchsia-default-arguments,\  
+  -fuchsia-multiple-inheritance,\
+  -fuchsia-default-arguments-calls,\
+  -fuchsia-trailing-return,\
+  -modernize-use-trailing-return-type,\
+  -misc-definitions-in-headers,\
+  -cert-err58-cpp,\
+  -clang-diagnostic-padded,\
+  -modernize-concat-nested-namespaces
+WarningsAsErrors: "*"
+HeaderFilterRegex: 'nanobench\.h'
+...
+

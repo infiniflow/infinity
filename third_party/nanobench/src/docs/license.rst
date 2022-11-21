@@ -1,0 +1,5 @@
+===========
+MIT License
+===========
+
+.. include:: ../../LICENSE

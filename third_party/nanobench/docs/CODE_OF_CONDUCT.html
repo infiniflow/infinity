@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contributor Covenant Code of Conduct &mdash; nanobench  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="MIT License" href="license.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> nanobench
+            <img src="_static/nanobench-logo.svg" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                v4.3.7
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#direct-inclusion">Direct Inclusion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#cmake-integration">CMake Integration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html#usage">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html#examples">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#something-fast">Something Fast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#something-slow">Something Slow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#something-unstable">Something Unstable</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html#comparing-results">Comparing Results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html#asymptotic-complexity">Asymptotic Complexity</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html#rendering-mustache-like-templates">Rendering Mustache-like Templates</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#csv-comma-separated-values">CSV - Comma-Separated Values</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#html-box-plots">HTML Box Plots</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#json-javascript-object-notation">JSON - JavaScript Object Notation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#pyperf-python-pyperf-module-output">pyperf - Python pyperf module Output</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="tutorial.html#show-benchmark-statistics">Show Benchmark Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tutorial.html#show-a-histogram">Show a Histogram</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tutorial.html#compare-results">Compare Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Comparison</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="comparison.html">Test Set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="comparison.html#runtime">Runtime</a></li>
+<li class="toctree-l1"><a class="reference internal" href="comparison.html#implementations-output">Implementations &amp; Output</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="comparison.html#nanobench">nanobench</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#sourcecode">Sourcecode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#results">Results</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="comparison.html#google-benchmark">Google Benchmark</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id2">Sourcecode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id3">Results</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="comparison.html#nonius">nonius</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id5">Sourcecode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id6">Results</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="comparison.html#picobench">Picobench</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id8">Sourcecode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id9">Results</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="comparison.html#catch2">Catch2</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id11">Sourcecode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id12">Results</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="comparison.html#moodycamel-microbench">moodycamel::microbench</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id14">Sourcecode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id15">Results</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="comparison.html#sltbench">sltbench</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id17">Sourcecode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="comparison.html#id18">Results</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="comparison.html#celero">Celero</a></li>
+<li class="toctree-l2"><a class="reference internal" href="comparison.html#folly-benchmark">folly Benchmark</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="reference.html"><code class="docutils literal notranslate"><span class="pre">ankerl::nanobench</span></code> Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#bench-main-entry-point"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">Bench</span></code> - Main Entry Point</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#rng-extremely-fast-prng"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">Rng</span></code> - Extremely fast PRNG</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#result-benchmark-results"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">Result</span></code> - Benchmark Results</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#donotoptimizeaway"><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">doNotOptimizeAway()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#render-mustache-like-templates"><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">render()</span></code> - Mustache-like Templates</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="reference.html#templates-csv"><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">templates::csv</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="reference.html#templates-htmlboxplot"><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">templates::htmlBoxplot</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="reference.html#templates-json"><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">templates::json</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="reference.html#templates-pyperf"><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">templates::pyperf</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#environment-variables">Environment Variables</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="reference.html#nanobench-endless-run-a-specific-test-endlessly"><code class="docutils literal notranslate"><span class="pre">NANOBENCH_ENDLESS</span></code> - Run a Specific Test Endlessly</a></li>
+<li class="toctree-l3"><a class="reference internal" href="reference.html#nanobench-suppress-warnings-no-stability-warnings"><code class="docutils literal notranslate"><span class="pre">NANOBENCH_SUPPRESS_WARNINGS</span></code> - No Stability Warnings</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="genindex.html">Index</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="license.html">MIT License</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Contributor Covenant Code of Conduct</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#our-pledge">Our Pledge</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#our-standards">Our Standards</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#enforcement-responsibilities">Enforcement Responsibilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#scope">Scope</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#enforcement">Enforcement</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#enforcement-guidelines">Enforcement Guidelines</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#correction">1. Correction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#warning">2. Warning</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#temporary-ban">3. Temporary Ban</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#permanent-ban">4. Permanent Ban</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#attribution">Attribution</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">nanobench</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Contributor Covenant Code of Conduct</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/martinus/nanobench/blob/master/src/docs/CODE_OF_CONDUCT.md" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="contributor-covenant-code-of-conduct">
+<h1>Contributor Covenant Code of Conduct<a class="headerlink" href="#contributor-covenant-code-of-conduct" title="Permalink to this headline"></a></h1>
+<section id="our-pledge">
+<h2>Our Pledge<a class="headerlink" href="#our-pledge" title="Permalink to this headline"></a></h2>
+<p>We as members, contributors, and leaders pledge to make participation in our
+community a harassment-free experience for everyone, regardless of age, body
+size, visible or invisible disability, ethnicity, sex characteristics, gender
+identity and expression, level of experience, education, socio-economic status,
+nationality, personal appearance, race, religion, or sexual identity
+and orientation.</p>
+<p>We pledge to act and interact in ways that contribute to an open, welcoming,
+diverse, inclusive, and healthy community.</p>
+</section>
+<section id="our-standards">
+<h2>Our Standards<a class="headerlink" href="#our-standards" title="Permalink to this headline"></a></h2>
+<p>Examples of behavior that contributes to a positive environment for our
+community include:</p>
+<ul class="simple">
+<li><p>Demonstrating empathy and kindness toward other people</p></li>
+<li><p>Being respectful of differing opinions, viewpoints, and experiences</p></li>
+<li><p>Giving and gracefully accepting constructive feedback</p></li>
+<li><p>Accepting responsibility and apologizing to those affected by our mistakes,
+and learning from the experience</p></li>
+<li><p>Focusing on what is best not just for us as individuals, but for the
+overall community</p></li>
+</ul>
+<p>Examples of unacceptable behavior include:</p>
+<ul class="simple">
+<li><p>The use of sexualized language or imagery, and sexual attention or
+advances of any kind</p></li>
+<li><p>Trolling, insulting or derogatory comments, and personal or political attacks</p></li>
+<li><p>Public or private harassment</p></li>
+<li><p>Publishing others’ private information, such as a physical or email
+address, without their explicit permission</p></li>
+<li><p>Other conduct which could reasonably be considered inappropriate in a
+professional setting</p></li>
+</ul>
+</section>
+<section id="enforcement-responsibilities">
+<h2>Enforcement Responsibilities<a class="headerlink" href="#enforcement-responsibilities" title="Permalink to this headline"></a></h2>
+<p>Community leaders are responsible for clarifying and enforcing our standards of
+acceptable behavior and will take appropriate and fair corrective action in
+response to any behavior that they deem inappropriate, threatening, offensive,
+or harmful.</p>
+<p>Community leaders have the right and responsibility to remove, edit, or reject
+comments, commits, code, wiki edits, issues, and other contributions that are
+not aligned to this Code of Conduct, and will communicate reasons for moderation
+decisions when appropriate.</p>
+</section>
+<section id="scope">
+<h2>Scope<a class="headerlink" href="#scope" title="Permalink to this headline"></a></h2>
+<p>This Code of Conduct applies within all community spaces, and also applies when
+an individual is officially representing the community in public spaces.
+Examples of representing our community include using an official e-mail address,
+posting via an official social media account, or acting as an appointed
+representative at an online or offline event.</p>
+</section>
+<section id="enforcement">
+<h2>Enforcement<a class="headerlink" href="#enforcement" title="Permalink to this headline"></a></h2>
+<p>Instances of abusive, harassing, or otherwise unacceptable behavior may be
+reported to the community leaders responsible for enforcement at
+martin.ankerl&#64;gmail.com.
+All complaints will be reviewed and investigated promptly and fairly.</p>
+<p>All community leaders are obligated to respect the privacy and security of the
+reporter of any incident.</p>
+</section>
+<section id="enforcement-guidelines">
+<h2>Enforcement Guidelines<a class="headerlink" href="#enforcement-guidelines" title="Permalink to this headline"></a></h2>
+<p>Community leaders will follow these Community Impact Guidelines in determining
+the consequences for any action they deem in violation of this Code of Conduct:</p>
+<section id="correction">
+<h3>1. Correction<a class="headerlink" href="#correction" title="Permalink to this headline"></a></h3>
+<p><strong>Community Impact</strong>: Use of inappropriate language or other behavior deemed
+unprofessional or unwelcome in the community.</p>
+<p><strong>Consequence</strong>: A private, written warning from community leaders, providing
+clarity around the nature of the violation and an explanation of why the
+behavior was inappropriate. A public apology may be requested.</p>
+</section>
+<section id="warning">
+<h3>2. Warning<a class="headerlink" href="#warning" title="Permalink to this headline"></a></h3>
+<p><strong>Community Impact</strong>: A violation through a single incident or series
+of actions.</p>
+<p><strong>Consequence</strong>: A warning with consequences for continued behavior. No
+interaction with the people involved, including unsolicited interaction with
+those enforcing the Code of Conduct, for a specified period of time. This
+includes avoiding interactions in community spaces as well as external channels
+like social media. Violating these terms may lead to a temporary or
+permanent ban.</p>
+</section>
+<section id="temporary-ban">
+<h3>3. Temporary Ban<a class="headerlink" href="#temporary-ban" title="Permalink to this headline"></a></h3>
+<p><strong>Community Impact</strong>: A serious violation of community standards, including
+sustained inappropriate behavior.</p>
+<p><strong>Consequence</strong>: A temporary ban from any sort of interaction or public
+communication with the community for a specified period of time. No public or
+private interaction with the people involved, including unsolicited interaction
+with those enforcing the Code of Conduct, is allowed during this period.
+Violating these terms may lead to a permanent ban.</p>
+</section>
+<section id="permanent-ban">
+<h3>4. Permanent Ban<a class="headerlink" href="#permanent-ban" title="Permalink to this headline"></a></h3>
+<p><strong>Community Impact</strong>: Demonstrating a pattern of violation of community
+standards, including sustained inappropriate behavior,  harassment of an
+individual, or aggression toward or disparagement of classes of individuals.</p>
+<p><strong>Consequence</strong>: A permanent ban from any sort of public interaction within
+the community.</p>
+</section>
+</section>
+<section id="attribution">
+<h2>Attribution<a class="headerlink" href="#attribution" title="Permalink to this headline"></a></h2>
+<p>This Code of Conduct is adapted from the <a class="reference external" href="https://www.contributor-covenant.org">Contributor Covenant</a>,
+version 2.0, available at
+https://www.contributor-covenant.org/version/2/0/code_of_conduct.html.</p>
+<p>Community Impact Guidelines were inspired by <a class="reference external" href="https://github.com/mozilla/diversity">Mozilla’s code of conduct
+enforcement ladder</a>.</p>
+<p>For answers to common questions about this code of conduct, see the FAQ at
+https://www.contributor-covenant.org/faq. Translations are available at
+https://www.contributor-covenant.org/translations.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="license.html" class="btn btn-neutral float-left" title="MIT License" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019-2022 Martin Ankerl &lt;martin.ankerl@gmail.com&gt;.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-36863101-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-36863101-2', {
+          'anonymize_ip': false,
+      });
+    </script> 
+
+</body>
+</html>

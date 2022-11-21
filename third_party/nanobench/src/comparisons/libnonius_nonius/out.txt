@@ -1,0 +1,26 @@
+clock resolution: mean is 22.0426 ns (20480002 iterations)
+
+
+new round for parameters
+X = 1
+
+benchmarking x += x
+collecting 100 samples, 56376 iterations each, in estimated 0 ns
+mean: 0.391109 ns, lb 0.391095 ns, ub 0.391135 ns, ci 0.95
+std dev: 9.50619e-05 ns, lb 6.25215e-05 ns, ub 0.000167224 ns, ci 0.95
+found 4 outliers among 100 samples (4%)
+variance is unaffected by outliers
+
+benchmarking sleep 10ms
+collecting 100 samples, 1 iterations each, in estimated 1013.66 ms
+mean: 10.1258 ms, lb 10.1189 ms, ub 10.1313 ms, ci 0.95
+std dev: 31.1777 μs, lb 26.5814 μs, ub 35.4952 μs, ci 0.95
+found 13 outliers among 100 samples (13%)
+variance is unaffected by outliers
+
+benchmarking random fluctuations
+collecting 100 samples, 23 iterations each, in estimated 2.2724 ms
+mean: 1016.26 ns, lb 991.161 ns, ub 1041.66 ns, ci 0.95
+std dev: 128.963 ns, lb 109.803 ns, ub 159.509 ns, ci 0.95
+found 2 outliers among 100 samples (2%)
+variance is severely inflated by outliers

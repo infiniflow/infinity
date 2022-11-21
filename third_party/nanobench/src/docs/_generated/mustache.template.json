@@ -1,0 +1,42 @@
+{
+    "results": [
+{{#result}}        {
+            "title": "{{title}}",
+            "name": "{{name}}",
+            "unit": "{{unit}}",
+            "batch": {{batch}},
+            "complexityN": {{complexityN}},
+            "epochs": {{epochs}},
+            "clockResolution": {{clockResolution}},
+            "clockResolutionMultiple": {{clockResolutionMultiple}},
+            "maxEpochTime": {{maxEpochTime}},
+            "minEpochTime": {{minEpochTime}},
+            "minEpochIterations": {{minEpochIterations}},
+            "epochIterations": {{epochIterations}},
+            "warmup": {{warmup}},
+            "relative": {{relative}},
+            "median(elapsed)": {{median(elapsed)}},
+            "medianAbsolutePercentError(elapsed)": {{medianAbsolutePercentError(elapsed)}},
+            "median(instructions)": {{median(instructions)}},
+            "medianAbsolutePercentError(instructions)": {{medianAbsolutePercentError(instructions)}},
+            "median(cpucycles)": {{median(cpucycles)}},
+            "median(contextswitches)": {{median(contextswitches)}},
+            "median(pagefaults)": {{median(pagefaults)}},
+            "median(branchinstructions)": {{median(branchinstructions)}},
+            "median(branchmisses)": {{median(branchmisses)}},
+            "totalTime": {{sumProduct(iterations, elapsed)}},
+            "measurements": [
+{{#measurement}}                {
+                    "iterations": {{iterations}},
+                    "elapsed": {{elapsed}},
+                    "pagefaults": {{pagefaults}},
+                    "cpucycles": {{cpucycles}},
+                    "contextswitches": {{contextswitches}},
+                    "instructions": {{instructions}},
+                    "branchinstructions": {{branchinstructions}},
+                    "branchmisses": {{branchmisses}}
+                }{{^-last}},{{/-last}}
+{{/measurement}}            ]
+        }{{^-last}},{{/-last}}
+{{/result}}    ]
+}

@@ -1,0 +1,20 @@
+# see https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+---
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: Cpp11
+
+# very limited width, so examples look good in the generated documentation
+ColumnLimit: 80
+
+AccessModifierOffset: -4
+IndentWidth: 4
+UseTab: Never
+
+AlignEscapedNewlines: Left
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Empty
+AlwaysBreakTemplateDeclarations: true
+BreakConstructorInitializers: BeforeComma
+IndentPPDirectives: AfterHash
+PointerAlignment: Left

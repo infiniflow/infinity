@@ -1,0 +1,16 @@
+2019-10-12 12:03:25
+Running ./gbench
+Run on (12 X 4600 MHz CPU s)
+CPU Caches:
+L1 Data 32K (x6)
+L1 Instruction 32K (x6)
+L2 Unified 256K (x6)
+L3 Unified 12288K (x1)
+Load Average: 0.21, 0.55, 0.60
+***WARNING*** CPU scaling is enabled, the benchmark real time measurements may be noisy and will incur extra overhead.
+----------------------------------------------------------------
+Benchmark                      Time             CPU   Iterations
+----------------------------------------------------------------
+ComparisonFast             0.313 ns        0.313 ns   1000000000
+ComparisonSlow          10137913 ns         3920 ns         1000
+ComparisonFluctuating        993 ns          992 ns       706946

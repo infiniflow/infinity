@@ -1,0 +1,21 @@
+{
+    "benchmarks": [
+        {
+            "runs": [
+                {
+                    "values": [
+{{#measurement}}                        {{elapsed}}{{^-last}},
+{{/last}}{{/measurement}}
+                    ]
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "loops": {{sum(iterations)}},
+        "inner_loops": {{batch}},
+        "name": "{{title}}",
+        "unit": "second"
+    },
+    "version": "1.0"
+}

@@ -1,0 +1,7 @@
+.vscode/
+.clangd/
+.cache/
+**/*.ppm
+**/perf.data
+**/perf.data.old
+/src/docs/_build

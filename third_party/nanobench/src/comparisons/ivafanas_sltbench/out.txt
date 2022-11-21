@@ -1,0 +1,4 @@
+benchmark                                                   arg                      status               time(ns)
+ComparisonFast                                                                       ok                          1
+ComparisonFluctuating                                                                ok                         20
+ComparisonSlow                                                                       ok                   10055943

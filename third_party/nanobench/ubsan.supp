@@ -1,0 +1,8 @@
+# https://github.com/gcc-mirror/gcc/blob/master/libsanitizer/ubsan/ubsan_checks.inc
+implicit-integer-sign-change:random.tcc
+signed-integer-overflow:random.tcc
+unsigned-integer-overflow:random.tcc
+shift-base:random.tcc
+shift-exponent:random.tcc
+unsigned-integer-overflow:random.h
+unsigned-integer-overflow:example_random_number_generators.cpp

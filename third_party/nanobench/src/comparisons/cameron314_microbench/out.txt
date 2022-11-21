@@ -1,0 +1,3 @@
+3.12506e-07 sec x += x (x==0)
+10.056 sec sleep 10ms
+0.000661384 sec random fluctuations
