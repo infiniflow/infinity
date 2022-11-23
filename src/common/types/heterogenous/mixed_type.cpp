@@ -47,14 +47,14 @@ MixedType::MakeString(const String& str) {
         MixedType value(MixedValueType::kLongStr);
 
         // LongStrMixedType* long_mixed_str
-        auto* long_mixed_str = (LongStrMixedType*)(&value);
+        auto* long_mixed_str_ptr = (LongStrMixedType*)(&value);
 
         TypeAssert(str.size() <= 65535, "String length exceeds 65535.");
-        long_mixed_str->length = static_cast<u16>(str_len);
-        long_mixed_str->ptr = new char_t[str_len];
-        memcpy(long_mixed_str->ptr, str.c_str(), str_len);
+        long_mixed_str_ptr->length = static_cast<u16>(str_len);
+        long_mixed_str_ptr->ptr = new char_t[str_len];
+        memcpy(long_mixed_str_ptr->ptr, str.c_str(), str_len);
         // Fill long string prefix
-        memcpy(long_mixed_str->header, str.c_str(), BaseMixedType::LONG_STR_HEADER);
+        memcpy(long_mixed_str_ptr->header, str.c_str(), BaseMixedType::LONG_STR_HEADER);
 
         return value;
     }
@@ -102,6 +102,182 @@ MixedType
 MixedType::MakeMissing() {
     MixedType value(MixedValueType::kMissing);
     return value;
+}
+
+void
+MixedType::CopyIntoTuple(const String& key, const MixedType& value) {
+    TypeAssert(this->type == MixedValueType::kTuple, "Not tuple type, can't set value.");
+    auto* tuple_ptr = (TupleMixedType*)(this);
+    TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
+
+    auto* tuple_value_ptr = (MixedTupleValue*)(this->ptr);
+
+    // TODO: currently, we use for loop to store the tuple. In the future, we will use hash table
+    for(u16 i = 0; i < tuple_ptr->count; i += 2) {
+        MixedType& key_ref = tuple_value_ptr->array[i];
+        MixedType& value_ref = tuple_value_ptr->array[i + 1];
+        if(key_ref.type == MixedValueType::kInvalid) {
+            // Assign the input to the tuple slot
+            key_ref = MakeString(key);
+            value_ref = value;
+        }
+    }
+}
+
+void
+MixedType::MoveIntoTuple(const String& key, MixedType&& value) {
+    TypeAssert(this->type == MixedValueType::kTuple, "Not tuple type, can't set value.");
+    auto* tuple_ptr = (TupleMixedType*)(this);
+    TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
+
+    auto* tuple_value_ptr = (MixedTupleValue*)(this->ptr);
+
+    // TODO: currently, we use for loop to store the tuple. In the future, we will use hash table
+    for(u16 i = 0; i < tuple_ptr->count; i += 2) {
+        MixedType& key_ref = tuple_value_ptr->array[i];
+        MixedType& value_ref = tuple_value_ptr->array[i + 1];
+        if(key_ref.type == MixedValueType::kInvalid) {
+            // Assign the input to the tuple slot
+            key_ref = MakeString(key);
+            value_ref = std::forward<MixedType>(value);
+        }
+    }
+}
+
+MixedType*
+MixedType::GetFromTuple(const String& key) {
+    TypeAssert(this->type == MixedValueType::kTuple, "Not tuple type, can't get value.");
+    auto* tuple_ptr = (TupleMixedType*)(this);
+    TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
+
+    auto* tuple_value_ptr = (MixedTupleValue*)(this->ptr);
+
+    // TODO: currently, we use for loop to get the tuple. In the future, we will use hash table
+    for(u16 i = 0; i < tuple_ptr->count; i += 2) {
+        MixedType& key_ref = tuple_value_ptr->array[i];
+        MixedType& value_ref = tuple_value_ptr->array[i + 1];
+        switch(key_ref.type) {
+            case MixedValueType::kInvalid: {
+                return nullptr;
+            }
+            case MixedValueType::kShortStr: {
+                auto* key_ptr = (ShortStrMixedType*)(&key_ref);
+                if(key_ptr->Equal(key)) {
+                    return &value_ref;
+                }
+                break;
+            }
+            case MixedValueType::kLongStr: {
+                auto* key_ptr = (LongStrMixedType*)(&key_ref);
+                if(key_ptr->Equal(key)) {
+                    return &value_ref;
+                }
+                break;
+            }
+            default: {
+                TypeError("Unexpected heterogeneous type");
+            }
+        }
+    }
+    return nullptr;
+}
+
+void
+MixedType::CopyIntoArray(const MixedType& value, u16 index) {
+
+    // FIXME: need nested type
+    auto* array_mixed_ptr = (ArrayMixedType*)this;
+    TypeAssert(index < array_mixed_ptr->count, "Index is invalid");
+
+    auto* array_value_ptr = (MixedArrayValue*)(array_mixed_ptr->ptr);
+    array_value_ptr->array[index] = value;
+}
+
+void
+MixedType::MoveIntoArray(MixedType&& value, u16 index) {
+
+    // FIXME: need nested type
+    auto* array_mixed_ptr = (ArrayMixedType*)this;
+    TypeAssert(index < array_mixed_ptr->count, "Index is invalid");
+
+    auto* array_value_ptr = (MixedArrayValue*)(array_mixed_ptr->ptr);
+    array_value_ptr->array[index] = std::forward<MixedType>(value);
+}
+
+void
+MixedType::InsertIntegerIntoArray(i64 value, u16 index) {
+    auto* array_mixed_ptr = (ArrayMixedType*)this;
+    TypeAssert(index < array_mixed_ptr->count, "Index is invalid");
+
+    auto* array_value_ptr = (MixedArrayValue*)(array_mixed_ptr->ptr);
+    MixedType& slot_ref = array_value_ptr->array[index];
+    slot_ref.Reset();
+    auto* integer_value_ptr = (IntegerMixedType*)(&slot_ref);
+    integer_value_ptr->type = MixedValueType::kInteger;
+    integer_value_ptr->value = value;
+}
+
+void
+MixedType::InsertFloatIntoArray(f64 value, u16 index) {
+    auto* array_mixed_ptr = (ArrayMixedType*)this;
+    TypeAssert(index < array_mixed_ptr->count, "Index is invalid");
+
+    auto* array_value_ptr = (MixedArrayValue*)(array_mixed_ptr->ptr);
+    MixedType& slot_ref = array_value_ptr->array[index];
+    slot_ref.Reset();
+    slot_ref.type = MixedValueType::kNestedFloat;
+    auto* nested_float_ptr = (NestedFloatMixedType*)(&slot_ref);
+    nested_float_ptr->array_index = index;
+    nested_float_ptr->value = value;
+}
+
+void
+MixedType::InsertStringIntoArray(const String& value, u16 index) {
+    auto* array_mixed_ptr = (ArrayMixedType*)this;
+    TypeAssert(index < array_mixed_ptr->count, "Index is invalid");
+
+    auto* array_value_ptr = (MixedArrayValue*)(array_mixed_ptr->ptr);
+    MixedType& slot_ref = array_value_ptr->array[index];
+    slot_ref.Reset();
+
+    size_t str_len = value.size();
+    if(str_len <= BaseMixedType::SHORT_STR_LIMIT) {
+        // ShortStrMixedType* short_mixed_ptr
+        auto* short_mixed_ptr = (ShortStrMixedType*)(&slot_ref);
+        short_mixed_ptr->type = MixedValueType::kShortStr;
+        memcpy(short_mixed_ptr->ptr, value.c_str(), str_len);
+        if(str_len < BaseMixedType::SHORT_STR_LIMIT) {
+            memset(short_mixed_ptr->ptr + str_len, 0, BaseMixedType::SHORT_STR_LIMIT - str_len);
+        }
+        short_mixed_ptr->length = static_cast<i8>(str_len);
+    } else {
+        // LongStrMixedType* long_mixed_str
+        auto* long_mixed_str_ptr = (LongStrMixedType*)(&array_value_ptr->array[index]);
+        if(long_mixed_str_ptr->type == MixedValueType::kLongStr) {
+            // Not empty, reset exist value
+            long_mixed_str_ptr->Reset();
+        }
+
+        TypeAssert(value.size() <= 65535, "String length exceeds 65535.");
+        long_mixed_str_ptr->length = static_cast<u16>(str_len);
+        long_mixed_str_ptr->ptr = new char_t[str_len];
+        memcpy(long_mixed_str_ptr->ptr, value.c_str(), str_len);
+        // Fill long string prefix
+        memcpy(long_mixed_str_ptr->header, value.c_str(), BaseMixedType::LONG_STR_HEADER);
+    }
+}
+
+void
+MixedType::InsertNullIntoArray(u16 index) {
+    auto* array_mixed_ptr = (ArrayMixedType*)this;
+    TypeAssert(index < array_mixed_ptr->count, "Index is invalid");
+
+    auto* array_value_ptr = (MixedArrayValue*)(array_mixed_ptr->ptr);
+    MixedType& slot_ref = array_value_ptr->array[index];
+    slot_ref.Reset();
+    slot_ref.type = MixedValueType::kNestedNull;
+    auto* nested_null_ptr = (NestedNullMixedType*)(&slot_ref);
+    nested_null_ptr->array_index = index;
 }
 
 // static member method for nested data

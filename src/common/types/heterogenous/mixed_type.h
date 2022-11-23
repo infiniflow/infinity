@@ -53,7 +53,37 @@ public:
     static MixedType
     MakeMissing();
 
-    // static member method for nested data
+    // Tuple related method
+public:
+    void
+    CopyIntoTuple(const String& key, const MixedType& value);
+
+    void
+    MoveIntoTuple(const String& key, MixedType&& value);
+
+    MixedType*
+    GetFromTuple(const String& key);
+
+    // Array related method
+public:
+    void
+    CopyIntoArray(const MixedType& value, u16 index);
+
+    void
+    MoveIntoArray(MixedType&& value, u16 index);
+
+    void
+    InsertIntegerIntoArray(i64 value, u16 index);
+
+    void
+    InsertFloatIntoArray(f64 value, u16 index);
+
+    void
+    InsertStringIntoArray(const String& value, u16 index);
+
+    void
+    InsertNullIntoArray(u16 index);
+    // static member method for array data
 public:
     static void
     InsertNestedInteger(i64 value, ptr_t position, u16 index);

@@ -112,6 +112,9 @@ TEST_F(MixedTypeTest, mixed_short_str) {
         String result = String(short_string_mixed_ptr->ptr, short_string_mixed_ptr->length);
         EXPECT_STREQ(result.c_str(), "Hello");
         EXPECT_EQ(short_string_mixed_ptr->length, 5);
+        String another = "Hell";
+        EXPECT_TRUE(short_string_mixed_ptr->Equal(result));
+        EXPECT_FALSE(short_string_mixed_ptr->Equal(another));
 
         mixed_short_string.Reset();
 
@@ -192,6 +195,13 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     String header = String(long_string_mixed_ptr->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header.c_str(), "Hello");
 
+    String another = "Aello the world";
+    EXPECT_FALSE(long_string_mixed_ptr->Equal(another));
+    another = "Hellow";
+    EXPECT_FALSE(long_string_mixed_ptr->Equal(another));
+    another = "Hello the world";
+    EXPECT_TRUE(long_string_mixed_ptr->Equal(another));
+
     // Copy constructor
     MixedType mixed_long_string1 = mixed_long_string;
     EXPECT_EQ(mixed_long_string1.type, MixedValueType::kLongStr);
@@ -248,5 +258,8 @@ TEST_F(MixedTypeTest, mixed_long_str) {
 TEST_F(MixedTypeTest, mixed_tuple) {
     using namespace infinity;
 
-
+    MixedType mixed_tuple1 = MixedType::MakeTuple(16);
+    EXPECT_EQ(mixed_tuple1.type, MixedValueType::kTuple);
+    auto *tuple_ptr1 = (TupleMixedType *) (&mixed_tuple1);
+    EXPECT_EQ(tuple_ptr1->count, 16);
 }

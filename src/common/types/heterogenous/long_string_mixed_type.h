@@ -21,6 +21,10 @@ public:
     LongStrMixedType&
     operator=(LongStrMixedType&& from) = delete;
 
+public:
+    bool
+    Equal(const String& input);
+
     inline void
     Reset() {
         if(ptr != nullptr) {
