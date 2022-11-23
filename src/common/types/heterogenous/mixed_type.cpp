@@ -6,6 +6,7 @@
 #include "mixed_array_value.h"
 #include "mixed_tuple_value.h"
 #include "common/utility/infinity_assert.h"
+#include "main/logger.h"
 
 namespace infinity {
 
@@ -29,15 +30,15 @@ MixedType::MakeFloat(f64 input) {
 MixedType
 MixedType::MakeString(const String& str) {
     size_t str_len = str.size();
-    if(str_len <= MixedType::SHORT_STR_LIMIT) {
+    if(str_len <= BaseMixedType::SHORT_STR_LIMIT) {
         // Short str
         MixedType value(MixedValueType::kShortStr);
 
         // ShortStrMixedType* short_mixed_ptr
         auto* short_mixed_ptr = (ShortStrMixedType*)(&value);
         memcpy(short_mixed_ptr->ptr, str.c_str(), str_len);
-        if(str_len < SHORT_STR_LIMIT) {
-            memset(short_mixed_ptr->ptr + str_len, 0, MixedType::SHORT_STR_LIMIT - str_len);
+        if(str_len < BaseMixedType::SHORT_STR_LIMIT) {
+            memset(short_mixed_ptr->ptr + str_len, 0, BaseMixedType::SHORT_STR_LIMIT - str_len);
         }
         short_mixed_ptr->length = static_cast<i8>(str_len);
         return value;
@@ -53,7 +54,7 @@ MixedType::MakeString(const String& str) {
         long_mixed_str->ptr = new char_t[str_len];
         memcpy(long_mixed_str->ptr, str.c_str(), str_len);
         // Fill long string prefix
-        memcpy(long_mixed_str->header, str.c_str(), LONG_STR_HEADER);
+        memcpy(long_mixed_str->header, str.c_str(), BaseMixedType::LONG_STR_HEADER);
 
         return value;
     }
@@ -120,12 +121,12 @@ void
 MixedType::InsertNestedString(const String& str, ptr_t position, u16 index) {
 
     size_t str_len = str.size();
-    if(str_len <= MixedType::SHORT_NESTED_STR_LIMIT) {
+    if(str_len <= BaseMixedType::SHORT_NESTED_STR_LIMIT) {
         // Short str
         NestedShortStrMixedType* nested_short_mixed_ptr = (NestedShortStrMixedType*)(position);
         memcpy(nested_short_mixed_ptr->ptr, str.c_str(), str_len);
-        if(str_len < SHORT_NESTED_STR_LIMIT) {
-            memset(nested_short_mixed_ptr->ptr + str_len, 0, MixedType::SHORT_NESTED_STR_LIMIT - str_len);
+        if(str_len < BaseMixedType::SHORT_NESTED_STR_LIMIT) {
+            memset(nested_short_mixed_ptr->ptr + str_len, 0, BaseMixedType::SHORT_NESTED_STR_LIMIT - str_len);
         }
     } else {
         // Long str
@@ -135,7 +136,7 @@ MixedType::InsertNestedString(const String& str, ptr_t position, u16 index) {
         nested_long_mixed_str->ptr = new char_t[str_len];
         memcpy(nested_long_mixed_str->ptr, str.c_str(), str_len);
         // Fill long string prefix
-        memcpy(nested_long_mixed_str->header, str.c_str(), LONG_NESTED_STR_HEADER);
+        memcpy(nested_long_mixed_str->header, str.c_str(), BaseMixedType::LONG_NESTED_STR_HEADER);
     }
 
 }
@@ -147,7 +148,7 @@ MixedType::MakeNestedTuple(u16 count, ptr_t position, u16 index) {
     object_type_ptr->count = count;
 
     // TODO this memory need to reallocate to hash map
-    object_type_ptr->ptr = new char_t[count * ELEMENT_SIZE * 2] {0};
+    object_type_ptr->ptr = new char_t[count * BaseMixedType::TUPLE_SIZE + sizeof(ptr_t)] {0};
 }
 
 void
@@ -165,7 +166,7 @@ MixedType::InsertNestedArray(u64 count, ptr_t position, u16 index) {
     array_type_ptr->count = count;
 
     // Allocate count * ELEMENT SIZE for array element, another point size space for the parent ptr.
-    array_type_ptr->ptr = new char_t[count * ELEMENT_SIZE + sizeof(ptr_t)] {0};
+    array_type_ptr->ptr = new char_t[count * BaseMixedType::ELEMENT_SIZE + sizeof(ptr_t)] {0};
     MixedArrayValue* nested_array_ptr = (MixedArrayValue*)(array_type_ptr->ptr);
 
     // Store the parent
@@ -177,14 +178,13 @@ MixedType::InsertNestedNull(ptr_t position, u16 index) {
 
 }
 
-
 // Non-static member method
 MixedType::MixedType(const MixedType& other) {
     Copy(other, *this);
 }
 
 MixedType::MixedType(MixedType&& other) noexcept {
-
+    Move(std::forward<MixedType>(other), *this);
 }
 
 MixedType&
@@ -204,42 +204,82 @@ MixedType::operator=(MixedType&& other) noexcept {
 void
 MixedType::Move(MixedType&& from, MixedType& to) {
     to.Reset();
-    memcpy((void*)&to, (void*)&from, ELEMENT_SIZE);
+    memcpy((void*)&to, (void*)&from, BaseMixedType::ELEMENT_SIZE);
+    memset((void*)&from, 0, BaseMixedType::ELEMENT_SIZE);
+    LOG_TRACE("MixedType::Move, {}", BaseMixedType::GetTypeName(to.type));
 }
 
 void
 MixedType::Copy(const MixedType& from, MixedType& to) {
-    to.type = from.type;
+    to.Reset();
+    memcpy((void*)&to, (void*)&from, BaseMixedType::ELEMENT_SIZE);
+    LOG_TRACE("MixedType::Copy, {}", BaseMixedType::GetTypeName(to.type));
     switch(to.type) {
+        case MixedValueType::kInvalid:
         case MixedValueType::kInteger:
         case MixedValueType::kFloat:
         case MixedValueType::kShortStr:
-        case MixedValueType::kTuple:
         case MixedValueType::kNull:
         case MixedValueType::kMissing:
         case MixedValueType::kNestedMissing:
         case MixedValueType::kNestedInteger:
         case MixedValueType::kNestedFloat:
         case MixedValueType::kNestedShortStr:
-        case MixedValueType::kNestedTuple:
         case MixedValueType::kNestedNull:
-            break;
-        case MixedValueType::kLongStr:
-            break;
-        case MixedValueType::kArray:
-            break;
-        case MixedValueType::kNestedLongStr:
-            break;
-        case MixedValueType::kNestedArray:
-            break;
-        case MixedValueType::kDummy:
-            break;
+        case MixedValueType::kDummy: {
+            return ;
+        }
+        case MixedValueType::kTuple: {
+            auto* from_ptr = (TupleMixedType*)(&from);
+            auto* to_ptr = (TupleMixedType*)(&to);
+//            to_ptr->ptr = new char_t[to_ptr->length];
+            memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->count * BaseMixedType::TUPLE_SIZE + sizeof(ptr_t));
+            return ;
+        }
+        case MixedValueType::kLongStr: {
+            auto* from_ptr = (LongStrMixedType*)(&from);
+            auto* to_ptr = (LongStrMixedType*)(&to);
+            u16 size_len = from_ptr->length;
+            to_ptr->ptr = new char_t[size_len];
+            memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->length);
+            return ;
+        }
+        case MixedValueType::kArray: {
+            auto* from_ptr = (ArrayMixedType*)(&from);
+            auto* to_ptr = (ArrayMixedType*)(&to);
+//            to_ptr->ptr = new char_t[to_ptr->length];
+            memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->count * BaseMixedType::ELEMENT_SIZE + sizeof(ptr_t));
+            return ;
+        }
+        case MixedValueType::kNestedTuple: {
+            auto* from_ptr = (NestedTupleMixedType*)(&from);
+            auto* to_ptr = (NestedTupleMixedType*)(&to);
+//            to_ptr->ptr = new char_t[to_ptr->length];
+            memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->count * BaseMixedType::TUPLE_SIZE + sizeof(ptr_t));
+            return ;
+        }
+        case MixedValueType::kNestedLongStr: {
+            auto* from_ptr = (LongStrMixedType*)(&from);
+            auto* to_ptr = (LongStrMixedType*)(&to);
+            u16 size_len = to_ptr->length;
+            to_ptr->ptr = new char_t[size_len];
+            memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->length);
+            return ;
+        }
+        case MixedValueType::kNestedArray: {
+            auto* from_ptr = (ArrayMixedType*)(&from);
+            auto* to_ptr = (ArrayMixedType*)(&to);
+//            to_ptr->ptr = new char_t[to_ptr->length];
+            memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->count * BaseMixedType::ELEMENT_SIZE + sizeof(ptr_t));
+            return ;
+        }
     }
 }
 
 void
 MixedType::Reset() {
     switch (this->type) {
+        case MixedValueType::kInvalid:
         case MixedValueType::kInteger:
         case MixedValueType::kFloat:
         case MixedValueType::kNestedInteger:

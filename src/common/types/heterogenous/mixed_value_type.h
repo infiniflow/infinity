@@ -4,9 +4,12 @@
 
 #pragma once
 
+#include "common/types/internal_types.h"
+
 namespace infinity {
 
 enum class MixedValueType : i8 {
+    kInvalid,
     // Not nested data type
     kInteger,
     kFloat,

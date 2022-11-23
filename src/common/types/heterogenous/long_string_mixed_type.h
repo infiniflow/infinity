@@ -6,6 +6,7 @@
 #pragma once
 
 #include "base_mixed_type.h"
+#include "main/logger.h"
 
 namespace infinity {
 
@@ -13,9 +14,17 @@ struct __attribute__((packed)) LongStrMixedType : public BaseMixedType {
 public:
     LongStrMixedType() : BaseMixedType(MixedValueType::kLongStr) {}
 
+    LongStrMixedType(const LongStrMixedType& from) = delete;
+    LongStrMixedType(LongStrMixedType&& from) = delete;
+    LongStrMixedType&
+    operator=(const LongStrMixedType& from) = delete;
+    LongStrMixedType&
+    operator=(LongStrMixedType&& from) = delete;
+
     inline void
     Reset() {
         if(ptr != nullptr) {
+            LOG_TRACE("Release the long str ptr");
             delete[] ptr;
             ptr = nullptr;
             length = 0;

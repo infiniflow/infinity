@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include "mixed_value_type.h"
+#include "common/types/internal_types.h"
+
 namespace infinity {
 
 struct BaseMixedType {
@@ -16,6 +19,10 @@ public:
     static constexpr i64 SHORT_NESTED_STR_LIMIT = 12;
     static constexpr i64 LONG_STR_HEADER = 5;
     static constexpr i64 LONG_NESTED_STR_HEADER = 3;
+
+public:
+    static String
+    GetTypeName(MixedValueType type) noexcept;
 
 public:
 
