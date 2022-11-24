@@ -11,14 +11,8 @@ namespace infinity {
 struct __attribute__((packed)) ArrayMixedType : public BaseMixedType {
 
 public:
-    inline void
-    Reset() {
-        if(ptr != nullptr) {
-            delete[] ptr;
-            ptr = nullptr;
-            count = 0;
-        }
-    }
+    void
+    Reset();
 
     ~ArrayMixedType() {
         Reset();

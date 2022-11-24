@@ -53,6 +53,18 @@ public:
     void
     MoveIntoTuple(const String& key, MixedType&& value);
 
+    void
+    InsertIntegerIntoTuple(const String& key, i64 value);
+
+    void
+    InsertFloatIntoTuple(const String& key, f64 value);
+
+    void
+    InsertStringIntoTuple(const String& key, const String& value);
+
+    void
+    InsertNullIntoTuple(const String& key);
+
     MixedType*
     GetFromTuple(const String& key);
 
@@ -75,6 +87,9 @@ public:
 
     void
     InsertNullIntoArray(u16 index);
+
+    MixedType*
+    GetByIndex(u16);
 
     // non-static member
 public:

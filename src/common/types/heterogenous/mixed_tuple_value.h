@@ -11,7 +11,6 @@ namespace infinity {
 
 struct MixedTupleValue {
 public:
-    ptr_t parent_ptr;
     MixedType array[0];
 };
 

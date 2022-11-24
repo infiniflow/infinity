@@ -67,11 +67,7 @@ MixedType::MakeTuple(u16 count) {
     mixed_tuple_ptr->count = count;
 
     // Parent ptr and count * sizeof(mixed tuple value: key + value)
-    mixed_tuple_ptr->ptr = new char_t[count * BaseMixedType::TUPLE_SIZE * 2 + sizeof(ptr_t)];
-    auto* tuple_value_ptr = (MixedTupleValue*)(mixed_tuple_ptr->ptr);
-
-    // Set the tuple values parent point
-    tuple_value_ptr->parent_ptr = mixed_tuple_ptr->ptr;
+    mixed_tuple_ptr->ptr = new char_t[count * BaseMixedType::TUPLE_SIZE * 2]{0};
 
     return value;
 }
@@ -84,11 +80,8 @@ MixedType::MakeArray(u16 count) {
     mixed_array_ptr->count = count;
 
     // Parent ptr and count * sizeof(mixed array value)
-    mixed_array_ptr->ptr = new char_t[count * BaseMixedType::ELEMENT_SIZE + sizeof(ptr_t)];
-    auto* array_value_ptr = (MixedArrayValue*)(mixed_array_ptr->ptr);
+    mixed_array_ptr->ptr = new char_t[count * BaseMixedType::ELEMENT_SIZE]{0};
 
-    // Set the array values parent point
-    array_value_ptr->parent_ptr = mixed_array_ptr->ptr;
     return value;
 }
 
@@ -110,16 +103,18 @@ MixedType::CopyIntoTuple(const String& key, const MixedType& value) {
     auto* tuple_ptr = (TupleMixedType*)(this);
     TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
 
-    auto* tuple_value_ptr = (MixedTupleValue*)(this->ptr);
+    auto* tuple_value_ptr = (MixedTupleValue*)(tuple_ptr->ptr);
 
     // TODO: currently, we use for loop to store the tuple. In the future, we will use hash table
-    for(u16 i = 0; i < tuple_ptr->count; i += 2) {
+    u32 entry_count = 2 * tuple_ptr->count; // Key and Array hold two position;
+    for(u32 i = 0; i < entry_count; i += 2) {
         MixedType& key_ref = tuple_value_ptr->array[i];
         MixedType& value_ref = tuple_value_ptr->array[i + 1];
         if(key_ref.type == MixedValueType::kInvalid) {
             // Assign the input to the tuple slot
             key_ref = MakeString(key);
             value_ref = value;
+            break;
         }
     }
 }
@@ -130,16 +125,18 @@ MixedType::MoveIntoTuple(const String& key, MixedType&& value) {
     auto* tuple_ptr = (TupleMixedType*)(this);
     TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
 
-    auto* tuple_value_ptr = (MixedTupleValue*)(this->ptr);
+    auto* tuple_value_ptr = (MixedTupleValue*)(tuple_ptr->ptr);
 
     // TODO: currently, we use for loop to store the tuple. In the future, we will use hash table
-    for(u16 i = 0; i < tuple_ptr->count; i += 2) {
+    u32 entry_count = 2 * tuple_ptr->count; // Key and Array hold two position;
+    for(u16 i = 0; i < entry_count; i += 2) {
         MixedType& key_ref = tuple_value_ptr->array[i];
         MixedType& value_ref = tuple_value_ptr->array[i + 1];
         if(key_ref.type == MixedValueType::kInvalid) {
             // Assign the input to the tuple slot
             key_ref = MakeString(key);
             value_ref = std::forward<MixedType>(value);
+            break;
         }
     }
 }
@@ -150,10 +147,11 @@ MixedType::GetFromTuple(const String& key) {
     auto* tuple_ptr = (TupleMixedType*)(this);
     TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
 
-    auto* tuple_value_ptr = (MixedTupleValue*)(this->ptr);
+    auto* tuple_value_ptr = (MixedTupleValue*)(tuple_ptr->ptr);
 
     // TODO: currently, we use for loop to get the tuple. In the future, we will use hash table
-    for(u16 i = 0; i < tuple_ptr->count; i += 2) {
+    u32 entry_count = 2 * tuple_ptr->count; // Key and Array hold two position;
+    for(u32 i = 0; i < entry_count; i += 2) {
         MixedType& key_ref = tuple_value_ptr->array[i];
         MixedType& value_ref = tuple_value_ptr->array[i + 1];
         switch(key_ref.type) {
@@ -180,6 +178,94 @@ MixedType::GetFromTuple(const String& key) {
         }
     }
     return nullptr;
+}
+
+void
+MixedType::InsertIntegerIntoTuple(const String& key, i64 value) {
+    TypeAssert(this->type == MixedValueType::kTuple, "Not tuple type, can't set value.");
+    auto* tuple_ptr = (TupleMixedType*)(this);
+    TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
+
+    auto* tuple_value_ptr = (MixedTupleValue*)(tuple_ptr->ptr);
+
+    // TODO: currently, we use for loop to store the tuple. In the future, we will use hash table
+    u32 entry_count = 2 * tuple_ptr->count; // Key and Array hold two position;
+    for(u32 i = 0; i < entry_count; i += 2) {
+        MixedType& key_ref = tuple_value_ptr->array[i];
+        MixedType& value_ref = tuple_value_ptr->array[i + 1];
+        if(key_ref.type == MixedValueType::kInvalid) {
+            // Assign the input to the tuple slot
+            key_ref = MakeString(key);
+            value_ref = MakeInteger(value);
+            break;
+        }
+    }
+}
+
+void
+MixedType::InsertFloatIntoTuple(const String& key, f64 value) {
+    TypeAssert(this->type == MixedValueType::kTuple, "Not tuple type, can't set value.");
+    auto* tuple_ptr = (TupleMixedType*)(this);
+    TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
+
+    auto* tuple_value_ptr = (MixedTupleValue*)(tuple_ptr->ptr);
+
+    // TODO: currently, we use for loop to store the tuple. In the future, we will use hash table
+    u32 entry_count = 2 * tuple_ptr->count; // Key and Array hold two position;
+    for(u32 i = 0; i < entry_count; i += 2) {
+        MixedType& key_ref = tuple_value_ptr->array[i];
+        MixedType& value_ref = tuple_value_ptr->array[i + 1];
+        if(key_ref.type == MixedValueType::kInvalid) {
+            // Assign the input to the tuple slot
+            key_ref = MakeString(key);
+            value_ref = MakeFloat(value);
+            break;
+        }
+    }
+}
+
+void
+MixedType::InsertStringIntoTuple(const String& key, const String& value) {
+    TypeAssert(this->type == MixedValueType::kTuple, "Not tuple type, can't set value.");
+    auto* tuple_ptr = (TupleMixedType*)(this);
+    TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
+
+    auto* tuple_value_ptr = (MixedTupleValue*)(tuple_ptr->ptr);
+
+    // TODO: currently, we use for loop to store the tuple. In the future, we will use hash table
+    u32 entry_count = 2 * tuple_ptr->count; // Key and Array hold two position;
+    for(u32 i = 0; i < entry_count; i += 2) {
+        MixedType& key_ref = tuple_value_ptr->array[i];
+        MixedType& value_ref = tuple_value_ptr->array[i + 1];
+        if(key_ref.type == MixedValueType::kInvalid) {
+            // Assign the input to the tuple slot
+            key_ref = MakeString(key);
+            value_ref = MakeString(value);
+            break;
+        }
+    }
+}
+
+void
+MixedType::InsertNullIntoTuple(const String& key) {
+    TypeAssert(this->type == MixedValueType::kTuple, "Not tuple type, can't set value.");
+    auto* tuple_ptr = (TupleMixedType*)(this);
+    TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
+
+    auto* tuple_value_ptr = (MixedTupleValue*)(tuple_ptr->ptr);
+
+    // TODO: currently, we use for loop to store the tuple. In the future, we will use hash table
+    u32 entry_count = 2 * tuple_ptr->count; // Key and Array hold two position;
+    for(u32 i = 0; i < entry_count; i += 2) {
+        MixedType& key_ref = tuple_value_ptr->array[i];
+        MixedType& value_ref = tuple_value_ptr->array[i + 1];
+        if(key_ref.type == MixedValueType::kInvalid) {
+            // Assign the input to the tuple slot
+            key_ref = MakeString(key);
+            value_ref = MakeNull();
+            break;
+        }
+    }
 }
 
 void
@@ -256,6 +342,7 @@ MixedType::InsertStringIntoArray(const String& value, u16 index) {
             // Not empty, reset exist value
             long_mixed_str_ptr->Reset();
         }
+        long_mixed_str_ptr->type = MixedValueType::kLongStr;
 
         TypeAssert(value.size() <= 65535, "String length exceeds 65535.");
         long_mixed_str_ptr->length = static_cast<u16>(str_len);
@@ -275,6 +362,14 @@ MixedType::InsertNullIntoArray(u16 index) {
     MixedType& slot_ref = array_value_ptr->array[index];
     slot_ref.Reset();
     slot_ref.type = MixedValueType::kNull;
+}
+
+MixedType*
+MixedType::GetByIndex(u16 index) {
+    auto* array_mixed_ptr = (ArrayMixedType*)this;
+    TypeAssert(index < array_mixed_ptr->count, "Index is invalid");
+    auto* array_value_ptr = (MixedArrayValue*)(array_mixed_ptr->ptr);
+    return &array_value_ptr->array[index];
 }
 
 // Non-static member method
@@ -327,7 +422,7 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
             auto* from_ptr = (TupleMixedType*)(&from);
             auto* to_ptr = (TupleMixedType*)(&to);
 //            to_ptr->ptr = new char_t[to_ptr->length];
-            memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->count * BaseMixedType::TUPLE_SIZE + sizeof(ptr_t));
+            memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->count * BaseMixedType::TUPLE_SIZE);
             return ;
         }
         case MixedValueType::kLongStr: {
@@ -342,7 +437,7 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
             auto* from_ptr = (ArrayMixedType*)(&from);
             auto* to_ptr = (ArrayMixedType*)(&to);
 //            to_ptr->ptr = new char_t[to_ptr->length];
-            memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->count * BaseMixedType::ELEMENT_SIZE + sizeof(ptr_t));
+            memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->count * BaseMixedType::ELEMENT_SIZE);
             return ;
         }
     }
