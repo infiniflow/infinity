@@ -14,14 +14,6 @@
 #include "array_mixed_type.h"
 #include "null_mixed_type.h"
 #include "missing_mixed_type.h"
-#include "nested_integer_mixed_type.h"
-#include "nested_float_mixed_type.h"
-#include "nested_long_string_mixed_type.h"
-#include "nested_short_string_mixed_type.h"
-#include "nested_tuple_mixed_type.h"
-#include "nested_array_mixed_type.h"
-#include "nested_null_mixed_type.h"
-#include "nested_missing_mixed_type.h"
 
 namespace infinity {
 
@@ -83,29 +75,6 @@ public:
 
     void
     InsertNullIntoArray(u16 index);
-    // static member method for array data
-public:
-    static void
-    InsertNestedInteger(i64 value, ptr_t position, u16 index);
-
-    static void
-    InsertNestedFloat(f64 value, ptr_t position, u16 index);
-
-    static void
-    InsertNestedString(const String& value, ptr_t position, u16 index);
-
-    // input should have map: key/value, most 65536 kv pair in one object.
-    static void
-    MakeNestedTuple(u16 count, ptr_t position, u16 index);
-
-    static void
-    InsertIntoNestedObject(const String& key, MixedType value, ptr_t position, u16 index);
-
-    static void
-    InsertNestedArray(u64 count, ptr_t position, u16 index);
-
-    static void
-    InsertNestedNull(ptr_t position, u16 index);
 
     // non-static member
 public:

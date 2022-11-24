@@ -17,14 +17,6 @@ static const char* type2name[] = {
         "Array",
         "Null",
         "Missing",
-        "Nested Missing",
-        "Nested Integer",
-        "Nested Float",
-        "Nested Long String",
-        "Nested Short String",
-        "Nested Tuple",
-        "Nested Array",
-        "Nested Null",
         "Dummy",
 };
 

@@ -20,16 +20,6 @@ enum class MixedValueType : i8 {
     kNull,
     kMissing,
 
-    // Nested in array data type
-    kNestedMissing,
-    kNestedInteger,
-    kNestedFloat,
-    kNestedLongStr,
-    kNestedShortStr,
-    kNestedTuple,
-    kNestedArray,
-    kNestedNull,
-
     kDummy,
 };
 
