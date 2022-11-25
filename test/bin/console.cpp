@@ -7,6 +7,7 @@
 #include "bin/console.h"
 #include "main/infinity.h"
 #include "common/utility/str.h"
+#include "main/stats/global_resource_usage.h"
 
 #include <filesystem>
 #include <fstream>
@@ -69,4 +70,9 @@ TEST_F(ConsoleTest, explain_unopt_logical) {
     for(auto& path: file_names) {
         execute_sql(console, path.string());
     }
+
+    EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+    EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+
+    console.UnInit();
 }

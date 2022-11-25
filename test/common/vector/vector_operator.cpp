@@ -6,14 +6,21 @@
 #include "base_test.h"
 #include "common/column_vector/vector_operations.h"
 #include "main/infinity.h"
+#include "main/logger.h"
+#include "main/stats/global_resource_usage.h"
 
 class VectorOperationTest : public BaseTest {
     void
     SetUp() override {
+        infinity::Logger::Initialize();
+        infinity::GlobalResourceUsage::Init();
     }
 
     void
     TearDown() override {
+        infinity::Logger::Shutdown();
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
     }
 };
 

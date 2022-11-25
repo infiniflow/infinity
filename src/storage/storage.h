@@ -16,9 +16,13 @@ class Storage {
 public:
     explicit Storage(std::string data_path);
 
-    [[nodiscard]] std::unique_ptr<Catalog>& catalog() { return catalog_; }
+    [[nodiscard]] inline std::unique_ptr<Catalog>&
+    catalog() noexcept {
+        return catalog_;
+    }
 
-    void Init();
+    void
+    Init();
 
 private:
     std::string data_path_;

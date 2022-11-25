@@ -16,12 +16,31 @@ namespace infinity {
 
 class Infinity : public Singleton<Infinity> {
 public:
-    [[nodiscard]] std::unique_ptr<Scheduler>& scheduler() { return scheduler_; }
-    [[nodiscard]] std::unique_ptr<Catalog>& catalog() { return storage_->catalog(); }
-    [[nodiscard]] std::unique_ptr<Config>& config() { return config_; }
-    [[nodiscard]] std::unique_ptr<Storage>& storage() { return storage_; }
+    [[nodiscard]] inline std::unique_ptr<Scheduler>&
+    scheduler() noexcept {
+        return scheduler_;
+    }
 
-    void Init();
+    [[nodiscard]] inline std::unique_ptr<Catalog>&
+    catalog() noexcept {
+        return storage_->catalog();
+    }
+
+    [[nodiscard]] std::unique_ptr<Config>&
+    config() noexcept {
+        return config_;
+    }
+
+    [[nodiscard]] inline std::unique_ptr<Storage>&
+    storage() noexcept {
+        return storage_;
+    }
+
+    void
+    Init();
+
+    void
+    UnInit();
 
 private:
     friend class Singleton;
@@ -31,7 +50,7 @@ private:
     std::unique_ptr<Config> config_;
     std::unique_ptr<Storage> storage_;
 
-    bool initialized_false_{false};
+    bool initialized_ {false};
 };
 
 }

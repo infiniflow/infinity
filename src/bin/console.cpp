@@ -9,6 +9,7 @@
 #include "main/profiler/show_logical_plan.h"
 
 #include "main/session.h"
+#include "main/stats/global_resource_usage.h"
 
 // Parser header
 #include "SQLParser.h"
@@ -40,8 +41,17 @@ Console::Console() {
     Register("RUN", [this](auto && placeholder) { RunScript(std::forward<decltype(placeholder)>(placeholder)); });
 }
 
-void Console::Init() {
+void
+Console::Init() {
     infinity::Infinity::instance().Init();
+    GlobalResourceUsage::Init();
+
+}
+
+void
+Console::UnInit() {
+    infinity::Infinity::instance().UnInit();
+    GlobalResourceUsage::UnInit();
 }
 
 void

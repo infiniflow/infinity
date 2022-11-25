@@ -6,16 +6,21 @@
 #include "base_test.h"
 #include "common/types/value.h"
 #include "main/logger.h"
+#include "main/stats/global_resource_usage.h"
 
 class MixedTypeTest : public BaseTest {
     void
     SetUp() override {
         infinity::Logger::Initialize();
+        infinity::GlobalResourceUsage::Init();
     }
 
     void
     TearDown() override {
         infinity::Logger::Shutdown();
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
     }
 };
 

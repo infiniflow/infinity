@@ -10,19 +10,28 @@
 #include "common/types/info/array_info.h"
 #include "common/types/info/embedding_info.h"
 #include "main/profiler/base_profiler.h"
+#include "main/logger.h"
+#include "main/stats/global_resource_usage.h"
 
 class DataBlockTest : public BaseTest {
     void
     SetUp() override {
+        infinity::Logger::Initialize();
+        infinity::GlobalResourceUsage::Init();
     }
 
     void
     TearDown() override {
+        infinity::Logger::Shutdown();
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
     }
 };
 
 TEST_F(DataBlockTest, test1) {
     using namespace infinity;
+
 
     DataBlock data_block;
     std::vector<DataType> column_types;
@@ -135,6 +144,8 @@ TEST_F(DataBlockTest, test1) {
         EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
     }
+
+
 }
 
 TEST_F(DataBlockTest, test2) {
