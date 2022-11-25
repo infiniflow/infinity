@@ -68,6 +68,10 @@ public:
     MixedType*
     GetFromTuple(const String& key);
 
+private:
+    static void
+    CheckKeyConflict(MixedType& key_ref, const String& key_str);
+
     // Array related method
 public:
     void
