@@ -7,6 +7,7 @@
 #include "mixed_tuple_value.h"
 #include "common/utility/infinity_assert.h"
 #include "main/logger.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -51,7 +52,10 @@ MixedType::MakeString(const String& str) {
 
         TypeAssert(str.size() <= 65535, "String length exceeds 65535.");
         long_mixed_str_ptr->length = static_cast<u16>(str_len);
-        long_mixed_str_ptr->ptr = new char_t[str_len];
+
+        long_mixed_str_ptr->ptr = new char_t[str_len]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
         memcpy(long_mixed_str_ptr->ptr, str.c_str(), str_len);
         // Fill long string prefix
         memcpy(long_mixed_str_ptr->header, str.c_str(), BaseMixedType::LONG_STR_HEADER);
@@ -70,6 +74,7 @@ MixedType::MakeTuple(u16 count) {
 
     // Parent ptr and count * sizeof(mixed tuple value: key + value)
     mixed_tuple_ptr->ptr = new char_t[count * BaseMixedType::TUPLE_SIZE * 2]{0};
+    GlobalResourceUsage::IncrRawMemCount();
 
     return value;
 }
@@ -85,6 +90,7 @@ MixedType::MakeArray(u16 count) {
 
     // Parent ptr and count * sizeof(mixed array value)
     mixed_array_ptr->ptr = new char_t[count * BaseMixedType::ELEMENT_SIZE]{0};
+    GlobalResourceUsage::IncrRawMemCount();
 
     return value;
 }
@@ -381,7 +387,10 @@ MixedType::InsertStringIntoArray(const String& value, u16 index) {
 
         TypeAssert(value.size() <= 65535, "String length exceeds 65535.");
         long_mixed_str_ptr->length = static_cast<u16>(str_len);
-        long_mixed_str_ptr->ptr = new char_t[str_len];
+
+        long_mixed_str_ptr->ptr = new char_t[str_len]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
         memcpy(long_mixed_str_ptr->ptr, value.c_str(), str_len);
         // Fill long string prefix
         memcpy(long_mixed_str_ptr->header, value.c_str(), BaseMixedType::LONG_STR_HEADER);
@@ -457,7 +466,10 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
             auto* from_ptr = (LongStrMixedType*)(&from);
             auto* to_ptr = (LongStrMixedType*)(&to);
             u16 size_len = from_ptr->length;
+
             to_ptr->ptr = new char_t[size_len]{0};
+            GlobalResourceUsage::IncrRawMemCount();
+
             memcpy(to_ptr->ptr, from_ptr->ptr, size_len);
             return ;
         }
@@ -466,7 +478,10 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
             auto* to_ptr = (TupleMixedType*)(&to);
 
             const u32 tuple_memory_size = from_ptr->count * BaseMixedType::TUPLE_SIZE;
+
             to_ptr->ptr = new char_t[tuple_memory_size] {0};
+            GlobalResourceUsage::IncrRawMemCount();
+
             // For loop to deep copy every element into new tuple space. Using memcpy will lead to shallow copy.
             // memcpy(to_ptr->ptr, from_ptr->ptr, tuple_memory_size);
 
@@ -484,7 +499,10 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
             auto* to_ptr = (ArrayMixedType*)(&to);
 
             const u32 array_memory_size = from_ptr->count * BaseMixedType::ELEMENT_SIZE;
+
             to_ptr->ptr = new char_t[array_memory_size] {0};
+            GlobalResourceUsage::IncrRawMemCount();
+
             // For loop to deep copy every element into new array space. Using memcpy will lead to shallow copy.
             // memcpy(to_ptr->ptr, from_ptr->ptr, from_ptr->count * BaseMixedType::ELEMENT_SIZE);
             MixedArrayValue* target_array_value_ptr = (MixedArrayValue*)(to_ptr->ptr);

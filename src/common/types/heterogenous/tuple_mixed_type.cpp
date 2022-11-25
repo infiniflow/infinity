@@ -4,6 +4,7 @@
 
 #include "tuple_mixed_type.h"
 #include "mixed_tuple_value.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -20,6 +21,8 @@ TupleMixedType::Reset() {
         }
 
         delete[] ptr;
+        GlobalResourceUsage::DecrRawMemCount();
+
         ptr = nullptr;
         count = 0;
     }

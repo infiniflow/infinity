@@ -3,6 +3,7 @@
 //
 
 #include "blob_type.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -35,7 +36,9 @@ BlobType::Copy(ptr_t blob_ptr, u64 blob_size) {
     // If input blob size is same as current blob size, don't need to allocate memory again
     if(blob_size != this->size) {
         Reset();
-        this->ptr = new char_t[blob_size];
+
+        this->ptr = new char_t[blob_size]{0};
+        GlobalResourceUsage::IncrRawMemCount();
     }
 
     memcpy(this->ptr, blob_ptr, blob_size);

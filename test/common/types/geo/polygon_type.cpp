@@ -32,7 +32,6 @@ TEST_F(PolygonTypeTest, polygon1) {
     EXPECT_THROW(polygon1.GetPoint(0), TypeException);
     EXPECT_THROW(polygon1.SetPoint(0, PointT(1.0, 2.1)), TypeException);
 
-
     polygon1.Initialize(2);
     EXPECT_THROW(polygon1.Initialize(0), TypeException);
     polygon1.SetPoint(0, PointT(1.0, 2.1));

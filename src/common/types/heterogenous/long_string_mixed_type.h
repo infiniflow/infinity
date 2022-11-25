@@ -7,6 +7,7 @@
 
 #include "base_mixed_type.h"
 #include "main/logger.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -29,7 +30,10 @@ public:
     Reset() {
         if(ptr != nullptr) {
             LOG_TRACE("Release the long str ptr");
+
             delete[] ptr;
+            GlobalResourceUsage::DecrRawMemCount();
+
             ptr = nullptr;
             length = 0;
         }

@@ -4,6 +4,7 @@
 
 #include "value.h"
 #include "common/utility/infinity_assert.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -1418,7 +1419,10 @@ Value::Reset() {
         }
         case kEmbedding: {
             if(value_.embedding != nullptr) {
+
                 delete[] value_.embedding;
+                GlobalResourceUsage::DecrRawMemCount();
+
                 value_.embedding = nullptr;
             }
             break;

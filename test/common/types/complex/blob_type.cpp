@@ -28,7 +28,10 @@ TEST_F(BlobTypeTest, blob1) {
     using namespace infinity;
 
     constexpr i64 SIZE = 27;
+
     ptr_t blob_ptr = new char[SIZE]{0};
+    GlobalResourceUsage::IncrRawMemCount();
+
     for(i64 i = 0; i < SIZE; ++ i) {
         blob_ptr[i] = 'a' + static_cast<char_t>(i);
     }
@@ -76,6 +79,8 @@ TEST_F(BlobTypeTest, blob1) {
 
     // Move from ptr;
     blob_ptr = new char[SIZE]{0};
+    GlobalResourceUsage::IncrRawMemCount();
+
     for(i64 i = 0; i < SIZE; ++ i) {
         blob_ptr[i] = 'a' + static_cast<char_t>(i);
     }

@@ -3,13 +3,17 @@
 //
 
 #include "bitmap_type.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
 BitmapType::BitmapType(const BitmapType& other) {
     count = other.count;
     u64 unit_count = UnitCount(other.count);
+
     ptr = new u64[unit_count]{0};
+    GlobalResourceUsage::IncrRawMemCount();
+
     memcpy(ptr, other.ptr, unit_count * UNIT_BITS);
 }
 
@@ -36,7 +40,10 @@ BitmapType::operator=(const BitmapType& other) {
         Reset();
     }
     count = other.count;
+
     ptr = new u64[target_unit_count]{0};
+    GlobalResourceUsage::IncrRawMemCount();
+
     memcpy(ptr, other.ptr, target_unit_count * UNIT_BITS);
     return *this;
 }
@@ -60,7 +67,10 @@ BitmapType::Initialize(u64 bit_count) {
     TypeAssert(count == 0,
                "The bitmap was already initialized. Please reset it before re-initialize it.");
     u64 unit_count = UnitCount(bit_count);
+
     ptr = new u64[unit_count]{0};
+    GlobalResourceUsage::IncrRawMemCount();
+
     count = bit_count;
 }
 

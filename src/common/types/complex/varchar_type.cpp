@@ -4,6 +4,7 @@
 
 #include "varchar_type.h"
 #include "common/utility/infinity_assert.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -90,7 +91,9 @@ VarcharType::DeepCopy(const VarcharType &other) {
         this->length = other.length;
         memcpy(prefix, other.prefix, PREFIX_LENGTH);
 
-        ptr = new char[this->length]();
+        ptr = new char[this->length]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
         LOG_TRACE("DeepCopy: allocate memory: {}, {}", (void*)ptr, length);
 
         memcpy(ptr, other.ptr, this->length);
@@ -122,7 +125,9 @@ VarcharType::Initialize(const char* input_ptr, size_t input_len) {
         memcpy(prefix, input_ptr, length);
         // ptr maybe also padding by the memcpy
     } else {
-        ptr = new char[input_len]();
+        ptr = new char[input_len]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
         LOG_TRACE("Initialize: allocate memory: {}, {}", (void*)ptr, length);
         memcpy(prefix, input_ptr, PREFIX_LENGTH);
         memcpy(ptr, input_ptr, length);
@@ -137,7 +142,10 @@ VarcharType::Reset() {
     } else {
         LOG_TRACE("Reset: free memory: {}, {}", (void*)ptr, length);
         length = 0;
+
         delete[] ptr;
+        GlobalResourceUsage::DecrRawMemCount();
+
         ptr = nullptr;
     }
 };

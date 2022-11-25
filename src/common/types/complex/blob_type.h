@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/types/varlen_type.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -44,7 +45,10 @@ public:
     Reset() {
         if(size != 0) {
             size = 0;
+
             delete[] ptr;
+            GlobalResourceUsage::DecrRawMemCount();
+
             ptr = nullptr;
         }
     }

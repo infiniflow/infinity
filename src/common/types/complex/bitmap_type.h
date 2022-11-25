@@ -6,6 +6,7 @@
 
 #include "common/types/varlen_type.h"
 #include "common/utility/infinity_assert.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -51,7 +52,9 @@ public:
     Reset() {
         if(count != 0) {
             count = 0;
+
             delete[] ptr;
+            GlobalResourceUsage::DecrRawMemCount();
         }
     }
 

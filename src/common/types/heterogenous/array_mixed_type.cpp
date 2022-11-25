@@ -5,6 +5,7 @@
 #include "array_mixed_type.h"
 #include "mixed_array_value.h"
 #include "mixed_type.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -20,6 +21,8 @@ ArrayMixedType::Reset() {
         }
 
         delete[] ptr;
+        GlobalResourceUsage::DecrRawMemCount();
+
         ptr = nullptr;
         count = 0;
     }

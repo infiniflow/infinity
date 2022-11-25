@@ -5,6 +5,7 @@
 #include "common/types/internal_types.h"
 #include "common/types/geo/box_type.h"
 #include "common/utility/infinity_assert.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -24,7 +25,10 @@ public:
     explicit inline
     PolygonType(i32 count): point_count(count) {
         if(count == 0) return ;
-        ptr = new char_t[point_count * sizeof(PointType)];
+
+        ptr = new char_t[point_count * sizeof(PointType)]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
         ResetBoundingBox();
     }
 
@@ -62,7 +66,10 @@ public:
         }
         if(count == 0) return ;
         point_count = count;
-        ptr = new char_t[point_count * sizeof(PointType)];
+
+        ptr = new char_t[point_count * sizeof(PointType)]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
         ResetBoundingBox();
     }
 
@@ -71,7 +78,9 @@ public:
         if(point_count == 0) return;
         point_count = 0;
         ResetBoundingBox();
-        delete ptr;
+
+        delete[] ptr;
+        GlobalResourceUsage::DecrRawMemCount();
     }
 
     inline void

@@ -144,8 +144,9 @@ TEST_F(BitmapTypeTest, bitmap1) {
 
     // Constructor
     u64* ptr = new u64[2]{};
-    BitmapType bt6(ptr, 100);
+    GlobalResourceUsage::IncrRawMemCount();
 
+    BitmapType bt6(ptr, 100);
     for(u64 i = 0; i < 100; ++ i) {
         if(i % 2 == 0) {
             bt6.SetBit(i, true);

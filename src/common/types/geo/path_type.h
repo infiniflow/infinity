@@ -6,6 +6,7 @@
 #include "common/types/varlen_type.h"
 #include "point_type.h"
 #include "common/utility/infinity_assert.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -25,7 +26,10 @@ public:
     explicit inline
     PathType(i32 count, i32 closed = 0): point_count(count), closed(closed) {
         if(count == 0) return ;
-        ptr = new char_t[point_count * sizeof(PointType)];
+
+        ptr = new char_t[point_count * sizeof(PointType)]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
     }
 
     PathType(const PathType& other);
@@ -59,15 +63,22 @@ public:
         if(count == 0) return ;
         this->closed = is_closed;
         point_count = count;
-        ptr = new char_t[point_count * sizeof(PointType)];
+
+        ptr = new char_t[point_count * sizeof(PointType)]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
     }
 
     inline void
     Reset() {
-        if(point_count == 0) return;
+        if(point_count == 0) {
+            return;
+        }
+
         point_count = 0;
         closed = 0;
-        delete ptr;
+        delete[] ptr;
+        GlobalResourceUsage::DecrRawMemCount();
     }
 
     [[nodiscard]] inline bool
