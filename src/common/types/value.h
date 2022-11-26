@@ -103,6 +103,9 @@ public:
     MakeArray(ArrayT input);
 
     static Value
+    MakeTuple(TupleT input);
+
+    static Value
     MakePoint(PointT input);
 
     static Value
@@ -180,6 +183,9 @@ public:
 
 private:
     void
+    Init();
+
+    void
     CopyUnionValue(const Value& other);
 
     void
@@ -216,9 +222,6 @@ public:
         TimestampT timestamp;
         TimestampTZT  timestamp_tz;
         IntervalT  interval;
-
-        ArrayT array;
-        TupleT tuple;
 
         PointT     point;
         LineT      line;
@@ -261,51 +264,9 @@ public:
         };
     } value_ = {};
     bool is_null_{false};
+
+    ArrayT array;
 };
-
-// Value maker
-template <> Value Value::MakeValue(BooleanT input);
-template <> Value Value::MakeValue(TinyIntT input);
-template <> Value Value::MakeValue(SmallIntT input);
-template <> Value Value::MakeValue(IntegerT input);
-template <> Value Value::MakeValue(BigIntT input);
-template <> Value Value::MakeValue(HugeIntT input);
-template <> Value Value::MakeValue(FloatT input);
-template <> Value Value::MakeValue(DoubleT input);
-template <> Value Value::MakeValue(Decimal16T input);
-template <> Value Value::MakeValue(Decimal32T input);
-template <> Value Value::MakeValue(Decimal64T input);
-template <> Value Value::MakeValue(Decimal128T input);
-template <> Value Value::MakeValue(VarcharT& input);
-template <> Value Value::MakeValue(const String& input);
-template <> Value Value::MakeValue(const char_t* input_ptr);
-template <> Value Value::MakeValue(Char1T input);
-template <> Value Value::MakeValue(Char2T input);
-template <> Value Value::MakeValue(Char4T input);
-template <> Value Value::MakeValue(Char8T input);
-template <> Value Value::MakeValue(Char15T input);
-template <> Value Value::MakeValue(Char31T input);
-template <> Value Value::MakeValue(Char63T input);
-
-template <> Value Value::MakeValue(DateT input);
-template <> Value Value::MakeValue(TimeT input);
-template <> Value Value::MakeValue(DateTimeT input);
-template <> Value Value::MakeValue(TimestampT input) ;
-template <> Value Value::MakeValue(TimestampTZT input);
-template <> Value Value::MakeValue(IntervalT input);
-template <> Value Value::MakeValue(ArrayT input);
-template <> Value Value::MakeValue(PointT input);
-template <> Value Value::MakeValue(LineT input);
-template <> Value Value::MakeValue(LineSegT input);
-template <> Value Value::MakeValue(BoxT input);
-template <> Value Value::MakeValue(PathT input);
-template <> Value Value::MakeValue(PolygonT input);
-template <> Value Value::MakeValue(CircleT input);
-template <> Value Value::MakeValue(BitmapT input);
-template <> Value Value::MakeValue(UuidT input);
-template <> Value Value::MakeValue(BlobT input);
-template <> Value Value::MakeValue(EmbeddingT input);
-template <> Value Value::MakeValue(MixedT input);
 
 // Value getter
 template <> BooleanT Value::GetValue() const;

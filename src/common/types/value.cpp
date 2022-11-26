@@ -239,7 +239,15 @@ Value::MakeInterval(IntervalT input) {
 Value
 Value::MakeArray(ArrayT input) {
     Value value(LogicalType::kArray);
-    value.value_.array = input;
+    value.array = std::move(input);
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeTuple(TupleT input) {
+    Value value(LogicalType::kTuple);
+    value.array = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -279,7 +287,7 @@ Value::MakeBox(BoxT input) {
 Value
 Value::MakePath(PathT input) {
     Value value(LogicalType::kPath);
-    value.value_.path = input;
+    value.value_.path = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -287,7 +295,7 @@ Value::MakePath(PathT input) {
 Value
 Value::MakePolygon(PolygonT input) {
     Value value(LogicalType::kPolygon);
-    value.value_.polygon = input;
+    value.value_.polygon = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -303,7 +311,7 @@ Value::MakeCircle(CircleT input) {
 Value
 Value::MakeBitmap(BitmapT input) {
     Value value(LogicalType::kBitmap);
-    value.value_.bitmap = input;
+    value.value_.bitmap = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -311,7 +319,7 @@ Value::MakeBitmap(BitmapT input) {
 Value
 Value::MakeUuid(UuidT input) {
     Value value(LogicalType::kUuid);
-    value.value_.uuid = input;
+    value.value_.uuid = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -319,7 +327,7 @@ Value::MakeUuid(UuidT input) {
 Value
 Value::MakeBlob(BlobT input) {
     Value value(LogicalType::kBlob);
-    value.value_.blob = input;
+    value.value_.blob = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -335,7 +343,7 @@ Value::MakeEmbedding(EmbeddingT input) {
 Value
 Value::MakeMixedData(MixedT input) {
     Value value(LogicalType::kMixed);
-    value.value_.mixed_value = input;
+    value.value_.mixed_value = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -498,8 +506,9 @@ Value::GetValue() const {
 
 template <> ArrayT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kArray, "Not matched type: " + type_.ToString());
-    return value_.array;
+    TypeAssert(type_.type() == LogicalType::kArray or type_.type() == LogicalType::kTuple,
+               "Not matched type: " + type_.ToString());
+    return array;
 }
 
 template <> PointT
@@ -574,203 +583,6 @@ Value::GetValue() const {
     return value_.mixed_value;
 }
 
-template <> Value
-Value::MakeValue(BooleanT input) {
-    return MakeBool(input);
-}
-
-template <> Value
-Value::MakeValue(TinyIntT input) {
-    return MakeBool(input);
-}
-
-template <> Value
-Value::MakeValue(SmallIntT input) {
-    return MakeBool(input);
-}
-
-template <> Value
-Value::MakeValue(IntegerT input) {
-    return MakeBool(input);
-}
-
-template <> Value
-Value::MakeValue(BigIntT input) {
-    return MakeBool(input);
-}
-
-template <> Value
-Value::MakeValue(HugeIntT input) {
-    return MakeHugeInt(input);
-}
-
-template <> Value
-Value::MakeValue(FloatT input) {
-    return MakeFloat(input);
-}
-
-template <> Value
-Value::MakeValue(DoubleT input) {
-    return MakeDouble(input);
-}
-
-template <> Value
-Value::MakeValue(Decimal16T input) {
-    return MakeDecimal16(input);
-}
-
-template <> Value
-Value::MakeValue(Decimal32T input) {
-    return MakeDecimal32(input);
-}
-
-template <> Value
-Value::MakeValue(Decimal64T input) {
-    return MakeDecimal64(input);
-}
-
-template <> Value
-Value::MakeValue(Decimal128T input) {
-    return MakeDecimal128(input);
-}
-
-template <> Value
-Value::MakeValue(VarcharT& input) {
-    return MakeVarchar(input);
-}
-
-template <> Value
-Value::MakeValue(const String& input_str_ref) {
-    return MakeVarchar(input_str_ref);
-}
-
-template <> Value
-Value::MakeValue(const char_t* input_ptr) {
-    return MakeVarchar(input_ptr);
-}
-
-template <> Value Value::MakeValue(Char1T input) {
-    return MakeChar1(input);
-}
-
-template <> Value Value::MakeValue(Char2T input) {
-    return MakeChar2(input);
-}
-
-template <> Value Value::MakeValue(Char4T input) {
-    return MakeChar4(input);
-}
-
-template <> Value Value::MakeValue(Char8T input) {
-    return MakeChar8(input);
-}
-
-template <> Value Value::MakeValue(Char15T input) {
-    return MakeChar15(input);
-}
-
-template <> Value Value::MakeValue(Char31T input) {
-    return MakeChar31(input);
-}
-
-template <> Value Value::MakeValue(Char63T input) {
-    return MakeChar63(input);
-}
-
-template <> Value
-Value::MakeValue(DateT input) {
-    return MakeDate(input);
-}
-
-template <> Value
-Value::MakeValue(TimeT input) {
-    return MakeTime(input);
-}
-
-template <> Value
-Value::MakeValue(DateTimeT input) {
-    return MakeDateTime(input);
-}
-
-template <> Value
-Value::MakeValue(TimestampT input) {
-    return MakeTimestamp(input);
-}
-
-template <> Value
-Value::MakeValue(TimestampTZT input) {
-    return MakeTimestampTz(input);
-}
-
-template <> Value
-Value::MakeValue(IntervalT input) {
-    return MakeInterval(input);
-}
-
-template <> Value
-Value::MakeValue(ArrayT input) {
-    return MakeArray(input);
-}
-
-template <> Value
-Value::MakeValue(PointT input) {
-    return MakePoint(input);
-}
-
-template <> Value
-Value::MakeValue(LineT input) {
-    return MakeLine(input);
-}
-
-template <> Value
-Value::MakeValue(LineSegT input) {
-    return MakeLineSegment(input);
-}
-
-template <> Value
-Value::MakeValue(BoxT input) {
-    return MakeBox(input);
-}
-
-template <> Value
-Value::MakeValue(PathT input) {
-    return MakePath(input);
-}
-
-template <> Value
-Value::MakeValue(PolygonT input) {
-    return MakePolygon(input);
-}
-
-template <> Value
-Value::MakeValue(CircleT input) {
-    return MakeCircle(input);
-}
-
-template <> Value
-Value::MakeValue(BitmapT input) {
-    return MakeBitmap(input);
-}
-
-template <> Value
-Value::MakeValue(UuidT input) {
-    return MakeUuid(input);
-}
-
-template <> Value
-Value::MakeValue(BlobT input) {
-    return MakeBlob(input);
-}
-
-template <> Value
-Value::MakeValue(EmbeddingT input) {
-    return MakeEmbedding(input);
-}
-
-template <> Value
-Value::MakeValue(MixedT input) {
-    return MakeMixedData(input);
-}
 
 Value::~Value() {
     switch(type_.type()) {
@@ -785,6 +597,51 @@ Value::~Value() {
 }
 
 Value::Value(LogicalType type): type_(type) {
+    Init();
+}
+
+Value::Value(const Value& other) : type_(other.type_), is_null_(other.is_null_)  {
+    Init();
+    CopyUnionValue(other);
+}
+
+Value::Value(Value&& other) noexcept :
+    type_(std::move(other.type_)),
+    is_null_(other.is_null_) {
+    Init();
+    MoveUnionValue(std::forward<Value>(other));
+}
+
+Value&
+Value::operator=(const Value& other) {
+    if(this == &other) return *this;
+    this->Reset();
+    if(this->type_ != other.type_) {
+        this->type_ = other.type_;
+        this->Init();
+    }
+    this->is_null_ = other.is_null_;
+    CopyUnionValue(other);
+
+    return *this;
+}
+
+Value&
+Value::operator=(Value&& other)  noexcept {
+    // Clear exist value, since some type need to free the allocated heap memory.
+    this->Reset();
+    if(this->type_ != other.type_) {
+        this->type_ = std::move(other.type_);
+        this->Init();
+    }
+    this->is_null_ = other.is_null_;
+    MoveUnionValue(std::forward<Value>(other));
+
+    return *this;
+}
+
+void
+Value::Init() {
     switch(type_.type()) {
         case kBoolean: {
             value_.boolean = false;
@@ -892,12 +749,12 @@ Value::Value(LogicalType type): type_(type) {
             break;
         }
         case kArray: {
-            value_.array.clear();
+            array.clear();
             break;
         }
         case kTuple: {
             // empty function
-            value_.tuple.clear();
+            array.clear();
             break;
         }
         case kPoint: {
@@ -954,39 +811,6 @@ Value::Value(LogicalType type): type_(type) {
         case kInvalid:
             break;
     }
-}
-
-Value::Value(const Value& other) : type_(other.type_) {
-
-}
-
-Value::Value(Value&& other) noexcept :
-    type_(std::move(other.type_)),
-    is_null_(other.is_null_) {
-    MoveUnionValue(std::forward<Value>(other));
-}
-
-Value&
-Value::operator=(const Value& other) {
-    if(this == &other) return *this;
-
-    this->type_ = other.type_;
-    this->is_null_ = other.is_null_;
-    CopyUnionValue(other);
-
-    return *this;
-}
-
-Value&
-Value::operator=(Value&& other)  noexcept {
-    // Clear exist value, since some type need to free the allocated heap memory.
-    this->Reset();
-
-    this->type_ = std::move(other.type_);
-    this->is_null_ = other.is_null_;
-    MoveUnionValue(std::forward<Value>(other));
-
-    return *this;
 }
 
 void
@@ -1117,12 +941,12 @@ Value::CopyUnionValue(const Value& other) {
         }
         case kArray: {
             // std::vector copy-assignment
-            value_.array = other.value_.array;
+            array = other.array;
             break;
         }
         case kTuple: {
             // std::vector copy-assignment
-            value_.tuple = other.value_.tuple;
+            array = other.array;
             break;
         }
         case kPoint: {
@@ -1309,12 +1133,11 @@ Value::MoveUnionValue(Value&& other) noexcept {
             break;
         }
         case kArray: {
-            LOG_ERROR("Not implemented");
-//            this->value_.array = std::move(other.value_.array);
+            this->array = std::move(other.array);
             break;
         }
         case kTuple: {
-            LOG_ERROR("Not implemented");
+            this->array = std::move(other.array);
             break;
         }
         case kPoint: {
@@ -1472,12 +1295,12 @@ Value::Reset() {
             break;
         }
         case kArray: {
-            value_.array.clear();
+            array.clear();
             break;
         }
         case kTuple: {
             // empty function
-            value_.tuple.clear();
+            array.clear();
             break;
         }
         case kPoint: {

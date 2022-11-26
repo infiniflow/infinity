@@ -25,6 +25,56 @@ class ValueTest : public BaseTest {
     }
 };
 
+TEST_F(ValueTest, Varchar) {
+    using namespace infinity;
+
+    Value value = Value::MakeBool(true);
+
+    value = Value::MakeVarchar("Hello");
+    Value value1 = Value::MakeBool(true);
+    value1 = value;
+    EXPECT_EQ(value.type_.type(), LogicalType::kVarchar);
+    EXPECT_EQ(value1.type_.type(), LogicalType::kVarchar);
+}
+
+TEST_F(ValueTest, Array) {
+    using namespace infinity;
+
+    Value value = Value::MakeBool(true);
+
+    {
+        ArrayT array;
+        array.reserve(3);
+        array.emplace_back(Value::MakeVarchar("Hello"));
+        array.emplace_back(Value::MakeTinyInt(12));
+        array.emplace_back(Value::MakeFloat(3.2));
+
+        value = Value::MakeArray(array);
+        {
+            ArrayT x = value.GetValue<ArrayT>();
+            EXPECT_EQ(x.size(), 3);
+        }
+        EXPECT_EQ(value.GetValue<ArrayT>().size(), 3);
+        EXPECT_EQ(value.GetValue<ArrayT>()[0].type_.type(), LogicalType::kVarchar);
+        EXPECT_EQ(value.GetValue<ArrayT>()[1].type_.type(), LogicalType::kTinyInt);
+        EXPECT_EQ(value.GetValue<ArrayT>()[2].type_.type(), LogicalType::kFloat);
+    }
+
+    {
+        ArrayT array;
+        array.reserve(3);
+        array.emplace_back(Value::MakeVarchar("Hello"));
+        array.emplace_back(Value::MakeTinyInt(12));
+        array.emplace_back(Value::MakeFloat(3.2));
+
+        value = Value::MakeArray(array);
+        EXPECT_EQ(value.GetValue<ArrayT>().size(), 3);
+        EXPECT_EQ(value.GetValue<ArrayT>()[0].type_.type(), LogicalType::kVarchar);
+        EXPECT_EQ(value.GetValue<ArrayT>()[1].type_.type(), LogicalType::kTinyInt);
+        EXPECT_EQ(value.GetValue<ArrayT>()[2].type_.type(), LogicalType::kFloat);
+    }
+}
+
 TEST_F(ValueTest, MakeAndGet) {
 
     using namespace infinity;
@@ -296,12 +346,34 @@ TEST_F(ValueTest, MakeAndGet) {
 
     // Array
     {
-        LOG_TRACE("TODO: need array type test");
+        ArrayT array;
+        array.emplace_back(Value::MakeVarchar("Hello"));
+        array.emplace_back(Value::MakeTinyInt(12));
+        array.emplace_back(Value::MakeFloat(3.2));
+        array.emplace_back(Value::MakeVarchar("HelloHelloHelloHelloHello"));
+
+        value = Value::MakeArray(array);
+        EXPECT_EQ(value.GetValue<ArrayT>().size(), 4);
+        EXPECT_EQ(value.GetValue<ArrayT>()[0].type_.type(), LogicalType::kVarchar);
+        EXPECT_EQ(value.GetValue<ArrayT>()[1].type_.type(), LogicalType::kTinyInt);
+        EXPECT_EQ(value.GetValue<ArrayT>()[2].type_.type(), LogicalType::kFloat);
+        EXPECT_EQ(value.GetValue<ArrayT>()[3].type_.type(), LogicalType::kVarchar);
     }
 
     // Tuple
     {
-        LOG_TRACE("TODO: need tuple type test");
+        TupleT tuple;
+        tuple.emplace_back(Value::MakeVarchar("Hello"));
+        tuple.emplace_back(Value::MakeTinyInt(12));
+        tuple.emplace_back(Value::MakeFloat(3.2));
+        tuple.emplace_back(Value::MakeVarchar("HelloHelloHelloHelloHello"));
+
+        value = Value::MakeTuple(tuple);
+        EXPECT_EQ(value.GetValue<TupleT>().size(), 4);
+        EXPECT_EQ(value.GetValue<TupleT>()[0].type_.type(), LogicalType::kVarchar);
+        EXPECT_EQ(value.GetValue<TupleT>()[1].type_.type(), LogicalType::kTinyInt);
+        EXPECT_EQ(value.GetValue<TupleT>()[2].type_.type(), LogicalType::kFloat);
+        EXPECT_EQ(value.GetValue<TupleT>()[3].type_.type(), LogicalType::kVarchar);
     }
 
     // PointT

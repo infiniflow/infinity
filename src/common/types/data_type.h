@@ -21,8 +21,6 @@
 #include "common/types/datetime/time_type.h"
 #include "common/types/datetime/timestamp_type.h"
 #include "common/types/datetime/timestamp_tz_type.h"
-#include "common/types/complex/array_type.h"
-#include "common/types/complex/tuple_type.h"
 #include "common/types/complex/embedding_type.h"
 #include "common/types/geo/point_type.h"
 #include "common/types/geo/line_type.h"
@@ -106,8 +104,11 @@ using MixedT = MixedType;
 class DataType {
 public:
     explicit
-    DataType(LogicalType logical_type, UniquePtr<TypeInfo> type_info_ptr = nullptr) :
+    DataType(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr) :
         type_(logical_type), type_info_(std::move(type_info_ptr)) {}
+
+    explicit
+    DataType(LogicalType logical_type): type_(logical_type), type_info_(nullptr) {}
 
     bool
     operator==(const DataType& other) const;
