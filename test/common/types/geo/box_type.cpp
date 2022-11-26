@@ -40,6 +40,8 @@ TEST_F(BoxTypeTest, point1) {
     EXPECT_EQ(b2.lower_right.x, 3.0f);
     EXPECT_EQ(b2.lower_right.y, 4.0f);
 
+    EXPECT_EQ(b1, b2);
+
     b1.Reset();
 
     EXPECT_EQ(b1.upper_left.x, 0);

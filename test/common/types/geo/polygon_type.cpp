@@ -136,4 +136,6 @@ TEST_F(PolygonTypeTest, polygon1) {
 
     EXPECT_EQ(polygon5.PointCount(), 2);
     EXPECT_NE(polygon5.ptr, nullptr);
+
+    EXPECT_EQ(polygon6 == polygon7, true);
 }

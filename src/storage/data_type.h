@@ -91,8 +91,16 @@ public:
     explicit LogicalType(LogicalTypeId logical_type_id);
     LogicalType(LogicalTypeId logical_type_id, int64_t length, int64_t precision, int64_t scale);
 
-    inline bool operator==(const LogicalType& other) const { return this->physical_type_ == other.physical_type_; }
-    inline bool operator!=(const LogicalType& other) const { return this->physical_type_ != other.physical_type_; }
+    inline bool
+    operator==(const LogicalType& other) const {
+        if(this == &other) return true;
+        return this->physical_type_ == other.physical_type_;
+    }
+
+    inline bool
+    operator!=(const LogicalType& other) const {
+        return !operator==(other);
+    }
 
     [[nodiscard]] std::string ToString() const;
     [[nodiscard]] LogicalTypeId GetTypeId() const { return logical_type_; }

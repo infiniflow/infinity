@@ -15,6 +15,7 @@ struct Decimal16Type {
 
     inline bool
     operator==(const Decimal16Type& other) const {
+        if(this == &other) return true;
         return other.value == value;
     }
 
@@ -27,6 +28,7 @@ struct Decimal32Type {
 
     inline bool
     operator==(const Decimal32Type& other) const {
+        if(this == &other) return true;
         return other.value == value;
     }
 
@@ -39,6 +41,7 @@ struct Decimal64Type {
 
     inline bool
     operator==(const Decimal64Type& other) const {
+        if(this == &other) return true;
         return other.value == value;
     }
 
@@ -51,6 +54,7 @@ public:
 
     bool
     operator==(const Decimal128Type& other) const {
+        if(this == &other) return true;
         return other.upper == upper && other.lower == lower;
     }
 

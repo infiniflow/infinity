@@ -17,6 +17,7 @@ public:
 
     bool
     operator==(const HugeInt& other) const {
+        if(this == &other) return true;
         return other.upper == upper && other.lower == lower;
     }
 

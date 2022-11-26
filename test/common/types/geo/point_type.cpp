@@ -38,6 +38,8 @@ TEST_F(PointTypeTest, point1) {
     EXPECT_EQ(p2.x, 1.0f);
     EXPECT_EQ(p2.y, 2.0f);
 
+    EXPECT_EQ(p1, p2);
+
     p2.Reset();
 
     EXPECT_EQ(p2.x, 0);

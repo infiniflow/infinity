@@ -37,6 +37,24 @@ public:
     PathType& operator=(const PathType& other);
     PathType& operator=(PathType&& other) noexcept;
 
+    inline bool
+    operator==(const PathType& other) const {
+        if(this == &other) return true;
+        if(this->point_count != other.point_count || this->closed != other.closed) return false;
+
+        auto* this_ptr = (PointType*)(ptr);
+        auto* other_ptr = (PointType*)(other.ptr);
+        for(i32 i = 0; i < this->point_count; ++ i) {
+            if(this_ptr[i] != other_ptr[i]) return false;
+        }
+        return true;
+    }
+
+    inline bool
+    operator!=(const PathType& other) const {
+        return !operator==(other);
+    }
+
     inline void
     SetPoint(i32 index, PointType point) {
         if(ptr == nullptr) TypeError("Not initialized.");
@@ -78,6 +96,7 @@ public:
         point_count = 0;
         closed = 0;
         delete[] ptr;
+        ptr = nullptr;
         GlobalResourceUsage::DecrRawMemCount();
     }
 

@@ -45,6 +45,14 @@ public:
     BitmapType& operator=(const BitmapType& other);
     BitmapType& operator=(BitmapType&& other) noexcept;
 
+    bool
+    operator==(const BitmapType& other) const;
+
+    inline bool
+    operator!=(const BitmapType& other) const {
+        return !operator==(other);
+    }
+
     void
     Initialize(u64 bit_count);
 

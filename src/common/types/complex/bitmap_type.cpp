@@ -62,6 +62,19 @@ BitmapType::operator=(BitmapType&& other) noexcept {
     return *this;
 }
 
+bool
+BitmapType::operator==(const BitmapType& other) const {
+    if(this == &other) return true;
+    if(this->count != other.count) return false;
+
+    u64 unit_count = UnitCount(this->count);
+
+    for(u64 i = 0; i < unit_count; ++ i) {
+        if(ptr[i] != other.ptr[i]) return false;
+    }
+    return true;
+}
+
 void
 BitmapType::Initialize(u64 bit_count) {
     TypeAssert(count == 0,

@@ -378,7 +378,91 @@ TEST_F(ValueTest, MakeAndGet) {
 
     // PointT
     {
-        LOG_TRACE("TODO: need point type test");
+        PointT point1(1.0f, 2.0f);
+        value = Value::MakePoint(point1);
+        EXPECT_EQ(value.GetValue<PointT>(), point1);
+    }
+
+    // LineT
+    {
+        LineT line(1.0f, 2.0f, 3.0f);
+        value = Value::MakeLine(line);
+        EXPECT_EQ(value.GetValue<LineT>(), line);
+    }
+
+    // LineSegT
+    {
+        PointT point1(1.0f, 2.0f), point2(3.0f, -5.4f);
+        LineSegT line_seg(point1, point2);
+        value = Value::MakeLineSegment(line_seg);
+        EXPECT_EQ(value.GetValue<LineSegT>(), line_seg);
+    }
+
+    // BoxT
+    {
+        PointT point1(1.0f, 2.0f), point2(3.0f, -5.4f);
+        BoxT box(point1, point2);
+        value = Value::MakeBox(box);
+        EXPECT_EQ(value.GetValue<BoxT>(), box);
+    }
+
+    // Path
+    {
+        PathT path1;
+        path1.Initialize(2);
+        path1.SetPoint(0, PointT(1.0, 2.1));
+        path1.SetPoint(1, PointT(1.1, 2.2));
+        value = Value::MakePath(path1);
+        EXPECT_EQ(value.GetValue<PathT>(), path1);
+    }
+
+    // Polygon
+    {
+        PolygonT polygon1;
+        polygon1.Initialize(2);
+        polygon1.SetPoint(0, PointT(1.0, 2.1));
+        polygon1.SetPoint(1, PointT(1.1, 2.2));
+        value = Value::MakePolygon(polygon1);
+        EXPECT_EQ(value.GetValue<PolygonT>(), polygon1);
+    }
+
+    // Circle
+    {
+        PointT point1(1.0f, 2.0f);
+        CircleT circle(point1, 1.3f);
+        value = Value::MakeCircle(circle);
+        EXPECT_EQ(value.GetValue<CircleT>(), circle);
+    }
+
+    // BitmapT
+    {
+        BitmapT bt1;
+        bt1.Initialize(100);
+
+        for(u64 i = 0; i < 100; ++ i) {
+            if(i % 2 == 0) {
+                bt1.SetBit(i, true);
+            } else {
+                bt1.SetBit(i, false);
+            }
+        }
+        value = Value::MakeBitmap(bt1);
+        EXPECT_EQ(value.GetValue<BitmapT>(), bt1);
+    }
+
+    // UuidT
+    {
+
+    }
+
+    // BlobT
+    {
+
+    }
+
+    // EmbeddingT
+    {
+
     }
 
     // Mixed

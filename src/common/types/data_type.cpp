@@ -154,6 +154,7 @@ DataType::ToString() const {
 
 bool
 DataType::operator==(const DataType &other) const {
+    if(this == &other) return true;
     if(type_ != other.type_) return false;
     if(*this->type_info_ != *other.type_info_) return false;
     return true;

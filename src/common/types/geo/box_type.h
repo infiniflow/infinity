@@ -17,6 +17,17 @@ struct BoxType {
     PointType upper_left;
     PointType lower_right;
 
+    inline bool
+    operator==(const BoxType& other) const {
+        if(this == &other) return true;
+        return (upper_left == other.upper_left) && (lower_right == other.lower_right);
+    }
+
+    inline bool
+    operator!=(const BoxType& other) const {
+        return !operator==(other);
+    }
+
     void Reset() {
         upper_left.Reset();
         lower_right.Reset();

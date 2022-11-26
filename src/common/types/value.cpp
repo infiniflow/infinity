@@ -3,6 +3,8 @@
 //
 
 #include "value.h"
+
+#include <utility>
 #include "common/utility/infinity_assert.h"
 #include "main/stats/global_resource_usage.h"
 
@@ -142,7 +144,7 @@ Value::MakeChar1(Char1T input) {
 Value
 Value::MakeChar2(Char2T input) {
     Value value(LogicalType::kChar2);
-    value.value_.char2 = input;
+    value.value_.char2 = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -150,7 +152,7 @@ Value::MakeChar2(Char2T input) {
 Value
 Value::MakeChar4(Char4T input) {
     Value value(LogicalType::kChar4);
-    value.value_.char4 = input;
+    value.value_.char4 = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -158,7 +160,7 @@ Value::MakeChar4(Char4T input) {
 Value
 Value::MakeChar8(Char8T input) {
     Value value(LogicalType::kChar8);
-    value.value_.char8 = input;
+    value.value_.char8 = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -166,7 +168,7 @@ Value::MakeChar8(Char8T input) {
 Value
 Value::MakeChar15(Char15T input) {
     Value value(LogicalType::kChar15);
-    value.value_.char15 = input;
+    value.value_.char15 = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -174,7 +176,7 @@ Value::MakeChar15(Char15T input) {
 Value
 Value::MakeChar31(Char31T input) {
     Value value(LogicalType::kChar31);
-    value.value_.char31 = input;
+    value.value_.char31 = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -182,7 +184,7 @@ Value::MakeChar31(Char31T input) {
 Value
 Value::MakeChar63(Char63T input) {
     Value value(LogicalType::kChar63);
-    value.value_.char63 = input;
+    value.value_.char63 = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -351,235 +353,235 @@ Value::MakeMixedData(MixedT input) {
 // Value getter
 template <> BooleanT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kBoolean, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kBoolean, "Not matched type: " + type_.ToString())
     return value_.boolean;
 }
 template <> TinyIntT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kTinyInt, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kTinyInt, "Not matched type: " + type_.ToString())
     return value_.tiny_int;
 }
 
 template <> SmallIntT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kSmallInt, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kSmallInt, "Not matched type: " + type_.ToString())
     return value_.small_int;
 }
 
 template <> IntegerT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kInteger, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kInteger, "Not matched type: " + type_.ToString())
     return value_.integer;
 }
 
 template <> BigIntT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kBigInt, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kBigInt, "Not matched type: " + type_.ToString())
     return value_.big_int;
 }
 
 template <> HugeIntT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kHugeInt, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kHugeInt, "Not matched type: " + type_.ToString())
     return value_.huge_int;
 }
 
 template <> FloatT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kFloat, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kFloat, "Not matched type: " + type_.ToString())
     return value_.float32;
 }
 
 template <> DoubleT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kDouble, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kDouble, "Not matched type: " + type_.ToString())
     return value_.float64;
 }
 
 template <> Decimal16T
 Value::GetValue() const {
-TypeAssert(type_.type() == LogicalType::kDecimal16, "Not matched type: " + type_.ToString());
+TypeAssert(type_.type() == LogicalType::kDecimal16, "Not matched type: " + type_.ToString())
 return value_.decimal16;
 }
 
 template <> Decimal32T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kDecimal32, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kDecimal32, "Not matched type: " + type_.ToString())
     return value_.decimal32;
 }
 
 template <> Decimal64T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kDecimal64, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kDecimal64, "Not matched type: " + type_.ToString())
     return value_.decimal64;
 }
 
 template <> Decimal128T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kDecimal128, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kDecimal128, "Not matched type: " + type_.ToString())
     return value_.decimal128;
 }
 
 template <> VarcharT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kVarchar, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kVarchar, "Not matched type: " + type_.ToString())
     return value_.varchar;
 }
 
 template <> Char1T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar1, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kChar1, "Not matched type: " + type_.ToString())
     return value_.char1;
 }
 
 template <> Char2T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar2, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kChar2, "Not matched type: " + type_.ToString())
     return value_.char2;
 }
 
 template <> Char4T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar4, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kChar4, "Not matched type: " + type_.ToString())
     return value_.char4;
 }
 
 template <> Char8T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar8, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kChar8, "Not matched type: " + type_.ToString())
     return value_.char8;
 }
 
 template <> Char15T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar15, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kChar15, "Not matched type: " + type_.ToString())
     return value_.char15;
 }
 
 template <> Char31T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar31, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kChar31, "Not matched type: " + type_.ToString())
     return value_.char31;
 }
 
 template <> Char63T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar63, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kChar63, "Not matched type: " + type_.ToString())
     return value_.char63;
 }
 
 template <> DateT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kDate, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kDate, "Not matched type: " + type_.ToString())
     return value_.date;
 }
 
 template <> TimeT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kTime, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kTime, "Not matched type: " + type_.ToString())
     return value_.time;
 }
 
 template <> DateTimeT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kDateTime, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kDateTime, "Not matched type: " + type_.ToString())
     return value_.datetime;
 }
 
 template <> TimestampT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kTimestamp, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kTimestamp, "Not matched type: " + type_.ToString())
     return value_.timestamp;
 }
 
 template <> TimestampTZT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kTimestampTZ, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kTimestampTZ, "Not matched type: " + type_.ToString())
     return value_.timestamp_tz;
 }
 
 template <> IntervalT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kInterval, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kInterval, "Not matched type: " + type_.ToString())
     return value_.interval;
 }
 
 template <> ArrayT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kArray or type_.type() == LogicalType::kTuple,
-               "Not matched type: " + type_.ToString());
+               "Not matched type: " + type_.ToString())
     return array;
 }
 
 template <> PointT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kPoint, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kPoint, "Not matched type: " + type_.ToString())
     return value_.point;
 }
 
 template <> LineT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kLine, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kLine, "Not matched type: " + type_.ToString())
     return value_.line;
 }
 
 template <> LineSegT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kLineSeg, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kLineSeg, "Not matched type: " + type_.ToString())
     return value_.line_segment;
 }
 
 template <> BoxT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kBox, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kBox, "Not matched type: " + type_.ToString())
     return value_.box;
 }
 
 template <> PathT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kPath, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kPath, "Not matched type: " + type_.ToString())
     return value_.path;
 }
 
 template <> PolygonT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kPolygon, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kPolygon, "Not matched type: " + type_.ToString())
     return value_.polygon;
 }
 
 template <> CircleT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kCircle, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kCircle, "Not matched type: " + type_.ToString())
     return value_.circle;
 }
 
 template <> BitmapT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kBitmap, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kBitmap, "Not matched type: " + type_.ToString())
     return value_.bitmap;
 }
 
 template <> UuidT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kUuid, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kUuid, "Not matched type: " + type_.ToString())
     return value_.uuid;
 }
 
 template <> BlobT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kBlob, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kBlob, "Not matched type: " + type_.ToString())
     return value_.blob;
 }
 
 template <> EmbeddingT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kEmbedding, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kEmbedding, "Not matched type: " + type_.ToString())
     return value_.embedding;
 }
 
 template <> MixedT
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kMixed, "Not matched type: " + type_.ToString());
+    TypeAssert(type_.type() == LogicalType::kMixed, "Not matched type: " + type_.ToString())
     return value_.mixed_value;
 }
 
@@ -588,6 +590,10 @@ Value::~Value() {
     switch(type_.type()) {
         case kVarchar: {
             value_.varchar.~VarcharType();
+            break;
+        }
+        case kBitmap: {
+            value_.bitmap.~BitmapType();
             break;
         }
         default: {
@@ -748,10 +754,7 @@ Value::Init() {
             value_.interval.Reset();
             break;
         }
-        case kArray: {
-            array.clear();
-            break;
-        }
+        case kArray:
         case kTuple: {
             // empty function
             array.clear();
@@ -774,11 +777,15 @@ Value::Init() {
             break;
         }
         case kPath: {
-            value_.path.Reset();
+            value_.path.closed = false;
+            value_.path.ptr = nullptr;
+            value_.path.point_count = 0;
             break;
         }
         case kPolygon: {
-            value_.polygon.Reset();
+            value_.polygon.point_count = 0;
+            value_.polygon.ptr = nullptr;
+            value_.polygon.bounding_box.Reset();
             break;
         }
         case kCircle: {
@@ -939,11 +946,7 @@ Value::CopyUnionValue(const Value& other) {
             value_.interval = other.value_.interval;
             break;
         }
-        case kArray: {
-            // std::vector copy-assignment
-            array = other.array;
-            break;
-        }
+        case kArray:
         case kTuple: {
             // std::vector copy-assignment
             array = other.array;
@@ -1019,7 +1022,7 @@ Value::CopyUnionValue(const Value& other) {
         }
         case kMissing:
         case kInvalid: {
-            LOG_ERROR("Unexpected error!");
+            LOG_ERROR("Unexpected error!")
             break;
         }
     }
@@ -1029,51 +1032,51 @@ void
 Value::MoveUnionValue(Value&& other) noexcept {
     switch(this->type_.type()) {
         case kBoolean: {
-            this->value_.boolean = std::move(other.value_.boolean);
+            this->value_.boolean = other.value_.boolean;
             break;
         }
         case kTinyInt: {
-            this->value_.tiny_int = std::move(other.value_.tiny_int);
+            this->value_.tiny_int = other.value_.tiny_int;
             break;
         }
         case kSmallInt: {
-            this->value_.small_int = std::move(other.value_.small_int);
+            this->value_.small_int = other.value_.small_int;
             break;
         }
         case kInteger: {
-            this->value_.integer = std::move(other.value_.integer);
+            this->value_.integer = other.value_.integer;
             break;
         }
         case kBigInt: {
-            this->value_.big_int = std::move(other.value_.big_int);
+            this->value_.big_int = other.value_.big_int;
             break;
         }
         case kHugeInt: {
-            this->value_.huge_int = std::move(other.value_.huge_int);
+            this->value_.huge_int = other.value_.huge_int;
             break;
         }
         case kFloat: {
-            this->value_.float32 = std::move(other.value_.float32);
+            this->value_.float32 = other.value_.float32;
             break;
         }
         case kDouble: {
-            this->value_.float64 = std::move(other.value_.float64);
+            this->value_.float64 = other.value_.float64;
             break;
         }
         case kDecimal16: {
-            this->value_.decimal16 = std::move(other.value_.decimal16);
+            this->value_.decimal16 = other.value_.decimal16;
             break;
         }
         case kDecimal32: {
-            this->value_.decimal32 = std::move(other.value_.decimal32);
+            this->value_.decimal32 = other.value_.decimal32;
             break;
         }
         case kDecimal64: {
-            this->value_.decimal64 = std::move(other.value_.decimal64);
+            this->value_.decimal64 = other.value_.decimal64;
             break;
         }
         case kDecimal128: {
-            this->value_.decimal128 = std::move(other.value_.decimal128);
+            this->value_.decimal128 = other.value_.decimal128;
             break;
         }
         case kVarchar: {
@@ -1081,7 +1084,7 @@ Value::MoveUnionValue(Value&& other) noexcept {
             break;
         }
         case kChar1: {
-            this->value_.char1.value = std::move(other.value_.char1.value);
+            this->value_.char1.value = other.value_.char1.value;
             break;
         }
         case kChar2: {
@@ -1109,51 +1112,48 @@ Value::MoveUnionValue(Value&& other) noexcept {
             break;
         }
         case kDate: {
-            this->value_.date = std::move(other.value_.date);
+            this->value_.date = other.value_.date;
             break;
         }
         case kTime: {
-            this->value_.time = std::move(other.value_.time);
+            this->value_.time = other.value_.time;
             break;
         }
         case kDateTime: {
-            this->value_.datetime = std::move(other.value_.datetime);
+            this->value_.datetime = other.value_.datetime;
             break;
         }
         case kTimestamp: {
-            this->value_.timestamp = std::move(other.value_.timestamp);
+            this->value_.timestamp = other.value_.timestamp;
             break;
         }
         case kTimestampTZ: {
-            this->value_.timestamp_tz = std::move(other.value_.timestamp_tz);
+            this->value_.timestamp_tz = other.value_.timestamp_tz;
             break;
         }
         case kInterval: {
-            this->value_.interval = std::move(other.value_.interval);
+            this->value_.interval = other.value_.interval;
             break;
         }
-        case kArray: {
-            this->array = std::move(other.array);
-            break;
-        }
+        case kArray:
         case kTuple: {
             this->array = std::move(other.array);
             break;
         }
         case kPoint: {
-            this->value_.point = std::move(other.value_.point);
+            this->value_.point = other.value_.point;
             break;
         }
         case kLine: {
-            this->value_.line = std::move(other.value_.line);
+            this->value_.line = other.value_.line;
             break;
         }
         case kLineSeg: {
-            this->value_.line_segment = std::move(other.value_.line_segment);
+            this->value_.line_segment = other.value_.line_segment;
             break;
         }
         case kBox: {
-            this->value_.box = std::move(other.value_.box);
+            this->value_.box = other.value_.box;
             break;
         }
         case kPath: {
@@ -1161,29 +1161,43 @@ Value::MoveUnionValue(Value&& other) noexcept {
             break;
         }
         case kPolygon: {
-            // TODO
+            this->value_.polygon = std::move(other.value_.polygon);
             break;
         }
         case kCircle: {
-            this->value_.circle = std::move(other.value_.circle);
+            this->value_.circle = other.value_.circle;
             break;
         }
-        case kBitmap:
+        case kBitmap: {
+            this->value_.bitmap = std::move(other.value_.bitmap);
             break;
-        case kUuid:
+        }
+        case kUuid: {
+            this->value_.uuid = std::move(other.value_.uuid);
             break;
-        case kBlob:
+        }
+        case kBlob: {
+            this->value_.blob = std::move(other.value_.blob);
             break;
-        case kEmbedding:
+        }
+        case kEmbedding: {
+            this->value_.embedding = other.value_.embedding;
+            other.value_.embedding = nullptr;
             break;
-        case kMixed:
+        }
+        case kMixed: {
+            this->value_.mixed_value = std::move(other.value_.mixed_value);
             break;
-        case kNull:
+        }
+        case kNull: {
+            // No value for null type
             break;
+        }
         case kMissing:
+        case kInvalid: {
+            LOG_ERROR("Unexpected error!")
             break;
-        case kInvalid:
-            break;
+        }
     }
 }
 
@@ -1294,10 +1308,7 @@ Value::Reset() {
             value_.interval.Reset();
             break;
         }
-        case kArray: {
-            array.clear();
-            break;
-        }
+        case kArray:
         case kTuple: {
             // empty function
             array.clear();
@@ -1454,7 +1465,7 @@ Value::ToString() const {
         case kInvalid:
             break;
     }
-    TypeError("Unexpected error.");
+    TypeError("Unexpected error.")
 }
 
 }

@@ -103,4 +103,6 @@ TEST_F(PathTypeTest, path1) {
 
     EXPECT_EQ(path5.PointCount(), 2);
     EXPECT_NE(path5.ptr, nullptr);
+
+    EXPECT_EQ(path6, path5);
 }

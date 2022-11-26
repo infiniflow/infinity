@@ -45,6 +45,7 @@ ColumnIdentifier::ToString() const {
 
 bool
 ColumnIdentifier::operator==(const ColumnIdentifier& other) const {
+    if(this == &other) return true;
     if(*column_name_ptr_ != *other.column_name_ptr_) {
         return false;
     }
