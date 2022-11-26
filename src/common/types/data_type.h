@@ -40,6 +40,8 @@
 
 namespace infinity {
 
+struct Value;
+
 // Bool
 using BooleanT = bool;
 
@@ -77,8 +79,10 @@ using TimestampTZT = TimestampTZType;
 using IntervalT = IntervalType;
 
 // Nest types
-using ArrayT = ArrayType;
-using TupleT = TupleType;
+using ArrayT = Vector<Value>;
+using TupleT = Vector<Value>;
+//using ArrayT = ArrayType;
+//using TupleT = TupleType;
 
 // Geography
 using PointT = PointType;
@@ -117,8 +121,11 @@ public:
     [[nodiscard]] size_t
     Size() const;
 
-    [[nodiscard]] LogicalType
+    [[nodiscard]] inline LogicalType
     type() const { return type_; }
+
+    [[nodiscard]] inline const SharedPtr<TypeInfo>&
+    type_info() const { return type_info_; }
 
 private:
 

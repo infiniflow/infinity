@@ -140,12 +140,17 @@ VarcharType::Reset() {
         LOG_TRACE("Reset inline varchar");
         length = 0;
     } else {
+        if(length == 0) {
+            ptr = nullptr;
+            return ;
+        }
+
         LOG_TRACE("Reset: free memory: {}, {}", (void*)ptr, length);
-        length = 0;
 
         delete[] ptr;
         GlobalResourceUsage::DecrRawMemCount();
 
+        length = 0;
         ptr = nullptr;
     }
 };

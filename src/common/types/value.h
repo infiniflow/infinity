@@ -167,17 +167,23 @@ public:
     Value(LogicalType type);
 
     Value(const Value& other);
-//
-//    Value(Value&& other) noexcept ;
-//
-//    Value&
-//    operator=(const Value& other);
+
+    Value(Value&& other) noexcept ;
+
+    Value&
+    operator=(const Value& other);
 
     Value&
     operator=(Value&& other) noexcept ;
 
     ~Value();
 
+private:
+    void
+    CopyUnionValue(const Value& other);
+
+    void
+    MoveUnionValue(Value&& other) noexcept;
 public:
     DataType type_;
     union UnionValue {
@@ -211,8 +217,8 @@ public:
         TimestampTZT  timestamp_tz;
         IntervalT  interval;
 
-        ArrayT     array;
-        TupleT     tuple; // No such value, a tuple will be resolved as other value.
+        ArrayT array;
+        TupleT tuple;
 
         PointT     point;
         LineT      line;
@@ -241,14 +247,14 @@ public:
         UnionValue(const UnionValue& other) {
             ;
         };
-//
-//        UnionValue(UnionValue&& other) noexcept {
-//            ;
-//        };
-//
-//        UnionValue& operator=(const UnionValue& other) {
-//            return *this;
-//        };
+
+        UnionValue(UnionValue&& other) noexcept {
+            ;
+        };
+
+        UnionValue& operator=(const UnionValue& other) {
+            return *this;
+        };
 
         UnionValue& operator=(UnionValue&& other) noexcept {
             return *this;

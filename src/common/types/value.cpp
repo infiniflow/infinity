@@ -892,12 +892,12 @@ Value::Value(LogicalType type): type_(type) {
             break;
         }
         case kArray: {
-            value_.array.Reset();
+            value_.array.clear();
             break;
         }
         case kTuple: {
             // empty function
-            value_.tuple.Reset();
+            value_.tuple.clear();
             break;
         }
         case kPoint: {
@@ -946,7 +946,7 @@ Value::Value(LogicalType type): type_(type) {
             break;
         }
         case kMixed: {
-            memset(&(value_.mixed_value), 0, sizeof(MixedT));
+            value_.mixed_value.Reset();
             break;
         }
         case kNull:
@@ -957,114 +957,25 @@ Value::Value(LogicalType type): type_(type) {
 }
 
 Value::Value(const Value& other) : type_(other.type_) {
-    switch(type_.type()) {
 
-        case kBoolean:
-            value_.boolean = other.value_.boolean;
-            break;
-        case kTinyInt:
-            break;
-        case kSmallInt:
-            break;
-        case kInteger:
-            break;
-        case kBigInt:
-            break;
-        case kHugeInt:
-            break;
-        case kFloat:
-            break;
-        case kDouble:
-            break;
-        case kDecimal16:
-            break;
-        case kDecimal32:
-            break;
-        case kDecimal64:
-            break;
-        case kDecimal128:
-            break;
-        case kVarchar:
-            break;
-        case kChar1:
-            break;
-        case kChar2:
-            break;
-        case kChar4:
-            break;
-        case kChar8:
-            break;
-        case kChar15:
-            break;
-        case kChar31:
-            break;
-        case kChar63:
-            break;
-        case kDate:
-            break;
-        case kTime:
-            break;
-        case kDateTime:
-            break;
-        case kTimestamp:
-            break;
-        case kTimestampTZ:
-            break;
-        case kInterval:
-            break;
-        case kArray:
-            break;
-        case kTuple:
-            break;
-        case kPoint:
-            break;
-        case kLine:
-            break;
-        case kLineSeg:
-            break;
-        case kBox:
-            break;
-        case kPath:
-            break;
-        case kPolygon:
-            break;
-        case kCircle:
-            break;
-        case kBitmap:
-            break;
-        case kUuid:
-            break;
-        case kBlob:
-            break;
-        case kEmbedding:
-            break;
-        case kMixed:
-            break;
-        case kNull:
-            break;
-        case kMissing:
-            break;
-        case kInvalid:
-            break;
-    }
 }
 
-//Value::Value(Value&& other) noexcept :
-//    type_(std::move(other.type_)),
-//    value_(std::move(other.value_)),
-//    is_null_(std::move(other.is_null_)) {
-//}
-//
-//Value&
-//Value::operator=(const Value& other) {
-//    if(this == &other) return *this;
-//    this->type_ = other.type_;
-//    this->is_null_ = other.is_null_;
-//    switch(this->type_.type()) {
-//    }
-//
-//    return *this;
-//}
+Value::Value(Value&& other) noexcept :
+    type_(std::move(other.type_)),
+    is_null_(other.is_null_) {
+    MoveUnionValue(std::forward<Value>(other));
+}
+
+Value&
+Value::operator=(const Value& other) {
+    if(this == &other) return *this;
+
+    this->type_ = other.type_;
+    this->is_null_ = other.is_null_;
+    CopyUnionValue(other);
+
+    return *this;
+}
 
 Value&
 Value::operator=(Value&& other)  noexcept {
@@ -1072,8 +983,226 @@ Value::operator=(Value&& other)  noexcept {
     this->Reset();
 
     this->type_ = std::move(other.type_);
-    this->is_null_ = std::move(other.is_null_);
-//    this->value_ = std::move(other.value_);
+    this->is_null_ = other.is_null_;
+    MoveUnionValue(std::forward<Value>(other));
+
+    return *this;
+}
+
+void
+Value::CopyUnionValue(const Value& other) {
+    switch(type_.type()) {
+        case kBoolean: {
+            value_.boolean = other.value_.boolean;
+            break;
+        }
+        case kTinyInt: {
+            value_.tiny_int = other.value_.tiny_int;
+            break;
+        }
+        case kSmallInt: {
+            value_.small_int = other.value_.small_int;
+            break;
+        }
+        case kInteger: {
+            value_.integer = other.value_.integer;
+            break;
+        }
+        case kBigInt: {
+            value_.big_int = other.value_.big_int;
+            break;
+        }
+        case kHugeInt: {
+            // trivial copy-assignment
+            value_.huge_int = other.value_.huge_int;
+            break;
+        }
+        case kFloat: {
+            value_.float32 = other.value_.float32;
+            break;
+        }
+        case kDouble: {
+            value_.float64 = other.value_.float64;
+            break;
+        }
+        case kDecimal16: {
+            // trivial copy-assignment
+            value_.decimal16 = other.value_.decimal16;
+            break;
+        }
+        case kDecimal32: {
+            // trivial copy-assignment
+            value_.decimal32 = other.value_.decimal32;
+            break;
+        }
+        case kDecimal64: {
+            // trivial copy-assignment
+            value_.decimal64 = other.value_.decimal64;
+            break;
+        }
+        case kDecimal128: {
+            // trivial copy-assignment
+            value_.decimal128 = other.value_.decimal128;
+            break;
+        }
+        case kVarchar: {
+            // Will use Varchar copy-assignment
+            value_.varchar = other.value_.varchar;
+            break;
+        }
+        case kChar1: {
+            // trivial copy-assignment
+            value_.char1 = other.value_.char1;
+            break;
+        }
+        case kChar2: {
+            // Char2Type copy assignment
+            value_.char2 = other.value_.char2;
+            break;
+        }
+        case kChar4: {
+            // Char4Type copy assignment
+            value_.char4 = other.value_.char4;
+            break;
+        }
+        case kChar8: {
+            // Char8Type copy assignment
+            value_.char8 = other.value_.char8;
+            break;
+        }
+        case kChar15: {
+            // Char15Type copy assignment
+            value_.char15 = other.value_.char15;
+            break;
+        }
+        case kChar31: {
+            // Char31Type copy assignment
+            value_.char31 = other.value_.char31;
+            break;
+        }
+        case kChar63: {
+            // Char63Type copy assignment
+            value_.char63 = other.value_.char63;
+            break;
+        }
+        case kDate: {
+            // trivial copy-assignment
+            value_.date = other.value_.date;
+            break;
+        }
+        case kTime: {
+            // trivial copy-assignment
+            value_.time = other.value_.time;
+            break;
+        }
+        case kDateTime: {
+            // trivial copy-assignment
+            value_.datetime = other.value_.datetime;
+            break;
+        }
+        case kTimestamp: {
+            // trivial copy-assignment
+            value_.timestamp = other.value_.timestamp;
+            break;
+        }
+        case kTimestampTZ: {
+            // trivial copy-assignment
+            value_.timestamp_tz = other.value_.timestamp_tz;
+            break;
+        }
+        case kInterval: {
+            // trivial copy-assignment
+            value_.interval = other.value_.interval;
+            break;
+        }
+        case kArray: {
+            // std::vector copy-assignment
+            value_.array = other.value_.array;
+            break;
+        }
+        case kTuple: {
+            // std::vector copy-assignment
+            value_.tuple = other.value_.tuple;
+            break;
+        }
+        case kPoint: {
+            // trivial copy-assignment
+            value_.point = other.value_.point;
+            break;
+        }
+        case kLine: {
+            // trivial copy-assignment
+            value_.line = other.value_.line;
+            break;
+        }
+        case kLineSeg: {
+            // trivial copy-assignment
+            value_.line_segment = other.value_.line_segment;
+            break;
+        }
+        case kBox: {
+            // trivial copy-assignment
+            value_.box = other.value_.box;
+            break;
+        }
+        case kPath: {
+            // PathT copy assignment
+            value_.path = other.value_.path;
+            break;
+        }
+        case kPolygon: {
+            // Polygon copy assignment
+            value_.polygon = other.value_.polygon;
+            break;
+        }
+        case kCircle: {
+            // trivial copy-assignment
+            value_.circle = other.value_.circle;
+            break;
+        }
+        case kBitmap: {
+            // bitmap copy assignment
+            value_.bitmap = other.value_.bitmap;
+            break;
+        }
+        case kUuid: {
+            // UUID copy assignment
+            value_.uuid = other.value_.uuid;
+            break;
+        }
+        case kBlob: {
+            // Blob copy assignment
+            value_.blob = other.value_.blob;
+            break;
+        }
+        case kEmbedding: {
+            size_t embedding_size = type_.type_info()->Size();
+
+            value_.embedding = new char_t[embedding_size]{0};
+            GlobalResourceUsage::IncrRawMemCount();
+
+            memcpy(value_.embedding, other.value_.embedding, embedding_size);
+            break;
+        }
+        case kMixed: {
+            // Heterogeneous data copy assignment
+            value_.mixed_value = other.value_.mixed_value;
+            break;
+        }
+        case kNull: {
+            // No value for null value.
+            break;
+        }
+        case kMissing:
+        case kInvalid: {
+            LOG_ERROR("Unexpected error!");
+            break;
+        }
+    }
+}
+
+void
+Value::MoveUnionValue(Value&& other) noexcept {
     switch(this->type_.type()) {
         case kBoolean: {
             this->value_.boolean = std::move(other.value_.boolean);
@@ -1233,33 +1362,7 @@ Value::operator=(Value&& other)  noexcept {
         case kInvalid:
             break;
     }
-
-    return *this;
 }
-
-//Value::Value(const Value& other) : type_(other.type_), value_(other.value_)  {
-//    LOG_DEBUG("Value copy constructor");
-//    switch(type_.type()) {
-//        case kVarchar: {
-//            value_.varchar.DeepCopy(other.value_.varchar);
-//        }
-//        default: {
-//
-//        }
-//    }
-//}
-//
-//Value::Value(const Value&& other) : type_(other.type_), value_(other.value_)  {
-//    LOG_DEBUG("Value move constructor");
-//    switch(type_.type()) {
-//        case kVarchar: {
-//            value_.varchar.DeepCopy(other.value_.varchar);
-//        }
-//        default: {
-//
-//        }
-//    }
-//}
 
 void
 Value::Reset() {
@@ -1369,12 +1472,12 @@ Value::Reset() {
             break;
         }
         case kArray: {
-            value_.array.Reset();
+            value_.array.clear();
             break;
         }
         case kTuple: {
             // empty function
-            value_.tuple.Reset();
+            value_.tuple.clear();
             break;
         }
         case kPoint: {
@@ -1428,7 +1531,7 @@ Value::Reset() {
             break;
         }
         case kMixed: {
-            memset(&(value_.mixed_value), 0, sizeof(MixedT));
+            value_.mixed_value.Reset();
             break;
         }
         case kNull:
