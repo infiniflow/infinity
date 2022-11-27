@@ -136,96 +136,138 @@ TEST_F(CharTypeTest, Char8) {
     EXPECT_EQ(c7.ToString(), "bcdefghi");
 }
 
-TEST_F(CharTypeTest, Char15) {
+TEST_F(CharTypeTest, Char16) {
     using namespace infinity;
 
     String s = "bcdefghijklmnop";
-    EXPECT_LE(s.length(), 15);
+    EXPECT_LE(s.length(), Char16Type::CHAR_LENGTH);
 
-    Char15T c1(s);
-    EXPECT_EQ(c1.ToString(), s);
+    Char16T c1(s);
+    String result = c1.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char15T c2("bcdefghijklmnop");
-    EXPECT_EQ(c2.ToString(), s);
+    Char16T c2("bcdefghijklmnop");
+    result = c2.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char15T c3(std::move(c1));
-    EXPECT_EQ(c3.ToString(), s);
+    Char16T c3(std::move(c1));
+    result = c3.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char15T c4(c1);
-    EXPECT_EQ(c4.ToString(), s);
+    Char16T c4(c1);
+    result = c4.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char15T c5;
+    Char16T c5;
     c5.Initialize("bcdefghijklmnop", 14);
-    EXPECT_EQ(c5.ToString(), "bcdefghijklmno");
+    result = c5.ToString();
+    trim(result);
+    EXPECT_EQ(result, "bcdefghijklmno");
 
-    Char15T c6;
+    Char16T c6;
     c6 = c5;
-    EXPECT_EQ(c6.ToString(), "bcdefghijklmno");
+    result = c6.ToString();
+    trim(result);
+    EXPECT_EQ(result, "bcdefghijklmno");
 
-    Char15T c7;
+    Char16T c7;
     c7 = std::move(c5);
-    EXPECT_EQ(c7.ToString(), "bcdefghijklmno");
+    result = c7.ToString();
+    trim(result);
+    EXPECT_EQ(result, "bcdefghijklmno");
 }
 
-TEST_F(CharTypeTest, Char31) {
+TEST_F(CharTypeTest, Char32) {
     using namespace infinity;
 
     String s = "bcdefghijklmnop bcdefghijklmnop";
     EXPECT_LE(s.length(), 31);
 
-    Char31T c1(s);
-    EXPECT_EQ(c1.ToString(), s);
+    Char32T c1(s);
+    String result = c1.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char31T c2("bcdefghijklmnop bcdefghijklmnop");
-    EXPECT_EQ(c2.ToString(), s);
+    Char32T c2("bcdefghijklmnop bcdefghijklmnop");
+    result = c2.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char31T c3(std::move(c1));
-    EXPECT_EQ(c3.ToString(), s);
+    Char32T c3(std::move(c1));
+    result = c3.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char31T c4(c1);
-    EXPECT_EQ(c4.ToString(), s);
+    Char32T c4(c1);
+    result = c4.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char31T c5;
+    Char32T c5;
     c5.Initialize("bcdefghijklmnop bcdefghijklmnop", 31);
-    EXPECT_EQ(c5.ToString(), "bcdefghijklmnop bcdefghijklmnop");
+    result = c5.ToString();
+    trim(result);
+    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop");
 
-    Char31T c6;
+    Char32T c6;
     c6 = c5;
-    EXPECT_EQ(c6.ToString(), "bcdefghijklmnop bcdefghijklmnop");
+    result = c6.ToString();
+    trim(result);
+    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop");
 
-    Char31T c7;
+    Char32T c7;
     c7 = std::move(c5);
-    EXPECT_EQ(c7.ToString(), "bcdefghijklmnop bcdefghijklmnop");
+    result = c7.ToString();
+    trim(result);
+    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop");
 }
 
-TEST_F(CharTypeTest, Char63) {
+TEST_F(CharTypeTest, Char64) {
     using namespace infinity;
 
     String s = "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop";
     EXPECT_LE(s.length(), 63);
 
-    Char63T c1(s);
-    EXPECT_EQ(c1.ToString(), s);
+    Char64T c1(s);
+    String result = c1.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char63T c2("bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
-    EXPECT_EQ(c2.ToString(), s);
+    Char64T c2("bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
+    result = c2.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char63T c3(std::move(c1));
-    EXPECT_EQ(c3.ToString(), s);
+    Char64T c3(std::move(c1));
+    result = c3.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char63T c4(c1);
-    EXPECT_EQ(c4.ToString(), s);
+    Char64T c4(c1);
+    result = c4.ToString();
+    trim(result);
+    EXPECT_EQ(result, s);
 
-    Char63T c5;
+    Char64T c5;
     c5.Initialize("bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop", 63);
-    EXPECT_EQ(c5.ToString(), "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
+    result = c5.ToString();
+    trim(result);
+    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
 
-    Char63T c6;
+    Char64T c6;
     c6 = c5;
-    EXPECT_EQ(c6.ToString(), "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
+    result = c6.ToString();
+    trim(result);
+    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
 
-    Char63T c7;
+    Char64T c7;
     c7 = std::move(c5);
-    EXPECT_EQ(c7.ToString(), "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
+    result = c1.ToString();
+    trim(result);
+    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
 }
 

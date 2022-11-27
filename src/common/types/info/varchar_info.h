@@ -15,8 +15,8 @@ public:
 
     static inline UniquePtr<VarcharInfo>
     Make(i64 limit) {
-        TypeAssert(limit >= 64 && limit <= DEFAULT_VARCHAR_SIZE,
-                   "Varchar length can't be less than 64 or larger than 65535.")
+        TypeAssert(limit >= 65 && limit <= DEFAULT_VARCHAR_SIZE,
+                   "Varchar length can't be less than 65 or larger than 65535.")
         return MakeUnique<VarcharInfo>(limit);
     }
 

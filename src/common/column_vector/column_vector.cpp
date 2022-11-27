@@ -89,14 +89,14 @@ ColumnVector::GetValue(idx_t index) const {
         case kChar8: {
             return Value::MakeChar8(((Char8T *) data_ptr_)[index]);
         }
-        case kChar15: {
-            return Value::MakeChar15(((Char15T *) data_ptr_)[index]);
+        case kChar16: {
+            return Value::MakeChar16(((Char16T *) data_ptr_)[index]);
         }
-        case kChar31: {
-            return Value::MakeChar31(((Char31T *) data_ptr_)[index]);
+        case kChar32: {
+            return Value::MakeChar32(((Char32T *) data_ptr_)[index]);
         }
-        case kChar63: {
-            return Value::MakeChar63(((Char63T *) data_ptr_)[index]);
+        case kChar64: {
+            return Value::MakeChar64(((Char64T *) data_ptr_)[index]);
         }
         case kDate: {
             return Value::MakeDate(((DateT *) data_ptr_)[index]);
@@ -243,16 +243,16 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             ((Char8T *) data_ptr_)[index] = value.GetValue<Char8T>();
             break;
         }
-        case kChar15: {
-            ((Char15T *) data_ptr_)[index] = value.GetValue<Char15T>();
+        case kChar16: {
+            ((Char16T *) data_ptr_)[index] = value.GetValue<Char16T>();
             break;
         }
-        case kChar31: {
-            ((Char31T *) data_ptr_)[index] = value.GetValue<Char31T>();
+        case kChar32: {
+            ((Char32T *) data_ptr_)[index] = value.GetValue<Char32T>();
             break;
         }
-        case kChar63: {
-            ((Char63T *) data_ptr_)[index] = value.GetValue<Char63T>();
+        case kChar64: {
+            ((Char64T *) data_ptr_)[index] = value.GetValue<Char64T>();
             break;
         }
         case kDate: {

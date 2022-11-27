@@ -28,11 +28,11 @@ class VarcharInfoTest : public BaseTest {
 TEST_F(VarcharInfoTest, varchar_info_A) {
     using namespace infinity;
 
-    EXPECT_THROW(VarcharInfo::Make(63), TypeException);
+    EXPECT_THROW(VarcharInfo::Make(64), TypeException);
     EXPECT_THROW(VarcharInfo::Make(65536), TypeException);
 
-    auto varchar_info_ptr = VarcharInfo::Make(64);
-    EXPECT_EQ(varchar_info_ptr->length_limit(), 64);
+    auto varchar_info_ptr = VarcharInfo::Make(65);
+    EXPECT_EQ(varchar_info_ptr->length_limit(), 65);
     EXPECT_EQ(varchar_info_ptr->Size(), 16);
 
     varchar_info_ptr = VarcharInfo::Make();

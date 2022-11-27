@@ -166,25 +166,25 @@ Value::MakeChar8(Char8T input) {
 }
 
 Value
-Value::MakeChar15(Char15T input) {
-    Value value(LogicalType::kChar15);
-    value.value_.char15 = std::move(input);
+Value::MakeChar16(Char16T input) {
+    Value value(LogicalType::kChar16);
+    value.value_.char16 = std::move(input);
     value.is_null_ = false;
     return value;
 }
 
 Value
-Value::MakeChar31(Char31T input) {
-    Value value(LogicalType::kChar31);
-    value.value_.char31 = std::move(input);
+Value::MakeChar32(Char32T input) {
+    Value value(LogicalType::kChar32);
+    value.value_.char32 = std::move(input);
     value.is_null_ = false;
     return value;
 }
 
 Value
-Value::MakeChar63(Char63T input) {
-    Value value(LogicalType::kChar63);
-    value.value_.char63 = std::move(input);
+Value::MakeChar64(Char64T input) {
+    Value value(LogicalType::kChar64);
+    value.value_.char64 = std::move(input);
     value.is_null_ = false;
     return value;
 }
@@ -460,22 +460,22 @@ Value::GetValue() const {
     return value_.char8;
 }
 
-template <> Char15T
+template <> Char16T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar15, "Not matched type: " + type_.ToString())
-    return value_.char15;
+    TypeAssert(type_.type() == LogicalType::kChar16, "Not matched type: " + type_.ToString())
+    return value_.char16;
 }
 
-template <> Char31T
+template <> Char32T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar31, "Not matched type: " + type_.ToString())
-    return value_.char31;
+    TypeAssert(type_.type() == LogicalType::kChar32, "Not matched type: " + type_.ToString())
+    return value_.char32;
 }
 
-template <> Char63T
+template <> Char64T
 Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar63, "Not matched type: " + type_.ToString())
-    return value_.char63;
+    TypeAssert(type_.type() == LogicalType::kChar64, "Not matched type: " + type_.ToString())
+    return value_.char64;
 }
 
 template <> DateT
@@ -741,16 +741,16 @@ Value::Init() {
             value_.char8.Reset();
             break;
         }
-        case kChar15: {
-            value_.char15.Reset();
+        case kChar16: {
+            value_.char16.Reset();
             break;
         }
-        case kChar31: {
-            value_.char31.Reset();
+        case kChar32: {
+            value_.char32.Reset();
             break;
         }
-        case kChar63: {
-            value_.char63.Reset();
+        case kChar64: {
+            value_.char64.Reset();
             break;
         }
         case kDate: {
@@ -925,19 +925,19 @@ Value::CopyUnionValue(const Value& other) {
             value_.char8 = other.value_.char8;
             break;
         }
-        case kChar15: {
-            // Char15Type copy assignment
-            value_.char15 = other.value_.char15;
+        case kChar16: {
+            // Char16Type copy assignment
+            value_.char16 = other.value_.char16;
             break;
         }
-        case kChar31: {
-            // Char31Type copy assignment
-            value_.char31 = other.value_.char31;
+        case kChar32: {
+            // Char32Type copy assignment
+            value_.char32 = other.value_.char32;
             break;
         }
-        case kChar63: {
-            // Char63Type copy assignment
-            value_.char63 = other.value_.char63;
+        case kChar64: {
+            // Char64Type copy assignment
+            value_.char64 = other.value_.char64;
             break;
         }
         case kDate: {
@@ -1123,16 +1123,16 @@ Value::MoveUnionValue(Value&& other) noexcept {
             this->value_.char8 = std::move(other.value_.char8);
             break;
         }
-        case kChar15: {
-            this->value_.char15 = std::move(other.value_.char15);
+        case kChar16: {
+            this->value_.char16 = std::move(other.value_.char16);
             break;
         }
-        case kChar31: {
-            this->value_.char31 = std::move(other.value_.char31);
+        case kChar32: {
+            this->value_.char32 = std::move(other.value_.char32);
             break;
         }
-        case kChar63: {
-            this->value_.char63 = std::move(other.value_.char63);
+        case kChar64: {
+            this->value_.char64 = std::move(other.value_.char64);
             break;
         }
         case kDate: {
@@ -1296,16 +1296,16 @@ Value::Reset() {
             value_.char8.Reset();
             break;
         }
-        case kChar15: {
-            value_.char15.Reset();
+        case kChar16: {
+            value_.char16.Reset();
             break;
         }
-        case kChar31: {
-            value_.char31.Reset();
+        case kChar32: {
+            value_.char32.Reset();
             break;
         }
-        case kChar63: {
-            value_.char63.Reset();
+        case kChar64: {
+            value_.char64.Reset();
             break;
         }
         case kDate: {
@@ -1432,11 +1432,11 @@ Value::ToString() const {
             break;
         case kChar8:
             break;
-        case kChar15:
+        case kChar16:
             break;
-        case kChar31:
+        case kChar32:
             break;
-        case kChar63:
+        case kChar64:
             break;
         case kDate:
             break;

@@ -58,16 +58,16 @@ TEST_F(DataBlockTest, test1) {
     EXPECT_THROW(column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(16)), TypeException);
 
     // Varchar * 1
-    column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(64));
+    column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(65));
 
     // Char * 7
     column_types.emplace_back(LogicalType::kChar1);
     column_types.emplace_back(LogicalType::kChar2);
     column_types.emplace_back(LogicalType::kChar4);
     column_types.emplace_back(LogicalType::kChar8);
-    column_types.emplace_back(LogicalType::kChar15);
-    column_types.emplace_back(LogicalType::kChar31);
-    column_types.emplace_back(LogicalType::kChar63);
+    column_types.emplace_back(LogicalType::kChar16);
+    column_types.emplace_back(LogicalType::kChar32);
+    column_types.emplace_back(LogicalType::kChar64);
 
     // Date and Time * 6
     column_types.emplace_back(LogicalType::kDate);

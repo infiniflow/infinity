@@ -188,105 +188,93 @@ Char8Type::Initialize(const char* ptr) {
     value[7] = ptr[7];
 }
 
-// Char15Type
-Char15Type::Char15Type(const Char15Type& other) {
-    length = other.length;
-    memcpy(value, other.value, length);
+// Char16Type
+Char16Type::Char16Type(const Char16Type& other) {
+    memcpy(value, other.value, CHAR_LENGTH);
 }
 
-Char15Type::Char15Type(Char15Type&& other) noexcept {
-    length = std::move(other.length);
-    memcpy(value, other.value, length);
+Char16Type::Char16Type(Char16Type&& other) noexcept {
+    memcpy(value, other.value, CHAR_LENGTH);
 }
 
-Char15Type&
-Char15Type::operator=(const Char15Type& other) {
+Char16Type&
+Char16Type::operator=(const Char16Type& other) {
     if(this == &other) return *this;
-    length = other.length;
-    memcpy(value, other.value, length);
+    memcpy(value, other.value, CHAR_LENGTH);
     return *this;
 }
-Char15Type&
-Char15Type::operator=(Char15Type&& other) noexcept {
+Char16Type&
+Char16Type::operator=(Char16Type&& other) noexcept {
     if(this == &other) return *this;
-    length = std::move(other.length);
-    memcpy(value, other.value, length);
+    memcpy(value, other.value, CHAR_LENGTH);
     return *this;
 }
 
 void
-Char15Type::Initialize(const char* ptr, size_t len) {
-//    TypeAssert(len <= CHAR15LENGTH,
-//               "Attempt to insert too large string into char15 type variable: " + std::to_string(len));
-    length = (len <= CHAR_LENGTH) ? static_cast<i8>(len) : CHAR_LENGTH;
+Char16Type::Initialize(const char* ptr, size_t len) {
+//    TypeAssert(len <= CHAR16LENGTH,
+//               "Attempt to insert too large string into char16 type variable: " + std::to_string(len));
+    size_t length = (len <= CHAR_LENGTH) ? len : CHAR_LENGTH;
     memcpy(value, ptr, length);
 }
 
-// Char31Type
-Char31Type::Char31Type(const Char31Type& other) {
-    length = other.length;
-    memcpy(value, other.value, length);
+// Char32Type
+Char32Type::Char32Type(const Char32Type& other) {
+    memcpy(value, other.value, CHAR_LENGTH);
 }
 
-Char31Type::Char31Type(Char31Type&& other) noexcept {
-    length = std::move(other.length);
-    memcpy(value, other.value, length);
+Char32Type::Char32Type(Char32Type&& other) noexcept {
+    memcpy(value, other.value, CHAR_LENGTH);
 }
 
-Char31Type&
-Char31Type::operator=(const Char31Type& other) {
+Char32Type&
+Char32Type::operator=(const Char32Type& other) {
     if(this == &other) return *this;
-    length = other.length;
-    memcpy(value, other.value, length);
+    memcpy(value, other.value, CHAR_LENGTH);
     return *this;
 }
 
-Char31Type&
-Char31Type::operator=(Char31Type&& other) noexcept {
+Char32Type&
+Char32Type::operator=(Char32Type&& other) noexcept {
     if(this == &other) return *this;
-    length = std::move(other.length);
-    memcpy(value, other.value, length);
+    memcpy(value, other.value, CHAR_LENGTH);
     return *this;
 }
 
 void
-Char31Type::Initialize(const char* ptr, size_t len) {
+Char32Type::Initialize(const char* ptr, size_t len) {
     // Assume the var won't overflow
-    length = (len <= CHAR_LENGTH) ? static_cast<i8>(len) : CHAR_LENGTH;
+    size_t length = (len <= CHAR_LENGTH) ? static_cast<size_t>(len) : CHAR_LENGTH;
     memcpy(value, ptr, length);
 }
 
-// Char63Type
-Char63Type::Char63Type(const Char63Type& other) {
-    length = other.length;
-    memcpy(value, other.value, length);
+// Char64Type
+Char64Type::Char64Type(const Char64Type& other) {
+    memcpy(value, other.value, CHAR_LENGTH);
 }
 
-Char63Type::Char63Type(Char63Type&& other) noexcept {
-    length = std::move(other.length);
-    memcpy(value, other.value, length);
+Char64Type::Char64Type(Char64Type&& other) noexcept {
+    memcpy(value, other.value, CHAR_LENGTH);
 }
 
-Char63Type&
-Char63Type::operator=(const Char63Type& other) {
+Char64Type&
+Char64Type::operator=(const Char64Type& other) {
     if(this == &other) return *this;
-    length = other.length;
-    memcpy(value, other.value, length);
+    memcpy(value, other.value, CHAR_LENGTH);
     return *this;
 }
 
-Char63Type&
-Char63Type::operator=(Char63Type&& other) noexcept {
+Char64Type&
+Char64Type::operator=(Char64Type&& other) noexcept {
     if(this == &other) return *this;
-    length = std::move(other.length);
-    memcpy(value, other.value, length);
+    memcpy(value, other.value, CHAR_LENGTH);
     return *this;
 }
 
 void
-Char63Type::Initialize(const char* ptr, size_t len) {
+Char64Type::Initialize(const char* ptr, size_t len) {
     // Assume the var won't overflow
-    length = (len <= CHAR_LENGTH) ? static_cast<i8>(len) : CHAR_LENGTH;
+    size_t length = (len <= CHAR_LENGTH) ? static_cast<size_t>(len) : CHAR_LENGTH;
     memcpy(value, ptr, length);
 }
 

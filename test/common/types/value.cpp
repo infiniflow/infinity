@@ -265,52 +265,58 @@ TEST_F(ValueTest, MakeAndGet) {
         EXPECT_EQ(value.GetValue<Char8T>().ToString(), s);
     }
 
-    // Char15
+    // Char16
     {
         String s;
-        for(size_t i = 0; i < Char15T::CHAR_LENGTH + 1; ++ i) {
-            Char15T char1(s);
-            value = Value::MakeChar15(char1);
-            EXPECT_EQ(value.GetValue<Char15T>().ToString(), s);
+        for(size_t i = 0; i < Char16T::CHAR_LENGTH + 1; ++ i) {
+            Char16T char1(s);
+            value = Value::MakeChar16(char1);
+            String result = value.GetValue<Char16T>().ToString();
+            trim(result);
+            EXPECT_EQ(result, s);
             s.push_back('a');
         }
 
-        Char15T char2(s);
-        value = Value::MakeChar15(char2);
+        Char16T char2(s);
+        value = Value::MakeChar16(char2);
         s.pop_back();
-        EXPECT_EQ(value.GetValue<Char15T>().ToString(), s);
+        EXPECT_EQ(value.GetValue<Char16T>().ToString(), s);
     }
 
-    // Char31
+    // Char32
     {
         String s;
-        for(size_t i = 0; i < Char31T::CHAR_LENGTH + 1; ++ i) {
-            Char31T char1(s);
-            value = Value::MakeChar31(char1);
-            EXPECT_EQ(value.GetValue<Char31T>().ToString(), s);
+        for(size_t i = 0; i < Char32T::CHAR_LENGTH + 1; ++ i) {
+            Char32T char1(s);
+            value = Value::MakeChar32(char1);
+            String result = value.GetValue<Char32T>().ToString();
+            trim(result);
+            EXPECT_EQ(result, s);
             s.push_back('a');
         }
 
-        Char31T char2(s);
-        value = Value::MakeChar31(char2);
+        Char32T char2(s);
+        value = Value::MakeChar32(char2);
         s.pop_back();
-        EXPECT_EQ(value.GetValue<Char31T>().ToString(), s);
+        EXPECT_EQ(value.GetValue<Char32T>().ToString(), s);
     }
 
-    // Char63
+    // Char64
     {
         String s;
-        for(size_t i = 0; i < Char63T::CHAR_LENGTH + 1; ++ i) {
-            Char63T char1(s);
-            value = Value::MakeChar63(char1);
-            EXPECT_EQ(value.GetValue<Char63T>().ToString(), s);
+        for(size_t i = 0; i < Char64T::CHAR_LENGTH + 1; ++ i) {
+            Char64T char1(s);
+            value = Value::MakeChar64(char1);
+            String result = value.GetValue<Char64T>().ToString();
+            trim(result);
+            EXPECT_EQ(result, s);
             s.push_back('a');
         }
 
-        Char63T char2(s);
-        value = Value::MakeChar63(char2);
+        Char64T char2(s);
+        value = Value::MakeChar64(char2);
         s.pop_back();
-        EXPECT_EQ(value.GetValue<Char63T>().ToString(), s);
+        EXPECT_EQ(value.GetValue<Char64T>().ToString(), s);
     }
 
     // Date

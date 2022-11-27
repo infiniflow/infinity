@@ -38,9 +38,9 @@ enum LogicalType: i8 {
     kChar2,
     kChar4,
     kChar8,
-    kChar15,
-    kChar31,
-    kChar63,
+    kChar16,
+    kChar32,
+    kChar64,
 
     // Date and Time * 6
     kDate,

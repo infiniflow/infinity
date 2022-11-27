@@ -163,40 +163,40 @@ public:
     char_t value[CHAR_LENGTH]{};
 };
 
-struct Char15Type {
-    static constexpr size_t CHAR_LENGTH = 15;
+struct Char16Type {
+    static constexpr size_t CHAR_LENGTH = 16;
 public:
-    Char15Type() = default;
-    ~Char15Type() = default;
+    Char16Type() = default;
+    ~Char16Type() = default;
 
     explicit inline
-    Char15Type(const String& str) {
+    Char16Type(const String& str) {
         // we assume the string length won't exceed the limitation;
         Initialize(str.c_str(), str.length());
     }
 
     explicit inline
-    Char15Type(const char* ptr) {
+    Char16Type(const char* ptr) {
         // we assume the string length won't exceed the limitation;
         Initialize(ptr, strlen(ptr));
     }
 
-    Char15Type(const Char15Type& other);
-    Char15Type(Char15Type&& other) noexcept;
-    Char15Type& operator=(const Char15Type& other);
-    Char15Type& operator=(Char15Type&& other) noexcept;
+    Char16Type(const Char16Type& other);
+    Char16Type(Char16Type&& other) noexcept;
+    Char16Type& operator=(const Char16Type& other);
+    Char16Type& operator=(Char16Type&& other) noexcept;
 
     void
     Initialize(const char* ptr, size_t length);
 
     [[nodiscard]] size_t
     Length() const {
-        return length;
+        return CHAR_LENGTH;
     }
 
     [[nodiscard]] inline String
     ToString() const {
-        return String(value, length);
+        return String(value, CHAR_LENGTH);
     }
 
     inline void
@@ -205,44 +205,43 @@ public:
     }
 
 public:
-    i8     length{0};
     char_t value[CHAR_LENGTH]{};
 };
 
-struct Char31Type {
-    static constexpr size_t CHAR_LENGTH = 31;
+struct Char32Type {
+    static constexpr size_t CHAR_LENGTH = 32;
 public:
-    Char31Type() = default;
-    ~Char31Type() = default;
+    Char32Type() = default;
+    ~Char32Type() = default;
 
     explicit inline
-    Char31Type(const String& str) {
+    Char32Type(const String& str) {
         // we assume the string length won't exceed the limitation;
         Initialize(str.c_str(), str.length());
     }
 
     explicit inline
-    Char31Type(const char* ptr) {
+    Char32Type(const char* ptr) {
         // we assume the string length won't exceed the limitation;
         Initialize(ptr, strlen(ptr));
     }
 
-    Char31Type(const Char31Type& other);
-    Char31Type(Char31Type&& other) noexcept;
-    Char31Type& operator=(const Char31Type& other);
-    Char31Type& operator=(Char31Type&& other) noexcept;
+    Char32Type(const Char32Type& other);
+    Char32Type(Char32Type&& other) noexcept;
+    Char32Type& operator=(const Char32Type& other);
+    Char32Type& operator=(Char32Type&& other) noexcept;
 
     void
     Initialize(const char* ptr, size_t length);
 
     [[nodiscard]] size_t
     Length() const {
-        return length;
+        return CHAR_LENGTH;
     }
 
     [[nodiscard]] inline String
     ToString() const {
-        return String(value, length);
+        return String(value, CHAR_LENGTH);
     }
 
     inline void
@@ -251,44 +250,43 @@ public:
     }
 
 public:
-    i8     length{0};
     char_t value[CHAR_LENGTH]{};
 };
 
-struct Char63Type {
-    static constexpr size_t CHAR_LENGTH = 63;
+struct Char64Type {
+    static constexpr size_t CHAR_LENGTH = 64;
 public:
-    Char63Type() = default;
-    ~Char63Type() = default;
+    Char64Type() = default;
+    ~Char64Type() = default;
 
     explicit inline
-    Char63Type(const String& str) {
+    Char64Type(const String& str) {
         // we assume the string length won't exceed the limitation;
         Initialize(str.c_str(), str.length());
     }
 
     explicit inline
-    Char63Type(const char* ptr) {
+    Char64Type(const char* ptr) {
         // we assume the string length won't exceed the limitation;
         Initialize(ptr, strlen(ptr));
     }
 
-    Char63Type(const Char63Type& other);
-    Char63Type(Char63Type&& other) noexcept;
-    Char63Type& operator=(const Char63Type& other);
-    Char63Type& operator=(Char63Type&& other) noexcept;
+    Char64Type(const Char64Type& other);
+    Char64Type(Char64Type&& other) noexcept;
+    Char64Type& operator=(const Char64Type& other);
+    Char64Type& operator=(Char64Type&& other) noexcept;
 
     void
     Initialize(const char* ptr, size_t length);
 
     [[nodiscard]] size_t
     Length() const {
-        return length;
+        return CHAR_LENGTH;
     }
 
     [[nodiscard]] inline String
     ToString() const {
-        return String(value, length);
+        return String(value, CHAR_LENGTH);
     }
 
     inline void
@@ -297,7 +295,6 @@ public:
     }
 
 public:
-    i8     length{0};
     char_t value[CHAR_LENGTH]{};
 };
 
