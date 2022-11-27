@@ -29,7 +29,7 @@ TEST_F(BlobTypeTest, blob1) {
 
     constexpr i64 SIZE = 27;
 
-    ptr_t blob_ptr = new char[SIZE]{0};
+    auto blob_ptr = new char[SIZE]{0};
     GlobalResourceUsage::IncrRawMemCount();
 
     for(i64 i = 0; i < SIZE; ++ i) {
@@ -48,6 +48,9 @@ TEST_F(BlobTypeTest, blob1) {
     BlobT b2(b1);
     EXPECT_STREQ(b2.ptr, "abcdefghijklmnopqrstuvwxyz");
     EXPECT_EQ(b2.size, SIZE);
+
+    EXPECT_EQ(b1, b2);
+    EXPECT_FALSE(b1 != b2);
 
     // Move constructor
     BlobT b3(std::move(b1));

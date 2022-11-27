@@ -31,23 +31,31 @@ public:
     UuidType& operator=(const UuidType& other);
     UuidType& operator=(UuidType&& other) noexcept;
 
+    bool
+    operator==(const UuidType& other) const;
+
+    inline bool
+    operator!=(const UuidType& other) const {
+        return !operator==(other);
+    }
+
     inline void
     Set(ptr_t input) {
-        memcpy(body, input, LENGTH);
+        memcpy(body, input, UuidType::LENGTH);
     }
 
     [[nodiscard]] inline String
     ToString() const {
-        return String(body, LENGTH);
+        return String(body, UuidType::LENGTH);
     }
 
     inline void
     Reset() {
-        memset(body, 0, LENGTH);
+        memset(body, 0, UuidType::LENGTH);
     }
 
 public:
-    char_t body[LENGTH];
+    char_t body[UuidType::LENGTH];
 };
 
 }

@@ -25,16 +25,34 @@ class ValueTest : public BaseTest {
     }
 };
 
-TEST_F(ValueTest, Varchar) {
+TEST_F(ValueTest, Bitmap) {
     using namespace infinity;
 
     Value value = Value::MakeBool(true);
 
-    value = Value::MakeVarchar("Hello");
-    Value value1 = Value::MakeBool(true);
-    value1 = value;
-    EXPECT_EQ(value.type_.type(), LogicalType::kVarchar);
-    EXPECT_EQ(value1.type_.type(), LogicalType::kVarchar);
+    for(int j = 0; j < 100; ++ j) {
+        {
+            PointT point1(1.0f, 2.0f);
+            CircleT circle(point1, 1.3f);
+            value = Value::MakeCircle(circle);
+            EXPECT_EQ(value.GetValue<CircleT>(), circle);
+        }
+
+        {
+            BitmapT bt1;
+            bt1.Initialize(100);
+
+            for(u64 i = 0; i < 100; ++ i) {
+                if(i % 2 == 0) {
+                    bt1.SetBit(i, true);
+                } else {
+                    bt1.SetBit(i, false);
+                }
+            }
+            value = Value::MakeBitmap(bt1);
+            EXPECT_EQ(value.GetValue<BitmapT>(), bt1);
+        }
+    }
 }
 
 TEST_F(ValueTest, Array) {
@@ -73,6 +91,27 @@ TEST_F(ValueTest, Array) {
         EXPECT_EQ(value.GetValue<ArrayT>()[1].type_.type(), LogicalType::kTinyInt);
         EXPECT_EQ(value.GetValue<ArrayT>()[2].type_.type(), LogicalType::kFloat);
     }
+}
+
+TEST_F(ValueTest, Blob) {
+    using namespace infinity;
+
+    Value value = Value::MakeBool(true);
+
+    constexpr i64 SIZE = 27;
+
+    auto blob_ptr = new char[SIZE]{0};
+    GlobalResourceUsage::IncrRawMemCount();
+
+    for(i64 i = 0; i < SIZE; ++ i) {
+        blob_ptr[i] = 'a' + static_cast<char_t>(i);
+    }
+    blob_ptr[SIZE - 1] = 0;
+
+    BlobT b1(blob_ptr, SIZE);
+
+    value = Value::MakeBlob(b1);
+    EXPECT_EQ(value.GetValue<BlobT>(), b1);
 }
 
 TEST_F(ValueTest, MakeAndGet) {
@@ -452,12 +491,31 @@ TEST_F(ValueTest, MakeAndGet) {
 
     // UuidT
     {
+        char uuid_str[17] = "aabbccddeeffgghh";
 
+        // Default constructor and Set
+        UuidType uuid1{};
+        uuid1.Set(uuid_str);
+        value = Value::MakeUuid(uuid1);
+        EXPECT_EQ(value.GetValue<UuidT>(), uuid1);
     }
 
     // BlobT
     {
+        constexpr i64 SIZE = 27;
 
+        auto blob_ptr = new char[SIZE]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
+        for(i64 i = 0; i < SIZE; ++ i) {
+            blob_ptr[i] = 'a' + static_cast<char_t>(i);
+        }
+        blob_ptr[SIZE - 1] = 0;
+
+        BlobT b1(blob_ptr, SIZE);
+
+        value = Value::MakeBlob(b1);
+        EXPECT_EQ(value.GetValue<BlobT>(), b1);
     }
 
     // EmbeddingT

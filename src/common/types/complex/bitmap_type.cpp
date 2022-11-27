@@ -7,23 +7,21 @@
 
 namespace infinity {
 
-BitmapType::BitmapType(const BitmapType& other) {
-    count = other.count;
-    u64 unit_count = UnitCount(other.count);
+BitmapType::BitmapType(const BitmapType& other) : count(other.count) {
+    u64 unit_count = UnitCount(count);
 
     ptr = new u64[unit_count]{0};
     GlobalResourceUsage::IncrRawMemCount();
 
-    memcpy(ptr, other.ptr, unit_count * UNIT_BITS);
+    memcpy(ptr, other.ptr, unit_count * UNIT_BYTES);
 }
 
-BitmapType::BitmapType(BitmapType&& other) noexcept {
-    count = other.count;
-    ptr = std::move(other.ptr);
+BitmapType::BitmapType(BitmapType&& other) noexcept
+    : count(other.count), ptr(other.ptr) {
     other.ptr = nullptr;
     other.count = 0;
-
 }
+
 BitmapType&
 BitmapType::operator=(const BitmapType& other) {
     if(this == &other) return *this;
@@ -31,7 +29,7 @@ BitmapType::operator=(const BitmapType& other) {
     u64 current_unit_count = UnitCount(this->count);
     u64 target_unit_count = UnitCount(other.count);
     if(current_unit_count == target_unit_count) {
-        memcpy(ptr, other.ptr, current_unit_count * UNIT_BITS);
+        memcpy(ptr, other.ptr, current_unit_count * UNIT_BYTES);
         return *this;
     }
 
@@ -56,7 +54,7 @@ BitmapType::operator=(BitmapType&& other) noexcept {
         Reset();
     }
     count = other.count;
-    ptr = std::move(other.ptr);
+    ptr = other.ptr;
     other.ptr = nullptr;
     other.count = 0;
     return *this;

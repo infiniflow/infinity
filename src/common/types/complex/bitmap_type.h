@@ -13,6 +13,7 @@ namespace infinity {
 struct BitmapType {
 public:
     static constexpr i8 UNIT_BITS = 64;
+    static constexpr i8 UNIT_BYTES = 8;
 
     static inline u64
     UnitCount(u64 bit_count) {

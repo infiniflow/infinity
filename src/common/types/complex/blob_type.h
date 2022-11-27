@@ -34,6 +34,14 @@ public:
     BlobType& operator=(const BlobType& other);
     BlobType& operator=(BlobType&& other) noexcept;
 
+    bool
+    operator==(const BlobType& other) const;
+
+    inline bool
+    operator!=(const BlobType& other) const {
+        return !operator==(other);
+    }
+
 public:
     void
     Copy(ptr_t blob_ptr, u64 blob_size);

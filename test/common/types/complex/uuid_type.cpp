@@ -53,6 +53,9 @@ TEST_F(UuidTypeTest, Uuid) {
     EXPECT_STREQ(uuid5.ToString().c_str(), uuid_str);
     EXPECT_STREQ(uuid3.ToString().c_str(), "");
 
+    EXPECT_EQ(uuid1, uuid5);
+    EXPECT_FALSE(uuid1 != uuid5);
+
     // Reset
     uuid5.Reset();
     EXPECT_STREQ(uuid5.ToString().c_str(), "");

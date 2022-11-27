@@ -592,8 +592,20 @@ Value::~Value() {
             value_.varchar.~VarcharType();
             break;
         }
+        case kPolygon: {
+            value_.polygon.~PolygonType();
+            break;
+        }
+        case kPath: {
+            value_.path.~PathType();
+            break;
+        }
         case kBitmap: {
             value_.bitmap.~BitmapType();
+            break;
+        }
+        case kBlob: {
+            value_.blob.~BlobType();
             break;
         }
         default: {
@@ -802,7 +814,8 @@ Value::Init() {
             break;
         }
         case kBlob: {
-            value_.blob.Reset();
+            value_.blob.ptr = nullptr;
+            value_.blob.size = 0;
             break;
         }
         case kEmbedding: {

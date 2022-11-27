@@ -31,6 +31,14 @@ BlobType& BlobType::operator=(BlobType&& other) noexcept {
     return *this;
 }
 
+bool
+BlobType::operator==(const BlobType& other) const {
+    if(this == &other) return true;
+    if(this->size != other.size) return false;
+    // TODO: Need to do benchmark of memcmp and strncmp to decide which one should be used here.
+    return memcmp(this->ptr, other.ptr, other.size) == 0;
+}
+
 void
 BlobType::Copy(ptr_t blob_ptr, u64 blob_size) {
     // If input blob size is same as current blob size, don't need to allocate memory again

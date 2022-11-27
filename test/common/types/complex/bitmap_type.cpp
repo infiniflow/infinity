@@ -62,6 +62,9 @@ TEST_F(BitmapTypeTest, bitmap1) {
         }
     }
 
+    EXPECT_EQ(bt1, bt2);
+    EXPECT_FALSE(bt1 != bt2);
+
     // copy assignment2
     BitmapType bt3(50);
 
