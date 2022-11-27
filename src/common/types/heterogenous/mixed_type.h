@@ -110,8 +110,17 @@ public:
 
     MixedType(const MixedType& other);
     MixedType(MixedType&& other) noexcept;
-    MixedType& operator=(const MixedType& other);
-    MixedType& operator=(MixedType&& other) noexcept;
+    MixedType&
+    operator=(const MixedType& other);
+    MixedType&
+    operator=(MixedType&& other) noexcept;
+
+    bool
+    operator==(const MixedType& other) const;
+    inline bool
+    operator!=(const MixedType& other) const {
+        return !operator==(other);
+    }
 
     void
     Reset();

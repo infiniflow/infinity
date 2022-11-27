@@ -526,14 +526,80 @@ TEST_F(ValueTest, MakeAndGet) {
         // Embedding need to manually SetNull or Reset.
         value.value_.embedding.Reset();
         eb.SetNull();
-        
+
         value = Value::MakeBool(true);
         EXPECT_EQ(value.value_.boolean, true);
     }
 
-    // Mixed
+    // Mixed Integer
     {
-        LOG_TRACE("TODO: need heterogeneous type test");
+        MixedT mixed_integer1 = MixedType::MakeInteger(10);
+        value = Value::MakeMixedData(mixed_integer1);
+        EXPECT_EQ(value.GetValue<MixedT>(), mixed_integer1);
+    }
+
+    // Mixed Float
+    {
+        MixedT mixed_float1 = MixedType::MakeFloat(10.05f);
+        value = Value::MakeMixedData(mixed_float1);
+        EXPECT_EQ(value.GetValue<MixedT>(), mixed_float1);
+    }
+
+    // Mixed Short string
+    {
+        MixedT mixed_short_str = MixedType::MakeString("hello");
+        value = Value::MakeMixedData(mixed_short_str);
+        EXPECT_EQ(value.GetValue<MixedT>(), mixed_short_str);
+    }
+
+    // Mixed Long string
+    {
+        MixedT mixed_long_str = MixedType::MakeString("hellohellohellohellohello");
+        value = Value::MakeMixedData(mixed_long_str);
+        EXPECT_EQ(value.GetValue<MixedT>(), mixed_long_str);
+    }
+
+    // Mixed Null
+    {
+        MixedT mixed_null = MixedType::MakeNull();
+        value = Value::MakeMixedData(mixed_null);
+        EXPECT_EQ(value.GetValue<MixedT>(), mixed_null);
+    }
+
+    // Mixed Tuple
+    {
+        MixedType mixed_tuple1 = MixedType::MakeTuple(5);
+        // Key1: integer
+        mixed_tuple1.InsertIntegerIntoTuple("key1", 100);
+        // Key2: float
+        mixed_tuple1.InsertFloatIntoTuple("key2", 1.1);
+        // Key3: short string
+        mixed_tuple1.InsertStringIntoTuple("key3", "Hello World !!");
+        // Key4: long string
+        mixed_tuple1.InsertStringIntoTuple("key4", "Hello World Hello World");
+        // Key5: null
+        mixed_tuple1.InsertNullIntoTuple("key5");
+
+        value = Value::MakeMixedData(mixed_tuple1);
+        EXPECT_EQ(value.GetValue<MixedT>(), mixed_tuple1);
+    }
+
+    // Mixed Array
+    {
+        MixedType mixed_array7 = MixedType::MakeArray(5);
+        // Integer
+        mixed_array7.InsertIntegerIntoArray(4300, 0);
+        // Float
+        mixed_array7.InsertFloatIntoArray(5.5, 1);
+        // Short str
+        mixed_array7.InsertStringIntoArray("FunnyHalloween", 2);
+        // Long str
+        mixed_array7.InsertStringIntoArray("FunnyHalloween OK", 3);
+        // Null
+        mixed_array7.InsertNullIntoArray(4);
+
+        value = Value::MakeMixedData(mixed_array7);
+        EXPECT_EQ(value.GetValue<MixedT>(), mixed_array7);
     }
 
 }

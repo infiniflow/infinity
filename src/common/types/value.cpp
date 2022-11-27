@@ -616,6 +616,9 @@ Value::~Value() {
             value_.blob.~BlobType();
             break;
         }
+        case kMixed: {
+            value_.mixed_value.~MixedType();
+        }
         default: {
 
         }

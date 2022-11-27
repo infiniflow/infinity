@@ -439,6 +439,70 @@ MixedType::operator=(MixedType&& other) noexcept {
     return *this;
 }
 
+bool
+MixedType::operator==(const MixedType& other) const {
+    if(this == &other) return true;
+    if(this->type != other.type) return false;
+    switch(this->type) {
+        case MixedValueType::kInvalid:
+            TypeError("Invalid heterogeneous type")
+        case MixedValueType::kInteger: {
+            auto* this_integer = (IntegerMixedType*)(this);
+            auto* other_integer = (IntegerMixedType*)(&other);
+            return this_integer->value == other_integer->value;
+        }
+        case MixedValueType::kFloat: {
+            auto* this_float = (FloatMixedType*)(this);
+            auto* other_float = (FloatMixedType*)(&other);
+            return fabs(this_float->value - other_float->value) < std::numeric_limits<f64>::epsilon();
+        }
+        case MixedValueType::kLongStr: {
+            auto* this_long_str = (LongStrMixedType*)(this);
+            auto* other_long_str = (LongStrMixedType*)(&other);
+            if(this_long_str->length != other_long_str->length) return false;
+            return (memcmp(this_long_str->ptr, other_long_str->ptr, this_long_str->length) == 0);
+        }
+        case MixedValueType::kShortStr: {
+            auto* this_short_str = (ShortStrMixedType*)(this);
+            auto* other_short_str = (ShortStrMixedType*)(&other);
+            if(this_short_str->length != other_short_str->length) return false;
+            return (memcmp(this_short_str->ptr, other_short_str->ptr, this_short_str->length) == 0);
+        }
+        case MixedValueType::kTuple: {
+            auto* this_tuple = (TupleMixedType*)(this);
+            auto* other_tuple = (TupleMixedType*)(&other);
+            if(this_tuple->count != other_tuple->count) return false;
+            auto* this_tuple_value = (MixedTupleValue*)(this_tuple->ptr);
+            auto* other_tuple_value = (MixedTupleValue*)(other_tuple->ptr);
+
+            // FIXME: current only loop to check the each entry are equivalent accordingly.
+            for(u16 i = 0; i < this_tuple->count; ++ i) {
+                if(this_tuple_value->array[i] != other_tuple_value->array[i]) return false;
+            }
+            return true;
+        }
+        case MixedValueType::kArray: {
+            auto* this_array = (ArrayMixedType*)(this);
+            auto* other_array = (ArrayMixedType*)(&other);
+            if(this_array->count != other_array->count) return false;
+            auto* this_array_value = (MixedArrayValue*)(this_array->ptr);
+            auto* other_array_value = (MixedArrayValue*)(other_array->ptr);
+
+            for(u16 i = 0; i < this_array->count; ++ i) {
+                if(this_array_value->array[i] != other_array_value->array[i]) return false;
+            }
+            return true;
+        }
+        case MixedValueType::kNull:
+        case MixedValueType::kMissing:
+            return true;
+        case MixedValueType::kDummy:
+            TypeError("Dummy heterogeneous type")
+    }
+}
+
+
+
 void
 MixedType::Move(MixedType&& from, MixedType& to) {
     to.Reset();
