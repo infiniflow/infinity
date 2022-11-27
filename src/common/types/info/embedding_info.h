@@ -27,8 +27,10 @@ public:
 
     ~EmbeddingInfo() override = default;
 
-    [[nodiscard]] size_t
-    Size() const override;
+    [[nodiscard]] inline size_t
+    Size() const override {
+        return EmbeddingType::EmbeddingSize(embedding_data_type_, dimension_);
+    }
 private:
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     size_t dimension_;

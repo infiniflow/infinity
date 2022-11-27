@@ -520,7 +520,15 @@ TEST_F(ValueTest, MakeAndGet) {
 
     // EmbeddingT
     {
-
+        value = Value::MakeEmbedding(EmbeddingDataType::kElemFloat, 128);
+        EmbeddingT eb = value.GetValue<EmbeddingType>();
+        EXPECT_EQ(eb.ptr, value.value_.embedding.ptr);
+        // Embedding need to manually SetNull or Reset.
+        value.value_.embedding.Reset();
+        eb.SetNull();
+        
+        value = Value::MakeBool(true);
+        EXPECT_EQ(value.value_.boolean, true);
     }
 
     // Mixed

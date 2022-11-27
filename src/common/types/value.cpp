@@ -335,9 +335,17 @@ Value::MakeBlob(BlobT input) {
 }
 
 Value
-Value::MakeEmbedding(EmbeddingT input) {
+Value::MakeEmbedding(EmbeddingDataType type, size_t dimension) {
     Value value(LogicalType::kEmbedding);
-    value.value_.embedding = input;
+    value.value_.embedding = EmbeddingType(type, dimension);
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeEmbedding(ptr_t ptr) {
+    Value value(LogicalType::kEmbedding);
+    value.value_.embedding.ptr = ptr;
     value.is_null_ = false;
     return value;
 }
@@ -819,7 +827,7 @@ Value::Init() {
             break;
         }
         case kEmbedding: {
-            value_.embedding = nullptr;
+            value_.embedding.SetNull();
             break;
         }
         case kMixed: {
@@ -1018,10 +1026,10 @@ Value::CopyUnionValue(const Value& other) {
         case kEmbedding: {
             size_t embedding_size = type_.type_info()->Size();
 
-            value_.embedding = new char_t[embedding_size]{0};
+            value_.embedding.ptr = new char_t[embedding_size]{0};
             GlobalResourceUsage::IncrRawMemCount();
 
-            memcpy(value_.embedding, other.value_.embedding, embedding_size);
+            memcpy(value_.embedding.ptr, other.value_.embedding.ptr, embedding_size);
             break;
         }
         case kMixed: {
@@ -1195,7 +1203,7 @@ Value::MoveUnionValue(Value&& other) noexcept {
         }
         case kEmbedding: {
             this->value_.embedding = other.value_.embedding;
-            other.value_.embedding = nullptr;
+            other.value_.embedding.SetNull();
             break;
         }
         case kMixed: {
@@ -1368,12 +1376,8 @@ Value::Reset() {
             break;
         }
         case kEmbedding: {
-            if(value_.embedding != nullptr) {
-
-                delete[] value_.embedding;
-                GlobalResourceUsage::DecrRawMemCount();
-
-                value_.embedding = nullptr;
+            if(value_.embedding.ptr != nullptr) {
+                LOG_TRACE("Need to manually reset the embedding type.");
             }
             break;
         }

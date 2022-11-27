@@ -6,20 +6,15 @@
 
 namespace infinity {
 
-static size_t embedding_type_size[] = {
-    1,   // bit
-    8,   // int8
-    16,  // int16
-    32,  // int32
-    64,  // int64
-    32,  // int32
-    64,  // int64
+size_t
+EmbeddingType::embedding_type_width[] = {
+        0,   // bit
+        1,   // int8
+        2,  // int16
+        4,  // int32
+        8,  // int64
+        4,  // float32
+        8,  // double64
 };
 
-size_t
-EmbeddingDataBitWidth(EmbeddingDataType type_index) {
-    return embedding_type_size[type_index];
 }
-
-}
-

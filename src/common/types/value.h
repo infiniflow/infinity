@@ -136,7 +136,10 @@ public:
     MakeBlob(BlobT input);
 
     static Value
-    MakeEmbedding(EmbeddingT input);
+    MakeEmbedding(EmbeddingDataType type, size_t dimension);
+
+    static Value
+    MakeEmbedding(ptr_t ptr);
 
     static Value
     MakeMixedData(MixedT input);
