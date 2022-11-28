@@ -11,6 +11,8 @@ namespace infinity {
 
 void ColumnVector::Initialize(size_t capacity) {
     GeneralAssert(!initialized, "Column vector is already initialized.")
+    GeneralAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't set.")
+    GeneralAssert(vector_type_ != ColumnVectorType::kInvalid, "Column Vector type isn't set.")
     capacity_ = capacity;
     tail_index_ = 0;
     data_type_size_ = data_type_.Size();
@@ -367,6 +369,8 @@ ColumnVector::Reset() {
     buffer_.reset();
     data_ptr_ = nullptr;
     initialized = false;
+    data_type_ = DataType(LogicalType::kInvalid);
+    vector_type_ = ColumnVectorType::kInvalid;
 }
 
 }

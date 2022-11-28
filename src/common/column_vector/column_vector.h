@@ -45,10 +45,10 @@ public:
     ptr_t data_ptr_ {nullptr};
 
     // A bitmap to indicate the null information
-    SharedPtr<Bitmask> nulls_ptr_;
+    SharedPtr<Bitmask> nulls_ptr_{nullptr};
 
     // this buffer is holding the data
-    SharedPtr<VectorBuffer> buffer_;
+    SharedPtr<VectorBuffer> buffer_{nullptr};
 
     bool initialized {false};
 
@@ -92,7 +92,14 @@ public:
 
     void
     SetVectorType(ColumnVectorType vector_type) {
+        GeneralAssert(!initialized, "Column Vector is initialized")
         vector_type_ = vector_type;
+    }
+
+    void
+    SetDataType(const DataType& data_type) {
+        GeneralAssert(!initialized, "Column Vector is initialized")
+        data_type_ = data_type;
     }
 
     void

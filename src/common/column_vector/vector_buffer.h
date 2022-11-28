@@ -12,7 +12,13 @@ public:
     Make(size_t data_type_size, size_t capacity);
 
 public:
-    explicit VectorBuffer() = default;
+    explicit VectorBuffer() {
+        GlobalResourceUsage::IncrObjectCount();
+    }
+
+    ~VectorBuffer() {
+        GlobalResourceUsage::DecrObjectCount();
+    }
 
     void
     Initialize(size_t data_size);
