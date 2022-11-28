@@ -105,10 +105,43 @@ class DataType {
 public:
     explicit
     DataType(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr) :
-        type_(logical_type), type_info_(std::move(type_info_ptr)) {}
+        type_(logical_type), type_info_(std::move(type_info_ptr)) {
+        GlobalResourceUsage::IncrObjectCount();
+    }
 
     explicit
-    DataType(LogicalType logical_type): type_(logical_type), type_info_(nullptr) {}
+    DataType(LogicalType logical_type): type_(logical_type), type_info_(nullptr) {
+        GlobalResourceUsage::IncrObjectCount();
+    }
+
+    ~DataType() {
+        GlobalResourceUsage::DecrObjectCount();
+    }
+
+    DataType(const DataType& other): type_(other.type_), type_info_(other.type_info_) {
+        GlobalResourceUsage::IncrObjectCount();
+    }
+
+    DataType(DataType&& other) noexcept: type_(other.type_), type_info_(other.type_info_) {
+        GlobalResourceUsage::IncrObjectCount();
+    }
+
+    DataType&
+    operator=(const DataType& other) {
+        if(this == &other) return *this;
+        type_ = other.type_;
+        type_info_ = other.type_info_;
+        return *this;
+    }
+
+    DataType&
+    operator=(DataType&& other) noexcept {
+        if(this == &other) return *this;
+        type_ = other.type_;
+        type_info_ = other.type_info_;
+        other.type_info_ = nullptr;
+        return *this;
+    }
 
     bool
     operator==(const DataType& other) const;
@@ -130,8 +163,8 @@ public:
 
 private:
 
-    LogicalType type_;
-    SharedPtr<TypeInfo> type_info_;
+    LogicalType type_{LogicalType::kInvalid};
+    SharedPtr<TypeInfo> type_info_{nullptr};
 
     // Static method
 public:

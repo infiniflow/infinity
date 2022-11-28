@@ -6,7 +6,6 @@
 #include "base_test.h"
 #include "common/types/value.h"
 #include "main/logger.h"
-#include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 
 class ValueTest : public BaseTest {

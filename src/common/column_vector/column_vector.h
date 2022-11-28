@@ -10,6 +10,7 @@
 #include "bitmask.h"
 #include "common/types/value.h"
 #include "common/default_values.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -44,7 +45,7 @@ public:
     ptr_t data_ptr_ {nullptr};
 
     // A bitmap to indicate the null information
-    UniquePtr<Bitmask> nulls_ptr_;
+    SharedPtr<Bitmask> nulls_ptr_;
 
     // this buffer is holding the data
     SharedPtr<VectorBuffer> buffer_;
@@ -54,18 +55,25 @@ public:
 public:
     // Construct a column vector without initialization;
     explicit
-    ColumnVector(DataType data_type, ColumnVectorType vector_type = ColumnVectorType::kFlat);
+    ColumnVector(DataType data_type, ColumnVectorType vector_type = ColumnVectorType::kFlat)
+            : data_type_(std::move(data_type)), vector_type_(vector_type) {
+        GlobalResourceUsage::IncrObjectCount();
+    }
+
+    ~ColumnVector() {
+        GlobalResourceUsage::DecrObjectCount();
+    }
 
     void
     Initialize(size_t capacity = DEFAULT_VECTOR_SIZE);
 
-    [[nodiscard]] String
+    String
     ToString() const;
 
     // Return the <index> of the vector
     // Since it will construct a new Value object, this function shouldn't be used in vectorized computation.
     // Directly uses data_ptr in vectorized computation.
-    [[nodiscard]] Value
+    Value
     GetValue(idx_t index) const;
 
     // Set the <index> element of the vector to the specified value.

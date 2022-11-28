@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/types/internal_types.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -43,10 +44,14 @@ enum class TypeInfoType {
 class TypeInfo {
 public:
     explicit
-    TypeInfo(TypeInfoType type) : type_(type) {};
+    TypeInfo(TypeInfoType type) : type_(type) {
+        GlobalResourceUsage::IncrObjectCount();
+    };
 
     virtual
-    ~TypeInfo() = default;
+    ~TypeInfo() {
+        GlobalResourceUsage::DecrObjectCount();
+    }
 
     bool
     operator==(const TypeInfo& other) const;

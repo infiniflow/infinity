@@ -43,7 +43,6 @@ public:
         return row_capacity_;
     }
 
-
     Vector<ColumnVector> columns;
 
 private:
