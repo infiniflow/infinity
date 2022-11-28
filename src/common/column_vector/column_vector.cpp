@@ -359,18 +359,19 @@ ColumnVector::Reserve(size_t new_capacity) {
     new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
     capacity_ = new_capacity;
     buffer_ = new_buffer;
+    data_ptr_ = buffer_->GetData();
 }
 
 void
 ColumnVector::Reset() {
     capacity_ = 0;
     tail_index_ = 0;
-    data_type_size_ = 0;
+//    data_type_size_ = 0;
     buffer_.reset();
     data_ptr_ = nullptr;
     initialized = false;
-    data_type_ = DataType(LogicalType::kInvalid);
-    vector_type_ = ColumnVectorType::kInvalid;
+//    data_type_ = DataType(LogicalType::kInvalid);
+//    vector_type_ = ColumnVectorType::kInvalid;
 }
 
 }
