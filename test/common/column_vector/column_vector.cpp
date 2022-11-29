@@ -436,3 +436,307 @@ TEST_F(ColumnVectorTest, flat_bigint) {
         EXPECT_THROW(col_bigint.GetValue(i + 1), std::logic_error);
     }
 }
+
+TEST_F(ColumnVectorTest, flat_hugeint) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kHugeInt);
+    ColumnVector col_hugeint(data_type, ColumnVectorType::kFlat);
+    col_hugeint.Initialize();
+
+    EXPECT_THROW(col_hugeint.SetDataType(DataType(LogicalType::kHugeInt)), std::logic_error);
+    EXPECT_THROW(col_hugeint.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_hugeint.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_hugeint.Size(), 0);
+    EXPECT_THROW(col_hugeint.ToString(), std::logic_error);
+    EXPECT_THROW(col_hugeint.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_hugeint.tail_index_, 0);
+    EXPECT_EQ(col_hugeint.data_type_size_, 16);
+    EXPECT_NE(col_hugeint.data_ptr_, nullptr);
+    EXPECT_EQ(col_hugeint.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_hugeint.data_type(), data_type);
+
+    EXPECT_NE(col_hugeint.buffer_, nullptr);
+    EXPECT_EQ(col_hugeint.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_hugeint.initialized);
+    col_hugeint.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = col_hugeint.data_ptr_;
+    EXPECT_EQ(col_hugeint.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_hugeint.data_ptr_);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        HugeIntT input(0, i);
+        Value v = Value::MakeHugeInt(input);
+        col_hugeint.AppendValue(v);
+        Value vx = col_hugeint.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
+        EXPECT_EQ(vx.value_.huge_int, input);
+        EXPECT_THROW(col_hugeint.GetValue(i + 1), std::logic_error);
+    }
+
+    col_hugeint.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = col_hugeint.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
+        EXPECT_EQ(vx.value_.huge_int, HugeIntT(0, i));
+    }
+    EXPECT_EQ(col_hugeint.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_hugeint.capacity(), 2* DEFAULT_VECTOR_SIZE);
+//    return ;
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+        HugeIntT input(0, i);
+        Value v = Value::MakeHugeInt(input);
+        col_hugeint.AppendValue(v);
+        Value vx = col_hugeint.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
+        EXPECT_EQ(vx.value_.huge_int, input);
+        EXPECT_THROW(col_hugeint.GetValue(i + 1), std::logic_error);
+    }
+
+    col_hugeint.Reset();
+    EXPECT_EQ(col_hugeint.capacity(), 0);
+    EXPECT_EQ(col_hugeint.tail_index_, 0);
+//    EXPECT_EQ(col_hugeint.data_type_size_, 0);
+    EXPECT_EQ(col_hugeint.buffer_, nullptr);
+    EXPECT_EQ(col_hugeint.data_ptr_, nullptr);
+    EXPECT_EQ(col_hugeint.initialized, false);
+//    EXPECT_EQ(col_hugeint.data_type(), DataType(LogicalType::kInvalid));
+//    EXPECT_EQ(col_hugeint.vector_type(), ColumnVectorType::kInvalid);
+//
+    // ====
+//    EXPECT_THROW(col_hugeint.Initialize(), std::logic_error);
+//    col_hugeint.SetDataType(DataType(LogicalType::kHugeInt));
+//    EXPECT_THROW(col_hugeint.Initialize(), std::logic_error);
+//    col_hugeint.SetVectorType(ColumnVectorType::kFlat);
+    col_hugeint.Initialize();
+    EXPECT_THROW(col_hugeint.SetDataType(DataType(LogicalType::kHugeInt)), std::logic_error);
+    EXPECT_THROW(col_hugeint.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_hugeint.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_hugeint.Size(), 0);
+    EXPECT_THROW(col_hugeint.ToString(), std::logic_error);
+    EXPECT_THROW(col_hugeint.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_hugeint.tail_index_, 0);
+    EXPECT_EQ(col_hugeint.data_type_size_, 16);
+    EXPECT_NE(col_hugeint.data_ptr_, nullptr);
+    EXPECT_EQ(col_hugeint.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_hugeint.data_type(), data_type);
+
+    EXPECT_NE(col_hugeint.buffer_, nullptr);
+    EXPECT_EQ(col_hugeint.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_hugeint.initialized);
+    col_hugeint.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = col_hugeint.data_ptr_;
+    EXPECT_EQ(col_hugeint.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_hugeint.data_ptr_);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        HugeIntT input(0, i);
+        Value v = Value::MakeHugeInt(input);
+        col_hugeint.AppendValue(v);
+        Value vx = col_hugeint.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
+        EXPECT_EQ(vx.value_.huge_int, input);
+        EXPECT_THROW(col_hugeint.GetValue(i + 1), std::logic_error);
+    }
+}
+
+TEST_F(ColumnVectorTest, flat_float) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kFloat);
+    ColumnVector col_float(data_type, ColumnVectorType::kFlat);
+    col_float.Initialize();
+
+    EXPECT_THROW(col_float.SetDataType(DataType(LogicalType::kFloat)), std::logic_error);
+    EXPECT_THROW(col_float.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_float.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_float.Size(), 0);
+    EXPECT_THROW(col_float.ToString(), std::logic_error);
+    EXPECT_THROW(col_float.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_float.tail_index_, 0);
+    EXPECT_EQ(col_float.data_type_size_, 4);
+    EXPECT_NE(col_float.data_ptr_, nullptr);
+    EXPECT_EQ(col_float.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_float.data_type(), data_type);
+
+    EXPECT_NE(col_float.buffer_, nullptr);
+    EXPECT_EQ(col_float.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_float.initialized);
+    col_float.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = col_float.data_ptr_;
+    EXPECT_EQ(col_float.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_float.data_ptr_);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
+        col_float.AppendValue(v);
+        Value vx = col_float.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
+        EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
+        EXPECT_THROW(col_float.GetValue(i + 1), std::logic_error);
+    }
+
+    col_float.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = col_float.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
+        EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
+    }
+    EXPECT_EQ(col_float.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_float.capacity(), 2* DEFAULT_VECTOR_SIZE);
+//    return ;
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
+        col_float.AppendValue(v);
+        Value vx = col_float.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
+        EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
+        EXPECT_THROW(col_float.GetValue(i + 1), std::logic_error);
+    }
+
+    col_float.Reset();
+    EXPECT_EQ(col_float.capacity(), 0);
+    EXPECT_EQ(col_float.tail_index_, 0);
+//    EXPECT_EQ(col_float.data_type_size_, 0);
+    EXPECT_EQ(col_float.buffer_, nullptr);
+    EXPECT_EQ(col_float.data_ptr_, nullptr);
+    EXPECT_EQ(col_float.initialized, false);
+//    EXPECT_EQ(col_float.data_type(), DataType(LogicalType::kInvalid));
+//    EXPECT_EQ(col_float.vector_type(), ColumnVectorType::kInvalid);
+
+    // ====
+//    EXPECT_THROW(col_float.Initialize(), std::logic_error);
+//    col_float.SetDataType(DataType(LogicalType::kFloat));
+//    EXPECT_THROW(col_float.Initialize(), std::logic_error);
+//    col_float.SetVectorType(ColumnVectorType::kFlat);
+    col_float.Initialize();
+    EXPECT_THROW(col_float.SetDataType(DataType(LogicalType::kFloat)), std::logic_error);
+    EXPECT_THROW(col_float.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_float.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_float.Size(), 0);
+    EXPECT_THROW(col_float.ToString(), std::logic_error);
+    EXPECT_THROW(col_float.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_float.tail_index_, 0);
+    EXPECT_EQ(col_float.data_type_size_, 4);
+    EXPECT_NE(col_float.data_ptr_, nullptr);
+    EXPECT_EQ(col_float.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_float.data_type(), data_type);
+
+    EXPECT_NE(col_float.buffer_, nullptr);
+    EXPECT_EQ(col_float.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_float.initialized);
+    col_float.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = col_float.data_ptr_;
+    EXPECT_EQ(col_float.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_float.data_ptr_);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
+        col_float.AppendValue(v);
+        Value vx = col_float.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
+        EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
+        EXPECT_THROW(col_float.GetValue(i + 1), std::logic_error);
+    }
+}
+
+TEST_F(ColumnVectorTest, flat_double) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kDouble);
+    ColumnVector col_double(data_type, ColumnVectorType::kFlat);
+    col_double.Initialize();
+
+    EXPECT_THROW(col_double.SetDataType(DataType(LogicalType::kDouble)), std::logic_error);
+    EXPECT_THROW(col_double.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_double.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_double.Size(), 0);
+    EXPECT_THROW(col_double.ToString(), std::logic_error);
+    EXPECT_THROW(col_double.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_double.tail_index_, 0);
+    EXPECT_EQ(col_double.data_type_size_, 8);
+    EXPECT_NE(col_double.data_ptr_, nullptr);
+    EXPECT_EQ(col_double.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_double.data_type(), data_type);
+
+    EXPECT_NE(col_double.buffer_, nullptr);
+    EXPECT_EQ(col_double.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_double.initialized);
+    col_double.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = col_double.data_ptr_;
+    EXPECT_EQ(col_double.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_double.data_ptr_);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
+        col_double.AppendValue(v);
+        Value vx = col_double.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
+        EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
+        EXPECT_THROW(col_double.GetValue(i + 1), std::logic_error);
+    }
+
+    col_double.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = col_double.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
+        EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
+    }
+    EXPECT_EQ(col_double.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_double.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
+        col_double.AppendValue(v);
+        Value vx = col_double.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
+        EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
+        EXPECT_THROW(col_double.GetValue(i + 1), std::logic_error);
+    }
+
+    col_double.Reset();
+    EXPECT_EQ(col_double.capacity(), 0);
+    EXPECT_EQ(col_double.tail_index_, 0);
+    EXPECT_EQ(col_double.buffer_, nullptr);
+    EXPECT_EQ(col_double.data_ptr_, nullptr);
+    EXPECT_EQ(col_double.initialized, false);
+
+    // ====
+    col_double.Initialize();
+    EXPECT_THROW(col_double.SetDataType(DataType(LogicalType::kDouble)), std::logic_error);
+    EXPECT_THROW(col_double.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_double.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_double.Size(), 0);
+    EXPECT_THROW(col_double.ToString(), std::logic_error);
+    EXPECT_THROW(col_double.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_double.tail_index_, 0);
+    EXPECT_EQ(col_double.data_type_size_, 8);
+    EXPECT_NE(col_double.data_ptr_, nullptr);
+    EXPECT_EQ(col_double.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_double.data_type(), data_type);
+
+    EXPECT_NE(col_double.buffer_, nullptr);
+    EXPECT_EQ(col_double.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_double.initialized);
+    col_double.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = col_double.data_ptr_;
+    EXPECT_EQ(col_double.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_double.data_ptr_);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
+        col_double.AppendValue(v);
+        Value vx = col_double.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
+        EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
+        EXPECT_THROW(col_double.GetValue(i + 1), std::logic_error);
+    }
+}
