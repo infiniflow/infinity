@@ -2,7 +2,6 @@
 // Created by JinHai on 2022/11/27.
 //
 
-
 #include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/types/data_type.h"

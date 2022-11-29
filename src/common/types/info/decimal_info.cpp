@@ -4,60 +4,33 @@
 
 #include "decimal_info.h"
 #include "common/types/number/decimal_type.h"
+#include "common/types/info/decimal16_info.h"
+#include "common/types/info/decimal32_info.h"
+#include "common/types/info/decimal64_info.h"
+#include "common/types/info/decimal128_info.h"
 
 namespace infinity {
 
-UniquePtr<DecimalInfo>
-DecimalInfo::Make(LogicalType logical_type, i64 precision, i64 scale) {
-    // Make sure the precision does not exceed the limitation of the specified decimal type.
-
-    switch(logical_type) {
-        case kDecimal16: {
-            return MakeUnique<DecimalInfo>(TypeInfoType::kDecimal16, precision, scale);
-        }
-        case kDecimal32: {
-            return MakeUnique<DecimalInfo>(TypeInfoType::kDecimal32, precision, scale);
-        }
-        case kDecimal64: {
-            return MakeUnique<DecimalInfo>(TypeInfoType::kDecimal64, precision, scale);
-        }
-        case kDecimal128: {
-            return MakeUnique<DecimalInfo>(TypeInfoType::kDecimal128, precision, scale);
-        }
-        default: {
-            TypeError("Unexpected error");
-        }
-    }
-}
-
-UniquePtr<DecimalInfo>
+UniquePtr<TypeInfo>
 DecimalInfo::Make(i64 precision, i64 scale) {
-
-    TypeInfoType type_info(TypeInfoType::kInvalid);
-
-    switch(DecimalType::GetLogicalType(precision)) {
-        case LogicalType::kDecimal16: {
-            type_info = TypeInfoType::kDecimal16;
-            break;
+    switch(precision) {
+        case 0 ... 4: {
+            return Decimal16Info::Make(precision, scale);
         }
-        case LogicalType::kDecimal32: {
-            type_info = TypeInfoType::kDecimal32;
-            break;
+        case 5 ... 9: {
+            return Decimal32Info::Make(precision, scale);
         }
-        case LogicalType::kDecimal64: {
-            type_info = TypeInfoType::kDecimal64;
-            break;
+        case 10 ... 18: {
+            return Decimal64Info::Make(precision, scale);
         }
-        case LogicalType::kDecimal128: {
-            type_info = TypeInfoType::kDecimal128;
-            break;
+        case 19 ... 38: {
+            return Decimal128Info::Make(precision, scale);
         }
         default: {
-            TypeError("Unexpected error");
+            TypeError("Unsupported decimal precision: " + std::to_string(precision));
         }
     }
-
-    return MakeUnique<DecimalInfo>(type_info, precision, scale);
 }
+
 
 }

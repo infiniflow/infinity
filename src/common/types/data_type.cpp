@@ -195,7 +195,7 @@ DataType::ConvertType(hsql::ColumnType type) {
 
         case hsql::DataType::DECIMAL: {
             LogicalType logical_type = DecimalType::GetLogicalType(type.precision);
-            UniquePtr<DecimalInfo> decimal_info = DecimalInfo::Make(logical_type, type.precision, type.scale);
+            UniquePtr<TypeInfo> decimal_info = DecimalInfo::Make(type.precision, type.scale);
             return DataType(logical_type, std::move(decimal_info));
         }
 

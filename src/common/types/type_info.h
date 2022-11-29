@@ -62,6 +62,11 @@ public:
     [[nodiscard]] virtual size_t
     Size() const = 0;
 
+    [[nodiscard]] inline TypeInfoType
+    type() const noexcept {
+        return type_;
+    }
+
 protected:
     TypeInfoType type_ { TypeInfoType::kInvalid };
 };
