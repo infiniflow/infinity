@@ -26,10 +26,10 @@ public:
     void
     Copy(ptr_t input, size_t size);
 
-    ptr_t
-    GetData() { return data_.get(); }
+    [[nodiscard]] ptr_t
+    GetData() const { return data_.get(); }
 
-private:
+public:
     bool initialized_ {false};
     UniquePtr<char[]> data_ {nullptr};
     size_t data_size_ {0};

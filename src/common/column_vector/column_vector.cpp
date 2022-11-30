@@ -16,7 +16,20 @@ void ColumnVector::Initialize(size_t capacity) {
     capacity_ = capacity;
     tail_index_ = 0;
     data_type_size_ = data_type_.Size();
-    buffer_ = VectorBuffer::Make(data_type_size_, capacity_);
+    switch(data_type_.type()) {
+        case LogicalType::kVarchar: {
+            buffer_ = StringVectorBuffer::Make(data_type_size_, capacity_);
+            break;
+        }
+        case LogicalType::kInvalid:
+        case LogicalType::kNull:
+        case LogicalType::kMissing: {
+            GeneralError("Unexpected data type for column vector.")
+        }
+        default: {
+            buffer_ = VectorBuffer::Make(data_type_size_, capacity_);
+        }
+    }
     data_ptr_ = buffer_->GetData();
     initialized = true;
 }
@@ -223,7 +236,15 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
         }
         case kVarchar: {
             // TODO: store string data into sequential address?
-            ((VarcharT *) data_ptr_)[index] = value.GetValue<VarcharT>();
+
+            auto* string_vector_buffer_ptr = (StringVectorBuffer*)(this->buffer_.get());
+
+            size_t varchar_len = value.value_.varchar.length;
+            ptr_t ptr = string_vector_buffer_ptr->buffer_arena_->Allocate(varchar_len);
+            memcpy(ptr, value.value_.varchar.ptr, varchar_len);
+
+            ((VarcharT *) data_ptr_)[index].ptr = ptr;
+            ((VarcharT *) data_ptr_)[index].length = static_cast<i16>(varchar_len);
             break;
         }
         case kChar1: {
@@ -355,10 +376,28 @@ ColumnVector::ShallowCopy(const ColumnVector &other) {
 void
 ColumnVector::Reserve(size_t new_capacity) {
     if(new_capacity <= capacity_) return ;
-    SharedPtr<VectorBuffer> new_buffer = VectorBuffer::Make(data_type_size_, new_capacity);
-    new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
+    switch(data_type_.type()) {
+        case LogicalType::kVarchar: {
+            auto* string_vector_buffer_ptr = (StringVectorBuffer*)(this->buffer_.get());
+            SharedPtr<StringVectorBuffer> new_buffer = StringVectorBuffer::Make(data_type_size_, new_capacity);
+            new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
+            new_buffer->buffer_arena_ = std::move(string_vector_buffer_ptr->buffer_arena_);
+            buffer_ = new_buffer;
+            break;
+        }
+        case LogicalType::kInvalid:
+        case LogicalType::kNull:
+        case LogicalType::kMissing: {
+            GeneralError("Unexpected data type for column vector.")
+        }
+        default: {
+            SharedPtr<VectorBuffer> new_buffer = VectorBuffer::Make(data_type_size_, new_capacity);
+            new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
+            buffer_ = new_buffer;
+        }
+    }
+
     capacity_ = new_capacity;
-    buffer_ = new_buffer;
     data_ptr_ = buffer_->GetData();
 }
 
@@ -370,6 +409,19 @@ ColumnVector::Reset() {
     buffer_.reset();
     data_ptr_ = nullptr;
     initialized = false;
+
+    // Need to reset special column vector related data.
+//    switch(data_type_.type()) {
+//        case LogicalType::kVarchar: {
+//            auto* string_vector_buffer_ptr = (StringVectorBuffer*)(this->buffer_.get());
+//            string_vector_buffer_ptr->buffer_arena_.reset();
+//            break;
+//        }
+//        default: {
+//            ;
+//        }
+//    }
+
 //    data_type_ = DataType(LogicalType::kInvalid);
 //    vector_type_ = ColumnVectorType::kInvalid;
 }
