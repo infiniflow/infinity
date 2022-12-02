@@ -25,19 +25,25 @@ public:
     u64* ptr {nullptr};
 public:
     inline
-    BitmapType() = default;
+    BitmapType() {
+        GlobalResourceUsage::IncrObjectCount();
+    }
 
     explicit inline
     BitmapType(u64 bit_count) {
+        GlobalResourceUsage::IncrObjectCount();
         Initialize(bit_count);
     }
 
     // The bitmap_ptr will also be freed by BitmapType's destructor.
     inline
-    BitmapType(u64* bitmap_ptr, u64 bit_count): ptr(bitmap_ptr), count(bit_count) {}
+    BitmapType(u64* bitmap_ptr, u64 bit_count): ptr(bitmap_ptr), count(bit_count) {
+        GlobalResourceUsage::IncrObjectCount();
+    }
 
     inline
     ~BitmapType() {
+        GlobalResourceUsage::DecrObjectCount();
         Reset();
     }
 
@@ -60,10 +66,10 @@ public:
     inline void
     Reset() {
         if(count != 0) {
-            count = 0;
-
             delete[] ptr;
             GlobalResourceUsage::DecrRawMemCount();
+            ptr = nullptr;
+            count = 0;
         }
     }
 

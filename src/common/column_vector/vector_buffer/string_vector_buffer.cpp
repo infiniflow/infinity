@@ -8,9 +8,9 @@
 namespace infinity {
 
 SharedPtr<StringVectorBuffer>
-StringVectorBuffer::Make(size_t varchar_type_size, size_t capacity) {
+StringVectorBuffer::Make(size_t capacity) {
     SharedPtr<StringVectorBuffer> buffer_ptr = MakeShared<StringVectorBuffer>();
-    buffer_ptr->Initialize(varchar_type_size * capacity);
+    buffer_ptr->Initialize(16u, capacity);
     return buffer_ptr;
 }
 

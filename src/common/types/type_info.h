@@ -6,6 +6,7 @@
 
 #include "common/types/internal_types.h"
 #include "main/stats/global_resource_usage.h"
+#include <iostream>
 
 namespace infinity {
 
@@ -53,8 +54,8 @@ public:
         GlobalResourceUsage::DecrObjectCount();
     }
 
-    bool
-    operator==(const TypeInfo& other) const;
+    virtual bool
+    operator==(const TypeInfo& other) const = 0;
 
     bool
     operator!=(const TypeInfo& other) const;

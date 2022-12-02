@@ -18,6 +18,7 @@ BitmapType::BitmapType(const BitmapType& other) : count(other.count) {
 
 BitmapType::BitmapType(BitmapType&& other) noexcept
     : count(other.count), ptr(other.ptr) {
+    GlobalResourceUsage::IncrObjectCount();
     other.ptr = nullptr;
     other.count = 0;
 }
@@ -29,15 +30,16 @@ BitmapType::operator=(const BitmapType& other) {
     u64 current_unit_count = UnitCount(this->count);
     u64 target_unit_count = UnitCount(other.count);
     if(current_unit_count == target_unit_count) {
-        memcpy(ptr, other.ptr, current_unit_count * UNIT_BYTES);
+        memcpy(ptr, other.ptr, target_unit_count * UNIT_BYTES);
+        this->count = other.count;
         return *this;
     }
 
     // Copy the other bitmap to current one.
-    if(count > 0) {
+    if(this->count > 0) {
         Reset();
     }
-    count = other.count;
+    this->count = other.count;
 
     ptr = new u64[target_unit_count]{0};
     GlobalResourceUsage::IncrRawMemCount();
@@ -53,7 +55,7 @@ BitmapType::operator=(BitmapType&& other) noexcept {
         // Need to release current ptr.
         Reset();
     }
-    count = other.count;
+    this->count = other.count;
     ptr = other.ptr;
     other.ptr = nullptr;
     other.count = 0;

@@ -5,10 +5,6 @@
 #include "type_info.h"
 
 namespace infinity {
-bool
-TypeInfo::operator==(const TypeInfo &other) const {
-    return true;
-}
 
 bool
 TypeInfo::operator!=(const TypeInfo &other) const {

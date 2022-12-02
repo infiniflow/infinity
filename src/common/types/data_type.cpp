@@ -156,8 +156,15 @@ bool
 DataType::operator==(const DataType &other) const {
     if(this == &other) return true;
     if(type_ != other.type_) return false;
-    if(*this->type_info_ != *other.type_info_) return false;
-    return true;
+    if(this->type_info_ == nullptr && other.type_info_ == nullptr) {
+        return true;
+    }
+    if(this->type_info_ != nullptr && other.type_info_ != nullptr) {
+        if(*this->type_info_ != *other.type_info_) return false;
+        return true;
+    } else {
+        return false;
+    }
 }
 
 bool
@@ -195,7 +202,7 @@ DataType::ConvertType(hsql::ColumnType type) {
 
         case hsql::DataType::DECIMAL: {
             LogicalType logical_type = DecimalType::GetLogicalType(type.precision);
-            UniquePtr<TypeInfo> decimal_info = DecimalInfo::Make(type.precision, type.scale);
+            SharedPtr<TypeInfo> decimal_info = DecimalInfo::Make(type.precision, type.scale);
             return DataType(logical_type, std::move(decimal_info));
         }
 

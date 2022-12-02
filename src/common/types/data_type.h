@@ -122,7 +122,7 @@ public:
         GlobalResourceUsage::IncrObjectCount();
     }
 
-    DataType(DataType&& other) noexcept: type_(other.type_), type_info_(other.type_info_) {
+    DataType(DataType&& other) noexcept: type_(other.type_), type_info_(std::move(other.type_info_)) {
         GlobalResourceUsage::IncrObjectCount();
     }
 
@@ -160,6 +160,12 @@ public:
 
     [[nodiscard]] inline const SharedPtr<TypeInfo>&
     type_info() const { return type_info_; }
+
+    inline void
+    Reset() {
+        type_ = LogicalType::kInvalid;
+        type_info_.reset();
+    }
 
 private:
 

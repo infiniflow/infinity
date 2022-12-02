@@ -11,7 +11,7 @@
 
 namespace infinity {
 
-UniquePtr<TypeInfo>
+SharedPtr<TypeInfo>
 DecimalInfo::Make(i64 precision, i64 scale) {
     switch(precision) {
         case 0 ... 4: {

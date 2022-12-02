@@ -5,7 +5,10 @@
 #pragma once
 
 #include "data_type.h"
-
+#include "common/types/info/decimal16_info.h"
+#include "common/types/info/decimal32_info.h"
+#include "common/types/info/decimal64_info.h"
+#include "common/types/info/decimal128_info.h"
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {
@@ -40,16 +43,16 @@ public:
     MakeDouble(DoubleT input);
 
     static Value
-    MakeDecimal16(Decimal16T input);
+    MakeDecimal16(Decimal16T input, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
-    MakeDecimal32(Decimal32T input);
+    MakeDecimal32(Decimal32T input, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
-    MakeDecimal64(Decimal64T input);
+    MakeDecimal64(Decimal64T input, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
-    MakeDecimal128(Decimal128T input);
+    MakeDecimal128(Decimal128T input, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
     MakeVarchar(VarcharT& input_ref);
@@ -170,7 +173,7 @@ public:
 public:
 //    Value() = default;
     explicit
-    Value(LogicalType type);
+    Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr = nullptr);
 
     Value(const Value& other);
 

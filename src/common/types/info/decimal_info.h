@@ -13,7 +13,7 @@ namespace infinity {
 
 struct DecimalInfo {
 
-static UniquePtr<TypeInfo>
+static SharedPtr<TypeInfo>
 Make(i64 precision, i64 scale);
 
 };

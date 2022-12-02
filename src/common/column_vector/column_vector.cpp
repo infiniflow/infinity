@@ -18,7 +18,7 @@ void ColumnVector::Initialize(size_t capacity) {
     data_type_size_ = data_type_.Size();
     switch(data_type_.type()) {
         case LogicalType::kVarchar: {
-            buffer_ = StringVectorBuffer::Make(data_type_size_, capacity_);
+            buffer_ = StringVectorBuffer::Make(capacity_);
             break;
         }
         case LogicalType::kInvalid:
@@ -75,16 +75,16 @@ ColumnVector::GetValue(idx_t index) const {
             return Value::MakeDouble(((DoubleT *) data_ptr_)[index]);
         }
         case kDecimal16: {
-            return Value::MakeDecimal16(((Decimal16T *) data_ptr_)[index]);
+            return Value::MakeDecimal16(((Decimal16T *) data_ptr_)[index], data_type_.type_info());
         }
         case kDecimal32: {
-            return Value::MakeDecimal32(((Decimal32T *) data_ptr_)[index]);
+            return Value::MakeDecimal32(((Decimal32T *) data_ptr_)[index], data_type_.type_info());
         }
         case kDecimal64: {
-            return Value::MakeDecimal64(((Decimal64T *) data_ptr_)[index]);
+            return Value::MakeDecimal64(((Decimal64T *) data_ptr_)[index], data_type_.type_info());
         }
         case kDecimal128: {
-            return Value::MakeDecimal128(((Decimal128T *) data_ptr_)[index]);
+            return Value::MakeDecimal128(((Decimal128T *) data_ptr_)[index], data_type_.type_info());
         }
         case kVarchar: {
             return Value::MakeVarchar(((VarcharT *) data_ptr_)[index]);
@@ -235,15 +235,20 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             break;
         }
         case kVarchar: {
-            // TODO: store string data into sequential address?
-
             auto* string_vector_buffer_ptr = (StringVectorBuffer*)(this->buffer_.get());
 
+            // Copy string
             size_t varchar_len = value.value_.varchar.length;
-            ptr_t ptr = string_vector_buffer_ptr->buffer_arena_->Allocate(varchar_len);
-            memcpy(ptr, value.value_.varchar.ptr, varchar_len);
-
-            ((VarcharT *) data_ptr_)[index].ptr = ptr;
+            if(varchar_len <= VarcharType::PREFIX_LENGTH) {
+                // Only prefix is enough to contain all string data.
+                memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.ptr, varchar_len);
+                ((VarcharT *) data_ptr_)[index].ptr = nullptr;
+            } else {
+                memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.ptr, VarcharType::PREFIX_LENGTH);
+                ptr_t ptr = string_vector_buffer_ptr->chunk_mgr_->Allocate(varchar_len);
+                memcpy(ptr, value.value_.varchar.ptr, varchar_len);
+                ((VarcharT *) data_ptr_)[index].ptr = ptr;
+            }
             ((VarcharT *) data_ptr_)[index].length = static_cast<i16>(varchar_len);
             break;
         }
@@ -379,9 +384,13 @@ ColumnVector::Reserve(size_t new_capacity) {
     switch(data_type_.type()) {
         case LogicalType::kVarchar: {
             auto* string_vector_buffer_ptr = (StringVectorBuffer*)(this->buffer_.get());
-            SharedPtr<StringVectorBuffer> new_buffer = StringVectorBuffer::Make(data_type_size_, new_capacity);
+            SharedPtr<StringVectorBuffer> new_buffer = StringVectorBuffer::Make(new_capacity);
+
+            // Copy the string header information.
             new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
-            new_buffer->buffer_arena_ = std::move(string_vector_buffer_ptr->buffer_arena_);
+
+            // Move the string chunks.
+            new_buffer->chunk_mgr_ = std::move(string_vector_buffer_ptr->chunk_mgr_);
             buffer_ = new_buffer;
             break;
         }
@@ -410,17 +419,6 @@ ColumnVector::Reset() {
     data_ptr_ = nullptr;
     initialized = false;
 
-    // Need to reset special column vector related data.
-//    switch(data_type_.type()) {
-//        case LogicalType::kVarchar: {
-//            auto* string_vector_buffer_ptr = (StringVectorBuffer*)(this->buffer_.get());
-//            string_vector_buffer_ptr->buffer_arena_.reset();
-//            break;
-//        }
-//        default: {
-//            ;
-//        }
-//    }
 
 //    data_type_ = DataType(LogicalType::kInvalid);
 //    vector_type_ = ColumnVectorType::kInvalid;

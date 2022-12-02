@@ -14,7 +14,7 @@ namespace infinity {
 class Decimal64Info : public TypeInfo {
 public:
 
-    static UniquePtr<Decimal64Info>
+    static SharedPtr<Decimal64Info>
     Make(i64 precision, i64 scale);
 
     explicit Decimal64Info(i64 precision, i64 scale) :
@@ -25,6 +25,9 @@ public:
     ~Decimal64Info() override {
 //        GlobalResourceUsage::DecrObjectCount();
     }
+
+    bool
+    operator==(const TypeInfo& other) const override;
 
     [[nodiscard]] i64
     precision() const { return precision_; }

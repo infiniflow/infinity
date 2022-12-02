@@ -3,10 +3,10 @@
 //
 
 #include "value.h"
-
-#include <utility>
 #include "common/utility/infinity_assert.h"
 #include "main/stats/global_resource_usage.h"
+
+#include <utility>
 
 namespace infinity {
 
@@ -77,15 +77,15 @@ Value::MakeDouble(DoubleT input) {
 }
 
 Value
-Value::MakeDecimal16(Decimal16T input) {
-    Value value(LogicalType::kDecimal16);
+Value::MakeDecimal16(Decimal16T input, const SharedPtr<TypeInfo>& type_info_ptr) {
+    Value value(LogicalType::kDecimal16, type_info_ptr);
     value.value_.decimal16 = input;
     value.is_null_ = false;
     return value;
 }
 
 Value
-Value::MakeDecimal32(Decimal32T input) {
+Value::MakeDecimal32(Decimal32T input, const SharedPtr<TypeInfo>& type_info_ptr) {
     Value value(LogicalType::kDecimal32);
     value.value_.decimal32 = input;
     value.is_null_ = false;
@@ -93,7 +93,7 @@ Value::MakeDecimal32(Decimal32T input) {
 }
 
 Value
-Value::MakeDecimal64(Decimal64T input) {
+Value::MakeDecimal64(Decimal64T input, const SharedPtr<TypeInfo>& type_info_ptr) {
     Value value(LogicalType::kDecimal64);
     value.value_.decimal64 = input;
     value.is_null_ = false;
@@ -101,13 +101,12 @@ Value::MakeDecimal64(Decimal64T input) {
 }
 
 Value
-Value::MakeDecimal128(Decimal128T input) {
+Value::MakeDecimal128(Decimal128T input, const SharedPtr<TypeInfo>& type_info_ptr) {
     Value value(LogicalType::kDecimal128);
     value.value_.decimal128 = input;
     value.is_null_ = false;
     return value;
 }
-
 
 Value
 Value::MakeVarchar(VarcharT& input) {
@@ -625,7 +624,7 @@ Value::~Value() {
     }
 }
 
-Value::Value(LogicalType type): type_(type) {
+Value::Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr): type_(type, std::move(typeinfo_ptr)) {
     Init();
 }
 
@@ -1393,6 +1392,7 @@ Value::Reset() {
         case kInvalid:
             break;
     }
+    type_.Reset();
 }
 
 String

@@ -13,22 +13,19 @@ namespace infinity {
 class VarcharInfo : public TypeInfo {
 public:
 
-    static inline UniquePtr<VarcharInfo>
-    Make(i64 limit) {
-        TypeAssert(limit >= 65 && limit <= DEFAULT_VARCHAR_SIZE,
-                   "Varchar length can't be less than 65 or larger than 65535.")
-        return MakeUnique<VarcharInfo>(limit);
-    }
+    static SharedPtr<VarcharInfo>
+    Make(i64 limit);
 
-    static inline UniquePtr<VarcharInfo>
-    Make() {
-        return MakeUnique<VarcharInfo>(DEFAULT_VARCHAR_SIZE);
-    }
+    static SharedPtr<VarcharInfo>
+    Make();
 
     explicit
     VarcharInfo(size_t limit) : TypeInfo(TypeInfoType::kVarchar), length_limit_(limit) {}
 
     ~VarcharInfo() override = default;
+
+    bool
+    operator==(const TypeInfo& other) const override;
 
     // Varchar type costs 16 bytes.
     [[nodiscard]] size_t

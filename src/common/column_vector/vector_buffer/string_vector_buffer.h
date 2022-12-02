@@ -13,10 +13,21 @@ namespace infinity {
 struct StringVectorBuffer: public VectorBuffer {
 public:
     static SharedPtr<StringVectorBuffer>
-    Make(size_t varchar_type_size, size_t capacity);
+    Make(size_t capacity);
+
+    inline
+    StringVectorBuffer() {
+        chunk_mgr_ = MakeUnique<StringChunkMgr>();
+        GlobalResourceUsage::IncrObjectCount();
+    }
+
+    inline
+    ~StringVectorBuffer() {
+        GlobalResourceUsage::DecrObjectCount();
+    }
 
 public:
-    UniquePtr<StringChunkMgr> buffer_arena_;
+    UniquePtr<StringChunkMgr> chunk_mgr_;
 };
 
 

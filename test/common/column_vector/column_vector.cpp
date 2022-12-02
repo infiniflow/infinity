@@ -8,6 +8,7 @@
 #include "common/types/value.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
+#include "common/types/info/decimal16_info.h"
 
 class ColumnVectorTest : public BaseTest {
     void
@@ -740,3 +741,103 @@ TEST_F(ColumnVectorTest, flat_double) {
         EXPECT_THROW(col_double.GetValue(i + 1), std::logic_error);
     }
 }
+
+
+TEST_F(ColumnVectorTest, flat_decimal16) {
+    using namespace infinity;
+
+    auto decimal16_info = Decimal16Info::Make(4, 4);
+    DataType data_type(LogicalType::kDecimal16, decimal16_info);
+    ColumnVector col_decimal16(data_type, ColumnVectorType::kFlat);
+    col_decimal16.Initialize();
+
+    EXPECT_THROW(col_decimal16.SetDataType(DataType(LogicalType::kDecimal16)), std::logic_error);
+    EXPECT_THROW(col_decimal16.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_decimal16.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_decimal16.Size(), 0);
+    EXPECT_THROW(col_decimal16.ToString(), std::logic_error);
+    EXPECT_THROW(col_decimal16.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_decimal16.tail_index_, 0);
+    EXPECT_EQ(col_decimal16.data_type_size_, 2);
+    EXPECT_NE(col_decimal16.data_ptr_, nullptr);
+    EXPECT_EQ(col_decimal16.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_decimal16.data_type(), data_type);
+
+    EXPECT_NE(col_decimal16.buffer_, nullptr);
+    EXPECT_EQ(col_decimal16.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_decimal16.initialized);
+    col_decimal16.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = col_decimal16.data_ptr_;
+    EXPECT_EQ(col_decimal16.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_decimal16.data_ptr_);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Decimal16T decimal16(static_cast<i16>(i));
+        Value v = Value::MakeDecimal16(decimal16, decimal16_info);
+        col_decimal16.AppendValue(v);
+        Value vx = col_decimal16.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDecimal16);
+        EXPECT_FLOAT_EQ(vx.value_.decimal16.value, static_cast<i16>(i));
+        EXPECT_THROW(col_decimal16.GetValue(i + 1), std::logic_error);
+    }
+//
+//    col_double.Reserve(DEFAULT_VECTOR_SIZE* 2);
+//
+//        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+//            Value vx = col_double.GetValue(i);
+//            EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
+//            EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
+//        }
+//
+//    EXPECT_EQ(col_double.tail_index_, DEFAULT_VECTOR_SIZE);
+//    EXPECT_EQ(col_double.capacity(), 2* DEFAULT_VECTOR_SIZE);
+//    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+//        Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
+//        col_double.AppendValue(v);
+//        Value vx = col_double.GetValue(i);
+//        EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
+//        EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
+//        EXPECT_THROW(col_double.GetValue(i + 1), std::logic_error);
+//    }
+//
+//    col_double.Reset();
+//    EXPECT_EQ(col_double.capacity(), 0);
+//    EXPECT_EQ(col_double.tail_index_, 0);
+//    EXPECT_EQ(col_double.buffer_, nullptr);
+//    EXPECT_EQ(col_double.data_ptr_, nullptr);
+//    EXPECT_EQ(col_double.initialized, false);
+//
+//    // ====
+//    col_double.Initialize();
+//    EXPECT_THROW(col_double.SetDataType(DataType(LogicalType::kDouble)), std::logic_error);
+//    EXPECT_THROW(col_double.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+//
+//    EXPECT_EQ(col_double.capacity(), DEFAULT_VECTOR_SIZE);
+//    EXPECT_EQ(col_double.Size(), 0);
+//    EXPECT_THROW(col_double.ToString(), std::logic_error);
+//    EXPECT_THROW(col_double.GetValue(0), std::logic_error);
+//    EXPECT_EQ(col_double.tail_index_, 0);
+//    EXPECT_EQ(col_double.data_type_size_, 8);
+//    EXPECT_NE(col_double.data_ptr_, nullptr);
+//    EXPECT_EQ(col_double.vector_type(), ColumnVectorType::kFlat);
+//    EXPECT_EQ(col_double.data_type(), data_type);
+//
+//    EXPECT_NE(col_double.buffer_, nullptr);
+//    EXPECT_EQ(col_double.nulls_ptr_, nullptr);
+//    EXPECT_TRUE(col_double.initialized);
+//    col_double.Reserve(DEFAULT_VECTOR_SIZE - 1);
+//    tmp_ptr = col_double.data_ptr_;
+//    EXPECT_EQ(col_double.capacity(), DEFAULT_VECTOR_SIZE);
+//    EXPECT_EQ(tmp_ptr, col_double.data_ptr_);
+//
+//    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+//        Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
+//        col_double.AppendValue(v);
+//        Value vx = col_double.GetValue(i);
+//        EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
+//        EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
+//        EXPECT_THROW(col_double.GetValue(i + 1), std::logic_error);
+//    }
+}
+

@@ -7,12 +7,23 @@
 
 namespace infinity {
 
-UniquePtr<Decimal16Info>
+SharedPtr<Decimal16Info>
 Decimal16Info::Make(i64 precision, i64 scale) {
     TypeAssert(scale <= precision, "Scale should not more than precision.")
     TypeAssert(precision <= 4, "Decimal16 max precision should not more than 4.")
 
-    return MakeUnique<Decimal16Info>(precision, scale);
+    return MakeShared<Decimal16Info>(precision, scale);
 }
+
+bool
+Decimal16Info::operator==(const TypeInfo& other) const {
+    if(other.type() != TypeInfoType::kDecimal16) return false;
+
+    auto* decimal16_info_ptr = (Decimal16Info*)(&other);
+
+    return this->precision_ == decimal16_info_ptr->precision_
+           && this->scale_ == decimal16_info_ptr->scale_;
+}
+
 
 }

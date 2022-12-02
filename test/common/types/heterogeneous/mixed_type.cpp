@@ -1534,7 +1534,8 @@ TEST_F(MixedTypeTest, mixed_array2) {
         auto *value4_ptr = mixed_array1.GetByIndex(3);
         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
         auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
-        EXPECT_STREQ(long_str_value_ptr->ptr, "HappyHalloween OK");
+        String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
+        EXPECT_STREQ(result.c_str(), "HappyHalloween OK");
     }
 
     // Null
