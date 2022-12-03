@@ -581,7 +581,7 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
 }
 
 void
-MixedType::Reset() {
+MixedType::Reset(bool in_constructor) {
     switch (this->type) {
         case MixedValueType::kInvalid:
         case MixedValueType::kInteger:
@@ -594,19 +594,19 @@ MixedType::Reset() {
         case MixedValueType::kLongStr: {
             // LongStrMixedType *long_str_mixed_ptr;
             auto *long_str_mixed_ptr = (LongStrMixedType *) this;
-            long_str_mixed_ptr->Reset();
+            long_str_mixed_ptr->Reset(in_constructor);
             break ;
         }
         case MixedValueType::kTuple: {
             // TupleMixedType *tuple_mixed_ptr;
             auto *tuple_mixed_ptr = (TupleMixedType *) this;
-            tuple_mixed_ptr->Reset();
+            tuple_mixed_ptr->Reset(in_constructor);
             break ;
         }
         case MixedValueType::kArray: {
             // ArrayMixedType *array_mixed_ptr;
             auto *array_mixed_ptr = (ArrayMixedType *) this;
-            array_mixed_ptr->Reset();
+            array_mixed_ptr->Reset(in_constructor);
             break ;
         }
     }

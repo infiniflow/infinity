@@ -596,47 +596,57 @@ Value::GetValue() const {
 Value::~Value() {
     switch(type_.type()) {
         case kVarchar: {
-            value_.varchar.~VarcharType();
+//            value_.varchar.~VarcharType();
+            value_.varchar.Reset();
             break;
         }
         case kPolygon: {
-            value_.polygon.~PolygonType();
+//            value_.polygon.~PolygonType();
+            value_.polygon.Reset();
             break;
         }
         case kPath: {
-            value_.path.~PathType();
+//            value_.path.~PathType();
+            value_.path.Reset();
             break;
         }
         case kBitmap: {
-            value_.bitmap.~BitmapType();
+//            value_.bitmap.~BitmapType();
+            value_.bitmap.Reset();
             break;
         }
         case kBlob: {
-            value_.blob.~BlobType();
+//            value_.blob.~BlobType();
+            value_.blob.Reset();
             break;
         }
         case kMixed: {
-            value_.mixed_value.~MixedType();
+//            value_.mixed_value.~MixedType();
+            value_.mixed_value.Reset();
         }
         default: {
 
         }
     }
+    GlobalResourceUsage::DecrObjectCount();
 }
 
 Value::Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr): type_(type, std::move(typeinfo_ptr)) {
-    Init();
+    GlobalResourceUsage::IncrObjectCount();
+    Init(true);
 }
 
 Value::Value(const Value& other) : type_(other.type_), is_null_(other.is_null_)  {
-    Init();
+    GlobalResourceUsage::IncrObjectCount();
+    Init(true);
     CopyUnionValue(other);
 }
 
 Value::Value(Value&& other) noexcept :
     type_(std::move(other.type_)),
     is_null_(other.is_null_) {
-    Init();
+    GlobalResourceUsage::IncrObjectCount();
+    Init(true);
     MoveUnionValue(std::forward<Value>(other));
 }
 
@@ -646,7 +656,7 @@ Value::operator=(const Value& other) {
     this->Reset();
     if(this->type_ != other.type_) {
         this->type_ = other.type_;
-        this->Init();
+        this->Init(false);
     }
     this->is_null_ = other.is_null_;
     CopyUnionValue(other);
@@ -660,7 +670,7 @@ Value::operator=(Value&& other)  noexcept {
     this->Reset();
     if(this->type_ != other.type_) {
         this->type_ = std::move(other.type_);
-        this->Init();
+        this->Init(false);
     }
     this->is_null_ = other.is_null_;
     MoveUnionValue(std::forward<Value>(other));
@@ -669,7 +679,7 @@ Value::operator=(Value&& other)  noexcept {
 }
 
 void
-Value::Init() {
+Value::Init(bool in_constructor) {
     switch(type_.type()) {
         case kBoolean: {
             value_.boolean = false;
@@ -833,7 +843,7 @@ Value::Init() {
             break;
         }
         case kMixed: {
-            value_.mixed_value.Reset();
+            value_.mixed_value.Reset(in_constructor);
             break;
         }
         case kNull:

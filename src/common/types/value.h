@@ -189,7 +189,7 @@ public:
 
 private:
     void
-    Init();
+    Init(bool in_constructor);
 
     void
     CopyUnionValue(const Value& other);

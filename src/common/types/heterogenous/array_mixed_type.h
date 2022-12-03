@@ -12,7 +12,7 @@ struct __attribute__((packed)) ArrayMixedType : public BaseMixedType {
 
 public:
     void
-    Reset();
+    Reset(bool in_constructor = false);
 
     ~ArrayMixedType() {
         Reset();

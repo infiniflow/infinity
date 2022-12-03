@@ -14,7 +14,7 @@ public:
     TupleMixedType() : BaseMixedType(MixedValueType::kTuple) {}
 
     void
-    Reset();
+    Reset(bool in_constructor = false);
 
     ~TupleMixedType() {
         Reset();

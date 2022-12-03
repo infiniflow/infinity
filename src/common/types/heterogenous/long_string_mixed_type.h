@@ -27,7 +27,12 @@ public:
     Equal(const String& input);
 
     inline void
-    Reset() {
+    Reset(bool in_constructor = false) {
+        if(in_constructor) {
+            ptr = nullptr;
+            length = 0;
+            return ;
+        }
         if(ptr != nullptr) {
             LOG_TRACE("Release the long str ptr");
 

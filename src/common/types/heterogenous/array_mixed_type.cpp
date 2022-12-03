@@ -10,7 +10,12 @@
 namespace infinity {
 
 void
-ArrayMixedType::Reset() {
+ArrayMixedType::Reset(bool in_constructor) {
+    if(in_constructor) {
+        ptr = nullptr;
+        count = 0;
+        return ;
+    }
 
     if(ptr != nullptr) {
 

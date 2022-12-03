@@ -9,7 +9,13 @@
 namespace infinity {
 
 void
-TupleMixedType::Reset() {
+TupleMixedType::Reset(bool in_constructor) {
+    if(in_constructor) {
+        ptr = nullptr;
+        count = 0;
+        return ;
+    }
+
     if(ptr != nullptr) {
         auto* tuple_value_ptr = (MixedTupleValue*)(this->ptr);
         u32 entry_count = count * 2;

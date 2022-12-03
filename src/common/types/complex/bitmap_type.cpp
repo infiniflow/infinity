@@ -12,7 +12,7 @@ BitmapType::BitmapType(const BitmapType& other) : count(other.count) {
 
     ptr = new u64[unit_count]{0};
     GlobalResourceUsage::IncrRawMemCount();
-
+    GlobalResourceUsage::IncrObjectCount();
     memcpy(ptr, other.ptr, unit_count * UNIT_BYTES);
 }
 

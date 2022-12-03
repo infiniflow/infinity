@@ -123,7 +123,7 @@ public:
     }
 
     void
-    Reset();
+    Reset(bool in_constructor = false);
 
 private:
     static void
