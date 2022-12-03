@@ -13,7 +13,7 @@ BitmapType::BitmapType(const BitmapType& other) : count(other.count) {
     ptr = new u64[unit_count]{0};
     GlobalResourceUsage::IncrRawMemCount();
     GlobalResourceUsage::IncrObjectCount();
-    memcpy(ptr, other.ptr, unit_count * UNIT_BYTES);
+    memcpy((char_t*)ptr, (char_t*)(other.ptr), unit_count * UNIT_BYTES);
 }
 
 BitmapType::BitmapType(BitmapType&& other) noexcept
@@ -30,7 +30,7 @@ BitmapType::operator=(const BitmapType& other) {
     u64 current_unit_count = UnitCount(this->count);
     u64 target_unit_count = UnitCount(other.count);
     if(current_unit_count == target_unit_count) {
-        memcpy(ptr, other.ptr, target_unit_count * UNIT_BYTES);
+        memcpy((char_t*)ptr, (char_t*)(other.ptr), target_unit_count * UNIT_BYTES);
         this->count = other.count;
         return *this;
     }
@@ -44,7 +44,7 @@ BitmapType::operator=(const BitmapType& other) {
     ptr = new u64[target_unit_count]{0};
     GlobalResourceUsage::IncrRawMemCount();
 
-    memcpy(ptr, other.ptr, target_unit_count * UNIT_BITS);
+    memcpy((char_t*)ptr, (char_t*)(other.ptr), target_unit_count * UNIT_BYTES);
     return *this;
 }
 
