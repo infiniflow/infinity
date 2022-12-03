@@ -6,6 +6,12 @@
 
 namespace infinity {
 
+enum class VectorBufferType {
+    kInvalid,
+    kNormal,
+    kString
+};
+
 class VectorBuffer {
 public:
     static SharedPtr<VectorBuffer>
@@ -34,6 +40,7 @@ public:
     UniquePtr<char[]> data_ {nullptr};
     size_t data_size_ {0};
     size_t capacity_ {0};
+    VectorBufferType buffer_type_{kInvalid};
 };
 
 }

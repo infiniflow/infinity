@@ -86,7 +86,7 @@ Value::MakeDecimal16(Decimal16T input, const SharedPtr<TypeInfo>& type_info_ptr)
 
 Value
 Value::MakeDecimal32(Decimal32T input, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kDecimal32);
+    Value value(LogicalType::kDecimal32, type_info_ptr);
     value.value_.decimal32 = input;
     value.is_null_ = false;
     return value;
@@ -94,7 +94,7 @@ Value::MakeDecimal32(Decimal32T input, const SharedPtr<TypeInfo>& type_info_ptr)
 
 Value
 Value::MakeDecimal64(Decimal64T input, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kDecimal64);
+    Value value(LogicalType::kDecimal64, type_info_ptr);
     value.value_.decimal64 = input;
     value.is_null_ = false;
     return value;
@@ -102,7 +102,7 @@ Value::MakeDecimal64(Decimal64T input, const SharedPtr<TypeInfo>& type_info_ptr)
 
 Value
 Value::MakeDecimal128(Decimal128T input, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kDecimal128);
+    Value value(LogicalType::kDecimal128, type_info_ptr);
     value.value_.decimal128 = input;
     value.is_null_ = false;
     return value;

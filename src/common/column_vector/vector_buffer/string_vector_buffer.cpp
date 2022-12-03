@@ -11,6 +11,7 @@ SharedPtr<StringVectorBuffer>
 StringVectorBuffer::Make(size_t capacity) {
     SharedPtr<StringVectorBuffer> buffer_ptr = MakeShared<StringVectorBuffer>();
     buffer_ptr->Initialize(16u, capacity);
+    buffer_ptr->buffer_type_ = VectorBufferType::kString;
     return buffer_ptr;
 }
 
