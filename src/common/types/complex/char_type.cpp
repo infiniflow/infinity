@@ -10,11 +10,7 @@ namespace infinity {
 // Char2Type
 
 Char2Type::Char2Type(const String& str) {
-    Initialize(str.c_str());
-}
-
-Char2Type::Char2Type(const char* ptr) {
-    Initialize(ptr);
+    Initialize(str.c_str(), str.length());
 }
 
 Char2Type::Char2Type(const Char2Type& other) {
@@ -47,19 +43,14 @@ Char2Type::operator=(Char2Type&& other) noexcept {
 }
 
 void
-Char2Type::Initialize(const char* ptr) {
-    // Assume the str size is OK;
-    value[0] = ptr[0];
-    value[1] = ptr[1];
+Char2Type::Initialize(const char* ptr, size_t len) {
+    size_t length = (len <= CHAR_LENGTH) ? len : CHAR_LENGTH;
+    memcpy(value, ptr, length);
 }
 
 // Char4Type
 Char4Type::Char4Type(const String& str) {
-    Initialize(str.c_str());
-}
-
-Char4Type::Char4Type(const char* ptr) {
-    Initialize(ptr);
+    Initialize(str.c_str(), str.length());
 }
 
 Char4Type::Char4Type(const Char4Type& other) {
@@ -100,21 +91,14 @@ Char4Type& Char4Type::operator=(Char4Type&& other) noexcept {
 }
 
 void
-Char4Type::Initialize(const char* ptr) {
-    // Assume the str size is OK;
-    value[0] = ptr[0];
-    value[1] = ptr[1];
-    value[2] = ptr[2];
-    value[3] = ptr[3];
+Char4Type::Initialize(const char* ptr, size_t len) {
+    size_t length = (len <= CHAR_LENGTH) ? len : CHAR_LENGTH;
+    memcpy(value, ptr, length);
 }
 
 // Char8Type
 Char8Type::Char8Type(const String& str) {
-    Initialize(str.c_str());
-}
-
-Char8Type::Char8Type(const char* ptr) {
-    Initialize(ptr);
+    Initialize(str.c_str(), str.length());
 }
 
 Char8Type::Char8Type(const Char8Type& other) {
@@ -176,16 +160,9 @@ Char8Type::operator=(Char8Type&& other) noexcept {
 }
 
 void
-Char8Type::Initialize(const char* ptr) {
-    // Assume the str size is OK;
-    value[0] = ptr[0];
-    value[1] = ptr[1];
-    value[2] = ptr[2];
-    value[3] = ptr[3];
-    value[4] = ptr[4];
-    value[5] = ptr[5];
-    value[6] = ptr[6];
-    value[7] = ptr[7];
+Char8Type::Initialize(const char* ptr, size_t len) {
+    size_t length = (len <= CHAR_LENGTH) ? len : CHAR_LENGTH;
+    memcpy(value, ptr, length);
 }
 
 // Char16Type

@@ -64,7 +64,7 @@ TEST_F(CharTypeTest, Char2) {
     EXPECT_EQ(c4.ToString(), "bc");
 
     Char2T c5;
-    c5.Initialize("bcdef");
+    c5.Initialize("bcdef", 2);
     EXPECT_EQ(c5.ToString(), "bc");
 
     Char2T c6;
@@ -74,6 +74,11 @@ TEST_F(CharTypeTest, Char2) {
     Char2T c7;
     c7 = std::move(c5);
     EXPECT_EQ(c7.ToString(), "bc");
+
+    s = "b";
+    Char2T c8;
+    c8.Initialize(s.c_str(), s.length());
+    EXPECT_EQ(c8.ToString(), "b");
 }
 
 TEST_F(CharTypeTest, Char4) {
@@ -94,7 +99,7 @@ TEST_F(CharTypeTest, Char4) {
     EXPECT_EQ(c4.ToString(), "bcde");
 
     Char4T c5;
-    c5.Initialize("bcdef");
+    c5.Initialize("bcdef", 4);
     EXPECT_EQ(c5.ToString(), "bcde");
 
     Char4T c6;
@@ -124,7 +129,7 @@ TEST_F(CharTypeTest, Char8) {
     EXPECT_EQ(c4.ToString(), "bcdefghi");
 
     Char8T c5;
-    c5.Initialize("bcdefghijk");
+    c5.Initialize("bcdefghijk", 8);
     EXPECT_EQ(c5.ToString(), "bcdefghi");
 
     Char8T c6;

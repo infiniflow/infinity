@@ -11,7 +11,7 @@ SharedPtr<VectorBuffer>
 VectorBuffer::Make(size_t data_type_size, size_t capacity) {
     SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
     buffer_ptr->Initialize(data_type_size, capacity);
-    buffer_ptr->buffer_type_ = VectorBufferType::kNormal;
+    buffer_ptr->buffer_type_ = VectorBufferType::kStandard;
     return buffer_ptr;
 }
 

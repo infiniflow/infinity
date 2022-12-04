@@ -8,7 +8,7 @@ namespace infinity {
 
 enum class VectorBufferType {
     kInvalid,
-    kNormal,
+    kStandard,
     kString
 };
 
