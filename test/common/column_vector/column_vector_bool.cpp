@@ -24,3 +24,8 @@ class ColumnVectorBoolTest : public BaseTest {
         infinity::GlobalResourceUsage::UnInit();
     }
 };
+
+TEST_F(ColumnVectorBoolTest, flat_bool) {
+    using namespace infinity;
+    // Not implemented
+}

@@ -9,7 +9,7 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 
-class ColumnVectorTest : public BaseTest {
+class ColumnVectorNestedTest : public BaseTest {
     void
     SetUp() override {
         infinity::Logger::Initialize();
@@ -25,13 +25,13 @@ class ColumnVectorTest : public BaseTest {
     }
 };
 
-TEST_F(ColumnVectorTest, flat_array) {
+TEST_F(ColumnVectorNestedTest, flat_array) {
     using namespace infinity;
 
     // No test cases.
 }
 
-TEST_F(ColumnVectorTest, flat_tuple) {
+TEST_F(ColumnVectorNestedTest, flat_tuple) {
     using namespace infinity;
 
     // No test cases.

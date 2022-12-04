@@ -9,7 +9,7 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 
-class ColumnVectorTest : public BaseTest {
+class ColumnVectorCharTest : public BaseTest {
     void
     SetUp() override {
         infinity::Logger::Initialize();
@@ -25,7 +25,7 @@ class ColumnVectorTest : public BaseTest {
     }
 };
 
-TEST_F(ColumnVectorTest, flat_char1) {
+TEST_F(ColumnVectorCharTest, flat_char1) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kChar1);
@@ -134,7 +134,7 @@ TEST_F(ColumnVectorTest, flat_char1) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_char2) {
+TEST_F(ColumnVectorCharTest, flat_char2) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kChar2);
@@ -258,7 +258,7 @@ TEST_F(ColumnVectorTest, flat_char2) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_char4) {
+TEST_F(ColumnVectorCharTest, flat_char4) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kChar4);
@@ -382,7 +382,7 @@ TEST_F(ColumnVectorTest, flat_char4) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_char8) {
+TEST_F(ColumnVectorCharTest, flat_char8) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kChar8);
@@ -506,7 +506,7 @@ TEST_F(ColumnVectorTest, flat_char8) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_char16) {
+TEST_F(ColumnVectorCharTest, flat_char16) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kChar16);
@@ -630,7 +630,7 @@ TEST_F(ColumnVectorTest, flat_char16) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_char32) {
+TEST_F(ColumnVectorCharTest, flat_char32) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kChar32);
@@ -754,7 +754,7 @@ TEST_F(ColumnVectorTest, flat_char32) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_char64) {
+TEST_F(ColumnVectorCharTest, flat_char64) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kChar64);

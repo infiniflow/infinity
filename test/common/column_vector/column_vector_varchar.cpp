@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "common/types/info/varchar_info.h"
 
-class ColumnVectorTest : public BaseTest {
+class ColumnVectorVarcharTest : public BaseTest {
     void
     SetUp() override {
         infinity::Logger::Initialize();
@@ -26,7 +26,7 @@ class ColumnVectorTest : public BaseTest {
     }
 };
 
-TEST_F(ColumnVectorTest, flat_inline_varchar) {
+TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     using namespace infinity;
 
     auto varchar_info = VarcharInfo::Make(65);
@@ -164,7 +164,7 @@ TEST_F(ColumnVectorTest, flat_inline_varchar) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_not_inline_varchar) {
+TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     using namespace infinity;
 
     auto varchar_info = VarcharInfo::Make(65);
@@ -304,7 +304,7 @@ TEST_F(ColumnVectorTest, flat_not_inline_varchar) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_mixed_inline_varchar) {
+TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     using namespace infinity;
 
     auto varchar_info = VarcharInfo::Make(65);

@@ -9,7 +9,7 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 
-class ColumnVectorTest : public BaseTest {
+class ColumnVectorTimeTest : public BaseTest {
     void
     SetUp() override {
         infinity::Logger::Initialize();
@@ -25,7 +25,7 @@ class ColumnVectorTest : public BaseTest {
     }
 };
 
-TEST_F(ColumnVectorTest, flat_date) {
+TEST_F(ColumnVectorTimeTest, flat_date) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kDate);
@@ -130,7 +130,7 @@ TEST_F(ColumnVectorTest, flat_date) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_time) {
+TEST_F(ColumnVectorTimeTest, flat_time) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTime);
@@ -235,7 +235,7 @@ TEST_F(ColumnVectorTest, flat_time) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_datetime) {
+TEST_F(ColumnVectorTimeTest, flat_datetime) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kDateTime);
@@ -346,7 +346,7 @@ TEST_F(ColumnVectorTest, flat_datetime) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_timestamp) {
+TEST_F(ColumnVectorTimeTest, flat_timestamp) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTimestamp);
@@ -457,7 +457,7 @@ TEST_F(ColumnVectorTest, flat_timestamp) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_timestamp_tz) {
+TEST_F(ColumnVectorTimeTest, flat_timestamp_tz) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTimestampTZ);
@@ -568,7 +568,7 @@ TEST_F(ColumnVectorTest, flat_timestamp_tz) {
     }
 }
 
-TEST_F(ColumnVectorTest, flat_interval) {
+TEST_F(ColumnVectorTimeTest, flat_interval) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kInterval);
