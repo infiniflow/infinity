@@ -479,7 +479,164 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, flat_path) {}
+TEST_F(ColumnVectorGeoTest, flat_path) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kPath);
+    ColumnVector col_path(data_type, ColumnVectorType::kFlat);
+    col_path.Initialize();
+
+    EXPECT_THROW(col_path.SetDataType(DataType(LogicalType::kPath)), std::logic_error);
+    EXPECT_THROW(col_path.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_path.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_path.Size(), 0);
+    EXPECT_THROW(col_path.ToString(), std::logic_error);
+    EXPECT_THROW(col_path.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_path.tail_index_, 0);
+    EXPECT_EQ(col_path.data_type_size_, 16);
+    EXPECT_NE(col_path.data_ptr_, nullptr);
+    EXPECT_EQ(col_path.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_path.data_type(), data_type);
+    EXPECT_EQ(col_path.buffer_->buffer_type_, VectorBufferType::kMemory);
+
+    EXPECT_NE(col_path.buffer_, nullptr);
+    EXPECT_EQ(col_path.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_path.initialized);
+    col_path.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = col_path.data_ptr_;
+    EXPECT_EQ(col_path.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_path.data_ptr_);
+
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        PathT path;
+        path.Initialize(4, 0);
+        path.SetPoint(0, p1);
+        path.SetPoint(1, p2);
+        path.SetPoint(2, p3);
+        path.SetPoint(3, p4);
+        Value v = Value::MakePath(path);
+        col_path.AppendValue(v);
+        Value vx = col_path.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kPath);
+        EXPECT_EQ(vx.value_.path.point_count, 4);
+        EXPECT_EQ(vx.value_.path.closed, 0);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
+
+        EXPECT_THROW(col_path.GetValue(i + 1), std::logic_error);
+    }
+
+    col_path.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+
+        Value vx = col_path.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kPath);
+        EXPECT_EQ(vx.value_.path.point_count, 4);
+        EXPECT_EQ(vx.value_.path.closed, 0);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
+    }
+
+    EXPECT_EQ(col_path.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_path.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        PathT path;
+        path.Initialize(4, 0);
+        path.SetPoint(0, p1);
+        path.SetPoint(1, p2);
+        path.SetPoint(2, p3);
+        path.SetPoint(3, p4);
+        Value v = Value::MakePath(path);
+        col_path.AppendValue(v);
+        Value vx = col_path.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kPath);
+        EXPECT_EQ(vx.value_.path.point_count, 4);
+        EXPECT_EQ(vx.value_.path.closed, 0);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
+
+        EXPECT_THROW(col_path.GetValue(i + 1), std::logic_error);
+    }
+
+    col_path.Reset();
+    EXPECT_EQ(col_path.capacity(), 0);
+    EXPECT_EQ(col_path.tail_index_, 0);
+//    EXPECT_EQ(col_path.data_type_size_, 0);
+    EXPECT_EQ(col_path.buffer_, nullptr);
+    EXPECT_EQ(col_path.data_ptr_, nullptr);
+    EXPECT_EQ(col_path.initialized, false);
+
+    // ====
+    col_path.Initialize();
+    EXPECT_THROW(col_path.SetDataType(DataType(LogicalType::kPath)), std::logic_error);
+    EXPECT_THROW(col_path.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_path.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_path.Size(), 0);
+    EXPECT_THROW(col_path.ToString(), std::logic_error);
+    EXPECT_THROW(col_path.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_path.tail_index_, 0);
+    EXPECT_EQ(col_path.data_type_size_, 16);
+    EXPECT_NE(col_path.data_ptr_, nullptr);
+    EXPECT_EQ(col_path.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_path.data_type(), data_type);
+    EXPECT_EQ(col_path.buffer_->buffer_type_, VectorBufferType::kMemory);
+
+    EXPECT_NE(col_path.buffer_, nullptr);
+    EXPECT_EQ(col_path.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_path.initialized);
+    col_path.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = col_path.data_ptr_;
+    EXPECT_EQ(col_path.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_path.data_ptr_);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        PathT path;
+        path.Initialize(4, 0);
+        path.SetPoint(0, p1);
+        path.SetPoint(1, p2);
+        path.SetPoint(2, p3);
+        path.SetPoint(3, p4);
+        Value v = Value::MakePath(path);
+        col_path.AppendValue(v);
+        Value vx = col_path.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kPath);
+        EXPECT_EQ(vx.value_.path.point_count, 4);
+        EXPECT_EQ(vx.value_.path.closed, 0);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
+
+        EXPECT_THROW(col_path.GetValue(i + 1), std::logic_error);
+    }
+}
 
 TEST_F(ColumnVectorGeoTest, flat_polygon) {}
 

@@ -6,7 +6,7 @@
 
 #include "common/types/internal_types.h"
 #include "common/types/data_type.h"
-#include "vector_buffer/string_vector_buffer.h"
+#include "vector_buffer/memory_vector_buffer.h"
 #include "bitmask.h"
 #include "common/types/value.h"
 #include "common/default_values.h"

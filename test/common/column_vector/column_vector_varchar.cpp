@@ -46,7 +46,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
     EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kString);
+    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
     EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
@@ -135,7 +135,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
     EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kString);
+    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
     EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
@@ -184,7 +184,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
     EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kString);
+    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
     EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
@@ -274,7 +274,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
     EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kString);
+    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
     EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
@@ -324,7 +324,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
     EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kString);
+    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
     EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
@@ -421,7 +421,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
     EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kString);
+    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
     EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);

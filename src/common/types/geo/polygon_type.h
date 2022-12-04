@@ -12,7 +12,7 @@ namespace infinity {
 struct PolygonType {
 public:
     ptr_t ptr {};
-    i32 point_count {0}; // 65535 point are the max point count
+    u32 point_count {0}; // 65535 point are the max point count
     BoxType bounding_box {};
 
 public:
@@ -23,7 +23,7 @@ public:
     }
 
     explicit inline
-    PolygonType(i32 count): point_count(count) {
+    PolygonType(u32 count): point_count(count) {
         if(count == 0) return ;
 
         ptr = new char_t[point_count * sizeof(PointType)]{0};
@@ -45,7 +45,7 @@ public:
 
         auto* this_ptr = (PointType*)(ptr);
         auto* other_ptr = (PointType*)(other.ptr);
-        for(i32 i = 0; i < this->point_count; ++ i) {
+        for(u32 i = 0; i < this->point_count; ++ i) {
             if(this_ptr[i] != other_ptr[i]) return false;
         }
         return true;
@@ -57,7 +57,7 @@ public:
     }
 
     inline void
-    SetPoint(i32 index, PointType point) {
+    SetPoint(u32 index, PointType point) {
         if(ptr == nullptr) TypeError("Not initialized.");
         if(index >= point_count) TypeError("Index is larger than point count");
         ((PointType*)(ptr))[index] = point;
@@ -73,13 +73,13 @@ public:
         return ((PointType*)(ptr))[index];
     }
 
-    [[nodiscard]] inline i32
+    [[nodiscard]] inline u32
     PointCount() const {
         return point_count;
     }
 
     inline void
-    Initialize(i32 count, i32 is_closed = 0) {
+    Initialize(u32 count, i32 is_closed = 0) {
         if(point_count != 0) {
             TypeError("Already initialized, need to reset before re-initialize");
         }

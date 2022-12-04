@@ -6,23 +6,23 @@
 
 #include "vector_buffer.h"
 #include "common/memory/allocator.h"
-#include "string_chunk.h"
+#include "memory_chunk.h"
 
 namespace infinity {
 
-struct StringVectorBuffer: public VectorBuffer {
+struct MemoryVectorBuffer: public VectorBuffer {
 public:
-    static SharedPtr<StringVectorBuffer>
+    static SharedPtr<MemoryVectorBuffer>
     Make(size_t capacity);
 
     inline
-    StringVectorBuffer() {
+    MemoryVectorBuffer() {
         chunk_mgr_ = MakeUnique<StringChunkMgr>();
         GlobalResourceUsage::IncrObjectCount();
     }
 
     inline
-    ~StringVectorBuffer() {
+    ~MemoryVectorBuffer() {
         GlobalResourceUsage::DecrObjectCount();
     }
 

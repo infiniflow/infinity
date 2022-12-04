@@ -17,8 +17,12 @@ void ColumnVector::Initialize(size_t capacity) {
     tail_index_ = 0;
     data_type_size_ = data_type_.Size();
     switch(data_type_.type()) {
+        case LogicalType::kBlob:
+        case LogicalType::kBitmap:
+        case LogicalType::kPolygon:
+        case LogicalType::kPath:
         case LogicalType::kVarchar: {
-            buffer_ = StringVectorBuffer::Make(capacity_);
+            buffer_ = MemoryVectorBuffer::Make(capacity_);
             break;
         }
         case LogicalType::kInvalid:
@@ -235,7 +239,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             break;
         }
         case kVarchar: {
-            auto* string_vector_buffer_ptr = (StringVectorBuffer*)(this->buffer_.get());
+            auto* string_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
 
             // Copy string
             size_t varchar_len = value.value_.varchar.length;
@@ -327,11 +331,36 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             break;
         }
         case kPath: {
-            ((PathT *) data_ptr_)[index] = value.GetValue<PathT>();
+            auto* path_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
+            u32 point_count = value.value_.path.point_count;
+
+            size_t point_area_size = point_count * sizeof(PointT);
+            ptr_t ptr = path_vector_buffer_ptr->chunk_mgr_->Allocate(point_area_size);
+            memcpy(ptr, value.value_.path.ptr, point_area_size);
+
+            // Why not use value.GetValue<PathT>(); ?
+            // It will call PathT operator= to allocate new memory for point area.
+            // In this case, we need the point area in memory vector buffer.
+            ((PathT *) data_ptr_)[index].ptr = ptr;
+            ((PathT *) data_ptr_)[index].point_count = point_count;
+            ((PathT *) data_ptr_)[index].closed = value.value_.path.closed;
             break;
         }
         case kPolygon: {
-            ((PolygonT *) data_ptr_)[index] = value.GetValue<PolygonT>();
+
+            auto* polygon_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
+            u32 point_count = value.value_.polygon.point_count;
+
+            size_t point_area_size = point_count * sizeof(PointT);
+            ptr_t ptr = polygon_vector_buffer_ptr->chunk_mgr_->Allocate(point_area_size);
+            memcpy(ptr, value.value_.polygon.ptr, point_area_size);
+
+            // Why not use value.GetValue<PolygonT>(); ?
+            // It will call PolygonT operator= to allocate new memory for point area.
+            // In this case, we need the point area in memory vector buffer.
+            ((PolygonT *) data_ptr_)[index].ptr = ptr;
+            ((PolygonT *) data_ptr_)[index].point_count = point_count;
+            ((PolygonT *) data_ptr_)[index].bounding_box = value.value_.polygon.bounding_box;
             break;
         }
         case kCircle: {
@@ -381,9 +410,10 @@ void
 ColumnVector::Reserve(size_t new_capacity) {
     if(new_capacity <= capacity_) return ;
     switch(data_type_.type()) {
+        case LogicalType::kPath:
         case LogicalType::kVarchar: {
-            auto* string_vector_buffer_ptr = (StringVectorBuffer*)(this->buffer_.get());
-            SharedPtr<StringVectorBuffer> new_buffer = StringVectorBuffer::Make(new_capacity);
+            auto* string_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
+            SharedPtr<MemoryVectorBuffer> new_buffer = MemoryVectorBuffer::Make(new_capacity);
 
             // Copy the string header information.
             new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);

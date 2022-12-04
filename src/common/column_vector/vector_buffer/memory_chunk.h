@@ -9,16 +9,16 @@
 
 namespace infinity {
 
-struct StringChunk {
+struct MemoryChunk {
 public:
     inline explicit
-    StringChunk(u64 capacity) : capacity_(capacity), current_offset_(0), object_count_(0) {
+    MemoryChunk(u64 capacity) : capacity_(capacity), current_offset_(0), object_count_(0) {
         GlobalResourceUsage::IncrObjectCount();
         ptr_ = Allocator::allocate(capacity);
     }
 
     inline
-    ~StringChunk() {
+    ~MemoryChunk() {
         Allocator::deallocate(ptr_);
         ptr_ = nullptr;
         capacity_ = 0;
@@ -67,7 +67,7 @@ public:
         return current_chunk_size_;
     }
 private:
-    Vector<UniquePtr<StringChunk>> chunks_;
+    Vector<UniquePtr<MemoryChunk>> chunks_;
     u64 current_chunk_size_{CHUNK_SIZE};
     u64 current_chunk_idx_{std::numeric_limits<u64>::max()};
 };

@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "base_test.h"
-#include "common/column_vector/vector_buffer/string_chunk.h"
+#include "common/column_vector/vector_buffer/memory_chunk.h"
 #include "common/types/value.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"

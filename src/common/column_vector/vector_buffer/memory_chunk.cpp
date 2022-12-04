@@ -2,7 +2,7 @@
 // Created by JinHai on 2022/11/30.
 //
 
-#include "string_chunk.h"
+#include "memory_chunk.h"
 #include "common/utility/infinity_assert.h"
 #include <sstream>
 
@@ -16,7 +16,7 @@ StringChunkMgr::Allocate(size_t nbytes) {
         while(current_chunk_size_ < nbytes) {
             current_chunk_size_ *= 2;
         }
-        chunks_.emplace_back(MakeUnique<StringChunk>(current_chunk_size_));
+        chunks_.emplace_back(MakeUnique<MemoryChunk>(current_chunk_size_));
         current_chunk_idx_ = 0;
     } else {
         if(chunks_[current_chunk_idx_]->current_offset_ + nbytes > current_chunk_size_) {
@@ -24,7 +24,7 @@ StringChunkMgr::Allocate(size_t nbytes) {
             while(current_chunk_size_ < nbytes) {
                 current_chunk_size_ *= 2;
             }
-            chunks_.emplace_back(MakeUnique<StringChunk>(current_chunk_size_));
+            chunks_.emplace_back(MakeUnique<MemoryChunk>(current_chunk_size_));
             ++ current_chunk_idx_;
         }
         ExecutorAssert(chunks_[current_chunk_idx_]->current_offset_ + nbytes <= current_chunk_size_,
