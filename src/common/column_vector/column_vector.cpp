@@ -87,7 +87,7 @@ ColumnVector::GetValue(idx_t index) const {
             return Value::MakeDecimal128(((Decimal128T *) data_ptr_)[index], data_type_.type_info());
         }
         case kVarchar: {
-            return Value::MakeVarchar(((VarcharT *) data_ptr_)[index]);
+            return Value::MakeVarchar(((VarcharT *) data_ptr_)[index], data_type_.type_info());
         }
         case kChar1: {
             return Value::MakeChar1(((Char1T *) data_ptr_)[index]);
@@ -239,10 +239,9 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
 
             // Copy string
             size_t varchar_len = value.value_.varchar.length;
-            if(varchar_len <= VarcharType::PREFIX_LENGTH) {
+            if(varchar_len <= VarcharType::INLINE_LENGTH) {
                 // Only prefix is enough to contain all string data.
-                memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.ptr, varchar_len);
-                ((VarcharT *) data_ptr_)[index].ptr = nullptr;
+                memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.prefix, varchar_len);
             } else {
                 memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.ptr, VarcharType::PREFIX_LENGTH);
                 ptr_t ptr = string_vector_buffer_ptr->chunk_mgr_->Allocate(varchar_len);

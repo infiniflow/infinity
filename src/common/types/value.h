@@ -55,13 +55,13 @@ public:
     MakeDecimal128(Decimal128T input, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
-    MakeVarchar(VarcharT& input_ref);
+    MakeVarchar(VarcharT& input_ref, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
-    MakeVarchar(const String& str);
+    MakeVarchar(const String& str, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
-    MakeVarchar(const char* ptr);
+    MakeVarchar(const char* ptr, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
     MakeChar1(Char1T input_ref);

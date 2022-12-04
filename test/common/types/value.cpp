@@ -7,6 +7,7 @@
 #include "common/types/value.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
+#include "common/types/info/varchar_info.h"
 
 class ValueTest : public BaseTest {
     void
@@ -62,7 +63,8 @@ TEST_F(ValueTest, Array) {
     {
         ArrayT array;
         array.reserve(3);
-        array.emplace_back(Value::MakeVarchar("Hello"));
+        auto varchar_info = VarcharInfo::Make(65);
+        array.emplace_back(Value::MakeVarchar("Hello", varchar_info));
         array.emplace_back(Value::MakeTinyInt(12));
         array.emplace_back(Value::MakeFloat(3.2));
 
@@ -80,7 +82,8 @@ TEST_F(ValueTest, Array) {
     {
         ArrayT array;
         array.reserve(3);
-        array.emplace_back(Value::MakeVarchar("Hello"));
+        auto varchar_info = VarcharInfo::Make(65);
+        array.emplace_back(Value::MakeVarchar("Hello", varchar_info));
         array.emplace_back(Value::MakeTinyInt(12));
         array.emplace_back(Value::MakeFloat(3.2));
 
@@ -207,12 +210,13 @@ TEST_F(ValueTest, MakeAndGet) {
     EXPECT_EQ(value.GetValue<Decimal128T>(), decimal_128);
 
     // Varchar (inline)
-    value = Value::MakeVarchar("Hello World!");
+    auto varchar_info = VarcharInfo::Make(65);
+    value = Value::MakeVarchar("Hello World!", varchar_info);
     EXPECT_EQ(value.GetValue<VarcharT>().IsInlined(), true);
     EXPECT_EQ(value.GetValue<VarcharT>().ToString(), "Hello World!");
 
     // Varchar (heap allocation)
-    value = Value::MakeVarchar("Hello World, Hello World");
+    value = Value::MakeVarchar("Hello World, Hello World", varchar_info);
     EXPECT_EQ(value.GetValue<VarcharT>().IsInlined(), false);
     EXPECT_EQ(value.GetValue<VarcharT>().ToString(), "Hello World, Hello World");
 
@@ -399,10 +403,10 @@ TEST_F(ValueTest, MakeAndGet) {
     // Array
     {
         ArrayT array;
-        array.emplace_back(Value::MakeVarchar("Hello"));
+        array.emplace_back(Value::MakeVarchar("Hello", varchar_info));
         array.emplace_back(Value::MakeTinyInt(12));
         array.emplace_back(Value::MakeFloat(3.2));
-        array.emplace_back(Value::MakeVarchar("HelloHelloHelloHelloHello"));
+        array.emplace_back(Value::MakeVarchar("HelloHelloHelloHelloHello", varchar_info));
 
         value = Value::MakeArray(array);
         EXPECT_EQ(value.GetValue<ArrayT>().size(), 4);
@@ -415,10 +419,10 @@ TEST_F(ValueTest, MakeAndGet) {
     // Tuple
     {
         TupleT tuple;
-        tuple.emplace_back(Value::MakeVarchar("Hello"));
+        tuple.emplace_back(Value::MakeVarchar("Hello", varchar_info));
         tuple.emplace_back(Value::MakeTinyInt(12));
         tuple.emplace_back(Value::MakeFloat(3.2));
-        tuple.emplace_back(Value::MakeVarchar("HelloHelloHelloHelloHello"));
+        tuple.emplace_back(Value::MakeVarchar("HelloHelloHelloHelloHello", varchar_info));
 
         value = Value::MakeTuple(tuple);
         EXPECT_EQ(value.GetValue<TupleT>().size(), 4);
