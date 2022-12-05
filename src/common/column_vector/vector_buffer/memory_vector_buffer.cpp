@@ -8,9 +8,9 @@
 namespace infinity {
 
 SharedPtr<MemoryVectorBuffer>
-MemoryVectorBuffer::Make(size_t capacity) {
+MemoryVectorBuffer::Make(size_t type_size, size_t capacity) {
     SharedPtr<MemoryVectorBuffer> buffer_ptr = MakeShared<MemoryVectorBuffer>();
-    buffer_ptr->Initialize(16u, capacity);
+    buffer_ptr->Initialize(type_size, capacity);
     buffer_ptr->buffer_type_ = VectorBufferType::kMemory;
     return buffer_ptr;
 }

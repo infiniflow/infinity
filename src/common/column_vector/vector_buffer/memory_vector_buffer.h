@@ -13,7 +13,7 @@ namespace infinity {
 struct MemoryVectorBuffer: public VectorBuffer {
 public:
     static SharedPtr<MemoryVectorBuffer>
-    Make(size_t capacity);
+    Make(size_t type_size, size_t capacity);
 
     inline
     MemoryVectorBuffer() {

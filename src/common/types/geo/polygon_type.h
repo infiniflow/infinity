@@ -12,7 +12,7 @@ namespace infinity {
 struct PolygonType {
 public:
     ptr_t ptr {};
-    u32 point_count {0}; // 65535 point are the max point count
+    u64 point_count {0}; // 65535 point are the max point count
     BoxType bounding_box {};
 
 public:
@@ -23,7 +23,7 @@ public:
     }
 
     explicit inline
-    PolygonType(u32 count): point_count(count) {
+    PolygonType(u64 count): point_count(count) {
         if(count == 0) return ;
 
         ptr = new char_t[point_count * sizeof(PointType)]{0};
@@ -45,7 +45,7 @@ public:
 
         auto* this_ptr = (PointType*)(ptr);
         auto* other_ptr = (PointType*)(other.ptr);
-        for(u32 i = 0; i < this->point_count; ++ i) {
+        for(u64 i = 0; i < this->point_count; ++ i) {
             if(this_ptr[i] != other_ptr[i]) return false;
         }
         return true;
@@ -57,7 +57,7 @@ public:
     }
 
     inline void
-    SetPoint(u32 index, PointType point) {
+    SetPoint(u64 index, PointType point) {
         if(ptr == nullptr) TypeError("Not initialized.");
         if(index >= point_count) TypeError("Index is larger than point count");
         ((PointType*)(ptr))[index] = point;
@@ -68,18 +68,18 @@ public:
     }
 
     inline PointType
-    GetPoint(i32 index) {
+    GetPoint(u64 index) {
         if(ptr == nullptr) TypeError("Not initialized.");
         return ((PointType*)(ptr))[index];
     }
 
-    [[nodiscard]] inline u32
+    [[nodiscard]] inline u64
     PointCount() const {
         return point_count;
     }
 
     inline void
-    Initialize(u32 count, i32 is_closed = 0) {
+    Initialize(u64 count) {
         if(point_count != 0) {
             TypeError("Already initialized, need to reset before re-initialize");
         }
@@ -95,18 +95,17 @@ public:
     inline void
     Reset() {
         if(point_count == 0) return;
+        delete[] ptr;
         point_count = 0;
         ResetBoundingBox();
-
-        delete[] ptr;
         GlobalResourceUsage::DecrRawMemCount();
     }
 
     inline void
     ResetBoundingBox() {
         bounding_box.upper_left.x = std::numeric_limits<f64>::max();
-        bounding_box.upper_left.y = std::numeric_limits<f64>::min();
-        bounding_box.lower_right.x = std::numeric_limits<f64>::min();
+        bounding_box.upper_left.y = -std::numeric_limits<f64>::max();
+        bounding_box.lower_right.x = -std::numeric_limits<f64>::max();
         bounding_box.lower_right.y = std::numeric_limits<f64>::max();
     }
 };

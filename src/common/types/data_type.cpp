@@ -126,7 +126,7 @@ static i64 type_size[] = {
     32, // LineSegment
     32, // Box
     16, // Path
-    46, // Polygon
+    48, // Polygon
     24, // Circle
 
     // Other

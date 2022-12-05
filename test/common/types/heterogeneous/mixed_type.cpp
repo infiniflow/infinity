@@ -195,7 +195,9 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     MixedType mixed_long_string = MixedType::MakeString("Hello the world");
     EXPECT_EQ(mixed_long_string.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr = (LongStrMixedType *) (&mixed_long_string);
-    EXPECT_STREQ(long_string_mixed_ptr->ptr, "Hello the world");
+
+    String long_str(long_string_mixed_ptr->ptr, long_string_mixed_ptr->length);
+    EXPECT_STREQ(long_str.c_str(), "Hello the world");
     EXPECT_EQ(long_string_mixed_ptr->length, 15);
     String header = String(long_string_mixed_ptr->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header.c_str(), "Hello");

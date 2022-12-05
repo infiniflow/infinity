@@ -22,7 +22,7 @@ void ColumnVector::Initialize(size_t capacity) {
         case LogicalType::kPolygon:
         case LogicalType::kPath:
         case LogicalType::kVarchar: {
-            buffer_ = MemoryVectorBuffer::Make(capacity_);
+            buffer_ = MemoryVectorBuffer::Make(data_type_size_, capacity_);
             break;
         }
         case LogicalType::kInvalid:
@@ -349,7 +349,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
         case kPolygon: {
 
             auto* polygon_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
-            u32 point_count = value.value_.polygon.point_count;
+            u64 point_count = value.value_.polygon.point_count;
 
             size_t point_area_size = point_count * sizeof(PointT);
             ptr_t ptr = polygon_vector_buffer_ptr->chunk_mgr_->Allocate(point_area_size);
@@ -410,10 +410,11 @@ void
 ColumnVector::Reserve(size_t new_capacity) {
     if(new_capacity <= capacity_) return ;
     switch(data_type_.type()) {
+        case LogicalType::kPolygon:
         case LogicalType::kPath:
         case LogicalType::kVarchar: {
             auto* string_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
-            SharedPtr<MemoryVectorBuffer> new_buffer = MemoryVectorBuffer::Make(new_capacity);
+            SharedPtr<MemoryVectorBuffer> new_buffer = MemoryVectorBuffer::Make(data_type_size_, new_capacity);
 
             // Copy the string header information.
             new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);

@@ -638,7 +638,184 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, flat_polygon) {}
+TEST_F(ColumnVectorGeoTest, flat_polygon) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kPolygon);
+    ColumnVector col_polygon(data_type, ColumnVectorType::kFlat);
+    col_polygon.Initialize();
+
+    EXPECT_THROW(col_polygon.SetDataType(DataType(LogicalType::kPolygon)), std::logic_error);
+    EXPECT_THROW(col_polygon.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_polygon.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_polygon.Size(), 0);
+    EXPECT_THROW(col_polygon.ToString(), std::logic_error);
+    EXPECT_THROW(col_polygon.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_polygon.tail_index_, 0);
+    EXPECT_EQ(col_polygon.data_type_size_, 48);
+    EXPECT_NE(col_polygon.data_ptr_, nullptr);
+    EXPECT_EQ(col_polygon.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_polygon.data_type(), data_type);
+    EXPECT_EQ(col_polygon.buffer_->buffer_type_, VectorBufferType::kMemory);
+
+    EXPECT_NE(col_polygon.buffer_, nullptr);
+    EXPECT_EQ(col_polygon.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_polygon.initialized);
+    col_polygon.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = col_polygon.data_ptr_;
+    EXPECT_EQ(col_polygon.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_polygon.data_ptr_);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        PolygonT polygon;
+        polygon.Initialize(4);
+        polygon.SetPoint(0, p1);
+        polygon.SetPoint(1, p2);
+        polygon.SetPoint(2, p3);
+        polygon.SetPoint(3, p4);
+        Value v = Value::MakePolygon(polygon);
+        col_polygon.AppendValue(v);
+        Value vx = col_polygon.GetValue(i);
+        BoxT bounding_box(PointT(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f),
+                          PointT(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f));
+        EXPECT_EQ(vx.type().type(), LogicalType::kPolygon);
+        EXPECT_EQ(vx.value_.polygon.point_count, 4);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 3), p4);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.x, bounding_box.upper_left.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.y, bounding_box.upper_left.y);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
+
+        EXPECT_THROW(col_polygon.GetValue(i + 1), std::logic_error);
+    }
+
+
+    col_polygon.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+
+        Value vx = col_polygon.GetValue(i);
+        BoxT bounding_box(PointT(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f),
+                          PointT(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f));
+        EXPECT_EQ(vx.type().type(), LogicalType::kPolygon);
+        EXPECT_EQ(vx.value_.polygon.point_count, 4);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 3), p4);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.x, bounding_box.upper_left.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.y, bounding_box.upper_left.y);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
+    }
+
+    EXPECT_EQ(col_polygon.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_polygon.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        PolygonT polygon;
+        polygon.Initialize(4);
+        polygon.SetPoint(0, p1);
+        polygon.SetPoint(1, p2);
+        polygon.SetPoint(2, p3);
+        polygon.SetPoint(3, p4);
+        Value v = Value::MakePolygon(polygon);
+        col_polygon.AppendValue(v);
+        Value vx = col_polygon.GetValue(i);
+        BoxT bounding_box(PointT(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f),
+                          PointT(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f));
+        EXPECT_EQ(vx.type().type(), LogicalType::kPolygon);
+        EXPECT_EQ(vx.value_.polygon.point_count, 4);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 3), p4);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.x, bounding_box.upper_left.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.y, bounding_box.upper_left.y);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
+
+        EXPECT_THROW(col_polygon.GetValue(i + 1), std::logic_error);
+    }
+
+    col_polygon.Reset();
+    EXPECT_EQ(col_polygon.capacity(), 0);
+    EXPECT_EQ(col_polygon.tail_index_, 0);
+//    EXPECT_EQ(col_polygon.data_type_size_, 0);
+    EXPECT_EQ(col_polygon.buffer_, nullptr);
+    EXPECT_EQ(col_polygon.data_ptr_, nullptr);
+    EXPECT_EQ(col_polygon.initialized, false);
+
+    // ====
+    col_polygon.Initialize();
+    EXPECT_THROW(col_polygon.SetDataType(DataType(LogicalType::kPolygon)), std::logic_error);
+    EXPECT_THROW(col_polygon.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+
+    EXPECT_EQ(col_polygon.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(col_polygon.Size(), 0);
+    EXPECT_THROW(col_polygon.ToString(), std::logic_error);
+    EXPECT_THROW(col_polygon.GetValue(0), std::logic_error);
+    EXPECT_EQ(col_polygon.tail_index_, 0);
+    EXPECT_EQ(col_polygon.data_type_size_, 48);
+    EXPECT_NE(col_polygon.data_ptr_, nullptr);
+    EXPECT_EQ(col_polygon.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(col_polygon.data_type(), data_type);
+    EXPECT_EQ(col_polygon.buffer_->buffer_type_, VectorBufferType::kMemory);
+
+    EXPECT_NE(col_polygon.buffer_, nullptr);
+    EXPECT_EQ(col_polygon.nulls_ptr_, nullptr);
+    EXPECT_TRUE(col_polygon.initialized);
+    col_polygon.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = col_polygon.data_ptr_;
+    EXPECT_EQ(col_polygon.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, col_polygon.data_ptr_);
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        PolygonT polygon;
+        polygon.Initialize(4);
+        polygon.SetPoint(0, p1);
+        polygon.SetPoint(1, p2);
+        polygon.SetPoint(2, p3);
+        polygon.SetPoint(3, p4);
+        Value v = Value::MakePolygon(polygon);
+        col_polygon.AppendValue(v);
+        Value vx = col_polygon.GetValue(i);
+        BoxT bounding_box(PointT(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f),
+                          PointT(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f));
+        EXPECT_EQ(vx.type().type(), LogicalType::kPolygon);
+        EXPECT_EQ(vx.value_.polygon.point_count, 4);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 3), p4);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.x, bounding_box.upper_left.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.y, bounding_box.upper_left.y);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
+
+        EXPECT_THROW(col_polygon.GetValue(i + 1), std::logic_error);
+    }
+}
 
 TEST_F(ColumnVectorGeoTest, flat_circle) {
     using namespace infinity;
