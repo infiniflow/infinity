@@ -385,7 +385,13 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             break;
         }
         case kBlob: {
-            ((BlobT *) data_ptr_)[index] = value.GetValue<BlobT>();
+            u64 blob_size = value.value_.blob.size;
+            auto* blob_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
+            ptr_t ptr = blob_vector_buffer_ptr->chunk_mgr_->Allocate(blob_size);
+            memcpy(ptr, (void*)(value.value_.blob.ptr), blob_size);
+
+            ((BlobT *) data_ptr_)[index].ptr = ptr;
+            ((BlobT *) data_ptr_)[index].size = blob_size;
             break;
         }
         case kEmbedding: {
@@ -419,6 +425,7 @@ void
 ColumnVector::Reserve(size_t new_capacity) {
     if(new_capacity <= capacity_) return ;
     switch(data_type_.type()) {
+        case LogicalType::kBlob:
         case LogicalType::kBitmap:
         case LogicalType::kPolygon:
         case LogicalType::kPath:
