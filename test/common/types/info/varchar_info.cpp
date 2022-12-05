@@ -36,7 +36,7 @@ TEST_F(VarcharInfoTest, varchar_info_A) {
     EXPECT_EQ(varchar_info_ptr->Size(), 16);
 
     varchar_info_ptr = VarcharInfo::Make();
-    EXPECT_EQ(varchar_info_ptr->length_limit(), DEFAULT_VARCHAR_SIZE);
+    EXPECT_EQ(varchar_info_ptr->length_limit(), MAX_VARCHAR_SIZE);
     EXPECT_EQ(varchar_info_ptr->Size(), 16);
 
 }

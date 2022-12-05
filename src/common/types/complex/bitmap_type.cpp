@@ -79,6 +79,7 @@ void
 BitmapType::Initialize(u64 bit_count) {
     TypeAssert(count == 0,
                "The bitmap was already initialized. Please reset it before re-initialize it.");
+    TypeAssert(bit_count > 0, "Empty bitmap isn't allowed.")
     u64 unit_count = UnitCount(bit_count);
 
     ptr = new u64[unit_count]{0};

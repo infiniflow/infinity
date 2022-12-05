@@ -62,8 +62,8 @@ TEST_F(PolygonTypeTest, polygon1) {
     PolygonT polygon3(3);
     EXPECT_EQ(polygon3.PointCount(), 3);
     EXPECT_EQ(polygon1.bounding_box.upper_left.x, std::numeric_limits<f64>::max());
-    EXPECT_EQ(polygon1.bounding_box.upper_left.y, std::numeric_limits<f64>::min());
-    EXPECT_EQ(polygon1.bounding_box.lower_right.x, std::numeric_limits<f64>::min());
+    EXPECT_EQ(polygon1.bounding_box.upper_left.y, -std::numeric_limits<f64>::max());
+    EXPECT_EQ(polygon1.bounding_box.lower_right.x, -std::numeric_limits<f64>::max());
     EXPECT_EQ(polygon1.bounding_box.lower_right.y, std::numeric_limits<f64>::max());
 
     polygon3 = polygon2;

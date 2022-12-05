@@ -368,7 +368,16 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             break;
         }
         case kBitmap: {
-            ((BitmapT *) data_ptr_)[index] = value.GetValue<BitmapT>();
+            auto* bitmap_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
+            u64 bit_count = value.value_.bitmap.count;
+            u64 unit_count = BitmapT::UnitCount(bit_count);
+
+            size_t bit_area_size = unit_count * BitmapT::UNIT_BYTES;
+            ptr_t ptr = bitmap_vector_buffer_ptr->chunk_mgr_->Allocate(bit_area_size);
+            memcpy(ptr, (void*)(value.value_.bitmap.ptr), bit_area_size);
+
+            ((BitmapT *) data_ptr_)[index].ptr = (u64*)ptr;
+            ((BitmapT *) data_ptr_)[index].count = bit_count;
             break;
         }
         case kUuid: {
@@ -410,6 +419,7 @@ void
 ColumnVector::Reserve(size_t new_capacity) {
     if(new_capacity <= capacity_) return ;
     switch(data_type_.type()) {
+        case LogicalType::kBitmap:
         case LogicalType::kPolygon:
         case LogicalType::kPath:
         case LogicalType::kVarchar: {
