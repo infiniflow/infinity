@@ -17,7 +17,7 @@ public:
     UuidType() = default;
 
     explicit
-    UuidType(ptr_t input) {
+    UuidType(const_ptr_t input) {
         Set(input);
     }
 
@@ -40,7 +40,7 @@ public:
     }
 
     inline void
-    Set(ptr_t input) {
+    Set(const_ptr_t input) {
         memcpy(body, input, UuidType::LENGTH);
     }
 
