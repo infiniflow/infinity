@@ -5,6 +5,7 @@
 #include "value.h"
 #include "common/utility/infinity_assert.h"
 #include "main/stats/global_resource_usage.h"
+#include "common/types/info/embedding_info.h"
 
 #include <utility>
 
@@ -335,15 +336,16 @@ Value::MakeBlob(BlobT input) {
 
 Value
 Value::MakeEmbedding(EmbeddingDataType type, size_t dimension) {
-    Value value(LogicalType::kEmbedding);
+    auto embedding_info_ptr = EmbeddingInfo::Make(type, dimension);
+    Value value(LogicalType::kEmbedding, embedding_info_ptr);
     value.value_.embedding = EmbeddingType(type, dimension);
     value.is_null_ = false;
     return value;
 }
 
 Value
-Value::MakeEmbedding(ptr_t ptr) {
-    Value value(LogicalType::kEmbedding);
+Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> embedding_info) {
+    Value value(LogicalType::kEmbedding, std::move(embedding_info));
     value.value_.embedding.ptr = ptr;
     value.is_null_ = false;
     return value;
@@ -623,6 +625,7 @@ Value::~Value() {
         case kMixed: {
 //            value_.mixed_value.~MixedType();
             value_.mixed_value.Reset();
+            break;
         }
         default: {
 

@@ -14,14 +14,14 @@ namespace infinity {
 class EmbeddingInfo : public TypeInfo {
 public:
 
-    inline static UniquePtr<EmbeddingInfo>
-    Make(EmbeddingDataType embedding_data_type, i64 dimension) {
+    inline static SharedPtr<EmbeddingInfo>
+    Make(EmbeddingDataType embedding_data_type, size_t dimension) {
         TypeAssert(dimension <= EMBEDDING_LIMIT,
                    "Embedding dimension should less than " + std::to_string(EMBEDDING_LIMIT))
-        return MakeUnique<EmbeddingInfo>(embedding_data_type, dimension);
+        return MakeShared<EmbeddingInfo>(embedding_data_type, dimension);
     }
 
-    explicit EmbeddingInfo(EmbeddingDataType type, i64 dimension):
+    explicit EmbeddingInfo(EmbeddingDataType type, size_t dimension):
             TypeInfo(TypeInfoType::kEmbedding),
             embedding_data_type_(type),
             dimension_(dimension)

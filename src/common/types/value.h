@@ -9,6 +9,7 @@
 #include "common/types/info/decimal32_info.h"
 #include "common/types/info/decimal64_info.h"
 #include "common/types/info/decimal128_info.h"
+#include "common/types/info/embedding_info.h"
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {
@@ -142,7 +143,7 @@ public:
     MakeEmbedding(EmbeddingDataType type, size_t dimension);
 
     static Value
-    MakeEmbedding(ptr_t ptr);
+    MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> embedding_info);
 
     static Value
     MakeMixedData(MixedT input);

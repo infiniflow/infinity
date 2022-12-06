@@ -169,7 +169,8 @@ ColumnVector::GetValue(idx_t index) const {
             return Value::MakeBlob(((BlobT *) data_ptr_)[index]);
         }
         case kEmbedding: {
-            return Value::MakeEmbedding(((ptr_t *) data_ptr_)[index]);
+            ptr_t ptr = data_ptr_ + index * data_type_.Size();
+            return Value::MakeEmbedding(ptr, data_type_.type_info());
         }
         case kMixed: {
             return Value::MakeMixedData(((MixedT *) data_ptr_)[index]);
@@ -395,8 +396,8 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             break;
         }
         case kEmbedding: {
-            EmbeddingT embedding = value.GetValue<EmbeddingT>();
-            memcpy(data_ptr_, embedding.ptr, data_type_.Size());
+            ptr_t ptr = data_ptr_ + index * data_type_.Size();
+            memcpy(ptr, value.value_.embedding.ptr, data_type_.Size());
             break;
         }
         case kMixed: {
