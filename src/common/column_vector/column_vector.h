@@ -61,6 +61,7 @@ public:
     }
 
     ~ColumnVector() {
+        Reset();
         GlobalResourceUsage::DecrObjectCount();
     }
 

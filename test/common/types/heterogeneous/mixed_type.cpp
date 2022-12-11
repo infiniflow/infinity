@@ -213,7 +213,8 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     MixedType mixed_long_string1 = mixed_long_string;
     EXPECT_EQ(mixed_long_string1.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr1 = (LongStrMixedType *) (&mixed_long_string1);
-    EXPECT_STREQ(long_string_mixed_ptr1->ptr, "Hello the world");
+    long_str = String(long_string_mixed_ptr->ptr, long_string_mixed_ptr->length);
+    EXPECT_STREQ(long_str.c_str(), "Hello the world");
     EXPECT_EQ(long_string_mixed_ptr1->length, 15);
     String header1 = String(long_string_mixed_ptr1->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header1.c_str(), "Hello");
@@ -227,7 +228,8 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     MixedType mixed_long_string2 = std::move(mixed_long_string1);
     EXPECT_EQ(mixed_long_string2.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr2 = (LongStrMixedType *) (&mixed_long_string2);
-    EXPECT_STREQ(long_string_mixed_ptr2->ptr, "Hello the world");
+    long_str = String(long_string_mixed_ptr2->ptr, long_string_mixed_ptr2->length);
+    EXPECT_STREQ(long_str.c_str(), "Hello the world");
     EXPECT_EQ(long_string_mixed_ptr2->length, 15);
     String header2 = String(long_string_mixed_ptr2->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header2.c_str(), "Hello");
@@ -241,7 +243,8 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     mixed_long_string3 = mixed_long_string2;
     EXPECT_EQ(mixed_long_string3.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr3 = (LongStrMixedType *) (&mixed_long_string3);
-    EXPECT_STREQ(long_string_mixed_ptr3->ptr, "Hello the world");
+    long_str = String(long_string_mixed_ptr3->ptr, long_string_mixed_ptr3->length);
+    EXPECT_STREQ(long_str.c_str(), "Hello the world");
     EXPECT_EQ(long_string_mixed_ptr3->length, 15);
     String header3 = String(long_string_mixed_ptr3->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header3.c_str(), "Hello");
@@ -251,8 +254,8 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     mixed_long_string4 = std::move(mixed_long_string2);
     EXPECT_EQ(mixed_long_string4.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr4 = (LongStrMixedType *) (&mixed_long_string4);
-
-    EXPECT_STREQ(long_string_mixed_ptr4->ptr, "Hello the world");
+    long_str = String(long_string_mixed_ptr4->ptr, long_string_mixed_ptr4->length);
+    EXPECT_STREQ(long_str.c_str(), "Hello the world");
     EXPECT_EQ(long_string_mixed_ptr4->length, 15);
     String header4 = String(long_string_mixed_ptr4->ptr, BaseMixedType::LONG_STR_HEADER);
     EXPECT_STREQ(header4.c_str(), "Hello");

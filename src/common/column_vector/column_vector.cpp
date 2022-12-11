@@ -460,6 +460,18 @@ ColumnVector::Reserve(size_t new_capacity) {
 
 void
 ColumnVector::Reset() {
+
+    if(data_type_.type() == LogicalType::kMixed) {
+        // Current solution:
+        // Tuple/Array/Long String will use heap memory which isn't managed by ColumnVector.
+        // This part of memory should managed by ColumnVector, but it isn't now.
+        // So, when ColumnVector is destructed, this part need to free here.
+        // TODO: we are going to manage the nested object in ColumnVector.
+        for(size_t idx = 0; idx < tail_index_; ++ idx) {
+            ((MixedT *) data_ptr_)[idx].Reset();
+        }
+    }
+
     capacity_ = 0;
     tail_index_ = 0;
 //    data_type_size_ = 0;
