@@ -66,7 +66,7 @@ public:
     InsertNullIntoTuple(const String& key);
 
     MixedType*
-    GetFromTuple(const String& key);
+    GetFromTuple(const String& key) const;
 
 private:
     static void

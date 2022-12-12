@@ -34,8 +34,7 @@ public:
             return ;
         }
         if(ptr != nullptr) {
-            LOG_TRACE("Release the long str ptr");
-
+//            LOG_TRACE("Release the long str ptr");
             delete[] ptr;
             GlobalResourceUsage::DecrRawMemCount();
 

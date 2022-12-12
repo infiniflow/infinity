@@ -152,7 +152,7 @@ MixedType::MoveIntoTuple(const String& key, MixedType&& value) {
 }
 
 MixedType*
-MixedType::GetFromTuple(const String& key) {
+MixedType::GetFromTuple(const String& key) const {
     TypeAssert(this->type == MixedValueType::kTuple, "Not tuple type, can't get value.");
     auto* tuple_ptr = (TupleMixedType*)(this);
     TypeAssert(tuple_ptr->count > 0, "The tuple isn't initialized");
@@ -508,14 +508,14 @@ MixedType::Move(MixedType&& from, MixedType& to) {
     to.Reset();
     memcpy((void*)&to, (void*)&from, BaseMixedType::ELEMENT_SIZE);
     memset((void*)&from, 0, BaseMixedType::ELEMENT_SIZE);
-    LOG_TRACE("MixedType::Move, {}", BaseMixedType::GetTypeName(to.type));
+//    LOG_TRACE("MixedType::Move, {}", BaseMixedType::GetTypeName(to.type));
 }
 
 void
 MixedType::Copy(const MixedType& from, MixedType& to) {
     to.Reset();
     memcpy((void*)&to, (void*)&from, BaseMixedType::ELEMENT_SIZE);
-    LOG_TRACE("MixedType::Copy, {}", BaseMixedType::GetTypeName(to.type));
+//    LOG_TRACE("MixedType::Copy, {}", BaseMixedType::GetTypeName(to.type));
     switch(to.type) {
         case MixedValueType::kInvalid:
         case MixedValueType::kInteger:
