@@ -409,7 +409,7 @@ MixedType::InsertNullIntoArray(u16 index) {
 }
 
 MixedType*
-MixedType::GetByIndex(u16 index) {
+MixedType::GetByIndex(u16 index) const {
     auto* array_mixed_ptr = (ArrayMixedType*)this;
     TypeAssert(index < array_mixed_ptr->count, "Index is invalid");
     auto* array_value_ptr = (MixedArrayValue*)(array_mixed_ptr->ptr);

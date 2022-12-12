@@ -93,7 +93,7 @@ public:
     InsertNullIntoArray(u16 index);
 
     MixedType*
-    GetByIndex(u16);
+    GetByIndex(u16) const;
 
     // non-static member
 public:

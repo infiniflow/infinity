@@ -734,7 +734,8 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
         auto *value3_ptr = mixed_tuple1.GetFromTuple("key3");
         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
         auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
-        EXPECT_STREQ(short_str_value_ptr->ptr, "Hello World !!");
+        String short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
+        EXPECT_STREQ(short_str.c_str(), "Hello World !!");
     }
 
     // Key4: long string
@@ -743,7 +744,8 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
         auto *value4_ptr = mixed_tuple1.GetFromTuple("key4");
         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
         auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
-        EXPECT_STREQ(long_str_value_ptr->ptr, "Hello World Hello World");
+        String long_str(long_str_value_ptr->ptr, long_str_value_ptr->length);
+        EXPECT_STREQ(long_str.c_str(), "Hello World Hello World");
     }
 
     // Key5: null
@@ -786,7 +788,8 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
             auto *value63_ptr = mixed_tuple_key6.GetFromTuple("key63");
             EXPECT_EQ(value63_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value63_ptr = (ShortStrMixedType *) (value63_ptr);
-            EXPECT_STREQ(short_str_value63_ptr->ptr, "Hello World !!");
+            String short_str(short_str_value63_ptr->ptr, short_str_value63_ptr->length);
+            EXPECT_STREQ(short_str.c_str(), "Hello World !!");
         }
 
         // Key64: long string
@@ -1530,7 +1533,8 @@ TEST_F(MixedTypeTest, mixed_array2) {
         auto *value3_ptr = mixed_array1.GetByIndex(2);
         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
         auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
-        EXPECT_STREQ(short_str_value_ptr->ptr, "HappyHalloween");
+        String short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
+        EXPECT_STREQ(short_str.c_str(), "HappyHalloween");
     }
 
     // Long str
@@ -1581,7 +1585,8 @@ TEST_F(MixedTypeTest, mixed_array2) {
             auto *value3_ptr = mixed_tuple5.GetFromTuple("key53");
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
-            EXPECT_STREQ(short_str_value_ptr->ptr, "ABCDEFGHIJKLMN");
+            String short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            EXPECT_STREQ(short_str.c_str(), "ABCDEFGHIJKLMN");
         }
 
         // Key54: long string
@@ -1590,7 +1595,8 @@ TEST_F(MixedTypeTest, mixed_array2) {
             auto *value4_ptr = mixed_tuple5.GetFromTuple("key54");
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
-            EXPECT_STREQ(long_str_value_ptr->ptr, "ABCDEFGHIJKLMNO");
+            String long_str(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            EXPECT_STREQ(long_str.c_str(), "ABCDEFGHIJKLMNO");
         }
 
         // Key55: null
@@ -1641,7 +1647,8 @@ TEST_F(MixedTypeTest, mixed_array2) {
             auto *value3_ptr = nested_array.GetByIndex(2);
             EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
             auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
-            EXPECT_STREQ(short_str_value_ptr->ptr, "MNOPQRSTUVWXYZ");
+            String short_str(short_str_value_ptr->ptr, short_str_value_ptr->length);
+            EXPECT_STREQ(short_str.c_str(), "MNOPQRSTUVWXYZ");
         }
 
         // Long str
@@ -1650,7 +1657,8 @@ TEST_F(MixedTypeTest, mixed_array2) {
             auto *value4_ptr = nested_array.GetByIndex(3);
             EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
             auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
-            EXPECT_STREQ(long_str_value_ptr->ptr, "LMNOPQRSTUVWXYZ");
+            String long_str(long_str_value_ptr->ptr, long_str_value_ptr->length);
+            EXPECT_STREQ(long_str.c_str(), "LMNOPQRSTUVWXYZ");
         }
 
         // Null
