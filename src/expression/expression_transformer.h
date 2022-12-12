@@ -8,6 +8,7 @@
 #include "conjunction_expression.h"
 
 #include <queue>
+#include <functional>
 
 namespace infinity {
 
