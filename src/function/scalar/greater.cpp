@@ -4,6 +4,7 @@
 
 #include "greater.h"
 #include "function/scalar_function.h"
+#include "function/scalar_function_set.h"
 #include <cmath>
 
 namespace infinity {

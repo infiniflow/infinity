@@ -9,6 +9,8 @@
 #include "expression/value_expression.h"
 #include "expression/function_expression.h"
 #include "expression/aggregate_expression.h"
+#include "function/scalar_function_set.h"
+#include "function/aggregate_function_set.h"
 
 #include "common/utility/infinity_assert.h"
 #include "main/infinity.h"

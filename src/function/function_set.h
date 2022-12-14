@@ -28,42 +28,10 @@ public:
     FunctionType type_;
 };
 
-class AggregateFunctionSet: public FunctionSet {
-public:
-    explicit AggregateFunctionSet(std::string name): FunctionSet(std::move(name), FunctionType::kAggregate) {}
-
-    void AddFunction(const AggregateFunction& func);
-
-    AggregateFunction GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>>& input_arguments);
-
-private:
-    std::vector<AggregateFunction> functions_;
-};
 
 
-class ScalarFunctionSet: public FunctionSet {
-public:
-    explicit ScalarFunctionSet(std::string name): FunctionSet(std::move(name), FunctionType::kScalar) {}
 
-    void AddFunction(const ScalarFunction& func);
 
-    ScalarFunction GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>>& input_arguments);
 
-private:
-    int64_t
-    MatchFunctionCost(const ScalarFunction& func,  const std::vector<std::shared_ptr<BaseExpression>>& arguments);
-
-    std::vector<ScalarFunction> functions_;
-};
-
-class TableFunctionSet: public FunctionSet {
-public:
-    explicit TableFunctionSet(std::string name): FunctionSet(std::move(name), FunctionType::kTable) {}
-
-    void AddFunction(const TableFunction& func);
-
-private:
-    std::vector<TableFunction> functions_;
-};
 
 }
