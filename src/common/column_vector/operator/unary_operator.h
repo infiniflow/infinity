@@ -12,7 +12,8 @@ namespace infinity {
 class UnaryOperation {
 public:
     template <typename InputType, typename ResultType, typename Operator>
-    static void inline Execute(const ColumnVector& input, ColumnVector& result, size_t count, bool nullable) {
+    static void inline
+    Execute(const ColumnVector& input, ColumnVector& result, size_t count, void* state_ptr, bool nullable) {
         const auto* input_ptr = (const InputType*)(input.data_ptr_);
         const UniquePtr<Bitmask>& input_null = input.nulls_ptr_;
 
@@ -30,9 +31,10 @@ public:
                                                                                 result_ptr,
                                                                                 input_null,
                                                                                 result_null,
-                                                                                count);
+                                                                                count,
+                                                                                state_ptr);
                 } else {
-                    return ExecuteFlat<InputType, ResultType, Operator>(input_ptr, result_ptr, count);
+                    return ExecuteFlat<InputType, ResultType, Operator>(input_ptr, result_ptr, count, state_ptr);
                 }
 
             }
@@ -63,7 +65,8 @@ public:
 private:
     template <typename InputType, typename ResultType, typename Operator>
     static void inline ExecuteFlat(const InputType* __restrict input_ptr,
-                                   ResultType* __restrict result_ptr
+                                   ResultType* __restrict result_ptr,
+                                   void* state_ptr,
                                    size_t count) {
         for (size_t i = 0; i < count; i++) {
              Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i]);
@@ -75,7 +78,8 @@ private:
                                            ResultType* __restrict result_ptr,
                                            const UniquePtr<Bitmask>& input_null,
                                            UniquePtr<Bitmask>& result_null,
-                                           size_t count) {
+                                           size_t count,
+                                           void* state_ptr) {
         if(input_null->IsAllTrue()) {
             // Initialized all true to output null bitmask.
             result_null->SetAllTrue();

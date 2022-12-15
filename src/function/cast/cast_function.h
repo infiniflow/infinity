@@ -6,20 +6,9 @@
 
 #include "common/column_vector/column_vector.h"
 #include "common/types/data_type.h"
+#include "bound_cast_func.h"
 
 namespace infinity {
-
-struct CastParameters {
-};
-
-using cast_function_t = bool(*)(const ColumnVector &source, ColumnVector &result, idx_t count, CastParameters& parameters);
-
-struct BoundCastFunc {
-    explicit
-    BoundCastFunc(cast_function_t func) : function(func) {};
-
-    cast_function_t function = nullptr;
-};
 
 class CastFunction {
 public:

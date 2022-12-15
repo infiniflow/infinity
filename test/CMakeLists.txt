@@ -11,6 +11,12 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        function_test_src
+        CONFIGURE_DEPENDS
+        function/*.cpp
+        )
+
+file(GLOB_RECURSE
         main_test_src
         CONFIGURE_DEPENDS
         main/*.cpp
@@ -31,6 +37,7 @@ file(GLOB_RECURSE
 add_executable(test_main
         main.cpp
         ${common_test_src}
+        ${function_test_src}
         ${main_test_src}
         ${bin_src}
         ${storage_src}

@@ -10,8 +10,8 @@
 #include "expression/base_expression.h"
 #include "executor/operation_state.h"
 #include "common/utility/infinity_assert.h"
-#include "common/column_vector/unary_operation.h"
-#include "common/column_vector/binary_operation.h"
+#include "common/column_vector/unary_operation_chunk.h"
+#include "common/column_vector/binary_operation_chunk.h"
 
 #include <vector>
 
