@@ -29,7 +29,6 @@ public:
 
         ptr = new char_t[point_count * sizeof(PointType)]{0};
         GlobalResourceUsage::IncrRawMemCount();
-
     }
 
     PathType(const PathType& other);

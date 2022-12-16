@@ -55,8 +55,7 @@ TEST_F(ColumnVectorTimeTest, flat_date) {
     EXPECT_EQ(tmp_ptr, col_date.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        DateT date;
-        date.value = static_cast<i32>(i);
+        DateT date(static_cast<i32>(i));
         Value v = Value::MakeDate(date);
         col_date.AppendValue(v);
         Value vx = col_date.GetValue(i);
@@ -76,8 +75,7 @@ TEST_F(ColumnVectorTimeTest, flat_date) {
     EXPECT_EQ(col_date.capacity(), 2* DEFAULT_VECTOR_SIZE);
 
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
-        DateT date;
-        date.value = static_cast<i32>(i);
+        DateT date(static_cast<i32>(i));
         Value v = Value::MakeDate(date);
         col_date.AppendValue(v);
         Value vx = col_date.GetValue(i);
@@ -119,8 +117,7 @@ TEST_F(ColumnVectorTimeTest, flat_date) {
     EXPECT_EQ(tmp_ptr, col_date.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        DateT date;
-        date.value = static_cast<i32>(i);
+        DateT date(static_cast<i32>(i));
         Value v = Value::MakeDate(date);
         col_date.AppendValue(v);
         Value vx = col_date.GetValue(i);
@@ -160,8 +157,7 @@ TEST_F(ColumnVectorTimeTest, flat_time) {
     EXPECT_EQ(tmp_ptr, col_time.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        TimeT time;
-        time.value = static_cast<i32>(i);
+        TimeT time(static_cast<i32>(i));
         Value v = Value::MakeTime(time);
         col_time.AppendValue(v);
         Value vx = col_time.GetValue(i);
@@ -181,8 +177,7 @@ TEST_F(ColumnVectorTimeTest, flat_time) {
     EXPECT_EQ(col_time.capacity(), 2* DEFAULT_VECTOR_SIZE);
 
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
-        TimeT time;
-        time.value = static_cast<i32>(i);
+        TimeT time(static_cast<i32>(i));
         Value v = Value::MakeTime(time);
         col_time.AppendValue(v);
         Value vx = col_time.GetValue(i);
@@ -224,8 +219,7 @@ TEST_F(ColumnVectorTimeTest, flat_time) {
     EXPECT_EQ(tmp_ptr, col_time.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        TimeT time;
-        time.value = static_cast<i32>(i);
+        TimeT time(static_cast<i32>(i));
         Value v = Value::MakeTime(time);
         col_time.AppendValue(v);
         Value vx = col_time.GetValue(i);
@@ -265,9 +259,7 @@ TEST_F(ColumnVectorTimeTest, flat_datetime) {
     EXPECT_EQ(tmp_ptr, col_datetime.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        DateTimeT datetime;
-        datetime.date = static_cast<i32>(i);
-        datetime.time = static_cast<i32>(i);
+        DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeDateTime(datetime);
         col_datetime.AppendValue(v);
         Value vx = col_datetime.GetValue(i);
@@ -289,9 +281,7 @@ TEST_F(ColumnVectorTimeTest, flat_datetime) {
     EXPECT_EQ(col_datetime.capacity(), 2* DEFAULT_VECTOR_SIZE);
 
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
-        DateTimeT datetime;
-        datetime.date = static_cast<i32>(i);
-        datetime.time = static_cast<i32>(i);
+        DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeDateTime(datetime);
         col_datetime.AppendValue(v);
         Value vx = col_datetime.GetValue(i);
@@ -333,9 +323,7 @@ TEST_F(ColumnVectorTimeTest, flat_datetime) {
     EXPECT_EQ(tmp_ptr, col_datetime.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        DateTimeT datetime;
-        datetime.date = static_cast<i32>(i);
-        datetime.time = static_cast<i32>(i);
+        DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeDateTime(datetime);
         col_datetime.AppendValue(v);
         Value vx = col_datetime.GetValue(i);
@@ -376,9 +364,7 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp) {
     EXPECT_EQ(tmp_ptr, col_timestamp.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        TimestampT timestamp;
-        timestamp.date = static_cast<i32>(i);
-        timestamp.time = static_cast<i32>(i);
+        TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeTimestamp(timestamp);
         col_timestamp.AppendValue(v);
         Value vx = col_timestamp.GetValue(i);
@@ -400,9 +386,7 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp) {
     EXPECT_EQ(col_timestamp.capacity(), 2* DEFAULT_VECTOR_SIZE);
 
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
-        TimestampT timestamp;
-        timestamp.date = static_cast<i32>(i);
-        timestamp.time = static_cast<i32>(i);
+        TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeTimestamp(timestamp);
         col_timestamp.AppendValue(v);
         Value vx = col_timestamp.GetValue(i);
@@ -444,9 +428,7 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp) {
     EXPECT_EQ(tmp_ptr, col_timestamp.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        TimestampT timestamp;
-        timestamp.date = static_cast<i32>(i);
-        timestamp.time = static_cast<i32>(i);
+        TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeTimestamp(timestamp);
         col_timestamp.AppendValue(v);
         Value vx = col_timestamp.GetValue(i);
@@ -487,9 +469,7 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp_tz) {
     EXPECT_EQ(tmp_ptr, col_timestamp_tz.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        TimestampTZT timestamp_tz;
-        timestamp_tz.date = static_cast<i32>(i);
-        timestamp_tz.time = static_cast<i32>(i);
+        TimestampTZT timestamp_tz(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeTimestampTz(timestamp_tz);
         col_timestamp_tz.AppendValue(v);
         Value vx = col_timestamp_tz.GetValue(i);
@@ -511,9 +491,7 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp_tz) {
     EXPECT_EQ(col_timestamp_tz.capacity(), 2* DEFAULT_VECTOR_SIZE);
 
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
-        TimestampTZT timestamp_tz;
-        timestamp_tz.date = static_cast<i32>(i);
-        timestamp_tz.time = static_cast<i32>(i);
+        TimestampTZT timestamp_tz(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeTimestampTz(timestamp_tz);
         col_timestamp_tz.AppendValue(v);
         Value vx = col_timestamp_tz.GetValue(i);
@@ -555,9 +533,7 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp_tz) {
     EXPECT_EQ(tmp_ptr, col_timestamp_tz.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        TimestampTZT timestamp_tz;
-        timestamp_tz.date = static_cast<i32>(i);
-        timestamp_tz.time = static_cast<i32>(i);
+        TimestampTZT timestamp_tz(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeTimestampTz(timestamp_tz);
         col_timestamp_tz.AppendValue(v);
         Value vx = col_timestamp_tz.GetValue(i);

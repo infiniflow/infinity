@@ -7,7 +7,12 @@
 namespace infinity {
 
 struct TimeType {
-    i32 value;
+    TimeType() = default;
+
+    explicit
+    TimeType(i32 time_value): value(time_value) {};
+
+    i32 value {};
 };
 
 }

@@ -7,6 +7,11 @@
 namespace infinity {
 
 struct TimestampTZType {
+    TimestampTZType() = default;
+
+    explicit
+    TimestampTZType(i32 date_value, i32 time_value) : date(date_value), time(time_value) {}
+
     i32 date {};
     i32 time {};
 

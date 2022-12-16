@@ -29,8 +29,17 @@ class BoolCastTest : public BaseTest {
 TEST_F(BoolCastTest, bool_cast1) {
     using namespace infinity;
 
-    DataType source(LogicalType::kBoolean);
-    DataType target(LogicalType::kVarchar);
-    BindBoolCast(source, target);
+    {
+        DataType source(LogicalType::kBoolean);
+        DataType target(LogicalType::kVarchar);
+        auto func_ptr = BindBoolCast(source, target);
+        EXPECT_EQ(func_ptr.function, nullptr);
+    }
+
+    {
+        DataType source(LogicalType::kBoolean);
+        DataType target(LogicalType::kBoolean);
+        EXPECT_THROW(BindBoolCast(source, target), TypeException);
+    }
 
 }

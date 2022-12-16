@@ -110,3 +110,46 @@ TEST_F(DataTypeTest, GetTypeName) {
     EXPECT_EQ(missing_type.ToString(), "Missing");
 
 }
+
+TEST_F(DataTypeTest, TypeToString) {
+    using namespace infinity;
+    EXPECT_STREQ(DataType::TypeToString<BooleanT>().c_str(), "Boolean");
+    EXPECT_STREQ(DataType::TypeToString<TinyIntT>().c_str(), "TinyInt");
+    EXPECT_STREQ(DataType::TypeToString<SmallIntT>().c_str(), "SmallInt");
+    EXPECT_STREQ(DataType::TypeToString<IntegerT>().c_str(), "Integer");
+    EXPECT_STREQ(DataType::TypeToString<BigIntT>().c_str(), "BigInt");
+    EXPECT_STREQ(DataType::TypeToString<HugeIntT>().c_str(), "HugeInt");
+    EXPECT_STREQ(DataType::TypeToString<FloatT>().c_str(), "Float");
+    EXPECT_STREQ(DataType::TypeToString<DoubleT>().c_str(), "Double");
+    EXPECT_STREQ(DataType::TypeToString<Decimal16T>().c_str(), "Decimal16");
+    EXPECT_STREQ(DataType::TypeToString<Decimal32T>().c_str(), "Decimal32");
+    EXPECT_STREQ(DataType::TypeToString<Decimal64T>().c_str(), "Decimal64");
+    EXPECT_STREQ(DataType::TypeToString<Decimal128T>().c_str(), "Decimal128");
+    EXPECT_STREQ(DataType::TypeToString<VarcharT>().c_str(), "Varchar");
+    EXPECT_STREQ(DataType::TypeToString<Char1T>().c_str(), "Char1");
+    EXPECT_STREQ(DataType::TypeToString<Char2T>().c_str(), "Char2");
+    EXPECT_STREQ(DataType::TypeToString<Char4T>().c_str(), "Char4");
+    EXPECT_STREQ(DataType::TypeToString<Char8T>().c_str(), "Char8");
+    EXPECT_STREQ(DataType::TypeToString<Char16T>().c_str(), "Char16");
+    EXPECT_STREQ(DataType::TypeToString<Char32T>().c_str(), "Char32");
+    EXPECT_STREQ(DataType::TypeToString<Char64T>().c_str(), "Char64");
+    EXPECT_STREQ(DataType::TypeToString<DateT>().c_str(), "Date");
+    EXPECT_STREQ(DataType::TypeToString<TimeT>().c_str(), "Time");
+    EXPECT_STREQ(DataType::TypeToString<DateTimeT>().c_str(), "DateTime");
+    EXPECT_STREQ(DataType::TypeToString<TimestampT>().c_str(), "Timestamp");
+    EXPECT_STREQ(DataType::TypeToString<TimestampTZT>().c_str(), "TimestampTZ");
+    EXPECT_STREQ(DataType::TypeToString<IntervalT>().c_str(), "Interval");
+    EXPECT_STREQ(DataType::TypeToString<ArrayT>().c_str(), "Array");
+//    EXPECT_EQ(DataType::TypeToString<TupleT>().c_str(), "Tuple");
+    EXPECT_STREQ(DataType::TypeToString<PointT>().c_str(), "Point");
+    EXPECT_STREQ(DataType::TypeToString<LineT>().c_str(), "Line");
+    EXPECT_STREQ(DataType::TypeToString<LineSegT>().c_str(), "LineSegment");
+    EXPECT_STREQ(DataType::TypeToString<BoxT>().c_str(), "Box");
+    EXPECT_STREQ(DataType::TypeToString<PathT>().c_str(), "Path");
+    EXPECT_STREQ(DataType::TypeToString<PolygonT>().c_str(), "Polygon");
+    EXPECT_STREQ(DataType::TypeToString<CircleT>().c_str(), "Circle");
+    EXPECT_STREQ(DataType::TypeToString<BitmapT>().c_str(), "Bitmap");
+    EXPECT_STREQ(DataType::TypeToString<UuidT>().c_str(), "UUID");
+    EXPECT_STREQ(DataType::TypeToString<BlobT>().c_str(), "Blob");
+    EXPECT_STREQ(DataType::TypeToString<EmbeddingT>().c_str(), "Embedding");
+}

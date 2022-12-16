@@ -8,22 +8,25 @@
 
 namespace infinity {
 
-enum TimeUnit : i8 {
+enum TimeUnit : i32 {
     kYear = 0,
     kMonth,
     kDay,
     kHour,
     kMinute,
-    kSecond
+    kSecond,
+    kInvalidUnit,
 };
 
 struct IntervalType {
-    i32 unit {};
+    IntervalType() = default;
+
+    TimeUnit unit {TimeUnit::kInvalidUnit};
     i32 value {};
 
     inline void
     Reset() {
-        unit = 0;
+        unit = TimeUnit::kInvalidUnit;
         value = 0;
     }
 };

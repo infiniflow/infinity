@@ -5,6 +5,7 @@
 #pragma once
 
 #include "bound_cast_func.h"
+//#include "column_vector_cast.h"
 #include "common/types/data_type.h"
 #include "common/utility/infinity_assert.h"
 
@@ -15,6 +16,7 @@ BindBoolCast(const DataType& source, DataType& target) {
     TypeAssert(source.type() == LogicalType::kBoolean, "Expect boolean type, but it is " + source.ToString());
     switch(target.type()) {
         case LogicalType::kVarchar: {
+//            ColumnVectorCast<BoolT, VarcharT>
             return BoundCastFunc(nullptr);
         }
         case LogicalType::kChar8: {

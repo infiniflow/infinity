@@ -7,7 +7,12 @@
 namespace infinity {
 
 struct DateType {
-    i32 value;
+    DateType() = default;
+
+    explicit
+    DateType(i32 date_value): value(date_value) {};
+
+    i32 value{0};
 };
 
 }

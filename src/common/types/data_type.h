@@ -179,6 +179,57 @@ public:
 
     static DataType
     ConvertType(hsql::ColumnType type);
+
+    template<typename T>
+    static String
+    TypeToString();
 };
+
+template<typename T>
+String
+DataType::TypeToString() {
+    TypeError("Unexpected date type.");
+}
+
+template <> String DataType::TypeToString<BooleanT>();
+template <> String DataType::TypeToString<TinyIntT>();
+template <> String DataType::TypeToString<SmallIntT>();
+template <> String DataType::TypeToString<IntegerT>();
+template <> String DataType::TypeToString<BigIntT>();
+template <> String DataType::TypeToString<HugeIntT>();
+template <> String DataType::TypeToString<FloatT>();
+template <> String DataType::TypeToString<DoubleT>();
+template <> String DataType::TypeToString<Decimal16T>();
+template <> String DataType::TypeToString<Decimal32T>();
+template <> String DataType::TypeToString<Decimal64T>();
+template <> String DataType::TypeToString<Decimal128T>();
+template <> String DataType::TypeToString<VarcharT>();
+template <> String DataType::TypeToString<Char1T>();
+template <> String DataType::TypeToString<Char2T>();
+template <> String DataType::TypeToString<Char4T>();
+template <> String DataType::TypeToString<Char8T>();
+template <> String DataType::TypeToString<Char16T>();
+template <> String DataType::TypeToString<Char32T>();
+template <> String DataType::TypeToString<Char64T>();
+template <> String DataType::TypeToString<DateT>();
+template <> String DataType::TypeToString<TimeT>();
+template <> String DataType::TypeToString<DateTimeT>();
+template <> String DataType::TypeToString<TimestampT>();
+template <> String DataType::TypeToString<TimestampTZT>();
+template <> String DataType::TypeToString<IntervalT>();
+template <> String DataType::TypeToString<ArrayT>();
+//template <> String DataType::TypeToString<TupleT>() { return "Tuple"; }
+template <> String DataType::TypeToString<PointT>();
+template <> String DataType::TypeToString<LineT>();
+template <> String DataType::TypeToString<LineSegT>();
+template <> String DataType::TypeToString<BoxT>();
+template <> String DataType::TypeToString<PathT>();
+template <> String DataType::TypeToString<PolygonT>();
+template <> String DataType::TypeToString<CircleT>();
+template <> String DataType::TypeToString<BitmapT>();
+template <> String DataType::TypeToString<UuidT>();
+template <> String DataType::TypeToString<BlobT>();
+template <> String DataType::TypeToString<EmbeddingT>();
+template <> String DataType::TypeToString<MixedT>();
 
 }

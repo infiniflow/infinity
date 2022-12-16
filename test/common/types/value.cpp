@@ -390,11 +390,11 @@ TEST_F(ValueTest, MakeAndGet) {
     {
         IntervalT interval;
         for(i32 unit = 1; unit < 7; ++ unit) {
-            interval.unit = unit;
+            interval.unit = TimeUnit::kSecond;
             for(i32 v = 1; v < 3600; ++ v) {
                 interval.value = v;
                 value = Value::MakeInterval(interval);
-                EXPECT_EQ(value.GetValue<IntervalT>().unit, unit);
+                EXPECT_EQ(value.GetValue<IntervalT>().unit, TimeUnit::kSecond);
                 EXPECT_EQ(value.GetValue<IntervalT>().value, v);
             }
         }
