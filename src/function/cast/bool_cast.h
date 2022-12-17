@@ -5,31 +5,39 @@
 #pragma once
 
 #include "bound_cast_func.h"
-//#include "column_vector_cast.h"
+#include "column_vector_cast.h"
 #include "common/types/data_type.h"
+#include "common/types/internal_types.h"
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {
+
+struct BoolTryCast {
+    template<typename SourceType, typename TargetType>
+    static inline bool
+    Operation(SourceType input, TargetType& target) {
+        return true;
+    }
+};
 
 inline static BoundCastFunc
 BindBoolCast(const DataType& source, DataType& target) {
     TypeAssert(source.type() == LogicalType::kBoolean, "Expect boolean type, but it is " + source.ToString());
     switch(target.type()) {
         case LogicalType::kVarchar: {
-//            ColumnVectorCast<BoolT, VarcharT>
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, BoolTryCast>);
         }
         case LogicalType::kChar8: {
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, Char8T, BoolTryCast>);
         }
         case LogicalType::kChar16: {
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, Char16T, BoolTryCast>);
         }
         case LogicalType::kChar32: {
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, Char32T, BoolTryCast>);
         }
         case LogicalType::kChar64: {
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, Char64T, BoolTryCast>);
         }
         default: {
             TypeError("Can't cast from Boolean to " + target.ToString());

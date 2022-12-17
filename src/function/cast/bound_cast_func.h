@@ -7,9 +7,10 @@
 namespace infinity {
 
 struct CastParameters {
+    bool strict{false};
 };
 
-using cast_function_t = bool(*)(const ColumnVector &source, ColumnVector &result, idx_t count, CastParameters& parameters);
+using cast_function_t = bool(*)(const ColumnVector &source, ColumnVector &result, size_t count, CastParameters& parameters);
 
 struct BoundCastFunc {
     explicit

@@ -10,6 +10,8 @@
 namespace infinity {
 
 struct Decimal16Type {
+    Decimal16Type() = default;
+
     explicit
     Decimal16Type(i16 val) : value(val) {}
 
@@ -19,10 +21,12 @@ struct Decimal16Type {
         return other.value == value;
     }
 
-    i16 value;
+    i16 value{0};
 };
 
 struct Decimal32Type {
+    Decimal32Type() = default;
+
     explicit
     Decimal32Type(i32 val) : value(val) {}
 
@@ -32,10 +36,12 @@ struct Decimal32Type {
         return other.value == value;
     }
 
-    i32 value;
+    i32 value{0};
 };
 
 struct Decimal64Type {
+    Decimal64Type() = default;
+
     explicit
     Decimal64Type(i64 val) : value(val) {}
 
@@ -45,11 +51,13 @@ struct Decimal64Type {
         return other.value == value;
     }
 
-    i64 value;
+    i64 value{0};
 };
 
 struct Decimal128Type {
 public:
+    Decimal128Type() = default;
+
     Decimal128Type(i64 val1, i64 val2) : upper(val1), lower(val2) {}
 
     bool
@@ -64,8 +72,8 @@ public:
         lower = 0;
     }
 
-    i64 upper;
-    i64 lower;
+    i64 upper{0};
+    i64 lower{0};
 };
 
 struct DecimalType {

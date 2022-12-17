@@ -1,5 +1,5 @@
 //
-// Created by JinHai on 2022/12/16.
+// Created by JinHai on 2022/12/17.
 //
 
 #include <gtest/gtest.h>
@@ -8,9 +8,9 @@
 #include "common/types/value.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "function/cast/bool_cast.h"
+#include "function/cast/integer_cast.h"
 
-class BoolCastTest : public BaseTest {
+class IntegerCastTest : public BaseTest {
     void
     SetUp() override {
         infinity::Logger::Initialize();
@@ -26,13 +26,13 @@ class BoolCastTest : public BaseTest {
     }
 };
 
-TEST_F(BoolCastTest, bool_cast1) {
+TEST_F(IntegerCastTest, integer_cast1) {
     using namespace infinity;
 
     {
-        DataType source(LogicalType::kBoolean);
-        DataType target(LogicalType::kVarchar);
-        auto func_ptr = BindBoolCast(source, target);
+        DataType source(LogicalType::kTinyInt);
+        DataType target(LogicalType::kSmallInt);
+        auto func_ptr = BindIntegerCast<TinyIntT>(source, target);
         EXPECT_NE(func_ptr.function, nullptr);
 
         // Construct column vector
@@ -40,9 +40,16 @@ TEST_F(BoolCastTest, bool_cast1) {
     }
 
     {
-        DataType source(LogicalType::kBoolean);
-        DataType target(LogicalType::kBoolean);
-        EXPECT_THROW(BindBoolCast(source, target), TypeException);
+        DataType source(LogicalType::kSmallInt);
+        DataType target(LogicalType::kBigInt);
+        auto func_ptr = BindIntegerCast<SmallIntT>(source, target);
+        EXPECT_NE(func_ptr.function, nullptr);
+    }
+
+    {
+        DataType source(LogicalType::kSmallInt);
+        DataType target(LogicalType::kArray);
+        EXPECT_THROW(BindIntegerCast<SmallIntT>(source, target), TypeException);
     }
 
 }
