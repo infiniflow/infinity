@@ -36,6 +36,8 @@ LogicalType::TypeConversion(hsql::ColumnType type) {
         case hsql::DataType::DATETIME: return LogicalType(LogicalTypeId::kDateTime, type.length, type.precision, type.scale);
         case hsql::DataType::UNKNOWN: return LogicalType(LogicalTypeId::kInvalid, type.length, type.precision, type.scale);
     }
+
+    return LogicalType(LogicalTypeId::kInvalid);
 }
 
 LogicalType::LogicalType(LogicalTypeId logical_type_id)

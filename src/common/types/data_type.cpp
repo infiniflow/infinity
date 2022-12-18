@@ -223,6 +223,8 @@ DataType::ConvertType(hsql::ColumnType type) {
             TypeError("Unknown date type.");
         }
     }
+
+    TypeError("Unexpected date type.");
 }
 
 template <> String DataType::TypeToString<BooleanT>() { return "Boolean"; }

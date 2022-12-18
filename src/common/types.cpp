@@ -3,6 +3,7 @@
 //
 
 #include "types.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -17,6 +18,7 @@ ToString(JoinType type) {
         case JoinType::kCross: return "Cross Product";
         case JoinType::kNatural: return "Natural Join";
     }
+    TypeError("Unexpected join type");
 }
 
 std::string
@@ -25,6 +27,7 @@ ToString(OrderByType type) {
         case OrderByType::kAscending: return "ASC";
         case OrderByType::kDescending: return "DESC";
     }
+    TypeError("Unexpected order type");
 }
 
 }

@@ -499,6 +499,8 @@ MixedType::operator==(const MixedType& other) const {
         case MixedValueType::kDummy:
             TypeError("Dummy heterogeneous type")
     }
+
+    TypeError("Unknown heterogeneous type.");
 }
 
 
