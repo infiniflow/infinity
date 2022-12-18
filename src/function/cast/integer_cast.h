@@ -101,7 +101,7 @@ BindIntegerCast(const DataType &source, DataType &target) {
 struct IntegerTryCastCheckOverflow {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Operation(SourceType source, TargetType &target) {
+    Run(SourceType source, TargetType &target) {
         FunctionError("Not implement to cast from " + DataType::TypeToString<SourceType>()
                  + " to " + DataType::TypeToString<TargetType>());
     }
@@ -109,38 +109,38 @@ struct IntegerTryCastCheckOverflow {
 
 // Cast TinyInt to other numeric type
 template<>
-bool IntegerTryCastCheckOverflow::Operation(TinyIntT source, SmallIntT &target) {
+bool IntegerTryCastCheckOverflow::Run(TinyIntT source, SmallIntT &target) {
     target = source;
     return true;
 }
 
 template<>
-bool IntegerTryCastCheckOverflow::Operation(TinyIntT source, IntegerT &target) {
+bool IntegerTryCastCheckOverflow::Run(TinyIntT source, IntegerT &target) {
     target = source;
     return true;
 }
 
 template<>
-bool IntegerTryCastCheckOverflow::Operation(TinyIntT source, BigIntT &target) {
+bool IntegerTryCastCheckOverflow::Run(TinyIntT source, BigIntT &target) {
     target = source;
     return true;
 }
 
 template<>
-bool IntegerTryCastCheckOverflow::Operation(TinyIntT source, HugeIntT &target) {
+bool IntegerTryCastCheckOverflow::Run(TinyIntT source, HugeIntT &target) {
     target.lower = source;
     target.upper = (source < 0) * -1;
     return true;
 }
 
 template<>
-bool IntegerTryCastCheckOverflow::Operation(TinyIntT source, FloatT &target) {
+bool IntegerTryCastCheckOverflow::Run(TinyIntT source, FloatT &target) {
     target = source;
     return true;
 }
 
 template<>
-bool IntegerTryCastCheckOverflow::Operation(TinyIntT source, DoubleT &target) {
+bool IntegerTryCastCheckOverflow::Run(TinyIntT source, DoubleT &target) {
     target = source;
     return true;
 }

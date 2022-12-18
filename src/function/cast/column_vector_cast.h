@@ -27,7 +27,7 @@ struct ValueTryCast {
     inline static TargetValueType
     Execute(SourceValueType input, Bitmask* nulls_ptr, size_t idx, void* state_ptr) {
         TargetValueType result;
-        if(Operator::template Operation<SourceValueType, TargetValueType>(input, result)) {
+        if(Operator::template Run<SourceValueType, TargetValueType>(input, result)) {
             return result;
         }
 

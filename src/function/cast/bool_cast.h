@@ -12,13 +12,7 @@
 
 namespace infinity {
 
-struct BoolTryCast {
-    template<typename SourceType, typename TargetType>
-    static inline bool
-    Operation(SourceType input, TargetType& target) {
-        return true;
-    }
-};
+struct BoolTryCast;
 
 inline static BoundCastFunc
 BindBoolCast(const DataType& source, DataType& target) {
@@ -44,5 +38,14 @@ BindBoolCast(const DataType& source, DataType& target) {
         }
     }
 }
+
+struct BoolTryCast  {
+
+    template<typename SourceType, typename TargetType>
+    static inline bool
+    Run(SourceType input, TargetType& target) {
+        return true;
+    }
+};
 
 }
