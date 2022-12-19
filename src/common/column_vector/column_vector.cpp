@@ -35,6 +35,7 @@ void ColumnVector::Initialize(size_t capacity) {
         }
     }
     data_ptr_ = buffer_->GetData();
+//    nulls_ptr_->Initialize(capacity_);
     initialized = true;
 }
 

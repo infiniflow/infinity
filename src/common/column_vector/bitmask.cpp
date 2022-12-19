@@ -4,36 +4,50 @@
 
 #include "bitmask.h"
 #include "common/utility/infinity_assert.h"
+#include "main/stats/global_resource_usage.h"
 
 #include <sstream>
 
 namespace infinity {
 
+Bitmask::Bitmask(): data_ptr_(nullptr), buffer_ptr(nullptr), count_(0) {
+    GlobalResourceUsage::IncrObjectCount();
+}
+
+Bitmask::~Bitmask() {
+    GlobalResourceUsage::DecrObjectCount();
+//    Reset();
+}
+
+void
+Bitmask::Reset() {
+    buffer_ptr.reset();
+    data_ptr_ = nullptr;
+    count_ = 0;
+}
+
 void
 Bitmask::Initialize(size_t count) {
-    if(data_ptr_ != nullptr) return ;
-
-    GeneralAssert((count & (count - 1)) == 0, "Capacity need to be N power of 2.");
+    TypeAssert(count_ == 0, "Bitmask is already initialized.")
+    TypeAssert((count & (count - 1)) == 0, "Capacity need to be N power of 2.");
     count_ = count;
-    buffer_ptr = BitmaskBuffer::Make(count);
-
-    // Set raw pointer;
-    data_ptr_ = buffer_ptr->data_ptr_.get();
 }
 
 void
 Bitmask::DeepCopy(const Bitmask& ref) {
+    count_ = ref.count_;
     if(ref.IsAllTrue()) {
         buffer_ptr = nullptr;
         data_ptr_ = nullptr;
     } else {
-        buffer_ptr = BitmaskBuffer::Make(ref.data_ptr_, ref.count_);
+        buffer_ptr = BitmaskBuffer::Make(ref.data_ptr_, count_);
         data_ptr_ = buffer_ptr->data_ptr_.get();
     }
 }
 
 void
 Bitmask::ShallowCopy(const Bitmask& ref) {
+    count_ = ref.count_;
     if(ref.IsAllTrue()) {
         buffer_ptr = nullptr;
         data_ptr_ = nullptr;
@@ -45,18 +59,18 @@ Bitmask::ShallowCopy(const Bitmask& ref) {
 
 void
 Bitmask::Resize(size_t new_count) {
-    GeneralAssert((new_count & (new_count - 1)) == 0, "New capacity need to be N power of 2.");
-    GeneralAssert(new_count >= count_, "Attempt to reduce the bitmask capacity.");
+    u64 bit_count = new_count & (new_count - 1);
+    TypeAssert(bit_count == 0, "New capacity need to be N power of 2.");
+    TypeAssert(new_count >= count_, "New capacity <= old capacity.");
 
     if(buffer_ptr) {
-        size_t old_u64_count = BitmaskBuffer::UnitCount(count_);
-        size_t new_u64_count = BitmaskBuffer::UnitCount(new_count);
-        SharedPtr<BitmaskBuffer> new_buffer_ptr = BitmaskBuffer::Make(new_u64_count);
+        SharedPtr<BitmaskBuffer> new_buffer_ptr = BitmaskBuffer::Make(new_count);
         u64* new_data_ptr = new_buffer_ptr->data_ptr_.get();
 
-        for(size_t i = 0; i < old_u64_count; ++ i) {
-            new_data_ptr[i] = data_ptr_[i]; // Copy old BitmaskBuffer into new buffer;
-        }
+        // TODO: use memcpy but not assignment
+        void* source_ptr = (void*)data_ptr_;
+        void* target_ptr = (void*)new_data_ptr;
+        memcpy(target_ptr, source_ptr, count_ / BitmaskBuffer::BYTE_BITS);
 
         // Reset part of new buffer was already initialized as true in BitmaskBuffer::Initialize before.
         buffer_ptr = new_buffer_ptr;
@@ -102,7 +116,7 @@ Bitmask::IsTrue(size_t row_index) {
         return true;
     }
 
-    size_t u64_index = BitmaskBuffer::UnitCount(row_index) - 1;
+    size_t u64_index = row_index / BitmaskBuffer::UNIT_BITS;
     size_t index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
     return data_ptr_[u64_index] & ((u64(1)) << index_in_u64);
 }
@@ -111,7 +125,7 @@ void
 Bitmask::SetTrue(size_t row_index) {
     if (data_ptr_ == nullptr) return ;
 
-    size_t u64_index = BitmaskBuffer::UnitCount(row_index) - 1;
+    size_t u64_index = row_index / BitmaskBuffer::UNIT_BITS;
     size_t index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
 
     data_ptr_[u64_index] |= ((u64(1)) << index_in_u64);
@@ -119,9 +133,13 @@ Bitmask::SetTrue(size_t row_index) {
 
 void
 Bitmask::SetFalse(size_t row_index) {
-    Initialize(count_);
+    if(buffer_ptr == nullptr) {
+        buffer_ptr = BitmaskBuffer::Make(count_);
+        // Set raw pointer;
+        data_ptr_ = buffer_ptr->data_ptr_.get();
+    }
 
-    size_t u64_index = BitmaskBuffer::UnitCount(row_index) - 1;
+    size_t u64_index = row_index / BitmaskBuffer::UNIT_BITS;
     size_t index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
 
     data_ptr_[u64_index] &= ~(((u64(1))) << index_in_u64);

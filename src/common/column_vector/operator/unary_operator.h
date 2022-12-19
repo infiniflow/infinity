@@ -22,10 +22,10 @@ public:
 
         switch(input.vector_type()) {
             case ColumnVectorType::kInvalid: {
-                GeneralError("Invalid column vector type.");
+                TypeError("Invalid column vector type.");
             }
             case ColumnVectorType::kFlat: {
-                result.SetVectorType(ColumnVectorType::kFlat);
+                TypeAssert(result.vector_type() == ColumnVectorType::kFlat, "Target vector type isn't flat.");
                 if(nullable) {
                     return ExecuteFlatWithNull<InputType, ResultType, Operator>(input_ptr,
                                                                                 input_null,

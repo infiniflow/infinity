@@ -9,7 +9,11 @@ namespace infinity {
 // use to indicate if the null or missing is set
 struct Bitmask {
 public:
-    Bitmask() = default;
+    Bitmask();
+    ~Bitmask();
+
+    void
+    Reset();
 
     void
     Initialize(size_t count);
