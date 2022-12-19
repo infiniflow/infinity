@@ -34,13 +34,13 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
     col_varchar.Initialize();
 
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kVarchar)), std::logic_error);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), std::logic_error);
-    EXPECT_THROW(col_varchar.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_varchar.ToString(), TypeException);
+    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
     EXPECT_EQ(col_varchar.tail_index_, 0);
     EXPECT_EQ(col_varchar.data_type_size_, 16);
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
@@ -49,7 +49,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
+    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_varchar.initialized);
     col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_varchar.data_ptr_;
@@ -71,7 +71,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
     }
 
     col_varchar.Reserve(DEFAULT_VECTOR_SIZE* 2);
@@ -111,7 +111,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
     }
 
     col_varchar.Reset();
@@ -123,13 +123,13 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     // ====
     col_varchar.Initialize();
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kDecimal128)), std::logic_error);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), std::logic_error);
-    EXPECT_THROW(col_varchar.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_varchar.ToString(), TypeException);
+    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
     EXPECT_EQ(col_varchar.tail_index_, 0);
     EXPECT_EQ(col_varchar.data_type_size_, 16);
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
@@ -138,7 +138,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
+    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_varchar.initialized);
     col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_varchar.data_ptr_;
@@ -160,7 +160,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
     }
 }
 
@@ -172,13 +172,13 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
     col_varchar.Initialize();
 
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kVarchar)), std::logic_error);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), std::logic_error);
-    EXPECT_THROW(col_varchar.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_varchar.ToString(), TypeException);
+    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
     EXPECT_EQ(col_varchar.tail_index_, 0);
     EXPECT_EQ(col_varchar.data_type_size_, 16);
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
@@ -187,7 +187,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
+    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_varchar.initialized);
     col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_varchar.data_ptr_;
@@ -209,7 +209,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
     }
 
     col_varchar.Reserve(DEFAULT_VECTOR_SIZE* 2);
@@ -250,7 +250,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
     }
 
     col_varchar.Reset();
@@ -262,13 +262,13 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     // ====
     col_varchar.Initialize();
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kDecimal128)), std::logic_error);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), std::logic_error);
-    EXPECT_THROW(col_varchar.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_varchar.ToString(), TypeException);
+    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
     EXPECT_EQ(col_varchar.tail_index_, 0);
     EXPECT_EQ(col_varchar.data_type_size_, 16);
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
@@ -277,7 +277,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
+    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_varchar.initialized);
     col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_varchar.data_ptr_;
@@ -300,7 +300,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
     }
 }
 
@@ -312,13 +312,13 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
     col_varchar.Initialize();
 
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kVarchar)), std::logic_error);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), std::logic_error);
-    EXPECT_THROW(col_varchar.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_varchar.ToString(), TypeException);
+    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
     EXPECT_EQ(col_varchar.tail_index_, 0);
     EXPECT_EQ(col_varchar.data_type_size_, 16);
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
@@ -327,7 +327,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
+    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_varchar.initialized);
     col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_varchar.data_ptr_;
@@ -354,7 +354,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
     }
 
     col_varchar.Reserve(DEFAULT_VECTOR_SIZE* 2);
@@ -397,7 +397,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
     }
 
     col_varchar.Reset();
@@ -409,13 +409,13 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     // ====
     col_varchar.Initialize();
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kDecimal128)), std::logic_error);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), std::logic_error);
-    EXPECT_THROW(col_varchar.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_varchar.ToString(), TypeException);
+    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
     EXPECT_EQ(col_varchar.tail_index_, 0);
     EXPECT_EQ(col_varchar.data_type_size_, 16);
     EXPECT_NE(col_varchar.data_ptr_, nullptr);
@@ -424,7 +424,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_EQ(col_varchar.nulls_ptr_, nullptr);
+    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_varchar.initialized);
     col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_varchar.data_ptr_;
@@ -448,6 +448,6 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
     }
 }

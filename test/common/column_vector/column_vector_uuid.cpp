@@ -32,13 +32,13 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     ColumnVector col_uuid(data_type, ColumnVectorType::kFlat);
     col_uuid.Initialize();
 
-    EXPECT_THROW(col_uuid.SetDataType(DataType(LogicalType::kUuid)), std::logic_error);
-    EXPECT_THROW(col_uuid.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_uuid.SetDataType(DataType(LogicalType::kUuid)), TypeException);
+    EXPECT_THROW(col_uuid.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_uuid.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_uuid.Size(), 0);
-    EXPECT_THROW(col_uuid.ToString(), std::logic_error);
-    EXPECT_THROW(col_uuid.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_uuid.ToString(), TypeException);
+    EXPECT_THROW(col_uuid.GetValue(0), TypeException);
     EXPECT_EQ(col_uuid.tail_index_, 0);
     EXPECT_EQ(col_uuid.data_type_size_, 16);
     EXPECT_NE(col_uuid.data_ptr_, nullptr);
@@ -47,7 +47,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     EXPECT_EQ(col_uuid.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_uuid.buffer_, nullptr);
-    EXPECT_EQ(col_uuid.nulls_ptr_, nullptr);
+    EXPECT_NE(col_uuid.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_uuid.initialized);
     col_uuid.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_uuid.data_ptr_;
@@ -63,7 +63,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
         Value vx = col_uuid.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
-        EXPECT_THROW(col_uuid.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_uuid.GetValue(i + 1), TypeException);
     }
 
     col_uuid.Reserve(DEFAULT_VECTOR_SIZE* 2);
@@ -89,7 +89,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
         Value vx = col_uuid.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
-        EXPECT_THROW(col_uuid.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_uuid.GetValue(i + 1), TypeException);
     }
 
     col_uuid.Reset();
@@ -101,13 +101,13 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
 
     // ====
     col_uuid.Initialize();
-    EXPECT_THROW(col_uuid.SetDataType(DataType(LogicalType::kDecimal128)), std::logic_error);
-    EXPECT_THROW(col_uuid.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_uuid.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(col_uuid.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_uuid.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_uuid.Size(), 0);
-    EXPECT_THROW(col_uuid.ToString(), std::logic_error);
-    EXPECT_THROW(col_uuid.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_uuid.ToString(), TypeException);
+    EXPECT_THROW(col_uuid.GetValue(0), TypeException);
     EXPECT_EQ(col_uuid.tail_index_, 0);
     EXPECT_EQ(col_uuid.data_type_size_, 16);
     EXPECT_NE(col_uuid.data_ptr_, nullptr);
@@ -116,7 +116,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     EXPECT_EQ(col_uuid.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_uuid.buffer_, nullptr);
-    EXPECT_EQ(col_uuid.nulls_ptr_, nullptr);
+    EXPECT_NE(col_uuid.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_uuid.initialized);
     col_uuid.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_uuid.data_ptr_;
@@ -131,6 +131,6 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
         Value vx = col_uuid.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
-        EXPECT_THROW(col_uuid.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_uuid.GetValue(i + 1), TypeException);
     }
 }

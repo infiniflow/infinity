@@ -32,13 +32,13 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     ColumnVector col_float(data_type, ColumnVectorType::kFlat);
     col_float.Initialize();
 
-    EXPECT_THROW(col_float.SetDataType(DataType(LogicalType::kFloat)), std::logic_error);
-    EXPECT_THROW(col_float.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_float.SetDataType(DataType(LogicalType::kFloat)), TypeException);
+    EXPECT_THROW(col_float.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_float.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_float.Size(), 0);
-    EXPECT_THROW(col_float.ToString(), std::logic_error);
-    EXPECT_THROW(col_float.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_float.ToString(), TypeException);
+    EXPECT_THROW(col_float.GetValue(0), TypeException);
     EXPECT_EQ(col_float.tail_index_, 0);
     EXPECT_EQ(col_float.data_type_size_, 4);
     EXPECT_NE(col_float.data_ptr_, nullptr);
@@ -47,7 +47,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     EXPECT_EQ(col_float.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_float.buffer_, nullptr);
-    EXPECT_EQ(col_float.nulls_ptr_, nullptr);
+    EXPECT_NE(col_float.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_float.initialized);
     col_float.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_float.data_ptr_;
@@ -60,7 +60,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
         Value vx = col_float.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
-        EXPECT_THROW(col_float.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_float.GetValue(i + 1), TypeException);
     }
 
     col_float.Reserve(DEFAULT_VECTOR_SIZE* 2);
@@ -79,7 +79,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
         Value vx = col_float.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
-        EXPECT_THROW(col_float.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_float.GetValue(i + 1), TypeException);
     }
 
     col_float.Reset();
@@ -93,18 +93,18 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
 //    EXPECT_EQ(col_float.vector_type(), ColumnVectorType::kInvalid);
 
     // ====
-//    EXPECT_THROW(col_float.Initialize(), std::logic_error);
+//    EXPECT_THROW(col_float.Initialize(), TypeException);
 //    col_float.SetDataType(DataType(LogicalType::kFloat));
-//    EXPECT_THROW(col_float.Initialize(), std::logic_error);
+//    EXPECT_THROW(col_float.Initialize(), TypeException);
 //    col_float.SetVectorType(ColumnVectorType::kFlat);
     col_float.Initialize();
-    EXPECT_THROW(col_float.SetDataType(DataType(LogicalType::kFloat)), std::logic_error);
-    EXPECT_THROW(col_float.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_float.SetDataType(DataType(LogicalType::kFloat)), TypeException);
+    EXPECT_THROW(col_float.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_float.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_float.Size(), 0);
-    EXPECT_THROW(col_float.ToString(), std::logic_error);
-    EXPECT_THROW(col_float.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_float.ToString(), TypeException);
+    EXPECT_THROW(col_float.GetValue(0), TypeException);
     EXPECT_EQ(col_float.tail_index_, 0);
     EXPECT_EQ(col_float.data_type_size_, 4);
     EXPECT_NE(col_float.data_ptr_, nullptr);
@@ -113,7 +113,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     EXPECT_EQ(col_float.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_float.buffer_, nullptr);
-    EXPECT_EQ(col_float.nulls_ptr_, nullptr);
+    EXPECT_NE(col_float.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_float.initialized);
     col_float.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_float.data_ptr_;
@@ -126,7 +126,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
         Value vx = col_float.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
-        EXPECT_THROW(col_float.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_float.GetValue(i + 1), TypeException);
     }
 }
 
@@ -137,13 +137,13 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     ColumnVector col_double(data_type, ColumnVectorType::kFlat);
     col_double.Initialize();
 
-    EXPECT_THROW(col_double.SetDataType(DataType(LogicalType::kDouble)), std::logic_error);
-    EXPECT_THROW(col_double.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_double.SetDataType(DataType(LogicalType::kDouble)), TypeException);
+    EXPECT_THROW(col_double.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_double.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_double.Size(), 0);
-    EXPECT_THROW(col_double.ToString(), std::logic_error);
-    EXPECT_THROW(col_double.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_double.ToString(), TypeException);
+    EXPECT_THROW(col_double.GetValue(0), TypeException);
     EXPECT_EQ(col_double.tail_index_, 0);
     EXPECT_EQ(col_double.data_type_size_, 8);
     EXPECT_NE(col_double.data_ptr_, nullptr);
@@ -152,7 +152,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     EXPECT_EQ(col_double.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_double.buffer_, nullptr);
-    EXPECT_EQ(col_double.nulls_ptr_, nullptr);
+    EXPECT_NE(col_double.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_double.initialized);
     col_double.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_double.data_ptr_;
@@ -165,7 +165,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
         Value vx = col_double.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
-        EXPECT_THROW(col_double.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_double.GetValue(i + 1), TypeException);
     }
 
     col_double.Reserve(DEFAULT_VECTOR_SIZE* 2);
@@ -183,7 +183,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
         Value vx = col_double.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
-        EXPECT_THROW(col_double.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_double.GetValue(i + 1), TypeException);
     }
 
     col_double.Reset();
@@ -195,13 +195,13 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
 
     // ====
     col_double.Initialize();
-    EXPECT_THROW(col_double.SetDataType(DataType(LogicalType::kDouble)), std::logic_error);
-    EXPECT_THROW(col_double.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_double.SetDataType(DataType(LogicalType::kDouble)), TypeException);
+    EXPECT_THROW(col_double.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_double.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_double.Size(), 0);
-    EXPECT_THROW(col_double.ToString(), std::logic_error);
-    EXPECT_THROW(col_double.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_double.ToString(), TypeException);
+    EXPECT_THROW(col_double.GetValue(0), TypeException);
     EXPECT_EQ(col_double.tail_index_, 0);
     EXPECT_EQ(col_double.data_type_size_, 8);
     EXPECT_NE(col_double.data_ptr_, nullptr);
@@ -210,7 +210,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     EXPECT_EQ(col_double.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_double.buffer_, nullptr);
-    EXPECT_EQ(col_double.nulls_ptr_, nullptr);
+    EXPECT_NE(col_double.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_double.initialized);
     col_double.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_double.data_ptr_;
@@ -223,7 +223,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
         Value vx = col_double.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
-        EXPECT_THROW(col_double.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_double.GetValue(i + 1), TypeException);
     }
 }
 

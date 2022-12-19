@@ -164,7 +164,7 @@ TEST_F(DataBlockTest, test2) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
 
-    EXPECT_THROW(data_block.AppendValue(0, Value::MakeBool( (row_count + 1) % 2 == 0)), std::logic_error);
+    EXPECT_THROW(data_block.AppendValue(0, Value::MakeBool( (row_count + 1) % 2 == 0)), TypeException);
 }
 
 TEST_F(DataBlockTest, test3) {

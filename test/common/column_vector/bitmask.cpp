@@ -152,3 +152,26 @@ TEST_F(BitmaskTest, bitmask_a) {
     bitmask2.Merge(bitmask3);
     EXPECT_EQ(bitmask2.CountTrue(), 0);
 }
+
+TEST_F(BitmaskTest, bitmask_b) {
+    using namespace infinity;
+
+    constexpr size_t bit_count = 8192;
+    SharedPtr<Bitmask> bitmask2 = Bitmask::Make(bit_count);
+
+
+    for(size_t i = 0; i < bit_count; ++ i) {
+        bitmask2->Set(i, i % 2 == 0);
+    }
+
+    EXPECT_EQ(bitmask2->CountTrue(), bit_count / 2);
+    EXPECT_EQ(bitmask2->CountFalse(), bit_count / 2);
+
+    for(size_t i = 0; i < bit_count; ++ i) {
+        if(i % 2 == 0) {
+            EXPECT_TRUE(bitmask2->IsTrue(i));
+        } else {
+            EXPECT_FALSE(bitmask2->IsTrue(i));
+        }
+    }
+}

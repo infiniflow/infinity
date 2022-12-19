@@ -33,13 +33,13 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     ColumnVector col_blob(data_type, ColumnVectorType::kFlat);
     col_blob.Initialize();
 
-    EXPECT_THROW(col_blob.SetDataType(DataType(LogicalType::kBlob)), std::logic_error);
-    EXPECT_THROW(col_blob.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_blob.SetDataType(DataType(LogicalType::kBlob)), TypeException);
+    EXPECT_THROW(col_blob.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_blob.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_blob.Size(), 0);
-    EXPECT_THROW(col_blob.ToString(), std::logic_error);
-    EXPECT_THROW(col_blob.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_blob.ToString(), TypeException);
+    EXPECT_THROW(col_blob.GetValue(0), TypeException);
     EXPECT_EQ(col_blob.tail_index_, 0);
     EXPECT_EQ(col_blob.data_type_size_, 16);
     EXPECT_NE(col_blob.data_ptr_, nullptr);
@@ -48,7 +48,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     EXPECT_EQ(col_blob.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_blob.buffer_, nullptr);
-    EXPECT_EQ(col_blob.nulls_ptr_, nullptr);
+    EXPECT_NE(col_blob.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_blob.initialized);
     col_blob.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_blob.data_ptr_;
@@ -71,7 +71,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
         Value vx = col_blob.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
         EXPECT_EQ(vx.value_.blob, b1);
-        EXPECT_THROW(col_blob.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_blob.GetValue(i + 1), TypeException);
     }
 
     col_blob.Reserve(DEFAULT_VECTOR_SIZE* 2);
@@ -110,7 +110,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
         Value vx = col_blob.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
         EXPECT_EQ(vx.value_.blob, b1);
-        EXPECT_THROW(col_blob.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_blob.GetValue(i + 1), TypeException);
     }
 
     col_blob.Reset();
@@ -122,13 +122,13 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
 
     // ====
     col_blob.Initialize();
-    EXPECT_THROW(col_blob.SetDataType(DataType(LogicalType::kDecimal128)), std::logic_error);
-    EXPECT_THROW(col_blob.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_blob.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(col_blob.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_blob.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_blob.Size(), 0);
-    EXPECT_THROW(col_blob.ToString(), std::logic_error);
-    EXPECT_THROW(col_blob.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_blob.ToString(), TypeException);
+    EXPECT_THROW(col_blob.GetValue(0), TypeException);
     EXPECT_EQ(col_blob.tail_index_, 0);
     EXPECT_EQ(col_blob.data_type_size_, 16);
     EXPECT_NE(col_blob.data_ptr_, nullptr);
@@ -137,7 +137,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     EXPECT_EQ(col_blob.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_blob.buffer_, nullptr);
-    EXPECT_EQ(col_blob.nulls_ptr_, nullptr);
+    EXPECT_NE(col_blob.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_blob.initialized);
     col_blob.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_blob.data_ptr_;
@@ -159,6 +159,6 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
         Value vx = col_blob.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
         EXPECT_EQ(vx.value_.blob, b1);
-        EXPECT_THROW(col_blob.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_blob.GetValue(i + 1), TypeException);
     }
 }

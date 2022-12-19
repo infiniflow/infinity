@@ -32,13 +32,13 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
     ColumnVector col_point(data_type, ColumnVectorType::kFlat);
     col_point.Initialize();
 
-    EXPECT_THROW(col_point.SetDataType(DataType(LogicalType::kPoint)), std::logic_error);
-    EXPECT_THROW(col_point.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_point.SetDataType(DataType(LogicalType::kPoint)), TypeException);
+    EXPECT_THROW(col_point.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_point.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_point.Size(), 0);
-    EXPECT_THROW(col_point.ToString(), std::logic_error);
-    EXPECT_THROW(col_point.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_point.ToString(), TypeException);
+    EXPECT_THROW(col_point.GetValue(0), TypeException);
     EXPECT_EQ(col_point.tail_index_, 0);
     EXPECT_EQ(col_point.data_type_size_, 16);
     EXPECT_NE(col_point.data_ptr_, nullptr);
@@ -47,7 +47,7 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
     EXPECT_EQ(col_point.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_point.buffer_, nullptr);
-    EXPECT_EQ(col_point.nulls_ptr_, nullptr);
+    EXPECT_NE(col_point.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_point.initialized);
     col_point.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_point.data_ptr_;
@@ -62,7 +62,7 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
         EXPECT_EQ(vx.type().type(), LogicalType::kPoint);
         EXPECT_FLOAT_EQ(vx.value_.point.x, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
-        EXPECT_THROW(col_point.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_point.GetValue(i + 1), TypeException);
     }
     col_point.Reserve(DEFAULT_VECTOR_SIZE* 2);
 
@@ -82,7 +82,7 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
         EXPECT_EQ(vx.type().type(), LogicalType::kPoint);
         EXPECT_FLOAT_EQ(vx.value_.point.x, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
-        EXPECT_THROW(col_point.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_point.GetValue(i + 1), TypeException);
     }
 
     col_point.Reset();
@@ -95,13 +95,13 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
 
     // ====
     col_point.Initialize();
-    EXPECT_THROW(col_point.SetDataType(DataType(LogicalType::kPoint)), std::logic_error);
-    EXPECT_THROW(col_point.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_point.SetDataType(DataType(LogicalType::kPoint)), TypeException);
+    EXPECT_THROW(col_point.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_point.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_point.Size(), 0);
-    EXPECT_THROW(col_point.ToString(), std::logic_error);
-    EXPECT_THROW(col_point.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_point.ToString(), TypeException);
+    EXPECT_THROW(col_point.GetValue(0), TypeException);
     EXPECT_EQ(col_point.tail_index_, 0);
     EXPECT_EQ(col_point.data_type_size_, 16);
     EXPECT_NE(col_point.data_ptr_, nullptr);
@@ -110,7 +110,7 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
     EXPECT_EQ(col_point.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_point.buffer_, nullptr);
-    EXPECT_EQ(col_point.nulls_ptr_, nullptr);
+    EXPECT_NE(col_point.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_point.initialized);
     col_point.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_point.data_ptr_;
@@ -125,7 +125,7 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
         EXPECT_EQ(vx.type().type(), LogicalType::kPoint);
         EXPECT_FLOAT_EQ(vx.value_.point.x, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
-        EXPECT_THROW(col_point.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_point.GetValue(i + 1), TypeException);
     }
 }
 
@@ -136,13 +136,13 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
     ColumnVector col_line(data_type, ColumnVectorType::kFlat);
     col_line.Initialize();
 
-    EXPECT_THROW(col_line.SetDataType(DataType(LogicalType::kLine)), std::logic_error);
-    EXPECT_THROW(col_line.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_line.SetDataType(DataType(LogicalType::kLine)), TypeException);
+    EXPECT_THROW(col_line.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_line.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_line.Size(), 0);
-    EXPECT_THROW(col_line.ToString(), std::logic_error);
-    EXPECT_THROW(col_line.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_line.ToString(), TypeException);
+    EXPECT_THROW(col_line.GetValue(0), TypeException);
     EXPECT_EQ(col_line.tail_index_, 0);
     EXPECT_EQ(col_line.data_type_size_, 24);
     EXPECT_NE(col_line.data_ptr_, nullptr);
@@ -151,7 +151,7 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
     EXPECT_EQ(col_line.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_line.buffer_, nullptr);
-    EXPECT_EQ(col_line.nulls_ptr_, nullptr);
+    EXPECT_NE(col_line.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_line.initialized);
     col_line.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_line.data_ptr_;
@@ -169,7 +169,7 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
         EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
-        EXPECT_THROW(col_line.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_line.GetValue(i + 1), TypeException);
     }
     col_line.Reserve(DEFAULT_VECTOR_SIZE* 2);
 
@@ -193,7 +193,7 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
         EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
-        EXPECT_THROW(col_line.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_line.GetValue(i + 1), TypeException);
     }
 
     col_line.Reset();
@@ -206,13 +206,13 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
 
     // ====
     col_line.Initialize();
-    EXPECT_THROW(col_line.SetDataType(DataType(LogicalType::kLine)), std::logic_error);
-    EXPECT_THROW(col_line.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_line.SetDataType(DataType(LogicalType::kLine)), TypeException);
+    EXPECT_THROW(col_line.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_line.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_line.Size(), 0);
-    EXPECT_THROW(col_line.ToString(), std::logic_error);
-    EXPECT_THROW(col_line.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_line.ToString(), TypeException);
+    EXPECT_THROW(col_line.GetValue(0), TypeException);
     EXPECT_EQ(col_line.tail_index_, 0);
     EXPECT_EQ(col_line.data_type_size_, 24);
     EXPECT_NE(col_line.data_ptr_, nullptr);
@@ -221,7 +221,7 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
     EXPECT_EQ(col_line.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_line.buffer_, nullptr);
-    EXPECT_EQ(col_line.nulls_ptr_, nullptr);
+    EXPECT_NE(col_line.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_line.initialized);
     col_line.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_line.data_ptr_;
@@ -239,7 +239,7 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
         EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
-        EXPECT_THROW(col_line.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_line.GetValue(i + 1), TypeException);
     }
 }
 
@@ -250,13 +250,13 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
     ColumnVector col_line_seg(data_type, ColumnVectorType::kFlat);
     col_line_seg.Initialize();
 
-    EXPECT_THROW(col_line_seg.SetDataType(DataType(LogicalType::kLineSeg)), std::logic_error);
-    EXPECT_THROW(col_line_seg.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_line_seg.SetDataType(DataType(LogicalType::kLineSeg)), TypeException);
+    EXPECT_THROW(col_line_seg.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_line_seg.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_line_seg.Size(), 0);
-    EXPECT_THROW(col_line_seg.ToString(), std::logic_error);
-    EXPECT_THROW(col_line_seg.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_line_seg.ToString(), TypeException);
+    EXPECT_THROW(col_line_seg.GetValue(0), TypeException);
     EXPECT_EQ(col_line_seg.tail_index_, 0);
     EXPECT_EQ(col_line_seg.data_type_size_, 32);
     EXPECT_NE(col_line_seg.data_ptr_, nullptr);
@@ -265,7 +265,7 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
     EXPECT_EQ(col_line_seg.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_line_seg.buffer_, nullptr);
-    EXPECT_EQ(col_line_seg.nulls_ptr_, nullptr);
+    EXPECT_NE(col_line_seg.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_line_seg.initialized);
     col_line_seg.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_line_seg.data_ptr_;
@@ -284,7 +284,7 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.x, static_cast<f64>(i) - 5.3f);
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(col_line_seg.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_line_seg.GetValue(i + 1), TypeException);
     }
     col_line_seg.Reserve(DEFAULT_VECTOR_SIZE* 2);
 
@@ -310,7 +310,7 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.x, static_cast<f64>(i) - 5.3f);
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(col_line_seg.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_line_seg.GetValue(i + 1), TypeException);
     }
 
     col_line_seg.Reset();
@@ -323,13 +323,13 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
 
     // ====
     col_line_seg.Initialize();
-    EXPECT_THROW(col_line_seg.SetDataType(DataType(LogicalType::kLineSeg)), std::logic_error);
-    EXPECT_THROW(col_line_seg.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_line_seg.SetDataType(DataType(LogicalType::kLineSeg)), TypeException);
+    EXPECT_THROW(col_line_seg.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_line_seg.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_line_seg.Size(), 0);
-    EXPECT_THROW(col_line_seg.ToString(), std::logic_error);
-    EXPECT_THROW(col_line_seg.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_line_seg.ToString(), TypeException);
+    EXPECT_THROW(col_line_seg.GetValue(0), TypeException);
     EXPECT_EQ(col_line_seg.tail_index_, 0);
     EXPECT_EQ(col_line_seg.data_type_size_, 32);
     EXPECT_NE(col_line_seg.data_ptr_, nullptr);
@@ -338,7 +338,7 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
     EXPECT_EQ(col_line_seg.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_line_seg.buffer_, nullptr);
-    EXPECT_EQ(col_line_seg.nulls_ptr_, nullptr);
+    EXPECT_NE(col_line_seg.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_line_seg.initialized);
     col_line_seg.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_line_seg.data_ptr_;
@@ -357,7 +357,7 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.x, static_cast<f64>(i) - 5.3f);
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(col_line_seg.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_line_seg.GetValue(i + 1), TypeException);
     }
 }
 
@@ -368,13 +368,13 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
     ColumnVector col_box(data_type, ColumnVectorType::kFlat);
     col_box.Initialize();
 
-    EXPECT_THROW(col_box.SetDataType(DataType(LogicalType::kBox)), std::logic_error);
-    EXPECT_THROW(col_box.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_box.SetDataType(DataType(LogicalType::kBox)), TypeException);
+    EXPECT_THROW(col_box.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_box.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_box.Size(), 0);
-    EXPECT_THROW(col_box.ToString(), std::logic_error);
-    EXPECT_THROW(col_box.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_box.ToString(), TypeException);
+    EXPECT_THROW(col_box.GetValue(0), TypeException);
     EXPECT_EQ(col_box.tail_index_, 0);
     EXPECT_EQ(col_box.data_type_size_, 32);
     EXPECT_NE(col_box.data_ptr_, nullptr);
@@ -383,7 +383,7 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
     EXPECT_EQ(col_box.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_box.buffer_, nullptr);
-    EXPECT_EQ(col_box.nulls_ptr_, nullptr);
+    EXPECT_NE(col_box.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_box.initialized);
     col_box.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_box.data_ptr_;
@@ -402,7 +402,7 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
         EXPECT_FLOAT_EQ(vx.value_.box.upper_left.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.box.lower_right.x, static_cast<f64>(i) - 5.3f);
         EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(col_box.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_box.GetValue(i + 1), TypeException);
     }
     col_box.Reserve(DEFAULT_VECTOR_SIZE* 2);
 
@@ -428,7 +428,7 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
         EXPECT_FLOAT_EQ(vx.value_.box.upper_left.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.box.lower_right.x, static_cast<f64>(i) - 5.3f);
         EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(col_box.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_box.GetValue(i + 1), TypeException);
     }
 
     col_box.Reset();
@@ -441,13 +441,13 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
 
     // ====
     col_box.Initialize();
-    EXPECT_THROW(col_box.SetDataType(DataType(LogicalType::kBox)), std::logic_error);
-    EXPECT_THROW(col_box.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_box.SetDataType(DataType(LogicalType::kBox)), TypeException);
+    EXPECT_THROW(col_box.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_box.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_box.Size(), 0);
-    EXPECT_THROW(col_box.ToString(), std::logic_error);
-    EXPECT_THROW(col_box.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_box.ToString(), TypeException);
+    EXPECT_THROW(col_box.GetValue(0), TypeException);
     EXPECT_EQ(col_box.tail_index_, 0);
     EXPECT_EQ(col_box.data_type_size_, 32);
     EXPECT_NE(col_box.data_ptr_, nullptr);
@@ -456,7 +456,7 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
     EXPECT_EQ(col_box.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_box.buffer_, nullptr);
-    EXPECT_EQ(col_box.nulls_ptr_, nullptr);
+    EXPECT_NE(col_box.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_box.initialized);
     col_box.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_box.data_ptr_;
@@ -475,7 +475,7 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
         EXPECT_FLOAT_EQ(vx.value_.box.upper_left.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.box.lower_right.x, static_cast<f64>(i) - 5.3f);
         EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(col_box.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_box.GetValue(i + 1), TypeException);
     }
 }
 
@@ -487,13 +487,13 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
     ColumnVector col_path(data_type, ColumnVectorType::kFlat);
     col_path.Initialize();
 
-    EXPECT_THROW(col_path.SetDataType(DataType(LogicalType::kPath)), std::logic_error);
-    EXPECT_THROW(col_path.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_path.SetDataType(DataType(LogicalType::kPath)), TypeException);
+    EXPECT_THROW(col_path.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_path.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_path.Size(), 0);
-    EXPECT_THROW(col_path.ToString(), std::logic_error);
-    EXPECT_THROW(col_path.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_path.ToString(), TypeException);
+    EXPECT_THROW(col_path.GetValue(0), TypeException);
     EXPECT_EQ(col_path.tail_index_, 0);
     EXPECT_EQ(col_path.data_type_size_, 16);
     EXPECT_NE(col_path.data_ptr_, nullptr);
@@ -502,7 +502,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
     EXPECT_EQ(col_path.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_path.buffer_, nullptr);
-    EXPECT_EQ(col_path.nulls_ptr_, nullptr);
+    EXPECT_NE(col_path.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_path.initialized);
     col_path.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_path.data_ptr_;
@@ -532,7 +532,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
         EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
         EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
 
-        EXPECT_THROW(col_path.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_path.GetValue(i + 1), TypeException);
     }
 
     col_path.Reserve(DEFAULT_VECTOR_SIZE* 2);
@@ -577,7 +577,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
         EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
         EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
 
-        EXPECT_THROW(col_path.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_path.GetValue(i + 1), TypeException);
     }
 
     col_path.Reset();
@@ -590,13 +590,13 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
 
     // ====
     col_path.Initialize();
-    EXPECT_THROW(col_path.SetDataType(DataType(LogicalType::kPath)), std::logic_error);
-    EXPECT_THROW(col_path.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_path.SetDataType(DataType(LogicalType::kPath)), TypeException);
+    EXPECT_THROW(col_path.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_path.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_path.Size(), 0);
-    EXPECT_THROW(col_path.ToString(), std::logic_error);
-    EXPECT_THROW(col_path.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_path.ToString(), TypeException);
+    EXPECT_THROW(col_path.GetValue(0), TypeException);
     EXPECT_EQ(col_path.tail_index_, 0);
     EXPECT_EQ(col_path.data_type_size_, 16);
     EXPECT_NE(col_path.data_ptr_, nullptr);
@@ -605,7 +605,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
     EXPECT_EQ(col_path.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_path.buffer_, nullptr);
-    EXPECT_EQ(col_path.nulls_ptr_, nullptr);
+    EXPECT_NE(col_path.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_path.initialized);
     col_path.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_path.data_ptr_;
@@ -634,7 +634,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
         EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
         EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
 
-        EXPECT_THROW(col_path.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_path.GetValue(i + 1), TypeException);
     }
 }
 
@@ -646,13 +646,13 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
     ColumnVector col_polygon(data_type, ColumnVectorType::kFlat);
     col_polygon.Initialize();
 
-    EXPECT_THROW(col_polygon.SetDataType(DataType(LogicalType::kPolygon)), std::logic_error);
-    EXPECT_THROW(col_polygon.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_polygon.SetDataType(DataType(LogicalType::kPolygon)), TypeException);
+    EXPECT_THROW(col_polygon.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_polygon.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_polygon.Size(), 0);
-    EXPECT_THROW(col_polygon.ToString(), std::logic_error);
-    EXPECT_THROW(col_polygon.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_polygon.ToString(), TypeException);
+    EXPECT_THROW(col_polygon.GetValue(0), TypeException);
     EXPECT_EQ(col_polygon.tail_index_, 0);
     EXPECT_EQ(col_polygon.data_type_size_, 48);
     EXPECT_NE(col_polygon.data_ptr_, nullptr);
@@ -661,7 +661,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
     EXPECT_EQ(col_polygon.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_polygon.buffer_, nullptr);
-    EXPECT_EQ(col_polygon.nulls_ptr_, nullptr);
+    EXPECT_NE(col_polygon.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_polygon.initialized);
     col_polygon.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_polygon.data_ptr_;
@@ -695,7 +695,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
         EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
         EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
 
-        EXPECT_THROW(col_polygon.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_polygon.GetValue(i + 1), TypeException);
     }
 
 
@@ -751,7 +751,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
         EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
         EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
 
-        EXPECT_THROW(col_polygon.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_polygon.GetValue(i + 1), TypeException);
     }
 
     col_polygon.Reset();
@@ -764,13 +764,13 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
 
     // ====
     col_polygon.Initialize();
-    EXPECT_THROW(col_polygon.SetDataType(DataType(LogicalType::kPolygon)), std::logic_error);
-    EXPECT_THROW(col_polygon.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_polygon.SetDataType(DataType(LogicalType::kPolygon)), TypeException);
+    EXPECT_THROW(col_polygon.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_polygon.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_polygon.Size(), 0);
-    EXPECT_THROW(col_polygon.ToString(), std::logic_error);
-    EXPECT_THROW(col_polygon.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_polygon.ToString(), TypeException);
+    EXPECT_THROW(col_polygon.GetValue(0), TypeException);
     EXPECT_EQ(col_polygon.tail_index_, 0);
     EXPECT_EQ(col_polygon.data_type_size_, 48);
     EXPECT_NE(col_polygon.data_ptr_, nullptr);
@@ -779,7 +779,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
     EXPECT_EQ(col_polygon.buffer_->buffer_type_, VectorBufferType::kMemory);
 
     EXPECT_NE(col_polygon.buffer_, nullptr);
-    EXPECT_EQ(col_polygon.nulls_ptr_, nullptr);
+    EXPECT_NE(col_polygon.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_polygon.initialized);
     col_polygon.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_polygon.data_ptr_;
@@ -813,7 +813,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
         EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
         EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
 
-        EXPECT_THROW(col_polygon.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_polygon.GetValue(i + 1), TypeException);
     }
 }
 
@@ -824,13 +824,13 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
     ColumnVector col_circle(data_type, ColumnVectorType::kFlat);
     col_circle.Initialize();
 
-    EXPECT_THROW(col_circle.SetDataType(DataType(LogicalType::kCircle)), std::logic_error);
-    EXPECT_THROW(col_circle.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_circle.SetDataType(DataType(LogicalType::kCircle)), TypeException);
+    EXPECT_THROW(col_circle.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_circle.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_circle.Size(), 0);
-    EXPECT_THROW(col_circle.ToString(), std::logic_error);
-    EXPECT_THROW(col_circle.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_circle.ToString(), TypeException);
+    EXPECT_THROW(col_circle.GetValue(0), TypeException);
     EXPECT_EQ(col_circle.tail_index_, 0);
     EXPECT_EQ(col_circle.data_type_size_, 24);
     EXPECT_NE(col_circle.data_ptr_, nullptr);
@@ -839,7 +839,7 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
     EXPECT_EQ(col_circle.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_circle.buffer_, nullptr);
-    EXPECT_EQ(col_circle.nulls_ptr_, nullptr);
+    EXPECT_NE(col_circle.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_circle.initialized);
     col_circle.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_circle.data_ptr_;
@@ -857,7 +857,7 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
         EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.circle.center.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(col_circle.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_circle.GetValue(i + 1), TypeException);
     }
     col_circle.Reserve(DEFAULT_VECTOR_SIZE* 2);
 
@@ -881,7 +881,7 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
         EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.circle.center.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(col_circle.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_circle.GetValue(i + 1), TypeException);
     }
 
     col_circle.Reset();
@@ -894,13 +894,13 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
 
     // ====
     col_circle.Initialize();
-    EXPECT_THROW(col_circle.SetDataType(DataType(LogicalType::kCircle)), std::logic_error);
-    EXPECT_THROW(col_circle.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_circle.SetDataType(DataType(LogicalType::kCircle)), TypeException);
+    EXPECT_THROW(col_circle.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_circle.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_circle.Size(), 0);
-    EXPECT_THROW(col_circle.ToString(), std::logic_error);
-    EXPECT_THROW(col_circle.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_circle.ToString(), TypeException);
+    EXPECT_THROW(col_circle.GetValue(0), TypeException);
     EXPECT_EQ(col_circle.tail_index_, 0);
     EXPECT_EQ(col_circle.data_type_size_, 24);
     EXPECT_NE(col_circle.data_ptr_, nullptr);
@@ -909,7 +909,7 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
     EXPECT_EQ(col_circle.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_circle.buffer_, nullptr);
-    EXPECT_EQ(col_circle.nulls_ptr_, nullptr);
+    EXPECT_NE(col_circle.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_circle.initialized);
     col_circle.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_circle.data_ptr_;
@@ -927,7 +927,7 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
         EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.circle.center.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(col_circle.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_circle.GetValue(i + 1), TypeException);
     }
 }
 

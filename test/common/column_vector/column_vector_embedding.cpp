@@ -35,13 +35,13 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     ColumnVector col_embedding(data_type, ColumnVectorType::kFlat);
     col_embedding.Initialize();
 
-    EXPECT_THROW(col_embedding.SetDataType(DataType(LogicalType::kEmbedding)), std::logic_error);
-    EXPECT_THROW(col_embedding.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_embedding.SetDataType(DataType(LogicalType::kEmbedding)), TypeException);
+    EXPECT_THROW(col_embedding.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_embedding.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_embedding.Size(), 0);
-    EXPECT_THROW(col_embedding.ToString(), std::logic_error);
-    EXPECT_THROW(col_embedding.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_embedding.ToString(), TypeException);
+    EXPECT_THROW(col_embedding.GetValue(0), TypeException);
     EXPECT_EQ(col_embedding.tail_index_, 0);
     EXPECT_EQ(col_embedding.data_type_size_, 4 * 16);
     EXPECT_NE(col_embedding.data_ptr_, nullptr);
@@ -50,7 +50,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_EQ(col_embedding.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_embedding.buffer_, nullptr);
-    EXPECT_EQ(col_embedding.nulls_ptr_, nullptr);
+    EXPECT_NE(col_embedding.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_embedding.initialized);
     col_embedding.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = col_embedding.data_ptr_;
@@ -73,7 +73,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
         }
 
         v.value_.embedding.Reset();
-        EXPECT_THROW(col_embedding.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_embedding.GetValue(i + 1), TypeException);
     }
 
     col_embedding.Reserve(DEFAULT_VECTOR_SIZE* 2);
@@ -115,7 +115,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
         }
 
         v.value_.embedding.Reset();
-        EXPECT_THROW(col_embedding.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_embedding.GetValue(i + 1), TypeException);
     }
 
     col_embedding.Reset();
@@ -127,13 +127,13 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
 
     // ====
     col_embedding.Initialize();
-    EXPECT_THROW(col_embedding.SetDataType(DataType(LogicalType::kDecimal128)), std::logic_error);
-    EXPECT_THROW(col_embedding.SetVectorType(ColumnVectorType::kFlat), std::logic_error);
+    EXPECT_THROW(col_embedding.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(col_embedding.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(col_embedding.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(col_embedding.Size(), 0);
-    EXPECT_THROW(col_embedding.ToString(), std::logic_error);
-    EXPECT_THROW(col_embedding.GetValue(0), std::logic_error);
+    EXPECT_THROW(col_embedding.ToString(), TypeException);
+    EXPECT_THROW(col_embedding.GetValue(0), TypeException);
     EXPECT_EQ(col_embedding.tail_index_, 0);
     EXPECT_EQ(col_embedding.data_type_size_, 16 * 4);
     EXPECT_NE(col_embedding.data_ptr_, nullptr);
@@ -142,7 +142,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_EQ(col_embedding.buffer_->buffer_type_, VectorBufferType::kStandard);
 
     EXPECT_NE(col_embedding.buffer_, nullptr);
-    EXPECT_EQ(col_embedding.nulls_ptr_, nullptr);
+    EXPECT_NE(col_embedding.nulls_ptr_, nullptr);
     EXPECT_TRUE(col_embedding.initialized);
     col_embedding.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = col_embedding.data_ptr_;
@@ -164,6 +164,6 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
         }
 
         v.value_.embedding.Reset();
-        EXPECT_THROW(col_embedding.GetValue(i + 1), std::logic_error);
+        EXPECT_THROW(col_embedding.GetValue(i + 1), TypeException);
     }
 }

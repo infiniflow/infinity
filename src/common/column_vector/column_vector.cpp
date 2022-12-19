@@ -28,26 +28,26 @@ void ColumnVector::Initialize(size_t capacity) {
         case LogicalType::kInvalid:
         case LogicalType::kNull:
         case LogicalType::kMissing: {
-            GeneralError("Unexpected data type for column vector.")
+            TypeError("Unexpected data type for column vector.")
         }
         default: {
             buffer_ = VectorBuffer::Make(data_type_size_, capacity_);
         }
     }
     data_ptr_ = buffer_->GetData();
-//    nulls_ptr_->Initialize(capacity_);
+    nulls_ptr_ = Bitmask::Make(capacity_);
     initialized = true;
 }
 
 String
 ColumnVector::ToString() const {
-    GeneralError("Not implemented");
+    TypeError("Not implemented");
 }
 
 Value
 ColumnVector::GetValue(idx_t index) const {
     if(index >= tail_index_) {
-        GeneralError("Attempt to access an invalid index of column vector.");
+        TypeError("Attempt to access an invalid index of column vector: " + std::to_string(index));
     }
 
     // TODO: Check the validity
@@ -414,13 +414,13 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
 
 void
 ColumnVector::AppendValue(const Value& value) {
-    GeneralAssert(tail_index_ < capacity_, "Exceed the column vector capacity.");
+    TypeAssert(tail_index_ < capacity_, "Exceed the column vector capacity.");
     SetValue(tail_index_ ++, value);
 }
 
 void
 ColumnVector::ShallowCopy(const ColumnVector &other) {
-    GeneralError("Not implemented");
+    TypeError("Not implemented");
 }
 
 void
@@ -446,7 +446,7 @@ ColumnVector::Reserve(size_t new_capacity) {
         case LogicalType::kInvalid:
         case LogicalType::kNull:
         case LogicalType::kMissing: {
-            GeneralError("Unexpected data type for column vector.")
+            TypeError("Unexpected data type for column vector.")
         }
         default: {
             SharedPtr<VectorBuffer> new_buffer = VectorBuffer::Make(data_type_size_, new_capacity);

@@ -8,6 +8,13 @@ namespace infinity {
 
 // use to indicate if the null or missing is set
 struct Bitmask {
+    static inline SharedPtr<Bitmask>
+    Make(size_t count) {
+        SharedPtr<Bitmask> ptr = MakeShared<Bitmask>();
+        ptr->Initialize(count);
+        return ptr;
+    }
+
 public:
     Bitmask();
     ~Bitmask();

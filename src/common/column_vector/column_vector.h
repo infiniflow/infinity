@@ -93,13 +93,13 @@ public:
 
     void
     SetVectorType(ColumnVectorType vector_type) {
-        GeneralAssert(!initialized, "Column Vector is initialized")
+        TypeAssert(!initialized, "Column Vector is initialized")
         vector_type_ = vector_type;
     }
 
     void
     SetDataType(const DataType& data_type) {
-        GeneralAssert(!initialized, "Column Vector is initialized")
+        TypeAssert(!initialized, "Column Vector is initialized")
         data_type_ = data_type;
     }
 
