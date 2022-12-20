@@ -19,7 +19,6 @@ template<class SourceType>
 inline static BoundCastFunc
 BindIntegerCast(const DataType &source, DataType &target) {
     TypeAssert(source.type() != target.type(), "Attempt to cast from " + source.ToString() + " to " + target.ToString());
-    // TODO: How to check data type is same as SourceType ?
     switch (target.type()) {
         case LogicalType::kTinyInt: {
             return BoundCastFunc(
@@ -60,37 +59,35 @@ BindIntegerCast(const DataType &source, DataType &target) {
         }
         case LogicalType::kVarchar: {
             return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, DoubleT, IntegerTryCastToVarlen>);
-            return BoundCastFunc(nullptr);
+                    &ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, IntegerTryCastToVarlen>);
         }
         case LogicalType::kChar1: {
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char1T, IntegerTryCastToFixlen>);
         }
         case LogicalType::kChar2: {
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char2T, IntegerTryCastToFixlen>);
         }
         case LogicalType::kChar4: {
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char4T, IntegerTryCastToFixlen>);
         }
         case LogicalType::kChar8: {
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char8T, IntegerTryCastToFixlen>);
         }
         case LogicalType::kChar16: {
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char16T, IntegerTryCastToFixlen>);
         }
         case LogicalType::kChar32: {
-            return BoundCastFunc(nullptr);
+            return BoundCastFunc(
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char32T, IntegerTryCastToFixlen>);
         }
         case LogicalType::kChar64: {
-            return BoundCastFunc(nullptr);
-        }
-        case LogicalType::kTimestamp: {
             return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Decimal64T, IntegerTryCastToFixlen>);
-        }
-        case LogicalType::kTimestampTZ: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Decimal64T, IntegerTryCastToFixlen>);
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char64T, IntegerTryCastToFixlen>);
         }
         default: {
             TypeError("BindIntegerCast: Can't cast from " + source.ToString() + " to " + target.ToString());
@@ -102,7 +99,7 @@ struct IntegerTryCastToFixlen {
     template<typename SourceType, typename TargetType>
     static inline bool
     Run(SourceType source, TargetType &target) {
-        FunctionError("Not implement to cast from " + DataType::TypeToString<SourceType>()
+        FunctionError("No implemention to cast from " + DataType::TypeToString<SourceType>()
                  + " to " + DataType::TypeToString<TargetType>());
     }
 };
@@ -111,7 +108,7 @@ struct IntegerTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
     Run(SourceType source, TargetType &target, const ColumnVector* vector_ptr) {
-        FunctionError("Not implement to cast from " + DataType::TypeToString<SourceType>()
+        FunctionError("Not implemention to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
 };
@@ -204,12 +201,13 @@ IntegerTryCastToFixlen::Run(TinyIntT source, Char2T &target) {
 template<>
 bool
 IntegerTryCastToFixlen::Run(TinyIntT source, Char4T &target) {
-    i64 src = source;
+
     if(source == 0) {
         target.value[0] = '0';
         return true;
     }
     size_t idx = 0;
+    i64 src = source;
     if(source < 0) {
         target.value[idx ++] = '-';
         src = -src;
@@ -228,32 +226,149 @@ IntegerTryCastToFixlen::Run(TinyIntT source, Char4T &target) {
 
     return true;
 }
-//
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Char8T &target) {
-//    return false;
-//}
-//
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Char16T &target) {
-//
-//}
-//
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Char32T &target) {
-//
-//}
-//
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Char64T &target) {
-//
-//}
-//
-//
-//// Cast TinyInt to varlen type
-//template<>
-//bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const ColumnVector *vector_ptr) {
-//    NotImplementError("Not implemented");
-//}
+
+template<>
+bool IntegerTryCastToFixlen::Run(TinyIntT source, Char8T &target) {
+
+    if(source == 0) {
+        target.value[0] = '0';
+        return true;
+    }
+    size_t idx = 0;
+    i64 src = source;
+    if(source < 0) {
+        target.value[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[Char8T::CHAR_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < Char8T::CHAR_LENGTH) {
+        -- tmp_idx;
+        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    return true;
+}
+
+template<>
+bool IntegerTryCastToFixlen::Run(TinyIntT source, Char16T &target) {
+
+    if(source == 0) {
+        target.value[0] = '0';
+        return true;
+    }
+    size_t idx = 0;
+    i64 src = source;
+    if(source < 0) {
+        target.value[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[Char16T::CHAR_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < Char16T::CHAR_LENGTH) {
+        -- tmp_idx;
+        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    return true;
+}
+
+template<>
+bool IntegerTryCastToFixlen::Run(TinyIntT source, Char32T &target) {
+
+    if(source == 0) {
+        target.value[0] = '0';
+        return true;
+    }
+    size_t idx = 0;
+    i64 src = source;
+    if(source < 0) {
+        target.value[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[Char32T::CHAR_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < Char32T::CHAR_LENGTH) {
+        -- tmp_idx;
+        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    return true;
+}
+
+template<>
+bool
+IntegerTryCastToFixlen::Run(TinyIntT source, Char64T &target) {
+
+    if(source == 0) {
+        target.value[0] = '0';
+        return true;
+    }
+    size_t idx = 0;
+    i64 src = source;
+    if(source < 0) {
+        target.value[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[Char64T::CHAR_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < Char64T::CHAR_LENGTH) {
+        -- tmp_idx;
+        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    return true;
+}
+
+// Cast TinyInt to varlen type
+template<>
+bool
+IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const ColumnVector *vector_ptr) {
+    if(source == 0) {
+        target.prefix[0] = '0';
+        target.length = 1;
+        return true;
+    }
+    i64 src = source;
+    size_t idx = 0;
+    if(source < 0) {
+        target.prefix[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[VarcharT::INLINE_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < VarcharT::INLINE_LENGTH) {
+        -- tmp_idx;
+        target.prefix[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    target.length = idx;
+    return true;
+}
 
 }

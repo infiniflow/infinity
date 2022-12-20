@@ -18,6 +18,8 @@ struct Value {
 // class member
 public:
     // Value creator from different type of input
+    static Value
+    MakeValue(DataType type);
 
     static Value
     MakeBool(BooleanT input);
@@ -150,12 +152,6 @@ public:
 
     // Object member
 public:
-    // Value maker template
-    template <class T>
-    static Value MakeValue(T value) {
-        TypeError("Not implemented value maker.");
-    }
-
     // Value getter template
     template <class T>
     T GetValue() const {

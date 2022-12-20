@@ -50,8 +50,10 @@ ColumnVector::GetValue(idx_t index) const {
         TypeError("Attempt to access an invalid index of column vector: " + std::to_string(index));
     }
 
-    // TODO: Check the validity
-    // TODO: If it is null / missing, return null/missing Value ?
+    // Not valid, make a same data type with null indicator
+    if(!(this->nulls_ptr_->IsTrue(index))) {
+        return Value::MakeValue(this->data_type_);
+    }
 
     switch(data_type_.type()) {
 

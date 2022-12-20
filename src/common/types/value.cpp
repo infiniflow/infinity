@@ -12,6 +12,13 @@
 namespace infinity {
 
 // Value maker
+Value
+Value::MakeValue(DataType type) {
+    Value value(type.type(), type.type_info());
+    value.is_null_ = true;
+    return value;
+}
+
 
 Value
 Value::MakeBool(BooleanT input) {
