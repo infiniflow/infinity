@@ -26,6 +26,182 @@ class IntegerCastTest : public BaseTest {
     }
 };
 
+TEST_F(IntegerCastTest, tiny_integer_cast0) {
+    using namespace infinity;
+
+    // TinyInt to SmallInt, throw exception
+    {
+        TinyIntT source = 0;
+        TinyIntT target;
+        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), TypeException);
+    }
+    // TinyInt to SmallInt
+    {
+        TinyIntT source = std::numeric_limits<TinyIntT>::min();
+        SmallIntT target;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target);
+
+        source = std::numeric_limits<TinyIntT>::max();
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target);
+
+        source = 0;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target);
+    }
+    // TinyInt to Integer
+    {
+        TinyIntT source = std::numeric_limits<TinyIntT>::min();
+        IntegerT target;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target);
+
+        source = std::numeric_limits<TinyIntT>::max();
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target);
+
+        source = 0;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target);
+    }
+    // TinyInt to BigInt
+    {
+        TinyIntT source = std::numeric_limits<TinyIntT>::min();
+        BigIntT target;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target);
+
+        source = std::numeric_limits<TinyIntT>::max();
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target);
+
+        source = 0;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target);
+    }
+    // TinyInt to HugeInt
+    {
+        TinyIntT source = std::numeric_limits<TinyIntT>::min();
+        HugeIntT target;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target.lower);
+        EXPECT_EQ((static_cast<i8>(source) < 0) * -1, target.upper);
+
+        source = std::numeric_limits<TinyIntT>::max();
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target.lower);
+        EXPECT_EQ((static_cast<i8>(source) < 0) * -1, target.upper);
+
+        source = 0;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        EXPECT_EQ(source, target.lower);
+        EXPECT_EQ((static_cast<i8>(source) < 0) * -1, target.upper);
+    }
+
+    // TODO:
+    // Cast to decimal16/32/64/128
+
+    // TinyInt to Char1T
+    {
+        TinyIntT source = std::numeric_limits<TinyIntT>::min();
+        Char1T target;
+        EXPECT_FALSE(IntegerTryCastToFixlen::Run(source, target));
+        source = std::numeric_limits<TinyIntT>::max();
+        EXPECT_FALSE(IntegerTryCastToFixlen::Run(source, target));
+
+        source = 0;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        String src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 1);
+        EXPECT_EQ(src_str[0], target.value);
+
+        source = 1;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 1);
+        EXPECT_EQ(src_str[0], target.value);
+    }
+
+    // TinyInt to Char2T
+    {
+        TinyIntT source = std::numeric_limits<TinyIntT>::min();
+        Char2T target;
+        String src_str, tgt_str;
+        EXPECT_FALSE(IntegerTryCastToFixlen::Run(source, target));
+        source = std::numeric_limits<TinyIntT>::max();
+        EXPECT_FALSE(IntegerTryCastToFixlen::Run(source, target));
+
+        source = 0;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 1);
+        tgt_str = String(target.value, 1);
+        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
+
+        source = 9;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 1);
+        EXPECT_STREQ(target.value, src_str.c_str());
+
+        source = 10;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 2);
+        tgt_str = String(target.value, 2);
+        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
+
+        source = 99;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 2);
+        tgt_str = String(target.value, 2);
+        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
+    }
+
+    // TinyInt to Char4T
+    {
+        TinyIntT source;
+        Char4T target;
+        String src_str, tgt_str;
+
+        source = std::numeric_limits<TinyIntT>::min();
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 4);
+        tgt_str = String(target.value, 4);
+        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
+
+        source = std::numeric_limits<TinyIntT>::max();
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 3);
+        tgt_str = String(target.value, 3);
+        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
+
+        source = 0;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 1);
+        tgt_str = String(target.value, 1);
+        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
+
+        source = 9;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 1);
+        EXPECT_STREQ(target.value, src_str.c_str());
+
+        source = 10;
+        EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 2);
+        tgt_str = String(target.value, 2);
+        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
+    }
+}
+
 TEST_F(IntegerCastTest, tiny_integer_cast1) {
     using namespace infinity;
 
