@@ -52,33 +52,33 @@ TEST_F(CharTypeTest, Char2) {
     String s = "bcd";
 
     Char2T c1(s);
-    EXPECT_EQ(c1.ToString(), "bc");
+    EXPECT_STREQ(c1.ToString().c_str(), "bc");
 
     Char2T c2("bcdef");
-    EXPECT_EQ(c2.ToString(), "bc");
+    EXPECT_STREQ(c2.ToString().c_str(), "bc");
 
     Char2T c3(std::move(c1));
-    EXPECT_EQ(c3.ToString(), "bc");
+    EXPECT_STREQ(c3.ToString().c_str(), "bc");
 
     Char2T c4(c1);
-    EXPECT_EQ(c4.ToString(), "bc");
+    EXPECT_STREQ(c4.ToString().c_str(), "bc");
 
     Char2T c5;
     c5.Initialize("bcdef", 2);
-    EXPECT_EQ(c5.ToString(), "bc");
+    EXPECT_STREQ(c5.ToString().c_str(), "bc");
 
     Char2T c6;
     c6 = c5;
-    EXPECT_EQ(c6.ToString(), "bc");
+    EXPECT_STREQ(c6.ToString().c_str(), "bc");
 
     Char2T c7;
     c7 = std::move(c5);
-    EXPECT_EQ(c7.ToString(), "bc");
+    EXPECT_STREQ(c7.ToString().c_str(), "bc");
 
     s = "b";
     Char2T c8;
     c8.Initialize(s.c_str(), s.length());
-    EXPECT_EQ(c8.ToString(), "b");
+    EXPECT_STREQ(c8.ToString().c_str(), "b");
 }
 
 TEST_F(CharTypeTest, Char4) {
@@ -87,28 +87,28 @@ TEST_F(CharTypeTest, Char4) {
     String s = "bcdef";
 
     Char4T c1(s);
-    EXPECT_EQ(c1.ToString(), "bcde");
+    EXPECT_STREQ(c1.ToString().c_str(), "bcde");
 
     Char4T c2("bcdef");
-    EXPECT_EQ(c2.ToString(), "bcde");
+    EXPECT_STREQ(c2.ToString().c_str(), "bcde");
 
     Char4T c3(std::move(c1));
-    EXPECT_EQ(c3.ToString(), "bcde");
+    EXPECT_STREQ(c3.ToString().c_str(), "bcde");
 
     Char4T c4(c1);
-    EXPECT_EQ(c4.ToString(), "bcde");
+    EXPECT_STREQ(c4.ToString().c_str(), "bcde");
 
     Char4T c5;
     c5.Initialize("bcdef", 4);
-    EXPECT_EQ(c5.ToString(), "bcde");
+    EXPECT_STREQ(c5.ToString().c_str(), "bcde");
 
     Char4T c6;
     c6 = c5;
-    EXPECT_EQ(c6.ToString(), "bcde");
+    EXPECT_STREQ(c6.ToString().c_str(), "bcde");
 
     Char4T c7;
     c7 = std::move(c5);
-    EXPECT_EQ(c7.ToString(), "bcde");
+    EXPECT_STREQ(c7.ToString().c_str(), "bcde");
 }
 
 TEST_F(CharTypeTest, Char8) {
@@ -117,28 +117,28 @@ TEST_F(CharTypeTest, Char8) {
     String s = "bcdefghijk";
 
     Char8T c1(s);
-    EXPECT_EQ(c1.ToString(), "bcdefghi");
+    EXPECT_STREQ(c1.ToString().c_str(), "bcdefghi");
 
     Char8T c2("bcdefghijk");
-    EXPECT_EQ(c2.ToString(), "bcdefghi");
+    EXPECT_STREQ(c2.ToString().c_str(), "bcdefghi");
 
     Char8T c3(std::move(c1));
-    EXPECT_EQ(c3.ToString(), "bcdefghi");
+    EXPECT_STREQ(c3.ToString().c_str(), "bcdefghi");
 
     Char8T c4(c1);
-    EXPECT_EQ(c4.ToString(), "bcdefghi");
+    EXPECT_STREQ(c4.ToString().c_str(), "bcdefghi");
 
     Char8T c5;
     c5.Initialize("bcdefghijk", 8);
-    EXPECT_EQ(c5.ToString(), "bcdefghi");
+    EXPECT_STREQ(c5.ToString().c_str(), "bcdefghi");
 
     Char8T c6;
     c6 = c5;
-    EXPECT_EQ(c6.ToString(), "bcdefghi");
+    EXPECT_STREQ(c6.ToString().c_str(), "bcdefghi");
 
     Char8T c7;
     c7 = std::move(c5);
-    EXPECT_EQ(c7.ToString(), "bcdefghi");
+    EXPECT_STREQ(c7.ToString().c_str(), "bcdefghi");
 }
 
 TEST_F(CharTypeTest, Char16) {
@@ -171,19 +171,19 @@ TEST_F(CharTypeTest, Char16) {
     c5.Initialize("bcdefghijklmnop", 14);
     result = c5.ToString();
     trim(result);
-    EXPECT_EQ(result, "bcdefghijklmno");
+    EXPECT_STREQ(result.c_str(), "bcdefghijklmno");
 
     Char16T c6;
     c6 = c5;
     result = c6.ToString();
     trim(result);
-    EXPECT_EQ(result, "bcdefghijklmno");
+    EXPECT_STREQ(result.c_str(), "bcdefghijklmno");
 
     Char16T c7;
     c7 = std::move(c5);
     result = c7.ToString();
     trim(result);
-    EXPECT_EQ(result, "bcdefghijklmno");
+    EXPECT_STREQ(result.c_str(), "bcdefghijklmno");
 }
 
 TEST_F(CharTypeTest, Char32) {
@@ -216,19 +216,19 @@ TEST_F(CharTypeTest, Char32) {
     c5.Initialize("bcdefghijklmnop bcdefghijklmnop", 31);
     result = c5.ToString();
     trim(result);
-    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop");
+    EXPECT_STREQ(result.c_str(), "bcdefghijklmnop bcdefghijklmnop");
 
     Char32T c6;
     c6 = c5;
     result = c6.ToString();
     trim(result);
-    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop");
+    EXPECT_STREQ(result.c_str(), "bcdefghijklmnop bcdefghijklmnop");
 
     Char32T c7;
     c7 = std::move(c5);
     result = c7.ToString();
     trim(result);
-    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop");
+    EXPECT_STREQ(result.c_str(), "bcdefghijklmnop bcdefghijklmnop");
 }
 
 TEST_F(CharTypeTest, Char64) {
@@ -261,18 +261,18 @@ TEST_F(CharTypeTest, Char64) {
     c5.Initialize("bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop", 63);
     result = c5.ToString();
     trim(result);
-    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
+    EXPECT_STREQ(result.c_str(), "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
 
     Char64T c6;
     c6 = c5;
     result = c6.ToString();
     trim(result);
-    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
+    EXPECT_STREQ(result.c_str(), "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
 
     Char64T c7;
     c7 = std::move(c5);
     result = c1.ToString();
     trim(result);
-    EXPECT_EQ(result, "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
+    EXPECT_STREQ(result.c_str(), "bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop bcdefghijklmnop");
 }
 

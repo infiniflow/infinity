@@ -94,7 +94,7 @@ VarcharType::DeepCopy(const VarcharType &other) {
         ptr = new char[this->length]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        LOG_TRACE("DeepCopy: allocate memory: {}, {}", (void*)ptr, length);
+//        LOG_TRACE("DeepCopy: allocate memory: {}, {}", (void*)ptr, length);
 
         memcpy(ptr, other.ptr, this->length);
     }
@@ -121,14 +121,14 @@ VarcharType::Initialize(const char* input_ptr, size_t input_len) {
     length = static_cast<i16>(input_len);
     ptr = nullptr;
     if(IsInlined()) {
-        LOG_TRACE("Initialize, inline varchar: {}", length);
+//        LOG_TRACE("Initialize, inline varchar: {}", length);
         memcpy(prefix, input_ptr, length);
         // ptr maybe also padding by the memcpy
     } else {
         ptr = new char[input_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        LOG_TRACE("Initialize: allocate memory: {}, {}", (void*)ptr, length);
+//        LOG_TRACE("Initialize: allocate memory: {}, {}", (void*)ptr, length);
         memcpy(prefix, input_ptr, PREFIX_LENGTH);
         memcpy(ptr, input_ptr, length);
     }
@@ -137,7 +137,7 @@ VarcharType::Initialize(const char* input_ptr, size_t input_len) {
 void
 VarcharType::Reset() {
     if(IsInlined()) {
-        LOG_TRACE("Reset inline varchar");
+//        LOG_TRACE("Reset inline varchar");
         length = 0;
     } else {
         if(length == 0) {
@@ -145,7 +145,7 @@ VarcharType::Reset() {
             return ;
         }
 
-        LOG_TRACE("Reset: free memory: {}, {}", (void*)ptr, length);
+//        LOG_TRACE("Reset: free memory: {}, {}", (void*)ptr, length);
 
         delete[] ptr;
         GlobalResourceUsage::DecrRawMemCount();
@@ -158,9 +158,9 @@ VarcharType::Reset() {
 String
 VarcharType::ToString() const {
     if(IsInlined()) {
-        return String(prefix, length);
+        return String{prefix, static_cast<size_t>(length)};
     } else {
-        return String(ptr, length);
+        return String{ptr, static_cast<size_t>(length)};
     }
 }
 

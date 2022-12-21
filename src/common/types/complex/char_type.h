@@ -70,17 +70,20 @@ public:
 
     [[nodiscard]] inline String
     ToString() const {
-        size_t len = std::min(strlen(value), CHAR_LENGTH);
-        return String(value, len);
+        String res(Char2Type::CHAR_LENGTH, 0);
+        for(size_t i = 0; i < Char2Type::CHAR_LENGTH; ++ i) {
+            res[i] = value[i];
+        }
+        return res;
     }
 
     inline void
     Reset() {
-        memset(value, 0, CHAR_LENGTH);
+        memset(value, 0, Char2Type::CHAR_LENGTH);
     }
 
 public:
-    char_t value[CHAR_LENGTH]{};
+    char_t value[Char2Type::CHAR_LENGTH]{};
 };
 
 struct Char4Type {
@@ -102,17 +105,20 @@ public:
 
     [[nodiscard]] inline String
     ToString() const {
-        size_t len = std::min(strlen(value), CHAR_LENGTH);
-        return String(value, len);
+        String res(Char4Type::CHAR_LENGTH, 0);
+        for(size_t i = 0; i < Char4Type::CHAR_LENGTH; ++ i) {
+            res[i] = value[i];
+        }
+        return res;
     }
 
     inline void
     Reset() {
-        memset(value, 0, CHAR_LENGTH);
+        memset(value, 0, Char4Type::CHAR_LENGTH);
     }
 
 public:
-    char_t value[CHAR_LENGTH]{};
+    char_t value[Char4Type::CHAR_LENGTH]{};
 
 };
 
@@ -135,17 +141,20 @@ public:
 
     [[nodiscard]] inline String
     ToString() const {
-        size_t len = std::min(strlen(value), CHAR_LENGTH);
-        return String(value, len);
+        String res(Char8Type::CHAR_LENGTH, 0);
+        for(size_t i = 0; i < Char8Type::CHAR_LENGTH; ++ i) {
+            res[i] = value[i];
+        }
+        return res;
     }
 
     inline void
     Reset() {
-        memset(value, 0, CHAR_LENGTH);
+        memset(value, 0, Char8Type::CHAR_LENGTH);
     }
 
 public:
-    char_t value[CHAR_LENGTH]{};
+    char_t value[Char8Type::CHAR_LENGTH]{};
 };
 
 struct Char16Type {
@@ -175,7 +184,11 @@ public:
 
     [[nodiscard]] inline String
     ToString() const {
-        return String(value, CHAR_LENGTH);
+        String res(Char16Type::CHAR_LENGTH, 0);
+        for(size_t i = 0; i < Char16Type::CHAR_LENGTH; ++ i) {
+            res[i] = value[i];
+        }
+        return res;
     }
 
     inline void
@@ -214,7 +227,11 @@ public:
 
     [[nodiscard]] inline String
     ToString() const {
-        return String(value, CHAR_LENGTH);
+        String res(Char32Type::CHAR_LENGTH, 0);
+        for(size_t i = 0; i < Char32Type::CHAR_LENGTH; ++ i) {
+            res[i] = value[i];
+        }
+        return res;
     }
 
     inline void
@@ -253,7 +270,11 @@ public:
 
     [[nodiscard]] inline String
     ToString() const {
-        return String(value, CHAR_LENGTH);
+        String res(Char64Type::CHAR_LENGTH, 0);
+        for(size_t i = 0; i < Char64Type::CHAR_LENGTH; ++ i) {
+            res[i] = value[i];
+        }
+        return res;
     }
 
     inline void

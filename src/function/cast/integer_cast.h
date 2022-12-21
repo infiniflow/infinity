@@ -353,25 +353,12 @@ IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const ColumnVecto
         target.length = 1;
         return true;
     }
-    i64 src = source;
-    size_t idx = 0;
-    if(source < 0) {
-        target.prefix[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[VarcharT::INLINE_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < VarcharT::INLINE_LENGTH) {
-        -- tmp_idx;
-        target.prefix[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    target.length = idx;
+    // TODO: High performance itoa needed here.
+    String tmp_str = std::to_string(source);
+    target.length = tmp_str.size();
+    TypeAssert(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
+    memcpy(target.prefix, tmp_str.c_str(), target.length);
+    memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     return true;
 }
 
@@ -618,25 +605,12 @@ IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, const ColumnVect
         target.length = 1;
         return true;
     }
-    i64 src = source;
-    size_t idx = 0;
-    if(source < 0) {
-        target.prefix[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[VarcharT::INLINE_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < VarcharT::INLINE_LENGTH) {
-        -- tmp_idx;
-        target.prefix[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    target.length = idx;
+    // TODO: High performance itoa needed here.
+    String tmp_str = std::to_string(source);
+    target.length = tmp_str.size();
+    TypeAssert(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
+    memcpy(target.prefix, tmp_str.c_str(), target.length);
+    memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     return true;
 }
 
@@ -877,7 +851,7 @@ IntegerTryCastToFixlen::Run(IntegerT source, Char64T &target) {
     return true;
 }
 
-// Cast SmallInt to varlen type
+// Cast integer to varlen type
 template<>
 inline bool
 IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const ColumnVector *vector_ptr) {
@@ -886,25 +860,13 @@ IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const ColumnVecto
         target.length = 1;
         return true;
     }
-    i64 src = source;
-    size_t idx = 0;
-    if(source < 0) {
-        target.prefix[idx ++] = '-';
-        src = -src;
-    }
 
-    char_t tmp[VarcharT::INLINE_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < VarcharT::INLINE_LENGTH) {
-        -- tmp_idx;
-        target.prefix[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    target.length = idx;
+    // TODO: High performance itoa needed here.
+    String tmp_str = std::to_string(source);
+    target.length = tmp_str.size();
+    TypeAssert(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
+    memcpy(target.prefix, tmp_str.c_str(), target.length);
+    memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     return true;
 }
 

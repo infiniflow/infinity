@@ -142,6 +142,7 @@ TEST_F(IntegerCastTest, integer_cast0) {
         EXPECT_TRUE(IntegerTryCastToFixlen::Run(source, target));
         EXPECT_FLOAT_EQ(source, target);
     }
+
     // TODO:
     // Cast to decimal16/32/64/128
     // IntegerT to Char1T
@@ -534,6 +535,7 @@ TEST_F(IntegerCastTest, integer_cast0) {
 
         source = std::numeric_limits<IntegerT>::min();
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, &col_varchar));
+
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 11);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
