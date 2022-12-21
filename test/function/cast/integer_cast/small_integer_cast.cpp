@@ -575,7 +575,6 @@ TEST_F(SmallIntegerCastTest, small_integer_cast0) {
 TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     using namespace infinity;
 
-    DataType smallint_data_type(LogicalType::kSmallInt);
     DataType smallint_type(LogicalType::kSmallInt);
     ColumnVector col_smallint(smallint_type, ColumnVectorType::kFlat);
     col_smallint.Initialize();
@@ -593,7 +592,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to tiny int column vector
     {
         DataType tinyint_data_type(LogicalType::kTinyInt);
-        auto small2tiny_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, tinyint_data_type);
+        auto small2tiny_ptr = BindIntegerCast<SmallIntT>(smallint_type, tinyint_data_type);
         EXPECT_NE(small2tiny_ptr.function, nullptr);
 
         ColumnVector col_tinyint(tinyint_data_type, ColumnVectorType::kFlat);
@@ -617,7 +616,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to integer column vector
     {
         DataType integer_data_type(LogicalType::kInteger);
-        auto small2integer_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, integer_data_type);
+        auto small2integer_ptr = BindIntegerCast<SmallIntT>(smallint_type, integer_data_type);
         EXPECT_NE(small2integer_ptr.function, nullptr);
 
         ColumnVector col_int(integer_data_type, ColumnVectorType::kFlat);
@@ -636,7 +635,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to big int column vector
     {
         DataType bigint_data_type(LogicalType::kBigInt);
-        auto small2bigint_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, bigint_data_type);
+        auto small2bigint_ptr = BindIntegerCast<SmallIntT>(smallint_type, bigint_data_type);
         EXPECT_NE(small2bigint_ptr.function, nullptr);
 
         ColumnVector col_bigint(bigint_data_type, ColumnVectorType::kFlat);
@@ -656,7 +655,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to huge int column vector
     {
         DataType hugeint_data_type(LogicalType::kHugeInt);
-        auto small2hugeint_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, hugeint_data_type);
+        auto small2hugeint_ptr = BindIntegerCast<SmallIntT>(smallint_type, hugeint_data_type);
         EXPECT_NE(small2hugeint_ptr.function, nullptr);
 
         ColumnVector col_hugeint(hugeint_data_type, ColumnVectorType::kFlat);
@@ -676,7 +675,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to float column vector
     {
         DataType float_data_type(LogicalType::kFloat);
-        auto small2float_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, float_data_type);
+        auto small2float_ptr = BindIntegerCast<SmallIntT>(smallint_type, float_data_type);
         EXPECT_NE(small2float_ptr.function, nullptr);
 
         ColumnVector col_float(float_data_type, ColumnVectorType::kFlat);
@@ -696,7 +695,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to double column vector
     {
         DataType double_data_type(LogicalType::kDouble);
-        auto small2double_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, double_data_type);
+        auto small2double_ptr = BindIntegerCast<SmallIntT>(smallint_type, double_data_type);
         EXPECT_NE(small2double_ptr.function, nullptr);
 
         ColumnVector col_double(double_data_type, ColumnVectorType::kFlat);
@@ -716,7 +715,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to Char1 vector
     {
         DataType char1_data_type(LogicalType::kChar1);
-        auto small2char1_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, char1_data_type);
+        auto small2char1_ptr = BindIntegerCast<SmallIntT>(smallint_type, char1_data_type);
         EXPECT_NE(small2char1_ptr.function, nullptr);
 
         ColumnVector col_char1(char1_data_type, ColumnVectorType::kFlat);
@@ -741,7 +740,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to Char2 vector
     {
         DataType char2_data_type(LogicalType::kChar2);
-        auto small2char2_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, char2_data_type);
+        auto small2char2_ptr = BindIntegerCast<SmallIntT>(smallint_type, char2_data_type);
         EXPECT_NE(small2char2_ptr.function, nullptr);
 
         ColumnVector col_char2(char2_data_type, ColumnVectorType::kFlat);
@@ -768,7 +767,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast tiny int column vector to Char4 vector
     {
         DataType char4_data_type(LogicalType::kChar4);
-        auto small2char4_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, char4_data_type);
+        auto small2char4_ptr = BindIntegerCast<SmallIntT>(smallint_type, char4_data_type);
         EXPECT_NE(small2char4_ptr.function, nullptr);
 
         ColumnVector col_char4(char4_data_type, ColumnVectorType::kFlat);
@@ -795,7 +794,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to Char8 vector
     {
         DataType char8_data_type(LogicalType::kChar8);
-        auto small2char8_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, char8_data_type);
+        auto small2char8_ptr = BindIntegerCast<SmallIntT>(smallint_type, char8_data_type);
         EXPECT_NE(small2char8_ptr.function, nullptr);
 
         ColumnVector col_char8(char8_data_type, ColumnVectorType::kFlat);
@@ -818,7 +817,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to Char16 vector
     {
         DataType char16_data_type(LogicalType::kChar16);
-        auto small2char16_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, char16_data_type);
+        auto small2char16_ptr = BindIntegerCast<SmallIntT>(smallint_type, char16_data_type);
         EXPECT_NE(small2char16_ptr.function, nullptr);
 
         ColumnVector col_char16(char16_data_type, ColumnVectorType::kFlat);
@@ -841,7 +840,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to Char32 vector
     {
         DataType char32_data_type(LogicalType::kChar32);
-        auto small2char32_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, char32_data_type);
+        auto small2char32_ptr = BindIntegerCast<SmallIntT>(smallint_type, char32_data_type);
         EXPECT_NE(small2char32_ptr.function, nullptr);
 
         ColumnVector col_char32(char32_data_type, ColumnVectorType::kFlat);
@@ -864,7 +863,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast small int column vector to Char64 vector
     {
         DataType char64_data_type(LogicalType::kChar64);
-        auto small2char64_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, char64_data_type);
+        auto small2char64_ptr = BindIntegerCast<SmallIntT>(smallint_type, char64_data_type);
         EXPECT_NE(small2char64_ptr.function, nullptr);
 
         ColumnVector col_char64(char64_data_type, ColumnVectorType::kFlat);
@@ -887,7 +886,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     // cast tiny int column vector to Varchar vector
     {
         DataType varchar_data_type(LogicalType::kVarchar);
-        auto small2varchar_ptr = BindIntegerCast<SmallIntT>(smallint_data_type, varchar_data_type);
+        auto small2varchar_ptr = BindIntegerCast<SmallIntT>(smallint_type, varchar_data_type);
         EXPECT_NE(small2varchar_ptr.function, nullptr);
 
         ColumnVector col_varchar(varchar_data_type, ColumnVectorType::kFlat);
