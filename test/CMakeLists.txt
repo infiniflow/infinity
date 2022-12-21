@@ -41,7 +41,7 @@ add_executable(test_main
         ${main_test_src}
         ${bin_src}
         ${storage_src}
-        common/column_vector/bitmask.cpp common/column_vector/bitmask_buffer.cpp)
+        )
 
 target_link_libraries(test_main
         gtest
