@@ -640,4 +640,272 @@ IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, const ColumnVect
     return true;
 }
 
+// Cast Integer to other numeric type
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, TinyIntT &target) {
+    if(source < std::numeric_limits<TinyIntT>::min() || source > std::numeric_limits<TinyIntT>::max()) {
+        return false;
+    }
+    target = static_cast<TinyIntT>(source);
+    return true;
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, SmallIntT &target) {
+    if(source < std::numeric_limits<SmallIntT>::min() || source > std::numeric_limits<SmallIntT>::max()) {
+        return false;
+    }
+    target = static_cast<SmallIntT>(source);
+    return true;
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, BigIntT &target) {
+    target = source;
+    return true;
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, HugeIntT &target) {
+    target.lower = source;
+    target.upper = (source < 0) * -1;
+    return true;
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, FloatT &target) {
+    target = source;
+    return true;
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, DoubleT &target) {
+    target = source;
+    return true;
+}
+
+// TODO
+//template<>
+//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal16T &target);
+//template<>
+//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal32T &target);
+//template<>
+//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal64T &target);
+//template<>
+//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal128T &target);
+
+// Cast SmallInt to Char type
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, Char1T &target) {
+    if(source < 0 or source >= 10) return false;
+    target.value =  '0' + source;
+    return true;
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, Char2T &target) {
+    if(source > -10 && source < 100) {
+        if(source < 0) {
+            target.value[0] = '-';
+            target.value[1] = '0' - source;
+        } else if(source > 0 && source < 10) {
+            target.value[0] = '0' + source;
+            target.value[1] = 0;
+        } else if(source >= 10) {
+            const i8 tens = source / 10;
+            target.value[0] = '0' + tens;
+            target.value[1] = '0' + source - tens * 10;
+        } else {
+            target.value[0] = '0';
+        }
+        return true;
+    } else {
+        return false;
+    }
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, Char4T &target) {
+    if(source < -999 || source > 9999) return false;
+    if(source == 0) {
+        target.value[0] = '0';
+        return true;
+    }
+    size_t idx = 0;
+    i64 src = source;
+    if(source < 0) {
+        target.value[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[Char4T::CHAR_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < Char4T::CHAR_LENGTH) {
+        -- tmp_idx;
+        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    return true;
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, Char8T &target) {
+    if(source < -9999999 || source > 99999999) return false;
+    if(source == 0) {
+        target.value[0] = '0';
+        return true;
+    }
+    size_t idx = 0;
+    i64 src = source;
+    if(source < 0) {
+        target.value[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[Char8T::CHAR_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < Char8T::CHAR_LENGTH) {
+        -- tmp_idx;
+        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    return true;
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, Char16T &target) {
+
+    if(source == 0) {
+        target.value[0] = '0';
+        return true;
+    }
+    size_t idx = 0;
+    i64 src = source;
+    if(source < 0) {
+        target.value[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[Char16T::CHAR_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < Char16T::CHAR_LENGTH) {
+        -- tmp_idx;
+        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    return true;
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, Char32T &target) {
+
+    if(source == 0) {
+        target.value[0] = '0';
+        return true;
+    }
+    size_t idx = 0;
+    i64 src = source;
+    if(source < 0) {
+        target.value[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[Char32T::CHAR_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < Char32T::CHAR_LENGTH) {
+        -- tmp_idx;
+        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    return true;
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(IntegerT source, Char64T &target) {
+
+    if(source == 0) {
+        target.value[0] = '0';
+        return true;
+    }
+    size_t idx = 0;
+    i64 src = source;
+    if(source < 0) {
+        target.value[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[Char64T::CHAR_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < Char64T::CHAR_LENGTH) {
+        -- tmp_idx;
+        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    return true;
+}
+
+// Cast SmallInt to varlen type
+template<>
+inline bool
+IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const ColumnVector *vector_ptr) {
+    if(source == 0) {
+        target.prefix[0] = '0';
+        target.length = 1;
+        return true;
+    }
+    i64 src = source;
+    size_t idx = 0;
+    if(source < 0) {
+        target.prefix[idx ++] = '-';
+        src = -src;
+    }
+
+    char_t tmp[VarcharT::INLINE_LENGTH];
+    i64 tmp_idx = 0;
+    while(src > 0) {
+        tmp[tmp_idx ++] = '0' + src % 10;
+        src /= 10;
+    }
+    while(idx < VarcharT::INLINE_LENGTH) {
+        -- tmp_idx;
+        target.prefix[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
+    }
+
+    target.length = idx;
+    return true;
+}
+
 }
