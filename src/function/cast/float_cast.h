@@ -272,12 +272,11 @@ FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const ColumnVector *v
     return true;
 }
 
-
 // Cast DoubleT to other numeric type
 template<>
 inline bool
 FloatTryCastToFixlen::Run(DoubleT source, TinyIntT &target) {
-    if(source < std::numeric_limits<TinyIntT>::min() || source > std::numeric_limits<TinyIntT>::max()) {
+    if(source < -128.0f || source > 127.0f) {
         return false;
     }
     target = static_cast<TinyIntT>(source);
@@ -287,7 +286,7 @@ FloatTryCastToFixlen::Run(DoubleT source, TinyIntT &target) {
 template<>
 inline bool
 FloatTryCastToFixlen::Run(DoubleT source, SmallIntT &target) {
-    if(source < std::numeric_limits<SmallIntT>::min() || source > std::numeric_limits<SmallIntT>::max()) {
+    if(source < -32768.0f || source > 32767.0f) {
         return false;
     }
     target = static_cast<SmallIntT>(source);
@@ -297,20 +296,23 @@ FloatTryCastToFixlen::Run(DoubleT source, SmallIntT &target) {
 template<>
 inline bool
 FloatTryCastToFixlen::Run(DoubleT source, IntegerT &target) {
-    if(source < std::numeric_limits<IntegerT>::min() || source > std::numeric_limits<IntegerT>::max()) {
+    if(source < -2147483648.0f || source > 2147483647.0f) {
         return false;
     }
-    target = static_cast<IntegerT>(source);
+    target = std::nearbyint(source);
     return true;
 }
 
 template<>
 inline bool
 FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
-    if(source < std::numeric_limits<BigIntT>::min() || source > std::numeric_limits<BigIntT>::max()) {
+    if(source < -9223372036854775808.0f || source > 9223372036854775807.0f) {
         return false;
     }
-    target = static_cast<BigIntT>(source);
+    target = std::nearbyint(source);
+    if(source > 0 && target < 0) {
+        return false;
+    }
     return true;
 }
 
@@ -325,7 +327,7 @@ FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(DoubleT source, DoubleT &target) {
+FloatTryCastToFixlen::Run(DoubleT source, FloatT &target) {
     target = source;
     return true;
 }
