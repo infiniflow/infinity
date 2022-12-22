@@ -56,6 +56,8 @@ struct TryCastValueToVarlen {
             return result;
         }
 
+        nulls_ptr->SetFalse(idx);
+
         auto* data_ptr = (ColumnVectorCastData*)(state_ptr);
         // This convert is failed
         data_ptr->all_converted_ = false;

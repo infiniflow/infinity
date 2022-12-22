@@ -118,7 +118,7 @@ struct FloatTryCastToVarlen {
 template<>
 inline bool
 FloatTryCastToFixlen::Run(FloatT source, TinyIntT &target) {
-    if(source < std::numeric_limits<TinyIntT>::min() || source > std::numeric_limits<TinyIntT>::max()) {
+    if(source < -128.0f || source > 127.0f) {
         return false;
     }
     target = static_cast<TinyIntT>(source);
@@ -128,7 +128,7 @@ FloatTryCastToFixlen::Run(FloatT source, TinyIntT &target) {
 template<>
 inline bool
 FloatTryCastToFixlen::Run(FloatT source, SmallIntT &target) {
-    if(source < std::numeric_limits<SmallIntT>::min() || source > std::numeric_limits<SmallIntT>::max()) {
+    if(source < -32768.0f || source > 32767.0f) {
         return false;
     }
     target = static_cast<SmallIntT>(source);
@@ -138,20 +138,23 @@ FloatTryCastToFixlen::Run(FloatT source, SmallIntT &target) {
 template<>
 inline bool
 FloatTryCastToFixlen::Run(FloatT source, IntegerT &target) {
-    if(source < std::numeric_limits<IntegerT>::min() || source > std::numeric_limits<IntegerT>::max()) {
+    if(source < -2147483648.0f || source > 2147483647.0f) {
         return false;
     }
-    target = static_cast<IntegerT>(source);
+    target = std::nearbyint(source);
+    if(source > 0 && target < 0) {
+        return false;
+    }
     return true;
 }
 
 template<>
 inline bool
 FloatTryCastToFixlen::Run(FloatT source, BigIntT &target) {
-    if(source < std::numeric_limits<BigIntT>::min() || source > std::numeric_limits<BigIntT>::max()) {
+    if(source < -9223372036854775808.0f || source > 9223372036854775807.0f) {
         return false;
     }
-    target = static_cast<BigIntT>(source);
+    target = std::nearbyint(source);
     return true;
 }
 
@@ -181,174 +184,245 @@ FloatTryCastToFixlen::Run(FloatT source, DoubleT &target) {
 //template<>
 //bool FloatTryCastToFixlen::Run(TinyIntT source, Decimal128T &target);
 
-// Cast SmallInt to Char type
-template<>
-inline bool
-FloatTryCastToFixlen::Run(FloatT source, Char1T &target) {
-    if(source < 0 or source >= 10) return false;
-    target.value =  '0' + source;
-    return true;
-}
+// Cast Float to Char type
+// Float can't be casted to Char1, Char2 and Char4.
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(BigIntT source, Char2T &target) {
-    if(source > -10 && source < 100) {
-        if(source < 0) {
-            target.value[0] = '-';
-            target.value[1] = '0' - source;
-        } else if(source > 0 && source < 10) {
-            target.value[0] = '0' + source;
-            target.value[1] = 0;
-        } else if(source >= 10) {
-            const i8 tens = source / 10;
-            target.value[0] = '0' + tens;
-            target.value[1] = '0' + source - tens * 10;
-        } else {
-            target.value[0] = '0';
-        }
-        return true;
-    } else {
+FloatTryCastToFixlen::Run(FloatT source, Char8T &target) {
+    // TODO: High-performance to_string implementation is needed.
+    String res = std::to_string(source);
+
+    size_t result_size = res.size();
+    if(result_size > Char8T::CHAR_LENGTH) {
         return false;
     }
-}
-
-template<>
-inline bool
-FloatTryCastToFixlen::Run(BigIntT source, Char4T &target) {
-    if(source < -999 || source > 9999) return false;
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char4T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char4T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
+    memcpy(target.value, res.c_str(), result_size);
+    memset(target.value + result_size, 0, Char8T::CHAR_LENGTH - result_size);
     return true;
 }
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(BigIntT source, Char8T &target) {
-    if(source < -9999999 || source > 99999999) return false;
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
+FloatTryCastToFixlen::Run(FloatT source, Char16T &target) {
+    // TODO: High-performance to_string implementation is needed.
+    String res = std::to_string(source);
 
-    char_t tmp[Char8T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
+    size_t result_size = res.size();
+    if(result_size > Char16T::CHAR_LENGTH) {
+        return false;
     }
-    while(idx < Char8T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
+    memcpy(target.value, res.c_str(), result_size);
+    memset(target.value + result_size, 0, Char16T::CHAR_LENGTH - result_size);
     return true;
 }
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(BigIntT source, Char16T &target) {
-    if(source < -999999999999999LL || source > 9999999999999999LL ) return false;
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
+FloatTryCastToFixlen::Run(FloatT source, Char32T &target) {
+    // TODO: High-performance to_string implementation is needed.
+    String res = std::to_string(source);
 
-    char_t tmp[Char16T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
+    size_t result_size = res.size();
+    if(result_size > Char32T::CHAR_LENGTH) {
+        return false;
     }
-    while(idx < Char16T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
+    memcpy(target.value, res.c_str(), result_size);
+    memset(target.value + result_size, 0, Char32T::CHAR_LENGTH - result_size);
     return true;
 }
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(BigIntT source, Char32T &target) {
+FloatTryCastToFixlen::Run(FloatT source, Char64T &target) {
+    // TODO: High-performance to_string implementation is needed.
+    String res = std::to_string(source);
 
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
+    size_t result_size = res.size();
+    if(result_size > Char64T::CHAR_LENGTH) {
+        return false;
+    }
+    memcpy(target.value, res.c_str(), result_size);
+    memset(target.value + result_size, 0, Char64T::CHAR_LENGTH - result_size);
+    return true;
+}
+
+// Cast FloatT to varlen type
+template<>
+inline bool
+FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const ColumnVector *vector_ptr){
+    // TODO: High-performance to_string implementation is needed.
+    String tmp_str = std::to_string(source);
+    target.length = static_cast<i16>(tmp_str.size());
+    if(target.length <= VarcharT::INLINE_LENGTH) {
+        memcpy(target.prefix, tmp_str.c_str(), target.length);
+        memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
+    } else {
+        memcpy(target.prefix, tmp_str.c_str(), VarcharT::PREFIX_LENGTH);
+        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kMemory,
+                   "Varchar column vector should use MemoryVectorBuffer. ");
+
+        auto* string_vector_buffer_ptr = (MemoryVectorBuffer*)(vector_ptr->buffer_.get());
+
+        ptr_t ptr = string_vector_buffer_ptr->chunk_mgr_->Allocate(target.length);
+        memcpy(ptr, tmp_str.c_str(), target.length);
+        target.ptr = ptr;
     }
 
-    // TODO: High performance itoa needed here.
-    String str = std::to_string(source);
-    size_t str_len = str.size();
-    TypeAssert(str_len < Char32T::CHAR_LENGTH, "BigInt number digits is more than 32");
-    memcpy(target.value, str.c_str(), str_len);
-    memset(target.value + str_len, 0, Char32T::CHAR_LENGTH - str_len);
+    return true;
+}
 
+
+// Cast DoubleT to other numeric type
+template<>
+inline bool
+FloatTryCastToFixlen::Run(DoubleT source, TinyIntT &target) {
+    if(source < std::numeric_limits<TinyIntT>::min() || source > std::numeric_limits<TinyIntT>::max()) {
+        return false;
+    }
+    target = static_cast<TinyIntT>(source);
     return true;
 }
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(BigIntT source, Char64T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
+FloatTryCastToFixlen::Run(DoubleT source, SmallIntT &target) {
+    if(source < std::numeric_limits<SmallIntT>::min() || source > std::numeric_limits<SmallIntT>::max()) {
+        return false;
     }
-
-    // TODO: High performance itoa needed here.
-    String str = std::to_string(source);
-    size_t str_len = str.size();
-    TypeAssert(str_len < Char32T::CHAR_LENGTH, "BigInt number digits is more than 32");
-    memcpy(target.value, str.c_str(), str_len);
-    memset(target.value + str_len, 0, Char32T::CHAR_LENGTH - str_len);
-
+    target = static_cast<SmallIntT>(source);
     return true;
 }
 
-// Cast integer to varlen type
 template<>
 inline bool
-IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const ColumnVector *vector_ptr){
-    if(source == 0) {
-        target.prefix[0] = '0';
-        target.length = 1;
-        return true;
+FloatTryCastToFixlen::Run(DoubleT source, IntegerT &target) {
+    if(source < std::numeric_limits<IntegerT>::min() || source > std::numeric_limits<IntegerT>::max()) {
+        return false;
     }
+    target = static_cast<IntegerT>(source);
+    return true;
+}
 
-    // TODO: High performance itoa needed here.
+template<>
+inline bool
+FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
+    if(source < std::numeric_limits<BigIntT>::min() || source > std::numeric_limits<BigIntT>::max()) {
+        return false;
+    }
+    target = static_cast<BigIntT>(source);
+    return true;
+}
+
+// TODO: Cast from double to hugeint
+//template<>
+//inline bool
+//FloatTryCastToFixlen::Run(FloatT source, HugeIntT &target) {
+//    target.lower = source;
+//    target.upper = (source < 0) * -1;
+//    return true;
+//}
+
+template<>
+inline bool
+FloatTryCastToFixlen::Run(DoubleT source, DoubleT &target) {
+    target = source;
+    return true;
+}
+
+// TODO
+//template<>
+//bool FloatTryCastToFixlen::Run(TinyIntT source, Decimal16T &target);
+//template<>
+//bool FloatTryCastToFixlen::Run(TinyIntT source, Decimal32T &target);
+//template<>
+//bool FloatTryCastToFixlen::Run(TinyIntT source, Decimal64T &target);
+//template<>
+//bool FloatTryCastToFixlen::Run(TinyIntT source, Decimal128T &target);
+
+// Cast Float to Char type
+// Float can't be casted to Char1 and Char2.
+
+template<>
+inline bool
+FloatTryCastToFixlen::Run(DoubleT source, Char4T &target) {
+    // TODO: High-performance to_string implementation is needed.
+    String res = std::to_string(source);
+
+    size_t result_size = res.size();
+    if(result_size > Char4T::CHAR_LENGTH) {
+        return false;
+    }
+    memcpy(target.value, res.c_str(), result_size);
+    memset(target.value + result_size, 0, Char4T::CHAR_LENGTH - result_size);
+    return true;
+}
+
+template<>
+inline bool
+FloatTryCastToFixlen::Run(DoubleT source, Char8T &target) {
+    // TODO: High-performance to_string implementation is needed.
+    String res = std::to_string(source);
+
+    size_t result_size = res.size();
+    if(result_size > Char8T::CHAR_LENGTH) {
+        return false;
+    }
+    memcpy(target.value, res.c_str(), result_size);
+    memset(target.value + result_size, 0, Char8T::CHAR_LENGTH - result_size);
+    return true;
+}
+
+template<>
+inline bool
+FloatTryCastToFixlen::Run(DoubleT source, Char16T &target) {
+    // TODO: High-performance to_string implementation is needed.
+    String res = std::to_string(source);
+
+    size_t result_size = res.size();
+    if(result_size > Char16T::CHAR_LENGTH) {
+        return false;
+    }
+    memcpy(target.value, res.c_str(), result_size);
+    memset(target.value + result_size, 0, Char16T::CHAR_LENGTH - result_size);
+    return true;
+}
+
+template<>
+inline bool
+FloatTryCastToFixlen::Run(DoubleT source, Char32T &target) {
+    // TODO: High-performance to_string implementation is needed.
+    String res = std::to_string(source);
+
+    size_t result_size = res.size();
+    if(result_size > Char32T::CHAR_LENGTH) {
+        return false;
+    }
+    memcpy(target.value, res.c_str(), result_size);
+    memset(target.value + result_size, 0, Char32T::CHAR_LENGTH - result_size);
+    return true;
+}
+
+template<>
+inline bool
+FloatTryCastToFixlen::Run(DoubleT source, Char64T &target) {
+    // TODO: High-performance to_string implementation is needed.
+    String res = std::to_string(source);
+
+    size_t result_size = res.size();
+    if(result_size > Char64T::CHAR_LENGTH) {
+        return false;
+    }
+    memcpy(target.value, res.c_str(), result_size);
+    memset(target.value + result_size, 0, Char64T::CHAR_LENGTH - result_size);
+    return true;
+}
+
+// Cast double to varlen type
+template<>
+inline bool
+FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const ColumnVector *vector_ptr){
+    // TODO: High-performance to_string implementation is needed.
     String tmp_str = std::to_string(source);
     target.length = static_cast<i16>(tmp_str.size());
     if(target.length <= VarcharT::INLINE_LENGTH) {
