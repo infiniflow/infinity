@@ -21,6 +21,9 @@ enum TimeUnit : i32 {
 struct IntervalType {
     IntervalType() = default;
 
+    inline explicit
+    IntervalType(i32 v) : value(v) {}
+
     TimeUnit unit {TimeUnit::kInvalidUnit};
     i32 value {};
 

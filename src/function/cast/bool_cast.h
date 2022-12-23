@@ -12,14 +12,14 @@
 
 namespace infinity {
 
-struct BoolTryCast;
+struct TryCastBoolean;
 
 inline static BoundCastFunc
 BindBoolCast(const DataType& source, DataType& target) {
     TypeAssert(source.type() == LogicalType::kBoolean, "Expect boolean type, but it is " + source.ToString());
     switch(target.type()) {
         case LogicalType::kVarchar: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, BoolTryCast>);
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, TryCastBoolean>);
         }
         default: {
             TypeError("Can't cast from Boolean to " + target.ToString());
@@ -27,7 +27,7 @@ BindBoolCast(const DataType& source, DataType& target) {
     }
 }
 
-struct BoolTryCast  {
+struct TryCastBoolean  {
     template<typename SourceType, typename TargetType>
     static inline bool
     Run(SourceType input, TargetType& target) {
@@ -36,10 +36,10 @@ struct BoolTryCast  {
     }
 };
 
-// Cast TinyInt to other numeric type
+// Cast BooleanT to other VarcharT type
 template<>
 inline bool
-BoolTryCast::Run(BooleanT source, VarcharT &target) {
+TryCastBoolean::Run(BooleanT source, VarcharT &target) {
     if(source) {
         constexpr size_t TRUE_LEN = 4;
         memcpy(target.prefix, "true", TRUE_LEN);

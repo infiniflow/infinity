@@ -33,18 +33,18 @@ TEST_F(BoolCastTest, bool_cast0) {
     {
         BooleanT source = true;
         BooleanT target;
-        EXPECT_THROW(BoolTryCast::Run(source, target), FunctionException);
+        EXPECT_THROW(TryCastBoolean::Run(source, target), FunctionException);
     }
     // BooleanT to VarcharT
     {
         BooleanT source = true;
         VarcharT target;
-        EXPECT_TRUE(BoolTryCast::Run(source, target));
+        EXPECT_TRUE(TryCastBoolean::Run(source, target));
         String result = String(target.prefix, 4);
         EXPECT_STREQ("true", result.c_str());
 
         source = false;
-        EXPECT_TRUE(BoolTryCast::Run(source, target));
+        EXPECT_TRUE(TryCastBoolean::Run(source, target));
         result = String(target.prefix, 5);
         EXPECT_STREQ("false", result.c_str());
     }
