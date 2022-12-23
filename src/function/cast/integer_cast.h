@@ -49,45 +49,24 @@ BindIntegerCast(const DataType &source, DataType &target) {
                     &ColumnVectorCast::TryCastColumnVector<SourceType, DoubleT, IntegerTryCastToFixlen>);
         }
         case LogicalType::kDecimal16: {
-            NotImplementError("Not implement cast from numeric to decimal16 type.");
+            return BoundCastFunc(
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Decimal16T, IntegerTryCastToFixlen>);
         }
         case LogicalType::kDecimal32: {
-            NotImplementError("Not implement cast from numeric to decimal32 type.");
+            return BoundCastFunc(
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Decimal32T, IntegerTryCastToFixlen>);
         }
         case LogicalType::kDecimal64: {
-            NotImplementError("Not implement cast from numeric to decimal64 type.");
+            return BoundCastFunc(
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Decimal64T, IntegerTryCastToFixlen>);
+        }
+        case LogicalType::kDecimal128: {
+            return BoundCastFunc(
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, Decimal128T, IntegerTryCastToFixlen>);
         }
         case LogicalType::kVarchar: {
             return BoundCastFunc(
                     &ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, IntegerTryCastToVarlen>);
-        }
-        case LogicalType::kChar1: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char1T, IntegerTryCastToFixlen>);
-        }
-        case LogicalType::kChar2: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char2T, IntegerTryCastToFixlen>);
-        }
-        case LogicalType::kChar4: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char4T, IntegerTryCastToFixlen>);
-        }
-        case LogicalType::kChar8: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char8T, IntegerTryCastToFixlen>);
-        }
-        case LogicalType::kChar16: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char16T, IntegerTryCastToFixlen>);
-        }
-        case LogicalType::kChar32: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char32T, IntegerTryCastToFixlen>);
-        }
-        case LogicalType::kChar64: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Char64T, IntegerTryCastToFixlen>);
         }
         default: {
             TypeError("BindIntegerCast: Can't cast from " + source.ToString() + " to " + target.ToString());
@@ -158,190 +137,25 @@ IntegerTryCastToFixlen::Run(TinyIntT source, DoubleT &target) {
 }
 
 // TODO
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal16T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal32T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal64T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal128T &target);
-
-// Cast TinyInt to Char type
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Char1T &target) {
-    if(source < 0 or source >= 10) return false;
-    target.value =  '0' + source;
-    return true;
+IntegerTryCastToFixlen::Run(TinyIntT source, Decimal16T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Char2T &target) {
-    if(source > -10 && source < 100) {
-        if(source < 0) {
-            target.value[0] = '-';
-            target.value[1] = '0' - source;
-        } else if(source > 0 && source < 10) {
-            target.value[0] = '0' + source;
-            target.value[1] = 0;
-        } else if(source >= 10) {
-            const i8 tens = source / 10;
-            target.value[0] = '0' + tens;
-            target.value[1] = '0' + source - tens * 10;
-        } else {
-            target.value[0] = '0';
-        }
-        return true;
-    } else {
-        return false;
-    }
+IntegerTryCastToFixlen::Run(TinyIntT source, Decimal32T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Char4T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char4T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char4T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
+IntegerTryCastToFixlen::Run(TinyIntT source, Decimal64T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Char8T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char8T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char8T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Char16T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char16T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char16T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Char32T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char32T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char32T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Char64T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char64T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char64T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
+IntegerTryCastToFixlen::Run(TinyIntT source, Decimal128T &target) {
+    NotImplementError("Not implemented");
 }
 
 // Cast TinyInt to varlen type
@@ -410,190 +224,25 @@ IntegerTryCastToFixlen::Run(SmallIntT source, DoubleT &target) {
 }
 
 // TODO
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal16T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal32T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal64T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal128T &target);
-
-// Cast SmallInt to Char type
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Char1T &target) {
-    if(source < 0 or source >= 10) return false;
-    target.value =  '0' + source;
-    return true;
+IntegerTryCastToFixlen::Run(SmallIntT source, Decimal16T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Char2T &target) {
-    if(source > -10 && source < 100) {
-        if(source < 0) {
-            target.value[0] = '-';
-            target.value[1] = '0' - source;
-        } else if(source > 0 && source < 10) {
-            target.value[0] = '0' + source;
-            target.value[1] = 0;
-        } else if(source >= 10) {
-            const i8 tens = source / 10;
-            target.value[0] = '0' + tens;
-            target.value[1] = '0' + source - tens * 10;
-        } else {
-            target.value[0] = '0';
-        }
-        return true;
-    } else {
-        return false;
-    }
+IntegerTryCastToFixlen::Run(SmallIntT source, Decimal32T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Char4T &target) {
-    if(source < -999 || source > 9999) return false;
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char4T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char4T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
+IntegerTryCastToFixlen::Run(SmallIntT source, Decimal64T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Char8T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char8T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char8T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Char16T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char16T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char16T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Char32T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char32T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char32T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Char64T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char64T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char64T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
+IntegerTryCastToFixlen::Run(SmallIntT source, Decimal128T &target) {
+    NotImplementError("Not implemented");
 }
 
 // Cast SmallInt to varlen type
@@ -665,190 +314,25 @@ IntegerTryCastToFixlen::Run(IntegerT source, DoubleT &target) {
 }
 
 // TODO
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal16T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal32T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal64T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal128T &target);
-
-// Cast SmallInt to Char type
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Char1T &target) {
-    if(source < 0 or source >= 10) return false;
-    target.value =  '0' + source;
-    return true;
+IntegerTryCastToFixlen::Run(IntegerT source, Decimal16T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Char2T &target) {
-    if(source > -10 && source < 100) {
-        if(source < 0) {
-            target.value[0] = '-';
-            target.value[1] = '0' - source;
-        } else if(source > 0 && source < 10) {
-            target.value[0] = '0' + source;
-            target.value[1] = 0;
-        } else if(source >= 10) {
-            const i8 tens = source / 10;
-            target.value[0] = '0' + tens;
-            target.value[1] = '0' + source - tens * 10;
-        } else {
-            target.value[0] = '0';
-        }
-        return true;
-    } else {
-        return false;
-    }
+IntegerTryCastToFixlen::Run(IntegerT source, Decimal32T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Char4T &target) {
-    if(source < -999 || source > 9999) return false;
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char4T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char4T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
+IntegerTryCastToFixlen::Run(IntegerT source, Decimal64T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Char8T &target) {
-    if(source < -9999999 || source > 99999999) return false;
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char8T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char8T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Char16T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char16T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char16T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Char32T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char32T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char32T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Char64T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char64T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char64T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
+IntegerTryCastToFixlen::Run(IntegerT source, Decimal128T &target) {
+    NotImplementError("Not implemented");
 }
 
 // Cast integer to varlen type
@@ -924,170 +408,25 @@ IntegerTryCastToFixlen::Run(BigIntT source, DoubleT &target) {
 }
 
 // TODO
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal16T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal32T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal64T &target);
-//template<>
-//bool IntegerTryCastToFixlen::Run(TinyIntT source, Decimal128T &target);
-
-// Cast SmallInt to Char type
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Char1T &target) {
-    if(source < 0 or source >= 10) return false;
-    target.value =  '0' + source;
-    return true;
+IntegerTryCastToFixlen::Run(BigIntT source, Decimal16T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Char2T &target) {
-    if(source > -10 && source < 100) {
-        if(source < 0) {
-            target.value[0] = '-';
-            target.value[1] = '0' - source;
-        } else if(source > 0 && source < 10) {
-            target.value[0] = '0' + source;
-            target.value[1] = 0;
-        } else if(source >= 10) {
-            const i8 tens = source / 10;
-            target.value[0] = '0' + tens;
-            target.value[1] = '0' + source - tens * 10;
-        } else {
-            target.value[0] = '0';
-        }
-        return true;
-    } else {
-        return false;
-    }
+IntegerTryCastToFixlen::Run(BigIntT source, Decimal32T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Char4T &target) {
-    if(source < -999 || source > 9999) return false;
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char4T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char4T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
+IntegerTryCastToFixlen::Run(BigIntT source, Decimal64T &target) {
+    NotImplementError("Not implemented");
 }
-
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Char8T &target) {
-    if(source < -9999999 || source > 99999999) return false;
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char8T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char8T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Char16T &target) {
-    if(source < -999999999999999LL || source > 9999999999999999LL ) return false;
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-    size_t idx = 0;
-    i64 src = source;
-    if(source < 0) {
-        target.value[idx ++] = '-';
-        src = -src;
-    }
-
-    char_t tmp[Char16T::CHAR_LENGTH];
-    i64 tmp_idx = 0;
-    while(src > 0) {
-        tmp[tmp_idx ++] = '0' + src % 10;
-        src /= 10;
-    }
-    while(idx < Char16T::CHAR_LENGTH) {
-        -- tmp_idx;
-        target.value[idx ++] = tmp_idx >= 0 ? tmp[tmp_idx] : 0;
-    }
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Char32T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-
-    // TODO: High performance itoa needed here.
-    String str = std::to_string(source);
-    size_t str_len = str.size();
-    TypeAssert(str_len < Char32T::CHAR_LENGTH, "BigInt number digits is more than 32");
-    memcpy(target.value, str.c_str(), str_len);
-    memset(target.value + str_len, 0, Char32T::CHAR_LENGTH - str_len);
-
-    return true;
-}
-
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Char64T &target) {
-
-    if(source == 0) {
-        target.value[0] = '0';
-        return true;
-    }
-
-    // TODO: High performance itoa needed here.
-    String str = std::to_string(source);
-    size_t str_len = str.size();
-    TypeAssert(str_len < Char32T::CHAR_LENGTH, "BigInt number digits is more than 32");
-    memcpy(target.value, str.c_str(), str_len);
-    memset(target.value + str_len, 0, Char32T::CHAR_LENGTH - str_len);
-
-    return true;
+IntegerTryCastToFixlen::Run(BigIntT source, Decimal128T &target) {
+    NotImplementError("Not implemented");
 }
 
 // Cast integer to varlen type

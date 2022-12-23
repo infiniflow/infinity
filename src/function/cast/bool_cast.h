@@ -21,18 +21,6 @@ BindBoolCast(const DataType& source, DataType& target) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, BoolTryCast>);
         }
-        case LogicalType::kChar8: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, Char8T, BoolTryCast>);
-        }
-        case LogicalType::kChar16: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, Char16T, BoolTryCast>);
-        }
-        case LogicalType::kChar32: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, Char32T, BoolTryCast>);
-        }
-        case LogicalType::kChar64: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, Char64T, BoolTryCast>);
-        }
         default: {
             TypeError("Can't cast from Boolean to " + target.ToString());
         }
@@ -40,12 +28,30 @@ BindBoolCast(const DataType& source, DataType& target) {
 }
 
 struct BoolTryCast  {
-
     template<typename SourceType, typename TargetType>
     static inline bool
     Run(SourceType input, TargetType& target) {
-        return true;
+        FunctionError("No implementation to cast from " + DataType::TypeToString<SourceType>()
+                      + " to " + DataType::TypeToString<TargetType>());
     }
 };
+
+// Cast TinyInt to other numeric type
+template<>
+inline bool
+BoolTryCast::Run(BooleanT source, VarcharT &target) {
+    if(source) {
+        constexpr size_t TRUE_LEN = 4;
+        memcpy(target.prefix, "true", TRUE_LEN);
+        memset(target.prefix + TRUE_LEN, 0, VarcharT::INLINE_LENGTH - TRUE_LEN);
+        target.length = TRUE_LEN;
+    } else {
+        constexpr size_t FALSE_LEN = 5;
+        memcpy(target.prefix, "false", FALSE_LEN);
+        memset(target.prefix + FALSE_LEN, 0, VarcharT::INLINE_LENGTH - FALSE_LEN);
+        target.length = FALSE_LEN;
+    }
+    return true;
+}
 
 }

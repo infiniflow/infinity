@@ -26,6 +26,30 @@ class BoolCastTest : public BaseTest {
     }
 };
 
+TEST_F(BoolCastTest, bool_cast0) {
+    using namespace infinity;
+
+    // BooleanT to BooleanT, throw exception
+    {
+        BooleanT source = true;
+        BooleanT target;
+        EXPECT_THROW(BoolTryCast::Run(source, target), TypeException);
+    }
+    // BooleanT to VarcharT
+    {
+        BooleanT source = true;
+        VarcharT target;
+        EXPECT_TRUE(BoolTryCast::Run(source, target));
+        String result = String(target.prefix, 4);
+        EXPECT_STREQ("true", result.c_str());
+
+        source = false;
+        EXPECT_TRUE(BoolTryCast::Run(source, target));
+        result = String(target.prefix, 5);
+        EXPECT_STREQ("false", result.c_str());
+    }
+}
+
 TEST_F(BoolCastTest, bool_cast1) {
     using namespace infinity;
 
@@ -34,9 +58,6 @@ TEST_F(BoolCastTest, bool_cast1) {
         DataType target(LogicalType::kVarchar);
         auto func_ptr = BindBoolCast(source, target);
         EXPECT_NE(func_ptr.function, nullptr);
-
-        // Construct column vector
-//        func_ptr.function()
     }
 
     {

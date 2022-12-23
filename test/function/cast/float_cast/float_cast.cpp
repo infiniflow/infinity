@@ -98,8 +98,8 @@ TEST_F(FloatCastTest, float_cast0) {
         EXPECT_EQ(source, target);
 
         source = std::numeric_limits<IntegerT>::max();
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        EXPECT_FLOAT_EQ(source, target);
+        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
+//        EXPECT_FLOAT_EQ(source, target);
 
         source = std::numeric_limits<IntegerT>::min();
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
@@ -121,7 +121,7 @@ TEST_F(FloatCastTest, float_cast0) {
 
         source = std::numeric_limits<BigIntT>::max();
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        EXPECT_FLOAT_EQ(source, target);
+//        EXPECT_FLOAT_EQ(source, target);
 
         source = std::numeric_limits<BigIntT>::min();
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
@@ -148,205 +148,28 @@ TEST_F(FloatCastTest, float_cast0) {
 
     // TODO:
     // Cast to decimal16/32/64/128
-
-
-    // FloatT can't be cast to Char1T
-    // FloatT can't be cast to Char2T
-    // FloatT can't be cast to Char4T
-
-
-    // FloatT to Char8T [0 - 10)
     {
-        FloatT source;
-        Char8T target;
-        String src_str, tgt_str;
-
-        source = std::numeric_limits<FloatT>::lowest();
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
-        source = std::numeric_limits<FloatT>::max();
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
-
-        source = 0;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 8);
-        tgt_str = String(target.value, 8);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = 9;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 8);
-        tgt_str = String(target.value, 8);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = 10;
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
-
-        source = 99;
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
-
-        source = -100;
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
-
-        source = -1;
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
+        FloatT source = std::numeric_limits<FloatT>::lowest();
+        Decimal16T target;
+        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
+    }
+    {
+        FloatT source = std::numeric_limits<FloatT>::lowest();
+        Decimal32T target;
+        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
+    }
+    {
+        FloatT source = std::numeric_limits<FloatT>::lowest();
+        Decimal64T target;
+        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
+    }
+    {
+        FloatT source = std::numeric_limits<FloatT>::lowest();
+        Decimal128T target;
+        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
-    // FloatT to Char16T
-    {
-        FloatT source;
-        Char16T target;
-        String src_str, tgt_str;
-
-        source = std::numeric_limits<FloatT>::lowest();
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
-
-        source = std::numeric_limits<FloatT>::max();
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
-
-        source = 0;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 8);
-        tgt_str = String(target.value, 8);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = 9;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 8);
-        tgt_str = String(target.value, 8);
-        EXPECT_STREQ(tgt_str.c_str(), src_str.c_str());
-
-        source = 10;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 9);
-        tgt_str = String(target.value, 9);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = 99;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 9);
-        tgt_str = String(target.value, 9);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = -100;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 11);
-        tgt_str = String(target.value, 11);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = 100;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 10);
-        tgt_str = String(target.value, 10);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = 100000000;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 16);
-        tgt_str = String(target.value, 16);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = -99999900;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 16);
-        tgt_str = String(target.value, 16);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-    }
-
-    // IntegerT to Char32T
-    {
-        FloatT source;
-        Char32T target;
-        String src_str, tgt_str;
-
-        source = std::numeric_limits<FloatT>::lowest();
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
-
-        source = std::numeric_limits<FloatT>::max();
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
-
-        source = 0;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 8);
-        tgt_str = String(target.value, 8);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = 9;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 8);
-        tgt_str = String(target.value, 8);
-        EXPECT_STREQ(tgt_str.c_str(), src_str.c_str());
-
-        source = 10;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 9);
-        tgt_str = String(target.value, 9);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = 99;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 9);
-        tgt_str = String(target.value, 9);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = -100;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 11);
-        tgt_str = String(target.value, 11);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = 100;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 10);
-        tgt_str = String(target.value, 10);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-    }
-
-    // IntegerT to Char64T
-    {
-        FloatT source;
-        Char64T target;
-        String src_str, tgt_str;
-
-        source = std::numeric_limits<FloatT>::lowest();
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 47);
-        tgt_str = String(target.value, 47);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = std::numeric_limits<FloatT>::max();
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 46);
-        tgt_str = String(target.value, 46);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-        source = 0;
-        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
-        src_str = std::to_string(source);
-        EXPECT_EQ(src_str.size(), 8);
-        tgt_str = String(target.value, 8);
-        EXPECT_STREQ(src_str.c_str(), tgt_str.c_str());
-
-    }
-
-    // IntegerT to VarcharT
+    // FloatT to VarcharT
     {
         FloatT source;
         VarcharT target;
@@ -491,6 +314,19 @@ TEST_F(FloatCastTest, float_cast1) {
     }
 
     // TODO: cast float column vector to huge int column vector
+    {
+        DataType hugeint_data_type(LogicalType::kHugeInt);
+        auto float2hugeint_ptr = BindFloatCast<FloatT>(float_type, hugeint_data_type);
+        EXPECT_NE(float2hugeint_ptr.function, nullptr);
+
+        ColumnVector col_hugeint(hugeint_data_type, ColumnVectorType::kFlat);
+        col_hugeint.Initialize();
+
+        CastParameters cast_parameters;
+
+//        bool result = float2hugeint_ptr.function(col_float, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters);
+        EXPECT_THROW(float2hugeint_ptr.function(col_float, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters), TypeException);
+    }
 
     // cast float column vector to double column vector
     {
@@ -509,110 +345,6 @@ TEST_F(FloatCastTest, float_cast1) {
             EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
             i32 check_value = static_cast<i32>(i);
             EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(check_value));
-        }
-    }
-
-    // can't cast float column vector to Char1 vector
-    // can't cast float column vector to Char2 vector
-    // can't cast int column vector to Char4 vector
-
-    // cast int column vector to Char8 vector
-    {
-        DataType char8_data_type(LogicalType::kChar8);
-        auto float2char8_ptr = BindFloatCast<FloatT>(float_type, char8_data_type);
-        EXPECT_NE(float2char8_ptr.function, nullptr);
-
-        ColumnVector col_char8(char8_data_type, ColumnVectorType::kFlat);
-        col_char8.Initialize();
-
-        CastParameters cast_parameters;
-        bool result = float2char8_ptr.function(col_float, col_char8, DEFAULT_VECTOR_SIZE, cast_parameters);
-        // Not all values are cast, then it's false.
-        EXPECT_FALSE(result);
-        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_char8.GetValue(i);
-            EXPECT_EQ(vx.type().type(), LogicalType::kChar8);
-            f32 check_value = static_cast<f32>(i);
-            if (check_value >= 0 && check_value <= 9) {
-                EXPECT_FALSE(vx.is_null());
-                String output_str(vx.value_.char8.value, 8);
-                String check_str(std::to_string(check_value));
-                EXPECT_STREQ(output_str.c_str(), check_str.c_str());
-            } else {
-                EXPECT_TRUE(vx.is_null());
-            }
-        }
-    }
-
-    // cast float column vector to Char16 vector
-    {
-        DataType char16_data_type(LogicalType::kChar16);
-        auto float2char16_ptr = BindFloatCast<FloatT>(float_type, char16_data_type);
-        EXPECT_NE(float2char16_ptr.function, nullptr);
-
-        ColumnVector col_char16(char16_data_type, ColumnVectorType::kFlat);
-        col_char16.Initialize();
-
-        CastParameters cast_parameters;
-        bool result = float2char16_ptr.function(col_float, col_char16, DEFAULT_VECTOR_SIZE, cast_parameters);
-        // Not all values are cast, then it's false.
-        EXPECT_TRUE(result);
-        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_char16.GetValue(i);
-            EXPECT_EQ(vx.type().type(), LogicalType::kChar16);
-            f32 check_value = static_cast<f32>(i);
-            EXPECT_FALSE(vx.is_null());
-            String output_str(vx.value_.char16.value, 16);
-            String check_str(std::to_string(check_value));
-            EXPECT_STREQ(output_str.c_str(), check_str.c_str());
-        }
-    }
-
-    // cast float column vector to Char32 vector
-    {
-        DataType char32_data_type(LogicalType::kChar32);
-        auto float2char32_ptr = BindFloatCast<FloatT>(float_type, char32_data_type);
-        EXPECT_NE(float2char32_ptr.function, nullptr);
-
-        ColumnVector col_char32(char32_data_type, ColumnVectorType::kFlat);
-        col_char32.Initialize();
-
-        CastParameters cast_parameters;
-        bool result = float2char32_ptr.function(col_float, col_char32, DEFAULT_VECTOR_SIZE, cast_parameters);
-        // Not all values are cast, then it's false.
-        EXPECT_TRUE(result);
-        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_char32.GetValue(i);
-            EXPECT_EQ(vx.type().type(), LogicalType::kChar32);
-            f32 check_value = static_cast<f32>(i);
-            EXPECT_FALSE(vx.is_null());
-            String output_str(vx.value_.char32.value, 32);
-            String check_str(std::to_string(check_value));
-            EXPECT_STREQ(output_str.c_str(), check_str.c_str());
-        }
-    }
-
-    // cast float column vector to Char64 vector
-    {
-        DataType char64_data_type(LogicalType::kChar64);
-        auto float2char64_ptr = BindFloatCast<FloatT>(float_type, char64_data_type);
-        EXPECT_NE(float2char64_ptr.function, nullptr);
-
-        ColumnVector col_char64(char64_data_type, ColumnVectorType::kFlat);
-        col_char64.Initialize();
-
-        CastParameters cast_parameters;
-        bool result = float2char64_ptr.function(col_float, col_char64, DEFAULT_VECTOR_SIZE, cast_parameters);
-        // Not all values are cast, then it's false.
-        EXPECT_TRUE(result);
-        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_char64.GetValue(i);
-            EXPECT_EQ(vx.type().type(), LogicalType::kChar64);
-            f32 check_value = static_cast<f32>(i);
-            EXPECT_FALSE(vx.is_null());
-            String output_str(vx.value_.char64.value, 64);
-            String check_str(std::to_string(check_value));
-            EXPECT_STREQ(output_str.c_str(), check_str.c_str());
         }
     }
 
