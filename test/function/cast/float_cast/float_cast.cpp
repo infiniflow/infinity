@@ -34,7 +34,7 @@ TEST_F(FloatCastTest, float_cast0) {
     {
         FloatT source = 0;
         FloatT target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), FunctionException);
     }
 
     // FloatT to TinyInt
@@ -325,7 +325,7 @@ TEST_F(FloatCastTest, float_cast1) {
         CastParameters cast_parameters;
 
 //        bool result = float2hugeint_ptr.function(col_float, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters);
-        EXPECT_THROW(float2hugeint_ptr.function(col_float, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters), TypeException);
+        EXPECT_THROW(float2hugeint_ptr.function(col_float, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
     }
 
     // cast float column vector to double column vector

@@ -34,7 +34,7 @@ TEST_F(IntegerCastTest, integer_cast0) {
     {
         IntegerT source = 0;
         IntegerT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), FunctionException);
     }
 
     // IntegerT to TinyInt

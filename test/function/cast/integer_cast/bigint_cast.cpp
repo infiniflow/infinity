@@ -35,7 +35,7 @@ TEST_F(BigIntCastTest, bigint_cast0) {
         BigIntT source = 0;
         BigIntT target;
 
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), FunctionException);
     }
 
     // BigIntT to TinyInt

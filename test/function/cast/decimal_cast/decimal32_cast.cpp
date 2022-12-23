@@ -34,77 +34,84 @@ TEST_F(Decimal32CastTest, decimal32_cast0) {
     {
         Decimal32T source;
         TinyIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal32T to SmallIntT, throw exception
     {
         Decimal32T source;
         SmallIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal32T to IntegerT, throw exception
     {
         Decimal32T source;
         IntegerT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal32T to BigIntT, throw exception
     {
         Decimal32T source;
         BigIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal32T to HugeIntT, throw exception
     {
         Decimal32T source;
         HugeIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal32T to FloatT, throw exception
     {
         Decimal32T source;
         FloatT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal32T to DoubleT, throw exception
     {
         Decimal32T source;
         DoubleT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
+    }
+
+    // Decimal32T to Decimal16T, throw exception
+    {
+        Decimal32T source;
+        Decimal16T target;
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal32T to Decimal32T, throw exception
     {
         Decimal32T source;
         Decimal32T target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
-    }
-
-    // Decimal32T to Decimal32T, throw exception
-    {
-        Decimal32T source;
-        Decimal32T target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), FunctionException);
     }
 
     // Decimal32T to Decimal64T, throw exception
     {
         Decimal32T source;
         Decimal64T target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
+    }
+
+    // Decimal32T to Decimal128T, throw exception
+    {
+        Decimal32T source;
+        Decimal128T target;
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal32T to VarcharT, throw exception
     {
         Decimal32T source;
         VarcharT target;
-        EXPECT_THROW(DecimalTryCastToVarlen::Run(source, target, nullptr), TypeException);
+        EXPECT_THROW(DecimalTryCastToVarlen::Run(source, target, nullptr), NotImplementException);
     }
 }
 
@@ -169,6 +176,12 @@ TEST_F(Decimal32CastTest, decimal32_cast1) {
     {
         DataType source_type(LogicalType::kDecimal32);
         DataType target_type(LogicalType::kDecimal64);
+        EXPECT_THROW(BindDecimalCast<Decimal32T>(source_type, target_type), NotImplementException);
+    }
+    // cast decimal32 column vector to decimal128 column vector
+    {
+        DataType source_type(LogicalType::kDecimal32);
+        DataType target_type(LogicalType::kDecimal128);
         EXPECT_THROW(BindDecimalCast<Decimal32T>(source_type, target_type), NotImplementException);
     }
     // cast decimal32 column vector to varchar column vector

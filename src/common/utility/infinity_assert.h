@@ -70,7 +70,7 @@ if(!(is_true)) {                                                            \
 #define FunctionAssert(is_true, message)                                              \
 if(!(is_true)) {                                                            \
     std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw TypeException(errmsg);                                       \
+    throw FunctionException(errmsg);                                       \
 }
 
 #define NotImplementAssert(is_true, message)                                              \

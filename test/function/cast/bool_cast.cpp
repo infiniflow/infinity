@@ -33,7 +33,7 @@ TEST_F(BoolCastTest, bool_cast0) {
     {
         BooleanT source = true;
         BooleanT target;
-        EXPECT_THROW(BoolTryCast::Run(source, target), TypeException);
+        EXPECT_THROW(BoolTryCast::Run(source, target), FunctionException);
     }
     // BooleanT to VarcharT
     {

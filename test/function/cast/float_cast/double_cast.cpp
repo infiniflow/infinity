@@ -34,7 +34,7 @@ TEST_F(DoubleCastTest, double_cast0) {
     {
         DoubleT source = 0;
         DoubleT target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), FunctionException);
     }
 
     // DoubleT to TinyInt
@@ -319,7 +319,7 @@ TEST_F(DoubleCastTest, double_cast1) {
     // TODO: cast double column vector to huge int column vector
     {
         DataType hugeint_data_type(LogicalType::kHugeInt);
-        auto double2hugeint_ptr = BindFloatCast<FloatT>(double_type, hugeint_data_type);
+        auto double2hugeint_ptr = BindFloatCast<DoubleT>(double_type, hugeint_data_type);
         EXPECT_NE(double2hugeint_ptr.function, nullptr);
 
         ColumnVector col_hugeint(hugeint_data_type, ColumnVectorType::kFlat);
@@ -328,7 +328,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         CastParameters cast_parameters;
 
 //        bool result = double2hugeint_ptr.function(col_float, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters);
-        EXPECT_THROW(double2hugeint_ptr.function(col_double, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters), TypeException);
+        EXPECT_THROW(double2hugeint_ptr.function(col_double, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
     }
 
     // cast double column vector to float column vector

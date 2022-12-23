@@ -34,77 +34,84 @@ TEST_F(Decimal64CastTest, decimal64_cast0) {
     {
         Decimal64T source;
         TinyIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal64T to SmallIntT, throw exception
     {
         Decimal64T source;
         SmallIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal64T to IntegerT, throw exception
     {
         Decimal64T source;
         IntegerT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal64T to BigIntT, throw exception
     {
         Decimal64T source;
         BigIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal64T to HugeIntT, throw exception
     {
         Decimal64T source;
         HugeIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal64T to FloatT, throw exception
     {
         Decimal64T source;
         FloatT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal64T to DoubleT, throw exception
     {
         Decimal64T source;
         DoubleT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
+    }
+
+    // Decimal64T to Decimal16T, throw exception
+    {
+        Decimal64T source;
+        Decimal16T target;
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
+    }
+
+    // Decimal64T to Decimal32T, throw exception
+    {
+        Decimal64T source;
+        Decimal32T target;
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal64T to Decimal64T, throw exception
     {
         Decimal64T source;
         Decimal64T target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), FunctionException);
     }
 
-    // Decimal64T to Decimal64T, throw exception
+    // Decimal64T to Decimal128T, throw exception
     {
         Decimal64T source;
-        Decimal64T target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
-    }
-
-    // Decimal64T to Decimal64T, throw exception
-    {
-        Decimal64T source;
-        Decimal64T target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        Decimal128T target;
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal64T to VarcharT, throw exception
     {
         Decimal64T source;
         VarcharT target;
-        EXPECT_THROW(DecimalTryCastToVarlen::Run(source, target, nullptr), TypeException);
+        EXPECT_THROW(DecimalTryCastToVarlen::Run(source, target, nullptr), NotImplementException);
     }
 }
 

@@ -78,7 +78,7 @@ struct IntegerTryCastToFixlen {
     template<typename SourceType, typename TargetType>
     static inline bool
     Run(SourceType source, TargetType &target) {
-        FunctionError("No implemention to cast from " + DataType::TypeToString<SourceType>()
+        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                  + " to " + DataType::TypeToString<TargetType>());
     }
 };
@@ -87,7 +87,7 @@ struct IntegerTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
     Run(SourceType source, TargetType &target, const ColumnVector* vector_ptr){
-        FunctionError("Not implemention to cast from " + DataType::TypeToString<SourceType>()
+        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
 };
@@ -158,7 +158,7 @@ IntegerTryCastToFixlen::Run(TinyIntT source, Decimal128T &target) {
     NotImplementError("Not implemented");
 }
 
-// Cast TinyInt to varlen type
+// Cast TinyIntT to VarcharT type
 template<>
 inline bool
 IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const ColumnVector *vector_ptr){
@@ -245,7 +245,7 @@ IntegerTryCastToFixlen::Run(SmallIntT source, Decimal128T &target) {
     NotImplementError("Not implemented");
 }
 
-// Cast SmallInt to varlen type
+// Cast SmallIntT to VarcharT type
 template<>
 inline bool
 IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, const ColumnVector *vector_ptr){
@@ -335,7 +335,7 @@ IntegerTryCastToFixlen::Run(IntegerT source, Decimal128T &target) {
     NotImplementError("Not implemented");
 }
 
-// Cast integer to varlen type
+// Cast IntegerT to VarcharT type
 template<>
 inline bool
 IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const ColumnVector *vector_ptr){
@@ -461,4 +461,69 @@ IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const ColumnVector
 }
 
 // TODO: Cast HugeInt to other numeric type
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(HugeIntT source, TinyIntT &target) {
+    NotImplementError("Not implemented");
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(HugeIntT source, SmallIntT &target) {
+    NotImplementError("Not implemented");
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(HugeIntT source, IntegerT &target) {
+    NotImplementError("Not implemented");
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(HugeIntT source, BigIntT &target) {
+    NotImplementError("Not implemented");
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(HugeIntT source, FloatT &target) {
+    NotImplementError("Not implemented");
+}
+
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(HugeIntT source, DoubleT &target) {
+    NotImplementError("Not implemented");
+}
+
+// TODO
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(HugeIntT source, Decimal16T &target) {
+    NotImplementError("Not implemented");
+}
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(HugeIntT source, Decimal32T &target) {
+    NotImplementError("Not implemented");
+}
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(HugeIntT source, Decimal64T &target) {
+    NotImplementError("Not implemented");
+}
+template<>
+inline bool
+IntegerTryCastToFixlen::Run(HugeIntT source, Decimal128T &target) {
+    NotImplementError("Not implemented");
+}
+
+// Cast integer to varlen type
+template<>
+inline bool
+IntegerTryCastToVarlen::Run(HugeIntT source, VarcharT &target, const ColumnVector *vector_ptr){
+    NotImplementError("Not implemented");
+}
+
 }

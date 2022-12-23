@@ -34,77 +34,84 @@ TEST_F(Decimal16CastTest, decimal16_cast0) {
     {
         Decimal16T source;
         TinyIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal16T to SmallIntT, throw exception
     {
         Decimal16T source;
         SmallIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal16T to IntegerT, throw exception
     {
         Decimal16T source;
         IntegerT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal16T to BigIntT, throw exception
     {
         Decimal16T source;
         BigIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal16T to HugeIntT, throw exception
     {
         Decimal16T source;
         HugeIntT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal16T to FloatT, throw exception
     {
         Decimal16T source;
         FloatT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal16T to DoubleT, throw exception
     {
         Decimal16T source;
         DoubleT target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal16T to Decimal16T, throw exception
     {
         Decimal16T source;
         Decimal16T target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), FunctionException);
     }
 
     // Decimal16T to Decimal32T, throw exception
     {
         Decimal16T source;
         Decimal32T target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal16T to Decimal64T, throw exception
     {
         Decimal16T source;
         Decimal64T target;
-        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), TypeException);
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
+    }
+
+    // Decimal16T to Decimal128T, throw exception
+    {
+        Decimal16T source;
+        Decimal128T target;
+        EXPECT_THROW(DecimalTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
     // Decimal16T to VarcharT, throw exception
     {
         Decimal16T source;
         VarcharT target;
-        EXPECT_THROW(DecimalTryCastToVarlen::Run(source, target, nullptr), TypeException);
+        EXPECT_THROW(DecimalTryCastToVarlen::Run(source, target, nullptr), NotImplementException);
     }
 }
 
@@ -169,6 +176,12 @@ TEST_F(Decimal16CastTest, decimal16_cast1) {
     {
         DataType source_type(LogicalType::kDecimal16);
         DataType target_type(LogicalType::kDecimal64);
+        EXPECT_THROW(BindDecimalCast<Decimal16T>(source_type, target_type), NotImplementException);
+    }
+    // cast decimal16 column vector to decimal128 column vector
+    {
+        DataType source_type(LogicalType::kDecimal16);
+        DataType target_type(LogicalType::kDecimal128);
         EXPECT_THROW(BindDecimalCast<Decimal16T>(source_type, target_type), NotImplementException);
     }
     // cast decimal16 column vector to varchar column vector

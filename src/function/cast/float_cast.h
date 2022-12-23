@@ -131,13 +131,11 @@ FloatTryCastToFixlen::Run(FloatT source, BigIntT &target) {
 }
 
 // TODO: Cast from float to hugeint
-//template<>
-//inline bool
-//FloatTryCastToFixlen::Run(FloatT source, HugeIntT &target) {
-//    target.lower = source;
-//    target.upper = (source < 0) * -1;
-//    return true;
-//}
+template<>
+inline bool
+FloatTryCastToFixlen::Run(FloatT source, HugeIntT &target) {
+        NotImplementError("Not implemented");
+}
 
 template<>
 inline bool
@@ -238,13 +236,11 @@ FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
 }
 
 // TODO: Cast from double to hugeint
-//template<>
-//inline bool
-//FloatTryCastToFixlen::Run(FloatT source, HugeIntT &target) {
-//    target.lower = source;
-//    target.upper = (source < 0) * -1;
-//    return true;
-//}
+template<>
+inline bool
+FloatTryCastToFixlen::Run(DoubleT source, HugeIntT &target) {
+    NotImplementError("Not implemented");
+}
 
 template<>
 inline bool
