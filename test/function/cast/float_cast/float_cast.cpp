@@ -129,6 +129,11 @@ TEST_F(FloatCastTest, float_cast0) {
     }
 
     // TODO: need to implement FloatT to HugeInt
+    {
+        FloatT source = std::numeric_limits<FloatT>::lowest();
+        HugeIntT target;
+        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
+    }
 
     // FloatT to Double
     {
@@ -290,6 +295,26 @@ TEST_F(FloatCastTest, float_cast1) {
             EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
             i32 check_value = static_cast<i32>(i);
             EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(check_value));
+        }
+    }
+
+    // cast float column vector to integer column vector
+    {
+        DataType integer_data_type(LogicalType::kInteger);
+        auto float2integer_ptr = BindFloatCast<FloatT>(float_type, integer_data_type);
+        EXPECT_NE(float2integer_ptr.function, nullptr);
+
+        ColumnVector col_int(integer_data_type, ColumnVectorType::kFlat);
+        col_int.Initialize();
+
+        CastParameters cast_parameters;
+        bool result = float2integer_ptr.function(col_float, col_int, DEFAULT_VECTOR_SIZE, cast_parameters);
+        EXPECT_TRUE(result);
+        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+            Value vx = col_int.GetValue(i);
+            EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
+            i32 check_value = static_cast<i32>(i);
+            EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(check_value));
         }
     }
 

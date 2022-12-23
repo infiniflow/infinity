@@ -178,6 +178,12 @@ TEST_F(Decimal64CastTest, decimal64_cast1) {
         DataType target_type(LogicalType::kDecimal64);
         EXPECT_THROW(BindDecimalCast<Decimal64T>(source_type, target_type), TypeException);
     }
+    // cast decimal64 column vector to decimal128 column vector
+    {
+        DataType source_type(LogicalType::kDecimal64);
+        DataType target_type(LogicalType::kDecimal128);
+        EXPECT_THROW(BindDecimalCast<Decimal64T>(source_type, target_type), NotImplementException);
+    }
     // cast decimal64 column vector to varchar column vector
     {
         DataType source_type(LogicalType::kDecimal64);

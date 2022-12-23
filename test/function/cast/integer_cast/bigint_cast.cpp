@@ -380,6 +380,58 @@ TEST_F(BigIntCastTest, bigint_cast1) {
         }
     }
 
+    // cast big int column vector to decimal16 column vector
+    {
+        DataType decimal_data_type(LogicalType::kDecimal16);
+        auto big2decimal_ptr = BindIntegerCast<TinyIntT>(bigint_type, decimal_data_type);
+        EXPECT_NE(big2decimal_ptr.function, nullptr);
+
+        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        col_decimal.Initialize();
+
+        CastParameters cast_parameters;
+        EXPECT_THROW(big2decimal_ptr.function(col_bigint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+    }
+
+    // cast big int column vector to decimal32 column vector
+    {
+        DataType decimal_data_type(LogicalType::kDecimal32);
+        auto big2decimal_ptr = BindIntegerCast<TinyIntT>(bigint_type, decimal_data_type);
+        EXPECT_NE(big2decimal_ptr.function, nullptr);
+
+        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        col_decimal.Initialize();
+
+        CastParameters cast_parameters;
+        EXPECT_THROW(big2decimal_ptr.function(col_bigint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+    }
+
+    // cast big int column vector to decimal64 column vector
+    {
+        DataType decimal_data_type(LogicalType::kDecimal64);
+        auto big2decimal_ptr = BindIntegerCast<TinyIntT>(bigint_type, decimal_data_type);
+        EXPECT_NE(big2decimal_ptr.function, nullptr);
+
+        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        col_decimal.Initialize();
+
+        CastParameters cast_parameters;
+        EXPECT_THROW(big2decimal_ptr.function(col_bigint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+    }
+
+    // cast big int column vector to decimal128 column vector
+    {
+        DataType decimal_data_type(LogicalType::kDecimal128);
+        auto big2decimal_ptr = BindIntegerCast<TinyIntT>(bigint_type, decimal_data_type);
+        EXPECT_NE(big2decimal_ptr.function, nullptr);
+
+        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        col_decimal.Initialize();
+
+        CastParameters cast_parameters;
+        EXPECT_THROW(big2decimal_ptr.function(col_bigint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+    }
+
     // cast bigint column vector to Varchar vector
     {
         DataType varchar_data_type(LogicalType::kVarchar);

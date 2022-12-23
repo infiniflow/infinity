@@ -359,7 +359,59 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         }
     }
 
-    // cast tiny int column vector to Varchar vector
+    // cast small int column vector to decimal16 column vector
+    {
+        DataType decimal_data_type(LogicalType::kDecimal16);
+        auto small2decimal_ptr = BindIntegerCast<TinyIntT>(smallint_type, decimal_data_type);
+        EXPECT_NE(small2decimal_ptr.function, nullptr);
+
+        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        col_decimal.Initialize();
+
+        CastParameters cast_parameters;
+        EXPECT_THROW(small2decimal_ptr.function(col_smallint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+    }
+
+    // cast small int column vector to decimal32 column vector
+    {
+        DataType decimal_data_type(LogicalType::kDecimal32);
+        auto small2decimal_ptr = BindIntegerCast<TinyIntT>(smallint_type, decimal_data_type);
+        EXPECT_NE(small2decimal_ptr.function, nullptr);
+
+        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        col_decimal.Initialize();
+
+        CastParameters cast_parameters;
+        EXPECT_THROW(small2decimal_ptr.function(col_smallint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+    }
+
+    // cast small int column vector to decimal64 column vector
+    {
+        DataType decimal_data_type(LogicalType::kDecimal64);
+        auto small2decimal_ptr = BindIntegerCast<TinyIntT>(smallint_type, decimal_data_type);
+        EXPECT_NE(small2decimal_ptr.function, nullptr);
+
+        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        col_decimal.Initialize();
+
+        CastParameters cast_parameters;
+        EXPECT_THROW(small2decimal_ptr.function(col_smallint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+    }
+
+    // cast small int column vector to decimal128 column vector
+    {
+        DataType decimal_data_type(LogicalType::kDecimal128);
+        auto small2decimal_ptr = BindIntegerCast<TinyIntT>(smallint_type, decimal_data_type);
+        EXPECT_NE(small2decimal_ptr.function, nullptr);
+
+        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        col_decimal.Initialize();
+
+        CastParameters cast_parameters;
+        EXPECT_THROW(small2decimal_ptr.function(col_smallint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+    }
+
+    // cast small int column vector to Varchar vector
     {
         DataType varchar_data_type(LogicalType::kVarchar);
         auto small2varchar_ptr = BindIntegerCast<SmallIntT>(smallint_type, varchar_data_type);
@@ -382,7 +434,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         }
     }
 
-    // Throw exception when cast tiny int to other types.
+    // Throw exception when cast small int to other types.
     {
         DataType source(LogicalType::kSmallInt);
         DataType target(LogicalType::kTimestamp);
