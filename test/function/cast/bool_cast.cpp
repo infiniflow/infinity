@@ -53,6 +53,44 @@ TEST_F(BoolCastTest, bool_cast0) {
 TEST_F(BoolCastTest, bool_cast1) {
     using namespace infinity;
 
+    DataType bool_type(LogicalType::kBoolean);
+    ColumnVector col_bool(bool_type, ColumnVectorType::kFlat);
+    col_bool.Initialize();
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeBool(i % 2 == 0);
+        col_bool.AppendValue(v);
+        Value vx = col_bool.GetValue(i);
+    }
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = col_bool.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
+        EXPECT_EQ(vx.value_.boolean, i % 2 == 0);
+    }
+
+    // cast bool column vector to varchar column vector
+    {
+        DataType varchar_type(LogicalType::kVarchar);
+        auto bool2varchar_ptr = BindBoolCast(bool_type, varchar_type);
+        EXPECT_NE(bool2varchar_ptr.function, nullptr);
+
+        ColumnVector col_varchar(varchar_type, ColumnVectorType::kFlat);
+        col_varchar.Initialize();
+
+        CastParameters cast_parameters;
+        bool result = bool2varchar_ptr.function(col_bool, col_varchar, DEFAULT_VECTOR_SIZE, cast_parameters);
+        EXPECT_TRUE(result);
+        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+            Value vx = col_varchar.GetValue(i);
+            EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
+            String res = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            if(i % 2 == 0) {
+                EXPECT_STREQ(res.c_str(), "true");
+            } else {
+                EXPECT_STREQ(res.c_str(), "false");
+            }
+        }
+    }
+
     {
         DataType source(LogicalType::kBoolean);
         DataType target(LogicalType::kVarchar);
