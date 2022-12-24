@@ -169,7 +169,7 @@ IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const ColumnVecto
     }
     // TODO: High performance itoa needed here.
     String tmp_str = std::to_string(source);
-    target.length = tmp_str.size();
+    target.length = static_cast<u16>(tmp_str.size());
     TypeAssert(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
     memcpy(target.prefix, tmp_str.c_str(), target.length);
     memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
@@ -256,7 +256,7 @@ IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, const ColumnVect
     }
     // TODO: High performance itoa needed here.
     String tmp_str = std::to_string(source);
-    target.length = tmp_str.size();
+    target.length = static_cast<u16>(tmp_str.size());
     TypeAssert(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
     memcpy(target.prefix, tmp_str.c_str(), target.length);
     memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
@@ -441,7 +441,7 @@ IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const ColumnVector
 
     // TODO: High performance itoa needed here.
     String tmp_str = std::to_string(source);
-    target.length = static_cast<i16>(tmp_str.size());
+    target.length = static_cast<u16>(tmp_str.size());
     if(target.length <= VarcharT::INLINE_LENGTH) {
         memcpy(target.prefix, tmp_str.c_str(), target.length);
         memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);

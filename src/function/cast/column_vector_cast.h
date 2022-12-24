@@ -3,6 +3,8 @@
 //
 
 #pragma once
+#include <utility>
+
 #include "common/column_vector/operator/unary_operator.h"
 #include "common/types/internal_types.h"
 #include "common/types/data_type.h"
@@ -12,11 +14,14 @@ namespace infinity {
 
 struct ColumnVectorCastData {
     explicit
-    ColumnVectorCastData(bool strict, ColumnVector* column_vector_ptr)
-        : strict_(strict), column_vector_ptr_(column_vector_ptr) {}
+    ColumnVectorCastData(bool strict, ColumnVector* column_vector_ptr, DataType source_type, DataType target_type)
+        : strict_(strict),
+        column_vector_ptr_(column_vector_ptr),
+        source_type_(std::move(source_type)),
+        target_type_(std::move(target_type)) {}
 
-    LogicalType source_type_{LogicalType::kInvalid};
-    LogicalType target_type_{LogicalType::kInvalid};
+    DataType source_type_{LogicalType::kInvalid};
+    DataType target_type_{LogicalType::kInvalid};
     bool strict_{false};
     bool all_converted_{true};
     ColumnVector* column_vector_ptr_{nullptr};
@@ -68,12 +73,40 @@ struct TryCastValueToVarlen {
     }
 };
 
+template<typename Operator>
+struct TryCastValueToVarlenWithType {
+    template<typename SourceValueType, typename TargetValueType>
+    inline static TargetValueType
+    Execute(const SourceValueType& input, Bitmask* nulls_ptr, size_t idx, void* state_ptr) {
+        TargetValueType result;
+        auto* cast_data_ptr = (ColumnVectorCastData*)(state_ptr);
+        LOG_TRACE("{}, {}", cast_data_ptr->source_type_.ToString(), cast_data_ptr->target_type_.ToString());
+        if(Operator::template Run<SourceValueType, TargetValueType>(input,
+                                                                    cast_data_ptr->source_type_,
+                                                                    result,
+                                                                    cast_data_ptr->target_type_,
+                                                                    cast_data_ptr->column_vector_ptr_)) {
+            return result;
+        }
+
+        nulls_ptr->SetFalse(idx);
+
+        auto* data_ptr = (ColumnVectorCastData*)(state_ptr);
+        // This convert is failed
+        data_ptr->all_converted_ = false;
+//        data_ptr->source_type_  =
+//        data_ptr->target_type_  =
+//        data_ptr->result_ref_
+        return NullValue<TargetValueType>();
+    }
+};
+
 struct ColumnVectorCast {
 
 template <class SourceType, class TargetType, class Operator>
 static bool
 GenericTryCastColumnVector(const ColumnVector &source, ColumnVector &result, size_t count, CastParameters &parameters) {
-    ColumnVectorCastData input(parameters.strict, &result);
+    ColumnVectorCastData input(parameters.strict, &result, source.data_type_, result.data_type_);
     UnaryOperation::Execute<SourceType, TargetType, Operator>(source, result, count, &input, true);
     return input.all_converted_;
 }
@@ -89,6 +122,13 @@ template <class SourceType, class TargetType, class Operator>
 inline static bool
 TryCastColumnVectorToVarlen(const ColumnVector &source, ColumnVector &target, size_t count, CastParameters &parameters) {
     bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValueToVarlen<Operator>>(source, target, count, parameters);
+    return result;
+}
+
+template <class SourceType, class TargetType, class Operator>
+inline static bool
+TryCastColumnVectorToVarlenWithType(const ColumnVector &source, ColumnVector &target, size_t count, CastParameters &parameters) {
+    bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValueToVarlenWithType<Operator>>(source, target, count, parameters);
     return result;
 }
 

@@ -96,6 +96,7 @@ private:
             result_null->SetAllTrue();
 
             for (size_t i = 0; i < count; i++) {
+                // Not valid for embedding type, since the embedding type width isn't sizeof(EmbeddingT)
                 result_ptr[i] = Operator::template Execute<InputType, ResultType>(input_ptr[i], result_null.get(), i, state_ptr);
             }
         } else {

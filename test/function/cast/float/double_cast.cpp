@@ -239,6 +239,17 @@ TEST_F(DoubleCastTest, double_cast0) {
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 10);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
+
+        // col_varchar will release extra memory. Therefore,
+
+        source = std::numeric_limits<FloatT>::max();
+        EXPECT_TRUE(FloatTryCastToVarlen::Run(source, target, &col_varchar));
+        src_str = std::to_string(source);
+        EXPECT_EQ(src_str.size(), 46);
+        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
+
+        // Not release the heap memory in varchar, due to the heap will be release in col_varchar's destructor
+        target.Reset(false);
     }
 }
 
@@ -393,11 +404,14 @@ TEST_F(DoubleCastTest, double_cast1) {
         // Not all values are cast, then it's false.
         EXPECT_TRUE(result);
         for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+            String s('a' + i % 26, 16);
+
             Value vx = col_varchar.GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             f64 check_value = static_cast<f64>(i);
             EXPECT_FALSE(vx.is_null());
             String check_str(std::to_string(check_value));
+
             EXPECT_STREQ(vx.value_.varchar.ToString().c_str(), check_str.c_str());
         }
     }

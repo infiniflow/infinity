@@ -80,7 +80,6 @@ void
 VarcharType::DeepCopy(const VarcharType &other) {
     // Used in copy constructor and copy assignment
     if(this->length > 0) {
-        // this->will will be zero in copy constructor, so now is copy assignment case
         Reset();
     }
 
@@ -118,7 +117,7 @@ VarcharType::Initialize(const char* input_ptr, size_t input_len) {
                "Attempt to write string with length exceed 65535 into value");
     TypeAssert(this->length == 0, "Varchar type was already initialized.")
 
-    length = static_cast<i16>(input_len);
+    length = static_cast<u16>(input_len);
     ptr = nullptr;
     if(IsInlined()) {
 //        LOG_TRACE("Initialize, inline varchar: {}", length);
@@ -135,7 +134,13 @@ VarcharType::Initialize(const char* input_ptr, size_t input_len) {
 }
 
 void
-VarcharType::Reset() {
+VarcharType::Reset(bool clean_memory) {
+    if(!clean_memory) {
+        length = 0;
+        ptr = nullptr;
+        return ;
+    }
+
     if(IsInlined()) {
 //        LOG_TRACE("Reset inline varchar");
         length = 0;

@@ -9,6 +9,9 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/logger.h"
 
+#include <sstream>
+#include <bitset>
+
 namespace infinity {
 
 enum EmbeddingDataType : i8 {
@@ -43,6 +46,56 @@ public:
         }
 
         return dimension * EmbeddingDataWidth(type);
+    }
+
+    static inline String
+    Embedding2String(const EmbeddingType& embedding, EmbeddingDataType type, size_t dimension) {
+        switch(type) {
+            case kElemBit:
+                return BitmapEmbedding2StringInternal(embedding, dimension);
+            case kElemInt8:
+                return Embedding2StringInternal<i8>(embedding, dimension);
+            case kElemInt16:
+                return Embedding2StringInternal<i16>(embedding, dimension);
+            case kElemInt32:
+                return Embedding2StringInternal<i32>(embedding, dimension);
+            case kElemInt64:
+                return Embedding2StringInternal<i64>(embedding, dimension);
+            case kElemFloat:
+                return Embedding2StringInternal<float>(embedding, dimension);
+            case kElemDouble:
+                return Embedding2StringInternal<double>(embedding, dimension);
+            default: {
+                TypeError("Unexpected embedding type");
+            }
+        }
+    }
+
+private:
+    template<typename T>
+    static inline String
+    Embedding2StringInternal(const EmbeddingType& embedding, size_t dimension) {
+        // TODO: High-performance implementation is needed here.
+        std::stringstream ss;
+        for(size_t i = 0; i < dimension - 1; ++ i) {
+            ss << ((T*)(embedding.ptr))[i] << ',';
+        }
+        ss << ((T*)(embedding.ptr))[dimension - 1];
+        return ss.str();
+    }
+
+    static inline String
+    BitmapEmbedding2StringInternal(const EmbeddingType& embedding, size_t dimension) {
+        // TODO:  This is for bitmap, and high-performance implementation is needed here.
+        std::stringstream ss;
+        TypeAssert(dimension % 8 == 0, "Binary embedding dimension should be the times of 8.")
+
+        i64* array = (i64*)(embedding.ptr);
+
+        for(size_t i = 0; i < dimension / 8; ++ i) {
+            ss << std::bitset<8>(array[i]);
+        }
+        return ss.str();
     }
 public:
     inline explicit

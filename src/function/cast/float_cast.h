@@ -172,7 +172,7 @@ inline bool
 FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const ColumnVector *vector_ptr){
     // TODO: High-performance to_string implementation is needed.
     String tmp_str = std::to_string(source);
-    target.length = static_cast<i16>(tmp_str.size());
+    target.length = static_cast<u16>(tmp_str.size());
     if(target.length <= VarcharT::INLINE_LENGTH) {
         memcpy(target.prefix, tmp_str.c_str(), target.length);
         memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
@@ -277,7 +277,7 @@ inline bool
 FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const ColumnVector *vector_ptr){
     // TODO: High-performance to_string implementation is needed.
     String tmp_str = std::to_string(source);
-    target.length = static_cast<i16>(tmp_str.size());
+    target.length = static_cast<u16>(tmp_str.size());
     if(target.length <= VarcharT::INLINE_LENGTH) {
         memcpy(target.prefix, tmp_str.c_str(), target.length);
         memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);

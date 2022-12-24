@@ -256,7 +256,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
                 memcpy(ptr, value.value_.varchar.ptr, varchar_len);
                 ((VarcharT *) data_ptr_)[index].ptr = ptr;
             }
-            ((VarcharT *) data_ptr_)[index].length = static_cast<i16>(varchar_len);
+            ((VarcharT *) data_ptr_)[index].length = static_cast<u16>(varchar_len);
             break;
         }
         case kChar1: {

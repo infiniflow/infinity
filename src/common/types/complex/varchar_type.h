@@ -13,6 +13,7 @@ struct VarcharType {
 public:
     static constexpr size_t PREFIX_LENGTH = 6;
     static constexpr size_t INLINE_LENGTH = 14;
+    static constexpr size_t LEN_LIMIT = 65536;
 public:
     VarcharType() {
         length = 0;
@@ -52,12 +53,12 @@ public:
     }
 
     void
-    Reset();
+    Reset(bool clean_memory = true);
 
     [[nodiscard]] String
     ToString() const;
 
-    i16 length{0};  // 65535 will be the limitation.
+    u16 length{0};  // 65535 will be the limitation.
     char_t prefix[PREFIX_LENGTH] {}; // prefix of the varchar
     // If length <= 14, ptr will be used as prefix.
     ptr_t ptr {nullptr};   // pointer to the varchar value buffer.

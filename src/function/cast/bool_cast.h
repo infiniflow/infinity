@@ -41,12 +41,12 @@ template<>
 inline bool
 TryCastBoolean::Run(BooleanT source, VarcharT &target) {
     if(source) {
-        constexpr size_t TRUE_LEN = 4;
+        constexpr u16 TRUE_LEN = 4;
         memcpy(target.prefix, "true", TRUE_LEN);
         memset(target.prefix + TRUE_LEN, 0, VarcharT::INLINE_LENGTH - TRUE_LEN);
         target.length = TRUE_LEN;
     } else {
-        constexpr size_t FALSE_LEN = 5;
+        constexpr u16 FALSE_LEN = 5;
         memcpy(target.prefix, "false", FALSE_LEN);
         memset(target.prefix + FALSE_LEN, 0, VarcharT::INLINE_LENGTH - FALSE_LEN);
         target.length = FALSE_LEN;
