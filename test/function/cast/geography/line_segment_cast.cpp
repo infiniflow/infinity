@@ -1,7 +1,6 @@
 //
-// Created by jinhai on 22-12-23.
+// Created by jinhai on 22-12-24.
 //
-
 
 #include <gtest/gtest.h>
 #include "base_test.h"
@@ -12,7 +11,7 @@
 #include "function/cast/geography_cast.h"
 #include "common/types/info/varchar_info.h"
 
-class LineCastTest : public BaseTest {
+class LineSegCastTest : public BaseTest {
     void
     SetUp() override {
         infinity::Logger::Initialize();
@@ -28,17 +27,21 @@ class LineCastTest : public BaseTest {
     }
 };
 
-TEST_F(LineCastTest, line_cast0) {
+TEST_F(LineSegCastTest, line_seg_cast0) {
     using namespace infinity;
 
-    // Try to cast line type to wrong type.
+    // Try to cast line seg type to wrong type.
     {
-        LineT source(1, 1, 1);
+        PointT p1(1, 1);
+        PointT p2(2, 2);
+        LineSegT source(p1, p2);
         TinyIntT target;
         EXPECT_THROW(GeographyTryCastToVarlen::Run(source, target, nullptr), FunctionException);
     }
     {
-        LineT source(1, 1, 1);
+        PointT p1(1, 1);
+        PointT p2(2, 2);
+        LineSegT source(p1, p2);
         VarcharT target;
 
         auto varchar_info = VarcharInfo::Make(65);
@@ -50,36 +53,38 @@ TEST_F(LineCastTest, line_cast0) {
     }
 }
 
-
-TEST_F(LineCastTest, line_cast1) {
+TEST_F(LineSegCastTest, line_seg_cast1) {
     using namespace infinity;
 
     // Call BindGeographyCast with wrong type of parameters
     {
-        DataType source_type(LogicalType::kLine);
+        DataType source_type(LogicalType::kLineSeg);
         DataType target_type(LogicalType::kDecimal16);
         EXPECT_THROW(BindGeographyCast<LineT>(source_type, target_type), TypeException);
     }
 
-    DataType source_type(LogicalType::kLine);
+    DataType source_type(LogicalType::kLineSeg);
     ColumnVector col_source(source_type, ColumnVectorType::kFlat);
     col_source.Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value v = Value::MakeLine(LineT(static_cast<f64>(i), static_cast<f64>(i), static_cast<f64>(i)));
+        PointT p1(static_cast<f64>(i), static_cast<f64>(i));
+        PointT p2(static_cast<f64>(i + 1), static_cast<f64>(i + 1));
+        Value v = Value::MakeLineSegment(LineSegT(p1, p2));
         col_source.AppendValue(v);
         Value vx = col_source.GetValue(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value vx = col_source.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kLine);
-        EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i));
-        EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i));
-        EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i));
+        EXPECT_EQ(vx.type().type(), LogicalType::kLineSeg);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.x, static_cast<f64>(i));
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i));
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.x, static_cast<f64>(i + 1));
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i + 1));
     }
-    // cast line column vector to varchar column vector
+    // cast line seg column vector to varchar column vector
     {
         DataType target_type(LogicalType::kVarchar);
-        auto source2target_ptr = BindGeographyCast<LineT>(source_type, target_type);
+        auto source2target_ptr = BindGeographyCast<LineSegT>(source_type, target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
         ColumnVector col_target(target_type, ColumnVectorType::kFlat);
