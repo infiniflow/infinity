@@ -123,7 +123,7 @@ TEST_F(DataBlockTest, test1) {
     // TinyInt: Test DataBlock::AppendValue
     constexpr size_t TinyIntColumnIndex = 1;
     for(size_t i = 0; i < row_count; ++ i) {
-        data_block.AppendValue(TinyIntColumnIndex, Value::MakeTinyInt(i));
+        data_block.AppendValue(TinyIntColumnIndex, Value::MakeTinyInt(static_cast<i8>(i)));
     }
 
     // Test DataBlock::GetValue
@@ -163,8 +163,8 @@ TEST_F(DataBlockTest, test2) {
     for(size_t i = 0; i < row_count; ++ i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
-
-    EXPECT_THROW(data_block.AppendValue(0, Value::MakeBool( (row_count + 1) % 2 == 0)), TypeException);
+    EXPECT_THROW(data_block.AppendValue(1, Value::MakeBool(true)), StorageException);
+    EXPECT_THROW(data_block.AppendValue(0, Value::MakeBool(true)), TypeException);
 }
 
 TEST_F(DataBlockTest, test3) {
@@ -185,11 +185,25 @@ TEST_F(DataBlockTest, test3) {
     profiler.End();
     std::cout << "Initialize data block cost: " << profiler.ElapsedToString() << std::endl;
 
+    // Test to store value into invalid column
+    EXPECT_THROW(data_block.SetValue(1, 0, Value::MakeTinyInt(static_cast<i8>(1))), StorageException);
+
+    // Test to store value into valid column but invalid row
+    EXPECT_THROW(data_block.SetValue(0, 1, Value::MakeTinyInt(static_cast<i8>(1))), StorageException);
+
     // Test DataBlock::AppendValue
     profiler.Begin();
     for(size_t i = 0; i < row_count; ++ i) {
-        data_block.AppendValue(0, Value::MakeTinyInt(i));
+        data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
     }
     profiler.End();
     std::cout << "Append data to data block cost: " << profiler.ElapsedToString() << std::endl;
+
+    // Validate the inserted data.
+    for(size_t i = 0; i < row_count; ++ i) {
+        auto v = Value::MakeTinyInt(static_cast<i8>(i));
+        auto vx = data_block.GetValue(0, i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(vx.value_.tiny_int, v.value_.tiny_int);
+    }
 }

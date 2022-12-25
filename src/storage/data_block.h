@@ -7,6 +7,7 @@
 
 namespace infinity {
 
+// Intermediate data structure transferred between operator.
 struct DataBlock {
 
     DataBlock() = default;
@@ -21,8 +22,8 @@ struct DataBlock {
     [[nodiscard]] Value
     GetValue(size_t column_index, size_t row_index) const;
 
-//    void
-//    SetValue(size_t column_index, size_t row_index, const Value& val);
+    void
+    SetValue(size_t column_index, size_t row_index, const Value& val);
 
     void
     AppendValue(size_t column_index, const Value& value);
@@ -43,7 +44,7 @@ public:
         return row_capacity_;
     }
 
-    Vector<ColumnVector> columns;
+    Vector<ColumnVector> column_vectors;
 
 private:
 

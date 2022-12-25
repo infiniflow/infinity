@@ -54,6 +54,11 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
     EXPECT_EQ(col_tinyint.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, col_tinyint.data_ptr_);
 
+    {
+        Value v = Value::MakeTinyInt(static_cast<TinyIntT>(3));
+        EXPECT_THROW(col_tinyint.SetValue(3, v), StorageException);
+    }
+
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeTinyInt(static_cast<TinyIntT>(i));
         col_tinyint.AppendValue(v);

@@ -187,6 +187,11 @@ ColumnVector::GetValue(idx_t index) const {
 
 void
 ColumnVector::SetValue(idx_t index, const Value &value) {
+    StorageAssert(index <= tail_index_,
+                  "Attempt to store value into unavailable row of column vector: "
+                  + std::to_string(index) + ", current column tail index: " + std::to_string(tail_index_)
+                  + ", capacity: " + std::to_string(capacity_))
+
     // TODO: Check if the value type is same as column vector type
     // TODO: if not, try to cast
     TypeAssert(value.type() == data_type_, "Attempt to store a different type value into column vector.");
