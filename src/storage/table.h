@@ -14,6 +14,13 @@ namespace infinity {
 
 class Block;
 
+//enum class TableType {
+//    kInvalid,
+//    kDataTable,
+//    kIntermediate,
+//    kResult,
+//};
+
 class Table {
 public:
     explicit Table(std::shared_ptr<TableDefinition> table_def);

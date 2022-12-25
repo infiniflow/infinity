@@ -9,6 +9,8 @@
 #include <vector>
 #include <limits>
 #include <cstring>
+#include <set>
+#include <unordered_map>
 
 namespace infinity {
 
@@ -31,6 +33,12 @@ inline UniquePtr<T> MakeUnique(Args &&...args) {
 
 template<typename T>
 using Vector = std::vector<T>;
+
+template<typename T>
+using Set = std::set<T>;
+
+template<typename S, typename T>
+using HashMap = std::unordered_map<S, T>;
 
 using String = std::string;
 

@@ -13,7 +13,7 @@ DataBlock::Init(const std::vector<DataType> &types) {
     column_vectors.reserve(column_count_);
     for(size_t i = 0; i < column_count_; ++ i) {
         column_vectors.emplace_back(types[i]);
-        column_vectors[i].Initialize(row_capacity_);
+        column_vectors[i].Initialize();
     }
     initialized = true;
 }
@@ -27,7 +27,7 @@ DataBlock::Reset() {
 
     for(size_t i = 0; i < column_count_; ++ i) {
         column_vectors[i].Reset();
-        column_vectors[i].Initialize(row_capacity_);
+        column_vectors[i].Initialize();
     }
 
     row_count_ = 0;

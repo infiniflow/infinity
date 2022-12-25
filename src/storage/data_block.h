@@ -39,17 +39,11 @@ public:
         return row_count_;
     }
 
-    [[nodiscard]] inline size_t
-    row_capacity() const {
-        return row_capacity_;
-    }
-
     Vector<ColumnVector> column_vectors;
 
 private:
 
     size_t row_count_ {0};
-    size_t row_capacity_ {DEFAULT_VECTOR_SIZE};
     size_t column_count_ {0};
     bool initialized = false;
 };
