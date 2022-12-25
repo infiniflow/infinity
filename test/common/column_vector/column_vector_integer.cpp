@@ -91,8 +91,8 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
     EXPECT_EQ(col_tinyint.capacity(), 0);
     EXPECT_EQ(col_tinyint.tail_index_, 0);
 //    EXPECT_EQ(col_tinyint.data_type_size_, 0);
-    EXPECT_EQ(col_tinyint.buffer_, nullptr);
-    EXPECT_EQ(col_tinyint.data_ptr_, nullptr);
+    EXPECT_NE(col_tinyint.buffer_, nullptr);
+    EXPECT_NE(col_tinyint.data_ptr_, nullptr);
     EXPECT_EQ(col_tinyint.initialized, false);
 //    EXPECT_EQ(col_tinyint.data_type(), DataType(LogicalType::kInvalid));
 //    EXPECT_EQ(col_tinyint.vector_type(), ColumnVectorType::kInvalid);
@@ -196,8 +196,8 @@ TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     EXPECT_EQ(col_smallint.capacity(), 0);
     EXPECT_EQ(col_smallint.tail_index_, 0);
 //    EXPECT_EQ(col_smallint.data_type_size_, 0);
-    EXPECT_EQ(col_smallint.buffer_, nullptr);
-    EXPECT_EQ(col_smallint.data_ptr_, nullptr);
+    EXPECT_NE(col_smallint.buffer_, nullptr);
+    EXPECT_NE(col_smallint.data_ptr_, nullptr);
     EXPECT_EQ(col_smallint.initialized, false);
 //    EXPECT_EQ(col_smallint.data_type(), DataType(LogicalType::kInvalid));
 //    EXPECT_EQ(col_smallint.vector_type(), ColumnVectorType::kInvalid);
@@ -301,8 +301,8 @@ TEST_F(ColumnVectorIntegerTest, flat_int) {
     EXPECT_EQ(col_int.capacity(), 0);
     EXPECT_EQ(col_int.tail_index_, 0);
 //    EXPECT_EQ(col_int.data_type_size_, 0);
-    EXPECT_EQ(col_int.buffer_, nullptr);
-    EXPECT_EQ(col_int.data_ptr_, nullptr);
+    EXPECT_NE(col_int.buffer_, nullptr);
+    EXPECT_NE(col_int.data_ptr_, nullptr);
     EXPECT_EQ(col_int.initialized, false);
 //    EXPECT_EQ(col_int.data_type(), DataType(LogicalType::kInvalid));
 //    EXPECT_EQ(col_int.vector_type(), ColumnVectorType::kInvalid);
@@ -406,8 +406,8 @@ TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     EXPECT_EQ(col_bigint.capacity(), 0);
     EXPECT_EQ(col_bigint.tail_index_, 0);
 //    EXPECT_EQ(col_bigint.data_type_size_, 0);
-    EXPECT_EQ(col_bigint.buffer_, nullptr);
-    EXPECT_EQ(col_bigint.data_ptr_, nullptr);
+    EXPECT_NE(col_bigint.buffer_, nullptr);
+    EXPECT_NE(col_bigint.data_ptr_, nullptr);
     EXPECT_EQ(col_bigint.initialized, false);
 //    EXPECT_EQ(col_bigint.data_type(), DataType(LogicalType::kInvalid));
 //    EXPECT_EQ(col_bigint.vector_type(), ColumnVectorType::kInvalid);
@@ -513,8 +513,8 @@ TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
     EXPECT_EQ(col_hugeint.capacity(), 0);
     EXPECT_EQ(col_hugeint.tail_index_, 0);
 //    EXPECT_EQ(col_hugeint.data_type_size_, 0);
-    EXPECT_EQ(col_hugeint.buffer_, nullptr);
-    EXPECT_EQ(col_hugeint.data_ptr_, nullptr);
+    EXPECT_NE(col_hugeint.buffer_, nullptr);
+    EXPECT_NE(col_hugeint.data_ptr_, nullptr);
     EXPECT_EQ(col_hugeint.initialized, false);
 //    EXPECT_EQ(col_hugeint.data_type(), DataType(LogicalType::kInvalid));
 //    EXPECT_EQ(col_hugeint.vector_type(), ColumnVectorType::kInvalid);

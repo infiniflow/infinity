@@ -9,16 +9,16 @@
 
 namespace infinity {
 
-struct MemoryChunk {
+struct HeapChunk {
 public:
     inline explicit
-    MemoryChunk(u64 capacity) : capacity_(capacity), current_offset_(0), object_count_(0) {
+    HeapChunk(u64 capacity) : capacity_(capacity), current_offset_(0), object_count_(0) {
         GlobalResourceUsage::IncrObjectCount();
         ptr_ = Allocator::allocate(capacity);
     }
 
     inline
-    ~MemoryChunk() {
+    ~HeapChunk() {
         Allocator::deallocate(ptr_);
         ptr_ = nullptr;
         capacity_ = 0;
@@ -33,17 +33,17 @@ public:
     u64 object_count_{0};
 };
 
-struct StringChunkMgr {
+struct StringHeapMgr {
     // Use to store string.
     static constexpr u64 CHUNK_SIZE = 4096;
 public:
     inline explicit
-    StringChunkMgr(u64 chunk_size = CHUNK_SIZE) : current_chunk_size_(chunk_size) {
+    StringHeapMgr(u64 chunk_size = CHUNK_SIZE) : current_chunk_size_(chunk_size) {
         GlobalResourceUsage::IncrObjectCount();
     }
 
     inline
-    ~StringChunkMgr() {
+    ~StringHeapMgr() {
         GlobalResourceUsage::DecrObjectCount();
     }
 
@@ -67,7 +67,7 @@ public:
         return current_chunk_size_;
     }
 private:
-    Vector<UniquePtr<MemoryChunk>> chunks_;
+    Vector<UniquePtr<HeapChunk>> chunks_;
     u64 current_chunk_size_{CHUNK_SIZE};
     u64 current_chunk_idx_{std::numeric_limits<u64>::max()};
 };

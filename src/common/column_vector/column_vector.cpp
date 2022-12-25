@@ -9,20 +9,30 @@
 
 namespace infinity {
 
-void ColumnVector::Initialize(size_t capacity) {
+void ColumnVector::Initialize(size_t capacity, ColumnVectorType vector_type) {
     GeneralAssert(!initialized, "Column vector is already initialized.")
-    GeneralAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't set.")
-    GeneralAssert(vector_type_ != ColumnVectorType::kInvalid, "Column Vector type isn't set.")
-    capacity_ = capacity;
+    GeneralAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
+    GeneralAssert(vector_type != ColumnVectorType::kInvalid, "Attempt to initialize column vector to invalid type.")
+    // TODO: No check on capacity value.
+
+    vector_type_ = vector_type;
+    if(vector_type_ == ColumnVectorType::kConstant) {
+        capacity_ = 1;
+    } else {
+        capacity_ = capacity;
+    }
+
     tail_index_ = 0;
     data_type_size_ = data_type_.Size();
+    VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
     switch(data_type_.type()) {
         case LogicalType::kBlob:
         case LogicalType::kBitmap:
         case LogicalType::kPolygon:
         case LogicalType::kPath:
         case LogicalType::kVarchar: {
-            buffer_ = MemoryVectorBuffer::Make(data_type_size_, capacity_);
+            vector_buffer_type = VectorBufferType::kHeap;
+
             break;
         }
         case LogicalType::kInvalid:
@@ -31,11 +41,21 @@ void ColumnVector::Initialize(size_t capacity) {
             TypeError("Unexpected data type for column vector.")
         }
         default: {
-            buffer_ = VectorBuffer::Make(data_type_size_, capacity_);
+            vector_buffer_type = VectorBufferType::kStandard;
         }
     }
-    data_ptr_ = buffer_->GetData();
-    nulls_ptr_ = Bitmask::Make(capacity_);
+    if(buffer_ == nullptr) {
+        buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
+        data_ptr_ = buffer_->GetData();
+        nulls_ptr_ = Bitmask::Make(capacity_);
+    } else {
+        // Initialize after reset will come to this branch
+        if(vector_buffer_type == VectorBufferType::kHeap) {
+            StorageAssert(buffer_->heap_mgr_ == nullptr, "Vector heap should be null.")
+            buffer_->heap_mgr_ = MakeUnique<StringHeapMgr>();
+        }
+    }
+
     initialized = true;
 }
 
@@ -248,8 +268,6 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             break;
         }
         case kVarchar: {
-            auto* string_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
-
             // Copy string
             size_t varchar_len = value.value_.varchar.length;
             if(varchar_len <= VarcharType::INLINE_LENGTH) {
@@ -257,7 +275,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
                 memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.prefix, varchar_len);
             } else {
                 memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.ptr, VarcharType::PREFIX_LENGTH);
-                ptr_t ptr = string_vector_buffer_ptr->chunk_mgr_->Allocate(varchar_len);
+                ptr_t ptr = this->buffer_->heap_mgr_->Allocate(varchar_len);
                 memcpy(ptr, value.value_.varchar.ptr, varchar_len);
                 ((VarcharT *) data_ptr_)[index].ptr = ptr;
             }
@@ -340,11 +358,10 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             break;
         }
         case kPath: {
-            auto* path_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
             u32 point_count = value.value_.path.point_count;
 
             size_t point_area_size = point_count * sizeof(PointT);
-            ptr_t ptr = path_vector_buffer_ptr->chunk_mgr_->Allocate(point_area_size);
+            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
             memcpy(ptr, value.value_.path.ptr, point_area_size);
 
             // Why not use value.GetValue<PathT>(); ?
@@ -357,11 +374,10 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
         }
         case kPolygon: {
 
-            auto* polygon_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
             u64 point_count = value.value_.polygon.point_count;
 
             size_t point_area_size = point_count * sizeof(PointT);
-            ptr_t ptr = polygon_vector_buffer_ptr->chunk_mgr_->Allocate(point_area_size);
+            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
             memcpy(ptr, value.value_.polygon.ptr, point_area_size);
 
             // Why not use value.GetValue<PolygonT>(); ?
@@ -377,12 +393,11 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             break;
         }
         case kBitmap: {
-            auto* bitmap_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
             u64 bit_count = value.value_.bitmap.count;
             u64 unit_count = BitmapT::UnitCount(bit_count);
 
             size_t bit_area_size = unit_count * BitmapT::UNIT_BYTES;
-            ptr_t ptr = bitmap_vector_buffer_ptr->chunk_mgr_->Allocate(bit_area_size);
+            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
             memcpy(ptr, (void*)(value.value_.bitmap.ptr), bit_area_size);
 
             ((BitmapT *) data_ptr_)[index].ptr = (u64*)ptr;
@@ -395,8 +410,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
         }
         case kBlob: {
             u64 blob_size = value.value_.blob.size;
-            auto* blob_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
-            ptr_t ptr = blob_vector_buffer_ptr->chunk_mgr_->Allocate(blob_size);
+            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(blob_size);
             memcpy(ptr, (void*)(value.value_.blob.ptr), blob_size);
 
             ((BlobT *) data_ptr_)[index].ptr = ptr;
@@ -433,34 +447,11 @@ ColumnVector::ShallowCopy(const ColumnVector &other) {
 void
 ColumnVector::Reserve(size_t new_capacity) {
     if(new_capacity <= capacity_) return ;
-    switch(data_type_.type()) {
-        case LogicalType::kBlob:
-        case LogicalType::kBitmap:
-        case LogicalType::kPolygon:
-        case LogicalType::kPath:
-        case LogicalType::kVarchar: {
-            auto* string_vector_buffer_ptr = (MemoryVectorBuffer*)(this->buffer_.get());
-            SharedPtr<MemoryVectorBuffer> new_buffer = MemoryVectorBuffer::Make(data_type_size_, new_capacity);
 
-            // Copy the string header information.
-            new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
-
-            // Move the string chunks.
-            new_buffer->chunk_mgr_ = std::move(string_vector_buffer_ptr->chunk_mgr_);
-            buffer_ = new_buffer;
-            break;
-        }
-        case LogicalType::kInvalid:
-        case LogicalType::kNull:
-        case LogicalType::kMissing: {
-            TypeError("Unexpected data type for column vector.")
-        }
-        default: {
-            SharedPtr<VectorBuffer> new_buffer = VectorBuffer::Make(data_type_size_, new_capacity);
-            new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
-            buffer_ = new_buffer;
-        }
-    }
+    SharedPtr<VectorBuffer> new_buffer = VectorBuffer::Make(data_type_size_, new_capacity, buffer_->buffer_type_);
+    new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
+    new_buffer->heap_mgr_ = std::move(buffer_->heap_mgr_);
+    buffer_ = new_buffer;
 
     capacity_ = new_capacity;
     data_ptr_ = buffer_->GetData();
@@ -468,7 +459,15 @@ ColumnVector::Reserve(size_t new_capacity) {
 
 void
 ColumnVector::Reset() {
+    // 1. Vector type is reset to invalid.
+    vector_type_ = ColumnVectorType::kInvalid;
 
+    // 2. Date type won't be changed.
+
+    // 3. Since data type isn't change, data_type_size_ won't be changed, either.
+
+    // 4. For trivial data type, the VectorBuffer will not be reset.
+    // But for non-trivial data type, the heap memory manage need to be reset
     if(data_type_.type() == LogicalType::kMixed) {
         // Current solution:
         // Tuple/Array/Long String will use heap memory which isn't managed by ColumnVector.
@@ -480,16 +479,21 @@ ColumnVector::Reset() {
         }
     }
 
+//    buffer_.reset();
+    buffer_->heap_mgr_ = nullptr;
+//    data_ptr_ = nullptr;
+
+    // 5. null indicator need to reset
+//    nulls_ptr_.reset();
+
+    // 6. Capacity is set to zero
     capacity_ = 0;
+
+    // 7. Tail index is set to zero
     tail_index_ = 0;
-//    data_type_size_ = 0;
-    buffer_.reset();
-    data_ptr_ = nullptr;
+
+    // 8. Reset initialized flag
     initialized = false;
-
-
-//    data_type_ = DataType(LogicalType::kInvalid);
-//    vector_type_ = ColumnVectorType::kInvalid;
 }
 
 }

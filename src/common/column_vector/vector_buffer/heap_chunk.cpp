@@ -2,21 +2,21 @@
 // Created by JinHai on 2022/11/30.
 //
 
-#include "memory_chunk.h"
+#include "heap_chunk.h"
 #include "common/utility/infinity_assert.h"
 #include <sstream>
 
 namespace infinity {
 
 ptr_t
-StringChunkMgr::Allocate(size_t nbytes) {
+StringHeapMgr::Allocate(size_t nbytes) {
     ExecutorAssert(nbytes > 0, "Attempt to allocate zero size memory.")
     if(current_chunk_idx_ == std::numeric_limits<u64>::max()) {
         // First chunk
         while(current_chunk_size_ < nbytes) {
             current_chunk_size_ *= 2;
         }
-        chunks_.emplace_back(MakeUnique<MemoryChunk>(current_chunk_size_));
+        chunks_.emplace_back(MakeUnique<HeapChunk>(current_chunk_size_));
         current_chunk_idx_ = 0;
     } else {
         if(chunks_[current_chunk_idx_]->current_offset_ + nbytes > current_chunk_size_) {
@@ -24,7 +24,7 @@ StringChunkMgr::Allocate(size_t nbytes) {
             while(current_chunk_size_ < nbytes) {
                 current_chunk_size_ *= 2;
             }
-            chunks_.emplace_back(MakeUnique<MemoryChunk>(current_chunk_size_));
+            chunks_.emplace_back(MakeUnique<HeapChunk>(current_chunk_size_));
             ++ current_chunk_idx_;
         }
         ExecutorAssert(chunks_[current_chunk_idx_]->current_offset_ + nbytes <= current_chunk_size_,
@@ -44,7 +44,7 @@ StringChunkMgr::Allocate(size_t nbytes) {
 }
 
 String
-StringChunkMgr::Stats() const {
+StringHeapMgr::Stats() const {
     std::stringstream ss;
     ss << "Chunk count: " << chunks_.size() << std::endl;
     for(u64 i = 0; auto& chunk: chunks_) {

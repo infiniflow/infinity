@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "base_test.h"
-#include "common/column_vector/vector_buffer/memory_chunk.h"
+#include "common/column_vector/vector_buffer/heap_chunk.h"
 #include "common/types/value.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
@@ -28,7 +28,7 @@ class StringChunkTest : public BaseTest {
 TEST_F(StringChunkTest, string_chunk_a) {
     using namespace infinity;
 
-    StringChunkMgr string_chunk_mgr;
+    StringHeapMgr string_chunk_mgr;
 
     EXPECT_THROW(string_chunk_mgr.Allocate(0), ExecutorException);
 

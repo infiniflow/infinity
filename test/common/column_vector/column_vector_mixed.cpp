@@ -100,8 +100,8 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     EXPECT_EQ(col_mixed.capacity(), 0);
     EXPECT_EQ(col_mixed.tail_index_, 0);
 //    EXPECT_EQ(col_mixed.data_type_size_, 0);
-    EXPECT_EQ(col_mixed.buffer_, nullptr);
-    EXPECT_EQ(col_mixed.data_ptr_, nullptr);
+    EXPECT_NE(col_mixed.buffer_, nullptr);
+    EXPECT_NE(col_mixed.data_ptr_, nullptr);
     EXPECT_EQ(col_mixed.initialized, false);
 
     // ====
@@ -215,8 +215,8 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     EXPECT_EQ(col_mixed.capacity(), 0);
     EXPECT_EQ(col_mixed.tail_index_, 0);
 //    EXPECT_EQ(col_mixed.data_type_size_, 0);
-    EXPECT_EQ(col_mixed.buffer_, nullptr);
-    EXPECT_EQ(col_mixed.data_ptr_, nullptr);
+    EXPECT_NE(col_mixed.buffer_, nullptr);
+    EXPECT_NE(col_mixed.data_ptr_, nullptr);
     EXPECT_EQ(col_mixed.initialized, false);
 
     // ====
@@ -336,8 +336,8 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     EXPECT_EQ(col_mixed.capacity(), 0);
     EXPECT_EQ(col_mixed.tail_index_, 0);
 //    EXPECT_EQ(col_mixed.data_type_size_, 0);
-    EXPECT_EQ(col_mixed.buffer_, nullptr);
-    EXPECT_EQ(col_mixed.data_ptr_, nullptr);
+    EXPECT_NE(col_mixed.buffer_, nullptr);
+    EXPECT_NE(col_mixed.data_ptr_, nullptr);
     EXPECT_EQ(col_mixed.initialized, false);
 
     // ====
@@ -479,8 +479,9 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     EXPECT_EQ(col_mixed.capacity(), 0);
     EXPECT_EQ(col_mixed.tail_index_, 0);
 //    EXPECT_EQ(col_mixed.data_type_size_, 0);
-    EXPECT_EQ(col_mixed.buffer_, nullptr);
-    EXPECT_EQ(col_mixed.data_ptr_, nullptr);
+    EXPECT_NE(col_mixed.buffer_, nullptr);
+    EXPECT_EQ(col_mixed.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(col_mixed.data_ptr_, nullptr);
     EXPECT_EQ(col_mixed.initialized, false);
 
     // ====
@@ -598,8 +599,8 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     EXPECT_EQ(col_mixed.capacity(), 0);
     EXPECT_EQ(col_mixed.tail_index_, 0);
 //    EXPECT_EQ(col_mixed.data_type_size_, 0);
-    EXPECT_EQ(col_mixed.buffer_, nullptr);
-    EXPECT_EQ(col_mixed.data_ptr_, nullptr);
+    EXPECT_NE(col_mixed.buffer_, nullptr);
+    EXPECT_NE(col_mixed.data_ptr_, nullptr);
     EXPECT_EQ(col_mixed.initialized, false);
 
     // ====
@@ -707,8 +708,8 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     EXPECT_EQ(col_mixed.capacity(), 0);
     EXPECT_EQ(col_mixed.tail_index_, 0);
 //    EXPECT_EQ(col_mixed.data_type_size_, 0);
-    EXPECT_EQ(col_mixed.buffer_, nullptr);
-    EXPECT_EQ(col_mixed.data_ptr_, nullptr);
+    EXPECT_NE(col_mixed.buffer_, nullptr);
+    EXPECT_NE(col_mixed.data_ptr_, nullptr);
     EXPECT_EQ(col_mixed.initialized, false);
 
     // ====
@@ -1276,8 +1277,9 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     EXPECT_EQ(col_mixed.capacity(), 0);
     EXPECT_EQ(col_mixed.tail_index_, 0);
 //    EXPECT_EQ(col_mixed.data_type_size_, 0);
-    EXPECT_EQ(col_mixed.buffer_, nullptr);
-    EXPECT_EQ(col_mixed.data_ptr_, nullptr);
+    EXPECT_NE(col_mixed.buffer_, nullptr);
+    EXPECT_EQ(col_mixed.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(col_mixed.data_ptr_, nullptr);
     EXPECT_EQ(col_mixed.initialized, false);
 
     // ====
@@ -2089,8 +2091,9 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     EXPECT_EQ(col_mixed.capacity(), 0);
     EXPECT_EQ(col_mixed.tail_index_, 0);
 //    EXPECT_EQ(col_mixed.data_type_size_, 0);
-    EXPECT_EQ(col_mixed.buffer_, nullptr);
-    EXPECT_EQ(col_mixed.data_ptr_, nullptr);
+    EXPECT_NE(col_mixed.buffer_, nullptr);
+    EXPECT_EQ(col_mixed.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(col_mixed.data_ptr_, nullptr);
     EXPECT_EQ(col_mixed.initialized, false);
 
     // ====

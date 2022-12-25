@@ -95,8 +95,8 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     col_uuid.Reset();
     EXPECT_EQ(col_uuid.capacity(), 0);
     EXPECT_EQ(col_uuid.tail_index_, 0);
-    EXPECT_EQ(col_uuid.buffer_, nullptr);
-    EXPECT_EQ(col_uuid.data_ptr_, nullptr);
+    EXPECT_NE(col_uuid.buffer_, nullptr);
+    EXPECT_NE(col_uuid.data_ptr_, nullptr);
     EXPECT_EQ(col_uuid.initialized, false);
 
     // ====

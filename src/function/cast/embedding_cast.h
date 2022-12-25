@@ -66,13 +66,12 @@ EmbeddingTryCastToVarlen::Run(const EmbeddingT& source,
         memcpy(target.prefix, source.ptr, target.length);
         memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     } else {
-        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kMemory,
+        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
                    "Varchar column vector should use MemoryVectorBuffer. ");
         // Set varchar prefix
         memcpy(target.prefix, source.ptr, VarcharT::PREFIX_LENGTH);
 
-        auto* string_vector_buffer_ptr = (MemoryVectorBuffer*)(vector_ptr->buffer_.get());
-        ptr_t ptr = string_vector_buffer_ptr->chunk_mgr_->Allocate(target.length);
+        ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
         memcpy(ptr, source.ptr, target.length);
         target.ptr = ptr;
     }

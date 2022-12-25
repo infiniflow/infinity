@@ -92,8 +92,8 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal16) {
     col_decimal16.Reset();
     EXPECT_EQ(col_decimal16.capacity(), 0);
     EXPECT_EQ(col_decimal16.tail_index_, 0);
-    EXPECT_EQ(col_decimal16.buffer_, nullptr);
-    EXPECT_EQ(col_decimal16.data_ptr_, nullptr);
+    EXPECT_NE(col_decimal16.buffer_, nullptr);
+    EXPECT_NE(col_decimal16.data_ptr_, nullptr);
     EXPECT_EQ(col_decimal16.initialized, false);
 
     // ====
@@ -194,8 +194,8 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal32) {
     col_decimal32.Reset();
     EXPECT_EQ(col_decimal32.capacity(), 0);
     EXPECT_EQ(col_decimal32.tail_index_, 0);
-    EXPECT_EQ(col_decimal32.buffer_, nullptr);
-    EXPECT_EQ(col_decimal32.data_ptr_, nullptr);
+    EXPECT_NE(col_decimal32.buffer_, nullptr);
+    EXPECT_NE(col_decimal32.data_ptr_, nullptr);
     EXPECT_EQ(col_decimal32.initialized, false);
 
     // ====
@@ -296,8 +296,8 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal64) {
     col_decimal64.Reset();
     EXPECT_EQ(col_decimal64.capacity(), 0);
     EXPECT_EQ(col_decimal64.tail_index_, 0);
-    EXPECT_EQ(col_decimal64.buffer_, nullptr);
-    EXPECT_EQ(col_decimal64.data_ptr_, nullptr);
+    EXPECT_NE(col_decimal64.buffer_, nullptr);
+    EXPECT_NE(col_decimal64.data_ptr_, nullptr);
     EXPECT_EQ(col_decimal64.initialized, false);
 
     // ====
@@ -398,8 +398,8 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal128) {
     col_decimal128.Reset();
     EXPECT_EQ(col_decimal128.capacity(), 0);
     EXPECT_EQ(col_decimal128.tail_index_, 0);
-    EXPECT_EQ(col_decimal128.buffer_, nullptr);
-    EXPECT_EQ(col_decimal128.data_ptr_, nullptr);
+    EXPECT_NE(col_decimal128.buffer_, nullptr);
+    EXPECT_NE(col_decimal128.data_ptr_, nullptr);
     EXPECT_EQ(col_decimal128.initialized, false);
 
     // ====

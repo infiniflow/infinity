@@ -8,10 +8,10 @@
 namespace infinity {
 
 SharedPtr<VectorBuffer>
-VectorBuffer::Make(size_t data_type_size, size_t capacity) {
+VectorBuffer::Make(size_t data_type_size, size_t capacity, VectorBufferType buffer_type) {
     SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
+    buffer_ptr->buffer_type_ = buffer_type;
     buffer_ptr->Initialize(data_type_size, capacity);
-    buffer_ptr->buffer_type_ = VectorBufferType::kStandard;
     return buffer_ptr;
 }
 
@@ -22,9 +22,19 @@ VectorBuffer::Initialize(size_t type_size, size_t capacity) {
     if(data_size > 0) {
         data_ = MakeUnique<char[]>(data_size);
     }
+    if(buffer_type_ == VectorBufferType::kHeap) {
+        heap_mgr_ = MakeUnique<StringHeapMgr>();
+    }
     initialized_ = true;
     data_size_ = data_size;
     capacity_ = capacity;
+}
+
+void
+VectorBuffer::ResetToInit() {
+    if(buffer_type_ == VectorBufferType::kHeap) {
+        heap_mgr_ = MakeUnique<StringHeapMgr>();
+    }
 }
 
 void

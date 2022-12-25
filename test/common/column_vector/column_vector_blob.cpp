@@ -45,7 +45,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     EXPECT_NE(col_blob.data_ptr_, nullptr);
     EXPECT_EQ(col_blob.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_blob.data_type(), data_type);
-    EXPECT_EQ(col_blob.buffer_->buffer_type_, VectorBufferType::kMemory);
+    EXPECT_EQ(col_blob.buffer_->buffer_type_, VectorBufferType::kHeap);
 
     EXPECT_NE(col_blob.buffer_, nullptr);
     EXPECT_NE(col_blob.nulls_ptr_, nullptr);
@@ -116,8 +116,9 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     col_blob.Reset();
     EXPECT_EQ(col_blob.capacity(), 0);
     EXPECT_EQ(col_blob.tail_index_, 0);
-    EXPECT_EQ(col_blob.buffer_, nullptr);
-    EXPECT_EQ(col_blob.data_ptr_, nullptr);
+    EXPECT_NE(col_blob.buffer_, nullptr);
+    EXPECT_EQ(col_blob.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(col_blob.data_ptr_, nullptr);
     EXPECT_EQ(col_blob.initialized, false);
 
     // ====
@@ -134,7 +135,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     EXPECT_NE(col_blob.data_ptr_, nullptr);
     EXPECT_EQ(col_blob.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_blob.data_type(), data_type);
-    EXPECT_EQ(col_blob.buffer_->buffer_type_, VectorBufferType::kMemory);
+    EXPECT_EQ(col_blob.buffer_->buffer_type_, VectorBufferType::kHeap);
 
     EXPECT_NE(col_blob.buffer_, nullptr);
     EXPECT_NE(col_blob.nulls_ptr_, nullptr);

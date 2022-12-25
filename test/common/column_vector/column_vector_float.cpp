@@ -86,8 +86,8 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     EXPECT_EQ(col_float.capacity(), 0);
     EXPECT_EQ(col_float.tail_index_, 0);
 //    EXPECT_EQ(col_float.data_type_size_, 0);
-    EXPECT_EQ(col_float.buffer_, nullptr);
-    EXPECT_EQ(col_float.data_ptr_, nullptr);
+    EXPECT_NE(col_float.buffer_, nullptr);
+    EXPECT_NE(col_float.data_ptr_, nullptr);
     EXPECT_EQ(col_float.initialized, false);
 //    EXPECT_EQ(col_float.data_type(), DataType(LogicalType::kInvalid));
 //    EXPECT_EQ(col_float.vector_type(), ColumnVectorType::kInvalid);
@@ -189,8 +189,8 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     col_double.Reset();
     EXPECT_EQ(col_double.capacity(), 0);
     EXPECT_EQ(col_double.tail_index_, 0);
-    EXPECT_EQ(col_double.buffer_, nullptr);
-    EXPECT_EQ(col_double.data_ptr_, nullptr);
+    EXPECT_NE(col_double.buffer_, nullptr);
+    EXPECT_NE(col_double.data_ptr_, nullptr);
     EXPECT_EQ(col_double.initialized, false);
 
     // ====

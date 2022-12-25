@@ -178,12 +178,10 @@ FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const ColumnVector *v
         memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     } else {
         memcpy(target.prefix, tmp_str.c_str(), VarcharT::PREFIX_LENGTH);
-        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kMemory,
+        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
                    "Varchar column vector should use MemoryVectorBuffer. ");
 
-        auto* string_vector_buffer_ptr = (MemoryVectorBuffer*)(vector_ptr->buffer_.get());
-
-        ptr_t ptr = string_vector_buffer_ptr->chunk_mgr_->Allocate(target.length);
+        ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
         memcpy(ptr, tmp_str.c_str(), target.length);
         target.ptr = ptr;
     }
@@ -283,12 +281,10 @@ FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const ColumnVector *
         memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     } else {
         memcpy(target.prefix, tmp_str.c_str(), VarcharT::PREFIX_LENGTH);
-        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kMemory,
+        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
                    "Varchar column vector should use MemoryVectorBuffer. ");
 
-        auto* string_vector_buffer_ptr = (MemoryVectorBuffer*)(vector_ptr->buffer_.get());
-
-        ptr_t ptr = string_vector_buffer_ptr->chunk_mgr_->Allocate(target.length);
+        ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
         memcpy(ptr, tmp_str.c_str(), target.length);
         target.ptr = ptr;
     }

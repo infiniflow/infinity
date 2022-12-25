@@ -6,7 +6,7 @@
 
 #include "common/types/internal_types.h"
 #include "common/types/data_type.h"
-#include "vector_buffer/memory_vector_buffer.h"
+#include "vector_buffer/vector_buffer.h"
 #include "bitmask.h"
 #include "common/types/value.h"
 #include "common/default_values.h"
@@ -35,11 +35,10 @@ public:
 
     DataType data_type_;
 
-    size_t capacity_{0};
-
-    size_t tail_index_ {0};
-
     size_t data_type_size_{0};
+
+    // this buffer is holding the data
+    SharedPtr<VectorBuffer> buffer_{nullptr};
 
     // Only a pointer to the real data in vector buffer
     ptr_t data_ptr_ {nullptr};
@@ -47,8 +46,9 @@ public:
     // A bitmap to indicate the null information
     SharedPtr<Bitmask> nulls_ptr_{nullptr};
 
-    // this buffer is holding the data
-    SharedPtr<VectorBuffer> buffer_{nullptr};
+    size_t capacity_{0};
+
+    size_t tail_index_ {0};
 
     bool initialized {false};
 
@@ -66,15 +66,15 @@ public:
     }
 
     void
-    Initialize(size_t capacity = DEFAULT_VECTOR_SIZE);
+    Initialize(size_t capacity = DEFAULT_VECTOR_SIZE, ColumnVectorType vector_type = ColumnVectorType::kFlat);
 
-    String
+    [[nodiscard]] String
     ToString() const;
 
     // Return the <index> of the vector
     // Since it will construct a new Value object, this function shouldn't be used in vectorized computation.
     // Directly uses data_ptr in vectorized computation.
-    Value
+    [[nodiscard]] Value
     GetValue(idx_t index) const;
 
     // Set the <index> element of the vector to the specified value.
@@ -94,7 +94,12 @@ public:
     void
     SetVectorType(ColumnVectorType vector_type) {
         TypeAssert(!initialized, "Column Vector is initialized")
-        vector_type_ = vector_type;
+        TypeAssert(vector_type != ColumnVectorType::kInvalid, "Attempt to set invalid column vector type.")
+        if(vector_type_ == vector_type) {
+            return ;
+        }
+        this->Reset();
+        this->Initialize(DEFAULT_VECTOR_SIZE, vector_type);
     }
 
     void

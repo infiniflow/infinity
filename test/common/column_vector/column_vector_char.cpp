@@ -93,8 +93,8 @@ TEST_F(ColumnVectorCharTest, flat_char1) {
     col_char1.Reset();
     EXPECT_EQ(col_char1.capacity(), 0);
     EXPECT_EQ(col_char1.tail_index_, 0);
-    EXPECT_EQ(col_char1.buffer_, nullptr);
-    EXPECT_EQ(col_char1.data_ptr_, nullptr);
+    EXPECT_NE(col_char1.buffer_, nullptr);
+    EXPECT_NE(col_char1.data_ptr_, nullptr);
     EXPECT_EQ(col_char1.initialized, false);
 
     // ====
@@ -213,8 +213,8 @@ TEST_F(ColumnVectorCharTest, flat_char2) {
     col_char2.Reset();
     EXPECT_EQ(col_char2.capacity(), 0);
     EXPECT_EQ(col_char2.tail_index_, 0);
-    EXPECT_EQ(col_char2.buffer_, nullptr);
-    EXPECT_EQ(col_char2.data_ptr_, nullptr);
+    EXPECT_NE(col_char2.buffer_, nullptr);
+    EXPECT_NE(col_char2.data_ptr_, nullptr);
     EXPECT_EQ(col_char2.initialized, false);
 
     // ====
@@ -337,8 +337,8 @@ TEST_F(ColumnVectorCharTest, flat_char4) {
     col_char4.Reset();
     EXPECT_EQ(col_char4.capacity(), 0);
     EXPECT_EQ(col_char4.tail_index_, 0);
-    EXPECT_EQ(col_char4.buffer_, nullptr);
-    EXPECT_EQ(col_char4.data_ptr_, nullptr);
+    EXPECT_NE(col_char4.buffer_, nullptr);
+    EXPECT_NE(col_char4.data_ptr_, nullptr);
     EXPECT_EQ(col_char4.initialized, false);
 
     // ====
@@ -461,8 +461,8 @@ TEST_F(ColumnVectorCharTest, flat_char8) {
     col_char8.Reset();
     EXPECT_EQ(col_char8.capacity(), 0);
     EXPECT_EQ(col_char8.tail_index_, 0);
-    EXPECT_EQ(col_char8.buffer_, nullptr);
-    EXPECT_EQ(col_char8.data_ptr_, nullptr);
+    EXPECT_NE(col_char8.buffer_, nullptr);
+    EXPECT_NE(col_char8.data_ptr_, nullptr);
     EXPECT_EQ(col_char8.initialized, false);
 
     // ====
@@ -585,8 +585,8 @@ TEST_F(ColumnVectorCharTest, flat_char16) {
     col_char16.Reset();
     EXPECT_EQ(col_char16.capacity(), 0);
     EXPECT_EQ(col_char16.tail_index_, 0);
-    EXPECT_EQ(col_char16.buffer_, nullptr);
-    EXPECT_EQ(col_char16.data_ptr_, nullptr);
+    EXPECT_NE(col_char16.buffer_, nullptr);
+    EXPECT_NE(col_char16.data_ptr_, nullptr);
     EXPECT_EQ(col_char16.initialized, false);
 
     // ====
@@ -709,8 +709,8 @@ TEST_F(ColumnVectorCharTest, flat_char32) {
     col_char32.Reset();
     EXPECT_EQ(col_char32.capacity(), 0);
     EXPECT_EQ(col_char32.tail_index_, 0);
-    EXPECT_EQ(col_char32.buffer_, nullptr);
-    EXPECT_EQ(col_char32.data_ptr_, nullptr);
+    EXPECT_NE(col_char32.buffer_, nullptr);
+    EXPECT_NE(col_char32.data_ptr_, nullptr);
     EXPECT_EQ(col_char32.initialized, false);
 
     // ====
@@ -833,8 +833,8 @@ TEST_F(ColumnVectorCharTest, flat_char64) {
     col_char64.Reset();
     EXPECT_EQ(col_char64.capacity(), 0);
     EXPECT_EQ(col_char64.tail_index_, 0);
-    EXPECT_EQ(col_char64.buffer_, nullptr);
-    EXPECT_EQ(col_char64.data_ptr_, nullptr);
+    EXPECT_NE(col_char64.buffer_, nullptr);
+    EXPECT_NE(col_char64.data_ptr_, nullptr);
     EXPECT_EQ(col_char64.initialized, false);
 
     // ====

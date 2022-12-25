@@ -21,6 +21,10 @@ DataBlock::Init(const std::vector<DataType> &types) {
 void
 DataBlock::Reset() {
 
+    // Reset behavior:
+    // Reset each column into just initialized status.
+    // No data is appended into any column.
+
     for(size_t i = 0; i < column_count_; ++ i) {
         column_vectors[i].Reset();
         column_vectors[i].Initialize(row_capacity_);

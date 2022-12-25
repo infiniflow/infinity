@@ -89,8 +89,8 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
     EXPECT_EQ(col_point.capacity(), 0);
     EXPECT_EQ(col_point.tail_index_, 0);
 //    EXPECT_EQ(col_point.data_type_size_, 0);
-    EXPECT_EQ(col_point.buffer_, nullptr);
-    EXPECT_EQ(col_point.data_ptr_, nullptr);
+    EXPECT_NE(col_point.buffer_, nullptr);
+    EXPECT_NE(col_point.data_ptr_, nullptr);
     EXPECT_EQ(col_point.initialized, false);
 
     // ====
@@ -200,8 +200,8 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
     EXPECT_EQ(col_line.capacity(), 0);
     EXPECT_EQ(col_line.tail_index_, 0);
 //    EXPECT_EQ(col_line.data_type_size_, 0);
-    EXPECT_EQ(col_line.buffer_, nullptr);
-    EXPECT_EQ(col_line.data_ptr_, nullptr);
+    EXPECT_NE(col_line.buffer_, nullptr);
+    EXPECT_NE(col_line.data_ptr_, nullptr);
     EXPECT_EQ(col_line.initialized, false);
 
     // ====
@@ -317,8 +317,8 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
     EXPECT_EQ(col_line_seg.capacity(), 0);
     EXPECT_EQ(col_line_seg.tail_index_, 0);
 //    EXPECT_EQ(col_line_seg.data_type_size_, 0);
-    EXPECT_EQ(col_line_seg.buffer_, nullptr);
-    EXPECT_EQ(col_line_seg.data_ptr_, nullptr);
+    EXPECT_NE(col_line_seg.buffer_, nullptr);
+    EXPECT_NE(col_line_seg.data_ptr_, nullptr);
     EXPECT_EQ(col_line_seg.initialized, false);
 
     // ====
@@ -435,8 +435,8 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
     EXPECT_EQ(col_box.capacity(), 0);
     EXPECT_EQ(col_box.tail_index_, 0);
 //    EXPECT_EQ(col_box.data_type_size_, 0);
-    EXPECT_EQ(col_box.buffer_, nullptr);
-    EXPECT_EQ(col_box.data_ptr_, nullptr);
+    EXPECT_NE(col_box.buffer_, nullptr);
+    EXPECT_NE(col_box.data_ptr_, nullptr);
     EXPECT_EQ(col_box.initialized, false);
 
     // ====
@@ -499,7 +499,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
     EXPECT_NE(col_path.data_ptr_, nullptr);
     EXPECT_EQ(col_path.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_path.data_type(), data_type);
-    EXPECT_EQ(col_path.buffer_->buffer_type_, VectorBufferType::kMemory);
+    EXPECT_EQ(col_path.buffer_->buffer_type_, VectorBufferType::kHeap);
 
     EXPECT_NE(col_path.buffer_, nullptr);
     EXPECT_NE(col_path.nulls_ptr_, nullptr);
@@ -584,8 +584,9 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
     EXPECT_EQ(col_path.capacity(), 0);
     EXPECT_EQ(col_path.tail_index_, 0);
 //    EXPECT_EQ(col_path.data_type_size_, 0);
-    EXPECT_EQ(col_path.buffer_, nullptr);
-    EXPECT_EQ(col_path.data_ptr_, nullptr);
+    EXPECT_NE(col_path.buffer_, nullptr);
+    EXPECT_EQ(col_path.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(col_path.data_ptr_, nullptr);
     EXPECT_EQ(col_path.initialized, false);
 
     // ====
@@ -602,7 +603,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
     EXPECT_NE(col_path.data_ptr_, nullptr);
     EXPECT_EQ(col_path.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_path.data_type(), data_type);
-    EXPECT_EQ(col_path.buffer_->buffer_type_, VectorBufferType::kMemory);
+    EXPECT_EQ(col_path.buffer_->buffer_type_, VectorBufferType::kHeap);
 
     EXPECT_NE(col_path.buffer_, nullptr);
     EXPECT_NE(col_path.nulls_ptr_, nullptr);
@@ -658,7 +659,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
     EXPECT_NE(col_polygon.data_ptr_, nullptr);
     EXPECT_EQ(col_polygon.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_polygon.data_type(), data_type);
-    EXPECT_EQ(col_polygon.buffer_->buffer_type_, VectorBufferType::kMemory);
+    EXPECT_EQ(col_polygon.buffer_->buffer_type_, VectorBufferType::kHeap);
 
     EXPECT_NE(col_polygon.buffer_, nullptr);
     EXPECT_NE(col_polygon.nulls_ptr_, nullptr);
@@ -758,8 +759,9 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
     EXPECT_EQ(col_polygon.capacity(), 0);
     EXPECT_EQ(col_polygon.tail_index_, 0);
 //    EXPECT_EQ(col_polygon.data_type_size_, 0);
-    EXPECT_EQ(col_polygon.buffer_, nullptr);
-    EXPECT_EQ(col_polygon.data_ptr_, nullptr);
+    EXPECT_NE(col_polygon.buffer_, nullptr);
+    EXPECT_EQ(col_polygon.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(col_polygon.data_ptr_, nullptr);
     EXPECT_EQ(col_polygon.initialized, false);
 
     // ====
@@ -776,7 +778,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
     EXPECT_NE(col_polygon.data_ptr_, nullptr);
     EXPECT_EQ(col_polygon.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_polygon.data_type(), data_type);
-    EXPECT_EQ(col_polygon.buffer_->buffer_type_, VectorBufferType::kMemory);
+    EXPECT_EQ(col_polygon.buffer_->buffer_type_, VectorBufferType::kHeap);
 
     EXPECT_NE(col_polygon.buffer_, nullptr);
     EXPECT_NE(col_polygon.nulls_ptr_, nullptr);
@@ -888,8 +890,8 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
     EXPECT_EQ(col_circle.capacity(), 0);
     EXPECT_EQ(col_circle.tail_index_, 0);
 //    EXPECT_EQ(col_circle.data_type_size_, 0);
-    EXPECT_EQ(col_circle.buffer_, nullptr);
-    EXPECT_EQ(col_circle.data_ptr_, nullptr);
+    EXPECT_NE(col_circle.buffer_, nullptr);
+    EXPECT_NE(col_circle.data_ptr_, nullptr);
     EXPECT_EQ(col_circle.initialized, false);
 
     // ====

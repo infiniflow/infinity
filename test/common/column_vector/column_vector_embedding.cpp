@@ -121,8 +121,9 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     col_embedding.Reset();
     EXPECT_EQ(col_embedding.capacity(), 0);
     EXPECT_EQ(col_embedding.tail_index_, 0);
-    EXPECT_EQ(col_embedding.buffer_, nullptr);
-    EXPECT_EQ(col_embedding.data_ptr_, nullptr);
+    EXPECT_NE(col_embedding.buffer_, nullptr);
+    EXPECT_EQ(col_embedding.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(col_embedding.data_ptr_, nullptr);
     EXPECT_EQ(col_embedding.initialized, false);
 
     // ====

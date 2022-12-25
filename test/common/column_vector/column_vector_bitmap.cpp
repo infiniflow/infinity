@@ -46,7 +46,7 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
     EXPECT_NE(col_bitmap.data_ptr_, nullptr);
     EXPECT_EQ(col_bitmap.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_bitmap.data_type(), data_type);
-    EXPECT_EQ(col_bitmap.buffer_->buffer_type_, VectorBufferType::kMemory);
+    EXPECT_EQ(col_bitmap.buffer_->buffer_type_, VectorBufferType::kHeap);
 
     EXPECT_NE(col_bitmap.buffer_, nullptr);
     EXPECT_NE(col_bitmap.nulls_ptr_, nullptr);
@@ -115,8 +115,9 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
     EXPECT_EQ(col_bitmap.capacity(), 0);
     EXPECT_EQ(col_bitmap.tail_index_, 0);
 //    EXPECT_EQ(col_bitmap.data_type_size_, 0);
-    EXPECT_EQ(col_bitmap.buffer_, nullptr);
-    EXPECT_EQ(col_bitmap.data_ptr_, nullptr);
+    EXPECT_NE(col_bitmap.buffer_, nullptr);
+    EXPECT_EQ(col_bitmap.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(col_bitmap.data_ptr_, nullptr);
     EXPECT_EQ(col_bitmap.initialized, false);
 
     // ====
@@ -133,7 +134,7 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
     EXPECT_NE(col_bitmap.data_ptr_, nullptr);
     EXPECT_EQ(col_bitmap.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(col_bitmap.data_type(), data_type);
-    EXPECT_EQ(col_bitmap.buffer_->buffer_type_, VectorBufferType::kMemory);
+    EXPECT_EQ(col_bitmap.buffer_->buffer_type_, VectorBufferType::kHeap);
 
     EXPECT_NE(col_bitmap.buffer_, nullptr);
     EXPECT_NE(col_bitmap.nulls_ptr_, nullptr);

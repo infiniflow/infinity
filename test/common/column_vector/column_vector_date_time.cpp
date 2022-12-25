@@ -88,8 +88,8 @@ TEST_F(ColumnVectorTimeTest, flat_date) {
     EXPECT_EQ(col_date.capacity(), 0);
     EXPECT_EQ(col_date.tail_index_, 0);
 //    EXPECT_EQ(col_tinyint.data_type_size_, 0);
-    EXPECT_EQ(col_date.buffer_, nullptr);
-    EXPECT_EQ(col_date.data_ptr_, nullptr);
+    EXPECT_NE(col_date.buffer_, nullptr);
+    EXPECT_NE(col_date.data_ptr_, nullptr);
     EXPECT_EQ(col_date.initialized, false);
 
     // ====
@@ -190,8 +190,8 @@ TEST_F(ColumnVectorTimeTest, flat_time) {
     EXPECT_EQ(col_time.capacity(), 0);
     EXPECT_EQ(col_time.tail_index_, 0);
 //    EXPECT_EQ(col_tinyint.data_type_size_, 0);
-    EXPECT_EQ(col_time.buffer_, nullptr);
-    EXPECT_EQ(col_time.data_ptr_, nullptr);
+    EXPECT_NE(col_time.buffer_, nullptr);
+    EXPECT_NE(col_time.data_ptr_, nullptr);
     EXPECT_EQ(col_time.initialized, false);
 
     // ====
@@ -294,8 +294,8 @@ TEST_F(ColumnVectorTimeTest, flat_datetime) {
     col_datetime.Reset();
     EXPECT_EQ(col_datetime.capacity(), 0);
     EXPECT_EQ(col_datetime.tail_index_, 0);
-    EXPECT_EQ(col_datetime.buffer_, nullptr);
-    EXPECT_EQ(col_datetime.data_ptr_, nullptr);
+    EXPECT_NE(col_datetime.buffer_, nullptr);
+    EXPECT_NE(col_datetime.data_ptr_, nullptr);
     EXPECT_EQ(col_datetime.initialized, false);
 
     // ====
@@ -399,8 +399,8 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp) {
     col_timestamp.Reset();
     EXPECT_EQ(col_timestamp.capacity(), 0);
     EXPECT_EQ(col_timestamp.tail_index_, 0);
-    EXPECT_EQ(col_timestamp.buffer_, nullptr);
-    EXPECT_EQ(col_timestamp.data_ptr_, nullptr);
+    EXPECT_NE(col_timestamp.buffer_, nullptr);
+    EXPECT_NE(col_timestamp.data_ptr_, nullptr);
     EXPECT_EQ(col_timestamp.initialized, false);
 
     // ====
@@ -504,8 +504,8 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp_tz) {
     col_timestamp_tz.Reset();
     EXPECT_EQ(col_timestamp_tz.capacity(), 0);
     EXPECT_EQ(col_timestamp_tz.tail_index_, 0);
-    EXPECT_EQ(col_timestamp_tz.buffer_, nullptr);
-    EXPECT_EQ(col_timestamp_tz.data_ptr_, nullptr);
+    EXPECT_NE(col_timestamp_tz.buffer_, nullptr);
+    EXPECT_NE(col_timestamp_tz.data_ptr_, nullptr);
     EXPECT_EQ(col_timestamp_tz.initialized, false);
 
     // ====
@@ -608,8 +608,8 @@ TEST_F(ColumnVectorTimeTest, flat_interval) {
     col_interval.Reset();
     EXPECT_EQ(col_interval.capacity(), 0);
     EXPECT_EQ(col_interval.tail_index_, 0);
-    EXPECT_EQ(col_interval.buffer_, nullptr);
-    EXPECT_EQ(col_interval.data_ptr_, nullptr);
+    EXPECT_NE(col_interval.buffer_, nullptr);
+    EXPECT_NE(col_interval.data_ptr_, nullptr);
     EXPECT_EQ(col_interval.initialized, false);
 
     // ====

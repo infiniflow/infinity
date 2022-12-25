@@ -40,12 +40,10 @@ inline bool
 UuidTryCastToVarlen::Run(const UuidT& source, VarcharT &target, const ColumnVector* vector_ptr) {
     target.length = UuidT::LENGTH;
     memcpy(target.prefix, source.body, VarcharT::PREFIX_LENGTH);
-    TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kMemory,
+    TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
                "Varchar column vector should use MemoryVectorBuffer. ");
 
-    auto* string_vector_buffer_ptr = (MemoryVectorBuffer*)(vector_ptr->buffer_.get());
-
-    ptr_t ptr = string_vector_buffer_ptr->chunk_mgr_->Allocate(target.length);
+    ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
     memcpy(ptr, source.body, target.length);
     target.ptr = ptr;
 
