@@ -22,16 +22,16 @@ RegisterMulFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
 
     ScalarFunction mul_function_int64(
             "*",
-            { LogicalType(LogicalTypeId::kBigInt), LogicalType(LogicalTypeId::kBigInt) },
-            { LogicalType(LogicalTypeId::kBigInt) },
-            &ScalarFunction::BinaryFunction<int64_t, int64_t, int64_t, MulFunction>);
+            { DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt) },
+            { DataType(LogicalType::kBigInt) },
+            &ScalarFunction::BinaryFunction<BigIntT, BigIntT, BigIntT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_int64);
 
     ScalarFunction mul_function_double(
             "*",
-            { LogicalType(LogicalTypeId::kDouble), LogicalType(LogicalTypeId::kDouble) },
-            { LogicalType(LogicalTypeId::kDouble) },
-            &ScalarFunction::BinaryFunction<double, double, double, MulFunction>);
+            { DataType(LogicalType::kDouble), DataType(LogicalType::kDouble) },
+            { DataType(LogicalType::kDouble) },
+            &ScalarFunction::BinaryFunction<DoubleT, DoubleT, DoubleT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_double);
 
     // TODO: other type multiply need to be given.

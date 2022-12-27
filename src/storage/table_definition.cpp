@@ -1,7 +1,7 @@
 //
 // Created by JinHai on 2022/8/8.
 //
-
+#if 0
 #include "common/utility/infinity_assert.h"
 #include "table_definition.h"
 
@@ -16,3 +16,4 @@ TableDefinition::GetIdByName(const std::string& name) const {
 }
 
 }
+#endif

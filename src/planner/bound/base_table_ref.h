@@ -13,20 +13,20 @@ namespace infinity {
 
 class BaseTableRef: public TableRef {
 public:
-    explicit BaseTableRef(std::shared_ptr<Table> table_ptr_,
+    explicit BaseTableRef(SharedPtr<Table> table_ptr_,
                           std::string alias,
-                          const std::vector<std::string>& column_names,
-                          const std::vector<LogicalType>& column_types)
+                          const Vector<std::string>& column_names,
+                          const Vector<DataType>& column_types)
         : TableRef(TableRefType::kBaseTable, std::move(alias)),
         table_ptr_(std::move(table_ptr_)),
         column_names_(column_names),
         column_types_(column_types)
         {}
 
-    std::shared_ptr<Table> table_ptr_;
+    SharedPtr<Table> table_ptr_;
 
-    std::vector<std::string> column_names_;
-    std::vector<LogicalType> column_types_;
+    Vector<std::string> column_names_;
+    Vector<DataType> column_types_;
 };
 
 }

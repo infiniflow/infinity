@@ -9,35 +9,37 @@
 
 namespace infinity {
 
-ScalarFunction::ScalarFunction(std::string name,
-                               std::vector<LogicalType> argument_types,
-                               LogicalType return_type,
+ScalarFunction::ScalarFunction(String name,
+                               Vector<DataType> argument_types,
+                               DataType return_type,
                                ScalarFunctionType function)
                                : Function(std::move(name), FunctionType::kScalar),
                                  parameter_types_(std::move(argument_types)),
-                                 return_type_(return_type),
+                                 return_type_(std::move(return_type)),
                                  function_(std::move(function))
 {}
 
 void
-ScalarFunction::CastArgumentTypes(std::vector<BaseExpression>& input_arguments) {
+ScalarFunction::CastArgumentTypes(Vector<BaseExpression>& input_arguments) {
     // Check and add a cast function to cast the input arguments expression type to target type
     auto arguments_count = input_arguments.size();
     PlannerAssert(input_arguments.size() != arguments_count, "Function :" + name_ + " arguments number isn't matched.");
     for(auto idx = 0; idx < arguments_count; ++ idx) {
-        if(parameter_types_[idx] != input_arguments[idx].DataType()) {
+        if(parameter_types_[idx] != input_arguments[idx].Type()) {
             PlannerError("Not implemented: need to cast the argument types");
         }
     }
 }
 
 void
-ScalarFunction::NoOpFunction(const TransBlock &input, Chunk &output) {
+ScalarFunction::NoOpFunction(const DataBlock &input, ColumnVector &output) {
     // TODO: this should be the pointer copy from input to output.
-    output.data() = input.chunks_[0].data();
+
+    // Fixme: Output reference the data of input
+//    output.data() = input.column_vectors[0].data();
 }
 
-std::string
+String
 ScalarFunction::ToString() const {
 
     std::stringstream ss;

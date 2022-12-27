@@ -24,6 +24,9 @@ public:
     void
     Init();
 
+    void
+    Uninit();
+
 private:
     std::string data_path_;
     std::unique_ptr<Catalog> catalog_;

@@ -21,8 +21,8 @@ GenerateOrFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr) {
 
     ScalarFunction or_function(
             "or",
-            { LogicalType(LogicalTypeId::kBoolean), LogicalType(LogicalTypeId::kBoolean) },
-            { LogicalType(LogicalTypeId::kBoolean) },
+            { DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean) },
+            { DataType(LogicalType::kBoolean) },
             &ScalarFunction::BinaryFunction<bool, bool, bool, OrFunction>);
     function_set_ptr->AddFunction(or_function);
 }

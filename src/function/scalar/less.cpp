@@ -16,15 +16,15 @@ struct LessFunction {
     }
 };
 
-template<typename DataType>
+template<typename CompareType>
 static void
-GenerateLessFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, LogicalTypeId type_id) {
+GenerateLessFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, DataType data_type) {
 
     ScalarFunction less_function(
             "<",
-            { LogicalType(type_id), LogicalType(type_id) },
-            { LogicalType(LogicalTypeId::kBoolean) },
-            &ScalarFunction::BinaryFunction<DataType, DataType, bool, LessFunction>);
+            { data_type, data_type },
+            { DataType(LogicalType::kBoolean) },
+            &ScalarFunction::BinaryFunction<CompareType, CompareType, bool, LessFunction>);
     function_set_ptr->AddFunction(less_function);
 }
 
@@ -32,26 +32,27 @@ void
 RegisterLessFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("<");
 
-    GenerateLessFunction<bool>(function_set_ptr, LogicalTypeId::kBoolean);
-    GenerateLessFunction<int8_t>(function_set_ptr, LogicalTypeId::kTinyInt);
-    GenerateLessFunction<int16_t>(function_set_ptr, LogicalTypeId::kSmallInt);
-    GenerateLessFunction<int32_t>(function_set_ptr, LogicalTypeId::kInteger);
-    GenerateLessFunction<int64_t>(function_set_ptr, LogicalTypeId::kBigInt);
-    GenerateLessFunction<float>(function_set_ptr, LogicalTypeId::kFloat);
-    GenerateLessFunction<double>(function_set_ptr, LogicalTypeId::kDouble);
+    GenerateLessFunction<BooleanT>(function_set_ptr, DataType(LogicalType::kBoolean));
+    GenerateLessFunction<TinyIntT>(function_set_ptr, DataType(LogicalType::kTinyInt));
+    GenerateLessFunction<SmallIntT>(function_set_ptr, DataType(LogicalType::kSmallInt));
+    GenerateLessFunction<IntegerT>(function_set_ptr, DataType(LogicalType::kInteger));
+    GenerateLessFunction<BigIntT>(function_set_ptr, DataType(LogicalType::kBigInt));
+    GenerateLessFunction<FloatT>(function_set_ptr, DataType(LogicalType::kFloat));
+    GenerateLessFunction<DoubleT>(function_set_ptr, DataType(LogicalType::kDouble));
 
-    // TODO: need to review following function
-    GenerateLessFunction<int64_t>(function_set_ptr, LogicalTypeId::kDate);
-    GenerateLessFunction<int64_t>(function_set_ptr, LogicalTypeId::kInterval);
-    GenerateLessFunction<int64_t>(function_set_ptr, LogicalTypeId::kDateTime);
-    GenerateLessFunction<int64_t>(function_set_ptr, LogicalTypeId::kTime);
-
-    // FIXME: decimal isn't int64
-    GenerateLessFunction<int64_t>(function_set_ptr, LogicalTypeId::kDecimal);
-
-    // TODO: need to review following function
-    GenerateLessFunction<std::string>(function_set_ptr, LogicalTypeId::kVarchar);
-    GenerateLessFunction<std::string>(function_set_ptr, LogicalTypeId::kText);
+    // TODO: finish following function
+//    // TODO: need to review following function
+//    GenerateLessFunction<int64_t>(function_set_ptr, DataType(LogicalType::kDate);
+//    GenerateLessFunction<int64_t>(function_set_ptr, DataType(LogicalType::kInterval);
+//    GenerateLessFunction<int64_t>(function_set_ptr, DataType(LogicalType::kDateTime);
+//    GenerateLessFunction<int64_t>(function_set_ptr, DataType(LogicalType::kTime);
+//
+//    // FIXME: decimal isn't int64
+//    GenerateLessFunction<int64_t>(function_set_ptr, DataType(LogicalType::kDecimal);
+//
+//    // TODO: need to review following function
+//    GenerateLessFunction<std::string>(function_set_ptr, DataType(LogicalType::kVarchar);
+//    GenerateLessFunction<std::string>(function_set_ptr, DataType(LogicalType::kText);
 
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }

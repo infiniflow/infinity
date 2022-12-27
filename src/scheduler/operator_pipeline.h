@@ -13,18 +13,23 @@ namespace infinity {
 
 class OperatorPipeline: public Pipeline {
 public:
-    explicit OperatorPipeline(std::shared_ptr<PhysicalOperator> op);
+    explicit
+    OperatorPipeline(SharedPtr<PhysicalOperator> op);
+
     ~OperatorPipeline() override = default;
 
-    static std::shared_ptr<OperatorPipeline> Create(const std::shared_ptr<PhysicalOperator>& op);
+    static SharedPtr<OperatorPipeline>
+    Create(const SharedPtr<PhysicalOperator>& op);
 
-    std::shared_ptr<Table> GetResult() override;
+    SharedPtr<Table>
+    GetResult() override;
+
 protected:
     void
-    OnExecute(std::shared_ptr<QueryContext>& query_context) final;
+    OnExecute(SharedPtr<QueryContext>& query_context) final;
 
 private:
-    std::shared_ptr<PhysicalOperator> operator_;
+    SharedPtr<PhysicalOperator> operator_;
 
 };
 

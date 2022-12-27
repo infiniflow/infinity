@@ -7,14 +7,15 @@
 
 namespace infinity {
 
-std::string LogicalInsert::ToString(int64_t& space) {
+String 
+LogicalInsert::ToString(i64& space) {
     std::stringstream ss;
-    std::string arrow_str;
+    String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "Insert Table: " << table_ptr_->table_def()->name();
+    ss << String(space, ' ') << arrow_str << "Insert Table: " << table_ptr_->TableName();
     space += arrow_str.size();
     return ss.str();
 }

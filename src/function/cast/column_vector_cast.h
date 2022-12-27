@@ -107,7 +107,7 @@ template <class SourceType, class TargetType, class Operator>
 static bool
 GenericTryCastColumnVector(const ColumnVector &source, ColumnVector &result, size_t count, CastParameters &parameters) {
     ColumnVectorCastData input(parameters.strict, &result, source.data_type_, result.data_type_);
-    UnaryOperation::Execute<SourceType, TargetType, Operator>(source, result, count, &input, true);
+    UnaryOperator::Execute<SourceType, TargetType, Operator>(source, result, count, &input, true);
     return input.all_converted_;
 }
 

@@ -16,6 +16,9 @@ struct DecimalInfo {
 static SharedPtr<TypeInfo>
 Make(i64 precision, i64 scale);
 
+static LogicalType
+GetDecimalType(i64 precision, i64 scale);
+
 };
 
 }

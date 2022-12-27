@@ -12,10 +12,16 @@ namespace infinity {
 class FunctionExpression: public BaseExpression {
 public:
     FunctionExpression(ScalarFunction function,
-                       std::vector<std::shared_ptr<BaseExpression>> arguments);
+                       Vector<SharedPtr<BaseExpression>> arguments);
 
-    LogicalType DataType() override;
-    std::string ToString() const override;
+    DataType
+    Type() const override {
+//        func_.return_type();
+        NotImplementError("Need to implement function expression");
+    }
+
+    String
+    ToString() const override;
 private:
     ScalarFunction func_;
 };

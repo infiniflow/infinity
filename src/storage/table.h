@@ -4,38 +4,92 @@
 
 #pragma once
 
-#include "table_definition.h"
-#include "transblock.h"
-#include "block.h"
+#include <utility>
 
-#include <any>
+#include "table_def.h"
+#include "data_block.h"
 
 namespace infinity {
 
 class Block;
 
-//enum class TableType {
-//    kInvalid,
-//    kDataTable,
-//    kIntermediate,
-//    kResult,
-//};
+enum class TableType {
+    kInvalid,
+    kDataTable,
+    kIntermediate,
+    kResult,
+};
 
 class Table {
 public:
-    explicit Table(std::shared_ptr<TableDefinition> table_def);
-    [[nodiscard]] std::shared_ptr<TableDefinition> table_def() const { return table_def_; }
-    [[nodiscard]] uint64_t row_count() const { return row_count_; }
-    [[nodiscard]] uint64_t block_count() const { return blocks_.size(); }
-    std::vector<std::shared_ptr<Block>>& blocks() { return blocks_; }
-    [[nodiscard]] TableType table_type() const { return table_type_; }
-    virtual void Append(const TransBlock& block) = 0;
+    explicit
+    Table(SharedPtr<TableDef> table_def_ptr, TableType type)
+        : definition_ptr_(std::move(table_def_ptr)),
+        row_count_(0),
+        type_(type)
+        {}
 
-protected:
-    std::shared_ptr<TableDefinition> table_def_;
-    int64_t row_count_{0};
-    TableType table_type_{TableType::kInvalid};
-    std::vector<std::shared_ptr<Block>> blocks_;
+public:
+    [[nodiscard]] SizeT
+    ColumnCount() const {
+        return definition_ptr_->column_count();
+    }
+
+    [[nodiscard]] String
+    TableName() const {
+        return definition_ptr_->name();
+    }
+
+    i64
+    GetColumnIdByName(const String& column_name) {
+        return definition_ptr_->GetColIdByName(column_name);
+    }
+
+    [[nodiscard]] SizeT
+    row_count() const {
+        return row_count_;
+    }
+
+    [[nodiscard]] TableType
+    type() const {
+        return type_;
+    }
+
+    [[nodiscard]] SizeT
+    BlockCount() const {
+        return data_blocks_.size();
+    }
+
+    [[nodiscard]] SharedPtr<DataBlock>
+    GetDataBlockById(SizeT idx) const {
+        StorageAssert(idx < data_blocks_.size(), "Attempt to access invalid index: " +
+                      std::to_string(idx) + "/" + std::to_string(BlockCount()))
+        return data_blocks_[idx];
+    }
+
+    [[nodiscard]] String
+    GetColumnNameById(SizeT idx) const {
+        return definition_ptr_->columns()[idx]->name();
+    }
+
+    [[nodiscard]] DataType
+    GetColumnTypeById(SizeT idx) const {
+        return definition_ptr_->columns()[idx]->type();
+    }
+
+    void
+    Append(const SharedPtr<DataBlock>& data_block) {
+        data_blocks_.emplace_back(data_block);
+    }
+public:
+    [[nodiscard]] String
+    ToString() const;
+
+private:
+    SharedPtr<TableDef> definition_ptr_;
+    SizeT row_count_{0};
+    TableType type_{TableType::kInvalid};
+    Vector<SharedPtr<DataBlock>> data_blocks_;
 };
 
 }

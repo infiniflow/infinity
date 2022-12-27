@@ -9,7 +9,7 @@
 
 namespace infinity {
 
-class UnaryOperation {
+class UnaryOperator {
 public:
     template <typename InputType, typename ResultType, typename Operator>
     static void inline

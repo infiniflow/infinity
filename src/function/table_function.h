@@ -5,10 +5,8 @@
 #pragma once
 #include "function.h"
 #include "function_data.h"
-#include "storage/data_type.h"
-#include "storage/transblock.h"
+#include "storage/data_block.h"
 #include "main/query_context.h"
-#include <vector>
 
 namespace infinity {
 
@@ -18,23 +16,23 @@ public:
 };
 
 using TableFunctionType
-    = std::function<void(std::shared_ptr<QueryContext>& query_context, std::shared_ptr<TableFunctionData> data, TransBlock &output)>;
+    = std::function<void(std::shared_ptr<QueryContext>& query_context, std::shared_ptr<TableFunctionData> data, DataBlock &output)>;
 
 
 class TableFunction : public Function {
 public:
-    explicit TableFunction(std::string name,
-                           std::vector<LogicalType> argument_types,
+    explicit TableFunction(String name,
+                           Vector<LogicalType> argument_types,
                            TableFunctionType function
                            );
 
-    [[nodiscard]] std::string
+    [[nodiscard]] String
     ToString() const override;
 
     TableFunctionType main_function_;
 
 private:
-    std::vector<LogicalType> parameter_types_;
+    Vector<LogicalType> parameter_types_;
 };
 }
 

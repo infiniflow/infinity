@@ -12,7 +12,7 @@ PhysicalDropView::Init() {
 }
 
 void
-PhysicalDropView::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalDropView::Execute(SharedPtr<QueryContext>& query_context) {
 
 }
 

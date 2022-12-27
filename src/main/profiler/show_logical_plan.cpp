@@ -9,11 +9,11 @@
 
 namespace infinity {
 
-std::string
+String
 ShowLogicalPlan::ToString() const {
     std::stringstream ss;
-    std::stack<std::shared_ptr<LogicalNode>> stack;
-    std::shared_ptr<LogicalNode> root = logical_node_;
+    std::stack<SharedPtr<LogicalNode>> stack;
+    SharedPtr<LogicalNode> root = logical_node_;
 
     int64_t intent = -4;
 

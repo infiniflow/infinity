@@ -23,44 +23,44 @@ RegisterAddFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
 //    GenerateAddFunction<bool>(function_set_ptr, LogicalTypeId::kBoolean);
     ScalarFunction add_function_int8(
             "+",
-            { LogicalType(LogicalTypeId::kTinyInt), LogicalType(LogicalTypeId::kTinyInt) },
-            { LogicalType(LogicalTypeId::kSmallInt) },
-            &ScalarFunction::BinaryFunction<int8_t , int8_t , int16_t, AddFunction>);
+            { DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt) },
+            { DataType(LogicalType::kSmallInt) },
+            &ScalarFunction::BinaryFunction<TinyIntT, TinyIntT , SmallIntT, AddFunction>);
     function_set_ptr->AddFunction(add_function_int8);
 
     ScalarFunction add_function_int16(
             "+",
-            { LogicalType(LogicalTypeId::kSmallInt), LogicalType(LogicalTypeId::kSmallInt) },
-            { LogicalType(LogicalTypeId::kInteger) },
-            &ScalarFunction::BinaryFunction<int16_t , int16_t , int32_t, AddFunction>);
+            { DataType(LogicalType::kSmallInt), DataType(LogicalType::kSmallInt) },
+            { DataType(LogicalType::kInteger) },
+            &ScalarFunction::BinaryFunction<SmallIntT, SmallIntT, IntegerT, AddFunction>);
     function_set_ptr->AddFunction(add_function_int16);
 
     ScalarFunction add_function_int32(
             "+",
-            { LogicalType(LogicalTypeId::kInteger), LogicalType(LogicalTypeId::kInteger) },
-            { LogicalType(LogicalTypeId::kBigInt) },
-            &ScalarFunction::BinaryFunction<int32_t , int32_t , int64_t, AddFunction>);
+            { DataType(LogicalType::kInteger), DataType(LogicalType::kInteger) },
+            { DataType(LogicalType::kBigInt) },
+            &ScalarFunction::BinaryFunction<IntegerT, IntegerT, BigIntT, AddFunction>);
     function_set_ptr->AddFunction(add_function_int32);
 
     ScalarFunction add_function_int64(
             "+",
-            { LogicalType(LogicalTypeId::kBigInt), LogicalType(LogicalTypeId::kBigInt) },
-            { LogicalType(LogicalTypeId::kBigInt) },
-            &ScalarFunction::BinaryFunction<int64_t , int64_t , int64_t, AddFunction>);
+            { DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt) },
+            { DataType(LogicalType::kBigInt) },
+            &ScalarFunction::BinaryFunction<BigIntT, BigIntT, BigIntT, AddFunction>);
     function_set_ptr->AddFunction(add_function_int64);
 
     ScalarFunction add_function_float(
             "+",
-            { LogicalType(LogicalTypeId::kFloat), LogicalType(LogicalTypeId::kFloat) },
-            { LogicalType(LogicalTypeId::kFloat) },
-            &ScalarFunction::BinaryFunction<float , float , float, AddFunction>);
+            { DataType(LogicalType::kFloat), DataType(LogicalType::kFloat) },
+            { DataType(LogicalType::kFloat) },
+            &ScalarFunction::BinaryFunction<FloatT, FloatT, FloatT, AddFunction>);
     function_set_ptr->AddFunction(add_function_float);
 
     ScalarFunction add_function_double(
             "+",
-            { LogicalType(LogicalTypeId::kDouble), LogicalType(LogicalTypeId::kDouble) },
-            { LogicalType(LogicalTypeId::kDouble) },
-            &ScalarFunction::BinaryFunction<double , double , double, AddFunction>);
+            { DataType(LogicalType::kDouble), DataType(LogicalType::kDouble) },
+            { DataType(LogicalType::kDouble) },
+            &ScalarFunction::BinaryFunction<DoubleT, DoubleT, DoubleT, AddFunction>);
     function_set_ptr->AddFunction(add_function_double);
 
     // TODO: other type add need to be given.

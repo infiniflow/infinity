@@ -16,15 +16,15 @@ struct GreaterFunction {
     }
 };
 
-template<typename DataType>
+template<typename CompareType>
 static void
-GenerateGreaterFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, LogicalTypeId type_id) {
+GenerateGreaterFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, DataType data_type) {
 
     ScalarFunction greater_function(
             ">",
-            { LogicalType(type_id), LogicalType(type_id) },
-            { LogicalType(LogicalTypeId::kBoolean) },
-            &ScalarFunction::BinaryFunction<DataType, DataType, bool, GreaterFunction>);
+            { data_type, data_type },
+            DataType(LogicalType::kBoolean),
+            &ScalarFunction::BinaryFunction<CompareType, CompareType, bool, GreaterFunction>);
     function_set_ptr->AddFunction(greater_function);
 }
 
@@ -32,26 +32,27 @@ void
 RegisterGreaterFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(">");
 
-    GenerateGreaterFunction<bool>(function_set_ptr, LogicalTypeId::kBoolean);
-    GenerateGreaterFunction<int8_t>(function_set_ptr, LogicalTypeId::kTinyInt);
-    GenerateGreaterFunction<int16_t>(function_set_ptr, LogicalTypeId::kSmallInt);
-    GenerateGreaterFunction<int32_t>(function_set_ptr, LogicalTypeId::kInteger);
-    GenerateGreaterFunction<int64_t>(function_set_ptr, LogicalTypeId::kBigInt);
-    GenerateGreaterFunction<float>(function_set_ptr, LogicalTypeId::kFloat);
-    GenerateGreaterFunction<double>(function_set_ptr, LogicalTypeId::kDouble);
+    GenerateGreaterFunction<BooleanT>(function_set_ptr, DataType(DataType(LogicalType::kBoolean)));
+    GenerateGreaterFunction<TinyIntT>(function_set_ptr, DataType(LogicalType::kTinyInt));
+    GenerateGreaterFunction<SmallIntT>(function_set_ptr, DataType(LogicalType::kSmallInt));
+    GenerateGreaterFunction<IntegerT>(function_set_ptr, DataType(LogicalType::kInteger));
+    GenerateGreaterFunction<BigIntT>(function_set_ptr, DataType(LogicalType::kBigInt));
+    GenerateGreaterFunction<FloatT>(function_set_ptr, DataType(LogicalType::kFloat));
+    GenerateGreaterFunction<DoubleT>(function_set_ptr, DataType(LogicalType::kDouble));
 
-    // TODO: need to review following function
-    GenerateGreaterFunction<int64_t>(function_set_ptr, LogicalTypeId::kDate);
-    GenerateGreaterFunction<int64_t>(function_set_ptr, LogicalTypeId::kInterval);
-    GenerateGreaterFunction<int64_t>(function_set_ptr, LogicalTypeId::kDateTime);
-    GenerateGreaterFunction<int64_t>(function_set_ptr, LogicalTypeId::kTime);
-
-    // FIXME: decimal isn't int64
-    GenerateGreaterFunction<int64_t>(function_set_ptr, LogicalTypeId::kDecimal);
-
-    // TODO: need to review following function
-    GenerateGreaterFunction<std::string>(function_set_ptr, LogicalTypeId::kVarchar);
-    GenerateGreaterFunction<std::string>(function_set_ptr, LogicalTypeId::kText);
+    // TODO: finish following type function
+//    // TODO: need to review following function
+//    GenerateGreaterFunction<int64_t>(function_set_ptr, DataType(LogicalType::kDate);
+//    GenerateGreaterFunction<int64_t>(function_set_ptr, DataType(LogicalType::kInterval);
+//    GenerateGreaterFunction<int64_t>(function_set_ptr, DataType(LogicalType::kDateTime);
+//    GenerateGreaterFunction<int64_t>(function_set_ptr, DataType(LogicalType::kTime);
+//
+//    // FIXME: decimal isn't int64
+//    GenerateGreaterFunction<int64_t>(function_set_ptr, DataType(LogicalType::kDecimal);
+//
+//    // TODO: need to review following function
+//    GenerateGreaterFunction<std::string>(function_set_ptr, DataType(LogicalType::kVarchar);
+//    GenerateGreaterFunction<std::string>(function_set_ptr, DataType(LogicalType::kText);
 
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }

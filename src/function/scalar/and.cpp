@@ -21,9 +21,9 @@ GenerateAndFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr) {
 
     ScalarFunction and_function(
             "and",
-            { LogicalType(LogicalTypeId::kBoolean), LogicalType(LogicalTypeId::kBoolean) },
-            { LogicalType(LogicalTypeId::kBoolean) },
-            &ScalarFunction::BinaryFunction<bool, bool, bool, AndFunction>);
+            { DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean) },
+            { DataType(LogicalType::kBoolean) },
+            &ScalarFunction::BinaryFunction<BooleanT, BooleanT, BooleanT, AndFunction>);
     function_set_ptr->AddFunction(and_function);
 }
 

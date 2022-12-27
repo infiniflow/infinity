@@ -4,22 +4,19 @@
 
 #include "correlated_column_expression.h"
 
+#include <utility>
+
 namespace infinity {
 
-CorrelatedColumnExpression::CorrelatedColumnExpression(infinity::LogicalType logical_type,
-                                                       std::string column_name)
+CorrelatedColumnExpression::CorrelatedColumnExpression(DataType data_type,
+                                                       String column_name)
      : BaseExpression(ExpressionType::kCorrelatedColumn, {}),
-     logical_type_(logical_type),
+     data_type_(std::move(data_type)),
      column_name_(std::move(column_name)) {}
 
-LogicalType
-CorrelatedColumnExpression::DataType() {
-    return LogicalType(LogicalTypeId::kText);
-}
-
-std::string
+String
 CorrelatedColumnExpression::ToString() const {
-    return std::string();
+    return {};
 }
 
 

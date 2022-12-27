@@ -4,11 +4,30 @@
 
 #include "table.h"
 
-#include <utility>
-
 namespace infinity {
 
-Table::Table(std::shared_ptr<TableDefinition> table_def)
-    : table_def_(std::move(table_def)) {}
+static String
+TableTypeToString(TableType type) {
+    switch (type) {
+        case TableType::kInvalid:
+            TypeError("Unexpected table type: Invalid")
+        case TableType::kDataTable:
+            return "DataTable";
+        case TableType::kIntermediate:
+            return "Intermediate";
+        case TableType::kResult:
+            return "Result";
+    }
+    TypeError("Unexpected error.")
+}
+
+String
+Table::ToString() const {
+    std::stringstream ss;
+    ss << definition_ptr_->ToString();
+    ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_;
+
+    return ss.str();
+}
 
 }

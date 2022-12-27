@@ -3,8 +3,7 @@
 //
 
 #pragma once
-
-#include "data_type.h"
+#if 0
 #include <vector>
 #include <any>
 
@@ -51,3 +50,4 @@ protected:
 };
 
 }
+#endif

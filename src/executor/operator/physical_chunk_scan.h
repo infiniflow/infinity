@@ -13,7 +13,7 @@ namespace infinity {
 
 class PhysicalChunkScan : public PhysicalOperator {
 public:
-    explicit PhysicalChunkScan(uint64_t id, ChunkScanType type)
+    explicit PhysicalChunkScan(u64 id, ChunkScanType type)
             : PhysicalOperator(PhysicalOperatorType::kChunkScan, nullptr, nullptr,id),
             scan_type_(type) {}
 
@@ -23,7 +23,7 @@ public:
     Init() override;
 
     void
-    Execute(std::shared_ptr<QueryContext>& query_context) override;
+    Execute(SharedPtr<QueryContext>& query_context) override;
 
 private:
     ChunkScanType scan_type_;

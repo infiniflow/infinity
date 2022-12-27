@@ -12,6 +12,8 @@
 #include "function/scalar_function_set.h"
 #include "function/aggregate_function_set.h"
 
+#include "common/types/info/varchar_info.h"
+
 #include "common/utility/infinity_assert.h"
 #include "main/infinity.h"
 #include "expression_binder.h"
@@ -19,8 +21,8 @@
 
 namespace infinity {
 
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext> &bind_context_ptr) {
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext> &bind_context_ptr) {
 
     switch(expr.type) {
         case hsql::kExprLiteralFloat:
@@ -68,34 +70,34 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<
             PlannerError("Unsupported expr type");
     }
 
-    return std::shared_ptr<BaseExpression>();
+    return SharedPtr<BaseExpression>();
 }
 
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildValueExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildValueExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
     switch(expr.type) {
         case hsql::kExprLiteralFloat: {
-            auto logical_type = LogicalType(LogicalTypeId::kDouble);
-            return std::make_shared<ValueExpression>(logical_type, expr.fval);
+            Value value = Value::MakeDouble(expr.fval);
+            return MakeShared<ValueExpression>(value);
         }
         case hsql::kExprLiteralInt: {
             // TODO: int16/int8 also can be found out.
-//            logical_type = static_cast<int32_t>(expr.ival) == expr.ival ?
-//                           LogicalType(LogicalTypeId::kInteger): LogicalType(LogicalTypeId::kBigInt);
-            auto logical_type = LogicalType(LogicalTypeId::kBigInt);
-            return std::make_shared<ValueExpression>(logical_type, expr.ival);
+//            data_type = static_cast<int32_t>(expr.ival) == expr.ival ?
+//                           DataType(LogicalType::kInteger): DataType(LogicalType::kBigInt);
+            Value value = Value::MakeBigInt(expr.ival);
+            return MakeShared<ValueExpression>(value);
         }
         case hsql::kExprLiteralString: {
-            auto logical_type = LogicalType(LogicalTypeId::kVarchar);
             PlannerAssert(expr.name != nullptr, "Literal string value is NULL.");
-            return std::make_shared<ValueExpression>(logical_type, std::string(expr.name));
+            auto data_type = DataType(LogicalType::kVarchar);
+            i64 varchar_len = static_cast<i64>(std::strlen(expr.name));
+            auto type_info_ptr = VarcharInfo::Make(varchar_len);
+            Value value = Value::MakeVarchar(expr.name, type_info_ptr);
+            return MakeShared<ValueExpression>(value);
         }
         case hsql::kExprLiteralDate: {
             // TODO: transfer from date string (expr.name) to date int64
-            int64_t date = 0;
-            auto logical_type = LogicalType(LogicalTypeId::kDate);
             PlannerError("Date isn't supported during binding period.");
-            return std::make_shared<ValueExpression>(logical_type, date);
         }
         case hsql::kExprLiteralInterval:
             // IntervalT should be a struct including the type of the value and an value of the interval
@@ -103,8 +105,8 @@ ExpressionBinder::BuildValueExpr(const hsql::Expr &expr, const std::shared_ptr<B
             PlannerError("Interval isn't supported during binding period.");
             break;
         case hsql::kExprLiteralNull: {
-            auto logical_type = LogicalType(LogicalTypeId::kNull);
-            return std::make_shared<ValueExpression>(logical_type);
+            Value value = Value::MakeNull();
+            return MakeShared<ValueExpression>(value);
         }
         default: {
             PlannerError("Unsupported expression type.");
@@ -112,40 +114,40 @@ ExpressionBinder::BuildValueExpr(const hsql::Expr &expr, const std::shared_ptr<B
     }
 }
 
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildColExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
     ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, expr);
-    std::shared_ptr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, 0);
+    SharedPtr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, 0);
     return column_expr;
 }
 
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
 
-    std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
 
-    std::vector<std::shared_ptr<BaseExpression>> arguments;
+    std::vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(expr.exprList->size());
     for(const auto* arg_expr : *expr.exprList) {
-        // std::shared_ptr<BaseExpression> expr_ptr
+        // SharedPtr<BaseExpression> expr_ptr
         auto expr_ptr = BuildExpression(*arg_expr, bind_context_ptr);
         arguments.emplace_back(expr_ptr);
     }
 
     switch(function_set_ptr->type_) {
         case FunctionType::kScalar:{
-            // std::shared_ptr<ScalarFunctionSet> scalar_function_set_ptr
+            // SharedPtr<ScalarFunctionSet> scalar_function_set_ptr
             auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
-            std::shared_ptr<FunctionExpression> function_expr_ptr
-                = std::make_shared<FunctionExpression>(scalar_function, arguments);
+            SharedPtr<FunctionExpression> function_expr_ptr
+                = MakeShared<FunctionExpression>(scalar_function, arguments);
             return function_expr_ptr;
         }
         case FunctionType::kAggregate: {
-            // std::shared_ptr<AggregateFunctionSet> aggregate_function_set_ptr
+            // SharedPtr<AggregateFunctionSet> aggregate_function_set_ptr
             auto aggregate_function_set_ptr = std::static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
             AggregateFunction aggregate_function = aggregate_function_set_ptr->GetMostMatchFunction(arguments);
-            auto aggregate_function_ptr = std::make_shared<AggregateExpression>(aggregate_function, arguments);
+            auto aggregate_function_ptr = MakeShared<AggregateExpression>(aggregate_function, arguments);
             return aggregate_function_ptr;
         }
         case FunctionType::kTable:
@@ -156,15 +158,15 @@ ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<Bi
     }
 }
 
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
 
     switch (expr.opType) {
         case hsql::kOpBetween: {
-            std::shared_ptr<BaseExpression> value = BuildExpression(*expr.expr, bind_context_ptr);
-            std::shared_ptr<BaseExpression> left_bound = BuildExpression(*(*expr.exprList)[0], bind_context_ptr);
-            std::shared_ptr<BaseExpression> right_bound = BuildExpression(*(*expr.exprList)[1], bind_context_ptr);
-            return std::make_shared<BetweenExpression>(value, left_bound, right_bound, true, true);
+            SharedPtr<BaseExpression> value = BuildExpression(*expr.expr, bind_context_ptr);
+            SharedPtr<BaseExpression> left_bound = BuildExpression(*(*expr.exprList)[0], bind_context_ptr);
+            SharedPtr<BaseExpression> right_bound = BuildExpression(*(*expr.exprList)[1], bind_context_ptr);
+            return MakeShared<BetweenExpression>(value, left_bound, right_bound, true, true);
         }
         case hsql::kOpCase: {
             return BuildCaseExpr(expr, bind_context_ptr);
@@ -215,9 +217,9 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_pt
             } else {
                 PlannerAssert(expr.exprList && !expr.exprList->empty(), "IN operation with emtpy list");
 
-                std::shared_ptr<BaseExpression> left_operand_ptr = BuildExpression(*expr.expr, bind_context_ptr);
+                SharedPtr<BaseExpression> left_operand_ptr = BuildExpression(*expr.expr, bind_context_ptr);
 
-                std::vector<std::shared_ptr<BaseExpression>> arguments;
+                std::vector<SharedPtr<BaseExpression>> arguments;
                 arguments.reserve(expr.exprList->size());
 
                 for (const auto* arg : *expr.exprList) {
@@ -225,7 +227,7 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_pt
                     arguments.emplace_back(arg_expr_ptr);
                 }
 
-                return std::make_shared<InExpression>(InType::kIn, left_operand_ptr, arguments);
+                return MakeShared<InExpression>(InType::kIn, left_operand_ptr, arguments);
             }
         }
         case hsql::kOpConcat: // Concat
@@ -251,133 +253,133 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const std::shared_pt
     PlannerError("ExpressionBinder::Build Operator");
 }
 
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildCastExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    std::shared_ptr<BaseExpression> source_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr);
-    LogicalType target_type = LogicalType::TypeConversion(expr.columnType.data_type);
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildCastExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+    SharedPtr<BaseExpression> source_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr);
+    DataType target_type = DataType::ConvertType(expr.columnType.data_type);
     return CastExpression::AddCastToType(source_expr_ptr, target_type);
 }
 
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
     PlannerAssert(expr.exprList, "No when and then expression");
     PlannerAssert(!expr.exprList->empty(), "No when and then expression list");
 
-    std::shared_ptr<CaseExpression> case_expression_ptr;
+    SharedPtr<CaseExpression> case_expression_ptr;
     // two kinds of case statement, please check:
     // https://docs.oracle.com/en/database/oracle/oracle-database/21/lnpls/CASE-statement.html
 
     if(expr.expr) {
         // Simple case
-        std::shared_ptr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr);
+        SharedPtr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr);
 
-        std::string function_name = "=";
+        String function_name = "=";
         auto &catalog = Infinity::instance().catalog();
-        std::shared_ptr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(function_name);
+        SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(function_name);
         auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
 
         for (const auto *case_when_expr : *expr.exprList) {
             // Construct when expression: left_expr = value_expr
-            std::vector<std::shared_ptr<BaseExpression>> arguments;
+            std::vector<SharedPtr<BaseExpression>> arguments;
             arguments.reserve(2);
-            // std::shared_ptr<BaseExpression> value_expr
+            // SharedPtr<BaseExpression> value_expr
             auto value_expr = BuildExpression(*case_when_expr->expr, bind_context_ptr);
             arguments.emplace_back(left_expr_ptr);
             arguments.emplace_back(value_expr);
             ScalarFunction equal_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
-            std::shared_ptr<FunctionExpression> when_expr_ptr
-                    = std::make_shared<FunctionExpression>(equal_function, arguments);
+            SharedPtr<FunctionExpression> when_expr_ptr
+                    = MakeShared<FunctionExpression>(equal_function, arguments);
 
             // Construct then expression
-            // std::shared_ptr<BaseExpression> then_expr
-            std::shared_ptr<BaseExpression> then_expr_ptr = BuildExpression(*case_when_expr->expr2, bind_context_ptr);
+            // SharedPtr<BaseExpression> then_expr
+            SharedPtr<BaseExpression> then_expr_ptr = BuildExpression(*case_when_expr->expr2, bind_context_ptr);
             case_expression_ptr->AddCaseCheck(when_expr_ptr, then_expr_ptr);
         }
     } else {
         // Searched case
         for (const auto *case_when_expr : *expr.exprList) {
             // Construct when expression: left_expr = value_expr
-            // std::shared_ptr<BaseExpression> when_expr
+            // SharedPtr<BaseExpression> when_expr
             auto when_expr_ptr = BuildExpression(*case_when_expr->expr, bind_context_ptr);
 
             // Construct then expression
-            // std::shared_ptr<BaseExpression> then_expr
-            std::shared_ptr<BaseExpression> then_expr_ptr = BuildExpression(*case_when_expr->expr2, bind_context_ptr);
+            // SharedPtr<BaseExpression> then_expr
+            SharedPtr<BaseExpression> then_expr_ptr = BuildExpression(*case_when_expr->expr2, bind_context_ptr);
             case_expression_ptr->AddCaseCheck(when_expr_ptr, then_expr_ptr);
         }
     }
     // Construct else expression
-    std::shared_ptr<BaseExpression> else_expr_ptr;
+    SharedPtr<BaseExpression> else_expr_ptr;
     if (expr.expr2 != nullptr) {
         else_expr_ptr = BuildExpression(*expr.expr2, bind_context_ptr);
     } else {
-        else_expr_ptr = std::make_shared<ValueExpression>(LogicalType(LogicalTypeId::kNull));
+        else_expr_ptr = MakeShared<ValueExpression>(Value::MakeNull());
     }
     case_expression_ptr->AddElseExpr(else_expr_ptr);
 
     return case_expression_ptr;
 }
 
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildBinaryScalarExpr(const std::string& op, const hsql::Expr* left,
-                                  const hsql::Expr* right, const std::shared_ptr<BindContext>& bind_context_ptr) {
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildBinaryScalarExpr(const String& op, const hsql::Expr* left,
+                                  const hsql::Expr* right, const SharedPtr<BindContext>& bind_context_ptr) {
     PlannerAssert(left != nullptr, "No left expression");
     PlannerAssert(right != nullptr , "No right expression");
 
     auto &catalog = Infinity::instance().catalog();
-    std::shared_ptr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(op);
+    SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(op);
     auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
 
-    std::vector<std::shared_ptr<BaseExpression>> arguments(2);
+    std::vector<SharedPtr<BaseExpression>> arguments(2);
     arguments[0] = BuildExpression(*left, bind_context_ptr);
     arguments[1] = BuildExpression(*right, bind_context_ptr);
     ScalarFunction binary_op_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
-    std::shared_ptr<FunctionExpression> result
-            = std::make_shared<FunctionExpression>(binary_op_function, arguments);
+    SharedPtr<FunctionExpression> result
+            = MakeShared<FunctionExpression>(binary_op_function, arguments);
 
     return result;
 }
 
 
-std::shared_ptr<BaseExpression>
-ExpressionBinder::BuildUnaryScalarExpr(const std::string& op,
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildUnaryScalarExpr(const String& op,
                                        const hsql::Expr* expr,
-                                       const std::shared_ptr<BindContext>& bind_context_ptr) {
+                                       const SharedPtr<BindContext>& bind_context_ptr) {
 
     auto &catalog = Infinity::instance().catalog();
-    std::shared_ptr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(op);
+    SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(op);
     auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
 
-    std::vector<std::shared_ptr<BaseExpression>> arguments(1);
+    std::vector<SharedPtr<BaseExpression>> arguments(1);
     arguments[0] = BuildExpression(*expr, bind_context_ptr);
 
     ScalarFunction unary_op_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
 
-    std::shared_ptr<FunctionExpression> result
-            = std::make_shared<FunctionExpression>(unary_op_function, arguments);
+    SharedPtr<FunctionExpression> result
+            = MakeShared<FunctionExpression>(unary_op_function, arguments);
 
     return result;
 }
 
 // Bind subquery expression.
-std::shared_ptr<SubqueryExpression>
+SharedPtr<SubqueryExpression>
 ExpressionBinder::BuildSubquery(const hsql::SelectStatement& select,
-                                const std::shared_ptr<BindContext>& bind_context_ptr,
+                                const SharedPtr<BindContext>& bind_context_ptr,
                                 SubqueryType subquery_type) {
 
-    std::shared_ptr<BindContext> subquery_binding_context_ptr = std::make_shared<BindContext>(bind_context_ptr);
-    std::shared_ptr<BoundSelectNode> select_node_ptr
+    SharedPtr<BindContext> subquery_binding_context_ptr = MakeShared<BindContext>(bind_context_ptr);
+    SharedPtr<BoundSelectNode> select_node_ptr
         = PlanBuilder::BuildSelect(query_context_, select, subquery_binding_context_ptr);
 
-    std::shared_ptr<SubqueryExpression> subquery_expr
-        = std::make_shared<SubqueryExpression>(select_node_ptr, subquery_type);
+    SharedPtr<SubqueryExpression> subquery_expr
+        = MakeShared<SubqueryExpression>(select_node_ptr, subquery_type);
 
     return subquery_expr;
 }
 //
 //// Bind window function.
-//std::shared_ptr<BaseExpression>
-//ExpressionBinder::BuildWindow(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+//SharedPtr<BaseExpression>
+//ExpressionBinder::BuildWindow(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
 //    PlannerError("ExpressionBinder::BuildWindow");
 //}
 

@@ -7,8 +7,8 @@
 
 namespace infinity {
 
-std::shared_ptr<Table>
-Schema::GetTableByName(const std::string &name) {
+SharedPtr<Table>
+Schema::GetTableByName(const String &name) {
     if (tables_.find(name) == tables_.end()) {
         // Table not found
         return nullptr;
@@ -17,26 +17,25 @@ Schema::GetTableByName(const std::string &name) {
 }
 
 void
-Schema::AddTable(const std::shared_ptr<Table>& table_def) {
-    const std::string& table_name = table_def->table_def()->name();
+Schema::AddTable(const SharedPtr<Table>& table) {
+    const String& table_name = table->TableName();
     if (tables_.find(table_name) == tables_.end()) {
-        table_def->table_def()->set_table_id(id_counter_++);
-        tables_[table_name] = table_def;
+        tables_[table_name] = table;
     } else {
         CatalogError("Table already exists: " + table_name);
     }
 }
 
 void
-Schema::DeleteTable(const std::string &table_name) {
+Schema::DeleteTable(const String &table_name) {
     if (tables_.find(table_name) == tables_.end()) {
         CatalogError("Table not found, can't be dropped: " + table_name);
     }
     tables_.erase(table_name);
 }
 
-std::shared_ptr<View>
-Schema::GetViewByName(const std::string &name) {
+SharedPtr<View>
+Schema::GetViewByName(const String &name) {
     if (views_.find(name) == views_.end()) {
         // View not found
         return nullptr;
@@ -45,8 +44,8 @@ Schema::GetViewByName(const std::string &name) {
 }
 
 void
-Schema::AddView(const std::shared_ptr<View>& view) {
-    const std::string& view_name = view->name();
+Schema::AddView(const SharedPtr<View>& view) {
+    const String& view_name = view->name();
     if (views_.find(view_name) == views_.end()) {
         views_[view_name] = view;
     } else {
@@ -55,7 +54,7 @@ Schema::AddView(const std::shared_ptr<View>& view) {
 }
 
 void
-Schema::DeleteView(const std::string &view_name) {
+Schema::DeleteView(const String &view_name) {
     if (views_.find(view_name) == views_.end()) {
         CatalogError("View not found, can't be dropped: " + view_name);
     }

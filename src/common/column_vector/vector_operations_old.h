@@ -3,8 +3,7 @@
 //
 
 #pragma once
-
-#include "storage/data_type.h"
+#if 0
 #include "storage/chunk.h"
 
 namespace infinity {
@@ -16,3 +15,4 @@ public:
 };
 
 }
+#endif

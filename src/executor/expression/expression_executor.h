@@ -27,55 +27,55 @@ public:
     void
     Execute(std::shared_ptr<BaseExpression>& expr,
             std::shared_ptr<ExpressionState>& state,
-            Chunk& output_column,
+            ColumnVector& output_column_vector,
             size_t count);
 
     void
     Execute(const std::shared_ptr<AggregateExpression>& expr,
             std::shared_ptr<ExpressionState>& state,
-            Chunk& output_column,
+            ColumnVector& output_column_vector,
             size_t count);
 
     void
     Execute(const std::shared_ptr<CastExpression>& expr,
             std::shared_ptr<ExpressionState>& state,
-            Chunk& output_column,
+            ColumnVector& output_column_vector,
             size_t count);
 
     void
     Execute(const std::shared_ptr<CaseExpression>& expr,
             std::shared_ptr<ExpressionState>& state,
-            Chunk& output_column,
+            ColumnVector& output_column_vector,
             size_t count);
 
     void
     Execute(const std::shared_ptr<ConjunctionExpression>& expr,
             std::shared_ptr<ExpressionState>& state,
-            Chunk& output_column,
+            ColumnVector& output_column_vector,
             size_t count);
 
     void
     Execute(const std::shared_ptr<ColumnExpression>& expr,
             std::shared_ptr<ExpressionState>& state,
-            Chunk& output_column,
+            ColumnVector& output_column_vector,
             size_t count);
 
     void
     Execute(const std::shared_ptr<FunctionExpression>& expr,
             std::shared_ptr<ExpressionState>& state,
-            Chunk& output_column,
+            ColumnVector& output_column_vector,
             size_t count);
 
     void
     Execute(const std::shared_ptr<BetweenExpression>& expr,
             std::shared_ptr<ExpressionState>& state,
-            Chunk& output_column,
+            ColumnVector& output_column_vector,
             size_t count);
 
     void
     Execute(const std::shared_ptr<ValueExpression>& expr,
             std::shared_ptr<ExpressionState>& state,
-            Chunk& output_column,
+            ColumnVector& output_column_vector,
             size_t count);
 
 private:

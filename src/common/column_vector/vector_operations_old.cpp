@@ -2,7 +2,8 @@
 // Created by JinHai on 2022/9/9.
 //
 
-#include "vector_operations.h"
+#if 0
+#include "vector_operations_old.h"
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {
@@ -205,3 +206,4 @@ VectorOperation::VectorCast(const Chunk& source, Chunk& target) {
 }
 
 }
+#endif

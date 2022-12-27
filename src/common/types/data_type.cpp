@@ -8,6 +8,7 @@
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/varchar_info.h"
 #include "common/types/info/embedding_info.h"
+#include "common/types/info/char_info.h"
 
 namespace infinity {
 
@@ -143,6 +144,68 @@ static i64 type_size[] = {
     0, // Missing
     0, // Invalid
 };
+
+DataType
+DataType::Make(hsql::ColumnType type) {
+    switch (type.data_type) {
+        case hsql::DataType::UNKNOWN: {
+            TypeError("Unknown parsed data type.")
+        }
+        case hsql::DataType::BIGINT: {
+            return DataType(LogicalType::kBigInt);
+        }
+        case hsql::DataType::BOOLEAN: {
+            return DataType(LogicalType::kBoolean);
+        }
+        case hsql::DataType::CHAR: {
+            SharedPtr<CharInfo> char_info_ptr = CharInfo::Make(type.length);
+            // Fixme: kChar64 -> kChar
+            return DataType(LogicalType::kChar64, char_info_ptr);
+        }
+        case hsql::DataType::DATE: {
+            return DataType(LogicalType::kDate);
+        }
+        case hsql::DataType::DATETIME: {
+            return DataType(LogicalType::kDateTime);
+        }
+        case hsql::DataType::DECIMAL: {
+            SharedPtr<TypeInfo> decimal_info_ptr = DecimalInfo::Make(type.precision, type.scale);
+            LogicalType decimal_type = DecimalInfo::GetDecimalType(type.precision, type.scale);
+            return DataType(decimal_type, decimal_info_ptr);
+        }
+        case hsql::DataType::DOUBLE: {
+            return DataType(LogicalType::kDouble);
+        }
+        case hsql::DataType::FLOAT: {
+            return DataType(LogicalType::kFloat);
+        }
+        case hsql::DataType::INT: {
+            return DataType(LogicalType::kInteger);
+        }
+        case hsql::DataType::LONG: {
+            return DataType(LogicalType::kBigInt);
+        }
+        case hsql::DataType::REAL: {
+            return DataType(LogicalType::kFloat);
+        }
+        case hsql::DataType::SMALLINT: {
+            return DataType(LogicalType::kSmallInt);
+        }
+        case hsql::DataType::TEXT: {
+            SharedPtr<VarcharInfo> varchar_info_ptr = VarcharInfo::Make(type.length);
+            return DataType(LogicalType::kVarchar, varchar_info_ptr);
+        }
+        case hsql::DataType::TIME: {
+            return DataType(LogicalType::kTime);
+        }
+        case hsql::DataType::VARCHAR: {
+            SharedPtr<VarcharInfo> varchar_info_ptr = VarcharInfo::Make(type.length);
+            return DataType(LogicalType::kVarchar, varchar_info_ptr);
+        }
+    }
+
+    TypeError("Unexpected data type.")
+}
 
 std::string
 DataType::ToString() const {

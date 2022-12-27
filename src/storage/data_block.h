@@ -2,6 +2,8 @@
 // Created by JinHai on 2022/11/12.
 //
 
+#pragma once
+
 #include "common/types/internal_types.h"
 #include "common/column_vector/column_vector.h"
 
@@ -9,6 +11,14 @@ namespace infinity {
 
 // Intermediate data structure transferred between operator.
 struct DataBlock {
+
+public:
+    static inline SharedPtr<DataBlock>
+    Make() {
+        return MakeShared<DataBlock>();
+    }
+
+public:
 
     DataBlock() = default;
 
@@ -20,22 +30,36 @@ struct DataBlock {
     Reset();
 
     [[nodiscard]] Value
-    GetValue(size_t column_index, size_t row_index) const;
+    GetValue(SizeT column_index, SizeT row_index) const;
 
     void
-    SetValue(size_t column_index, size_t row_index, const Value& val);
+    SetValue(SizeT column_index, SizeT row_index, const Value& val);
 
     void
-    AppendValue(size_t column_index, const Value& value);
+    AppendValue(SizeT column_index, const Value& value);
+
+    void
+    Finalize();
+
+    String
+    ToString() const;
+
+    [[nodiscard]] bool
+    Finalized() const {
+        return finalized;
+    }
 
 public:
-    [[nodiscard]] inline size_t
+    [[nodiscard]] inline SizeT
     column_count() const {
         return column_count_;
     }
 
-    [[nodiscard]] inline size_t
+    [[nodiscard]] inline SizeT
     row_count() const {
+        if(!finalized) {
+            StorageError("Not finalized data block")
+        }
         return row_count_;
     }
 
@@ -43,8 +67,9 @@ public:
 
 private:
 
-    size_t row_count_ {0};
-    size_t column_count_ {0};
+    SizeT row_count_ {0};
+    SizeT column_count_ {0};
     bool initialized = false;
+    bool finalized = false;
 };
 }

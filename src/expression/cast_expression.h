@@ -10,18 +10,24 @@ namespace infinity {
 
 class CastExpression: public BaseExpression {
 public:
-    CastExpression(const std::shared_ptr<BaseExpression>& argument, LogicalType data_type);
+    CastExpression(const SharedPtr<BaseExpression>& argument, DataType target_type);
 
-    LogicalType DataType() override;
-    std::string ToString() const override;
+    DataType
+    Type() const override {
+        return target_type_;
+    }
 
-    static bool CanCast(const LogicalType& source, const LogicalType& target);
+    String
+    ToString() const override;
 
-    static std::shared_ptr<BaseExpression>
-    AddCastToType(const std::shared_ptr<BaseExpression>& expr, const LogicalType &target_type);
+    static bool
+    CanCast(const DataType& source, const DataType& target);
+
+    static SharedPtr<BaseExpression>
+    AddCastToType(const SharedPtr<BaseExpression>& expr, const DataType &target_type);
 
 private:
-    LogicalType data_type_;
+    DataType target_type_;
 
     // TODO: Cast function should be scalar function
 };

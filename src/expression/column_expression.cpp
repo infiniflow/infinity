@@ -9,17 +9,17 @@
 
 namespace infinity {
 
-ColumnExpression::ColumnExpression(LogicalType logical_type, std::string table_name,
-                                   std::string column_name, int64_t column_index, int64_t depth)
+ColumnExpression::ColumnExpression(DataType data_type, String table_name,
+                                   String column_name, i64 column_index, i64 depth)
                                    : BaseExpression(ExpressionType::kColumn, {}),
-                                   data_type_(logical_type),
+                                   data_type_(std::move(data_type)),
                                    table_name_(std::move(table_name)),
                                    column_name_(std::move(column_name)),
                                    column_index_(column_index),
                                    depth_(depth)
 {}
 
-std::string
+String
 ColumnExpression::ToString() const {
     std::stringstream ss;
     if(!table_name_.empty()) {

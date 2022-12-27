@@ -13,18 +13,24 @@
 
 namespace infinity {
 
-
 class FunctionSet {
 public:
-    static std::shared_ptr<FunctionSet> GetFunctionSet(const hsql::Expr &expr);
-    static std::string
-    ToString(const std::string& name, const std::vector<std::shared_ptr<BaseExpression>>& arguments);
+    static SharedPtr<FunctionSet>
+    GetFunctionSet(const hsql::Expr &expr);
 
-    explicit FunctionSet(std::string name, FunctionType type): name_(std::move(name)), type_(type) {}
+    static String
+    ToString(const String& name, const Vector<SharedPtr<BaseExpression>>& arguments);
 
-    [[nodiscard]] const std::string& name() const { return name_; }
+public:
+    explicit
+    FunctionSet(String name, FunctionType type): name_(std::move(name)), type_(type) {}
 
-    std::string name_;
+    [[nodiscard]] const String&
+    name() const {
+        return name_;
+    }
+
+    String name_;
     FunctionType type_;
 };
 

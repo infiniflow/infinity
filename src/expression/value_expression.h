@@ -5,28 +5,31 @@
 #pragma once
 
 #include "base_expression.h"
-#include "storage/chunk.h"
-
-#include <any>
+#include "common/types/value.h"
+#include "common/column_vector/column_vector.h"
 
 namespace infinity {
 
 class ValueExpression: public BaseExpression {
 public:
-    explicit ValueExpression(LogicalType logical_type, std::any value);
-    explicit ValueExpression(LogicalType logical_type);
+    explicit
+    ValueExpression(Value value) : BaseExpression(ExpressionType::kValue, {}), value_(std::move(value)){}
 
-    LogicalType DataType() override {
-        return data_type_;
+    String
+    ToString() const override;
+
+    DataType
+    Type() const override {
+        return value_.type();
     }
 
-    std::string ToString() const override;
-    bool IsNull() const { return data_type_.GetTypeId() == LogicalTypeId::kNull; }
-    void AppendToChunk(Chunk& chunk);
+    inline void
+    AppendToChunk(ColumnVector& column_vector) {
+        column_vector.AppendValue(value_);
+    }
 
 private:
-    LogicalType data_type_;
-    std::any value_;
+    Value value_;
 };
 
 }

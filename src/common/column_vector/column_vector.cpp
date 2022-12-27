@@ -64,6 +64,11 @@ ColumnVector::ToString() const {
     TypeError("Not implemented");
 }
 
+String
+ColumnVector::ToString(SizeT row_index) const {
+    NotImplementError("Not implemented.")
+}
+
 Value
 ColumnVector::GetValue(idx_t index) const {
     if(index >= tail_index_) {

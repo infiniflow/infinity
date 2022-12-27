@@ -1,7 +1,7 @@
 //
 // Created by JinHai on 2022/7/23.
 //
-
+#if 0
 #include "column_definition.h"
 #include <sstream>
 #include <utility>
@@ -26,4 +26,6 @@ std::string ColumnDefinition::ToString() const {
     return ss.str();
 }
 
+
 }
+#endif

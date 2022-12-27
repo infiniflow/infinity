@@ -150,6 +150,9 @@ public:
     static Value
     MakeMixedData(MixedT input);
 
+    static Value
+    MakeNull();
+
     // Object member
 public:
     // Value getter template

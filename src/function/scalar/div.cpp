@@ -22,43 +22,43 @@ RegisterDivFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
 
     ScalarFunction div_function_int8(
             "/",
-            { LogicalType(LogicalTypeId::kTinyInt), LogicalType(LogicalTypeId::kTinyInt) },
-            { LogicalType(LogicalTypeId::kTinyInt) },
+            { DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt) },
+            { DataType(LogicalType::kTinyInt) },
             &ScalarFunction::BinaryFunction<int8_t, int8_t, int8_t, DivFunction>);
     function_set_ptr->AddFunction(div_function_int8);
 
     ScalarFunction div_function_int16(
             "/",
-            { LogicalType(LogicalTypeId::kSmallInt), LogicalType(LogicalTypeId::kSmallInt) },
-            { LogicalType(LogicalTypeId::kSmallInt) },
+            { DataType(LogicalType::kSmallInt), DataType(LogicalType::kSmallInt) },
+            { DataType(LogicalType::kSmallInt) },
             &ScalarFunction::BinaryFunction<int16_t, int16_t, int16_t, DivFunction>);
     function_set_ptr->AddFunction(div_function_int16);
 
     ScalarFunction div_function_int32(
             "/",
-            { LogicalType(LogicalTypeId::kInteger), LogicalType(LogicalTypeId::kInteger) },
-            { LogicalType(LogicalTypeId::kInteger) },
+            { DataType(LogicalType::kInteger), DataType(LogicalType::kInteger) },
+            { DataType(LogicalType::kInteger) },
             &ScalarFunction::BinaryFunction<int32_t, int32_t, int32_t, DivFunction>);
     function_set_ptr->AddFunction(div_function_int32);
 
     ScalarFunction div_function_int64(
             "/",
-            { LogicalType(LogicalTypeId::kBigInt), LogicalType(LogicalTypeId::kBigInt) },
-            { LogicalType(LogicalTypeId::kBigInt) },
+            { DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt) },
+            { DataType(LogicalType::kBigInt) },
             &ScalarFunction::BinaryFunction<int64_t, int64_t, int64_t, DivFunction>);
     function_set_ptr->AddFunction(div_function_int64);
 
     ScalarFunction div_function_float(
             "/",
-            { LogicalType(LogicalTypeId::kFloat), LogicalType(LogicalTypeId::kFloat) },
-            { LogicalType(LogicalTypeId::kFloat) },
+            { DataType(LogicalType::kFloat), DataType(LogicalType::kFloat) },
+            { DataType(LogicalType::kFloat) },
             &ScalarFunction::BinaryFunction<float, float, float, DivFunction>);
     function_set_ptr->AddFunction(div_function_float);
 
     ScalarFunction div_function_double(
             "/",
-            { LogicalType(LogicalTypeId::kDouble), LogicalType(LogicalTypeId::kDouble) },
-            { LogicalType(LogicalTypeId::kDouble) },
+            { DataType(LogicalType::kDouble), DataType(LogicalType::kDouble) },
+            { DataType(LogicalType::kDouble) },
             &ScalarFunction::BinaryFunction<double, double, double, DivFunction>);
     function_set_ptr->AddFunction(div_function_double);
 

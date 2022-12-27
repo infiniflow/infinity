@@ -11,22 +11,39 @@ namespace infinity {
 
 class ColumnExpression : public BaseExpression {
 public:
-    ColumnExpression(LogicalType logical_type, std::string table_name,
-                     std::string column_name, int64_t column_index, int64_t depth);
+    ColumnExpression(DataType data_type, String table_name,
+                     String column_name, i64 column_index, i64 depth);
 
-    LogicalType DataType() override { return data_type_; };
-    std::string ToString() const override;
+    DataType Type() const override {
+        return data_type_;
+    };
 
-    const std::string& table_name() const { return table_name_; }
-    const std::string& column_name() const { return column_name_; }
-    int64_t column_index() const { return column_index_; }
+    String
+    ToString() const override;
+
+    const String&
+    table_name() const {
+        return table_name_;
+    }
+
+    const String&
+    column_name() const {
+        return column_name_;
+    }
+
+    i64
+    column_index() const {
+        return column_index_;
+    }
+
 private:
-    LogicalType data_type_;
-    std::string table_name_;
-    std::string column_name_;
 
-    int64_t column_index_;
-    int64_t depth_;
+    DataType data_type_;
+    String table_name_;
+    String column_name_;
+
+    i64 column_index_;
+    i64 depth_;
 };
 
 

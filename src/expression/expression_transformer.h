@@ -19,21 +19,21 @@ enum class VisitControlType {
 };
 
 // Transform expr_a AND expr_b AND expr_c into expressions array: [expr_a, expr_b, expr_c].
-std::vector<std::shared_ptr<BaseExpression>>
-SplitExpressionByDelimiter(const std::shared_ptr<BaseExpression>& expression, ConjunctionType conjunction_type);
+Vector<SharedPtr<BaseExpression>>
+SplitExpressionByDelimiter(const SharedPtr<BaseExpression>& expression, ConjunctionType conjunction_type);
 
-std::shared_ptr<BaseExpression>
-ComposeExpressionWithDelimiter(const std::vector<std::shared_ptr<BaseExpression>>& expressions,
+SharedPtr<BaseExpression>
+ComposeExpressionWithDelimiter(const Vector<SharedPtr<BaseExpression>>& expressions,
                              ConjunctionType conjunction_type);
 
 
 // Traverse the expression and it's child
 void
-VisitExpression(const std::shared_ptr<BaseExpression>& expression,
-                const std::function<VisitControlType(std::shared_ptr<BaseExpression> &child)>& visitor);
+VisitExpression(const SharedPtr<BaseExpression>& expression,
+                const std::function<VisitControlType(SharedPtr<BaseExpression> &child)>& visitor);
 
 void
-VisitExpression(const std::shared_ptr<BaseExpression>& expression,
-                const std::function<void(std::shared_ptr<BaseExpression> &child)>& visitor);
+VisitExpression(const SharedPtr<BaseExpression>& expression,
+                const std::function<void(SharedPtr<BaseExpression> &child)>& visitor);
 
 }

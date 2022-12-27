@@ -8,16 +8,16 @@
 
 namespace infinity {
 
-BetweenExpression::BetweenExpression(const std::shared_ptr<BaseExpression> &value,
-                                     const std::shared_ptr<BaseExpression> &upper_bound,
-                                     const std::shared_ptr<BaseExpression> &lower_bound,
+BetweenExpression::BetweenExpression(const SharedPtr<BaseExpression> &value,
+                                     const SharedPtr<BaseExpression> &upper_bound,
+                                     const SharedPtr<BaseExpression> &lower_bound,
                                      bool upper_inclusive,
                                      bool lower_inclusive)
      : BaseExpression(ExpressionType::kArithmetic, {lower_bound, value, upper_bound}),
      upper_inclusive_(upper_inclusive), lower_inclusive_(lower_inclusive) {}
 
 
-std::string
+String
 BetweenExpression::ToString() const {
     std::stringstream ss;
 
@@ -26,9 +26,9 @@ BetweenExpression::ToString() const {
     return ss.str();
 }
 
-LogicalType
-BetweenExpression::DataType() {
-    return LogicalType(LogicalTypeId::kText);
+DataType
+BetweenExpression::Type() const {
+    return DataType(LogicalType::kBoolean);
 }
 
 }

@@ -11,27 +11,42 @@
 namespace infinity {
 
 struct CaseCheck {
-    CaseCheck(std::shared_ptr<BaseExpression> when_expr, std::shared_ptr<BaseExpression> then_expr)
+    CaseCheck(SharedPtr<BaseExpression> when_expr, SharedPtr<BaseExpression> then_expr)
         : when_expr_(std::move(when_expr)), then_expr_(std::move(then_expr)) {}
 
-    std::shared_ptr<BaseExpression> when_expr_;
-    std::shared_ptr<BaseExpression> then_expr_;
+    SharedPtr<BaseExpression> when_expr_;
+    SharedPtr<BaseExpression> then_expr_;
 };
 
 class CaseExpression : public BaseExpression {
 public:
     CaseExpression();
-    void AddCaseCheck(const std::shared_ptr<BaseExpression>& when_expr, const std::shared_ptr<BaseExpression>& then_expr);
-    void AddElseExpr(const std::shared_ptr<BaseExpression>& else_expr);
 
-    LogicalType DataType() override;
-    std::string ToString() const override;
+    void
+    AddCaseCheck(const SharedPtr<BaseExpression>& when_expr, const SharedPtr<BaseExpression>& then_expr);
 
-    std::vector<CaseCheck>& CaseExpr() { return case_check_; }
-    std::shared_ptr<BaseExpression>& ElseExpr() { return else_expr_; }
+    void
+    AddElseExpr(const SharedPtr<BaseExpression>& else_expr);
+
+    DataType
+    Type() const override;
+
+    String
+    ToString() const override;
+
+    Vector<CaseCheck>&
+    CaseExpr() {
+        return case_check_;
+    }
+
+    SharedPtr<BaseExpression>&
+    ElseExpr() {
+        return else_expr_;
+    }
+
 private:
-    std::vector<CaseCheck> case_check_;
-    std::shared_ptr<BaseExpression> else_expr_;
+    Vector<CaseCheck> case_check_;
+    SharedPtr<BaseExpression> else_expr_;
 };
 
 }

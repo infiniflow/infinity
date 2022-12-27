@@ -12,7 +12,7 @@ PhysicalAggregate::Init() {
 }
 
 void
-PhysicalAggregate::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
 
 }
 

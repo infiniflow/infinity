@@ -28,13 +28,13 @@ public:
         return columns_.size();
     }
 
-    [[nodiscard]] inline const std::string&
+    [[nodiscard]] inline const String&
     name() const {
         return name_;
     }
 
     [[nodiscard]] inline i64
-    GetColIdByName(const std::string& name) const {
+    GetColIdByName(const String& name) const {
         if(column_name2id_.contains(name)) {
             return column_name2id_.at(name);
         } else {

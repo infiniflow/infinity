@@ -103,6 +103,10 @@ using MixedT = MixedType;
 
 class DataType {
 public:
+    static DataType
+    Make(hsql::ColumnType type);
+
+public:
     explicit
     DataType(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr) :
         type_(logical_type), type_info_(std::move(type_info_ptr)) {

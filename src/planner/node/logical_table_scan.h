@@ -15,23 +15,28 @@ namespace infinity {
 class LogicalTableScan : public LogicalNode {
 public:
     explicit
-    LogicalTableScan(std::shared_ptr<Table> table_ptr,
-                     std::shared_ptr<BindContext>& bind_context,
-                     std::shared_ptr<TableScanFunction> table_scan_func,
-                     std::string table_alias,
-                     std::vector<std::string> column_names,
-                     std::vector<LogicalType> column_types);
+    LogicalTableScan(SharedPtr<Table> table_ptr,
+                     SharedPtr<BindContext>& bind_context,
+                     SharedPtr<TableScanFunction> table_scan_func,
+                     String table_alias,
+                     Vector<String> column_names,
+                     Vector<DataType> column_types);
 
-    [[nodiscard]] std::shared_ptr<Table> table_ptr() const { return table_ptr_; }
-    std::string ToString(int64_t& space) final;
+    [[nodiscard]] SharedPtr<Table>
+    table_ptr() const {
+        return table_ptr_;
+    }
 
-    std::string table_alias_;
-    std::vector<std::string> column_names_;
-    std::vector<LogicalType> column_types_;
+    String
+    ToString(i64& space) final;
 
-    std::shared_ptr<TableScanFunction> table_scan_func_ptr_;
+    String table_alias_;
+    Vector<String> column_names_;
+    Vector<DataType> column_types_;
+
+    SharedPtr<TableScanFunction> table_scan_func_ptr_;
 private:
-    std::shared_ptr<Table> table_ptr_{nullptr};
+    SharedPtr<Table> table_ptr_{nullptr};
 
 };
 

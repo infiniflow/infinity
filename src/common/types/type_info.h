@@ -19,6 +19,7 @@ enum class TypeInfoType {
     kDecimal64,
     kDecimal128,
     kVarchar,
+    kChar,
 
     // Nested
     kArray,

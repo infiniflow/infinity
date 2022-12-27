@@ -14,7 +14,9 @@ public:
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline Execute(const ColumnVector& left,
                                const ColumnVector& right,
-                               ColumnVector& result, size_t count, bool nullable) {
+                               ColumnVector& result,
+                               size_t count,
+                               bool nullable) {
         switch(left.vector_type()) {
             case ColumnVectorType::kInvalid: {
                 GeneralError("Invalid column vector type.");
@@ -140,63 +142,64 @@ private:
     static void inline ExecuteFlatFlat(const ColumnVector& left,
                                    const ColumnVector& right,
                                    ColumnVector& result, size_t count, bool nullable) {
-        GeneralError("Not implemented.");
+        GeneralError("Not implemented.")
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteFlatConstant(const ColumnVector& left,
                                            const ColumnVector& right,
                                            ColumnVector& result, size_t count, bool nullable) {
-        GeneralError("Not implemented.");
+        GeneralError("Not implemented.")
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteFlatHeterogeneous(const ColumnVector& left,
                                                 const ColumnVector& right,
                                                 ColumnVector& result, size_t count, bool nullable) {
-        GeneralError("Not implemented.");
+        GeneralError("Not implemented.")
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteConstantFlat(const ColumnVector& left,
                                            const ColumnVector& right,
                                            ColumnVector& result, size_t count, bool nullable) {
-        GeneralError("Not implemented.");
+        GeneralError("Not implemented.")
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteConstantConstant(const ColumnVector& left,
                                                const ColumnVector& right,
                                                ColumnVector& result, size_t count, bool nullable) {
-        GeneralError("Not implemented.");
+        GeneralError("Not implemented.")
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteConstantHeterogeneous(const ColumnVector& left,
                                                     const ColumnVector& right,
                                                     ColumnVector& result, size_t count, bool nullable) {
-        GeneralError("Not implemented.");
+        GeneralError("Not implemented.")
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteHeterogeneousFlat(const ColumnVector& left,
                                                 const ColumnVector& right,
                                                 ColumnVector& result, size_t count, bool nullable) {
-        GeneralError("Not implemented.");
+        GeneralError("Not implemented.")
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteHeterogeneousConstant(const ColumnVector& left,
                                                     const ColumnVector& right,
                                                     ColumnVector& result, size_t count, bool nullable) {
-        GeneralError("Not implemented.");
+        GeneralError("Not implemented.")
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
     static void inline ExecuteHeterogeneousHeterogeneous(const ColumnVector& left,
                                                          const ColumnVector& right,
                                                          ColumnVector& result, size_t count, bool nullable) {
-        GeneralError("Not implemented.");
+        GeneralError("Not implemented.")
     }
-}
+};
+
 }

@@ -1,10 +1,10 @@
 //
 // Created by JinHai on 2022/9/9.
 //
-
+#if 0
 #include <gtest/gtest.h>
 #include "base_test.h"
-#include "common/column_vector/vector_operations.h"
+#include "common/column_vector/vector_operations_old.h"
 #include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
@@ -892,3 +892,4 @@ TEST_F(VectorOperationTest, TextToOther) {
         EXPECT_EQ(std::string(e.what()), "Cast Error");
     }
 }
+#endif

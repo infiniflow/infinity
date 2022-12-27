@@ -15,66 +15,56 @@
 #include "expression/conjunction_expression.h"
 #include "expression/function_expression.h"
 #include "expression/value_expression.h"
+#include "storage/data_block.h"
 
 namespace infinity {
-
-//    case ExpressionType::kAggregate:
-//    break;
-//    case ExpressionType::kCast:
-//    break;
-//    case ExpressionType::kCase:
-//    break;
-//    case ExpressionType::kConjunction:
-//    break;
-//    case ExpressionType::kColumn:
-//    break;
-//    case ExpressionType::kFunction:
-//    break;
-//    case ExpressionType::kBetween:
-//    break;
-//    case ExpressionType::kValue:
-//    break;
 
 class ExpressionState {
 public:
     // Static functions
-    static std::shared_ptr<ExpressionState>
-    CreateState(const std::shared_ptr<BaseExpression>& expression);
+    static SharedPtr<ExpressionState>
+    CreateState(const SharedPtr<BaseExpression>& expression);
 
-    static std::shared_ptr<ExpressionState>
-    CreateState(const std::shared_ptr<AggregateExpression>& agg_expr);
+    static SharedPtr<ExpressionState>
+    CreateState(const SharedPtr<AggregateExpression>& agg_expr);
 
-    static std::shared_ptr<ExpressionState>
-    CreateState(const std::shared_ptr<BetweenExpression>& agg_expr);
+    static SharedPtr<ExpressionState>
+    CreateState(const SharedPtr<BetweenExpression>& agg_expr);
 
-    static std::shared_ptr<ExpressionState>
-    CreateState(const std::shared_ptr<CaseExpression>& agg_expr);
+    static SharedPtr<ExpressionState>
+    CreateState(const SharedPtr<CaseExpression>& agg_expr);
 
-    static std::shared_ptr<ExpressionState>
-    CreateState(const std::shared_ptr<CastExpression>& agg_expr);
+    static SharedPtr<ExpressionState>
+    CreateState(const SharedPtr<CastExpression>& agg_expr);
 
-    static std::shared_ptr<ExpressionState>
-    CreateState(const std::shared_ptr<ColumnExpression>& agg_expr);
+    static SharedPtr<ExpressionState>
+    CreateState(const SharedPtr<ColumnExpression>& agg_expr);
 
-    static std::shared_ptr<ExpressionState>
-    CreateState(const std::shared_ptr<ConjunctionExpression>& agg_expr);
+    static SharedPtr<ExpressionState>
+    CreateState(const SharedPtr<ConjunctionExpression>& agg_expr);
 
-    static std::shared_ptr<ExpressionState>
-    CreateState(const std::shared_ptr<FunctionExpression>& agg_expr);
+    static SharedPtr<ExpressionState>
+    CreateState(const SharedPtr<FunctionExpression>& agg_expr);
 
-    static std::shared_ptr<ExpressionState>
-    CreateState(const std::shared_ptr<ValueExpression>& agg_expr);
+    static SharedPtr<ExpressionState>
+    CreateState(const SharedPtr<ValueExpression>& agg_expr);
 public:
     void
-    AddChild(const std::shared_ptr<BaseExpression>& expression);
+    AddChild(const SharedPtr<BaseExpression>& expression);
 
-    std::vector<std::shared_ptr<ExpressionState>>& Children() { return children_; }
+    Vector<SharedPtr<ExpressionState>>&
+    Children() {
+        return children_;
+    }
 
-    Chunk& OutputChunk() { return output_block_.chunks_[0]; }
+    ColumnVector&
+    OutputColumnVector() {
+        return output_data_block_.column_vectors[0];
+    }
 private:
-    std::vector<std::shared_ptr<ExpressionState>> children_;
-    std::string name_;
-    TransBlock output_block_;
+    Vector<SharedPtr<ExpressionState>> children_;
+    String name_;
+    DataBlock output_data_block_;
 };
 
 }

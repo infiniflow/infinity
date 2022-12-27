@@ -72,8 +72,8 @@ enum LogicalType: i8 {
     // Heterogeneous type * 1
     kMixed,
 
-    // only used in heterogeneous type
     kNull,
+    // only used in heterogeneous type
     kMissing,
 
     kInvalid,

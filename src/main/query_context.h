@@ -19,35 +19,50 @@ struct QueryResult {
     std::shared_ptr<Table> result_;
     LogicalNodeType root_operator_type_;
 
-    [[nodiscard]] std::string ToString() const;
+    [[nodiscard]] String
+    ToString() const;
 };
 
 class QueryContext : public std::enable_shared_from_this<QueryContext> {
 public:
-    explicit QueryContext(const std::shared_ptr<Session>& session_ptr, std::unique_ptr<TransactionContext>& transaction);
-    QueryResult Query(const std::string& query);
-//    static QueryResult Execute(const std::string& query);
+    explicit
+    QueryContext(const std::shared_ptr<Session>& session_ptr, UniquePtr<TransactionContext>& transaction);
 
-    inline void set_current_schema(const std::string& current_schema) { current_schema_ = current_schema; }
-    inline std::unique_ptr<TransactionContext>& transaction() { return transaction_; }
+    QueryResult
+    Query(const String& query);
+//    static QueryResult Execute(const String& query);
 
-    const std::string& schema_name() const { return current_schema_; }
+    inline void
+    set_current_schema(const String& current_schema) {
+        current_schema_ = current_schema;
+    }
+
+    inline UniquePtr<TransactionContext>& 
+    transaction() { 
+        return transaction_; 
+    }
+
+    const String& 
+    schema_name() const { 
+        return current_schema_; 
+    }
+    
 private:
-    std::unique_ptr<TransactionContext>& transaction_;
-    std::unique_ptr<QueryProfiler> query_metrics_;
+    UniquePtr<TransactionContext>& transaction_;
+    UniquePtr<QueryProfiler> query_metrics_;
 
 //    std::weak_ptr<Session> session_ptr_;
 
     // Get following information from session.
     // Current schema
-    std::string current_schema_;
+    String current_schema_;
 
     // User / Tenant information
-    std::string tenant_name_;
-    std::string user_name_;
+    String tenant_name_;
+    String user_name_;
 
-    uint64_t tenant_id_{0};
-    uint64_t user_id_{0};
+    u64 tenant_id_{0};
+    u64 user_id_{0};
 };
 
 }

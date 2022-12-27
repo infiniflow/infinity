@@ -1,7 +1,7 @@
 //
 // Created by JinHai on 2022/9/15.
 //
-
+#if 0
 #include "storage/transblock.h"
 #include "common/utility/infinity_assert.h"
 
@@ -74,3 +74,4 @@ public:
 };
 
 }
+#endif

@@ -6,24 +6,27 @@
 #include "common/utility/infinity_assert.h"
 
 #include <sstream>
+#include <utility>
 
 namespace infinity {
 
-std::shared_ptr<BaseExpression>
-CastExpression::AddCastToType(const std::shared_ptr<BaseExpression>& source_expr_ptr, const LogicalType &target_type) {
-    if (source_expr_ptr->DataType() == target_type) {
+SharedPtr<BaseExpression>
+CastExpression::AddCastToType(const SharedPtr<BaseExpression>& source_expr_ptr, const DataType &target_type) {
+    if (source_expr_ptr->Type() == target_type) {
         return source_expr_ptr;
     }
 
-    if(CastExpression::CanCast(source_expr_ptr->DataType(), target_type)) {
+    if(CastExpression::CanCast(source_expr_ptr->Type(), target_type)) {
         return std::make_shared<CastExpression>(source_expr_ptr, target_type);
     } else {
-        PlannerError("Can't cast from: " + source_expr_ptr->DataType().ToString() + " to" + target_type.ToString());
+        PlannerError("Can't cast from: " + source_expr_ptr->Type().ToString() + " to" + target_type.ToString());
     }
 }
 
 bool
-CastExpression::CanCast(const LogicalType& source, const LogicalType& target) {
+CastExpression::CanCast(const DataType& source, const DataType& target) {
+    return true;
+#if 0
     switch(target.GetTypeId()) {
         case LogicalTypeId::kNull:
         case LogicalTypeId::kAny:
@@ -118,26 +121,21 @@ CastExpression::CanCast(const LogicalType& source, const LogicalType& target) {
         default:
             PlannerError("Invalid data type");
     }
+#endif
 }
 
 
-CastExpression::CastExpression(const std::shared_ptr<BaseExpression> &argument,
-                               LogicalType data_type)
-   : BaseExpression(ExpressionType::kCast, {argument}), data_type_(data_type) {}
+CastExpression::CastExpression(const SharedPtr<BaseExpression> &argument,
+                               DataType data_type)
+   : BaseExpression(ExpressionType::kCast, {argument}), target_type_(std::move(data_type)) {}
 
-std::string
+String
 CastExpression::ToString() const {
     std::stringstream ss;
 
-    ss << "Cast(" << arguments_[0]->ToString() << " As " << data_type_.ToString();
+    ss << "Cast(" << arguments_[0]->ToString() << " As " << target_type_.ToString();
 
     return ss.str();
 }
-
-LogicalType
-CastExpression::DataType() {
-    return data_type_;
-}
-
 
 }

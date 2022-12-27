@@ -1,7 +1,7 @@
 //
 // Created by JinHai on 2022/7/23.
 //
-
+#if 0
 #pragma once
 
 #include <string>
@@ -37,3 +37,4 @@ struct TableColumnDefinition final {
 };
 
 }
+#endif

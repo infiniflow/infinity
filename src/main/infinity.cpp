@@ -8,9 +8,9 @@
 namespace infinity {
 
 Infinity::Infinity()
-    : scheduler_(std::make_unique<NaiveScheduler>()),
-    config_(std::make_unique<Config>()),
-    storage_(std::make_unique<Storage>(std::string())){
+    : scheduler_(MakeUnique<NaiveScheduler>()),
+    config_(MakeUnique<Config>()),
+    storage_(MakeUnique<Storage>(String())){
 }
 
 void
@@ -28,6 +28,7 @@ void
 Infinity::UnInit() {
     if(!initialized_) return;
     initialized_ = false;
+    storage_->Uninit();
     Logger::Shutdown();
 }
 

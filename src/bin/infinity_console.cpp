@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
             // Add command into history
             linenoiseHistoryAdd(result.c_str());
 
-            // Flush the persist the history file.
+            // Flush the persistent the history file.
             linenoiseHistorySave(history_file.c_str());
         } catch (std::exception& e) {
             std::cout << e.what() << std::endl;

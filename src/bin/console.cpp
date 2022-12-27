@@ -43,9 +43,8 @@ Console::Console() {
 
 void
 Console::Init() {
-    infinity::Infinity::instance().Init();
     GlobalResourceUsage::Init();
-
+    infinity::Infinity::instance().Init();
 }
 
 void

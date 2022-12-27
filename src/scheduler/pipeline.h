@@ -23,43 +23,75 @@ namespace infinity {
 
 class Pipeline : public std::enable_shared_from_this<Pipeline> {
 public:
-    explicit Pipeline(uint64_t id) : id_(id) {}
-    virtual ~Pipeline() = 0;
+    explicit
+    Pipeline(u64 id) : id_(id) {}
 
-    bool IsReady() const { return pending_predecessors_ == 0; }
-    bool IsDone() const { return state_ == TaskState::kDone; }
+    virtual
+    ~Pipeline() = 0;
+
+    bool
+    IsReady() const {
+        return pending_predecessors_ == 0;
+    }
+
+    bool
+    IsDone() const {
+        return state_ == TaskState::kDone;
+    }
 
     // Set dependencies
-    void SetPredecessorOf(const std::shared_ptr<Pipeline>& successor);
-    const std::vector<std::shared_ptr<Pipeline>>& predecessors() const { return predecessors_; }
-    const std::vector<Pipeline*>& successors() const { return successors_; }
+    void
+    SetPredecessorOf(const SharedPtr<Pipeline>& successor);
 
-    void Schedule();
-    void Execute(std::shared_ptr<QueryContext>& query_context);
+    const Vector<SharedPtr<Pipeline>>&
+    predecessors() const {
+        return predecessors_;
+    }
 
-    TaskState state() const { return state_; }
-    uint64_t Id() const { return id_; }
-    virtual std::shared_ptr<Table> GetResult() = 0;
+    const Vector<Pipeline*>&
+    successors() const {
+        return successors_;
+    }
+
+    void
+    Schedule();
+
+    void
+    Execute(SharedPtr<QueryContext>& query_context);
+
+    TaskState
+    state() const {
+        return state_;
+    }
+    
+    u64
+    Id() const {
+        return id_;
+    }
+
+    virtual SharedPtr<Table>
+    GetResult() = 0;
 
 protected:
     virtual void
-    OnExecute(std::shared_ptr<QueryContext>& query_context) = 0;
+    OnExecute(SharedPtr<QueryContext>& query_context) = 0;
 
 private:
-    void OnPredecessorDone();
+    void
+    OnPredecessorDone();
 
     // Task state
     TaskState state_{TaskState::kCreated};
 
     // Task dependencies
-    std::atomic<uint64_t> pending_predecessors_{0};
+    std::atomic<u64> pending_predecessors_{0};
 
     // TODO: leaf node will be freed due to weak ptr;
-    std::vector<std::shared_ptr<Pipeline>> predecessors_;
+    Vector<SharedPtr<Pipeline>> predecessors_;
 
-    std::vector<Pipeline*> successors_;
+    Vector<Pipeline*> successors_;
 
-    uint64_t id_{0};
+    u64 id_{0};
 };
 
 

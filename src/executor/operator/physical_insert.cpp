@@ -15,33 +15,34 @@ PhysicalInsert::Init() {
 }
 
 void
-PhysicalInsert::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
 
     // TODO: execute insert into table;
-    std::vector<LogicalType> chunk_types;
+    Vector<DataType> output_types;
     uint64_t value_count = value_list_.size();
     for(uint64_t idx = 0; idx < value_count; ++ idx) {
         if (value_list_[idx]->type() != ExpressionType::kValue) {
             ExecutorError("Not value expression.");
         }
-        chunk_types.emplace_back(value_list_[idx]->DataType());
+        output_types.emplace_back(value_list_[idx]->Type());
     }
 
-    TransBlock transient_block;
-    transient_block.Init(chunk_types);
+    SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
+    output_block->Init(output_types);
     for(uint64_t idx = 0; idx < value_count; ++ idx) {
-        std::shared_ptr<ValueExpression> value_expr_ptr = std::static_pointer_cast<ValueExpression>(value_list_[idx]);
-        value_expr_ptr->AppendToChunk(transient_block.chunks_[idx]);
+        SharedPtr<ValueExpression> value_expr_ptr = std::static_pointer_cast<ValueExpression>(value_list_[idx]);
+        value_expr_ptr->AppendToChunk(output_block->column_vectors[idx]);
     }
-    transient_block.row_count_ += 1;
+    // Finalize the output block row count.
+    output_block->Finalize();
 
-    table_ptr_->Append(transient_block);
+    table_ptr_->Append(output_block);
 
-    // Generate the result
-    std::vector<ColumnDefinition> column_defs;
-    std::shared_ptr<TableDefinition> table_def_ptr
-            = std::make_shared<TableDefinition>("Tables", column_defs, false);
-    output_ = std::make_shared<FixedRowCountTable>(table_def_ptr);
+    // Generate the result table
+    Vector<SharedPtr<ColumnDef>> column_defs;
+    SharedPtr<TableDef> table_def_ptr
+            = MakeShared<TableDef>("Tables", column_defs, false);
+    output_ = MakeShared<Table>(table_def_ptr, TableType::kResult);
 }
 
 }

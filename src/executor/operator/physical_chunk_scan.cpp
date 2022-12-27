@@ -2,8 +2,10 @@
 // Created by JinHai on 2022/9/8.
 //
 
-#include "storage/table_with_fix_row.h"
 #include "common/utility/infinity_assert.h"
+#include "common/types/logical_type.h"
+#include "common/types/internal_types.h"
+#include "common/types/info/varchar_info.h"
 #include "expression/value_expression.h"
 #include "physical_chunk_scan.h"
 #include "main/infinity.h"
@@ -16,72 +18,84 @@ PhysicalChunkScan::Init() {
 }
 
 void
-PhysicalChunkScan::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
 
     switch(scan_type_) {
         case ChunkScanType::kShowTables: {
             // Define output table schema
-            std::vector<ColumnDefinition> column_defs = {
-                    {"table_name", 0, LogicalType(LogicalTypeId::kVarchar), false, std::set<ConstrainType>()},
-                    {"column_count", 1, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
-                    {"row_count", 2, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
-                    {"block_count", 3, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
-                    {"block_size", 4, LogicalType(LogicalTypeId::kBigInt), false, std::set<ConstrainType>()},
+            Vector<SharedPtr<ColumnDef>> column_defs = {
+                    ColumnDef::Make("table_name", 0, DataType(LogicalType::kVarchar), Set<ConstrainType>()),
+                    ColumnDef::Make("column_count", 1, DataType(LogicalType::kBigInt), Set<ConstrainType>()),
+                    ColumnDef::Make("row_count", 2, DataType(LogicalType::kBigInt), Set<ConstrainType>()),
+                    ColumnDef::Make("block_count", 3, DataType(LogicalType::kBigInt), Set<ConstrainType>()),
+                    ColumnDef::Make("block_size", 4, DataType(LogicalType::kBigInt), Set<ConstrainType>()),
             };
 
-            std::shared_ptr<TableDefinition> table_def_ptr = std::make_shared<TableDefinition>("Tables", column_defs, false);
-            output_ = std::make_shared<FixedRowCountTable>(table_def_ptr);
+            output_ = MakeShared<Table>(MakeShared<TableDef>("Tables", column_defs, false), TableType::kResult);
 
             // Get tables from catalog
             // TODO: Use context to carry runtime information, such as current schema
-            std::vector<std::shared_ptr<Table>> tables = Infinity::instance().catalog()->GetTables("Default");
+            Vector<SharedPtr<Table>> tables = Infinity::instance().catalog()->GetTables("Default");
 
-            // Create two value type:
-            LogicalType varchar_type = LogicalType(LogicalTypeId::kVarchar);
-            LogicalType bigint_type = LogicalType(LogicalTypeId::kBigInt);
+            // Prepare the output data block
+            SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+            Vector<DataType> column_types {
+                DataType(LogicalType::kVarchar),
+                DataType(LogicalType::kBigInt),
+                DataType(LogicalType::kBigInt),
+                DataType(LogicalType::kBigInt),
+                DataType(LogicalType::kBigInt)
+            };
 
-            for(std::shared_ptr<Table>& table: tables) {
-                TransBlock output_block;
+            output_block_ptr->Init(column_types);
+
+            for(i64 i = 0; auto& table: tables) {
 
                 size_t column_id = 0;
-                output_block.chunks_.emplace_back(varchar_type);
-                // Append table name
-                std::shared_ptr<ValueExpression> table_name
-                    = std::make_shared<ValueExpression>(varchar_type, table->table_def()->name());
-                table_name->AppendToChunk(output_block.chunks_[column_id]);
+                {
+                    // Append table name to the 1st column
+                    const String& table_name = table->TableName();
+                    auto type_info_ptr = VarcharInfo::Make(TABLE_NAME_LIMIT);
+                    Value value = Value::MakeVarchar(table_name, type_info_ptr);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
 
                 ++ column_id;
-                output_block.chunks_.emplace_back(bigint_type);
-                // Append column count
-                std::shared_ptr<ValueExpression> column_count
-                    = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(table->table_def()->column_count()));
-                column_count->AppendToChunk(output_block.chunks_[column_id]);
+                {
+                    // Append column count the 2nd column
+                    Value value = Value::MakeBigInt(static_cast<i64>(table->ColumnCount()));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
 
                 ++ column_id;
-                output_block.chunks_.emplace_back(bigint_type);
-                // Append row count
-                std::shared_ptr<ValueExpression> row_count
-                    = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(table->row_count()));
-                row_count->AppendToChunk(output_block.chunks_[column_id]);
+                {
+                    // Append row count the 3rd column
+                    Value value = Value::MakeBigInt(static_cast<i64>(table->row_count()));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
 
                 ++ column_id;
-                output_block.chunks_.emplace_back(bigint_type);
-                // Append block count
-                std::shared_ptr<ValueExpression> chunk_count
-                    = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(table->block_count()));
-                chunk_count->AppendToChunk(output_block.chunks_[column_id]);
+                {
+                    // Append block count the 4th column
+                    Value value = Value::MakeBigInt(static_cast<i64>(table->BlockCount()));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
 
                 ++ column_id;
-                output_block.chunks_.emplace_back(bigint_type);
-                // Append block size
-                std::shared_ptr<ValueExpression> block_size
-                    = std::make_shared<ValueExpression>(bigint_type, static_cast<int64_t>(Infinity::instance().config()->option_.default_row_count_));
-                block_size->AppendToChunk(output_block.chunks_[column_id]);
-
-                output_block.row_count_ = 1;
-
-                output_->Append(output_block);
+                {
+                    // Append block limit the 5th column
+                    Value value = Value::MakeBigInt(Infinity::instance().config()->option_.default_row_count_);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
             }
+
+            output_block_ptr->Finalize();
+            output_->Append(output_block_ptr);
             break;
         }
         case ChunkScanType::kShowColumn: {
@@ -93,7 +107,6 @@ PhysicalChunkScan::Execute(std::shared_ptr<QueryContext>& query_context) {
         default:
             ExecutorError("Invalid chunk scan type");
     }
-
 
 }
 

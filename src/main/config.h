@@ -5,21 +5,20 @@
 #pragma once
 
 #include "common/singleton.h"
-#include "storage/chunk.h"
+#include "common/types/internal_types.h"
 
 #include <cstdint>
 
 namespace infinity {
 
 struct Options {
-    int64_t default_row_count_ = 8192u;
-    int64_t default_chunk_size = 65536u;
-    TableType table_type_ = TableType::kFixedRowCount;
+    i64 default_row_count_ = 8192u;
+    i64 default_chunk_size = 65536u;
 
-    std::string log_file = "/tmp/infinity.log";
-    std::size_t log_max_size = 1024*1024*10;
-    std::size_t log_file_rotate_count = 10;
-    std::string log_level = "trace";
+    String log_file = "/tmp/infinity.log";
+    SizeT log_max_size = 1024*1024*10;
+    SizeT log_file_rotate_count = 10;
+    String log_level = "trace";
 };
 
 class Config {

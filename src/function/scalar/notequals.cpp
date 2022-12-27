@@ -16,15 +16,15 @@ struct NotEqualsFunction {
     }
 };
 
-template<typename DataType>
+template<typename CompareType>
 static void
-GenerateNotEqualsFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, LogicalTypeId type_id) {
+GenerateNotEqualsFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, DataType data_type) {
 
     ScalarFunction not_equals_function(
             "<>",
-            { LogicalType(type_id), LogicalType(type_id) },
-            { LogicalType(LogicalTypeId::kBoolean) },
-            &ScalarFunction::BinaryFunction<DataType, DataType, bool, NotEqualsFunction>);
+            { data_type, data_type },
+            { DataType(LogicalType::kBoolean) },
+            &ScalarFunction::BinaryFunction<CompareType, CompareType, bool, NotEqualsFunction>);
     function_set_ptr->AddFunction(not_equals_function);
 }
 
@@ -32,26 +32,26 @@ void
 RegisterNotEqualsFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("<>");
 
-    GenerateNotEqualsFunction<bool>(function_set_ptr, LogicalTypeId::kBoolean);
-    GenerateNotEqualsFunction<int8_t>(function_set_ptr, LogicalTypeId::kTinyInt);
-    GenerateNotEqualsFunction<int16_t>(function_set_ptr, LogicalTypeId::kSmallInt);
-    GenerateNotEqualsFunction<int32_t>(function_set_ptr, LogicalTypeId::kInteger);
-    GenerateNotEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kBigInt);
-    GenerateNotEqualsFunction<float>(function_set_ptr, LogicalTypeId::kFloat);
-    GenerateNotEqualsFunction<double>(function_set_ptr, LogicalTypeId::kDouble);
+    GenerateNotEqualsFunction<bool>(function_set_ptr, DataType(LogicalType::kBoolean));
+    GenerateNotEqualsFunction<int8_t>(function_set_ptr, DataType(LogicalType::kTinyInt));
+    GenerateNotEqualsFunction<int16_t>(function_set_ptr, DataType(LogicalType::kSmallInt));
+    GenerateNotEqualsFunction<int32_t>(function_set_ptr, DataType(LogicalType::kInteger));
+    GenerateNotEqualsFunction<int64_t>(function_set_ptr, DataType(LogicalType::kBigInt));
+    GenerateNotEqualsFunction<float>(function_set_ptr, DataType(LogicalType::kFloat));
+    GenerateNotEqualsFunction<double>(function_set_ptr, DataType(LogicalType::kDouble));
 
-    // TODO: need to review following function
-    GenerateNotEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kDate);
-    GenerateNotEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kInterval);
-    GenerateNotEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kDateTime);
-    GenerateNotEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kTime);
-
-    // FIXME: decimal isn't int64
-    GenerateNotEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kDecimal);
-
-    // TODO: need to review following function
-    GenerateNotEqualsFunction<std::string>(function_set_ptr, LogicalTypeId::kVarchar);
-    GenerateNotEqualsFunction<std::string>(function_set_ptr, LogicalTypeId::kText);
+    // TODO: need to finish other functions
+//    GenerateNotEqualsFunction<int64_t>(function_set_ptr, DataType(LogicalType::kDate);
+//    GenerateNotEqualsFunction<int64_t>(function_set_ptr, DataType(LogicalType::kInterval);
+//    GenerateNotEqualsFunction<int64_t>(function_set_ptr, DataType(LogicalType::kDateTime);
+//    GenerateNotEqualsFunction<int64_t>(function_set_ptr, DataType(LogicalType::kTime);
+//
+//    // FIXME: decimal isn't int64
+//    GenerateNotEqualsFunction<int64_t>(function_set_ptr, DataType(LogicalType::kDecimal);
+//
+//    // TODO: need to review following function
+//    GenerateNotEqualsFunction<std::string>(function_set_ptr, DataType(LogicalType::kVarchar);
+//    GenerateNotEqualsFunction<std::string>(function_set_ptr, DataType(LogicalType::kText);
 
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }

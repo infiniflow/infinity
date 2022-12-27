@@ -1,7 +1,7 @@
 //
 // Created by JinHai on 2022/7/24.
 //
-
+#if 0
 #pragma once
 
 #include "column_definition.h"
@@ -30,5 +30,5 @@ private:
 
 
 }
-
+#endif
 

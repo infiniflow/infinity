@@ -39,9 +39,9 @@ FunctionSet::ToString(const std::string& name, const std::vector<std::shared_ptr
     } else {
         ss << "(";
         for(auto i = 0; i < argument_count - 1; ++ i) {
-            ss << arguments[i]->DataType().ToString() << ", ";
+            ss << arguments[i]->Type().ToString() << ", ";
         }
-        ss << arguments.back()->DataType().ToString();
+        ss << arguments.back()->Type().ToString();
         ss << ")";
     }
 

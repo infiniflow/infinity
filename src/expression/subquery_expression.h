@@ -21,10 +21,14 @@ enum class SubqueryType {
 
 class SubqueryExpression : public BaseExpression {
 public:
-    explicit SubqueryExpression(std::shared_ptr<BoundSelectNode> select_node, SubqueryType subquery_type);
+    explicit
+    SubqueryExpression(SharedPtr<BoundSelectNode> select_node, SubqueryType subquery_type);
 
-    std::string ToString() const override;
-    LogicalType DataType() override;
+    String
+    ToString() const override;
+
+    DataType
+    Type() const override;
 
     std::shared_ptr<BoundSelectNode> select_node_ptr_;
     SubqueryType subquery_type_;

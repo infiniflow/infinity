@@ -71,6 +71,9 @@ public:
     [[nodiscard]] String
     ToString() const;
 
+    [[nodiscard]] String
+    ToString(SizeT row_index) const;
+
     // Return the <index> of the vector
     // Since it will construct a new Value object, this function shouldn't be used in vectorized computation.
     // Directly uses data_ptr in vectorized computation.

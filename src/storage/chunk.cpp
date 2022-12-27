@@ -1,7 +1,7 @@
 //
 // Created by JinHai on 2022/7/31.
 //
-
+#if 0
 #include "chunk.h"
 #include "common/utility/infinity_assert.h"
 
@@ -185,3 +185,4 @@ Chunk::RowToString(int64_t row_id) {
 }
 
 }
+#endif

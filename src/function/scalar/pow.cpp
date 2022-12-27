@@ -22,9 +22,9 @@ RegisterPowFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
 
     ScalarFunction pow_function(
             "pow",
-            { LogicalType(LogicalTypeId::kDouble), LogicalType(LogicalTypeId::kDouble) },
-            { LogicalType(LogicalTypeId::kDouble) },
-            &ScalarFunction::BinaryFunction<double, double, double, PowFunction>);
+            { DataType(LogicalType::kDouble), DataType(LogicalType::kDouble) },
+            { DataType(LogicalType::kDouble) },
+            &ScalarFunction::BinaryFunction<DoubleT, DoubleT, DoubleT, PowFunction>);
     function_set_ptr->AddFunction(pow_function);
 
     catalog_ptr->AddFunctionSet(function_set_ptr);

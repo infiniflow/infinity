@@ -26,4 +26,9 @@ Storage::Init() {
     builtin_functions.Init();
 }
 
+void
+Storage::Uninit() {
+    catalog_.reset();
+}
+
 }

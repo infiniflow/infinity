@@ -32,5 +32,25 @@ DecimalInfo::Make(i64 precision, i64 scale) {
     }
 }
 
+LogicalType
+DecimalInfo::GetDecimalType(i64 precision, i64 scale) {
+    switch(precision) {
+        case 0 ... 4: {
+            return LogicalType::kDecimal16;
+        }
+        case 5 ... 9: {
+            return LogicalType::kDecimal32;
+        }
+        case 10 ... 18: {
+            return LogicalType::kDecimal64;
+        }
+        case 19 ... 38: {
+            return LogicalType::kDecimal128;
+        }
+        default: {
+            TypeError("Unsupported decimal precision: " + std::to_string(precision));
+        }
+    }
+}
 
 }

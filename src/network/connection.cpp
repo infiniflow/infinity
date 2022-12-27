@@ -11,9 +11,9 @@
 namespace infinity {
 
 Connection::Connection(boost::asio::io_service& io_service)
-    : socket_(std::make_shared<boost::asio::ip::tcp::socket>(io_service)),
-      pg_handler_(std::make_shared<PGProtocolHandler>(socket())),
-      session_ptr_(std::make_shared<Session>()){}
+    : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)),
+      pg_handler_(MakeShared<PGProtocolHandler>(socket())),
+      session_ptr_(MakeShared<Session>()){}
 
 void
 Connection::Run() {
@@ -24,7 +24,7 @@ Connection::Run() {
         try {
             HandleRequest();
         } catch (const std::exception& e) {
-            std::map<PGMessageType, std::string> error_message_map;
+            std::map<PGMessageType, String> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();
             LOG_ERROR(e.what());
             pg_handler_->send_error_response(error_message_map);
@@ -51,8 +51,8 @@ void
 Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
-    std::shared_ptr<QueryContext> query_context_ptr
-        = std::make_shared<QueryContext>(session_ptr_, session_ptr_->transaction());
+    SharedPtr<QueryContext> query_context_ptr
+        = MakeShared<QueryContext>(session_ptr_, session_ptr_->transaction());
     query_context_ptr->set_current_schema(session_ptr_->current_schema());
 
     switch (cmd_type) {
@@ -91,8 +91,8 @@ Connection::HandleRequest() {
 }
 
 void
-Connection::HandlerSimpleQuery(std::shared_ptr<QueryContext>& query_context) {
-    const std::string& query = pg_handler_->read_command_body();
+Connection::HandlerSimpleQuery(SharedPtr<QueryContext>& query_context) {
+    const String& query = pg_handler_->read_command_body();
     LOG_DEBUG("Query: {}", query);
 
     // Start to execute the query.
@@ -100,15 +100,15 @@ Connection::HandlerSimpleQuery(std::shared_ptr<QueryContext>& query_context) {
 
     // Response to the result message to client
     if(result.result_ == nullptr) {
-        std::map<PGMessageType, std::string> error_message_map;
-        std::string response_message = "Error: " + query;
+        std::map<PGMessageType, String> error_message_map;
+        String response_message = "Error: " + query;
         error_message_map[PGMessageType::kHumanReadableError] = response_message;
         pg_handler_->send_error_response(error_message_map);
     } else {
         // Have result
         SendTableDescription(result.result_);
         SendQueryResponse(result.result_);
-        uint64_t row_count = result.result_->row_count();
+        u64 row_count = result.result_->row_count();
         SendComplete(result.root_operator_type_, row_count);
     }
 
@@ -117,99 +117,106 @@ Connection::HandlerSimpleQuery(std::shared_ptr<QueryContext>& query_context) {
 }
 
 void
-Connection::SendTableDescription(const std::shared_ptr<Table>& result_table) {
-    uint32_t column_name_length_sum = 0;
-    for(auto& column: result_table->table_def()->columns()) {
-        column_name_length_sum += column.name().size();
+Connection::SendTableDescription(const SharedPtr<Table>& result_table) {
+    u32 column_name_length_sum = 0;
+    SizeT column_count = result_table->ColumnCount();
+    for(SizeT idx = 0; idx < column_count; ++ idx) {
+        column_name_length_sum += result_table->GetColumnNameById(idx).length();
     }
 
     // No output columns, no need to send table description, just return.
     if (column_name_length_sum == 0) return ;
 
-    pg_handler_->SendDescriptionHeader(column_name_length_sum, result_table->table_def()->columns().size());
+    pg_handler_->SendDescriptionHeader(column_name_length_sum, column_count);
 
-    for(auto& column: result_table->table_def()->columns()) {
-        uint32_t object_id = 0;
-        int16_t  object_width = 0;
+    for(SizeT idx = 0; idx < column_count; ++ idx) {
+        DataType column_type = result_table->GetColumnTypeById(idx);
 
-        switch(column.logical_type().GetTypeId()) {
-            case LogicalTypeId::kBoolean:
+        u32 object_id = 0;
+        i16 object_width = 0;
+
+        switch(column_type.type()) {
+            case LogicalType::kBoolean: {
                 object_id = 16;
                 object_width = 1;
                 break;
-            case LogicalTypeId::kSmallInt:
+            }
+            case LogicalType::kSmallInt: {
                 object_id = 21;
                 object_width = 2;
                 break;
-            case LogicalTypeId::kTinyInt:
+            }
+            case LogicalType::kTinyInt: {
                 object_id = 18; // char
                 object_width = 1;
                 break;
-            case LogicalTypeId::kInteger:
+            }
+            case LogicalType::kInteger: {
                 object_id = 23;
                 object_width = 4;
                 break;
-            case LogicalTypeId::kBigInt:
+            }
+            case LogicalType::kBigInt: {
                 object_id = 20;
                 object_width = 8;
                 break;
-            case LogicalTypeId::kFloat:
+            }
+            case LogicalType::kFloat: {
                 object_id = 700;
                 object_width = 4;
                 break;
-            case LogicalTypeId::kDouble:
+            }
+            case LogicalType::kDouble: {
                 object_id = 701;
                 object_width = 8;
                 break;
-            case LogicalTypeId::kText:
+            }
+            case LogicalType::kVarchar: {
                 object_id = 25;
                 object_width = -1;
                 break;
-            case LogicalTypeId::kVarchar:
-                object_id = 25;
-                object_width = -1;
-                break;
-            case LogicalTypeId::kDate:
+            }
+            case LogicalType::kDate: {
                 object_id = 1082;
                 object_width = 8;
                 break;
-            case LogicalTypeId::kTime:
+            }
+            case LogicalType::kTime: {
                 object_id = 1266;
                 object_width = 12;
                 break;
-            case LogicalTypeId::kDecimal:
-                object_id = 1700;
-                object_width = -1;
-                break;
-            case LogicalTypeId::kInterval:
+            }
+            case LogicalType::kInterval: {
                 object_id = 1186;
                 object_width = 16;
                 break;
-            default:
-                NetworkError("Not supported type.");
+            }
+            default: {
+                TypeError("Unexpected type");
+            }
         }
 
-        pg_handler_->SendDescription(column.name(), object_id, object_width);
+        pg_handler_->SendDescription(result_table->GetColumnNameById(idx), object_id, object_width);
     }
 }
 
 void
-Connection::SendQueryResponse(const std::shared_ptr<Table>& result_table) {
-    int64_t column_count = result_table->table_def()->column_count();
-    auto values_as_strings = std::vector<std::optional<std::string>>(column_count);
-    uint64_t block_count = result_table->block_count();
-    for(uint64_t idx = 0; idx < block_count; ++ idx) {
-        auto block = result_table->blocks()[idx];
-        int64_t row_count = block->row_count();
+Connection::SendQueryResponse(const SharedPtr<Table>& result_table) {
+    SizeT column_count = result_table->ColumnCount();
+    auto values_as_strings = std::vector<std::optional<String>>(column_count);
+    SizeT block_count = result_table->BlockCount();
+    for(SizeT idx = 0; idx < block_count; ++ idx) {
+        auto block = result_table->GetDataBlockById(idx);
+        SizeT row_count = block->row_count();
 
-        for(int64_t row_id = 0; row_id < row_count; ++ row_id) {
-            int64_t string_length_sum = 0;
+        for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
+            SizeT string_length_sum = 0;
 
-            // iterate each chunk of the block
-            for(int64_t chunk_id = 0; chunk_id < column_count; ++ chunk_id) {
-                auto& chunk = block->columns()[chunk_id];
-                const std::string string_value = chunk.RowToString(row_id);
-                values_as_strings[chunk_id] = string_value;
+            // iterate each column_vector of the block
+            for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+                auto& column_vector = block->column_vectors[column_id];
+                const String string_value = column_vector.ToString(row_id);
+                values_as_strings[column_id] = string_value;
                 string_length_sum += string_value.size();
             }
             pg_handler_->SendData(values_as_strings, string_length_sum);
@@ -218,8 +225,8 @@ Connection::SendQueryResponse(const std::shared_ptr<Table>& result_table) {
 }
 
 void
-Connection::SendComplete(LogicalNodeType root_operator_type, uint64_t row_count) {
-    std::string message;
+Connection::SendComplete(LogicalNodeType root_operator_type, u64 row_count) {
+    String message;
     switch (root_operator_type) {
         case LogicalNodeType::kInsert: {
             message = "INSERT 0 1";

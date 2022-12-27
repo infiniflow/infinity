@@ -17,17 +17,24 @@ enum class ConjunctionType {
 class ConjunctionExpression: public BaseExpression {
 public:
     ConjunctionExpression(ConjunctionType conjunction_type,
-                          const std::shared_ptr<BaseExpression>& left_operand,
-                          const std::shared_ptr<BaseExpression>& right_operand);
+                          const SharedPtr<BaseExpression>& left_operand,
+                          const SharedPtr<BaseExpression>& right_operand);
 
-    LogicalType DataType() override;
-    std::string ToString() const override;
-    ConjunctionType conjunction_type() const { return conjunction_type_; }
+    DataType
+    Type() const override {
+        return DataType{LogicalType::kBoolean};
+    }
 
-    LogicalType data_type_{LogicalTypeId::kBoolean};
+    String
+    ToString() const override;
+
+    ConjunctionType
+    conjunction_type() const {
+        return conjunction_type_;
+    }
+
+private:
     ConjunctionType conjunction_type_{ConjunctionType::kInvalid};
-
-
 };
 
 

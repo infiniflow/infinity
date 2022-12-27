@@ -1,12 +1,11 @@
 //
 // Created by JinHai on 2022/10/23.
 //
-
+#if 0
 #pragma once
 
 #include <string>
 #include <utility>
-#include "data_type.h"
 
 namespace infinity {
 
@@ -22,4 +21,5 @@ public:
 };
 
 }
+#endif
 

@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "storage/data_type.h"
-
 #include <vector>
 
 namespace infinity {
@@ -17,19 +15,22 @@ enum class BoundNodeType {
 
 class BoundNode {
 public:
-    explicit BoundNode(BoundNodeType type) : type_(type) {}
-    virtual ~BoundNode() = default;
+    explicit
+    BoundNode(BoundNodeType type) : type_(type) {}
+
+    virtual
+    ~BoundNode() = default;
 
     virtual std::shared_ptr<LogicalNode>
     BuildPlan() = 0;
 
     std::vector<std::string> names;
-    std::vector<LogicalType> types;
+    std::vector<DataType> types;
 
-    virtual int64_t GetTableIndex() = 0;
+    virtual int64_t
+    GetTableIndex() = 0;
+
 protected:
     BoundNodeType type_{BoundNodeType::kInvalid};
-
-
 };
 }

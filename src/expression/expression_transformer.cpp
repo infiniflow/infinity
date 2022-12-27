@@ -6,12 +6,12 @@
 
 namespace infinity {
 
-std::vector<std::shared_ptr<BaseExpression>>
-SplitExpressionByDelimiter(const std::shared_ptr<BaseExpression> &expression, ConjunctionType delimiter) {
-    std::vector<std::shared_ptr<BaseExpression>> result;
+Vector<SharedPtr<BaseExpression>>
+SplitExpressionByDelimiter(const SharedPtr<BaseExpression> &expression, ConjunctionType delimiter) {
+    Vector<SharedPtr<BaseExpression>> result;
 
-    std::function<VisitControlType(std::shared_ptr<BaseExpression> &child)> func
-        = [&](const std::shared_ptr<BaseExpression> &expr_ptr) -> VisitControlType {
+    std::function<VisitControlType(SharedPtr<BaseExpression> &child)> func
+        = [&](const SharedPtr<BaseExpression> &expr_ptr) -> VisitControlType {
         if(expr_ptr->type() == ExpressionType::kConjunction) {
             const auto conjunction_expr_ptr = std::static_pointer_cast<ConjunctionExpression>(expr_ptr);
             if(conjunction_expr_ptr->conjunction_type() == delimiter) return VisitControlType::kVisit;
@@ -25,14 +25,14 @@ SplitExpressionByDelimiter(const std::shared_ptr<BaseExpression> &expression, Co
     return result;
 }
 
-std::shared_ptr<BaseExpression>
-ComposeExpressionWithDelimiter(const std::vector<std::shared_ptr<BaseExpression>>& expressions,
+SharedPtr<BaseExpression>
+ComposeExpressionWithDelimiter(const Vector<SharedPtr<BaseExpression>>& expressions,
                              ConjunctionType conjunction_type) {
     auto expr_count = expressions.size();
     if(expr_count == 0) {
         return nullptr;
     }
-    std::shared_ptr<BaseExpression> result = expressions[0];
+    SharedPtr<BaseExpression> result = expressions[0];
     for(auto i = 1; i < expr_count; ++ i) {
         result = std::make_shared<ConjunctionExpression>(conjunction_type, result, expressions[i]);
     }
@@ -40,9 +40,9 @@ ComposeExpressionWithDelimiter(const std::vector<std::shared_ptr<BaseExpression>
 }
 
 void
-VisitExpression(const std::shared_ptr<BaseExpression>& expression,
-                const std::function<VisitControlType(std::shared_ptr<BaseExpression> &child)>& visitor) {
-    std::queue<std::shared_ptr<BaseExpression>> queue;
+VisitExpression(const SharedPtr<BaseExpression>& expression,
+                const std::function<VisitControlType(SharedPtr<BaseExpression> &child)>& visitor) {
+    std::queue<SharedPtr<BaseExpression>> queue;
     queue.push(expression);
 
     while (!queue.empty()) {
@@ -58,9 +58,9 @@ VisitExpression(const std::shared_ptr<BaseExpression>& expression,
 }
 
 void
-VisitExpression(const std::shared_ptr<BaseExpression>& expression,
-                const std::function<void(std::shared_ptr<BaseExpression> &child)>& visitor) {
-    std::queue<std::shared_ptr<BaseExpression>> queue;
+VisitExpression(const SharedPtr<BaseExpression>& expression,
+                const std::function<void(SharedPtr<BaseExpression> &child)>& visitor) {
+    std::queue<SharedPtr<BaseExpression>> queue;
     queue.push(expression);
 
     while (!queue.empty()) {

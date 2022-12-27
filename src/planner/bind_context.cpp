@@ -20,7 +20,7 @@ BindContext::Destroy() {
 }
 
 std::shared_ptr<CommonTableExpressionInfo>
-BindContext::GetCTE(const std::string& name) const {
+BindContext::GetCTE(const String& name) const {
     auto entry = CTE_map_.find(name);
     if(entry != CTE_map_.end()) {
         return entry->second;
@@ -47,7 +47,7 @@ BindContext::IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) c
 }
 
 bool
-BindContext::IsViewBound(const std::string& view_name) const {
+BindContext::IsViewBound(const String& view_name) const {
 
     if(bound_view_set_.contains(view_name)) {
         return true;
@@ -61,7 +61,7 @@ BindContext::IsViewBound(const std::string& view_name) const {
 }
 
 bool
-BindContext::IsTableBound(const std::string& table_name) const {
+BindContext::IsTableBound(const String& table_name) const {
 
     if(bound_table_set_.contains(table_name)) {
         return true;
@@ -90,7 +90,7 @@ BindContext::AddBinding(const std::shared_ptr<Binding>& binding) {
     for(auto& column_name: binding->column_names_) {
         auto iter = binding_names_by_column_.find(column_name);
         if(iter == binding_names_by_column_.end()) {
-            binding_names_by_column_.emplace(column_name, std::vector<std::string>());
+            binding_names_by_column_.emplace(column_name, Vector<String>());
             binding_names_by_column_[column_name].emplace_back(binding->table_name_);
         } else {
             iter->second.emplace_back(binding->table_name_);
@@ -99,33 +99,33 @@ BindContext::AddBinding(const std::shared_ptr<Binding>& binding) {
 }
 
 void
-BindContext::AddSubqueryBinding(const std::string& name,
-                               const std::vector<LogicalType>& column_types,
-                               const std::vector<std::string>& column_names) {
+BindContext::AddSubqueryBinding(const String& name,
+                               const Vector<DataType>& column_types,
+                               const Vector<String>& column_names) {
     auto binding = Binding::MakeBinding(BindingType::kSubquery, name, column_types, column_names);
     AddBinding(binding);
 }
 
 void
-BindContext::AddCTEBinding(const std::string& name, const std::vector<LogicalType>& column_types,
-                           const std::vector<std::string>& column_names) {
+BindContext::AddCTEBinding(const String& name, const Vector<DataType>& column_types,
+                           const Vector<String>& column_names) {
     auto binding = Binding::MakeBinding(BindingType::kCTE, name, column_types, column_names);
     AddBinding(binding);
 }
 
 void
-BindContext::AddViewBinding(const std::string& name, const std::vector<LogicalType>& column_types,
-                            const std::vector<std::string>& column_names) {
+BindContext::AddViewBinding(const String& name, const Vector<DataType>& column_types,
+                            const Vector<String>& column_names) {
     auto binding = Binding::MakeBinding(BindingType::kView, name, column_types, column_names);
     AddBinding(binding);
 }
 
 void
-BindContext::AddTableBinding(const std::string& name, std::shared_ptr<Table> table_ptr,
+BindContext::AddTableBinding(const String& name, std::shared_ptr<Table> table_ptr,
 //                             int64_t logical_node_id,
 //                             std::shared_ptr<LogicalNode> logical_node_ptr,
-                             const std::vector<LogicalType>& column_types,
-                             const std::vector<std::string>& column_names) {
+                             const Vector<DataType>& column_types,
+                             const Vector<String>& column_names) {
     auto binding = Binding::MakeBinding(BindingType::kTable, name, std::move(table_ptr),
 //                                        std::move(logical_node_ptr),
 //                                        logical_node_id,
@@ -182,7 +182,7 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t 
 
     std::shared_ptr<BaseExpression> bound_column_expr;
 
-    const std::string& column_name_ref = *column_identifier.column_name_ptr_;
+    const String& column_name_ref = *column_identifier.column_name_ptr_;
 
     if(column_identifier.table_name_ptr_ == nullptr) {
         // Not table name
@@ -190,12 +190,12 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t 
         if(binding_names_by_column_.contains(column_name_ref)) {
             // We find the table
             // TODO: What will happen, when different tables have the same column name?
-            std::vector<std::string>& binding_names = binding_names_by_column_[column_name_ref];
+            Vector<String>& binding_names = binding_names_by_column_[column_name_ref];
             if(binding_names.size() > 1) {
                 PlannerError("Ambiguous column name: " + column_identifier.ToString());
             }
 
-            std::string& binding_name = binding_names[0];
+            String& binding_name = binding_names[0];
             auto binding = binding_by_name_[binding_name];
 
             if(binding->name2index_.contains(column_name_ref)) {
@@ -218,7 +218,7 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t 
             bound_column_expr = nullptr;
         }
     } else {
-        const std::string& table_name_ref = *column_identifier.table_name_ptr_;
+        const String& table_name_ref = *column_identifier.table_name_ptr_;
         auto binding = binding_by_name_[table_name_ref];
         if(binding != nullptr) {
             if(binding->name2index_.contains(column_name_ref)) {

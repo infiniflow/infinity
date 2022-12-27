@@ -7,10 +7,10 @@
 
 namespace infinity {
 
-std::shared_ptr<Binding>
-Binding::MakeBinding(BindingType binding_type, const std::string& name,
-                     const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names) {
-    std::shared_ptr<Binding> binding = std::make_shared<Binding>();
+SharedPtr<Binding>
+Binding::MakeBinding(BindingType binding_type, const String& name,
+                     const Vector<DataType>& column_types, const Vector<String>& column_names) {
+    SharedPtr<Binding> binding = std::make_shared<Binding>();
     binding->binding_type_ = binding_type;
     binding->table_name_ = name;
 
@@ -25,9 +25,9 @@ Binding::MakeBinding(BindingType binding_type, const std::string& name,
     return binding;
 }
 
-std::shared_ptr<Binding>
-Binding::MakeBinding(BindingType binding_type, const std::string& name, std::shared_ptr<Table> table_ptr,
-            const std::vector<LogicalType>& column_types, const std::vector<std::string>& column_names) {
+SharedPtr<Binding>
+Binding::MakeBinding(BindingType binding_type, const String& name, SharedPtr<Table> table_ptr,
+            const Vector<DataType>& column_types, const Vector<String>& column_names) {
     auto binding = MakeBinding(binding_type, name, column_types, column_names);
     binding->table_ptr_ = std::move(table_ptr);
 //    binding->logical_node_ptr_ = std::move(logical_node_ptr);

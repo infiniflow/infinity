@@ -366,6 +366,13 @@ Value::MakeMixedData(MixedT input) {
     return value;
 }
 
+Value
+Value::MakeNull() {
+    Value value(LogicalType::kNull);
+    value.is_null_ = true;
+    return value;
+}
+
 // Value getter
 template <> BooleanT
 Value::GetValue() const {

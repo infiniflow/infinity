@@ -62,4 +62,5 @@ using f64 = double;
 using ptr_t = char *;
 using const_ptr_t = const char *;
 using char_t = char;
+using SizeT = size_t;
 }

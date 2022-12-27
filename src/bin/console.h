@@ -15,6 +15,8 @@ public:
     explicit
     Console();
 
+    ~Console() = default;
+
     void
     Init();
 

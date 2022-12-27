@@ -12,8 +12,8 @@ namespace infinity {
 
 
 InExpression::InExpression(InType in_type,
-                           std::shared_ptr<BaseExpression> left_operand,
-                           const std::vector<std::shared_ptr<BaseExpression>>& value_list)
+                           SharedPtr<BaseExpression> left_operand,
+                           const Vector<SharedPtr<BaseExpression>>& value_list)
    : BaseExpression(ExpressionType::kArithmetic, value_list),
    left_operand_ptr_(std::move(left_operand)),
    in_type_(in_type) {}
@@ -46,11 +46,5 @@ InExpression::ToString() const {
 
     return  op.str();
 }
-
-LogicalType
-InExpression::DataType() {
-    return LogicalType(LogicalTypeId::kBoolean);
-}
-
 
 }

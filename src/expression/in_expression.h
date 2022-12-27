@@ -17,14 +17,19 @@ enum class InType {
 class InExpression : public BaseExpression {
 public:
     InExpression(InType in_type,
-                 std::shared_ptr<BaseExpression>  left_operand,
-                 const std::vector<std::shared_ptr<BaseExpression>>& value_list);
+                 SharedPtr<BaseExpression>  left_operand,
+                 const Vector<SharedPtr<BaseExpression>>& value_list);
 
-    std::string ToString() const override;
-    LogicalType DataType() override;
+    String
+    ToString() const override;
+
+    DataType
+    Type() const override {
+        return DataType{LogicalType::kBoolean};
+    }
 
 private:
-    std::shared_ptr<BaseExpression> left_operand_ptr_;
+    SharedPtr<BaseExpression> left_operand_ptr_;
     InType in_type_;
 };
 

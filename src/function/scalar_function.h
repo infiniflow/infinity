@@ -5,50 +5,66 @@
 #pragma once
 
 #include "function.h"
-#include "storage/data_type.h"
-#include "storage/transblock.h"
 #include "expression/base_expression.h"
 #include "executor/operation_state.h"
 #include "common/utility/infinity_assert.h"
-#include "common/column_vector/unary_operation_chunk.h"
-#include "common/column_vector/binary_operation_chunk.h"
+#include "common/column_vector/operator/unary_operator.h"
+#include "common/column_vector/operator/binary_operator.h"
+#include "storage/data_block.h"
 
 #include <vector>
 
 namespace infinity {
 
-using ScalarFunctionType = std::function<void(const TransBlock&, Chunk &)>;
+using ScalarFunctionType = std::function<void(const DataBlock&, ColumnVector&)>;
 
 class ScalarFunction : public Function {
 public:
-    explicit ScalarFunction(std::string name,
-                            std::vector<LogicalType> argument_types,
-                            LogicalType return_type,
+    explicit ScalarFunction(String name,
+                            Vector<DataType> argument_types,
+                            DataType return_type,
                             ScalarFunctionType function);
 
-    void CastArgumentTypes(std::vector<BaseExpression>& input_arguments);
-    [[nodiscard]] const LogicalType& return_type() const { return return_type_; }
+    void
+    CastArgumentTypes(Vector<BaseExpression>& input_arguments);
 
-    [[nodiscard]] std::string
+    [[nodiscard]] const DataType&
+    return_type() const { return return_type_; }
+
+    [[nodiscard]] String
     ToString() const override;
 public:
-    static void NoOpFunction(const TransBlock& input, Chunk& output);
+    static void
+    NoOpFunction(const DataBlock& input, ColumnVector& output);
 
     template<typename InputType, typename OutputType, typename Operation>
-    static void UnaryFunction(const TransBlock& input, Chunk& output) {
-        ExecutorAssert(input.ColumnCount() == 1, "Unary function: input column count isn't one.");
-        UnaryOperation::Execute<InputType, OutputType, Operation>(input.chunks_[0], output);
+    static void
+    UnaryFunction(const DataBlock& input, ColumnVector& output) {
+        ExecutorAssert(input.column_count() == 1, "Unary function: input column count isn't one.");
+        ExecutorAssert(input.Finalized(), "Input data block is finalized");
+        UnaryOperator::Execute<InputType, OutputType, Operation>(
+                input.column_vectors[0],
+                output,
+                input.row_count(),
+                nullptr,
+                true);
     }
 
     template<typename LeftType, typename RightType, typename OutputType, typename OperationType>
-    static void BinaryFunction(const TransBlock& input, Chunk& output) {
-        ExecutorAssert(input.ColumnCount() == 2, "Binary function: input column count isn't two.");
-        ExecutorAssert(input.chunks_[0].row_count() == input.chunks_[1].row_count(), "Two input chunk row count are mismatched.");
-        BinaryOperation::Execute<LeftType, RightType, OutputType, OperationType>(input.chunks_[0], input.chunks_[1], output);
+    static void
+    BinaryFunction(const DataBlock& input, ColumnVector& output) {
+        ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
+        ExecutorAssert(input.Finalized(), "Input data block is finalized");
+        BinaryOperator::Execute<LeftType, RightType, OutputType, OperationType>(
+                input.column_vectors[0],
+                input.column_vectors[1],
+                output,
+                input.row_count(),
+                true);
     }
 
-    std::vector<LogicalType> parameter_types_;
-    LogicalType return_type_;
+    Vector<DataType> parameter_types_;
+    DataType return_type_;
 
     ScalarFunctionType function_;
 

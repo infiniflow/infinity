@@ -41,21 +41,21 @@ QueryResult::ToString() const {
     }
 
 
-    size_t column_count = result_->table_def()->column_count();
-    for(size_t column_id = 0; column_id < column_count; ++ column_id) {
-        ss << result_->table_def()->columns()[column_id].name() << " ";
+    SizeT column_count = result_->ColumnCount();
+    for(SizeT idx = 0; idx < column_count; ++ idx) {
+        ss << result_->GetColumnNameById(idx);
     }
     ss << std::endl;
 
     // Get Block count
-    uint64_t block_count = result_->block_count();
+    SizeT block_count = result_->BlockCount();
 
     // Iterate all blocks
-    for(uint64_t block_id = 0; block_id < block_count; ++ block_id) {
+    for(SizeT idx = 0; idx < block_count; ++ idx) {
         // Get current block
-        std::shared_ptr<Block>& current_block = result_->blocks()[block_id];
+        std::shared_ptr<DataBlock> current_block = result_->GetDataBlockById(idx);
 
-        ss << current_block->AsStringRow();
+        ss << current_block->ToString();
     }
 
     return ss.str();

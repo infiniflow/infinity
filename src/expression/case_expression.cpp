@@ -12,19 +12,19 @@ namespace infinity {
 CaseExpression::CaseExpression() : BaseExpression(ExpressionType::kCase, {}) {}
 
 void
-CaseExpression::AddCaseCheck(const std::shared_ptr<BaseExpression>& when_expr, const std::shared_ptr<BaseExpression>& then_expr) {
+CaseExpression::AddCaseCheck(const SharedPtr<BaseExpression>& when_expr, const SharedPtr<BaseExpression>& then_expr) {
     case_check_.emplace_back(when_expr, then_expr);
 }
 
 void
-CaseExpression::AddElseExpr(const std::shared_ptr<BaseExpression>& else_expr) {
+CaseExpression::AddElseExpr(const SharedPtr<BaseExpression>& else_expr) {
     if(else_expr_ != nullptr) {
         PlannerError("else expression already been assigned before.");
     }
     else_expr_ = else_expr;
 }
 
-std::string
+String
 CaseExpression::ToString() const {
     std::stringstream ss;
 
@@ -36,10 +36,11 @@ CaseExpression::ToString() const {
     return ss.str();
 }
 
-LogicalType
-CaseExpression::DataType() {
+DataType
+CaseExpression::Type() const {
     // expression_common_type(then()->data_type(), otherwise()->data_type());
-    return LogicalType(LogicalTypeId::kBigInt);
+    // Fixme: this type need to refactor.
+    return DataType(LogicalType::kBoolean);
 }
 
 }

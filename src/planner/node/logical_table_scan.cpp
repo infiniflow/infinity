@@ -9,12 +9,12 @@
 
 namespace infinity {
 
-LogicalTableScan::LogicalTableScan(std::shared_ptr<Table> table_ptr,
-                                   std::shared_ptr<BindContext>& bind_context,
-                                   std::shared_ptr<TableScanFunction> table_scan_func,
-                                   std::string table_alias,
-                                   std::vector<std::string> column_names,
-                                   std::vector<LogicalType> column_types)
+LogicalTableScan::LogicalTableScan(SharedPtr<Table> table_ptr,
+                                   SharedPtr<BindContext>& bind_context,
+                                   SharedPtr<TableScanFunction> table_scan_func,
+                                   String table_alias,
+                                   Vector<String> column_names,
+                                   Vector<DataType> column_types)
     : LogicalNode(LogicalNodeType::kTableScan, bind_context),
     table_ptr_(std::move(table_ptr)),
     table_scan_func_ptr_(std::move(table_scan_func)),
@@ -32,16 +32,16 @@ LogicalTableScan::LogicalTableScan(std::shared_ptr<Table> table_ptr,
 //    }
 }
 
-std::string
-LogicalTableScan::ToString(int64_t& space) {
+String
+LogicalTableScan::ToString(i64& space) {
     std::stringstream ss;
-    std::string arrow_str;
+    String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "TableScan: " << table_ptr_->table_def()->name() << ", on: ";
-    size_t column_count = table_ptr_->table_def()->column_count();
+    ss << String(space, ' ') << arrow_str << "TableScan: " << table_ptr_->TableName() << ", on: ";
+    size_t column_count = table_ptr_->ColumnCount();
     for(size_t i = 0; i < column_count - 1; ++ i) {
         ss << column_names_[i] << " ";
     }

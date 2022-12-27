@@ -16,15 +16,15 @@ struct EqualsFunction {
     }
 };
 
-template<typename DataType>
+template<typename CompareType>
 static void
-GenerateEqualsFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, LogicalTypeId type_id) {
+GenerateEqualsFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, DataType data_type) {
 
     ScalarFunction equals_function(
             "=",
-            { LogicalType(type_id), LogicalType(type_id) },
-            { LogicalType(LogicalTypeId::kBoolean) },
-            &ScalarFunction::BinaryFunction<DataType, DataType, bool, EqualsFunction>);
+            { data_type, data_type },
+            DataType(kBoolean),
+            &ScalarFunction::BinaryFunction<CompareType, CompareType, BooleanT, EqualsFunction>);
     function_set_ptr->AddFunction(equals_function);
 }
 
@@ -32,26 +32,27 @@ void
 RegisterEqualsFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("=");
 
-    GenerateEqualsFunction<bool>(function_set_ptr, LogicalTypeId::kBoolean);
-    GenerateEqualsFunction<int8_t>(function_set_ptr, LogicalTypeId::kTinyInt);
-    GenerateEqualsFunction<int16_t>(function_set_ptr, LogicalTypeId::kSmallInt);
-    GenerateEqualsFunction<int32_t>(function_set_ptr, LogicalTypeId::kInteger);
-    GenerateEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kBigInt);
-    GenerateEqualsFunction<float>(function_set_ptr, LogicalTypeId::kFloat);
-    GenerateEqualsFunction<double>(function_set_ptr, LogicalTypeId::kDouble);
+    GenerateEqualsFunction<BooleanT>(function_set_ptr, DataType(LogicalType::kBoolean));
+    GenerateEqualsFunction<TinyIntT>(function_set_ptr, DataType(LogicalType::kTinyInt));
+    GenerateEqualsFunction<SmallIntT>(function_set_ptr, DataType(LogicalType::kSmallInt));
+    GenerateEqualsFunction<IntegerT>(function_set_ptr, DataType(LogicalType::kInteger));
+    GenerateEqualsFunction<BigIntT>(function_set_ptr, DataType(LogicalType::kBigInt));
+    GenerateEqualsFunction<FloatT>(function_set_ptr, DataType(LogicalType::kFloat));
+    GenerateEqualsFunction<DoubleT>(function_set_ptr, DataType(LogicalType::kDouble));
 
-    // TODO: need to review following function
-    GenerateEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kDate);
-    GenerateEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kInterval);
-    GenerateEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kDateTime);
-    GenerateEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kTime);
-
-    // FIXME: decimal isn't int64
-    GenerateEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kDecimal);
-
-    // TODO: need to review following function
-    GenerateEqualsFunction<std::string>(function_set_ptr, LogicalTypeId::kVarchar);
-    GenerateEqualsFunction<std::string>(function_set_ptr, LogicalTypeId::kText);
+    // TODO: other equals function
+//    // TODO: need to review following function
+//    GenerateEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
+//    GenerateEqualsFunction<IntervalT>(function_set_ptr, DataType(LogicalType::kInterval));
+//    GenerateEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kDateTime);
+//    GenerateEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kTime);
+//
+//    // FIXME: decimal isn't int64
+//    GenerateEqualsFunction<int64_t>(function_set_ptr, LogicalTypeId::kDecimal);
+//
+//    // TODO: need to review following function
+//    GenerateEqualsFunction<std::string>(function_set_ptr, LogicalTypeId::kVarchar);
+//    GenerateEqualsFunction<std::string>(function_set_ptr, LogicalTypeId::kText);
 
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }

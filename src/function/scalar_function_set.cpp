@@ -8,17 +8,17 @@
 namespace infinity {
 
 void
-ScalarFunctionSet::AddFunction(const infinity::ScalarFunction& func) {
+ScalarFunctionSet::AddFunction(const ScalarFunction& func) {
     functions_.emplace_back(func);
 }
 
 ScalarFunction
-ScalarFunctionSet::GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>> &input_arguments) {
+ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>> &input_arguments) {
 
 
     int64_t lowest_cost = std::numeric_limits<int64_t>::max();
     size_t function_count = functions_.size();
-    std::vector<int64_t> candidates_index;
+    Vector<int64_t> candidates_index;
 
     for(auto i = 0; i < function_count; ++ i) {
         ScalarFunction& function = functions_[i];
@@ -62,7 +62,7 @@ ScalarFunctionSet::GetMostMatchFunction(const std::vector<std::shared_ptr<BaseEx
 
 int64_t
 ScalarFunctionSet::MatchFunctionCost(const ScalarFunction& func,
-                                     const std::vector<std::shared_ptr<BaseExpression>>& arguments) {
+                                     const Vector<SharedPtr<BaseExpression>>& arguments) {
     // TODO: variable argument list function need to handled here.
 
     if(func.parameter_types_.size() != arguments.size()) {
@@ -74,7 +74,7 @@ ScalarFunctionSet::MatchFunctionCost(const ScalarFunction& func,
     int64_t total_cost = 0;
     for(auto i = 0; i < argument_count; ++ i) {
         // Get the cost from argument to parameter
-        int64_t type_cast_cost = LogicalType::CastRule(arguments[i]->DataType().GetTypeId(), func.parameter_types_[i].GetTypeId());
+        int64_t type_cast_cost = DataType::CastRule(arguments[i]->Type(), func.parameter_types_[i]);
         if(type_cast_cost < 0) {
             // Can't cast the value type;
             return -1;

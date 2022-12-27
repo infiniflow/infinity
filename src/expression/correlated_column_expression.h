@@ -10,14 +10,19 @@ namespace infinity {
 
 class CorrelatedColumnExpression: public BaseExpression {
 public:
-    CorrelatedColumnExpression(LogicalType logical_type, std::string column_name);
+    CorrelatedColumnExpression(DataType data_type, String column_name);
 
-    LogicalType DataType() override;
-    std::string ToString() const override;
+    DataType
+    Type() const override {
+        return data_type_;
+    }
+
+    String
+    ToString() const override;
 
 private:
-    LogicalType logical_type_;
-    std::string column_name_;
+    DataType data_type_;
+    String column_name_;
 };
 
 

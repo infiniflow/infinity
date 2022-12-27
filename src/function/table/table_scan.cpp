@@ -8,27 +8,28 @@
 namespace infinity {
 
 static void
-TableScanFunc(std::shared_ptr<QueryContext>& query_context,
-              const std::shared_ptr<TableFunctionData>& table_function_data_ptr,
-              TransBlock &output) {
+TableScanFunc(SharedPtr<QueryContext>& query_context,
+              const SharedPtr<TableFunctionData>& table_function_data_ptr,
+              DataBlock &output) {
 
-    std::shared_ptr<TableScanFunctionData> table_scan_function_data_ptr
+    SharedPtr<TableScanFunctionData> table_scan_function_data_ptr
         = std::static_pointer_cast<TableScanFunctionData>(table_function_data_ptr);
 
-    std::shared_ptr<Table>& table_ptr = table_scan_function_data_ptr->table_ptr_;
-    std::vector<int64_t>& column_ids = table_scan_function_data_ptr->column_ids_;
-    int64_t& current_block_id = table_scan_function_data_ptr->block_count_;
-    if(current_block_id >= table_ptr->block_count()) {
+    SharedPtr<Table>& table_ptr = table_scan_function_data_ptr->table_ptr_;
+    std::vector<size_t>& column_ids = table_scan_function_data_ptr->column_ids_;
+    i64& current_block_id = table_scan_function_data_ptr->block_count_;
+    if(current_block_id >= table_ptr->BlockCount()) {
         LOG_DEBUG("All blocks are read from storage.");
         output.Reset();
         return ;
     } else {
-        std::shared_ptr<Block>& current_block = table_ptr->blocks()[current_block_id];
-        int64_t output_column_id = 0;
-        for(int64_t& column_id: column_ids) {
-            output.chunks_[output_column_id ++ ].Append(current_block->columns()[column_id], 0);
+        SharedPtr<DataBlock> current_block = table_ptr->GetDataBlockById(current_block_id);
+        i64 output_column_id = 0;
+        for(size_t column_id: column_ids) {
+            output.column_vectors[output_column_id ++] = current_block->column_vectors[column_id];
         }
-        output.row_count_ = current_block->row_count();
+        // Fixme: use set_row_count to save time cost?
+        output.Finalize();
         ++ current_block_id;
     }
 }
@@ -36,7 +37,7 @@ TableScanFunc(std::shared_ptr<QueryContext>& query_context,
 void
 RegisterTableScanFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
 
-    std::shared_ptr<TableScanFunction> seq_scan_ptr = std::make_shared<TableScanFunction>("seq_scan", TableScanFunc);
+    SharedPtr<TableScanFunction> seq_scan_ptr = std::make_shared<TableScanFunction>("seq_scan", TableScanFunc);
 
     catalog_ptr->AddTableFunction(seq_scan_ptr);
 

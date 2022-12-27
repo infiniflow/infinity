@@ -3,6 +3,7 @@
 //
 
 #include "abs.h"
+#include "function_template.h"
 #include "function/scalar_function.h"
 #include "function/scalar_function_set.h"
 
@@ -10,7 +11,8 @@ namespace infinity {
 
 struct AbsFunctionInt {
     template <typename TA, typename TB>
-    static inline TA Execute(TB value) {
+    static inline TA
+    Run(TB value) {
         ExecutorAssert(value > std::numeric_limits<TB>::min(), "Overflow on abs(" + std::to_string(value) + ").");
         return value < 0 ? -value : value;
     }
@@ -18,56 +20,57 @@ struct AbsFunctionInt {
 
 struct AbsFunctionFloat {
     template <typename TA, typename TB>
-    static inline TA Execute(TB value) {
+    static inline TA
+    Run(TB value) {
         return value < 0 ? -value : value;
     }
 };
 
 
 void
-RegisterAbsFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
-    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("abs");
+RegisterAbsFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>("abs");
 
     ScalarFunction abs_int8(
             "abs",
-            { LogicalType(LogicalTypeId::kTinyInt) },
-            { LogicalType(LogicalTypeId::kTinyInt) },
-            &ScalarFunction::UnaryFunction<int8_t, int8_t, AbsFunctionInt>);
+            { DataType(LogicalType::kTinyInt) },
+            DataType(LogicalType::kTinyInt),
+            &ScalarFunction::UnaryFunction<TinyIntT, TinyIntT, TryUnaryMathFunction<AbsFunctionInt>>);
     function_set_ptr->AddFunction(abs_int8);
 
     ScalarFunction abs_int16(
             "abs",
-            { LogicalType(LogicalTypeId::kSmallInt) },
-            { LogicalType(LogicalTypeId::kSmallInt) },
-            &ScalarFunction::UnaryFunction<int16_t, int16_t, AbsFunctionInt>);
+            { DataType(LogicalType::kSmallInt) },
+            { DataType(LogicalType::kSmallInt) },
+            &ScalarFunction::UnaryFunction<SmallIntT, SmallIntT, TryUnaryMathFunction<AbsFunctionInt>>);
     function_set_ptr->AddFunction(abs_int16);
 
     ScalarFunction abs_int32(
             "abs",
-            { LogicalType(LogicalTypeId::kInteger) },
-            { LogicalType(LogicalTypeId::kInteger) },
-            &ScalarFunction::UnaryFunction<int32_t, int32_t, AbsFunctionInt>);
+            { DataType(LogicalType::kInteger) },
+            { DataType(LogicalType::kInteger) },
+            &ScalarFunction::UnaryFunction<IntegerT, IntegerT, TryUnaryMathFunction<AbsFunctionInt>>);
     function_set_ptr->AddFunction(abs_int32);
 
     ScalarFunction abs_int64(
             "abs",
-            { LogicalType(LogicalTypeId::kBigInt) },
-            { LogicalType(LogicalTypeId::kBigInt) },
-            &ScalarFunction::UnaryFunction<int64_t, int64_t, AbsFunctionInt>);
+            { DataType(LogicalType::kBigInt) },
+            { DataType(LogicalType::kBigInt) },
+            &ScalarFunction::UnaryFunction<BigIntT, BigIntT, TryUnaryMathFunction<AbsFunctionInt>>);
     function_set_ptr->AddFunction(abs_int64);
 
     ScalarFunction abs_float(
             "abs",
-            { LogicalType(LogicalTypeId::kFloat) },
-            { LogicalType(LogicalTypeId::kFloat) },
-            &ScalarFunction::UnaryFunction<float, float, AbsFunctionFloat>);
+            { DataType(LogicalType::kFloat) },
+            { DataType(LogicalType::kFloat) },
+            &ScalarFunction::UnaryFunction<FloatT, FloatT, TryUnaryMathFunction<AbsFunctionFloat>>);
     function_set_ptr->AddFunction(abs_float);
 
     ScalarFunction abs_double(
             "abs",
-            { LogicalType(LogicalTypeId::kDouble) },
-            { LogicalType(LogicalTypeId::kDouble) },
-            &ScalarFunction::UnaryFunction<float, float, AbsFunctionFloat>);
+            { DataType(LogicalType::kDouble) },
+            { DataType(LogicalType::kDouble) },
+            &ScalarFunction::UnaryFunction<DoubleT, DoubleT, TryUnaryMathFunction<AbsFunctionFloat>>);
     function_set_ptr->AddFunction(abs_double);
 
     catalog_ptr->AddFunctionSet(function_set_ptr);

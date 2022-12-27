@@ -19,38 +19,65 @@ namespace infinity {
 class LogicalNode {
 public:
     explicit
-    LogicalNode(LogicalNodeType node_type, std::shared_ptr<BindContext>& bind_context_ptr);
+    LogicalNode(LogicalNodeType node_type, SharedPtr<BindContext>& bind_context_ptr);
 
-    virtual ~LogicalNode() = default;
+    virtual
+    ~LogicalNode() = default;
 
-    [[nodiscard]] std::shared_ptr<LogicalNode> left_node() const { return left_node_; }
-    [[nodiscard]] std::shared_ptr<LogicalNode> right_node() const { return right_node_; }
-    void set_left_node(const std::shared_ptr<LogicalNode>& left) { left_node_ = left; }
-    void set_right_node(const std::shared_ptr<LogicalNode>& right) { right_node_ = right; };
+    [[nodiscard]] SharedPtr<LogicalNode>
+    left_node() const {
+        return left_node_;
+    }
 
-//    void AddOutputNode(const std::shared_ptr<LogicalNode>& output);
-//    void RemoveOutputNode(const std::shared_ptr<LogicalNode>& output);
+    [[nodiscard]] SharedPtr<LogicalNode>
+    right_node() const {
+        return right_node_;
+    }
+
+    void
+    set_left_node(const SharedPtr<LogicalNode>& left) {
+        left_node_ = left;
+    }
+
+    void
+    set_right_node(const SharedPtr<LogicalNode>& right) {
+        right_node_ = right;
+    };
+
+//    void AddOutputNode(const SharedPtr<LogicalNode>& output);
+//    void RemoveOutputNode(const SharedPtr<LogicalNode>& output);
 //    void ClearOutputs();
-//    [[nodiscard]] std::vector<std::shared_ptr<LogicalNode>> outputs() const { return outputs_; }
+//    [[nodiscard]] std::vector<SharedPtr<LogicalNode>> outputs() const { return outputs_; }
 
-    virtual std::string ToString(int64_t& space) = 0;
-    [[nodiscard]] uint64_t node_id() const { return node_id_; }
-    void set_node_id(uint64_t node_id) { node_id_ = node_id; }
+    virtual String
+    ToString(i64& space) = 0;
 
-    [[nodiscard]] LogicalNodeType operator_type() const {return operator_type_; }
+    [[nodiscard]] u64
+    node_id() const {
+        return node_id_;
+    }
+
+    void set_node_id(u64 node_id) {
+        node_id_ = node_id;
+    }
+
+    [[nodiscard]] LogicalNodeType
+    operator_type() const {
+        return operator_type_;
+    }
 
 protected:
     LogicalNodeType operator_type_ = LogicalNodeType::kInvalid;
 
-    std::shared_ptr<LogicalNode> left_node_;
-    std::shared_ptr<LogicalNode> right_node_;
-//    std::vector<std::shared_ptr<LogicalNode>> outputs_;
+    SharedPtr<LogicalNode> left_node_;
+    SharedPtr<LogicalNode> right_node_;
+//    std::vector<SharedPtr<LogicalNode>> outputs_;
 
     // Each node has an id which is unique in this plan tree.
-    int64_t node_id_{0};
+    u64 node_id_{0};
 
     // bind_context_
-    std::shared_ptr<BindContext>& bind_context_ptr_;
+    SharedPtr<BindContext>& bind_context_ptr_;
 };
 
 }

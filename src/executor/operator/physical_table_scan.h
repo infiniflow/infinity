@@ -14,11 +14,11 @@ namespace infinity {
 class PhysicalTableScan : public PhysicalOperator {
 public:
     explicit PhysicalTableScan(uint64_t id,
-                               std::string table_alias,
-                               std::vector<std::string> column_names,
-                               std::vector<LogicalType> column_types,
-                               std::shared_ptr<TableScanFunction> table_scan_function_ptr,
-                               std::shared_ptr<TableScanFunctionData> table_scan_function_data_ptr)
+                               String table_alias,
+                               Vector<String> column_names,
+                               Vector<DataType> column_types,
+                               SharedPtr<TableScanFunction> table_scan_function_ptr,
+                               SharedPtr<TableScanFunctionData> table_scan_function_data_ptr)
         : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr,id),
           table_alias_(std::move(table_alias)),
           column_names_(std::move(column_names)),
@@ -33,14 +33,14 @@ public:
     Init() override;
 
     void
-    Execute(std::shared_ptr<QueryContext>& query_context) override;
+    Execute(SharedPtr<QueryContext>& query_context) override;
 
 private:
-    std::string table_alias_;
-    std::vector<std::string> column_names_;
-    std::vector<LogicalType> column_types_;
-    std::shared_ptr<TableScanFunction> table_scan_func_ptr_{nullptr};
-    std::shared_ptr<TableScanFunctionData> table_scan_function_data_ptr_;
+    String table_alias_;
+    Vector<String> column_names_;
+    Vector<DataType> column_types_;
+    SharedPtr<TableScanFunction> table_scan_func_ptr_{nullptr};
+    SharedPtr<TableScanFunctionData> table_scan_function_data_ptr_;
 };
 
 

@@ -1,10 +1,10 @@
 //
 // Created by JinHai on 2022/7/31.
 //
-
+#if 0
 #include "block.h"
 #include "common/utility/infinity_assert.h"
-#include "common/column_vector/vector_operations.h"
+#include "common/column_vector/vector_operations_old.h"
 
 #include <sstream>
 
@@ -147,3 +147,4 @@ Block::AsStringRow() {
     return ss.str();
 }
 }
+#endif

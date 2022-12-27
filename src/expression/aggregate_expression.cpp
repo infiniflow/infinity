@@ -10,7 +10,7 @@
 namespace infinity {
 
 AggregateExpression::AggregateExpression(AggregateFunction aggregate_function,
-                                         std::vector<std::shared_ptr<BaseExpression>> arguments)
+                                         Vector<SharedPtr<BaseExpression>> arguments)
      : BaseExpression(ExpressionType::kAggregate, std::move(arguments)),
      aggregate_function_(std::move(aggregate_function)) {}
 
@@ -19,13 +19,13 @@ AggregateExpression::IsCountStar() const {
     return false;
 }
 
-std::string
+String
 AggregateExpression::ToString() const {
     return aggregate_function_.name();
 }
 
-LogicalType
-AggregateExpression::DataType() {
+DataType
+AggregateExpression::Type() const {
     return aggregate_function_.return_type();
 }
 

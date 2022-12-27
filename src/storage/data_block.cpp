@@ -50,7 +50,22 @@ DataBlock::AppendValue(size_t column_index, const Value& value) {
     StorageAssert(column_index < column_count_,
                   "Attempt to access invalid column index: " + std::to_string(column_index));
     column_vectors[column_index].AppendValue(value);
-    ++ row_count_;
+    finalized = false;
+}
+
+void
+DataBlock::Finalize() {
+    size_t row_count = column_vectors[0].Size();
+    for(size_t i = 1; i < column_count(); ++ i) {
+        StorageAssert(row_count == column_vectors[i].Size(), "Column vectors in same data block have different size.")
+    }
+    row_count_ = row_count;
+    finalized = true;
+}
+
+String
+DataBlock::ToString() const {
+    NotImplementError("Not implemented.")
 }
 
 }

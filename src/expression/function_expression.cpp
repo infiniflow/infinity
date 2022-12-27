@@ -13,7 +13,7 @@ FunctionExpression::FunctionExpression(ScalarFunction function,
                                        std::vector<std::shared_ptr<BaseExpression>> arguments)
    : BaseExpression(ExpressionType::kFunction, std::move(arguments)), func_(std::move(function)) {}
 
-std::string
+String
 FunctionExpression::ToString() const {
     std::stringstream ss;
     ss << func_.name()<< "(";
@@ -27,11 +27,6 @@ FunctionExpression::ToString() const {
         ss << arguments_.back()->ToString() << ")";
     }
     return ss.str();
-}
-
-LogicalType
-FunctionExpression::DataType() {
-    return func_.return_type();
 }
 
 }

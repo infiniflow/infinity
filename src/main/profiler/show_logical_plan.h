@@ -12,11 +12,14 @@ namespace infinity {
 
 class ShowLogicalPlan {
 public:
-    explicit ShowLogicalPlan(std::shared_ptr<LogicalNode> logical_node): logical_node_(std::move(logical_node)) {}
+    explicit 
+    ShowLogicalPlan(SharedPtr<LogicalNode> logical_node): logical_node_(std::move(logical_node)) {}
 
-    [[nodiscard]] std::string ToString() const;
+    [[nodiscard]] String
+    ToString() const;
+    
 private:
-    std::shared_ptr<LogicalNode> logical_node_;
+    SharedPtr<LogicalNode> logical_node_;
 };
 
 }

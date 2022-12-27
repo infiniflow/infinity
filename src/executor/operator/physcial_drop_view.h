@@ -9,7 +9,7 @@
 namespace infinity {
 class PhysicalDropView : public PhysicalOperator {
 public:
-    explicit PhysicalDropView(uint64_t id)
+    explicit PhysicalDropView(u64 id)
         : PhysicalOperator(PhysicalOperatorType::kDropView, nullptr, nullptr, id) {}
     ~PhysicalDropView() override = default;
 
@@ -17,7 +17,7 @@ public:
     Init() override;
 
     void
-    Execute(std::shared_ptr<QueryContext>& query_context) override;
+    Execute(SharedPtr<QueryContext>& query_context) override;
 };
 
 }
