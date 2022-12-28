@@ -34,100 +34,112 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal16) {
 
     auto decimal16_info = Decimal16Info::Make(4, 4);
     DataType data_type(LogicalType::kDecimal16, decimal16_info);
-    ColumnVector col_decimal16(data_type, ColumnVectorType::kFlat);
-    col_decimal16.Initialize();
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
 
-    EXPECT_THROW(col_decimal16.SetDataType(DataType(LogicalType::kDecimal16)), TypeException);
-    EXPECT_THROW(col_decimal16.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal16)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_decimal16.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal16.Size(), 0);
-    EXPECT_THROW(col_decimal16.ToString(), TypeException);
-    EXPECT_THROW(col_decimal16.GetValue(0), TypeException);
-    EXPECT_EQ(col_decimal16.tail_index_, 0);
-    EXPECT_EQ(col_decimal16.data_type_size_, 2);
-    EXPECT_NE(col_decimal16.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal16.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_decimal16.data_type(), data_type);
-    EXPECT_EQ(col_decimal16.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 2);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
 
-    EXPECT_NE(col_decimal16.buffer_, nullptr);
-    EXPECT_NE(col_decimal16.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_decimal16.initialized);
-    col_decimal16.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = col_decimal16.data_ptr_;
-    EXPECT_EQ(col_decimal16.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_decimal16.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal16T decimal16(static_cast<i16>(i));
         Value v = Value::MakeDecimal16(decimal16, decimal16_info);
-        col_decimal16.AppendValue(v);
-        Value vx = col_decimal16.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal16);
         EXPECT_EQ(vx.value_.decimal16.value, static_cast<i16>(i));
-        EXPECT_THROW(col_decimal16.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_decimal16.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    ColumnVector clone_column_vector(data_type);
+    clone_column_vector.ShallowCopy(column_vector);
+    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
+    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
+    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
+    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
+    EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
+    EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
+    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value vx = col_decimal16.GetValue(i);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal16);
         EXPECT_EQ(vx.value_.decimal16.value, static_cast<i16>(i));
     }
 
-    EXPECT_EQ(col_decimal16.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal16.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal16T decimal16(static_cast<i16>(i));
         Value v = Value::MakeDecimal16(decimal16, decimal16_info);
-        col_decimal16.AppendValue(v);
-        Value vx = col_decimal16.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal16);
         EXPECT_EQ(vx.value_.decimal16.value, static_cast<i16>(i));
-        EXPECT_THROW(col_decimal16.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_decimal16.Reset();
-    EXPECT_EQ(col_decimal16.capacity(), 0);
-    EXPECT_EQ(col_decimal16.tail_index_, 0);
-    EXPECT_NE(col_decimal16.buffer_, nullptr);
-    EXPECT_NE(col_decimal16.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal16.initialized, false);
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    col_decimal16.Initialize();
-    EXPECT_THROW(col_decimal16.SetDataType(DataType(LogicalType::kDecimal16)), TypeException);
-    EXPECT_THROW(col_decimal16.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    column_vector.Initialize();
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal16)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_decimal16.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal16.Size(), 0);
-    EXPECT_THROW(col_decimal16.ToString(), TypeException);
-    EXPECT_THROW(col_decimal16.GetValue(0), TypeException);
-    EXPECT_EQ(col_decimal16.tail_index_, 0);
-    EXPECT_EQ(col_decimal16.data_type_size_, 2);
-    EXPECT_NE(col_decimal16.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal16.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_decimal16.data_type(), data_type);
-    EXPECT_EQ(col_decimal16.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 2);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
 
-    EXPECT_NE(col_decimal16.buffer_, nullptr);
-    EXPECT_NE(col_decimal16.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_decimal16.initialized);
-    col_decimal16.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = col_decimal16.data_ptr_;
-    EXPECT_EQ(col_decimal16.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_decimal16.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal16T decimal16(static_cast<i16>(i));
         Value v = Value::MakeDecimal16(decimal16, decimal16_info);
-        col_decimal16.AppendValue(v);
-        Value vx = col_decimal16.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal16);
         EXPECT_EQ(vx.value_.decimal16.value, static_cast<i16>(i));
-        EXPECT_THROW(col_decimal16.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
 
@@ -136,100 +148,112 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal32) {
 
     auto decimal32_info = Decimal32Info::Make(9, 9);
     DataType data_type(LogicalType::kDecimal32, decimal32_info);
-    ColumnVector col_decimal32(data_type, ColumnVectorType::kFlat);
-    col_decimal32.Initialize();
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
 
-    EXPECT_THROW(col_decimal32.SetDataType(DataType(LogicalType::kDecimal32)), TypeException);
-    EXPECT_THROW(col_decimal32.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal32)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_decimal32.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal32.Size(), 0);
-    EXPECT_THROW(col_decimal32.ToString(), TypeException);
-    EXPECT_THROW(col_decimal32.GetValue(0), TypeException);
-    EXPECT_EQ(col_decimal32.tail_index_, 0);
-    EXPECT_EQ(col_decimal32.data_type_size_, 4);
-    EXPECT_NE(col_decimal32.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal32.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_decimal32.data_type(), data_type);
-    EXPECT_EQ(col_decimal32.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 4);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
 
-    EXPECT_NE(col_decimal32.buffer_, nullptr);
-    EXPECT_NE(col_decimal32.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_decimal32.initialized);
-    col_decimal32.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = col_decimal32.data_ptr_;
-    EXPECT_EQ(col_decimal32.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_decimal32.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal32T decimal32(static_cast<i32>(i));
         Value v = Value::MakeDecimal32(decimal32, decimal32_info);
-        col_decimal32.AppendValue(v);
-        Value vx = col_decimal32.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal32);
         EXPECT_EQ(vx.value_.decimal32.value, static_cast<i32>(i));
-        EXPECT_THROW(col_decimal32.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_decimal32.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    ColumnVector clone_column_vector(data_type);
+    clone_column_vector.ShallowCopy(column_vector);
+    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
+    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
+    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
+    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
+    EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
+    EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
+    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value vx = col_decimal32.GetValue(i);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal32);
         EXPECT_EQ(vx.value_.decimal32.value, static_cast<i32>(i));
     }
 
-    EXPECT_EQ(col_decimal32.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal32.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal32T decimal32(static_cast<i32>(i));
         Value v = Value::MakeDecimal32(decimal32, decimal32_info);
-        col_decimal32.AppendValue(v);
-        Value vx = col_decimal32.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal32);
         EXPECT_EQ(vx.value_.decimal32.value, static_cast<i32>(i));
-        EXPECT_THROW(col_decimal32.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_decimal32.Reset();
-    EXPECT_EQ(col_decimal32.capacity(), 0);
-    EXPECT_EQ(col_decimal32.tail_index_, 0);
-    EXPECT_NE(col_decimal32.buffer_, nullptr);
-    EXPECT_NE(col_decimal32.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal32.initialized, false);
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    col_decimal32.Initialize();
-    EXPECT_THROW(col_decimal32.SetDataType(DataType(LogicalType::kDecimal32)), TypeException);
-    EXPECT_THROW(col_decimal32.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    column_vector.Initialize();
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal32)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_decimal32.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal32.Size(), 0);
-    EXPECT_THROW(col_decimal32.ToString(), TypeException);
-    EXPECT_THROW(col_decimal32.GetValue(0), TypeException);
-    EXPECT_EQ(col_decimal32.tail_index_, 0);
-    EXPECT_EQ(col_decimal32.data_type_size_, 4);
-    EXPECT_NE(col_decimal32.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal32.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_decimal32.data_type(), data_type);
-    EXPECT_EQ(col_decimal32.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 4);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
 
-    EXPECT_NE(col_decimal32.buffer_, nullptr);
-    EXPECT_NE(col_decimal32.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_decimal32.initialized);
-    col_decimal32.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = col_decimal32.data_ptr_;
-    EXPECT_EQ(col_decimal32.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_decimal32.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal32T decimal32(static_cast<i32>(i));
         Value v = Value::MakeDecimal32(decimal32, decimal32_info);
-        col_decimal32.AppendValue(v);
-        Value vx = col_decimal32.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal32);
         EXPECT_EQ(vx.value_.decimal32.value, static_cast<i32>(i));
-        EXPECT_THROW(col_decimal32.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
 
@@ -238,100 +262,112 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal64) {
 
     auto decimal64_info = Decimal64Info::Make(18, 18);
     DataType data_type(LogicalType::kDecimal64, decimal64_info);
-    ColumnVector col_decimal64(data_type, ColumnVectorType::kFlat);
-    col_decimal64.Initialize();
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
 
-    EXPECT_THROW(col_decimal64.SetDataType(DataType(LogicalType::kDecimal64)), TypeException);
-    EXPECT_THROW(col_decimal64.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal64)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_decimal64.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal64.Size(), 0);
-    EXPECT_THROW(col_decimal64.ToString(), TypeException);
-    EXPECT_THROW(col_decimal64.GetValue(0), TypeException);
-    EXPECT_EQ(col_decimal64.tail_index_, 0);
-    EXPECT_EQ(col_decimal64.data_type_size_, 8);
-    EXPECT_NE(col_decimal64.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal64.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_decimal64.data_type(), data_type);
-    EXPECT_EQ(col_decimal64.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 8);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
 
-    EXPECT_NE(col_decimal64.buffer_, nullptr);
-    EXPECT_NE(col_decimal64.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_decimal64.initialized);
-    col_decimal64.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = col_decimal64.data_ptr_;
-    EXPECT_EQ(col_decimal64.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_decimal64.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal64T decimal64(static_cast<i64>(i));
         Value v = Value::MakeDecimal64(decimal64, decimal64_info);
-        col_decimal64.AppendValue(v);
-        Value vx = col_decimal64.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal64);
         EXPECT_EQ(vx.value_.decimal64.value, static_cast<i64>(i));
-        EXPECT_THROW(col_decimal64.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_decimal64.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    ColumnVector clone_column_vector(data_type);
+    clone_column_vector.ShallowCopy(column_vector);
+    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
+    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
+    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
+    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
+    EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
+    EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
+    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value vx = col_decimal64.GetValue(i);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal64);
         EXPECT_EQ(vx.value_.decimal64.value, static_cast<i64>(i));
     }
 
-    EXPECT_EQ(col_decimal64.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal64.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal64T decimal64(static_cast<i64>(i));
         Value v = Value::MakeDecimal64(decimal64, decimal64_info);
-        col_decimal64.AppendValue(v);
-        Value vx = col_decimal64.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal64);
         EXPECT_EQ(vx.value_.decimal64.value, static_cast<i64>(i));
-        EXPECT_THROW(col_decimal64.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_decimal64.Reset();
-    EXPECT_EQ(col_decimal64.capacity(), 0);
-    EXPECT_EQ(col_decimal64.tail_index_, 0);
-    EXPECT_NE(col_decimal64.buffer_, nullptr);
-    EXPECT_NE(col_decimal64.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal64.initialized, false);
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    col_decimal64.Initialize();
-    EXPECT_THROW(col_decimal64.SetDataType(DataType(LogicalType::kDecimal64)), TypeException);
-    EXPECT_THROW(col_decimal64.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    column_vector.Initialize();
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal64)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_decimal64.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal64.Size(), 0);
-    EXPECT_THROW(col_decimal64.ToString(), TypeException);
-    EXPECT_THROW(col_decimal64.GetValue(0), TypeException);
-    EXPECT_EQ(col_decimal64.tail_index_, 0);
-    EXPECT_EQ(col_decimal64.data_type_size_, 8);
-    EXPECT_NE(col_decimal64.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal64.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_decimal64.data_type(), data_type);
-    EXPECT_EQ(col_decimal64.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 8);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
 
-    EXPECT_NE(col_decimal64.buffer_, nullptr);
-    EXPECT_NE(col_decimal64.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_decimal64.initialized);
-    col_decimal64.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = col_decimal64.data_ptr_;
-    EXPECT_EQ(col_decimal64.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_decimal64.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal64T decimal64(static_cast<i64>(i));
         Value v = Value::MakeDecimal64(decimal64, decimal64_info);
-        col_decimal64.AppendValue(v);
-        Value vx = col_decimal64.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal64);
         EXPECT_EQ(vx.value_.decimal64.value, static_cast<i64>(i));
-        EXPECT_THROW(col_decimal64.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
 
@@ -340,99 +376,111 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal128) {
 
     auto decimal128_info = Decimal128Info::Make(38, 38);
     DataType data_type(LogicalType::kDecimal128, decimal128_info);
-    ColumnVector col_decimal128(data_type, ColumnVectorType::kFlat);
-    col_decimal128.Initialize();
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
 
-    EXPECT_THROW(col_decimal128.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
-    EXPECT_THROW(col_decimal128.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_decimal128.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal128.Size(), 0);
-    EXPECT_THROW(col_decimal128.ToString(), TypeException);
-    EXPECT_THROW(col_decimal128.GetValue(0), TypeException);
-    EXPECT_EQ(col_decimal128.tail_index_, 0);
-    EXPECT_EQ(col_decimal128.data_type_size_, 16);
-    EXPECT_NE(col_decimal128.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal128.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_decimal128.data_type(), data_type);
-    EXPECT_EQ(col_decimal128.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
 
-    EXPECT_NE(col_decimal128.buffer_, nullptr);
-    EXPECT_NE(col_decimal128.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_decimal128.initialized);
-    col_decimal128.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = col_decimal128.data_ptr_;
-    EXPECT_EQ(col_decimal128.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_decimal128.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal128T decimal128(0, static_cast<i64>(i));
         Value v = Value::MakeDecimal128(decimal128, decimal128_info);
-        col_decimal128.AppendValue(v);
-        Value vx = col_decimal128.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal128);
         EXPECT_EQ(vx.value_.decimal128.lower, static_cast<i64>(i));
-        EXPECT_THROW(col_decimal128.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_decimal128.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    ColumnVector clone_column_vector(data_type);
+    clone_column_vector.ShallowCopy(column_vector);
+    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
+    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
+    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
+    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
+    EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
+    EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
+    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value vx = col_decimal128.GetValue(i);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal128);
         EXPECT_EQ(vx.value_.decimal128.lower, static_cast<i64>(i));
     }
 
-    EXPECT_EQ(col_decimal128.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal128.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal128T decimal128(0, static_cast<i64>(i));
         Value v = Value::MakeDecimal128(decimal128, decimal128_info);
-        col_decimal128.AppendValue(v);
-        Value vx = col_decimal128.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal128);
         EXPECT_EQ(vx.value_.decimal128.lower, static_cast<i64>(i));
-        EXPECT_THROW(col_decimal128.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_decimal128.Reset();
-    EXPECT_EQ(col_decimal128.capacity(), 0);
-    EXPECT_EQ(col_decimal128.tail_index_, 0);
-    EXPECT_NE(col_decimal128.buffer_, nullptr);
-    EXPECT_NE(col_decimal128.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal128.initialized, false);
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    col_decimal128.Initialize();
-    EXPECT_THROW(col_decimal128.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
-    EXPECT_THROW(col_decimal128.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    column_vector.Initialize();
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_decimal128.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_decimal128.Size(), 0);
-    EXPECT_THROW(col_decimal128.ToString(), TypeException);
-    EXPECT_THROW(col_decimal128.GetValue(0), TypeException);
-    EXPECT_EQ(col_decimal128.tail_index_, 0);
-    EXPECT_EQ(col_decimal128.data_type_size_, 16);
-    EXPECT_NE(col_decimal128.data_ptr_, nullptr);
-    EXPECT_EQ(col_decimal128.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_decimal128.data_type(), data_type);
-    EXPECT_EQ(col_decimal128.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
 
-    EXPECT_NE(col_decimal128.buffer_, nullptr);
-    EXPECT_NE(col_decimal128.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_decimal128.initialized);
-    col_decimal128.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = col_decimal128.data_ptr_;
-    EXPECT_EQ(col_decimal128.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_decimal128.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Decimal128T decimal128(0, static_cast<i64>(i));
         Value v = Value::MakeDecimal128(decimal128, decimal128_info);
-        col_decimal128.AppendValue(v);
-        Value vx = col_decimal128.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal128);
         EXPECT_EQ(vx.value_.decimal128.lower, static_cast<i64>(i));
-        EXPECT_THROW(col_decimal128.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }

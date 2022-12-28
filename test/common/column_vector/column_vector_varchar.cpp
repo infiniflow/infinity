@@ -31,37 +31,37 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     auto varchar_info = VarcharInfo::Make(65);
     DataType data_type(LogicalType::kVarchar, varchar_info);
-    ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
-    col_varchar.Initialize();
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
 
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), TypeException);
-    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
-    EXPECT_EQ(col_varchar.tail_index_, 0);
-    EXPECT_EQ(col_varchar.data_type_size_, 16);
-    EXPECT_NE(col_varchar.data_ptr_, nullptr);
-    EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
 
-    EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_varchar.initialized);
-    col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = col_varchar.data_ptr_;
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_varchar.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "hello" + std::to_string(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        col_varchar.AppendValue(v);
-        Value vx = col_varchar.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
         if(vx.value_.varchar.IsInlined()) {
@@ -71,13 +71,25 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_varchar.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    ColumnVector clone_column_vector(data_type);
+    clone_column_vector.ShallowCopy(column_vector);
+    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
+    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
+    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
+    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
+    EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
+    EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
+    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value vx = col_varchar.GetValue(i);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
         String s = "hello" + std::to_string(i);
@@ -92,16 +104,16 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
         }
     }
 
-    EXPECT_EQ(col_varchar.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_varchar.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
 
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
 
         String s = "hello" + std::to_string(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        col_varchar.AppendValue(v);
-        Value vx = col_varchar.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
         if(vx.value_.varchar.IsInlined()) {
@@ -111,46 +123,46 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_varchar.Reset();
-    EXPECT_EQ(col_varchar.capacity(), 0);
-    EXPECT_EQ(col_varchar.tail_index_, 0);
-    EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_NE(col_varchar.data_ptr_, nullptr);
-    EXPECT_EQ(col_varchar.initialized, false);
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    col_varchar.Initialize();
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    column_vector.Initialize();
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), TypeException);
-    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
-    EXPECT_EQ(col_varchar.tail_index_, 0);
-    EXPECT_EQ(col_varchar.data_type_size_, 16);
-    EXPECT_NE(col_varchar.data_ptr_, nullptr);
-    EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
 
-    EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_varchar.initialized);
-    col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = col_varchar.data_ptr_;
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_varchar.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "hello" + std::to_string(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        col_varchar.AppendValue(v);
-        Value vx = col_varchar.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
         if(vx.value_.varchar.IsInlined()) {
@@ -160,7 +172,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
 
@@ -169,37 +181,37 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     auto varchar_info = VarcharInfo::Make(65);
     DataType data_type(LogicalType::kVarchar, varchar_info);
-    ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
-    col_varchar.Initialize();
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
 
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), TypeException);
-    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
-    EXPECT_EQ(col_varchar.tail_index_, 0);
-    EXPECT_EQ(col_varchar.data_type_size_, 16);
-    EXPECT_NE(col_varchar.data_ptr_, nullptr);
-    EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
 
-    EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_varchar.initialized);
-    col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = col_varchar.data_ptr_;
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_varchar.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "hellohellohello" + std::to_string(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        col_varchar.AppendValue(v);
-        Value vx = col_varchar.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         EXPECT_FALSE(vx.value_.varchar.IsInlined());
         if(vx.value_.varchar.IsInlined()) {
@@ -209,13 +221,25 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_varchar.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    ColumnVector clone_column_vector(data_type);
+    clone_column_vector.ShallowCopy(column_vector);
+    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
+    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
+    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
+    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
+    EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
+    EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
+    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value vx = col_varchar.GetValue(i);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
         String s = "hellohellohello" + std::to_string(i);
@@ -230,16 +254,16 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
         }
     }
 
-    EXPECT_EQ(col_varchar.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_varchar.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
 
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
 
         String s = "hellohellohello" + std::to_string(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        col_varchar.AppendValue(v);
-        Value vx = col_varchar.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
         EXPECT_FALSE(vx.value_.varchar.IsInlined());
@@ -250,47 +274,47 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_varchar.Reset();
-    EXPECT_EQ(col_varchar.capacity(), 0);
-    EXPECT_EQ(col_varchar.tail_index_, 0);
-    EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_EQ(col_varchar.buffer_->heap_mgr_, nullptr);
-    EXPECT_NE(col_varchar.data_ptr_, nullptr);
-    EXPECT_EQ(col_varchar.initialized, false);
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    col_varchar.Initialize();
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    column_vector.Initialize();
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), TypeException);
-    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
-    EXPECT_EQ(col_varchar.tail_index_, 0);
-    EXPECT_EQ(col_varchar.data_type_size_, 16);
-    EXPECT_NE(col_varchar.data_ptr_, nullptr);
-    EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
 
-    EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_varchar.initialized);
-    col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = col_varchar.data_ptr_;
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_varchar.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "hellohellohello" + std::to_string(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        col_varchar.AppendValue(v);
-        Value vx = col_varchar.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
         EXPECT_FALSE(vx.value_.varchar.IsInlined());
@@ -301,7 +325,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
 
@@ -310,37 +334,37 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     auto varchar_info = VarcharInfo::Make(65);
     DataType data_type(LogicalType::kVarchar, varchar_info);
-    ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
-    col_varchar.Initialize();
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
 
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), TypeException);
-    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
-    EXPECT_EQ(col_varchar.tail_index_, 0);
-    EXPECT_EQ(col_varchar.data_type_size_, 16);
-    EXPECT_NE(col_varchar.data_ptr_, nullptr);
-    EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
 
-    EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_varchar.initialized);
-    col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = col_varchar.data_ptr_;
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_varchar.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "Professional" + std::to_string(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        col_varchar.AppendValue(v);
-        Value vx = col_varchar.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         if(s.length() <= VarcharType::INLINE_LENGTH) {
             EXPECT_TRUE(vx.value_.varchar.IsInlined());
@@ -355,13 +379,25 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_varchar.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+
+    ColumnVector clone_column_vector(data_type);
+    clone_column_vector.ShallowCopy(column_vector);
+    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
+    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
+    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
+    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
+    EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
+    EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
+    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value vx = col_varchar.GetValue(i);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
         String s = "Professional" + std::to_string(i);
@@ -377,16 +413,16 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
         }
     }
 
-    EXPECT_EQ(col_varchar.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_varchar.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
 
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
 
         String s = "Professional" + std::to_string(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        col_varchar.AppendValue(v);
-        Value vx = col_varchar.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
         if(s.length() <= VarcharType::INLINE_LENGTH) {
@@ -398,47 +434,47 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_varchar.Reset();
-    EXPECT_EQ(col_varchar.capacity(), 0);
-    EXPECT_EQ(col_varchar.tail_index_, 0);
-    EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_EQ(col_varchar.buffer_->heap_mgr_, nullptr);
-    EXPECT_NE(col_varchar.data_ptr_, nullptr);
-    EXPECT_EQ(col_varchar.initialized, false);
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    col_varchar.Initialize();
-    EXPECT_THROW(col_varchar.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
-    EXPECT_THROW(col_varchar.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    column_vector.Initialize();
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_varchar.Size(), 0);
-    EXPECT_THROW(col_varchar.ToString(), TypeException);
-    EXPECT_THROW(col_varchar.GetValue(0), TypeException);
-    EXPECT_EQ(col_varchar.tail_index_, 0);
-    EXPECT_EQ(col_varchar.data_type_size_, 16);
-    EXPECT_NE(col_varchar.data_ptr_, nullptr);
-    EXPECT_EQ(col_varchar.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_varchar.data_type(), data_type);
-    EXPECT_EQ(col_varchar.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
 
-    EXPECT_NE(col_varchar.buffer_, nullptr);
-    EXPECT_NE(col_varchar.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_varchar.initialized);
-    col_varchar.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = col_varchar.data_ptr_;
-    EXPECT_EQ(col_varchar.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_varchar.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "Professional" + std::to_string(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        col_varchar.AppendValue(v);
-        Value vx = col_varchar.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
         if(s.length() <= VarcharType::INLINE_LENGTH) {
@@ -450,6 +486,6 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
             String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
             EXPECT_STREQ(whole_str.c_str(), s.c_str());
         }
-        EXPECT_THROW(col_varchar.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }

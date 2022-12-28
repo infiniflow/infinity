@@ -54,7 +54,7 @@ TEST_F(BoolCastTest, bool_cast1) {
     using namespace infinity;
 
     DataType bool_type(LogicalType::kBoolean);
-    ColumnVector col_bool(bool_type, ColumnVectorType::kFlat);
+    ColumnVector col_bool(bool_type);
     col_bool.Initialize();
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeBool(i % 2 == 0);
@@ -73,7 +73,7 @@ TEST_F(BoolCastTest, bool_cast1) {
         auto bool2varchar_ptr = BindBoolCast(bool_type, varchar_type);
         EXPECT_NE(bool2varchar_ptr.function, nullptr);
 
-        ColumnVector col_varchar(varchar_type, ColumnVectorType::kFlat);
+        ColumnVector col_varchar(varchar_type);
         col_varchar.Initialize();
 
         CastParameters cast_parameters;

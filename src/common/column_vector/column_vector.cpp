@@ -9,10 +9,10 @@
 
 namespace infinity {
 
-void ColumnVector::Initialize(size_t capacity, ColumnVectorType vector_type) {
-    GeneralAssert(!initialized, "Column vector is already initialized.")
-    GeneralAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
-    GeneralAssert(vector_type != ColumnVectorType::kInvalid, "Attempt to initialize column vector to invalid type.")
+void ColumnVector::Initialize(SizeT capacity, ColumnVectorType vector_type) {
+    StorageAssert(!initialized, "Column vector is already initialized.")
+    StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
+    StorageAssert(vector_type != ColumnVectorType::kInvalid, "Attempt to initialize column vector to invalid type.")
     // TODO: No check on capacity value.
 
     vector_type_ = vector_type;
@@ -61,16 +61,19 @@ void ColumnVector::Initialize(size_t capacity, ColumnVectorType vector_type) {
 
 String
 ColumnVector::ToString() const {
+    StorageAssert(initialized, "Column vector isn't initialized.")
     TypeError("Not implemented");
 }
 
 String
 ColumnVector::ToString(SizeT row_index) const {
+    StorageAssert(initialized, "Column vector isn't initialized.")
     NotImplementError("Not implemented.")
 }
 
 Value
 ColumnVector::GetValue(idx_t index) const {
+    StorageAssert(initialized, "Column vector isn't initialized.")
     if(index >= tail_index_) {
         TypeError("Attempt to access an invalid index of column vector: " + std::to_string(index));
     }
@@ -212,6 +215,7 @@ ColumnVector::GetValue(idx_t index) const {
 
 void
 ColumnVector::SetValue(idx_t index, const Value &value) {
+    StorageAssert(initialized, "Column vector isn't initialized.")
     StorageAssert(index <= tail_index_,
                   "Attempt to store value into unavailable row of column vector: "
                   + std::to_string(index) + ", current column tail index: " + std::to_string(tail_index_)
@@ -274,7 +278,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
         }
         case kVarchar: {
             // Copy string
-            size_t varchar_len = value.value_.varchar.length;
+            SizeT varchar_len = value.value_.varchar.length;
             if(varchar_len <= VarcharType::INLINE_LENGTH) {
                 // Only prefix is enough to contain all string data.
                 memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.prefix, varchar_len);
@@ -365,7 +369,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
         case kPath: {
             u32 point_count = value.value_.path.point_count;
 
-            size_t point_area_size = point_count * sizeof(PointT);
+            SizeT point_area_size = point_count * sizeof(PointT);
             ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
             memcpy(ptr, value.value_.path.ptr, point_area_size);
 
@@ -381,7 +385,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
 
             u64 point_count = value.value_.polygon.point_count;
 
-            size_t point_area_size = point_count * sizeof(PointT);
+            SizeT point_area_size = point_count * sizeof(PointT);
             ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
             memcpy(ptr, value.value_.polygon.ptr, point_area_size);
 
@@ -401,7 +405,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
             u64 bit_count = value.value_.bitmap.count;
             u64 unit_count = BitmapT::UnitCount(bit_count);
 
-            size_t bit_area_size = unit_count * BitmapT::UNIT_BYTES;
+            SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
             ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
             memcpy(ptr, (void*)(value.value_.bitmap.ptr), bit_area_size);
 
@@ -440,17 +444,32 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
 
 void
 ColumnVector::AppendValue(const Value& value) {
+    StorageAssert(initialized, "Column vector isn't initialized.")
     TypeAssert(tail_index_ < capacity_, "Exceed the column vector capacity.");
     SetValue(tail_index_ ++, value);
 }
 
 void
 ColumnVector::ShallowCopy(const ColumnVector &other) {
-    TypeError("Not implemented");
+    StorageAssert(this->data_type_ == other.data_type_,
+                  "Attempt to shallow copy: " + other.data_type_.ToString() + "column vector to: " + this->data_type_.ToString());
+    if(this->buffer_ != other.buffer_) {
+        this->buffer_ = other.buffer_;
+    }
+    if(this->nulls_ptr_ != other.nulls_ptr_) {
+        this->nulls_ptr_ = other.nulls_ptr_;
+    }
+    this->vector_type_ = other.vector_type_;
+    this->data_ptr_ = other.data_ptr_;
+    this->data_type_size_ = other.data_type_size_;
+    this->initialized = other.initialized;
+    this->capacity_ = other.capacity_;
+    this->tail_index_ = other.tail_index_;
 }
 
 void
-ColumnVector::Reserve(size_t new_capacity) {
+ColumnVector::Reserve(SizeT new_capacity) {
+    StorageAssert(initialized, "Column vector isn't initialized.")
     if(new_capacity <= capacity_) return ;
 
     SharedPtr<VectorBuffer> new_buffer = VectorBuffer::Make(data_type_size_, new_capacity, buffer_->buffer_type_);
@@ -479,7 +498,7 @@ ColumnVector::Reset() {
         // This part of memory should managed by ColumnVector, but it isn't now.
         // So, when ColumnVector is destructed, this part need to free here.
         // TODO: we are going to manage the nested object in ColumnVector.
-        for(size_t idx = 0; idx < tail_index_; ++ idx) {
+        for(SizeT idx = 0; idx < tail_index_; ++ idx) {
             ((MixedT *) data_ptr_)[idx].Reset();
         }
     }

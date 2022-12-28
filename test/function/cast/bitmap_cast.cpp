@@ -59,7 +59,7 @@ TEST_F(BitmapCastTest, bitmap_cast0) {
 
         auto varchar_info = VarcharInfo::Make(65);
         DataType data_type(LogicalType::kVarchar, varchar_info);
-        ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
+        ColumnVector col_varchar(data_type);
         col_varchar.Initialize();
 
         EXPECT_THROW(BitmapTryCastToVarlen::Run(source, target, &col_varchar), NotImplementException);
@@ -77,7 +77,7 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
     }
 
     DataType source_type(LogicalType::kBitmap);
-    ColumnVector col_source(source_type, ColumnVectorType::kFlat);
+    ColumnVector col_source(source_type);
     col_source.Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         BitmapT bitmap;
@@ -113,7 +113,7 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
         auto source2target_ptr = BindBitmapCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type, ColumnVectorType::kFlat);
+        ColumnVector col_target(target_type);
         col_target.Initialize();
 
         CastParameters cast_parameters;

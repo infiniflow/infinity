@@ -182,7 +182,7 @@ TEST_F(FloatCastTest, float_cast0) {
 
         auto varchar_info = VarcharInfo::Make(65);
         DataType data_type(LogicalType::kVarchar, varchar_info);
-        ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
+        ColumnVector col_varchar(data_type);
         col_varchar.Initialize();
 
         source = std::numeric_limits<FloatT>::lowest();
@@ -240,7 +240,7 @@ TEST_F(FloatCastTest, float_cast1) {
     using namespace infinity;
 
     DataType float_type(LogicalType::kFloat);
-    ColumnVector col_float(float_type, ColumnVectorType::kFlat);
+    ColumnVector col_float(float_type);
     col_float.Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeFloat(static_cast<FloatT>(i));
@@ -259,7 +259,7 @@ TEST_F(FloatCastTest, float_cast1) {
         auto float2tiny_ptr = BindFloatCast<FloatT>(float_type, tinyint_data_type);
         EXPECT_NE(float2tiny_ptr.function, nullptr);
 
-        ColumnVector col_tinyint(tinyint_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_tinyint(tinyint_data_type);
         col_tinyint.Initialize();
 
         CastParameters cast_parameters;
@@ -284,7 +284,7 @@ TEST_F(FloatCastTest, float_cast1) {
         auto float2small_ptr = BindFloatCast<FloatT>(float_type, small_data_type);
         EXPECT_NE(float2small_ptr.function, nullptr);
 
-        ColumnVector col_smallint(small_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_smallint(small_data_type);
         col_smallint.Initialize();
 
         CastParameters cast_parameters;
@@ -304,7 +304,7 @@ TEST_F(FloatCastTest, float_cast1) {
         auto float2integer_ptr = BindFloatCast<FloatT>(float_type, integer_data_type);
         EXPECT_NE(float2integer_ptr.function, nullptr);
 
-        ColumnVector col_int(integer_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_int(integer_data_type);
         col_int.Initialize();
 
         CastParameters cast_parameters;
@@ -324,7 +324,7 @@ TEST_F(FloatCastTest, float_cast1) {
         auto float2bigint_ptr = BindFloatCast<FloatT>(float_type, bigint_data_type);
         EXPECT_NE(float2bigint_ptr.function, nullptr);
 
-        ColumnVector col_bigint(bigint_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_bigint(bigint_data_type);
         col_bigint.Initialize();
 
         CastParameters cast_parameters;
@@ -344,7 +344,7 @@ TEST_F(FloatCastTest, float_cast1) {
         auto float2hugeint_ptr = BindFloatCast<FloatT>(float_type, hugeint_data_type);
         EXPECT_NE(float2hugeint_ptr.function, nullptr);
 
-        ColumnVector col_hugeint(hugeint_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_hugeint(hugeint_data_type);
         col_hugeint.Initialize();
 
         CastParameters cast_parameters;
@@ -359,7 +359,7 @@ TEST_F(FloatCastTest, float_cast1) {
         auto float2double_ptr = BindFloatCast<FloatT>(float_type, double_data_type);
         EXPECT_NE(float2double_ptr.function, nullptr);
 
-        ColumnVector col_double(double_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_double(double_data_type);
         col_double.Initialize();
 
         CastParameters cast_parameters;
@@ -379,7 +379,7 @@ TEST_F(FloatCastTest, float_cast1) {
         auto float2varchar_ptr = BindFloatCast<FloatT>(float_type, varchar_data_type);
         EXPECT_NE(float2varchar_ptr.function, nullptr);
 
-        ColumnVector col_varchar(varchar_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_varchar(varchar_data_type);
         col_varchar.Initialize();
 
         CastParameters cast_parameters;

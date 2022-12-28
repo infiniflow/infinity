@@ -30,31 +30,31 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kBitmap);
-    ColumnVector col_bitmap(data_type, ColumnVectorType::kFlat);
+    ColumnVector column_vector(data_type);
 
-    col_bitmap.Initialize();
+    column_vector.Initialize();
 
-    EXPECT_THROW(col_bitmap.SetDataType(DataType(LogicalType::kBitmap)), TypeException);
-    EXPECT_THROW(col_bitmap.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBitmap)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_bitmap.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_bitmap.Size(), 0);
-    EXPECT_THROW(col_bitmap.ToString(), TypeException);
-    EXPECT_THROW(col_bitmap.GetValue(0), TypeException);
-    EXPECT_EQ(col_bitmap.tail_index_, 0);
-    EXPECT_EQ(col_bitmap.data_type_size_, 16);
-    EXPECT_NE(col_bitmap.data_ptr_, nullptr);
-    EXPECT_EQ(col_bitmap.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_bitmap.data_type(), data_type);
-    EXPECT_EQ(col_bitmap.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
 
-    EXPECT_NE(col_bitmap.buffer_, nullptr);
-    EXPECT_NE(col_bitmap.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_bitmap.initialized);
-    col_bitmap.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = col_bitmap.data_ptr_;
-    EXPECT_EQ(col_bitmap.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_bitmap.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         BitmapT bitmap;
@@ -67,15 +67,26 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
             }
         }
         Value v = Value::MakeBitmap(bitmap);
-        col_bitmap.AppendValue(v);
-        Value vx = col_bitmap.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
 
         EXPECT_EQ(vx.value_.bitmap, bitmap);
-        EXPECT_THROW(col_bitmap.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
 
-    col_bitmap.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    ColumnVector clone_column_vector(data_type);
+    clone_column_vector.ShallowCopy(column_vector);
+    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
+    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
+    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
+    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
+    EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
+    EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
+    EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
+    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         BitmapT bitmap;
@@ -87,12 +98,12 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
                 bitmap.SetBit(j, false);
             }
         }
-        Value vx = col_bitmap.GetValue(i);
+        Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.value_.bitmap, bitmap);
     }
 
-    EXPECT_EQ(col_bitmap.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_bitmap.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
     for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
@@ -104,45 +115,45 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
             }
         }
         Value v = Value::MakeBitmap(bitmap);
-        col_bitmap.AppendValue(v);
-        Value vx = col_bitmap.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
 
         EXPECT_EQ(vx.value_.bitmap, bitmap);
-        EXPECT_THROW(col_bitmap.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    col_bitmap.Reset();
-    EXPECT_EQ(col_bitmap.capacity(), 0);
-    EXPECT_EQ(col_bitmap.tail_index_, 0);
-//    EXPECT_EQ(col_bitmap.data_type_size_, 0);
-    EXPECT_NE(col_bitmap.buffer_, nullptr);
-    EXPECT_EQ(col_bitmap.buffer_->heap_mgr_, nullptr);
-    EXPECT_NE(col_bitmap.data_ptr_, nullptr);
-    EXPECT_EQ(col_bitmap.initialized, false);
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    col_bitmap.Initialize();
-    EXPECT_THROW(col_bitmap.SetDataType(DataType(LogicalType::kBitmap)), TypeException);
-    EXPECT_THROW(col_bitmap.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    column_vector.Initialize();
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBitmap)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
-    EXPECT_EQ(col_bitmap.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(col_bitmap.Size(), 0);
-    EXPECT_THROW(col_bitmap.ToString(), TypeException);
-    EXPECT_THROW(col_bitmap.GetValue(0), TypeException);
-    EXPECT_EQ(col_bitmap.tail_index_, 0);
-    EXPECT_EQ(col_bitmap.data_type_size_, 16);
-    EXPECT_NE(col_bitmap.data_ptr_, nullptr);
-    EXPECT_EQ(col_bitmap.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(col_bitmap.data_type(), data_type);
-    EXPECT_EQ(col_bitmap.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
 
-    EXPECT_NE(col_bitmap.buffer_, nullptr);
-    EXPECT_NE(col_bitmap.nulls_ptr_, nullptr);
-    EXPECT_TRUE(col_bitmap.initialized);
-    col_bitmap.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = col_bitmap.data_ptr_;
-    EXPECT_EQ(col_bitmap.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, col_bitmap.data_ptr_);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
@@ -154,10 +165,10 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
             }
         }
         Value v = Value::MakeBitmap(bitmap);
-        col_bitmap.AppendValue(v);
-        Value vx = col_bitmap.GetValue(i);
+        column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
 
         EXPECT_EQ(vx.value_.bitmap, bitmap);
-        EXPECT_THROW(col_bitmap.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }

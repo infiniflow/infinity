@@ -43,7 +43,7 @@ TEST_F(TimeCastTest, date_cast0) {
 
         auto varchar_info = VarcharInfo::Make(65);
         DataType data_type(LogicalType::kVarchar, varchar_info);
-        ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
+        ColumnVector col_varchar(data_type);
         col_varchar.Initialize();
 
         EXPECT_THROW(TimeTryCastToVarlen::Run(source, target, &col_varchar), NotImplementException);
@@ -61,7 +61,7 @@ TEST_F(TimeCastTest, date_cast1) {
     }
 
     DataType source_type(LogicalType::kTime);
-    ColumnVector col_source(source_type, ColumnVectorType::kFlat);
+    ColumnVector col_source(source_type);
     col_source.Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeTime(TimeT(static_cast<i32>(i)));
@@ -79,7 +79,7 @@ TEST_F(TimeCastTest, date_cast1) {
         auto source2target_ptr = BindTimeCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type, ColumnVectorType::kFlat);
+        ColumnVector col_target(target_type);
         col_target.Initialize();
 
         CastParameters cast_parameters;

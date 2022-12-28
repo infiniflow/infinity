@@ -35,7 +35,7 @@ public:
 
     DataType data_type_;
 
-    size_t data_type_size_{0};
+    SizeT data_type_size_{0};
 
     // this buffer is holding the data
     SharedPtr<VectorBuffer> buffer_{nullptr};
@@ -46,17 +46,17 @@ public:
     // A bitmap to indicate the null information
     SharedPtr<Bitmask> nulls_ptr_{nullptr};
 
-    size_t capacity_{0};
+    SizeT capacity_{0};
 
-    size_t tail_index_ {0};
+    SizeT tail_index_ {0};
 
     bool initialized {false};
 
 public:
     // Construct a column vector without initialization;
     explicit
-    ColumnVector(DataType data_type, ColumnVectorType vector_type = ColumnVectorType::kFlat)
-            : data_type_(std::move(data_type)), vector_type_(vector_type) {
+    ColumnVector(DataType data_type)
+            : data_type_(std::move(data_type)), vector_type_(ColumnVectorType::kInvalid) {
         GlobalResourceUsage::IncrObjectCount();
     }
 
@@ -66,7 +66,7 @@ public:
     }
 
     void
-    Initialize(size_t capacity = DEFAULT_VECTOR_SIZE, ColumnVectorType vector_type = ColumnVectorType::kFlat);
+    Initialize(SizeT capacity = DEFAULT_VECTOR_SIZE, ColumnVectorType vector_type = ColumnVectorType::kFlat);
 
     [[nodiscard]] String
     ToString() const;
@@ -92,7 +92,7 @@ public:
 
     // Enlarge the column vector capacity.
     void
-    Reserve(size_t new_capacity);
+    Reserve(SizeT new_capacity);
 
     void
     SetVectorType(ColumnVectorType vector_type) {
@@ -129,11 +129,11 @@ public:
         return data_ptr_;
     }
 
-    [[nodiscard]] inline size_t capacity() const {
+    [[nodiscard]] inline SizeT capacity() const {
         return capacity_;
     }
 
-    [[nodiscard]] inline size_t Size() const {
+    [[nodiscard]] inline SizeT Size() const {
         return tail_index_;
     }
 };

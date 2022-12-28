@@ -61,7 +61,7 @@ TEST_F(PolygonCastTest, polygon_cast0) {
 
         auto varchar_info = VarcharInfo::Make(65);
         DataType data_type(LogicalType::kVarchar, varchar_info);
-        ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
+        ColumnVector col_varchar(data_type);
         col_varchar.Initialize();
 
         EXPECT_THROW(GeographyTryCastToVarlen::Run(source, target, &col_varchar), NotImplementException);
@@ -79,7 +79,7 @@ TEST_F(PolygonCastTest, polygon_cast1) {
     }
 
     DataType source_type(LogicalType::kPolygon);
-    ColumnVector col_source(source_type, ColumnVectorType::kFlat);
+    ColumnVector col_source(source_type);
     col_source.Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
@@ -122,7 +122,7 @@ TEST_F(PolygonCastTest, polygon_cast1) {
         auto source2target_ptr = BindGeographyCast<PolygonT>(source_type, target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type, ColumnVectorType::kFlat);
+        ColumnVector col_target(target_type);
         col_target.Initialize();
 
         CastParameters cast_parameters;

@@ -57,7 +57,7 @@ class EmbeddingCastTest : public BaseTest {
 //        auto varchar_info = VarcharInfo::Make(65);
 //        DataType target_data_type(LogicalType::kVarchar, varchar_info);
 //
-//        ColumnVector col_varchar(target_data_type, ColumnVectorType::kFlat);
+//        ColumnVector col_varchar(target_data_type);
 //        col_varchar.Initialize();
 //
 //        EXPECT_TRUE(EmbeddingTryCastToVarlen::Run(source, source_data_type, target, target_data_type, &col_varchar));
@@ -77,7 +77,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
     DataType source_type(LogicalType::kEmbedding, embedding_info);
-    ColumnVector col_source(source_type, ColumnVectorType::kFlat);
+    ColumnVector col_source(source_type);
     col_source.Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
@@ -112,7 +112,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
         auto source2target_ptr = BindEmbeddingCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type, ColumnVectorType::kFlat);
+        ColumnVector col_target(target_type);
         col_target.Initialize();
 
 //        EmbeddingT* embedding_ptr = (EmbeddingT*)(col_source.data_ptr_);

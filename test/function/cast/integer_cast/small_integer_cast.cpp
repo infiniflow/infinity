@@ -166,7 +166,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast0) {
 
         auto varchar_info = VarcharInfo::Make(65);
         DataType data_type(LogicalType::kVarchar, varchar_info);
-        ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
+        ColumnVector col_varchar(data_type);
         col_varchar.Initialize();
 
         source = std::numeric_limits<SmallIntT>::min();
@@ -223,7 +223,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     using namespace infinity;
 
     DataType smallint_type(LogicalType::kSmallInt);
-    ColumnVector col_smallint(smallint_type, ColumnVectorType::kFlat);
+    ColumnVector col_smallint(smallint_type);
     col_smallint.Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeSmallInt(static_cast<SmallIntT>(i));
@@ -242,7 +242,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2tiny_ptr = BindIntegerCast<SmallIntT>(smallint_type, tinyint_data_type);
         EXPECT_NE(small2tiny_ptr.function, nullptr);
 
-        ColumnVector col_tinyint(tinyint_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_tinyint(tinyint_data_type);
         col_tinyint.Initialize();
 
         CastParameters cast_parameters;
@@ -266,7 +266,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2integer_ptr = BindIntegerCast<SmallIntT>(smallint_type, integer_data_type);
         EXPECT_NE(small2integer_ptr.function, nullptr);
 
-        ColumnVector col_int(integer_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_int(integer_data_type);
         col_int.Initialize();
 
         CastParameters cast_parameters;
@@ -285,7 +285,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2bigint_ptr = BindIntegerCast<SmallIntT>(smallint_type, bigint_data_type);
         EXPECT_NE(small2bigint_ptr.function, nullptr);
 
-        ColumnVector col_bigint(bigint_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_bigint(bigint_data_type);
         col_bigint.Initialize();
 
         CastParameters cast_parameters;
@@ -305,7 +305,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2hugeint_ptr = BindIntegerCast<SmallIntT>(smallint_type, hugeint_data_type);
         EXPECT_NE(small2hugeint_ptr.function, nullptr);
 
-        ColumnVector col_hugeint(hugeint_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_hugeint(hugeint_data_type);
         col_hugeint.Initialize();
 
         CastParameters cast_parameters;
@@ -325,7 +325,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2float_ptr = BindIntegerCast<SmallIntT>(smallint_type, float_data_type);
         EXPECT_NE(small2float_ptr.function, nullptr);
 
-        ColumnVector col_float(float_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_float(float_data_type);
         col_float.Initialize();
 
         CastParameters cast_parameters;
@@ -345,7 +345,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2double_ptr = BindIntegerCast<SmallIntT>(smallint_type, double_data_type);
         EXPECT_NE(small2double_ptr.function, nullptr);
 
-        ColumnVector col_double(double_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_double(double_data_type);
         col_double.Initialize();
 
         CastParameters cast_parameters;
@@ -365,7 +365,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2decimal_ptr = BindIntegerCast<TinyIntT>(smallint_type, decimal_data_type);
         EXPECT_NE(small2decimal_ptr.function, nullptr);
 
-        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_decimal(decimal_data_type);
         col_decimal.Initialize();
 
         CastParameters cast_parameters;
@@ -378,7 +378,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2decimal_ptr = BindIntegerCast<TinyIntT>(smallint_type, decimal_data_type);
         EXPECT_NE(small2decimal_ptr.function, nullptr);
 
-        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_decimal(decimal_data_type);
         col_decimal.Initialize();
 
         CastParameters cast_parameters;
@@ -391,7 +391,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2decimal_ptr = BindIntegerCast<TinyIntT>(smallint_type, decimal_data_type);
         EXPECT_NE(small2decimal_ptr.function, nullptr);
 
-        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_decimal(decimal_data_type);
         col_decimal.Initialize();
 
         CastParameters cast_parameters;
@@ -404,7 +404,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2decimal_ptr = BindIntegerCast<TinyIntT>(smallint_type, decimal_data_type);
         EXPECT_NE(small2decimal_ptr.function, nullptr);
 
-        ColumnVector col_decimal(decimal_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_decimal(decimal_data_type);
         col_decimal.Initialize();
 
         CastParameters cast_parameters;
@@ -417,7 +417,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         auto small2varchar_ptr = BindIntegerCast<SmallIntT>(smallint_type, varchar_data_type);
         EXPECT_NE(small2varchar_ptr.function, nullptr);
 
-        ColumnVector col_varchar(varchar_data_type, ColumnVectorType::kFlat);
+        ColumnVector col_varchar(varchar_data_type);
         col_varchar.Initialize();
 
         CastParameters cast_parameters;

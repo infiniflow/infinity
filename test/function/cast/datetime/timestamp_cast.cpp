@@ -64,7 +64,7 @@ TEST_F(TimestampCastTest, datetime_cast0) {
 
         auto varchar_info = VarcharInfo::Make(65);
         DataType data_type(LogicalType::kVarchar, varchar_info);
-        ColumnVector col_varchar(data_type, ColumnVectorType::kFlat);
+        ColumnVector col_varchar(data_type);
         col_varchar.Initialize();
 
         EXPECT_THROW(TimestampTryCastToVarlen::Run(source, target, &col_varchar), NotImplementException);
@@ -82,7 +82,7 @@ TEST_F(TimestampCastTest, datetime_cast1) {
     }
 
     DataType source_type(LogicalType::kTimestamp);
-    ColumnVector col_source(source_type, ColumnVectorType::kFlat);
+    ColumnVector col_source(source_type);
     col_source.Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeTimestamp(TimestampT(static_cast<i32>(i), static_cast<i32>(i)));
@@ -102,7 +102,7 @@ TEST_F(TimestampCastTest, datetime_cast1) {
         auto source2target_ptr = BindTimestampCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type, ColumnVectorType::kFlat);
+        ColumnVector col_target(target_type);
         col_target.Initialize();
 
         CastParameters cast_parameters;
@@ -114,7 +114,7 @@ TEST_F(TimestampCastTest, datetime_cast1) {
         auto source2target_ptr = BindTimestampCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type, ColumnVectorType::kFlat);
+        ColumnVector col_target(target_type);
         col_target.Initialize();
 
         CastParameters cast_parameters;
@@ -126,7 +126,7 @@ TEST_F(TimestampCastTest, datetime_cast1) {
         auto source2target_ptr = BindTimestampCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type, ColumnVectorType::kFlat);
+        ColumnVector col_target(target_type);
         col_target.Initialize();
 
         CastParameters cast_parameters;
@@ -138,7 +138,7 @@ TEST_F(TimestampCastTest, datetime_cast1) {
         auto source2target_ptr = BindTimestampCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type, ColumnVectorType::kFlat);
+        ColumnVector col_target(target_type);
         col_target.Initialize();
 
         CastParameters cast_parameters;
@@ -151,7 +151,7 @@ TEST_F(TimestampCastTest, datetime_cast1) {
         auto source2target_ptr = BindTimestampCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type, ColumnVectorType::kFlat);
+        ColumnVector col_target(target_type);
         col_target.Initialize();
 
         CastParameters cast_parameters;
