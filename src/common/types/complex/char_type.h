@@ -5,9 +5,86 @@
 #pragma once
 
 #include "common/types/internal_types.h"
+#include "main/stats/global_resource_usage.h"
 #include "main/logger.h"
 
 namespace infinity {
+
+struct CharType {
+public:
+    ptr_t ptr = nullptr;
+
+public:
+    inline explicit
+    CharType(ptr_t&& from_ptr): ptr(from_ptr) {
+        from_ptr = nullptr;
+    }
+
+    inline explicit
+    CharType(SizeT dimension) {
+        ptr = new char_t[dimension]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+    }
+
+    inline
+    ~CharType() {
+        if(ptr != nullptr) {
+            LOG_TRACE("Char type isn't null, need to manually SetNull or Reset");
+            Reset();
+        }
+    }
+
+    inline
+    CharType(const CharType& other) = default;
+
+    inline
+    CharType(CharType&& other) noexcept {
+        this->ptr = other.ptr;
+        other.ptr = nullptr;
+    }
+
+    CharType&
+    operator=(const CharType& other) {
+        if(this == &other) return *this;
+        if(ptr != nullptr) {
+            LOG_TRACE("Target Char isn't null, need to manually SetNull or Reset");
+//            Reset();
+        }
+        ptr = other.ptr;
+        return *this;
+    }
+
+    CharType&
+    operator=(CharType&& other) noexcept {
+        if(this == &other) return *this;
+        if(ptr != nullptr) {
+            LOG_TRACE("Target char type isn't null, need to manually SetNull or Reset");
+//            Reset();
+        }
+        ptr = other.ptr;
+        other.ptr = nullptr;
+        return *this;
+    }
+
+    bool
+    operator==(const CharType& other) const {
+        return strcmp(this->ptr, other.ptr);
+    }
+
+    inline void
+    Reset() {
+        if(ptr != nullptr) {
+            delete[] ptr;
+            ptr = nullptr;
+            GlobalResourceUsage::DecrRawMemCount();
+        }
+    }
+
+    inline void
+    SetNull() {
+        ptr = nullptr;
+    }
+};
 
 struct Char1Type {
 

@@ -60,6 +60,7 @@ using Decimal128T = Decimal128Type;
 
 // String
 using VarcharT = VarcharType;
+using CharT = CharType;
 using Char1T = Char1Type;
 using Char2T = Char2Type;
 using Char4T = Char4Type;

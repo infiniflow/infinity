@@ -8,8 +8,8 @@ namespace infinity {
 
 SharedPtr<VarcharInfo>
 VarcharInfo::Make(i64 limit) {
-    TypeAssert(limit >= 65 && limit <= MAX_VARCHAR_SIZE,
-               "Varchar type length can't be less than 65 or larger than 65535.")
+    TypeAssert(limit >= 1 && limit <= MAX_VARCHAR_SIZE,
+               "Varchar type length can't be less than 1 or larger than 65535.")
     return MakeShared<VarcharInfo>(limit);
 }
 

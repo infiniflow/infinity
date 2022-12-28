@@ -34,6 +34,7 @@ enum LogicalType: i8 {
     kVarchar,
 
     // Char * 7
+    kChar,
     kChar1,
     kChar2,
     kChar4,

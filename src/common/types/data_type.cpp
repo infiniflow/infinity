@@ -31,6 +31,7 @@ static const char* type2name[] = {
 
     // String
     "Varchar",
+    "Char",
     "Char1",
     "Char2",
     "Char4",
@@ -99,6 +100,9 @@ static i64 type_size[] = {
 
     // Varchar * 1
     16, // Varchar
+
+    // Char * 1
+    8,  // Char
 
     // Char * 7
     1, // Char1
@@ -303,6 +307,7 @@ template <> String DataType::TypeToString<Decimal32T>() { return "Decimal32"; }
 template <> String DataType::TypeToString<Decimal64T>() { return "Decimal64"; }
 template <> String DataType::TypeToString<Decimal128T>() { return "Decimal128"; }
 template <> String DataType::TypeToString<VarcharT>() { return "Varchar"; }
+template <> String DataType::TypeToString<CharT>() { return "Char"; }
 template <> String DataType::TypeToString<Char1T>() { return "Char1"; }
 template <> String DataType::TypeToString<Char2T>() { return "Char2"; }
 template <> String DataType::TypeToString<Char4T>() { return "Char4"; }

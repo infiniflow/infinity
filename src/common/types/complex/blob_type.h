@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "common/types/varlen_type.h"
 #include "main/stats/global_resource_usage.h"
 
 namespace infinity {

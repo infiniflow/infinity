@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "common/types/varlen_type.h"
 #include "common/utility/infinity_assert.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/logger.h"
@@ -99,7 +98,7 @@ private:
     }
 public:
     inline explicit
-    EmbeddingType(ptr_t& from_ptr): ptr(from_ptr) {
+    EmbeddingType(ptr_t&& from_ptr): ptr(from_ptr) {
         from_ptr = nullptr;
     }
 

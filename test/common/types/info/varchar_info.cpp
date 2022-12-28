@@ -28,7 +28,7 @@ class VarcharInfoTest : public BaseTest {
 TEST_F(VarcharInfoTest, varchar_info_A) {
     using namespace infinity;
 
-    EXPECT_THROW(VarcharInfo::Make(64), TypeException);
+    EXPECT_THROW(VarcharInfo::Make(0), TypeException);
     EXPECT_THROW(VarcharInfo::Make(65536), TypeException);
 
     auto varchar_info_ptr = VarcharInfo::Make(65);

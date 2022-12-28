@@ -269,7 +269,7 @@ template <>
 inline EmbeddingT
 NullValue() {
     ptr_t ptr = std::numeric_limits<ptr_t>::infinity();
-    EmbeddingT embedding(ptr);
+    EmbeddingT embedding(std::move(ptr));
     return embedding;
 }
 

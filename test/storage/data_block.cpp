@@ -55,8 +55,6 @@ TEST_F(DataBlockTest, test1) {
     column_types.emplace_back(LogicalType::kDecimal64, DecimalInfo::Make(18, 2));
     column_types.emplace_back(LogicalType::kDecimal128, DecimalInfo::Make(38, 2));
 
-    EXPECT_THROW(column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(16)), TypeException);
-
     // Varchar * 1
     column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(65));
 
