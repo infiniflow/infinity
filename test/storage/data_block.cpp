@@ -57,6 +57,7 @@ TEST_F(DataBlockTest, test1) {
 
     // Varchar * 1
     column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(65));
+    column_types.emplace_back(LogicalType::kChar, VarcharInfo::Make(128));
 
     // Char * 7
     column_types.emplace_back(LogicalType::kChar1);

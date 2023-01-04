@@ -163,8 +163,7 @@ DataType::Make(hsql::ColumnType type) {
         }
         case hsql::DataType::CHAR: {
             SharedPtr<CharInfo> char_info_ptr = CharInfo::Make(type.length);
-            // Fixme: kChar64 -> kChar
-            return DataType(LogicalType::kChar64, char_info_ptr);
+            return DataType(LogicalType::kChar, char_info_ptr);
         }
         case hsql::DataType::DATE: {
             return DataType(LogicalType::kDate);
