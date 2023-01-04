@@ -70,6 +70,9 @@ public:
     MakeChar(const String& str, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
+    MakeChar(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr);
+
+    static Value
     MakeChar1(Char1T input_ref);
 
     static Value

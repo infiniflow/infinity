@@ -156,6 +156,14 @@ Value::MakeChar(const String& str, const SharedPtr<TypeInfo>& type_info_ptr) {
 }
 
 Value
+Value::MakeChar(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
+    Value value(LogicalType::kChar, std::move(type_info_ptr));
+    value.value_.char_n.ptr = ptr;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
 Value::MakeChar1(Char1T input) {
     Value value(LogicalType::kChar1);
     value.value_.char1 = input;

@@ -28,7 +28,7 @@ public:
     operator==(const TypeInfo& other) const override;
 
     [[nodiscard]] SizeT
-    Size() const override {  return 8u; }
+    Size() const override {  return length_limit_; }
 
     [[nodiscard]] SizeT
     length_limit() const { return length_limit_; }

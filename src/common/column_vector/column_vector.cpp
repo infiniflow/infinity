@@ -124,6 +124,10 @@ ColumnVector::GetValue(idx_t index) const {
         case kVarchar: {
             return Value::MakeVarchar(((VarcharT *) data_ptr_)[index], data_type_.type_info());
         }
+        case kChar: {
+            ptr_t ptr = data_ptr_ + index * data_type_.Size();
+            return Value::MakeChar(ptr, data_type_.type_info());
+        }
         case kChar1: {
             return Value::MakeChar1(((Char1T *) data_ptr_)[index]);
         }
@@ -289,6 +293,11 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
                 ((VarcharT *) data_ptr_)[index].ptr = ptr;
             }
             ((VarcharT *) data_ptr_)[index].length = static_cast<u16>(varchar_len);
+            break;
+        }
+        case kChar: {
+            ptr_t ptr = data_ptr_ + index * data_type_.Size();
+            memcpy(ptr, value.value_.char_n.ptr, data_type_.Size());
             break;
         }
         case kChar1: {
