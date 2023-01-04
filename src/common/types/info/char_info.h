@@ -20,21 +20,21 @@ public:
     Make();
 
     explicit
-    CharInfo(size_t limit) : TypeInfo(TypeInfoType::kChar), length_limit_(limit) {}
+    CharInfo(SizeT limit) : TypeInfo(TypeInfoType::kChar), length_limit_(limit) {}
 
     ~CharInfo() override = default;
 
     bool
     operator==(const TypeInfo& other) const override;
 
-    [[nodiscard]] size_t
-    Size() const override {  return length_limit_; }
+    [[nodiscard]] SizeT
+    Size() const override {  return 8u; }
 
-    [[nodiscard]] size_t
+    [[nodiscard]] SizeT
     length_limit() const { return length_limit_; }
 
 private:
-    size_t length_limit_ {0};
+    SizeT length_limit_ {0};
 };
 
 }

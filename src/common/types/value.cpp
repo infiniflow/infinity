@@ -6,6 +6,7 @@
 #include "common/utility/infinity_assert.h"
 #include "main/stats/global_resource_usage.h"
 #include "common/types/info/embedding_info.h"
+#include "common/types/info/char_info.h"
 
 #include <utility>
 
@@ -136,6 +137,20 @@ Value
 Value::MakeVarchar(const char* ptr, const SharedPtr<TypeInfo>& type_info_ptr) {
     Value value(LogicalType::kVarchar, type_info_ptr);
     value.value_.varchar.Initialize(ptr);
+    value.is_null_ = false;
+    return value;
+}
+
+Value
+Value::MakeChar(const String& str, const SharedPtr<TypeInfo>& type_info_ptr) {
+    Value value(LogicalType::kChar, type_info_ptr);
+    SharedPtr<CharInfo> char_info_ptr = std::static_pointer_cast<CharInfo>(type_info_ptr);
+    SizeT len_limit = char_info_ptr->length_limit();
+    CharT char_n(len_limit);
+
+    char_n.Initialize(str, len_limit);
+    value.value_.char_n.SetNull();
+    value.value_.char_n = std::move(char_n);
     value.is_null_ = false;
     return value;
 }
@@ -451,6 +466,12 @@ Value::GetValue() const {
     return value_.varchar;
 }
 
+template <> CharT
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kChar, "Not matched type: " + type_.ToString())
+    return value_.char_n;
+}
+
 template <> Char1T
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kChar1, "Not matched type: " + type_.ToString())
@@ -749,6 +770,10 @@ Value::Init(bool in_constructor) {
         case kVarchar: {
             value_.varchar.ptr = nullptr;
             value_.varchar.length = 0;
+            break;
+        }
+        case kChar: {
+            value_.char_n.SetNull();
             break;
         }
         case kChar1: {
@@ -1131,6 +1156,11 @@ Value::MoveUnionValue(Value&& other) noexcept {
         }
         case kVarchar: {
             this->value_.varchar = std::move(other.value_.varchar);
+            break;
+        }
+        case kChar: {
+            this->value_.char_n = other.value_.char_n;
+            other.value_.char_n.SetNull();
             break;
         }
         case kChar1: {

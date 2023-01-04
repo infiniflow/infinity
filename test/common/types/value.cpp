@@ -8,6 +8,7 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "common/types/info/varchar_info.h"
+#include "common/types/info/char_info.h"
 
 class ValueTest : public BaseTest {
     void
@@ -328,6 +329,19 @@ TEST_F(ValueTest, MakeAndGet) {
         value = Value::MakeChar64(char2);
         s.pop_back();
         EXPECT_EQ(value.GetValue<Char64T>().ToString(), s);
+    }
+
+    // CharT
+    {
+        String str = "Hello";
+        auto char_info = CharInfo::Make(64);
+        value = Value::MakeChar(str, char_info);
+
+        CharT char_n = value.GetValue<CharT>();
+        EXPECT_EQ(char_n.ptr, value.value_.char_n.ptr);
+        // CharT need to manually SetNull or Reset.
+        value.value_.char_n.Reset();
+        char_n.SetNull();
     }
 
     // Date

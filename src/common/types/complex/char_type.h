@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "common/utility/infinity_assert.h"
 #include "common/types/internal_types.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/logger.h"
@@ -21,8 +22,8 @@ public:
     }
 
     inline explicit
-    CharType(SizeT dimension) {
-        ptr = new char_t[dimension]{0};
+    CharType(SizeT limit_size) {
+        ptr = new char_t[limit_size]{0};
         GlobalResourceUsage::IncrRawMemCount();
     }
 
@@ -48,7 +49,7 @@ public:
         if(this == &other) return *this;
         if(ptr != nullptr) {
             LOG_TRACE("Target Char isn't null, need to manually SetNull or Reset");
-//            Reset();
+            Reset();
         }
         ptr = other.ptr;
         return *this;
@@ -59,7 +60,7 @@ public:
         if(this == &other) return *this;
         if(ptr != nullptr) {
             LOG_TRACE("Target char type isn't null, need to manually SetNull or Reset");
-//            Reset();
+            Reset();
         }
         ptr = other.ptr;
         other.ptr = nullptr;
@@ -69,6 +70,14 @@ public:
     bool
     operator==(const CharType& other) const {
         return strcmp(this->ptr, other.ptr);
+    }
+
+    inline void
+    Initialize(const String& input, SizeT limit) {
+        StorageAssert(input.size() < limit,
+                      "Attempt to store size: " + std::to_string(input.size() + 1)
+                      + " string into CharT with capacity: " + std::to_string(limit));
+        memcpy(this->ptr, input.c_str(), input.size());
     }
 
     inline void
@@ -83,6 +92,12 @@ public:
     inline void
     SetNull() {
         ptr = nullptr;
+    }
+
+    [[nodiscard]] inline SizeT
+    size() const {
+        StorageAssert(this->ptr != nullptr, "Char type isn't initialized.")
+        return std::strlen(ptr) + 1;
     }
 };
 

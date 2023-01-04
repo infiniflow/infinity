@@ -67,6 +67,9 @@ public:
     MakeVarchar(const char* ptr, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
+    MakeChar(const String& str, const SharedPtr<TypeInfo>& type_info_ptr);
+
+    static Value
     MakeChar1(Char1T input_ref);
 
     static Value
@@ -214,6 +217,7 @@ public:
         Decimal128T decimal128;
 
         VarcharT varchar;
+        CharT char_n;
         Char1T char1;
         Char2T char2;
         Char4T char4;
@@ -288,6 +292,7 @@ template <> Decimal32T Value::GetValue() const;
 template <> Decimal64T Value::GetValue() const;
 template <> Decimal128T Value::GetValue() const;
 template <> VarcharT Value::GetValue() const;
+template <> CharT Value::GetValue() const;
 template <> Char1T Value::GetValue() const;
 template <> Char2T Value::GetValue() const;
 template <> Char4T Value::GetValue() const;
