@@ -32,13 +32,6 @@ static const char* type2name[] = {
     // String
     "Varchar",
     "Char",
-    "Char1",
-    "Char2",
-    "Char4",
-    "Char8",
-    "Char16",
-    "Char32",
-    "Char64",
 
     // Date and Time
     "Date",
@@ -103,15 +96,6 @@ static i64 type_size[] = {
 
     // Char * 1
     8,  // Char
-
-    // Char * 7
-    1, // Char1
-    2, // Char2
-    4, // Char4
-    8, // Char8
-    16, // Char16
-    32, // Char32
-    64, // Char64
 
     // Date and Time * 6
     4, // Date
@@ -307,13 +291,6 @@ template <> String DataType::TypeToString<Decimal64T>() { return "Decimal64"; }
 template <> String DataType::TypeToString<Decimal128T>() { return "Decimal128"; }
 template <> String DataType::TypeToString<VarcharT>() { return "Varchar"; }
 template <> String DataType::TypeToString<CharT>() { return "Char"; }
-template <> String DataType::TypeToString<Char1T>() { return "Char1"; }
-template <> String DataType::TypeToString<Char2T>() { return "Char2"; }
-template <> String DataType::TypeToString<Char4T>() { return "Char4"; }
-template <> String DataType::TypeToString<Char8T>() { return "Char8"; }
-template <> String DataType::TypeToString<Char16T>() { return "Char16"; }
-template <> String DataType::TypeToString<Char32T>() { return "Char32"; }
-template <> String DataType::TypeToString<Char64T>() { return "Char64"; }
 template <> String DataType::TypeToString<DateT>() { return "Date"; }
 template <> String DataType::TypeToString<TimeT>() { return "Time"; }
 template <> String DataType::TypeToString<DateTimeT>() { return "DateTime"; }

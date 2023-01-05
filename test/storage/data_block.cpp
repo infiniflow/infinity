@@ -7,6 +7,7 @@
 #include "storage/data_block.h"
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/varchar_info.h"
+#include "common/types/info/char_info.h"
 #include "common/types/info/array_info.h"
 #include "common/types/info/embedding_info.h"
 #include "main/profiler/base_profiler.h"
@@ -57,16 +58,9 @@ TEST_F(DataBlockTest, test1) {
 
     // Varchar * 1
     column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(65));
-    column_types.emplace_back(LogicalType::kChar, VarcharInfo::Make(128));
 
-    // Char * 7
-    column_types.emplace_back(LogicalType::kChar1);
-    column_types.emplace_back(LogicalType::kChar2);
-    column_types.emplace_back(LogicalType::kChar4);
-    column_types.emplace_back(LogicalType::kChar8);
-    column_types.emplace_back(LogicalType::kChar16);
-    column_types.emplace_back(LogicalType::kChar32);
-    column_types.emplace_back(LogicalType::kChar64);
+    // Char * 1
+    column_types.emplace_back(LogicalType::kChar, CharInfo::Make(128));
 
     // Date and Time * 6
     column_types.emplace_back(LogicalType::kDate);

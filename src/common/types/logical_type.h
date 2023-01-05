@@ -33,15 +33,8 @@ enum LogicalType: i8 {
     // Varchar * 1
     kVarchar,
 
-    // Char * 7
+    // Char * 1
     kChar,
-    kChar1,
-    kChar2,
-    kChar4,
-    kChar8,
-    kChar16,
-    kChar32,
-    kChar64,
 
     // Date and Time * 6
     kDate,

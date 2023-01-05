@@ -97,48 +97,6 @@ NullValue() {
 }
 
 template <>
-inline Char1T
-NullValue() {
-    return Char1T();
-}
-
-template <>
-inline Char2T
-NullValue() {
-    return Char2T();
-}
-
-template <>
-inline Char4T
-NullValue() {
-    return Char4T();
-}
-
-template <>
-inline Char8T
-NullValue() {
-    return Char8T();
-}
-
-template <>
-inline Char16T
-NullValue() {
-    return Char16T();
-}
-
-template <>
-inline Char32T
-NullValue() {
-    return Char32T();
-}
-
-template <>
-inline Char64T
-NullValue() {
-    return Char64T();
-}
-
-template <>
 inline DateT
 NullValue() {
     return DateT(std::numeric_limits<i32>::infinity());

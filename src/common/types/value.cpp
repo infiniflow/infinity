@@ -164,63 +164,6 @@ Value::MakeChar(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
 }
 
 Value
-Value::MakeChar1(Char1T input) {
-    Value value(LogicalType::kChar1);
-    value.value_.char1 = input;
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeChar2(Char2T input) {
-    Value value(LogicalType::kChar2);
-    value.value_.char2 = std::move(input);
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeChar4(Char4T input) {
-    Value value(LogicalType::kChar4);
-    value.value_.char4 = std::move(input);
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeChar8(Char8T input) {
-    Value value(LogicalType::kChar8);
-    value.value_.char8 = std::move(input);
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeChar16(Char16T input) {
-    Value value(LogicalType::kChar16);
-    value.value_.char16 = std::move(input);
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeChar32(Char32T input) {
-    Value value(LogicalType::kChar32);
-    value.value_.char32 = std::move(input);
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeChar64(Char64T input) {
-    Value value(LogicalType::kChar64);
-    value.value_.char64 = std::move(input);
-    value.is_null_ = false;
-    return value;
-}
-
-
-Value
 Value::MakeDate(DateT input) {
     Value value(LogicalType::kDate);
     value.value_.date = input;
@@ -478,48 +421,6 @@ template <> CharT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kChar, "Not matched type: " + type_.ToString())
     return value_.char_n;
-}
-
-template <> Char1T
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar1, "Not matched type: " + type_.ToString())
-    return value_.char1;
-}
-
-template <> Char2T
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar2, "Not matched type: " + type_.ToString())
-    return value_.char2;
-}
-
-template <> Char4T
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar4, "Not matched type: " + type_.ToString())
-    return value_.char4;
-}
-
-template <> Char8T
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar8, "Not matched type: " + type_.ToString())
-    return value_.char8;
-}
-
-template <> Char16T
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar16, "Not matched type: " + type_.ToString())
-    return value_.char16;
-}
-
-template <> Char32T
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar32, "Not matched type: " + type_.ToString())
-    return value_.char32;
-}
-
-template <> Char64T
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar64, "Not matched type: " + type_.ToString())
-    return value_.char64;
 }
 
 template <> DateT
@@ -784,34 +685,6 @@ Value::Init(bool in_constructor) {
             value_.char_n.SetNull();
             break;
         }
-        case kChar1: {
-            value_.char1.value = 0;
-            break;
-        }
-        case kChar2: {
-            value_.char2.Reset();
-            break;
-        }
-        case kChar4: {
-            value_.char4.Reset();
-            break;
-        }
-        case kChar8: {
-            value_.char8.Reset();
-            break;
-        }
-        case kChar16: {
-            value_.char16.Reset();
-            break;
-        }
-        case kChar32: {
-            value_.char32.Reset();
-            break;
-        }
-        case kChar64: {
-            value_.char64.Reset();
-            break;
-        }
         case kDate: {
             value_.date.value = 0;
             break;
@@ -962,41 +835,6 @@ Value::CopyUnionValue(const Value& other) {
         case kVarchar: {
             // Will use Varchar copy-assignment
             value_.varchar = other.value_.varchar;
-            break;
-        }
-        case kChar1: {
-            // trivial copy-assignment
-            value_.char1 = other.value_.char1;
-            break;
-        }
-        case kChar2: {
-            // Char2Type copy assignment
-            value_.char2 = other.value_.char2;
-            break;
-        }
-        case kChar4: {
-            // Char4Type copy assignment
-            value_.char4 = other.value_.char4;
-            break;
-        }
-        case kChar8: {
-            // Char8Type copy assignment
-            value_.char8 = other.value_.char8;
-            break;
-        }
-        case kChar16: {
-            // Char16Type copy assignment
-            value_.char16 = other.value_.char16;
-            break;
-        }
-        case kChar32: {
-            // Char32Type copy assignment
-            value_.char32 = other.value_.char32;
-            break;
-        }
-        case kChar64: {
-            // Char64Type copy assignment
-            value_.char64 = other.value_.char64;
             break;
         }
         case kDate: {
@@ -1171,34 +1009,6 @@ Value::MoveUnionValue(Value&& other) noexcept {
             other.value_.char_n.SetNull();
             break;
         }
-        case kChar1: {
-            this->value_.char1.value = other.value_.char1.value;
-            break;
-        }
-        case kChar2: {
-            this->value_.char2 = std::move(other.value_.char2);
-            break;
-        }
-        case kChar4: {
-            this->value_.char4 = std::move(other.value_.char4);
-            break;
-        }
-        case kChar8: {
-            this->value_.char8 = std::move(other.value_.char8);
-            break;
-        }
-        case kChar16: {
-            this->value_.char16 = std::move(other.value_.char16);
-            break;
-        }
-        case kChar32: {
-            this->value_.char32 = std::move(other.value_.char32);
-            break;
-        }
-        case kChar64: {
-            this->value_.char64 = std::move(other.value_.char64);
-            break;
-        }
         case kDate: {
             this->value_.date = other.value_.date;
             break;
@@ -1344,34 +1154,6 @@ Value::Reset() {
             value_.varchar.Reset();
             break;
         }
-        case kChar1: {
-            value_.char1.value = 0;
-            break;
-        }
-        case kChar2: {
-            value_.char2.Reset();
-            break;
-        }
-        case kChar4: {
-            value_.char4.Reset();
-            break;
-        }
-        case kChar8: {
-            value_.char8.Reset();
-            break;
-        }
-        case kChar16: {
-            value_.char16.Reset();
-            break;
-        }
-        case kChar32: {
-            value_.char32.Reset();
-            break;
-        }
-        case kChar64: {
-            value_.char64.Reset();
-            break;
-        }
         case kDate: {
             value_.date.value = 0;
             break;
@@ -1489,19 +1271,7 @@ Value::ToString() const {
             break;
         case kVarchar:
             break;
-        case kChar1:
-            break;
-        case kChar2:
-            break;
-        case kChar4:
-            break;
-        case kChar8:
-            break;
-        case kChar16:
-            break;
-        case kChar32:
-            break;
-        case kChar64:
+        case kChar:
             break;
         case kDate:
             break;

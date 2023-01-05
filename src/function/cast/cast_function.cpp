@@ -82,27 +82,6 @@ CastFunction::GetBoundFunc(const infinity::DataType &source, const infinity::Dat
         case kVarchar: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
         }
-        case kChar1: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
-        case kChar2: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
-        case kChar4: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
-        case kChar8: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
-        case kChar16: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
-        case kChar32: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
-        case kChar64: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
         case kDate: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
         }

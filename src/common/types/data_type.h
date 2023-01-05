@@ -61,13 +61,6 @@ using Decimal128T = Decimal128Type;
 // String
 using VarcharT = VarcharType;
 using CharT = CharType;
-using Char1T = Char1Type;
-using Char2T = Char2Type;
-using Char4T = Char4Type;
-using Char8T = Char8Type;
-using Char16T = Char16Type;
-using Char32T = Char32Type;
-using Char64T = Char64Type;
 
 // Date and Time
 using DateT = DateType;
@@ -209,13 +202,6 @@ template <> String DataType::TypeToString<Decimal32T>();
 template <> String DataType::TypeToString<Decimal64T>();
 template <> String DataType::TypeToString<Decimal128T>();
 template <> String DataType::TypeToString<VarcharT>();
-template <> String DataType::TypeToString<Char1T>();
-template <> String DataType::TypeToString<Char2T>();
-template <> String DataType::TypeToString<Char4T>();
-template <> String DataType::TypeToString<Char8T>();
-template <> String DataType::TypeToString<Char16T>();
-template <> String DataType::TypeToString<Char32T>();
-template <> String DataType::TypeToString<Char64T>();
 template <> String DataType::TypeToString<DateT>();
 template <> String DataType::TypeToString<TimeT>();
 template <> String DataType::TypeToString<DateTimeT>();

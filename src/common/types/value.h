@@ -73,27 +73,6 @@ public:
     MakeChar(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr);
 
     static Value
-    MakeChar1(Char1T input_ref);
-
-    static Value
-    MakeChar2(Char2T input_ref);
-
-    static Value
-    MakeChar4(Char4T input_ref);
-
-    static Value
-    MakeChar8(Char8T input_ref);
-
-    static Value
-    MakeChar16(Char16T input);
-
-    static Value
-    MakeChar32(Char32T input);
-
-    static Value
-    MakeChar64(Char64T input);
-
-    static Value
     MakeDate(DateT input);
 
     static Value
@@ -221,13 +200,6 @@ public:
 
         VarcharT varchar;
         CharT char_n;
-        Char1T char1;
-        Char2T char2;
-        Char4T char4;
-        Char8T char8;
-        Char16T char16;
-        Char32T char32;
-        Char64T char64;
 
         DateT    date;
         TimeT    time;
@@ -296,13 +268,6 @@ template <> Decimal64T Value::GetValue() const;
 template <> Decimal128T Value::GetValue() const;
 template <> VarcharT Value::GetValue() const;
 template <> CharT Value::GetValue() const;
-template <> Char1T Value::GetValue() const;
-template <> Char2T Value::GetValue() const;
-template <> Char4T Value::GetValue() const;
-template <> Char8T Value::GetValue() const;
-template <> Char16T Value::GetValue() const;
-template <> Char32T Value::GetValue() const;
-template <> Char64T Value::GetValue() const;
 template <> DateT Value::GetValue() const;
 template <> TimeT Value::GetValue() const;
 template <> DateTimeT Value::GetValue() const;
