@@ -14,7 +14,8 @@ public:
     ColumnExpression(DataType data_type, String table_name,
                      String column_name, i64 column_index, i64 depth);
 
-    DataType Type() const override {
+    DataType
+    Type() const override {
         return data_type_;
     };
 

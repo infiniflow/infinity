@@ -17,8 +17,8 @@ struct AddFunction {
 };
 
 void
-RegisterAddFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
-    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("+");
+RegisterAddFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>("+");
 
 //    GenerateAddFunction<bool>(function_set_ptr, LogicalTypeId::kBoolean);
     ScalarFunction add_function_int8(

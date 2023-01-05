@@ -31,14 +31,14 @@ struct ColumnVectorCastData {
 template<typename Operator>
 struct TryCastValue {
     template<typename SourceValueType, typename TargetValueType>
-    inline static TargetValueType
-    Execute(SourceValueType input, Bitmask* nulls_ptr, size_t idx, void* state_ptr) {
-        TargetValueType result;
+    inline static void
+    Execute(SourceValueType input, TargetValueType& result, Bitmask* nulls_ptr, size_t idx, void* state_ptr) {
         if(Operator::template Run<SourceValueType, TargetValueType>(input, result)) {
-            return result;
+            return ;
         }
 
         nulls_ptr->SetFalse(idx);
+        result = NullValue<TargetValueType>();
 
         auto* data_ptr = (ColumnVectorCastData*)(state_ptr);
         // This convert is failed
@@ -46,22 +46,21 @@ struct TryCastValue {
 //        data_ptr->source_type_  =
 //        data_ptr->target_type_  =
 //        data_ptr->result_ref_
-        return NullValue<TargetValueType>();
     }
 };
 
 template<typename Operator>
 struct TryCastValueToVarlen {
     template<typename SourceValueType, typename TargetValueType>
-    inline static TargetValueType
-    Execute(SourceValueType input, Bitmask* nulls_ptr, size_t idx, void* state_ptr) {
-        TargetValueType result;
+    inline static void
+    Execute(SourceValueType input, TargetValueType& result, Bitmask* nulls_ptr, size_t idx, void* state_ptr) {
         auto* cast_data_ptr = (ColumnVectorCastData*)(state_ptr);
         if(Operator::template Run<SourceValueType, TargetValueType>(input, result, cast_data_ptr->column_vector_ptr_)) {
-            return result;
+            return ;
         }
 
         nulls_ptr->SetFalse(idx);
+        result = NullValue<TargetValueType>();
 
         auto* data_ptr = (ColumnVectorCastData*)(state_ptr);
         // This convert is failed
@@ -69,27 +68,26 @@ struct TryCastValueToVarlen {
 //        data_ptr->source_type_  =
 //        data_ptr->target_type_  =
 //        data_ptr->result_ref_
-        return NullValue<TargetValueType>();
     }
 };
 
 template<typename Operator>
 struct TryCastValueToVarlenWithType {
     template<typename SourceValueType, typename TargetValueType>
-    inline static TargetValueType
-    Execute(const SourceValueType& input, Bitmask* nulls_ptr, size_t idx, void* state_ptr) {
-        TargetValueType result;
+    inline static void
+    Execute(const SourceValueType& input, TargetValueType& result, Bitmask* nulls_ptr, size_t idx, void* state_ptr) {
         auto* cast_data_ptr = (ColumnVectorCastData*)(state_ptr);
-        LOG_TRACE("{}, {}", cast_data_ptr->source_type_.ToString(), cast_data_ptr->target_type_.ToString());
+//        LOG_TRACE("{}, {}", cast_data_ptr->source_type_.ToString(), cast_data_ptr->target_type_.ToString());
         if(Operator::template Run<SourceValueType, TargetValueType>(input,
                                                                     cast_data_ptr->source_type_,
                                                                     result,
                                                                     cast_data_ptr->target_type_,
                                                                     cast_data_ptr->column_vector_ptr_)) {
-            return result;
+            return ;
         }
 
         nulls_ptr->SetFalse(idx);
+        result = NullValue<TargetValueType>();
 
         auto* data_ptr = (ColumnVectorCastData*)(state_ptr);
         // This convert is failed
@@ -97,7 +95,6 @@ struct TryCastValueToVarlenWithType {
 //        data_ptr->source_type_  =
 //        data_ptr->target_type_  =
 //        data_ptr->result_ref_
-        return NullValue<TargetValueType>();
     }
 };
 

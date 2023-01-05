@@ -46,20 +46,22 @@ public:
                 if(nullable) {
                     if(input.nulls_ptr_->IsAllTrue()) {
                         result_null->SetAllTrue();
-                        result_ptr[0] = Operator::template Execute<InputType, ResultType>(input_ptr[0],
-                                                                                          result_null.get(),
-                                                                                          0,
-                                                                                          state_ptr);
+                        Operator::template Execute<InputType, ResultType>(input_ptr[0],
+                                                                          result_ptr[0],
+                                                                          result_null.get(),
+                                                                          0,
+                                                                          state_ptr);
                         return ;
                     } else {
                         result_null->SetFalse(0);
                         return ;
                     }
                 } else {
-                    result_ptr[0] = Operator::template Execute<InputType, ResultType>(input_ptr[0],
-                                                                                      result_null.get(),
-                                                                                      0,
-                                                                                      state_ptr);
+                    Operator::template Execute<InputType, ResultType>(input_ptr[0],
+                                                                      result_ptr[0],
+                                                                      result_null.get(),
+                                                                      0,
+                                                                      state_ptr);
                 }
             }
             case ColumnVectorType::kHeterogeneous: {
@@ -79,7 +81,7 @@ private:
                 size_t count,
                 void* state_ptr) {
         for (size_t i = 0; i < count; i++) {
-            result_ptr[i] = Operator::template Execute<InputType, ResultType>(input_ptr[i], result_null.get(), i, state_ptr);
+             Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
         }
     }
 
@@ -97,7 +99,7 @@ private:
 
             for (size_t i = 0; i < count; i++) {
                 // Not valid for embedding type, since the embedding type width isn't sizeof(EmbeddingT)
-                result_ptr[i] = Operator::template Execute<InputType, ResultType>(input_ptr[i], result_null.get(), i, state_ptr);
+                Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
             }
         } else {
             result_null->DeepCopy(*input_null);
@@ -108,10 +110,11 @@ private:
                 if(input_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     while(start_index < end_index) {
-                        result_ptr[i] = Operator::template Execute<InputType, ResultType>(input_ptr[i],
-                                                                                          result_null.get(),
-                                                                                          start_index ++,
-                                                                                          state_ptr);
+                        Operator::template Execute<InputType, ResultType>(input_ptr[i],
+                                                                          result_ptr[i],
+                                                                          result_null.get(),
+                                                                          start_index ++,
+                                                                          state_ptr);
                     }
                 } else if(input_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                     // all data of 64 rows are null
@@ -121,8 +124,9 @@ private:
                     while(start_index < end_index) {
                         if(input_null->IsTrue(start_index - original_start)) {
                             // This row isn't null
-                            result_ptr[i] = Operator::template Execute<InputType, ResultType>(
+                            Operator::template Execute<InputType, ResultType>(
                                     input_ptr[i],
+                                    result_ptr[i],
                                     result_null.get(),
                                     start_index ++,
                                     state_ptr);
@@ -141,7 +145,7 @@ private:
                          size_t count,
                          void* state_ptr) {
         for (size_t i = 0; i < count; i++) {
-            result_ptr[i] = Operator::template Execute<InputType, ResultType>(input_ptr[i], result_null.get(), i, state_ptr);
+            Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
         }
     }
 };
