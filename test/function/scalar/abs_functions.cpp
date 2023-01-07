@@ -14,7 +14,7 @@
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
 
-class MathFunctionsTest : public BaseTest {
+class AbsFunctionsTest : public BaseTest {
     void
     SetUp() override {
         infinity::Logger::Initialize();
@@ -30,7 +30,7 @@ class MathFunctionsTest : public BaseTest {
     }
 };
 
-TEST_F(MathFunctionsTest, abs_func) {
+TEST_F(AbsFunctionsTest, abs_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
@@ -53,7 +53,7 @@ TEST_F(MathFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(TinyInt)", func.ToString().c_str());
+        EXPECT_STREQ("abs(TinyInt)->TinyInt", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -103,7 +103,7 @@ TEST_F(MathFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(SmallInt)", func.ToString().c_str());
+        EXPECT_STREQ("abs(SmallInt)->SmallInt", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -149,7 +149,7 @@ TEST_F(MathFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(Integer)", func.ToString().c_str());
+        EXPECT_STREQ("abs(Integer)->Integer", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -195,7 +195,7 @@ TEST_F(MathFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(BigInt)", func.ToString().c_str());
+        EXPECT_STREQ("abs(BigInt)->BigInt", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -241,7 +241,7 @@ TEST_F(MathFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(Float)", func.ToString().c_str());
+        EXPECT_STREQ("abs(Float)->Float", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -293,7 +293,7 @@ TEST_F(MathFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(Double)", func.ToString().c_str());
+        EXPECT_STREQ("abs(Double)->Double", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -346,6 +346,6 @@ TEST_F(MathFunctionsTest, abs_func) {
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
 
-        EXPECT_STREQ("abs(Float)", func.ToString().c_str());
+        EXPECT_STREQ("abs(Float)->Float", func.ToString().c_str());
     }
 }

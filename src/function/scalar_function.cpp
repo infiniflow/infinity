@@ -54,7 +54,7 @@ ScalarFunction::ToString() const {
             ss << parameter_types_[i].ToString() << ", ";
         }
         ss << parameter_types_.back().ToString();
-        ss << ")";
+        ss << ")->" << return_type_.ToString();
     }
 
     return ss.str();
