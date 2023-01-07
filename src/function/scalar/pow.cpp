@@ -11,8 +11,9 @@ namespace infinity {
 
 struct PowFunction {
     template<typename TA, typename TB, typename TC>
-    static inline TA Execute(TB base, TC exponent) {
-        return std::pow(base, exponent);
+    static inline void
+    Run(TA base, TB exponent, TC& result) {
+        result = std::pow(base, exponent);
     }
 };
 

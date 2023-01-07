@@ -37,11 +37,34 @@ struct UnaryOpDirectWrapper {
 };
 
 template<typename Operator>
+struct BinaryOpDirectWrapper {
+    template<typename LeftValueType, typename RightValueType, typename TargetValueType>
+    inline static void
+    Execute(LeftValueType left, RightValueType right, TargetValueType& result, Bitmask *nulls_ptr, size_t idx, void *state_ptr) {
+        return Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result);
+    }
+};
+
+template<typename Operator>
 struct UnaryTryOpWrapper {
     template<typename SourceValueType, typename TargetValueType>
     inline static void
     Execute(SourceValueType input, TargetValueType& result, Bitmask *nulls_ptr, size_t idx, void *state_ptr) {
         if(Operator::template Run<SourceValueType, TargetValueType>(input, result)) {
+            return ;
+        }
+
+        nulls_ptr->SetFalse(idx);
+        result = NullValue<TargetValueType>();
+    }
+};
+
+template<typename Operator>
+struct BinaryTryOpWrapper {
+    template<typename LeftValueType, typename RightValueType, typename TargetValueType>
+    inline static void
+    Execute(LeftValueType left, RightValueType right, TargetValueType& result, Bitmask *nulls_ptr, size_t idx, void *state_ptr) {
+        if(Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result)) {
             return ;
         }
 
@@ -61,12 +84,37 @@ struct UnaryOpDirectToVarlenWrapper {
 };
 
 template<typename Operator>
+struct BinaryOpDirectToVarlenWrapper {
+    template<typename LeftValueType, typename RightValueType, typename TargetValueType>
+    inline static void
+    Execute(LeftValueType left, RightValueType right, TargetValueType& result, Bitmask *nulls_ptr, size_t idx, void *state_ptr) {
+        auto* function_data_ptr = (ScalarFunctionData*)(state_ptr);
+        return Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result, function_data_ptr->column_vector_ptr_);
+    }
+};
+
+template<typename Operator>
 struct UnaryTryOpToVarlenWrapper {
     template<typename SourceValueType, typename TargetValueType>
     inline static void
     Execute(SourceValueType input, TargetValueType& result, Bitmask *nulls_ptr, size_t idx, void *state_ptr) {
         auto* function_data_ptr = (ScalarFunctionData*)(state_ptr);
         if(Operator::template Run<SourceValueType, TargetValueType>(input, result, function_data_ptr->column_vector_ptr_)) {
+            return ;
+        }
+
+        nulls_ptr->SetFalse(idx);
+        result = NullValue<TargetValueType>();
+    }
+};
+
+template<typename Operator>
+struct BinaryTryOpToVarlenWrapper {
+    template<typename LeftValueType, typename RightValueType, typename TargetValueType>
+    inline static void
+    Execute(LeftValueType left, RightValueType right, TargetValueType& result, Bitmask *nulls_ptr, size_t idx, void *state_ptr) {
+        auto* function_data_ptr = (ScalarFunctionData*)(state_ptr);
+        if(Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result, function_data_ptr->column_vector_ptr_)) {
             return ;
         }
 
@@ -164,49 +212,59 @@ public:
     template<typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void
     BinaryFunction(const DataBlock& input, ColumnVector& output) {
-    }
-
-    // Binary function with some failures such as overflow.
-    template<typename LeftType, typename RightType, typename OutputType, typename Operation>
-    static inline void
-    BinaryFunctionWithFailure(const DataBlock& input, ColumnVector& output) {
-    }
-
-    // Binary function result is varlen without any failure.
-    template<typename LeftType, typename RightType, typename OutputType, typename Operation>
-    static inline void
-    BinaryFunctionToVarlen(const DataBlock& input, ColumnVector& output) {
-    }
-
-    // Binary function result is varlen with some failures such as overflow.
-    template<typename LeftType, typename RightType, typename OutputType, typename Operation>
-    static inline void
-    BinaryFunctionToVarlenWithFailure(const DataBlock& input, ColumnVector& output) {
-    }
-
-    template<typename InputType, typename OutputType, typename Operation>
-    static void
-    UnaryFunctionOld(const DataBlock& input, ColumnVector& output) {
-        ExecutorAssert(input.column_count() == 1, "Unary function: input column count isn't one.");
+        ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
-        UnaryOperator::Execute<InputType, OutputType, Operation>(
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectWrapper<Operation>>(
                 input.column_vectors[0],
+                input.column_vectors[1],
                 output,
                 input.row_count(),
                 nullptr,
                 true);
     }
 
-    template<typename LeftType, typename RightType, typename OutputType, typename OperationType>
-    static void
-    BinaryFunctionOld(const DataBlock& input, ColumnVector& output) {
+    // Binary function with some failures such as overflow.
+    template<typename LeftType, typename RightType, typename OutputType, typename Operation>
+    static inline void
+    BinaryFunctionWithFailure(const DataBlock& input, ColumnVector& output) {
         ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
-        BinaryOperator::Execute<LeftType, RightType, OutputType, OperationType>(
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpWrapper<Operation>>(
                 input.column_vectors[0],
                 input.column_vectors[1],
                 output,
                 input.row_count(),
+                nullptr,
+                true);
+    }
+
+    // Binary function result is varlen without any failure.
+    template<typename LeftType, typename RightType, typename OutputType, typename Operation>
+    static inline void
+    BinaryFunctionToVarlen(const DataBlock& input, ColumnVector& output) {
+        ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
+        ExecutorAssert(input.Finalized(), "Input data block is finalized");
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectToVarlenWrapper<Operation>>(
+                input.column_vectors[0],
+                input.column_vectors[1],
+                output,
+                input.row_count(),
+                nullptr,
+                true);
+    }
+
+    // Binary function result is varlen with some failures such as overflow.
+    template<typename LeftType, typename RightType, typename OutputType, typename Operation>
+    static inline void
+    BinaryFunctionToVarlenWithFailure(const DataBlock& input, ColumnVector& output) {
+        ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
+        ExecutorAssert(input.Finalized(), "Input data block is finalized");
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpToVarlenWrapper<Operation>>(
+                input.column_vectors[0],
+                input.column_vectors[1],
+                output,
+                input.row_count(),
+                nullptr,
                 true);
     }
 };

@@ -11,8 +11,9 @@ namespace infinity {
 
 struct DivFunction {
     template<typename TA, typename TB, typename TC>
-    static inline TA Execute(TB left, TC right) {
-        return left / right;
+    static inline void
+    Run(TA left, TB right, TC& result) {
+        result = left / right;
     }
 };
 

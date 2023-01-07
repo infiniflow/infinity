@@ -345,7 +345,7 @@ TEST_F(MathFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        
+
         EXPECT_STREQ("abs(Float)", func.ToString().c_str());
     }
 }

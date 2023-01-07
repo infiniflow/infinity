@@ -33,13 +33,13 @@ public:
                                                                          result_null,
                                                                          count,
                                                                          state_ptr);
-                    // Result tail_index need to update.
-                    result.tail_index_ = count;
-                    return ;
-                } else {
-                    return ExecuteFlat<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr);
-                }
 
+                } else {
+                    ExecuteFlat<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr);
+                }
+                // Result tail_index need to update.
+                result.tail_index_ = count;
+                return ;
             }
             case ColumnVectorType::kConstant: {
                 result.SetVectorType(ColumnVectorType::kConstant);

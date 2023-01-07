@@ -11,8 +11,9 @@ namespace infinity {
 
 struct OrFunction {
     template<typename TA, typename TB, typename TC>
-    static inline TA Execute(TB left, TC right) {
-        return left or right;
+    static inline void
+    Run(TA left, TB right, TC& result) {
+        result = left or right;
     }
 };
 
@@ -23,7 +24,7 @@ GenerateOrFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr) {
             "or",
             { DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean) },
             { DataType(LogicalType::kBoolean) },
-            &ScalarFunction::BinaryFunction<bool, bool, bool, OrFunction>);
+            &ScalarFunction::BinaryFunction<BooleanT, BooleanT, BooleanT, OrFunction>);
     function_set_ptr->AddFunction(or_function);
 }
 

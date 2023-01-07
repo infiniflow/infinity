@@ -11,8 +11,9 @@ namespace infinity {
 
 struct LessFunction {
     template<typename TA, typename TB, typename TC>
-    static inline TA Execute(TB left, TC right) {
-        return left < right;
+    static inline void
+    Run(TA left, TB right, TC& result) {
+        result = left < right;
     }
 };
 
@@ -24,7 +25,7 @@ GenerateLessFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, DataT
             "<",
             { data_type, data_type },
             { DataType(LogicalType::kBoolean) },
-            &ScalarFunction::BinaryFunction<CompareType, CompareType, bool, LessFunction>);
+            &ScalarFunction::BinaryFunction<CompareType, CompareType, BooleanT, LessFunction>);
     function_set_ptr->AddFunction(less_function);
 }
 
