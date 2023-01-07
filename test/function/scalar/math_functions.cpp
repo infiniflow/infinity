@@ -30,7 +30,7 @@ class MathFunctionsTest : public BaseTest {
     }
 };
 
-TEST_F(MathFunctionsTest, test1) {
+TEST_F(MathFunctionsTest, abs_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
@@ -41,16 +41,311 @@ TEST_F(MathFunctionsTest, test1) {
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
-    Vector<SharedPtr<BaseExpression>> inputs;
+    {
+        Vector<SharedPtr<BaseExpression>> inputs;
 
-    SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(DataType(LogicalType::kTinyInt),
-                                                                            "t1",
-                                                                            "c1",
-                                                                            0,
-                                                                            0);
+        DataType data_type(LogicalType::kTinyInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
 
-    inputs.emplace_back(col_expr_ptr);
-//    EXPECT_THROW(scalar_function_set->GetMostMatchFunction(inputs), PlannerException);
-    ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-    LOG_TRACE("{}", func.ToString());
+        inputs.emplace_back(col_expr_ptr);
+        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+        EXPECT_STREQ("abs(TinyInt)", func.ToString().c_str());
+
+        std::vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        size_t row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (size_t i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
+        }
+        data_block.Finalize();
+
+        for (size_t i = 0; i < row_count; ++i) {
+            Value v = data_block.GetValue(0, i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
+            EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(i));
+        }
+
+        ColumnVector result(data_type);
+        result.Initialize();
+        func.function_(data_block, result);
+
+        for (size_t i = 0; i < row_count; ++i) {
+            Value v = result.GetValue(i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
+            i8 res = static_cast<i8>(i);
+            if (res == std::numeric_limits<i8>::min()) {
+                EXPECT_EQ(result.nulls_ptr_->IsTrue(i), false);
+            } else {
+                EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+                EXPECT_EQ(v.value_.tiny_int, abs(res));
+            }
+        }
+    }
+
+    {
+        Vector<SharedPtr<BaseExpression>> inputs;
+
+        DataType data_type(LogicalType::kSmallInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        inputs.emplace_back(col_expr_ptr);
+        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+        EXPECT_STREQ("abs(SmallInt)", func.ToString().c_str());
+
+        std::vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        size_t row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (size_t i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeSmallInt(static_cast<i16>(-i)));
+        }
+        data_block.Finalize();
+
+        for (size_t i = 0; i < row_count; ++i) {
+            Value v = data_block.GetValue(0, i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
+            EXPECT_EQ(v.value_.small_int, -static_cast<i16>(i));
+        }
+
+        ColumnVector result(data_type);
+        result.Initialize();
+        func.function_(data_block, result);
+
+        for (size_t i = 0; i < row_count; ++i) {
+            Value v = result.GetValue(i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
+            i16 res = static_cast<i16>(i);
+            EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+            EXPECT_EQ(v.value_.small_int, abs(res));
+        }
+    }
+
+    {
+        Vector<SharedPtr<BaseExpression>> inputs;
+
+        DataType data_type(LogicalType::kInteger);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        inputs.emplace_back(col_expr_ptr);
+        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+        EXPECT_STREQ("abs(Integer)", func.ToString().c_str());
+
+        std::vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        size_t row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (size_t i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeInt(static_cast<i32>(-i)));
+        }
+        data_block.Finalize();
+
+        for (size_t i = 0; i < row_count; ++i) {
+            Value v = data_block.GetValue(0, i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
+            EXPECT_EQ(v.value_.integer, -static_cast<i32>(i));
+        }
+
+        ColumnVector result(data_type);
+        result.Initialize();
+        func.function_(data_block, result);
+
+        for (size_t i = 0; i < row_count; ++i) {
+            Value v = result.GetValue(i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
+            i32 res = static_cast<i32>(i);
+            EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+            EXPECT_EQ(v.value_.integer, abs(res));
+        }
+    }
+
+    {
+        Vector<SharedPtr<BaseExpression>> inputs;
+
+        DataType data_type(LogicalType::kBigInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        inputs.emplace_back(col_expr_ptr);
+        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+        EXPECT_STREQ("abs(BigInt)", func.ToString().c_str());
+
+        std::vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        size_t row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (size_t i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeBigInt(static_cast<i64>(-i)));
+        }
+        data_block.Finalize();
+
+        for (size_t i = 0; i < row_count; ++i) {
+            Value v = data_block.GetValue(0, i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
+            EXPECT_EQ(v.value_.big_int, -static_cast<i64>(i));
+        }
+
+        ColumnVector result(data_type);
+        result.Initialize();
+        func.function_(data_block, result);
+
+        for (size_t i = 0; i < row_count; ++i) {
+            Value v = result.GetValue(i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
+            i64 res = static_cast<i64>(i);
+            EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+            EXPECT_EQ(v.value_.big_int, abs(res));
+        }
+    }
+
+    {
+        Vector<SharedPtr<BaseExpression>> inputs;
+
+        DataType data_type(LogicalType::kFloat);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        inputs.emplace_back(col_expr_ptr);
+        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+        EXPECT_STREQ("abs(Float)", func.ToString().c_str());
+
+        std::vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        i64 row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (i64 i = 0; i < row_count; ++i) {
+            f32 input = i - 16384;
+            input -= 0.5;
+            data_block.AppendValue(0, Value::MakeFloat(input));
+        }
+        data_block.Finalize();
+
+        for (i64 i = 0; i < row_count; ++i) {
+            Value v = data_block.GetValue(0, i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
+
+            f32 input = i - 16384;
+            input -= 0.5;
+            EXPECT_FLOAT_EQ(v.value_.float32, input);
+        }
+
+        ColumnVector result(data_type);
+        result.Initialize();
+        func.function_(data_block, result);
+
+        for (i64 i = 0; i < row_count; ++i) {
+            Value v = result.GetValue(i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
+            f32 input = i - 16384;
+            input -= 0.5;
+            EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+            EXPECT_FLOAT_EQ(v.value_.float32, fabs(input));
+        }
+    }
+
+    {
+        Vector<SharedPtr<BaseExpression>> inputs;
+
+        DataType data_type(LogicalType::kDouble);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        inputs.emplace_back(col_expr_ptr);
+        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+        EXPECT_STREQ("abs(Double)", func.ToString().c_str());
+
+        std::vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        i64 row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (i64 i = 0; i < row_count; ++i) {
+            f64 input = i - 16384;
+            input -= 0.5;
+            data_block.AppendValue(0, Value::MakeDouble(input));
+        }
+        data_block.Finalize();
+
+        for (i64 i = 0; i < row_count; ++i) {
+            Value v = data_block.GetValue(0, i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
+
+            f64 input = i - 16384;
+            input -= 0.5;
+            EXPECT_FLOAT_EQ(v.value_.float64, input);
+        }
+
+        ColumnVector result(data_type);
+        result.Initialize();
+        func.function_(data_block, result);
+
+        for (i64 i = 0; i < row_count; ++i) {
+            Value v = result.GetValue(i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
+            f64 input = i - 16384;
+            input -= 0.5;
+            EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+            EXPECT_FLOAT_EQ(v.value_.float64, fabs(input));
+        }
+    }
+
+    {
+        Vector<SharedPtr<BaseExpression>> inputs;
+
+        DataType data_type(LogicalType::kHugeInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        inputs.emplace_back(col_expr_ptr);
+        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+        
+        EXPECT_STREQ("abs(Float)", func.ToString().c_str());
+    }
 }
