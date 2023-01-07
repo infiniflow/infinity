@@ -50,7 +50,7 @@ TEST_F(MathFunctionsTest, test1) {
                                                                             0);
 
     inputs.emplace_back(col_expr_ptr);
-    EXPECT_THROW(scalar_function_set->GetMostMatchFunction(inputs), PlannerException);
-//    ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-//    LOG_TRACE("{}", func.ToString());
+//    EXPECT_THROW(scalar_function_set->GetMostMatchFunction(inputs), PlannerException);
+    ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+    LOG_TRACE("{}", func.ToString());
 }

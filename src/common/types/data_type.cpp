@@ -3,6 +3,7 @@
 //
 
 #include "data_type.h"
+#include "function/cast/cast_table.h"
 #include "common/utility/infinity_assert.h"
 
 #include "common/types/info/decimal_info.h"
@@ -237,7 +238,7 @@ DataType::Size() const {
 
 int64_t
 DataType::CastRule(const DataType &from, const DataType &to) {
-    return 0;
+    return CastTable::instance().GetCastCost(from.type_, to.type_);
 }
 
 DataType
