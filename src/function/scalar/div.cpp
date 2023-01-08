@@ -11,11 +11,40 @@ namespace infinity {
 
 struct DivFunction {
     template<typename TA, typename TB, typename TC>
-    static inline void
+    static inline bool
     Run(TA left, TB right, TC& result) {
+        if(right == 0) {
+            return false;
+        }
+        if(left == std::numeric_limits<TA>::min() && right == -1) {
+            return false;
+        }
         result = left / right;
+        return true;
     }
 };
+
+template<>
+inline bool
+DivFunction::Run(FloatT left, FloatT right, FloatT& result) {
+    result = left / right;
+    if (std::isnan(result) || std::isinf(result)) return false;
+    return true;
+}
+
+template<>
+inline bool
+DivFunction::Run(DoubleT left, DoubleT right, DoubleT& result) {
+    result = left / right;
+    if (std::isnan(result) || std::isinf(result)) return false;
+    return true;
+}
+
+template<>
+inline bool
+DivFunction::Run(HugeIntT left, HugeIntT right, HugeIntT& result) {
+    NotImplementError("Not implement huge int divide operator.")
+}
 
 void
 RegisterDivFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
@@ -25,45 +54,50 @@ RegisterDivFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
             "/",
             { DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt) },
             { DataType(LogicalType::kTinyInt) },
-            &ScalarFunction::BinaryFunction<int8_t, int8_t, int8_t, DivFunction>);
+            &ScalarFunction::BinaryFunctionWithFailure<TinyIntT, TinyIntT, TinyIntT, DivFunction>);
     function_set_ptr->AddFunction(div_function_int8);
 
     ScalarFunction div_function_int16(
             "/",
             { DataType(LogicalType::kSmallInt), DataType(LogicalType::kSmallInt) },
             { DataType(LogicalType::kSmallInt) },
-            &ScalarFunction::BinaryFunction<int16_t, int16_t, int16_t, DivFunction>);
+            &ScalarFunction::BinaryFunctionWithFailure<SmallIntT, SmallIntT, SmallIntT, DivFunction>);
     function_set_ptr->AddFunction(div_function_int16);
 
     ScalarFunction div_function_int32(
             "/",
             { DataType(LogicalType::kInteger), DataType(LogicalType::kInteger) },
             { DataType(LogicalType::kInteger) },
-            &ScalarFunction::BinaryFunction<int32_t, int32_t, int32_t, DivFunction>);
+            &ScalarFunction::BinaryFunctionWithFailure<IntegerT, IntegerT, IntegerT, DivFunction>);
     function_set_ptr->AddFunction(div_function_int32);
 
     ScalarFunction div_function_int64(
             "/",
             { DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt) },
             { DataType(LogicalType::kBigInt) },
-            &ScalarFunction::BinaryFunction<int64_t, int64_t, int64_t, DivFunction>);
+            &ScalarFunction::BinaryFunctionWithFailure<BigIntT, BigIntT, BigIntT, DivFunction>);
     function_set_ptr->AddFunction(div_function_int64);
+
+    ScalarFunction div_function_int128(
+            "/",
+            { DataType(LogicalType::kHugeInt), DataType(LogicalType::kHugeInt) },
+            { DataType(LogicalType::kHugeInt) },
+            &ScalarFunction::BinaryFunctionWithFailure<HugeIntT, HugeIntT, HugeIntT, DivFunction>);
+    function_set_ptr->AddFunction(div_function_int128);
 
     ScalarFunction div_function_float(
             "/",
             { DataType(LogicalType::kFloat), DataType(LogicalType::kFloat) },
             { DataType(LogicalType::kFloat) },
-            &ScalarFunction::BinaryFunction<float, float, float, DivFunction>);
+            &ScalarFunction::BinaryFunctionWithFailure<FloatT, FloatT, FloatT, DivFunction>);
     function_set_ptr->AddFunction(div_function_float);
 
     ScalarFunction div_function_double(
             "/",
             { DataType(LogicalType::kDouble), DataType(LogicalType::kDouble) },
             { DataType(LogicalType::kDouble) },
-            &ScalarFunction::BinaryFunction<double, double, double, DivFunction>);
+            &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_double);
-
-    // TODO: other type divide need to be given.
 
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }
