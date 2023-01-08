@@ -48,7 +48,8 @@ DataBlock::SetValue(size_t column_index, size_t row_index, const Value &val) {
 void
 DataBlock::AppendValue(size_t column_index, const Value& value) {
     StorageAssert(column_index < column_count_,
-                  "Attempt to access invalid column index: " + std::to_string(column_index));
+                  "Attempt to access invalid column index: " + std::to_string(column_index) +
+                  " in column count: " + std::to_string(column_count_));
     column_vectors[column_index].AppendValue(value);
     finalized = false;
 }
