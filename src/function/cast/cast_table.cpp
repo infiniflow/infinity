@@ -167,6 +167,11 @@ CastTable::CastTable() {
     matrix_[kTimestampTZ][kChar] = 3;
     matrix_[kTimestampTZ][kVarchar] = 3;
 
+    // From interval to other type
+    matrix_[kInterval][kInterval] = 0;
+    matrix_[kInterval][kChar] = 1;
+    matrix_[kInterval][kVarchar] = 1;
+
     // From array to other type
     // From tuple to other type
 
@@ -268,39 +273,75 @@ CastTable::CastTable() {
 
     // From char to other type
     matrix_[kChar][kNull] = 0;
-    matrix_[kNull][kBoolean] = 0;
-    matrix_[kNull][kTinyInt] = 0;
-    matrix_[kNull][kSmallInt] = 0;
-    matrix_[kNull][kInteger] = 0;
-    matrix_[kNull][kBigInt] = 0;
-    matrix_[kNull][kHugeInt] = 0;
-    matrix_[kNull][kFloat] = 0;
-    matrix_[kNull][kDouble] = 0;
-    matrix_[kNull][kDecimal16] = 0;
-    matrix_[kNull][kDecimal32] = 0;
-    matrix_[kNull][kDecimal64] = 0;
-    matrix_[kNull][kDecimal128] = 0;
-    matrix_[kNull][kVarchar] = 0;
-    matrix_[kNull][kChar] = 0;
-    matrix_[kNull][kDate] = 0;
-    matrix_[kNull][kTime] = 0;
-    matrix_[kNull][kDateTime] = 0;
-    matrix_[kNull][kTimestamp] = 0;
-    matrix_[kNull][kTimestampTZ] = 0;
-    matrix_[kNull][kInterval] = 0;
-    matrix_[kNull][kArray] = 0;
-    matrix_[kNull][kTuple] = 0;
-    matrix_[kNull][kPoint] = 0;
-    matrix_[kNull][kLine] = 0;
-    matrix_[kNull][kLineSeg] = 0;
-    matrix_[kNull][kBox] = 0;
-    matrix_[kNull][kPath] = 0;
-    matrix_[kNull][kPolygon] = 0;
-    matrix_[kNull][kCircle] = 0;
-    matrix_[kNull][kBitmap] = 0;
-    matrix_[kNull][kUuid] = 0;
-    matrix_[kNull][kBlob] = 0;
-    matrix_[kNull][kEmbedding] = 0;
+    matrix_[kChar][kBoolean] = 0;
+    matrix_[kChar][kTinyInt] = 0;
+    matrix_[kChar][kSmallInt] = 0;
+    matrix_[kChar][kInteger] = 0;
+    matrix_[kChar][kBigInt] = 0;
+    matrix_[kChar][kHugeInt] = 0;
+    matrix_[kChar][kFloat] = 0;
+    matrix_[kChar][kDouble] = 0;
+    matrix_[kChar][kDecimal16] = 0;
+    matrix_[kChar][kDecimal32] = 0;
+    matrix_[kChar][kDecimal64] = 0;
+    matrix_[kChar][kDecimal128] = 0;
+    matrix_[kChar][kVarchar] = 0;
+    matrix_[kChar][kChar] = 0;
+    matrix_[kChar][kDate] = 0;
+    matrix_[kChar][kTime] = 0;
+    matrix_[kChar][kDateTime] = 0;
+    matrix_[kChar][kTimestamp] = 0;
+    matrix_[kChar][kTimestampTZ] = 0;
+    matrix_[kChar][kInterval] = 0;
+    matrix_[kChar][kArray] = 0;
+    matrix_[kChar][kTuple] = 0;
+    matrix_[kChar][kPoint] = 0;
+    matrix_[kChar][kLine] = 0;
+    matrix_[kChar][kLineSeg] = 0;
+    matrix_[kChar][kBox] = 0;
+    matrix_[kChar][kPath] = 0;
+    matrix_[kChar][kPolygon] = 0;
+    matrix_[kChar][kCircle] = 0;
+    matrix_[kChar][kBitmap] = 0;
+    matrix_[kChar][kUuid] = 0;
+    matrix_[kChar][kBlob] = 0;
+    matrix_[kChar][kEmbedding] = 0;
+
+    // From varchar to other type
+    matrix_[kVarchar][kNull] = 0;
+    matrix_[kVarchar][kBoolean] = 0;
+    matrix_[kVarchar][kTinyInt] = 0;
+    matrix_[kVarchar][kSmallInt] = 0;
+    matrix_[kVarchar][kInteger] = 0;
+    matrix_[kVarchar][kBigInt] = 0;
+    matrix_[kVarchar][kHugeInt] = 0;
+    matrix_[kVarchar][kFloat] = 0;
+    matrix_[kVarchar][kDouble] = 0;
+    matrix_[kVarchar][kDecimal16] = 0;
+    matrix_[kVarchar][kDecimal32] = 0;
+    matrix_[kVarchar][kDecimal64] = 0;
+    matrix_[kVarchar][kDecimal128] = 0;
+    matrix_[kVarchar][kVarchar] = 0;
+    matrix_[kVarchar][kChar] = 0;
+    matrix_[kVarchar][kDate] = 0;
+    matrix_[kVarchar][kTime] = 0;
+    matrix_[kVarchar][kDateTime] = 0;
+    matrix_[kVarchar][kTimestamp] = 0;
+    matrix_[kVarchar][kTimestampTZ] = 0;
+    matrix_[kVarchar][kInterval] = 0;
+    matrix_[kVarchar][kArray] = 0;
+    matrix_[kVarchar][kTuple] = 0;
+    matrix_[kVarchar][kPoint] = 0;
+    matrix_[kVarchar][kLine] = 0;
+    matrix_[kVarchar][kLineSeg] = 0;
+    matrix_[kVarchar][kBox] = 0;
+    matrix_[kVarchar][kPath] = 0;
+    matrix_[kVarchar][kPolygon] = 0;
+    matrix_[kVarchar][kCircle] = 0;
+    matrix_[kVarchar][kBitmap] = 0;
+    matrix_[kVarchar][kUuid] = 0;
+    matrix_[kVarchar][kBlob] = 0;
+    matrix_[kVarchar][kEmbedding] = 0;
 }
 
 i64
