@@ -36,7 +36,7 @@ ScalarFunction::NoOpFunction(const DataBlock &input, ColumnVector &output) {
     // TODO: this should be the pointer copy from input to output.
 
     // Fixme: Output reference the data of input
-//    output.data() = input.column_vectors[0].data();
+    output.ShallowCopy(input.column_vectors[0]);
 }
 
 String
