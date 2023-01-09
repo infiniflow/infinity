@@ -15,10 +15,39 @@ public:
     explicit HugeInt(i64 upper, i64 lower) :
         upper(upper), lower(lower) {}
 
-    bool
+    inline bool
     operator==(const HugeInt& other) const {
         if(this == &other) return true;
         return other.upper == upper && other.lower == lower;
+    }
+
+    inline bool
+    operator!=(const HugeInt& other) const {
+        return !(operator==(other));
+    }
+
+    inline bool
+    operator>(const HugeInt& other) const {
+        if(this->upper > other.upper) return true;
+        if(this->upper == other.upper && this->lower > other.lower) return true;
+        return false;
+    }
+
+    inline bool
+    operator<(const HugeInt& other) const {
+        if(this->upper < other.upper) return true;
+        if(this->upper == other.upper && this->lower < other.lower) return true;
+        return false;
+    }
+
+    inline bool
+    operator<=(const HugeInt& other) const {
+        return !(operator>(other));
+    }
+
+    inline bool
+    operator>=(const HugeInt& other) const {
+        return !(operator<(other));
     }
 
     i64 upper{};
