@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterNotEqualsFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+RegisterInEqualsFunction(const std::unique_ptr<Catalog> &catalog_ptr);
 
 }

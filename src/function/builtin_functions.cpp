@@ -17,7 +17,7 @@
 
 // Match comparison function
 #include "scalar/equals.h"
-#include "scalar/notequals.h"
+#include "scalar/inequals.h"
 #include "scalar/less.h"
 #include "scalar/less_equals.h"
 #include "scalar/greater.h"
@@ -70,7 +70,7 @@ BuiltinFunctions::RegisterScalarFunction() {
 
     // register comparison operator
     RegisterEqualsFunction(catalog_ptr_);
-    RegisterNotEqualsFunction(catalog_ptr_);
+    RegisterInEqualsFunction(catalog_ptr_);
     RegisterLessFunction(catalog_ptr_);
     RegisterLessEqualsFunction(catalog_ptr_);
     RegisterGreaterFunction(catalog_ptr_);
