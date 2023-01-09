@@ -23,6 +23,7 @@ EqualsFunction::Run(VarcharT left, VarcharT right, bool & result) {
     if(left.IsInlined()) {
         if(right.IsInlined()) {
             result = (memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) == 0);
+            return ;
         }
     } else if(right.IsInlined()) {
         ;
@@ -31,6 +32,7 @@ EqualsFunction::Run(VarcharT left, VarcharT right, bool & result) {
         if(left.length == right.length) {
             if(memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) == 0) {
                 result = (memcmp(left.ptr, right.ptr, left.length) == 0);
+                return ;
             }
         }
     }
