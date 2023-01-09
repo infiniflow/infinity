@@ -114,47 +114,47 @@ RegisterLessFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
 
 //    GenerateEqualsFunction<MixedT>(function_set_ptr, DataType(LogicalType::kMixed));
 
-    ScalarFunction mix_greater_bigint(
+    ScalarFunction mix_less_bigint(
             "<",
             { DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, BigIntT, BooleanT, LessFunction>);
-    function_set_ptr->AddFunction(mix_greater_bigint);
+    function_set_ptr->AddFunction(mix_less_bigint);
 
-    ScalarFunction bigint_greater_mixed(
+    ScalarFunction bigint_less_mixed(
             "<",
             { DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<BigIntT, MixedT, BooleanT, LessFunction>);
-    function_set_ptr->AddFunction(bigint_greater_mixed);
+    function_set_ptr->AddFunction(bigint_less_mixed);
 
-    ScalarFunction mix_greater_double(
+    ScalarFunction mix_less_double(
             "<",
             { DataType(LogicalType::kMixed), DataType(LogicalType::kDouble) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, DoubleT, BooleanT, LessFunction>);
-    function_set_ptr->AddFunction(mix_greater_double);
+    function_set_ptr->AddFunction(mix_less_double);
 
-    ScalarFunction double_greater_mixed(
+    ScalarFunction double_less_mixed(
             "<",
             { DataType(LogicalType::kDouble), DataType(LogicalType::kMixed) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<DoubleT, MixedT, BooleanT, LessFunction>);
-    function_set_ptr->AddFunction(double_greater_mixed);
+    function_set_ptr->AddFunction(double_less_mixed);
 
-    ScalarFunction mix_greater_varchar(
+    ScalarFunction mix_less_varchar(
             "<",
             { DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, VarcharT, BooleanT, LessFunction>);
-    function_set_ptr->AddFunction(mix_greater_varchar);
+    function_set_ptr->AddFunction(mix_less_varchar);
 
-    ScalarFunction varchar_greater_mixed(
+    ScalarFunction varchar_less_mixed(
             "<",
             { DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, LessFunction>);
-    function_set_ptr->AddFunction(varchar_greater_mixed);
+    function_set_ptr->AddFunction(varchar_less_mixed);
 
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }
