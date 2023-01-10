@@ -54,7 +54,7 @@ TEST_F(OrFunctionsTest, or_func) {
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
                                                                                  "c2",
-                                                                                 0,
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);

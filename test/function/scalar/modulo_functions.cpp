@@ -52,8 +52,8 @@ TEST_F(ModuloFunctionsTest, mod_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -115,8 +115,8 @@ TEST_F(ModuloFunctionsTest, mod_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -177,8 +177,8 @@ TEST_F(ModuloFunctionsTest, mod_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -239,8 +239,8 @@ TEST_F(ModuloFunctionsTest, mod_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);

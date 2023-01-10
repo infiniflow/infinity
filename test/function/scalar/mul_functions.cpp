@@ -53,8 +53,8 @@ TEST_F(MulFunctionsTest, mul_func) {
                                                                                 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -80,7 +80,7 @@ TEST_F(MulFunctionsTest, mul_func) {
 
         for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
-            Value v2 = data_block.GetValue(0, i);
+            Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kTinyInt);
             EXPECT_EQ(v2.type_.type(), LogicalType::kTinyInt);
             EXPECT_EQ(v1.value_.tiny_int, static_cast<i8>(i));
@@ -115,8 +115,8 @@ TEST_F(MulFunctionsTest, mul_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -142,7 +142,7 @@ TEST_F(MulFunctionsTest, mul_func) {
 
         for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
-            Value v2 = data_block.GetValue(0, i);
+            Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v2.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v1.value_.small_int, static_cast<i16>(i));
@@ -177,8 +177,8 @@ TEST_F(MulFunctionsTest, mul_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -204,7 +204,7 @@ TEST_F(MulFunctionsTest, mul_func) {
 
         for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
-            Value v2 = data_block.GetValue(0, i);
+            Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(v2.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(v1.value_.integer, static_cast<i32>(i));
@@ -239,8 +239,8 @@ TEST_F(MulFunctionsTest, mul_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -266,7 +266,7 @@ TEST_F(MulFunctionsTest, mul_func) {
 
         for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
-            Value v2 = data_block.GetValue(0, i);
+            Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v2.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v1.value_.big_int, static_cast<i64>(i));
@@ -301,8 +301,8 @@ TEST_F(MulFunctionsTest, mul_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -328,7 +328,7 @@ TEST_F(MulFunctionsTest, mul_func) {
 
         for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
-            Value v2 = data_block.GetValue(0, i);
+            Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kFloat);
             EXPECT_EQ(v2.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(v1.value_.float32, static_cast<f32>(i));
@@ -363,8 +363,8 @@ TEST_F(MulFunctionsTest, mul_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -390,7 +390,7 @@ TEST_F(MulFunctionsTest, mul_func) {
 
         for (size_t i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
-            Value v2 = data_block.GetValue(0, i);
+            Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kDouble);
             EXPECT_EQ(v2.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(v1.value_.float64, static_cast<f64>(i));
@@ -425,8 +425,8 @@ TEST_F(MulFunctionsTest, mul_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -448,8 +448,8 @@ TEST_F(MulFunctionsTest, mul_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -471,8 +471,8 @@ TEST_F(MulFunctionsTest, mul_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
@@ -494,8 +494,8 @@ TEST_F(MulFunctionsTest, mul_func) {
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
-                                                                                 "c1",
-                                                                                 0,
+                                                                                 "c2",
+                                                                                 1,
                                                                                  0);
 
         inputs.emplace_back(col1_expr_ptr);
