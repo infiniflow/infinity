@@ -10,11 +10,11 @@
 #include "main/stats/global_resource_usage.h"
 #include "common/types/info/varchar_info.h"
 #include "storage/catalog.h"
-#include "function/scalar/and.h"
+#include "function/scalar/or.h"
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
 
-class AndFunctionsTest : public BaseTest {
+class OrFunctionsTest : public BaseTest {
     void
     SetUp() override {
         infinity::Logger::Initialize();
@@ -30,14 +30,14 @@ class AndFunctionsTest : public BaseTest {
     }
 };
 
-TEST_F(AndFunctionsTest, and_func) {
+TEST_F(OrFunctionsTest, or_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
-    RegisterAndFunction(catalog_ptr);
+    RegisterOrFunction(catalog_ptr);
 
-    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName("and");
+    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName("or");
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -61,7 +61,7 @@ TEST_F(AndFunctionsTest, and_func) {
         inputs.emplace_back(col2_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("and(Boolean, Boolean)->Boolean", func.ToString().c_str());
+        EXPECT_STREQ("or(Boolean, Boolean)->Boolean", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -104,7 +104,7 @@ TEST_F(AndFunctionsTest, and_func) {
         for (size_t i = 0; i < row_count; ++i) {
             Value v = result.GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-            EXPECT_EQ(v.value_.boolean, false);
+            EXPECT_EQ(v.value_.boolean, true);
         }
     }
 }

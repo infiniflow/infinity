@@ -29,7 +29,7 @@ class DivFunctionsTest : public BaseTest {
     }
 };
 
-TEST_F(DivFunctionsTest, add_func) {
+TEST_F(DivFunctionsTest, div_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();

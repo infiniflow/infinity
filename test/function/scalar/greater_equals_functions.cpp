@@ -30,7 +30,7 @@ class GreaterEqualsFunctionsTest : public BaseTest {
     }
 };
 
-TEST_F(GreaterEqualsFunctionsTest, greater_func) {
+TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();

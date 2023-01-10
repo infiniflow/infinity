@@ -30,7 +30,7 @@ class LessFunctionsTest : public BaseTest {
     }
 };
 
-TEST_F(LessFunctionsTest, greater_func) {
+TEST_F(LessFunctionsTest, less_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();

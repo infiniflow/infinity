@@ -30,7 +30,7 @@ class MulFunctionsTest : public BaseTest {
     }
 };
 
-TEST_F(MulFunctionsTest, add_func) {
+TEST_F(MulFunctionsTest, mul_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
