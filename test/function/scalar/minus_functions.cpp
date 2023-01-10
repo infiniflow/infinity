@@ -10,11 +10,11 @@
 #include "main/stats/global_resource_usage.h"
 #include "common/types/info/varchar_info.h"
 #include "storage/catalog.h"
-#include "function/scalar/plus.h"
+#include "function/scalar/minus.h"
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
 
-class PlusFunctionsTest : public BaseTest {
+class MinusFunctionsTest : public BaseTest {
     void
     SetUp() override {
         infinity::Logger::Initialize();
@@ -30,14 +30,14 @@ class PlusFunctionsTest : public BaseTest {
     }
 };
 
-TEST_F(PlusFunctionsTest, plus_func) {
+TEST_F(MinusFunctionsTest, plus_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
-    RegisterPlusFunction(catalog_ptr);
+    RegisterMinusFunction(catalog_ptr);
 
-    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName("+");
+    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName("-");
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -55,7 +55,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(TinyInt)->TinyInt", func.ToString().c_str());
+        EXPECT_STREQ("-(TinyInt)->TinyInt", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -83,7 +83,11 @@ TEST_F(PlusFunctionsTest, plus_func) {
         for (size_t i = 0; i < row_count; ++i) {
             Value v = result.GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
-            EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(i));
+            if(static_cast<i8>(i) == std::numeric_limits<i8>::min()) {
+                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+            } else {
+                EXPECT_EQ(v.value_.tiny_int, -static_cast<i8>(i));
+            }
         }
     }
 
@@ -101,7 +105,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(SmallInt)->SmallInt", func.ToString().c_str());
+        EXPECT_STREQ("-(SmallInt)->SmallInt", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -129,7 +133,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         for (size_t i = 0; i < row_count; ++i) {
             Value v = result.GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
-            EXPECT_EQ(v.value_.small_int, static_cast<i16>(i));
+            EXPECT_EQ(v.value_.small_int, -static_cast<i16>(i));
         }
     }
 
@@ -147,7 +151,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Integer)->Integer", func.ToString().c_str());
+        EXPECT_STREQ("-(Integer)->Integer", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -175,7 +179,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         for (size_t i = 0; i < row_count; ++i) {
             Value v = result.GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
-            EXPECT_EQ(v.value_.integer, static_cast<i32>(i));
+            EXPECT_EQ(v.value_.integer, -static_cast<i32>(i));
         }
     }
 
@@ -193,7 +197,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(BigInt)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("-(BigInt)->BigInt", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -221,7 +225,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         for (size_t i = 0; i < row_count; ++i) {
             Value v = result.GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
-            EXPECT_EQ(v.value_.big_int, static_cast<i64>(i));
+            EXPECT_EQ(v.value_.big_int, -static_cast<i64>(i));
         }
     }
 
@@ -239,38 +243,9 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(HugeInt)->HugeInt", func.ToString().c_str());
+        EXPECT_STREQ("-(HugeInt)->HugeInt", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
-        column_types.emplace_back(data_type);
-
-        size_t row_count = DEFAULT_VECTOR_SIZE;
-
-        DataBlock data_block;
-        data_block.Init(column_types);
-
-        for (size_t i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeHugeInt(HugeIntT(static_cast<i64>(i), static_cast<i64>(i))));
-        }
-        data_block.Finalize();
-
-        for (size_t i = 0; i < row_count; ++i) {
-            Value v1 = data_block.GetValue(0, i);
-            EXPECT_EQ(v1.type_.type(), LogicalType::kHugeInt);
-            EXPECT_EQ(v1.value_.huge_int.lower, static_cast<i64>(i));
-            EXPECT_EQ(v1.value_.huge_int.upper, static_cast<i64>(i));
-        }
-
-        ColumnVector result(result_type);
-        result.Initialize();
-        func.function_(data_block, result);
-
-        for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
-            EXPECT_EQ(v.type_.type(), LogicalType::kHugeInt);
-            EXPECT_EQ(v.value_.huge_int.lower, static_cast<i64>(i));
-            EXPECT_EQ(v.value_.huge_int.upper, static_cast<i64>(i));
-        }
+        // TODO: complete it.
     }
 
     {
@@ -287,7 +262,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Float)->Float", func.ToString().c_str());
+        EXPECT_STREQ("-(Float)->Float", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -315,7 +290,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         for (size_t i = 0; i < row_count; ++i) {
             Value v = result.GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
-            EXPECT_FLOAT_EQ(v.value_.float32, static_cast<f32>(i));
+            EXPECT_FLOAT_EQ(v.value_.float32, -static_cast<f32>(i));
         }
     }
 
@@ -333,7 +308,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Double)->Double", func.ToString().c_str());
+        EXPECT_STREQ("-(Double)->Double", func.ToString().c_str());
 
         std::vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -361,7 +336,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         for (size_t i = 0; i < row_count; ++i) {
             Value v = result.GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
-            EXPECT_FLOAT_EQ(v.value_.float64, static_cast<f64>(i));
+            EXPECT_FLOAT_EQ(v.value_.float64, -static_cast<f64>(i));
         }
     }
 
@@ -379,7 +354,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Decimal16)->Decimal16", func.ToString().c_str());
+        EXPECT_STREQ("-(Decimal16)->Decimal16", func.ToString().c_str());
 
         // TODO: complete it.
     }
@@ -398,7 +373,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Decimal32)->Decimal32", func.ToString().c_str());
+        EXPECT_STREQ("-(Decimal32)->Decimal32", func.ToString().c_str());
 
         // TODO: complete it.
     }
@@ -417,7 +392,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Decimal64)->Decimal64", func.ToString().c_str());
+        EXPECT_STREQ("-(Decimal64)->Decimal64", func.ToString().c_str());
 
         // TODO: complete it.
     }
@@ -436,7 +411,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Decimal128)->Decimal128", func.ToString().c_str());
+        EXPECT_STREQ("-(Decimal128)->Decimal128", func.ToString().c_str());
 
         // TODO: complete it.
     }
@@ -455,7 +430,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         inputs.emplace_back(col1_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Heterogeneous)->Heterogeneous", func.ToString().c_str());
+        EXPECT_STREQ("-(Heterogeneous)->Heterogeneous", func.ToString().c_str());
 
         // TODO: complete it.
     }
