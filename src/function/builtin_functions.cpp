@@ -7,9 +7,9 @@
 // Arithmetic scalar function
 #include "scalar/add.h"
 
-#include "scalar/sub.h"
-#include "scalar/mul.h"
-#include "scalar/div.h"
+#include "scalar/subtract.h"
+#include "scalar/multiply.h"
+#include "scalar/divide.h"
 
 // Match scalar function
 #include "scalar/abs.h"
@@ -55,7 +55,7 @@ BuiltinFunctions::RegisterScalarFunction() {
 
     // Arithmetic functions
     RegisterAddFunction(catalog_ptr_);
-    RegisterSubFunction(catalog_ptr_);
+    RegisterSubtractFunction(catalog_ptr_);
     RegisterMulFunction(catalog_ptr_);
     RegisterDivFunction(catalog_ptr_);
 

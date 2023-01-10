@@ -149,34 +149,6 @@ AddFunction::Run(IntervalT left, DateTimeT right, DateTimeT& result) {
     return AddFunction::Run(right, left, result);
 }
 
-// Date + Interval
-template<>
-inline bool
-AddFunction::Run(DateT left, IntervalT right, DateT& result) {
-    NotImplementError("DateT + IntervalT");
-}
-
-// Interval + Date
-template<>
-inline bool
-AddFunction::Run(IntervalT left, DateT right, DateT& result) {
-    return AddFunction::Run(right, left, result);
-}
-
-// Time + Interval
-template<>
-inline bool
-AddFunction::Run(TimeT left, IntervalT right, TimeT& result) {
-    NotImplementError("DateT + IntervalT");
-}
-
-// Interval + Time
-template<>
-inline bool
-AddFunction::Run(IntervalT left, TimeT right, TimeT& result) {
-    return AddFunction::Run(right, left, result);
-}
-
 // TimestampT + Interval
 template<>
 inline bool
@@ -421,34 +393,6 @@ RegisterAddFunction(const UniquePtr<Catalog> &catalog_ptr) {
             { DataType(LogicalType::kDateTime) },
             &ScalarFunction::BinaryFunctionWithFailure<IntervalT, DateTimeT, DateTimeT, AddFunction>);
     function_set_ptr->AddFunction(add_function_interval_datetime);
-
-    ScalarFunction add_function_date_interval(
-            "+",
-            { DataType(LogicalType::kDate), DataType(LogicalType::kInterval) },
-            { DataType(LogicalType::kDate) },
-            &ScalarFunction::BinaryFunctionWithFailure<DateT, IntervalT, DateT, AddFunction>);
-    function_set_ptr->AddFunction(add_function_date_interval);
-
-    ScalarFunction add_function_interval_date(
-            "+",
-            { DataType(LogicalType::kInterval), DataType(LogicalType::kDate) },
-            { DataType(LogicalType::kDate) },
-            &ScalarFunction::BinaryFunctionWithFailure<IntervalT, DateT, DateT, AddFunction>);
-    function_set_ptr->AddFunction(add_function_interval_date);
-
-    ScalarFunction add_function_time_interval(
-            "+",
-            { DataType(LogicalType::kTime), DataType(LogicalType::kInterval) },
-            { DataType(LogicalType::kTime) },
-            &ScalarFunction::BinaryFunctionWithFailure<TimeT, IntervalT, TimeT, AddFunction>);
-    function_set_ptr->AddFunction(add_function_time_interval);
-
-    ScalarFunction add_function_interval_time(
-            "+",
-            { DataType(LogicalType::kInterval), DataType(LogicalType::kTime) },
-            { DataType(LogicalType::kTime) },
-            &ScalarFunction::BinaryFunctionWithFailure<IntervalT, TimeT, TimeT, AddFunction>);
-    function_set_ptr->AddFunction(add_function_interval_time);
 
     ScalarFunction add_function_timestamp_interval(
             "+",

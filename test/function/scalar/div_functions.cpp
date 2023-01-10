@@ -9,7 +9,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "common/types/info/varchar_info.h"
 #include "storage/catalog.h"
-#include "function/scalar/div.h"
+#include "function/scalar/divide.h"
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
 
