@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterModFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+RegisterModuloFunction(const std::unique_ptr<Catalog> &catalog_ptr);
 
 }
