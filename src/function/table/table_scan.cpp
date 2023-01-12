@@ -26,7 +26,8 @@ TableScanFunc(SharedPtr<QueryContext>& query_context,
         SharedPtr<DataBlock> current_block = table_ptr->GetDataBlockById(current_block_id);
         i64 output_column_id = 0;
         for(size_t column_id: column_ids) {
-            output.column_vectors[output_column_id ++] = current_block->column_vectors[column_id];
+//            output.column_vectors[output_column_id ++] = current_block->column_vectors[column_id];
+            output.column_vectors[output_column_id ++].ShallowCopy(current_block->column_vectors[column_id]);
         }
         // Fixme: use set_row_count to save time cost?
         output.Finalize();

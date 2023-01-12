@@ -15,7 +15,7 @@ namespace infinity {
 struct TryCastBoolean;
 
 inline static BoundCastFunc
-BindBoolCast(const DataType& source, DataType& target) {
+BindBoolCast(const DataType& source, const DataType& target) {
     TypeAssert(source.type() == LogicalType::kBoolean, "Expect boolean type, but it is " + source.ToString());
     switch(target.type()) {
         case LogicalType::kVarchar: {

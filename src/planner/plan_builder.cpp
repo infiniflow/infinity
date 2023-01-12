@@ -430,6 +430,23 @@ PlanBuilder::BuildInsertValue(SharedPtr<QueryContext>& query_context,
         }
 
         value_list = rewrite_value_list;
+    } else {
+        SizeT table_column_count = table_ptr->ColumnCount();
+
+        // Create value list with table column size and null value
+        std::vector<std::shared_ptr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
+
+        for(SizeT column_idx = 0; column_idx < table_column_count; ++ column_idx) {
+            DataType table_column_type = table_ptr->GetColumnTypeById(column_idx);
+            DataType value_type = value_list[column_idx]->Type();
+            if(table_column_type == value_type) {
+                rewrite_value_list[column_idx] = value_list[column_idx];
+            } else {
+                SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(value_list[column_idx], table_column_type);
+                rewrite_value_list[column_idx] = cast_expr;
+            }
+        }
+        value_list = rewrite_value_list;
     }
 
     // Create logical insert node.

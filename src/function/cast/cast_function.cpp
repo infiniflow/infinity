@@ -3,6 +3,7 @@
 //
 
 #include "cast_function.h"
+#include "bool_cast.h"
 
 namespace infinity {
 
@@ -39,12 +40,12 @@ NumericCast(const infinity::DataType &target) {
 
 
 BoundCastFunc
-CastFunction::GetBoundFunc(const infinity::DataType &source, const infinity::DataType &target) {
+CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
     TypeAssert(source != target, "Attempt to cast from " + source.ToString() + " to " + target.ToString());
 
     switch(source.type()) {
         case kBoolean: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
+            return BindBoolCast(source, target);
         }
         case kTinyInt: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());

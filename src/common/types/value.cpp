@@ -4,9 +4,10 @@
 
 #include "value.h"
 #include "common/utility/infinity_assert.h"
-#include "main/stats/global_resource_usage.h"
 #include "common/types/info/embedding_info.h"
 #include "common/types/info/char_info.h"
+#include "main/stats/global_resource_usage.h"
+#include "function/cast/cast_function.h"
 
 #include <utility>
 
@@ -1240,6 +1241,16 @@ Value::Reset() {
             break;
     }
     type_.Reset();
+}
+
+bool
+Value::TryCastAs(const DataType &target_type, Value &new_value) const {
+    BoundCastFunc cast = CastFunction::GetBoundFunc(this->type_, target_type);
+    ColumnVector source(this->type_);
+    source.Initialize(1, ColumnVectorType::kConstant);
+    source.AppendValue(*this);
+//    cast.function(*this, new_value);
+    return true;
 }
 
 String

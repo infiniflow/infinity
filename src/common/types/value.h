@@ -154,6 +154,10 @@ public:
 
     void
     Reset();
+
+    bool
+    TryCastAs(const DataType &target_type, Value &new_value) const;
+
     // Member method
 public:
 //    Value() = default;

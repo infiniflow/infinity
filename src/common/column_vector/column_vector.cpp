@@ -525,6 +525,9 @@ void
 ColumnVector::AppendValue(const Value& value) {
     StorageAssert(initialized, "Column vector isn't initialized.")
     TypeAssert(tail_index_ < capacity_, "Exceed the column vector capacity.");
+    if(this->vector_type_ == ColumnVectorType::kConstant && tail_index_ == 1) {
+        StorageError("Constant type column can hold one value")
+    }
     SetValue(tail_index_ ++, value);
 }
 
@@ -548,6 +551,7 @@ ColumnVector::ShallowCopy(const ColumnVector &other) {
 
 void
 ColumnVector::Reserve(SizeT new_capacity) {
+    StorageAssert(vector_type_ != ColumnVectorType::kConstant, "Constant column vector can only have one value")
     StorageAssert(initialized, "Column vector isn't initialized.")
     if(new_capacity <= capacity_) return ;
 

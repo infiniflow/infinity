@@ -93,7 +93,7 @@ QueryContext::Query(const std::string &query) {
         std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
         // Create execution pipeline
-        std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
+        std::shared_ptr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
 
         // Schedule the query pipeline
         Infinity::instance().scheduler()->Schedule(query_context, pipeline);
