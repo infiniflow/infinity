@@ -39,8 +39,9 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
 
             // Prepare the output data block
             SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+            auto table_name_type_info_ptr = VarcharInfo::Make(TABLE_NAME_LIMIT);
             Vector<DataType> column_types {
-                DataType(LogicalType::kVarchar),
+                DataType(LogicalType::kVarchar, table_name_type_info_ptr),
                 DataType(LogicalType::kBigInt),
                 DataType(LogicalType::kBigInt),
                 DataType(LogicalType::kBigInt),
@@ -55,8 +56,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
                 {
                     // Append table name to the 1st column
                     const String& table_name = table->TableName();
-                    auto type_info_ptr = VarcharInfo::Make(TABLE_NAME_LIMIT);
-                    Value value = Value::MakeVarchar(table_name, type_info_ptr);
+                    Value value = Value::MakeVarchar(table_name, table_name_type_info_ptr);
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                 }

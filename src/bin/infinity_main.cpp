@@ -34,15 +34,25 @@ void ParseArguments(int argc, char** argv, infinity::StartupParameter& parameter
 }
 
 int main(int argc, char** argv) {
-    std::cout << "Startup Infinity database, version: "
+    std::cout << "Infinity, version: "
               << VERSION_MAJOR << "."
               << VERSION_MINOR << "."
               << VERSION_PATCH << " built on "
-              << BUILD_TIME << " from branch: "
+              << BUILD_TIME << " with "
+              << BUILD_TYPE << " mode from branch: "
               << GIT_BRANCH_NAME << std::endl;
 
     infinity::StartupParameter parameters;
     ParseArguments(argc, argv, parameters);
+
+    std::cout << "Startup database server, at: "
+              << parameters.address.to_string() << " and port: "
+              << parameters.port << std::endl;
+
+    std::cout << std::endl
+              << "Run 'psql -h " << parameters.address.to_string()
+              << " -p " << parameters.port
+              << "' to connect to the server." << std::endl;
 
     infinity::DBServer db_server(parameters);
     db_server.Run();

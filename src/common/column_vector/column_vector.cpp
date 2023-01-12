@@ -68,7 +68,126 @@ ColumnVector::ToString() const {
 String
 ColumnVector::ToString(SizeT row_index) const {
     StorageAssert(initialized, "Column vector isn't initialized.")
-    NotImplementError("Not implemented.")
+
+    // Not valid, make a same data type with null indicator
+    if(!(this->nulls_ptr_->IsTrue(row_index))) {
+        return "null";
+    }
+
+    switch(data_type_.type()) {
+        case kBoolean: {
+            return ((BooleanT *) data_ptr_)[row_index] ? "true": "false";
+        }
+        case kTinyInt: {
+            return std::to_string(((TinyIntT *) data_ptr_)[row_index]);
+        }
+        case kSmallInt: {
+            return std::to_string(((SmallIntT *) data_ptr_)[row_index]);
+        }
+        case kInteger: {
+            return std::to_string(((IntegerT *) data_ptr_)[row_index]);
+        }
+        case kBigInt: {
+            return std::to_string(((BigIntT *) data_ptr_)[row_index]);
+        }
+        case kHugeInt: {
+            TypeError("Not implemented");
+        }
+        case kFloat: {
+            return std::to_string(((FloatT *) data_ptr_)[row_index]);
+        }
+        case kDouble: {
+            return std::to_string(((DoubleT *) data_ptr_)[row_index]);
+        }
+        case kDecimal16: {
+            TypeError("Not implemented");
+        }
+        case kDecimal32: {
+            TypeError("Not implemented");
+        }
+        case kDecimal64: {
+            TypeError("Not implemented");
+        }
+        case kDecimal128: {
+            TypeError("Not implemented");
+        }
+        case kVarchar: {
+            VarcharT varchar_ptr = ((VarcharT *) data_ptr_)[row_index];
+            if(varchar_ptr.IsInlined()) {
+                return {varchar_ptr.prefix, VarcharT::INLINE_LENGTH};
+            } else {
+                return {varchar_ptr.ptr, varchar_ptr.length};
+            }
+        }
+        case kChar: {
+            CharT char_ptr = ((CharT *) data_ptr_)[row_index];
+            return {char_ptr.ptr, data_type_.type_info()->Size()};
+        }
+        case kDate: {
+            TypeError("Not implemented");
+        }
+        case kTime: {
+            TypeError("Not implemented");
+        }
+        case kDateTime: {
+            TypeError("Not implemented");
+        }
+        case kTimestamp: {
+            TypeError("Not implemented");
+        }
+        case kTimestampTZ: {
+            TypeError("Not implemented");
+        }
+        case kInterval: {
+            TypeError("Not implemented");
+        }
+        case kArray: {
+            TypeError("Not implemented");
+        }
+        case kTuple: {
+            TypeError("Not implemented");
+        }
+        case kPoint: {
+            TypeError("Not implemented");
+        }
+        case kLine: {
+            TypeError("Not implemented");
+        }
+        case kLineSeg: {
+            TypeError("Not implemented");
+        }
+        case kBox: {
+            TypeError("Not implemented");
+        }
+        case kPath: {
+            TypeError("Not implemented");
+        }
+        case kPolygon: {
+            TypeError("Not implemented");
+        }
+        case kCircle: {
+            TypeError("Not implemented");
+        }
+        case kBitmap: {
+            TypeError("Not implemented");
+        }
+        case kUuid: {
+            TypeError("Not implemented");
+        }
+        case kBlob: {
+            TypeError("Not implemented");
+        }
+        case kEmbedding: {
+            TypeError("Not implemented");
+        }
+        case kMixed: {
+            TypeError("Not implemented");
+        }
+        default: {
+            TypeError("Attempt to access an unaccepted type");
+            // Null/Missing/Invalid
+        }
+    }
 }
 
 Value

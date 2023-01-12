@@ -107,7 +107,7 @@ PGProtocolHandler::SendDescriptionHeader(uint32_t total_column_name_length, uint
 
     // Length + column count + values for each columns
     uint32_t message_size = LENGTH_FIELD_SIZE + sizeof(uint16_t)
-                            + column_count * (sizeof('\0')) + 3 * sizeof(uint32_t) + 3 * sizeof(uint16_t)
+                            + column_count * (sizeof('\0') + 3 * sizeof(uint32_t) + 3 * sizeof(uint16_t))
                             + total_column_name_length;
     buffer_writer_.send_value<uint32_t>(message_size);
     buffer_writer_.send_value<uint16_t>(column_count);
