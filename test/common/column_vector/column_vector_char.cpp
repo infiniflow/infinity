@@ -156,3 +156,105 @@ TEST_F(ColumnVectorCharTest, flat_char) {
     }
 }
 
+TEST_F(ColumnVectorCharTest, contant_char) {
+
+    using namespace infinity;
+
+    auto char_info = CharInfo::Make(128);
+    DataType data_type(LogicalType::kChar, char_info);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kChar)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 128);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        Value v = Value::MakeChar(std::to_string(i), char_info);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kChar);
+        EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kChar);
+        EXPECT_EQ(vx.type().type_info()->Size(), 128);
+
+        EXPECT_STREQ(vx.value_.char_n.ptr, std::to_string(i).c_str());
+
+        v.value_.char_n.Reset();
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kChar);
+        EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kChar);
+        EXPECT_EQ(vx.type().type_info()->Size(), 128);
+
+        EXPECT_STREQ(vx.value_.char_n.ptr, std::to_string(i).c_str());
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kChar)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 128);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        Value v = Value::MakeChar(std::to_string(i), char_info);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kChar);
+        EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kChar);
+        EXPECT_EQ(vx.type().type_info()->Size(), 128);
+
+        EXPECT_STREQ(vx.value_.char_n.ptr, std::to_string(i).c_str());
+
+        v.value_.char_n.Reset();
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+

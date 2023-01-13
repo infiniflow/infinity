@@ -216,6 +216,7 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
         }
         Value v = Value::MakeBitmap(bitmap);
         column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
 
         EXPECT_EQ(vx.value_.bitmap, bitmap);
@@ -279,6 +280,7 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
         }
         Value v = Value::MakeBitmap(bitmap);
         column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
 
         EXPECT_EQ(vx.value_.bitmap, bitmap);
