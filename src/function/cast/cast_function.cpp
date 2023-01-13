@@ -58,7 +58,7 @@ CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
             return BindIntegerCast<IntegerT>(source, target);
         }
         case kBigInt: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
+            return BindIntegerCast<BigIntT>(source, target);
         }
         case kHugeInt: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
