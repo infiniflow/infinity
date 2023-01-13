@@ -42,7 +42,7 @@ public:
                 return ;
             }
             case ColumnVectorType::kConstant: {
-                result.SetVectorType(ColumnVectorType::kConstant);
+                StorageAssert(count == 1, "Attempting to execute more than one row of the constant column vector.")
                 if(nullable) {
                     if(input.nulls_ptr_->IsAllTrue()) {
                         result_null->SetAllTrue();
@@ -51,10 +51,8 @@ public:
                                                                           result_null.get(),
                                                                           0,
                                                                           state_ptr);
-                        return ;
                     } else {
                         result_null->SetFalse(0);
-                        return ;
                     }
                 } else {
                     Operator::template Execute<InputType, ResultType>(input_ptr[0],
@@ -63,6 +61,8 @@ public:
                                                                       0,
                                                                       state_ptr);
                 }
+                result.tail_index_ = 1;
+                return ;
             }
             case ColumnVectorType::kHeterogeneous: {
                 return ExecuteHeterogeneous<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr);

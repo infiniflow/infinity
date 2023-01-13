@@ -1249,7 +1249,13 @@ Value::TryCastAs(const DataType &target_type, Value &new_value) const {
     ColumnVector source(this->type_);
     source.Initialize(1, ColumnVectorType::kConstant);
     source.AppendValue(*this);
-//    cast.function(*this, new_value);
+
+    ColumnVector col_varchar(target_type);
+    col_varchar.Initialize(1, ColumnVectorType::kConstant);
+
+    CastParameters parameters;
+    cast.function(source, col_varchar, 1, parameters);
+    new_value = col_varchar.GetValue(0);
     return true;
 }
 
