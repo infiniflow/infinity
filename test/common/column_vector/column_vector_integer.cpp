@@ -147,6 +147,94 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
     }
 }
 
+TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kTinyInt);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 1);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        Value v = Value::MakeTinyInt(static_cast<TinyIntT>(i));
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 1);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        Value v = Value::MakeTinyInt(static_cast<TinyIntT>(i));
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
 TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     using namespace infinity;
 
@@ -257,6 +345,94 @@ TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeSmallInt(static_cast<SmallIntT>(i));
         column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
+        EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
+TEST_F(ColumnVectorIntegerTest, contant_smallint) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kSmallInt);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kSmallInt)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 2);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        Value v = Value::MakeSmallInt(static_cast<SmallIntT>(i));
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
+        EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
+        EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kSmallInt)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 2);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        Value v = Value::MakeSmallInt(static_cast<SmallIntT>(i));
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
         EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
@@ -381,6 +557,94 @@ TEST_F(ColumnVectorIntegerTest, flat_int) {
     }
 }
 
+TEST_F(ColumnVectorIntegerTest, contant_int) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kInteger);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInteger)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 4);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        Value v = Value::MakeInt(static_cast<IntegerT>(i));
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
+        EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(i));
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
+        EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(i));
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInteger)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 4);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        Value v = Value::MakeInt(static_cast<IntegerT>(i));
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
+        EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(i));
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
 TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     using namespace infinity;
 
@@ -491,6 +755,94 @@ TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeBigInt(static_cast<BigIntT>(i));
         column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
+        EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
+TEST_F(ColumnVectorIntegerTest, contant_bigint) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kBigInt);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBigInt)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 8);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        Value v = Value::MakeBigInt(static_cast<BigIntT>(i));
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
+        EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
+        EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBigInt)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 8);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        Value v = Value::MakeBigInt(static_cast<BigIntT>(i));
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
         EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
@@ -611,6 +963,96 @@ TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
         HugeIntT input(0, i);
         Value v = Value::MakeHugeInt(input);
         column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
+        EXPECT_EQ(vx.value_.huge_int, input);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
+TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kHugeInt);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kHugeInt)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        HugeIntT input(0, i);
+        Value v = Value::MakeHugeInt(input);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
+        EXPECT_EQ(vx.value_.huge_int, input);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
+        EXPECT_EQ(vx.value_.huge_int, HugeIntT(0, i));
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kHugeInt)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        HugeIntT input(0, i);
+        Value v = Value::MakeHugeInt(input);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
         EXPECT_EQ(vx.value_.huge_int, input);

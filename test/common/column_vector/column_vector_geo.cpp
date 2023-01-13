@@ -141,6 +141,99 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
     }
 }
 
+TEST_F(ColumnVectorGeoTest, contant_point) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kPoint);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPoint)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT point(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
+        Value v = Value::MakePoint(point);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kPoint);
+        EXPECT_FLOAT_EQ(vx.value_.point.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kPoint);
+        EXPECT_FLOAT_EQ(vx.value_.point.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPoint)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT point(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
+        Value v = Value::MakePoint(point);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kPoint);
+        EXPECT_FLOAT_EQ(vx.value_.point.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
 TEST_F(ColumnVectorGeoTest, flat_line) {
     using namespace infinity;
 
@@ -258,6 +351,106 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
                    static_cast<f64>(i) - 5.3f);
         Value v = Value::MakeLine(line);
         column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kLine);
+        EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
+TEST_F(ColumnVectorGeoTest, contant_line) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kLine);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kLine)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 24);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        LineT line(static_cast<f64>(i) + 0.5f,
+                   static_cast<f64>(i) - 0.8f,
+                   static_cast<f64>(i) - 5.3f);
+        Value v = Value::MakeLine(line);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kLine);
+        EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kLine);
+        EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kLine)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 24);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        LineT line(static_cast<f64>(i) + 0.5f,
+                   static_cast<f64>(i) - 0.8f,
+                   static_cast<f64>(i) - 5.3f);
+        Value v = Value::MakeLine(line);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kLine);
         EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
@@ -397,6 +590,109 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
     }
 }
 
+TEST_F(ColumnVectorGeoTest, contant_line_seg) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kLineSeg);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kLineSeg)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 32);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
+        PointT p2(static_cast<f64>(i) - 5.3f, static_cast<f64>(i) + 7.9f);
+        LineSegT line_seg(p1, p2);
+        Value v = Value::MakeLineSegment(line_seg);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kLineSeg);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.x, static_cast<f64>(i) - 5.3f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kLineSeg);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.x, static_cast<f64>(i) - 5.3f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kLineSeg)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 32);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
+        PointT p2(static_cast<f64>(i) - 5.3f, static_cast<f64>(i) + 7.9f);
+        LineSegT line_seg(p1, p2);
+        Value v = Value::MakeLineSegment(line_seg);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kLineSeg);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.x, static_cast<f64>(i) - 5.3f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
 TEST_F(ColumnVectorGeoTest, flat_box) {
     using namespace infinity;
 
@@ -517,6 +813,109 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
         BoxT box(p1, p2);
         Value v = Value::MakeBox(box);
         column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBox);
+        EXPECT_FLOAT_EQ(vx.value_.box.upper_left.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.box.upper_left.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.box.lower_right.x, static_cast<f64>(i) - 5.3f);
+        EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
+TEST_F(ColumnVectorGeoTest, contant_box) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kBox);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBox)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 32);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
+        PointT p2(static_cast<f64>(i) - 5.3f, static_cast<f64>(i) + 7.9f);
+        BoxT box(p1, p2);
+        Value v = Value::MakeBox(box);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBox);
+        EXPECT_FLOAT_EQ(vx.value_.box.upper_left.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.box.upper_left.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.box.lower_right.x, static_cast<f64>(i) - 5.3f);
+        EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBox);
+        EXPECT_FLOAT_EQ(vx.value_.box.upper_left.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.box.upper_left.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.box.lower_right.x, static_cast<f64>(i) - 5.3f);
+        EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBox)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 32);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
+        PointT p2(static_cast<f64>(i) - 5.3f, static_cast<f64>(i) + 7.9f);
+        BoxT box(p1, p2);
+        Value v = Value::MakeBox(box);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBox);
         EXPECT_FLOAT_EQ(vx.value_.box.upper_left.x, static_cast<f64>(i) + 0.5f);
@@ -686,6 +1085,136 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
         path.SetPoint(3, p4);
         Value v = Value::MakePath(path);
         column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kPath);
+        EXPECT_EQ(vx.value_.path.point_count, 4);
+        EXPECT_EQ(vx.value_.path.closed, 0);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
+
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
+TEST_F(ColumnVectorGeoTest, contant_path) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kPath);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPath)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        PathT path;
+        path.Initialize(4, 0);
+        path.SetPoint(0, p1);
+        path.SetPoint(1, p2);
+        path.SetPoint(2, p3);
+        path.SetPoint(3, p4);
+        Value v = Value::MakePath(path);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kPath);
+        EXPECT_EQ(vx.value_.path.point_count, 4);
+        EXPECT_EQ(vx.value_.path.closed, 0);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
+
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kPath);
+        EXPECT_EQ(vx.value_.path.point_count, 4);
+        EXPECT_EQ(vx.value_.path.closed, 0);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPath)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        PathT path;
+        path.Initialize(4, 0);
+        path.SetPoint(0, p1);
+        path.SetPoint(1, p2);
+        path.SetPoint(2, p3);
+        path.SetPoint(3, p4);
+        Value v = Value::MakePath(path);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kPath);
         EXPECT_EQ(vx.value_.path.point_count, 4);
@@ -891,6 +1420,151 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
     }
 }
 
+TEST_F(ColumnVectorGeoTest, contant_polygon) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kPolygon);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPolygon)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 48);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        PolygonT polygon;
+        polygon.Initialize(4);
+        polygon.SetPoint(0, p1);
+        polygon.SetPoint(1, p2);
+        polygon.SetPoint(2, p3);
+        polygon.SetPoint(3, p4);
+        Value v = Value::MakePolygon(polygon);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        BoxT bounding_box(PointT(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f),
+                          PointT(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f));
+        EXPECT_EQ(vx.type().type(), LogicalType::kPolygon);
+        EXPECT_EQ(vx.value_.polygon.point_count, 4);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 3), p4);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.x, bounding_box.upper_left.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.y, bounding_box.upper_left.y);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
+
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+
+        Value vx = column_vector.GetValue(i);
+        BoxT bounding_box(PointT(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f),
+                          PointT(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f));
+        EXPECT_EQ(vx.type().type(), LogicalType::kPolygon);
+        EXPECT_EQ(vx.value_.polygon.point_count, 4);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 3), p4);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.x, bounding_box.upper_left.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.y, bounding_box.upper_left.y);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPolygon)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 48);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        PolygonT polygon;
+        polygon.Initialize(4);
+        polygon.SetPoint(0, p1);
+        polygon.SetPoint(1, p2);
+        polygon.SetPoint(2, p3);
+        polygon.SetPoint(3, p4);
+        Value v = Value::MakePolygon(polygon);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        BoxT bounding_box(PointT(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f),
+                          PointT(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f));
+        EXPECT_EQ(vx.type().type(), LogicalType::kPolygon);
+        EXPECT_EQ(vx.value_.polygon.point_count, 4);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 3), p4);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.x, bounding_box.upper_left.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.y, bounding_box.upper_left.y);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
+
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
 TEST_F(ColumnVectorGeoTest, flat_circle) {
     using namespace infinity;
 
@@ -1008,6 +1682,106 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
         CircleT circle(p1, r);
         Value v = Value::MakeCircle(circle);
         column_vector.AppendValue(v);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kCircle);
+        EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.circle.center.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
+TEST_F(ColumnVectorGeoTest, contant_circle) {
+
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kCircle);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kCircle)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 24);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
+        f64 r = static_cast<f64>(i) + 7.9f;
+        CircleT circle(p1, r);
+        Value v = Value::MakeCircle(circle);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kCircle);
+        EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.circle.center.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kCircle);
+        EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.circle.center.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kCircle)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 24);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
+        f64 r = static_cast<f64>(i) + 7.9f;
+        CircleT circle(p1, r);
+        Value v = Value::MakeCircle(circle);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kCircle);
         EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);

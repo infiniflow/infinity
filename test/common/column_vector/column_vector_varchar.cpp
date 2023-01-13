@@ -176,6 +176,123 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     }
 }
 
+TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
+
+    using namespace infinity;
+
+    auto varchar_info = VarcharInfo::Make(65);
+    DataType data_type(LogicalType::kVarchar, varchar_info);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        String s = "hello" + std::to_string(i);
+        VarcharT varchar_value(s);
+        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
+        EXPECT_TRUE(vx.value_.varchar.IsInlined());
+        if(vx.value_.varchar.IsInlined()) {
+            String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), s.c_str());
+        } else {
+            String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), s.c_str());
+        }
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
+
+        String s = "hello" + std::to_string(i);
+
+        EXPECT_TRUE(vx.value_.varchar.IsInlined());
+        if(vx.value_.varchar.IsInlined()) {
+            String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), s.c_str());
+        } else {
+            String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), s.c_str());
+        }
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        String s = "hello" + std::to_string(i);
+        VarcharT varchar_value(s);
+        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
+        EXPECT_TRUE(vx.value_.varchar.IsInlined());
+        if(vx.value_.varchar.IsInlined()) {
+            String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), s.c_str());
+        } else {
+            String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), s.c_str());
+        }
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
 TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     using namespace infinity;
 
@@ -317,6 +434,123 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
+        EXPECT_FALSE(vx.value_.varchar.IsInlined());
+        if(vx.value_.varchar.IsInlined()) {
+            String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), s.c_str());
+        } else {
+            String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), s.c_str());
+        }
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
+TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
+
+    using namespace infinity;
+
+    auto varchar_info = VarcharInfo::Make(65);
+    DataType data_type(LogicalType::kVarchar, varchar_info);
+    ColumnVector column_vector(data_type);
+
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    auto tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+
+    for(i64 i = 0; i < 1; ++ i) {
+        String s = "hellohellohello" + std::to_string(i);
+        VarcharT varchar_value(s);
+        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
+        EXPECT_FALSE(vx.value_.varchar.IsInlined());
+        if(vx.value_.varchar.IsInlined()) {
+            String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), s.c_str());
+        } else {
+            String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), s.c_str());
+        }
+        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+    for (i64 i = 0; i < 1; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
+
+        String s = "hellohellohello" + std::to_string(i);
+
+        EXPECT_FALSE(vx.value_.varchar.IsInlined());
+        if(vx.value_.varchar.IsInlined()) {
+            String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), s.c_str());
+        } else {
+            String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), s.c_str());
+        }
+    }
+
+    column_vector.Reset();
+    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.initialized, false);
+
+    // ====
+    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+
+    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_THROW(column_vector.ToString(), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
+    EXPECT_EQ(column_vector.data_type(), data_type);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+
+    EXPECT_NE(column_vector.buffer_, nullptr);
+    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+    EXPECT_TRUE(column_vector.initialized);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    tmp_ptr = column_vector.data_ptr_;
+    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    for(i64 i = 0; i < 1; ++ i) {
+        String s = "hellohellohello" + std::to_string(i);
+        VarcharT varchar_value(s);
+        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        column_vector.AppendValue(v);
+        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         EXPECT_FALSE(vx.value_.varchar.IsInlined());
         if(vx.value_.varchar.IsInlined()) {
             String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
