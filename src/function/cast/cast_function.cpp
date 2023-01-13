@@ -4,6 +4,7 @@
 
 #include "cast_function.h"
 #include "bool_cast.h"
+#include "integer_cast.h"
 
 namespace infinity {
 
@@ -48,7 +49,7 @@ CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
             return BindBoolCast(source, target);
         }
         case kTinyInt: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
+            return BindIntegerCast<TinyIntT>(source, target);
         }
         case kSmallInt: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());

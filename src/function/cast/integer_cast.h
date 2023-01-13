@@ -17,7 +17,7 @@ struct IntegerTryCastToVarlen;
 
 template<class SourceType>
 static inline BoundCastFunc
-BindIntegerCast(const DataType &source, DataType &target) {
+BindIntegerCast(const DataType &source, const DataType &target) {
     TypeAssert(source.type() != target.type(), "Attempt to cast from " + source.ToString() + " to " + target.ToString());
     switch (target.type()) {
         case LogicalType::kTinyInt: {
