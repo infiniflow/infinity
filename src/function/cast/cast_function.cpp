@@ -52,7 +52,7 @@ CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
             return BindIntegerCast<TinyIntT>(source, target);
         }
         case kSmallInt: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
+            return BindIntegerCast<SmallIntT>(source, target);
         }
         case kInteger: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());

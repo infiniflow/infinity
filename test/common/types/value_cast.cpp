@@ -36,6 +36,7 @@ TEST_F(ValueCastTest, bool_value_cast) {
     {
         EXPECT_EQ(value.GetValue<BooleanT>(), true);
         value.TryCastAs(target_type, target_value);
+        EXPECT_FALSE(target_value.is_null());
         EXPECT_EQ(target_value.type_.type(), LogicalType::kVarchar);
         EXPECT_EQ(target_value.value_.varchar.ToString(), "true");
     }
@@ -44,6 +45,7 @@ TEST_F(ValueCastTest, bool_value_cast) {
         value = Value::MakeBool(false);
         EXPECT_EQ(value.GetValue<BooleanT>(), false);
         value.TryCastAs(target_type, target_value);
+        EXPECT_FALSE(target_value.is_null());
         EXPECT_EQ(target_value.type_.type(), LogicalType::kVarchar);
         EXPECT_EQ(target_value.value_.varchar.ToString(), "false");
     }
@@ -62,6 +64,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
         {
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(target_value.value_.small_int, source);
         }
@@ -71,6 +74,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(target_value.value_.small_int, source);
         }
@@ -80,6 +84,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(target_value.value_.small_int, source);
         }
@@ -95,6 +100,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
         {
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(target_value.value_.integer, source);
         }
@@ -104,6 +110,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(target_value.value_.integer, source);
         }
@@ -113,6 +120,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(target_value.value_.integer, source);
         }
@@ -128,6 +136,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
         {
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(target_value.value_.big_int, source);
         }
@@ -137,6 +146,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(target_value.value_.big_int, source);
         }
@@ -146,6 +156,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(target_value.value_.big_int, source);
         }
@@ -161,6 +172,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
         {
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kHugeInt);
             EXPECT_EQ(target_value.value_.huge_int.lower, source);
             EXPECT_EQ((static_cast<i8>(source) < 0) * -1, target_value.value_.huge_int.upper);
@@ -171,6 +183,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kHugeInt);
             EXPECT_EQ(target_value.value_.huge_int.lower, source);
             EXPECT_EQ((static_cast<i8>(source) < 0) * -1, target_value.value_.huge_int.upper);
@@ -181,6 +194,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kHugeInt);
             EXPECT_EQ(target_value.value_.huge_int.lower, source);
             EXPECT_EQ((static_cast<i8>(source) < 0) * -1, target_value.value_.huge_int.upper);
@@ -197,6 +211,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
         {
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(target_value.value_.float32, source);
         }
@@ -206,6 +221,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(target_value.value_.float32, source);
         }
@@ -215,6 +231,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(target_value.value_.float32, source);
         }
@@ -230,6 +247,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
         {
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(target_value.value_.float64, source);
         }
@@ -239,6 +257,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(target_value.value_.float64, source);
         }
@@ -248,6 +267,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(source);
             EXPECT_EQ(value.GetValue<TinyIntT>(), source);
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(target_value.value_.float64, source);
         }
@@ -314,6 +334,7 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
         {
             EXPECT_EQ(value.GetValue<TinyIntT>(), std::numeric_limits<TinyIntT>::min());
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.value_.varchar.ToString(), std::to_string(std::numeric_limits<TinyIntT>::min()));
         }
 
@@ -321,12 +342,335 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
             value = Value::MakeTinyInt(std::numeric_limits<TinyIntT>::max());
             EXPECT_EQ(value.GetValue<TinyIntT>(), std::numeric_limits<TinyIntT>::max());
             value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
             EXPECT_EQ(target_value.value_.varchar.ToString(), std::to_string(std::numeric_limits<TinyIntT>::max()));
         }
 
         {
             value = Value::MakeTinyInt(0);
             EXPECT_EQ(value.GetValue<TinyIntT>(), 0);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.value_.varchar.ToString(), std::to_string(0));
+        }
+    }
+}
+
+TEST_F(ValueCastTest, smallint_value_cast) {
+    using namespace infinity;
+
+    {
+        // TinyInt to SmallInt
+        DataType target_type(LogicalType::kTinyInt);
+        Value target_value(LogicalType::kTinyInt);
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_TRUE(target_value.is_null());
+        }
+
+        {
+            source = std::numeric_limits<TinyIntT>::min();
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kTinyInt);
+            EXPECT_EQ(target_value.value_.tiny_int, static_cast<TinyIntT>(source));
+        }
+
+        {
+            source = std::numeric_limits<TinyIntT>::max();
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kTinyInt);
+            EXPECT_EQ(target_value.value_.tiny_int, static_cast<TinyIntT>(source));
+        }
+
+        {
+            source = std::numeric_limits<SmallIntT>::max();
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_TRUE(target_value.is_null());
+        }
+
+        {
+            source = 0;
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kTinyInt);
+            EXPECT_EQ(target_value.value_.tiny_int, static_cast<TinyIntT>(source));
+        }
+
+    }
+
+    {
+        // SmallInt to Integer
+        DataType target_type(LogicalType::kInteger);
+        Value target_value(LogicalType::kInteger);
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kInteger);
+            EXPECT_EQ(target_value.value_.integer, source);
+        }
+
+        {
+            source = std::numeric_limits<SmallIntT>::max();
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kInteger);
+            EXPECT_EQ(target_value.value_.integer, source);
+        }
+
+        {
+            source = 0;
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kInteger);
+            EXPECT_EQ(target_value.value_.integer, source);
+        }
+    }
+
+    {
+        // SmallInt to BigInt
+        DataType target_type(LogicalType::kBigInt);
+        Value target_value(LogicalType::kBigInt);
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kBigInt);
+            EXPECT_EQ(target_value.value_.big_int, source);
+        }
+
+        {
+            source = std::numeric_limits<SmallIntT>::max();
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kBigInt);
+            EXPECT_EQ(target_value.value_.big_int, source);
+        }
+
+        {
+            source = 0;
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kBigInt);
+            EXPECT_EQ(target_value.value_.big_int, source);
+        }
+    }
+
+    {
+        // SmallInt to BigInt
+        DataType target_type(LogicalType::kHugeInt);
+        Value target_value(LogicalType::kHugeInt);
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kHugeInt);
+            EXPECT_EQ(target_value.value_.huge_int.lower, source);
+            EXPECT_EQ((static_cast<SmallIntT>(source) < 0) * -1, target_value.value_.huge_int.upper);
+        }
+
+        {
+            source = std::numeric_limits<SmallIntT>::max();
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kHugeInt);
+            EXPECT_EQ(target_value.value_.huge_int.lower, source);
+            EXPECT_EQ((static_cast<SmallIntT>(source) < 0) * -1, target_value.value_.huge_int.upper);
+        }
+
+        {
+            source = 0;
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kHugeInt);
+            EXPECT_EQ(target_value.value_.huge_int.lower, source);
+            EXPECT_EQ((static_cast<SmallIntT>(source) < 0) * -1, target_value.value_.huge_int.upper);
+        }
+    }
+
+    {
+        // SmallInt to Float
+        DataType target_type(LogicalType::kFloat);
+        Value target_value(LogicalType::kFloat);
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kFloat);
+            EXPECT_FLOAT_EQ(target_value.value_.float32, source);
+        }
+
+        {
+            source = std::numeric_limits<SmallIntT>::max();
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kFloat);
+            EXPECT_FLOAT_EQ(target_value.value_.float32, source);
+        }
+
+        {
+            source = 0;
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kFloat);
+            EXPECT_FLOAT_EQ(target_value.value_.float32, source);
+        }
+    }
+
+    {
+        // SmallInt to Double
+        DataType target_type(LogicalType::kDouble);
+        Value target_value(LogicalType::kDouble);
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kDouble);
+            EXPECT_FLOAT_EQ(target_value.value_.float64, source);
+        }
+
+        {
+            source = std::numeric_limits<SmallIntT>::max();
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kDouble);
+            EXPECT_FLOAT_EQ(target_value.value_.float64, source);
+        }
+
+        {
+            source = 0;
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_FALSE(target_value.is_null());
+            EXPECT_EQ(target_value.type_.type(), LogicalType::kDouble);
+            EXPECT_FLOAT_EQ(target_value.value_.float64, source);
+        }
+    }
+
+    {
+        // SmallInt to Decimal16
+        DataType target_type(LogicalType::kDecimal16);
+        Value target_value(LogicalType::kDecimal16);
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
+        }
+    }
+
+    {
+        // SmallInt to Decimal32
+        DataType target_type(LogicalType::kDecimal32);
+        Value target_value(LogicalType::kDecimal32);
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
+        }
+    }
+
+    {
+        // SmallInt to Decimal64
+        DataType target_type(LogicalType::kDecimal64);
+        Value target_value(LogicalType::kDecimal64);
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
+        }
+    }
+
+    {
+        // SmallInt to Decimal128
+        DataType target_type(LogicalType::kDecimal128);
+        Value target_value(LogicalType::kDecimal128);
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
+        }
+    }
+
+    {
+        // SmallInt to Varchar
+        DataType target_type(LogicalType::kVarchar, VarcharInfo::Make(64));
+        Value target_value(LogicalType::kVarchar, VarcharInfo::Make(64));
+
+        SmallIntT source = std::numeric_limits<SmallIntT>::min();
+        Value value = Value::MakeSmallInt(source);
+        {
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_EQ(target_value.value_.varchar.ToString(), std::to_string(source));
+        }
+
+        {
+            source = std::numeric_limits<SmallIntT>::max();
+            value = Value::MakeSmallInt(source);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
+            value.TryCastAs(target_type, target_value);
+            EXPECT_EQ(target_value.value_.varchar.ToString(), std::to_string(source));
+        }
+
+        {
+            value = Value::MakeSmallInt(0);
+            EXPECT_EQ(value.GetValue<SmallIntT>(), 0);
             value.TryCastAs(target_type, target_value);
             EXPECT_EQ(target_value.value_.varchar.ToString(), std::to_string(0));
         }
