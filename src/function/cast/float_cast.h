@@ -17,7 +17,7 @@ struct FloatTryCastToVarlen;
 
 template<class SourceType>
 static inline BoundCastFunc
-BindFloatCast(const DataType &source, DataType &target) {
+BindFloatCast(const DataType &source, const DataType &target) {
     TypeAssert(source.type() != target.type(),
                "Attempt to cast from " + source.ToString() + " to " + target.ToString());
     switch (target.type()) {
@@ -58,12 +58,15 @@ BindFloatCast(const DataType &source, DataType &target) {
         case LogicalType::kDecimal64: {
             NotImplementError("Not implement cast from numeric to decimal64 type.");
         }
+        case LogicalType::kDecimal128: {
+            NotImplementError("Not implement cast from numeric to decimal128 type.");
+        }
         case LogicalType::kVarchar: {
             return BoundCastFunc(
                     &ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, FloatTryCastToVarlen>);
         }
         default: {
-            TypeError("BindIntegerCast: Can't cast from " + source.ToString() + " to " + target.ToString());
+            TypeError("BindFloatCast: Can't cast from " + source.ToString() + " to " + target.ToString());
         }
     }
 }

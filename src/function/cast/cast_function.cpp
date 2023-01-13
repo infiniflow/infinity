@@ -5,6 +5,7 @@
 #include "cast_function.h"
 #include "bool_cast.h"
 #include "integer_cast.h"
+#include "float_cast.h"
 
 namespace infinity {
 
@@ -61,13 +62,13 @@ CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
             return BindIntegerCast<BigIntT>(source, target);
         }
         case kHugeInt: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
+            return BindIntegerCast<HugeIntT>(source, target);
         }
         case kFloat: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
+            return BindFloatCast<FloatT>(source, target);
         }
         case kDouble: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
+            return BindFloatCast<DoubleT>(source, target);
         }
         case kDecimal16: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
