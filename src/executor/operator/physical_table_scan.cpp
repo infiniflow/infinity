@@ -29,9 +29,9 @@ PhysicalTableScan::Execute(std::shared_ptr<QueryContext>& query_context) {
             = MakeShared<TableDef>(table_alias_, column_defs, false);
     output_ = MakeShared<Table>(table_def_ptr, TableType::kResult);
 
-    SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
-    output_block->Init(column_types_);
     while(true) {
+         SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
+         output_block->Init(column_types_);
          table_scan_func_ptr_->main_function_(
                  query_context,
                  table_scan_function_data_ptr_,

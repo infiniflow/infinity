@@ -80,6 +80,7 @@ public:
     void
     Append(const SharedPtr<DataBlock>& data_block) {
         data_blocks_.emplace_back(data_block);
+        row_count_ += data_block->row_count();
     }
 public:
     [[nodiscard]] String

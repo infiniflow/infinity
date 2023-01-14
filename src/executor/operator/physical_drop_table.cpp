@@ -16,6 +16,15 @@ PhysicalDropTable::Init() {
 void
 PhysicalDropTable::Execute(std::shared_ptr<QueryContext>& query_context) {
     Infinity::instance().catalog()->DeleteTable(*schema_name_, *table_name_);
+
+    // Generate the result
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+            ColumnDef::Make("OK", 0, DataType(LogicalType::kInteger), Set<ConstrainType>()),
+    };
+
+    SharedPtr<TableDef> result_table_def_ptr
+            = MakeShared<TableDef>("Tables", column_defs, false);
+    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 
 

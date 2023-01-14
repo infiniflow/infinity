@@ -57,6 +57,8 @@ public:
 
     [[nodiscard]] inline SizeT
     row_count() const {
+        if(row_count_ == 0) return 0;
+
         if(!finalized) {
             StorageError("Not finalized data block")
         }
