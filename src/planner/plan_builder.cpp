@@ -541,7 +541,7 @@ PlanBuilder::BuildSelect(SharedPtr<QueryContext>& query_context,
 
     // 5. SELECT list (aliases)
     // Unfold the star expression in the select list.
-    // Star expression will be unfold and bound as column expressions.
+    // Star expression will be unfolded and bound as column expressions.
     std::vector<SelectItem> select_list = BuildSelectList(query_context, *statement.selectList, bind_context_ptr);
 
     std::unordered_map<String, const hsql::Expr *> alias2expr;

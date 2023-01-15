@@ -14,7 +14,7 @@ namespace infinity {
 
 struct ColumnVectorCastData {
     explicit
-    ColumnVectorCastData(bool strict, ColumnVector* column_vector_ptr, DataType source_type, DataType target_type)
+    ColumnVectorCastData(bool strict, SharedPtr<ColumnVector>& column_vector_ptr, DataType source_type, DataType target_type)
         : strict_(strict),
         column_vector_ptr_(column_vector_ptr),
         source_type_(std::move(source_type)),
@@ -24,7 +24,7 @@ struct ColumnVectorCastData {
     DataType target_type_{LogicalType::kInvalid};
     bool strict_{false};
     bool all_converted_{true};
-    ColumnVector* column_vector_ptr_{nullptr};
+    SharedPtr<ColumnVector> column_vector_ptr_{nullptr};
 };
 
 
@@ -102,29 +102,29 @@ struct ColumnVectorCast {
 
 template <class SourceType, class TargetType, class Operator>
 static bool
-GenericTryCastColumnVector(const ColumnVector &source, ColumnVector &result, size_t count, CastParameters &parameters) {
-    ColumnVectorCastData input(parameters.strict, &result, source.data_type_, result.data_type_);
+GenericTryCastColumnVector(const SharedPtr<ColumnVector>&source, SharedPtr<ColumnVector>&result, size_t count, CastParameters &parameters) {
+    ColumnVectorCastData input(parameters.strict, result, source->data_type_, result->data_type_);
     UnaryOperator::Execute<SourceType, TargetType, Operator>(source, result, count, &input, true);
     return input.all_converted_;
 }
 
 template <class SourceType, class TargetType, class Operator>
 inline static bool
-TryCastColumnVector(const ColumnVector &source, ColumnVector &target, size_t count, CastParameters &parameters) {
+TryCastColumnVector(const SharedPtr<ColumnVector>&source, SharedPtr<ColumnVector>&target, size_t count, CastParameters &parameters) {
     bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValue<Operator>>(source, target, count, parameters);
     return result;
 }
 
 template <class SourceType, class TargetType, class Operator>
 inline static bool
-TryCastColumnVectorToVarlen(const ColumnVector &source, ColumnVector &target, size_t count, CastParameters &parameters) {
+TryCastColumnVectorToVarlen(const SharedPtr<ColumnVector>&source, SharedPtr<ColumnVector>&target, size_t count, CastParameters &parameters) {
     bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValueToVarlen<Operator>>(source, target, count, parameters);
     return result;
 }
 
 template <class SourceType, class TargetType, class Operator>
 inline static bool
-TryCastColumnVectorToVarlenWithType(const ColumnVector &source, ColumnVector &target, size_t count, CastParameters &parameters) {
+TryCastColumnVectorToVarlenWithType(const SharedPtr<ColumnVector>&source, SharedPtr<ColumnVector>&target, size_t count, CastParameters &parameters) {
     bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValueToVarlenWithType<Operator>>(source, target, count, parameters);
     return result;
 }

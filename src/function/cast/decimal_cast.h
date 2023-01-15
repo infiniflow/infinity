@@ -75,7 +75,7 @@ struct DecimalTryCastToFixlen {
 struct DecimalTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target, const ColumnVector *vector_ptr) {
+    Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector>& vector_ptr) {
         FunctionError("Not implementation to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -144,7 +144,7 @@ DecimalTryCastToFixlen::Run(Decimal16T source, Decimal128T &target) {
 
 template<>
 inline bool
-DecimalTryCastToVarlen::Run(Decimal16T source, VarcharT &target, const ColumnVector *vector_ptr) {
+DecimalTryCastToVarlen::Run(Decimal16T source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr) {
     NotImplementError("Not implemented");
 }
 
@@ -211,7 +211,7 @@ DecimalTryCastToFixlen::Run(Decimal32T source, Decimal128T &target) {
 
 template<>
 inline bool
-DecimalTryCastToVarlen::Run(Decimal32T source, VarcharT &target, const ColumnVector *vector_ptr) {
+DecimalTryCastToVarlen::Run(Decimal32T source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr) {
     NotImplementError("Not implemented");
 }
 
@@ -278,7 +278,7 @@ DecimalTryCastToFixlen::Run(Decimal64T source, Decimal128T &target) {
 
 template<>
 inline bool
-DecimalTryCastToVarlen::Run(Decimal64T source, VarcharT &target, const ColumnVector *vector_ptr) {
+DecimalTryCastToVarlen::Run(Decimal64T source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr) {
     NotImplementError("Not implemented");
 }
 
@@ -345,7 +345,7 @@ DecimalTryCastToFixlen::Run(Decimal128T source, Decimal64T &target) {
 
 template<>
 inline bool
-DecimalTryCastToVarlen::Run(Decimal128T source, VarcharT &target, const ColumnVector *vector_ptr) {
+DecimalTryCastToVarlen::Run(Decimal128T source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr) {
     NotImplementError("Not implemented");
 }
 

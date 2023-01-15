@@ -86,7 +86,7 @@ struct IntegerTryCastToFixlen {
 struct IntegerTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target, const ColumnVector* vector_ptr){
+    Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector>& vector_ptr){
         FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -161,7 +161,7 @@ IntegerTryCastToFixlen::Run(TinyIntT source, Decimal128T &target) {
 // Cast TinyIntT to VarcharT type
 template<>
 inline bool
-IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const ColumnVector *vector_ptr){
+IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr){
     if(source == 0) {
         target.prefix[0] = '0';
         target.length = 1;
@@ -248,7 +248,7 @@ IntegerTryCastToFixlen::Run(SmallIntT source, Decimal128T &target) {
 // Cast SmallIntT to VarcharT type
 template<>
 inline bool
-IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, const ColumnVector *vector_ptr){
+IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr){
     if(source == 0) {
         target.prefix[0] = '0';
         target.length = 1;
@@ -338,7 +338,7 @@ IntegerTryCastToFixlen::Run(IntegerT source, Decimal128T &target) {
 // Cast IntegerT to VarcharT type
 template<>
 inline bool
-IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const ColumnVector *vector_ptr){
+IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr){
     if(source == 0) {
         target.prefix[0] = '0';
         target.length = 1;
@@ -432,7 +432,7 @@ IntegerTryCastToFixlen::Run(BigIntT source, Decimal128T &target) {
 // Cast integer to varlen type
 template<>
 inline bool
-IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const ColumnVector *vector_ptr){
+IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr){
     if(source == 0) {
         target.prefix[0] = '0';
         target.length = 1;
@@ -520,7 +520,7 @@ IntegerTryCastToFixlen::Run(HugeIntT source, Decimal128T &target) {
 // Cast integer to varlen type
 template<>
 inline bool
-IntegerTryCastToVarlen::Run(HugeIntT source, VarcharT &target, const ColumnVector *vector_ptr){
+IntegerTryCastToVarlen::Run(HugeIntT source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr){
     NotImplementError("Not implemented");
 }
 

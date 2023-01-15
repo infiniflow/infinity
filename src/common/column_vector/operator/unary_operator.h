@@ -13,19 +13,19 @@ class UnaryOperator {
 public:
     template <typename InputType, typename ResultType, typename Operator>
     static void inline
-    Execute(const ColumnVector& input, ColumnVector& result, size_t count, void* state_ptr, bool nullable) {
-        const auto* input_ptr = (const InputType*)(input.data_ptr_);
-        const SharedPtr<Bitmask>& input_null = input.nulls_ptr_;
+    Execute(const SharedPtr<ColumnVector>& input, SharedPtr<ColumnVector>& result, size_t count, void* state_ptr, bool nullable) {
+        const auto* input_ptr = (const InputType*)(input->data_ptr_);
+        const SharedPtr<Bitmask>& input_null = input->nulls_ptr_;
 
-        auto* result_ptr = (ResultType*)(result.data_ptr_);
-        SharedPtr<Bitmask>& result_null = result.nulls_ptr_;
+        auto* result_ptr = (ResultType*)(result->data_ptr_);
+        SharedPtr<Bitmask>& result_null = result->nulls_ptr_;
 
-        switch(input.vector_type()) {
+        switch(input->vector_type()) {
             case ColumnVectorType::kInvalid: {
                 TypeError("Invalid column vector type.");
             }
             case ColumnVectorType::kFlat: {
-                TypeAssert(result.vector_type() == ColumnVectorType::kFlat, "Target vector type isn't flat.");
+                TypeAssert(result->vector_type() == ColumnVectorType::kFlat, "Target vector type isn't flat.");
                 if(nullable) {
                     ExecuteFlatWithNull<InputType, ResultType, Operator>(input_ptr,
                                                                          input_null,
@@ -38,13 +38,13 @@ public:
                     ExecuteFlat<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr);
                 }
                 // Result tail_index need to update.
-                result.tail_index_ = count;
+                result->tail_index_ = count;
                 return ;
             }
             case ColumnVectorType::kConstant: {
                 StorageAssert(count == 1, "Attempting to execute more than one row of the constant column vector.")
                 if(nullable) {
-                    if(input.nulls_ptr_->IsAllTrue()) {
+                    if(input->nulls_ptr_->IsAllTrue()) {
                         result_null->SetAllTrue();
                         Operator::template Execute<InputType, ResultType>(input_ptr[0],
                                                                           result_ptr[0],
@@ -61,7 +61,7 @@ public:
                                                                       0,
                                                                       state_ptr);
                 }
-                result.tail_index_ = 1;
+                result->tail_index_ = 1;
                 return ;
             }
             case ColumnVectorType::kHeterogeneous: {

@@ -18,7 +18,7 @@ TableScanFunc(SharedPtr<QueryContext>& query_context,
     SharedPtr<Table>& table_ptr = table_scan_function_data_ptr->table_ptr_;
     std::vector<size_t>& column_ids = table_scan_function_data_ptr->column_ids_;
     i64& current_block_id = table_scan_function_data_ptr->block_count_;
-    if(current_block_id >= table_ptr->BlockCount()) {
+    if(current_block_id >= table_ptr->DataBlockCount()) {
         LOG_DEBUG("All blocks are read from storage.");
         output.Reset();
         return ;
@@ -27,7 +27,7 @@ TableScanFunc(SharedPtr<QueryContext>& query_context,
         i64 output_column_id = 0;
         for(size_t column_id: column_ids) {
 //            output.column_vectors[output_column_id ++] = current_block->column_vectors[column_id];
-            output.column_vectors[output_column_id ++].ShallowCopy(current_block->column_vectors[column_id]);
+            output.column_vectors[output_column_id ++]->ShallowCopy(*current_block->column_vectors[column_id]);
         }
         // Fixme: use set_row_count to save time cost?
         output.Finalize();

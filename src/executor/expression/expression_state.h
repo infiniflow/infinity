@@ -57,7 +57,7 @@ public:
         return children_;
     }
 
-    ColumnVector&
+    SharedPtr<ColumnVector>&
     OutputColumnVector() {
         return output_data_block_.column_vectors[0];
     }

@@ -74,18 +74,18 @@ TEST_F(AbsFunctionsTest, abs_func) {
             EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(i));
         }
 
-        ColumnVector result(data_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             i8 res = static_cast<i8>(i);
             if (res == std::numeric_limits<i8>::min()) {
-                EXPECT_EQ(result.nulls_ptr_->IsTrue(i), false);
+                EXPECT_EQ(result->nulls_ptr_->IsTrue(i), false);
             } else {
-                EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+                EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
                 EXPECT_EQ(v.value_.tiny_int, abs(res));
             }
         }
@@ -124,15 +124,15 @@ TEST_F(AbsFunctionsTest, abs_func) {
             EXPECT_EQ(v.value_.small_int, -static_cast<i16>(i));
         }
 
-        ColumnVector result(data_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             i16 res = static_cast<i16>(i);
-            EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+            EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
             EXPECT_EQ(v.value_.small_int, abs(res));
         }
     }
@@ -170,15 +170,15 @@ TEST_F(AbsFunctionsTest, abs_func) {
             EXPECT_EQ(v.value_.integer, -static_cast<i32>(i));
         }
 
-        ColumnVector result(data_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             i32 res = static_cast<i32>(i);
-            EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+            EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
             EXPECT_EQ(v.value_.integer, abs(res));
         }
     }
@@ -216,15 +216,15 @@ TEST_F(AbsFunctionsTest, abs_func) {
             EXPECT_EQ(v.value_.big_int, -static_cast<i64>(i));
         }
 
-        ColumnVector result(data_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             i64 res = static_cast<i64>(i);
-            EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+            EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
             EXPECT_EQ(v.value_.big_int, abs(res));
         }
     }
@@ -267,16 +267,16 @@ TEST_F(AbsFunctionsTest, abs_func) {
             EXPECT_FLOAT_EQ(v.value_.float32, input);
         }
 
-        ColumnVector result(data_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (i64 i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             f32 input = i - 16384;
             input -= 0.5;
-            EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+            EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
             EXPECT_FLOAT_EQ(v.value_.float32, fabs(input));
         }
     }
@@ -319,16 +319,16 @@ TEST_F(AbsFunctionsTest, abs_func) {
             EXPECT_FLOAT_EQ(v.value_.float64, input);
         }
 
-        ColumnVector result(data_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(data_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (i64 i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             f64 input = i - 16384;
             input -= 0.5;
-            EXPECT_EQ(result.nulls_ptr_->IsTrue(i), true);
+            EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
             EXPECT_FLOAT_EQ(v.value_.float64, fabs(input));
         }
     }

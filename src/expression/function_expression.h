@@ -16,13 +16,12 @@ public:
 
     DataType
     Type() const override {
-//        func_.return_type();
-        NotImplementError("Need to implement function expression");
+        return func_.return_type();
     }
 
     String
     ToString() const override;
-private:
+public:
     ScalarFunction func_;
 };
 

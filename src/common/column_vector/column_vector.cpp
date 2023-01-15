@@ -584,7 +584,9 @@ ColumnVector::Reset() {
     }
 
 //    buffer_.reset();
-    buffer_->heap_mgr_ = nullptr;
+    if(buffer_ != nullptr) {
+        buffer_->heap_mgr_ = nullptr;
+    }
 //    data_ptr_ = nullptr;
 
     // 5. null indicator need to reset

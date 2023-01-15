@@ -83,7 +83,7 @@ struct FloatTryCastToFixlen {
 struct FloatTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target, const ColumnVector *vector_ptr) {
+    Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector>& vector_ptr) {
         FunctionError("Not implemention to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -172,7 +172,7 @@ FloatTryCastToFixlen::Run(FloatT source, Decimal128T &target) {
 // Cast FloatT to varlen type
 template<>
 inline bool
-FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const ColumnVector *vector_ptr){
+FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr){
     // TODO: High-performance to_string implementation is needed.
     String tmp_str = std::to_string(source);
     target.length = static_cast<u16>(tmp_str.size());
@@ -275,7 +275,7 @@ FloatTryCastToFixlen::Run(DoubleT source, Decimal128T &target) {
 // Cast double to varlen type
 template<>
 inline bool
-FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const ColumnVector *vector_ptr){
+FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr){
     // TODO: High-performance to_string implementation is needed.
     String tmp_str = std::to_string(source);
     target.length = static_cast<u16>(tmp_str.size());

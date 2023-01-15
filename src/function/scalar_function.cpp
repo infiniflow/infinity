@@ -32,11 +32,11 @@ ScalarFunction::CastArgumentTypes(Vector<BaseExpression>& input_arguments) {
 }
 
 void
-ScalarFunction::NoOpFunction(const DataBlock &input, ColumnVector &output) {
+ScalarFunction::NoOpFunction(const DataBlock &input, SharedPtr<ColumnVector>& output) {
     // TODO: this should be the pointer copy from input to output.
 
     // Fixme: Output reference the data of input
-    output.ShallowCopy(input.column_vectors[0]);
+    output->ShallowCopy(*input.column_vectors[0]);
 }
 
 String

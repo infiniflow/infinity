@@ -59,10 +59,10 @@ TEST_F(BlobCastTest, blob_cast0) {
 
         auto varchar_info = VarcharInfo::Make(65);
         DataType data_type(LogicalType::kVarchar, varchar_info);
-        ColumnVector col_varchar(data_type);
-        col_varchar.Initialize();
+        SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
+        col_varchar_ptr->Initialize();
 
-        EXPECT_TRUE(BlobTryCastToVarlen::Run(source, target, &col_varchar));
+        EXPECT_TRUE(BlobTryCastToVarlen::Run(source, target, col_varchar_ptr));
         target.Reset(false);
     }
 }
@@ -78,8 +78,8 @@ TEST_F(BlobCastTest, blob_cast1) {
     }
 
     DataType source_type(LogicalType::kBlob);
-    ColumnVector col_source(source_type);
-    col_source.Initialize();
+    SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
+    col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
@@ -92,7 +92,7 @@ TEST_F(BlobCastTest, blob_cast1) {
         BlobT b1(blob_ptr, blob_len);
 
         Value v = Value::MakeBlob(b1);
-        col_source.AppendValue(v);
+        col_source->AppendValue(v);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         i64 blob_len = i + 1;
@@ -105,7 +105,7 @@ TEST_F(BlobCastTest, blob_cast1) {
         blob_ptr[blob_len - 1] = 0;
         BlobT b1(blob_ptr, blob_len);
 
-        Value vx = col_source.GetValue(i);
+        Value vx = col_source->GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
         EXPECT_EQ(vx.value_.blob, b1);
     }
@@ -115,8 +115,8 @@ TEST_F(BlobCastTest, blob_cast1) {
         auto source2target_ptr = BindBlobCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type);
-        col_target.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
         EXPECT_TRUE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters));
@@ -130,7 +130,7 @@ TEST_F(BlobCastTest, blob_cast1) {
                 check_value[j] = 'a' + static_cast<char_t>(j);
             }
             check_value[blob_len - 1] = 0;
-            Value vx = col_target.GetValue(i);
+            Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_FALSE(vx.is_null());
             EXPECT_STREQ(vx.value_.varchar.ToString().c_str(), check_value.c_str());

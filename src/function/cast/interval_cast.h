@@ -29,7 +29,7 @@ BindTimeCast(DataType& target) {
 struct IntervalTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target, const ColumnVector* vector_ptr){
+    Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector>& vector_ptr){
         FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -37,7 +37,7 @@ struct IntervalTryCastToVarlen {
 
 template<>
 inline bool
-IntervalTryCastToVarlen::Run(IntervalT source, VarcharType &target, const ColumnVector* vector_ptr) {
+IntervalTryCastToVarlen::Run(IntervalT source, VarcharType &target, const SharedPtr<ColumnVector>& vector_ptr) {
     NotImplementError("Not implemented");
 }
 

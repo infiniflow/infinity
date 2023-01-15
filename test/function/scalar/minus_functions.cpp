@@ -76,15 +76,15 @@ TEST_F(MinusFunctionsTest, plus_func) {
             EXPECT_EQ(v1.value_.tiny_int, static_cast<i8>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             if(static_cast<i8>(i) == std::numeric_limits<i8>::min()) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
                 EXPECT_EQ(v.value_.tiny_int, -static_cast<i8>(i));
             }
@@ -126,12 +126,12 @@ TEST_F(MinusFunctionsTest, plus_func) {
             EXPECT_EQ(v1.value_.small_int, static_cast<i16>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v.value_.small_int, -static_cast<i16>(i));
         }
@@ -172,12 +172,12 @@ TEST_F(MinusFunctionsTest, plus_func) {
             EXPECT_EQ(v1.value_.integer, static_cast<i32>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(v.value_.integer, -static_cast<i32>(i));
         }
@@ -218,12 +218,12 @@ TEST_F(MinusFunctionsTest, plus_func) {
             EXPECT_EQ(v1.value_.big_int, static_cast<i64>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, -static_cast<i64>(i));
         }
@@ -283,12 +283,12 @@ TEST_F(MinusFunctionsTest, plus_func) {
             EXPECT_FLOAT_EQ(v1.value_.float32, static_cast<f32>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(v.value_.float32, -static_cast<f32>(i));
         }
@@ -329,12 +329,12 @@ TEST_F(MinusFunctionsTest, plus_func) {
             EXPECT_FLOAT_EQ(v1.value_.float64, static_cast<f64>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(v.value_.float64, -static_cast<f64>(i));
         }

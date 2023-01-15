@@ -29,6 +29,12 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        executor_src
+        CONFIGURE_DEPENDS
+        executor/*.cpp
+        )
+
+file(GLOB_RECURSE
         storage_src
         CONFIGURE_DEPENDS
         storage/*.cpp
@@ -40,6 +46,7 @@ add_executable(test_main
         ${function_test_src}
         ${main_test_src}
         ${bin_src}
+        ${executor_src}
         ${storage_src}
         )
 

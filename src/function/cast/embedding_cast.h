@@ -33,7 +33,7 @@ struct EmbeddingTryCastToVarlen {
         const DataType& source_type,
         TargetType &target,
         const DataType& target_type,
-        const ColumnVector* vector_ptr){
+        const SharedPtr<ColumnVector>& vector_ptr){
         FunctionError("Not support to cast from " + source_type.ToString()
                       + " to " + target_type.ToString());
     }
@@ -45,7 +45,7 @@ EmbeddingTryCastToVarlen::Run(const EmbeddingT& source,
                               const DataType& source_type,
                               VarcharT &target,
                               const DataType& target_type,
-                              const ColumnVector* vector_ptr) {
+                              const SharedPtr<ColumnVector>& vector_ptr) {
     LOG_TRACE("{}", "Not support to cast from " + source_type.ToString() + " to " + target_type.ToString());
 
     TypeAssert(source_type.type() == LogicalType::kEmbedding,

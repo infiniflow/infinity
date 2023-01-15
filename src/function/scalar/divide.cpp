@@ -47,7 +47,7 @@ DivFunction::Run(HugeIntT left, HugeIntT right, HugeIntT& result) {
 }
 
 void
-RegisterDivFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
+RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("/");
 
     ScalarFunction div_function_int8(

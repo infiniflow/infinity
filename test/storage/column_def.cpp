@@ -38,7 +38,7 @@ TEST_F(ColumnDefTest, test1) {
     EXPECT_EQ(column_def_ptr->type(), DataType(LogicalType::kTinyInt));
     EXPECT_EQ(column_def_ptr->id(), 0);
     EXPECT_STREQ(column_def_ptr->name().c_str(), "c1");
-    EXPECT_EQ(column_def_ptr->ToString(), "( c1 TinyInt Unique Not nullable )");
+    EXPECT_EQ(column_def_ptr->ToString(), "(c1 TinyInt Unique Not nullable)");
 }
 
 TEST_F(ColumnDefTest, test2) {
@@ -52,5 +52,5 @@ TEST_F(ColumnDefTest, test2) {
     EXPECT_EQ(column_def_ptr->type(), DataType(LogicalType::kVarchar, type_info_ptr));
     EXPECT_EQ(column_def_ptr->id(), 3);
     EXPECT_EQ(column_def_ptr->name(), "c2");
-    EXPECT_EQ(column_def_ptr->ToString(), "( c2 Varchar PrimaryKey )");
+    EXPECT_EQ(column_def_ptr->ToString(), "(c2 Varchar PrimaryKey)");
 }

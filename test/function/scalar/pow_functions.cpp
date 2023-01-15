@@ -87,12 +87,12 @@ TEST_F(PowFunctionsTest, mul_func) {
             EXPECT_FLOAT_EQ(v2.value_.float32, static_cast<f32>(i % 4));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(v.value_.float32, std::pow(static_cast<f32>(i), static_cast<f32>(i % 4)));
         }
@@ -144,12 +144,12 @@ TEST_F(PowFunctionsTest, mul_func) {
             EXPECT_FLOAT_EQ(v2.value_.float64, static_cast<f64>(i % 4));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(v.value_.float64, std::pow(static_cast<f64>(i), static_cast<f64>(i % 4)));
         }

@@ -123,7 +123,7 @@ struct BinaryTryOpToVarlenWrapper {
     }
 };
 
-using ScalarFunctionType = std::function<void(const DataBlock&, ColumnVector&)>;
+using ScalarFunctionType = std::function<void(const DataBlock&, SharedPtr<ColumnVector>&)>;
 
 class ScalarFunction : public Function {
 public:
@@ -150,12 +150,12 @@ public:
 public:
     // Unary function
     static void
-    NoOpFunction(const DataBlock& input, ColumnVector& output);
+    NoOpFunction(const DataBlock& input, SharedPtr<ColumnVector>& output);
 
     // Unary function without any failure.
     template<typename InputType, typename OutputType, typename Operation>
     static inline void
-    UnaryFunction(const DataBlock& input, ColumnVector& output) {
+    UnaryFunction(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 1, "Unary function: input column count isn't one.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
         UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectWrapper<Operation>>(
@@ -169,7 +169,7 @@ public:
     // Unary function with some failures such as overflow.
     template<typename InputType, typename OutputType, typename Operation>
     static inline void
-    UnaryFunctionWithFailure(const DataBlock& input, ColumnVector& output) {
+    UnaryFunctionWithFailure(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 1, "Unary function: input column count isn't one.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
         UnaryOperator::Execute<InputType, OutputType, UnaryTryOpWrapper<Operation>>(
@@ -183,7 +183,7 @@ public:
     // Unary function result is varlen without any failure.
     template<typename InputType, typename OutputType, typename Operation>
     static inline void
-    UnaryFunctionToVarlen(const DataBlock& input, ColumnVector& output) {
+    UnaryFunctionToVarlen(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 1, "Unary function: input column count isn't one.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
         UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectToVarlenWrapper<Operation>>(
@@ -197,7 +197,7 @@ public:
     // Unary function result is varlen with some failures such as overflow.
     template<typename InputType, typename OutputType, typename Operation>
     static inline void
-    UnaryFunctionToVarlenWithFailure(const DataBlock& input, ColumnVector& output) {
+    UnaryFunctionToVarlenWithFailure(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 1, "Unary function: input column count isn't one.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
         UnaryOperator::Execute<InputType, OutputType, UnaryTryOpToVarlenWrapper<Operation>>(
@@ -211,7 +211,7 @@ public:
     // Binary function without any failure.
     template<typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void
-    BinaryFunction(const DataBlock& input, ColumnVector& output) {
+    BinaryFunction(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectWrapper<Operation>>(
@@ -226,7 +226,7 @@ public:
     // Binary function with some failures such as overflow.
     template<typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void
-    BinaryFunctionWithFailure(const DataBlock& input, ColumnVector& output) {
+    BinaryFunctionWithFailure(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpWrapper<Operation>>(
@@ -241,7 +241,7 @@ public:
     // Binary function result is varlen without any failure.
     template<typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void
-    BinaryFunctionToVarlen(const DataBlock& input, ColumnVector& output) {
+    BinaryFunctionToVarlen(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectToVarlenWrapper<Operation>>(
@@ -256,7 +256,7 @@ public:
     // Binary function result is varlen with some failures such as overflow.
     template<typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void
-    BinaryFunctionToVarlenWithFailure(const DataBlock& input, ColumnVector& output) {
+    BinaryFunctionToVarlenWithFailure(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpToVarlenWrapper<Operation>>(

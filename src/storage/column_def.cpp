@@ -26,9 +26,9 @@ ConstrainTypeToString(ConstrainType type) {
 String
 ColumnDef::ToString() const {
     std::stringstream ss;
-    ss << "( " << name_ << " " << type_.ToString() << " ";
+    ss << "(" << name_ << " " << type_.ToString();
     for(auto& constraint: constrains_) {
-        ss << ConstrainTypeToString(constraint) << " ";
+        ss << " " << ConstrainTypeToString(constraint);
     }
     ss << ")";
     return ss.str();

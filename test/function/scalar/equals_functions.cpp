@@ -97,12 +97,12 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             EXPECT_EQ(v.value_.boolean, false);
         }
@@ -164,12 +164,12 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -235,12 +235,12 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -306,12 +306,12 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -377,12 +377,12 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -448,12 +448,12 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -519,12 +519,12 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -590,12 +590,12 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -665,12 +665,12 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
                 EXPECT_EQ(v.value_.boolean, true);

@@ -43,10 +43,10 @@ TEST_F(LineCastTest, line_cast0) {
 
         auto varchar_info = VarcharInfo::Make(65);
         DataType data_type(LogicalType::kVarchar, varchar_info);
-        ColumnVector col_varchar(data_type);
-        col_varchar.Initialize();
+        SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
+        col_varchar_ptr->Initialize();
 
-        EXPECT_THROW(GeographyTryCastToVarlen::Run(source, target, &col_varchar), NotImplementException);
+        EXPECT_THROW(GeographyTryCastToVarlen::Run(source, target, col_varchar_ptr), NotImplementException);
     }
 }
 
@@ -62,15 +62,15 @@ TEST_F(LineCastTest, line_cast1) {
     }
 
     DataType source_type(LogicalType::kLine);
-    ColumnVector col_source(source_type);
-    col_source.Initialize();
+    SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
+    col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeLine(LineT(static_cast<f64>(i), static_cast<f64>(i), static_cast<f64>(i)));
-        col_source.AppendValue(v);
-        Value vx = col_source.GetValue(i);
+        col_source->AppendValue(v);
+        Value vx = col_source->GetValue(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value vx = col_source.GetValue(i);
+        Value vx = col_source->GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kLine);
         EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i));
         EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i));
@@ -82,8 +82,8 @@ TEST_F(LineCastTest, line_cast1) {
         auto source2target_ptr = BindGeographyCast<LineT>(source_type, target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type);
-        col_target.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
         EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);

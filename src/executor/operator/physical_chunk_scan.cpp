@@ -80,7 +80,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
                 ++ column_id;
                 {
                     // Append block count the 4th column
-                    Value value = Value::MakeBigInt(static_cast<i64>(table->BlockCount()));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table->DataBlockCount()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                 }

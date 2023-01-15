@@ -8,7 +8,7 @@
 namespace infinity {
 
 void
-ExpressionExecutor::Init(const std::vector<std::shared_ptr<BaseExpression>> &exprs) {
+ExpressionExecutor::Init(const Vector<SharedPtr<BaseExpression>> &exprs) {
     for(auto& expr_ptr: exprs) {
         expressions.emplace_back(expr_ptr);
         states.emplace_back(ExpressionState::CreateState(expr_ptr));
@@ -16,27 +16,48 @@ ExpressionExecutor::Init(const std::vector<std::shared_ptr<BaseExpression>> &exp
 }
 
 void
-ExpressionExecutor::Execute(std::shared_ptr<Table> &input_table, std::shared_ptr<Table> &output_table) {
+ExpressionExecutor::Execute(SharedPtr<Table> &input_table, SharedPtr<Table> &output_table) {
     ExecutorAssert(!expressions.empty(), "No expression.");
-    size_t output_column_count = expressions.size();
-    ExecutorAssert(output_column_count == output_table->ColumnCount(), "Expression execution output columns count is mismatched.");
+    SizeT expression_count = expressions.size();
+    ExecutorAssert(expression_count == output_table->ColumnCount(), "Expression execution output columns count is mismatched.");
 
-    // Get first block of output table
-    SharedPtr<DataBlock> output_data_block = output_table->GetDataBlockById(0);
-    size_t count = (input_table->row_count() == 0) ? 1 : input_table->row_count();
+//    table_map_.emplace(input_table->TableName(), input_table);
 
-    table_map_.emplace(input_table->TableName(), input_table);
+    // Output data block types
+    Vector<DataType> output_types;
+    output_types.reserve(expression_count);
 
-    for(size_t i = 0; i < output_column_count; ++ i) {
-        Execute(expressions[i], states[i], output_data_block->column_vectors[i], count);
+    for(SizeT idx = 0; idx < expression_count; ++ idx) {
+        output_types.emplace_back(expressions[idx]->Type());
     }
 
+    SizeT input_data_block_count = input_table->DataBlockCount();
+    for(SizeT idx = 0; idx < input_data_block_count; ++ idx) {
+        SharedPtr<DataBlock> output_data_block = DataBlock::Make();
+        output_data_block->Init(output_types);
+
+        Execute(input_table->GetDataBlockById(idx), output_data_block);
+        output_data_block->Finalize();
+        output_table->Append(output_data_block);
+    }
 }
 
 void
-ExpressionExecutor::Execute(std::shared_ptr<BaseExpression>& expr,
-                            std::shared_ptr<ExpressionState>& state,
-                            ColumnVector& output_column,
+ExpressionExecutor::Execute(const SharedPtr<DataBlock>& input_data_block, SharedPtr<DataBlock>& output_data_block) {
+    // Set input data block as the input data of the executor.
+    this->input_data_ = input_data_block;
+    SizeT row_count = input_data_block->row_count() == 0 ? 1 : input_data_block->row_count();
+
+    SizeT expression_output_count = expressions.size();
+    for(SizeT idx = 0; idx < expression_output_count; ++ idx) {
+        Execute(expressions[idx], states[idx], output_data_block->column_vectors[idx], row_count);
+    }
+}
+
+void
+ExpressionExecutor::Execute(SharedPtr<BaseExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column,
                             size_t count) {
 
     switch(expr->type()) {
@@ -62,138 +83,125 @@ ExpressionExecutor::Execute(std::shared_ptr<BaseExpression>& expr,
 }
 
 void
-ExpressionExecutor::Execute(const std::shared_ptr<AggregateExpression>& expr,
-                            std::shared_ptr<ExpressionState>& state,
-                            ColumnVector& output_column_vector,
+ExpressionExecutor::Execute(const SharedPtr<AggregateExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column_vector,
                             size_t count) {
-    std::shared_ptr<ExpressionState>& child_state = state->Children()[0];
-    std::shared_ptr<BaseExpression>& child_expr = expr->arguments()[0];
+    SharedPtr<ExpressionState>& child_state = state->Children()[0];
+    SharedPtr<BaseExpression>& child_expr = expr->arguments()[0];
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    ColumnVector& child_output = child_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& child_output = child_state->OutputColumnVector();
     Execute(child_expr, child_state, child_output, count);
 
     ExecutorError("Aggregate function isn't implemented yet.");
 }
 
 void
-ExpressionExecutor::Execute(const std::shared_ptr<CastExpression>& expr,
-                            std::shared_ptr<ExpressionState>& state,
-                            ColumnVector& output_column_vector,
+ExpressionExecutor::Execute(const SharedPtr<CastExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column_vector,
                             size_t count) {
-    std::shared_ptr<ExpressionState>& child_state = state->Children()[0];
-    std::shared_ptr<BaseExpression>& child_expr = expr->arguments()[0];
+    SharedPtr<ExpressionState>& child_state = state->Children()[0];
+    SharedPtr<BaseExpression>& child_expr = expr->arguments()[0];
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    ColumnVector& child_output = child_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& child_output = child_state->OutputColumnVector();
     Execute(child_expr, child_state, child_output, count);
 
     ExecutorError("Cast function isn't implemented yet.");
 }
 
 void
-ExpressionExecutor::Execute(const std::shared_ptr<CaseExpression>& expr,
-                            std::shared_ptr<ExpressionState>& state,
-                            ColumnVector& output_column_vector,
+ExpressionExecutor::Execute(const SharedPtr<CaseExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column_vector,
                             size_t count) {
     ExecutorError("Case execution isn't implemented yet.");
 }
 
 void
-ExpressionExecutor::Execute(const std::shared_ptr<ConjunctionExpression>& expr,
-                            std::shared_ptr<ExpressionState>& state,
-                            ColumnVector& output_column_vector,
+ExpressionExecutor::Execute(const SharedPtr<ConjunctionExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column_vector,
                             size_t count) {
     // Process left child expression
-    std::shared_ptr<ExpressionState>& left_state = state->Children()[0];
-    std::shared_ptr<BaseExpression>& left_expr = expr->arguments()[0];
+    SharedPtr<ExpressionState>& left_state = state->Children()[0];
+    SharedPtr<BaseExpression>& left_expr = expr->arguments()[0];
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    ColumnVector& left_output = left_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& left_output = left_state->OutputColumnVector();
     Execute(left_expr, left_state, left_output, count);
 
     // Process right child expression
-    std::shared_ptr<ExpressionState>& right_state = state->Children()[1];
-    std::shared_ptr<BaseExpression>& right_expr = expr->arguments()[1];
+    SharedPtr<ExpressionState>& right_state = state->Children()[1];
+    SharedPtr<BaseExpression>& right_expr = expr->arguments()[1];
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    ColumnVector& right_output = right_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& right_output = right_state->OutputColumnVector();
     Execute(right_expr, right_state, right_output, count);
 
     ExecutorError("Conjunction function isn't implemented yet.");
 }
 
 void
-ExpressionExecutor::Execute(const std::shared_ptr<ColumnExpression>& expr,
-                            std::shared_ptr<ExpressionState>& state,
-                            ColumnVector& output_column_vector,
+ExpressionExecutor::Execute(const SharedPtr<ColumnExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column_vector,
                             size_t count) {
-    const std::string& table_name = expr->table_name();
-    if(!table_map_.contains(table_name)) {
-        ExecutorError("Table: " + table_name + ", doesn't exist.");
-    }
-    std::shared_ptr<Table>& table_ptr = table_map_.at(expr->table_name());
-    const std::string& column_name = expr->column_name();
-    int64_t column_index = expr->column_index();
 
-    size_t table_column_count = table_ptr->ColumnCount();
-    if(column_index >= table_column_count) {
-        ExecutorError("Table: " + table_name + ", column count: " + std::to_string(table_column_count)
-                        + ", expect to access column index: " + std::to_string(column_index) );
-    }
-
-    const std::string& target_column_name = table_ptr->GetColumnNameById(column_index);
-    if(column_name != target_column_name) {
-        ExecutorError("Table: " + table_name + ", expect column name: " + column_name + ", at "
-                        + std::to_string(column_index) + ", actually column name: " + target_column_name );
-    }
-
-    // FIXME: Now, the output column is copied from input table which should only be a reference operation but not copy.
-    output_column_vector = table_ptr->GetDataBlockById(0)->column_vectors[column_index];
+    i64 column_index = expr->column_index();
+    ExecutorAssert(column_index < this->input_data_->column_count(), "Invalid column index");
+    output_column_vector = this->input_data_->column_vectors[column_index];
 }
 
 void
-ExpressionExecutor::Execute(const std::shared_ptr<FunctionExpression>& expr,
-                            std::shared_ptr<ExpressionState>& state,
-                            ColumnVector& output_column_vector,
+ExpressionExecutor::Execute(const SharedPtr<FunctionExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column_vector,
                             size_t count) {
+
     size_t argument_count = expr->arguments().size();
+    Vector<SharedPtr<ColumnVector>> output_columns;
+    output_columns.reserve(argument_count);
     for(size_t i = 0; i < argument_count; ++ i) {
-        std::shared_ptr<ExpressionState>& argument_state = state->Children()[i];
-        std::shared_ptr<BaseExpression>& argument_expr = expr->arguments()[i];
-        ColumnVector& argument_output = argument_state->OutputColumnVector();
+        SharedPtr<ExpressionState>& argument_state = state->Children()[i];
+        SharedPtr<BaseExpression>& argument_expr = expr->arguments()[i];
+        SharedPtr<ColumnVector>& argument_output = argument_state->OutputColumnVector();
         Execute(argument_expr, argument_state, argument_output, count);
+        output_columns.emplace_back(argument_output);
     }
-
-    ExecutorError("Function expression execution isn't implemented yet.");
+    DataBlock func_input_data_block;
+    func_input_data_block.Init(output_columns);
+    expr->func_.function_(func_input_data_block, output_column_vector);
 }
 
 void
-ExpressionExecutor::Execute(const std::shared_ptr<BetweenExpression>& expr,
-                            std::shared_ptr<ExpressionState>& state,
-                            ColumnVector& output_column_vector,
+ExpressionExecutor::Execute(const SharedPtr<BetweenExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column_vector,
                             size_t count) {
 
     // Lower expression execution
-    std::shared_ptr<ExpressionState>& lower_state = state->Children()[0];
-    std::shared_ptr<BaseExpression>& lower_expr = expr->arguments()[0];
-    ColumnVector& lower_output = lower_state->OutputColumnVector();
+    SharedPtr<ExpressionState>& lower_state = state->Children()[0];
+    SharedPtr<BaseExpression>& lower_expr = expr->arguments()[0];
+    SharedPtr<ColumnVector>& lower_output = lower_state->OutputColumnVector();
     Execute(lower_expr, lower_state, lower_output, count);
 
     // Input expression execution
-    std::shared_ptr<ExpressionState>& input_state = state->Children()[1];
-    std::shared_ptr<BaseExpression>& input_expr = expr->arguments()[1];
-    ColumnVector& input_output = input_state->OutputColumnVector();
+    SharedPtr<ExpressionState>& input_state = state->Children()[1];
+    SharedPtr<BaseExpression>& input_expr = expr->arguments()[1];
+    SharedPtr<ColumnVector>& input_output = input_state->OutputColumnVector();
     Execute(input_expr, input_state, input_output, count);
 
     // Upper expression execution
-    std::shared_ptr<ExpressionState>& upper_state = state->Children()[1];
-    std::shared_ptr<BaseExpression>& upper_expr = expr->arguments()[1];
-    ColumnVector& upper_output = upper_state->OutputColumnVector();
+    SharedPtr<ExpressionState>& upper_state = state->Children()[1];
+    SharedPtr<BaseExpression>& upper_expr = expr->arguments()[1];
+    SharedPtr<ColumnVector>& upper_output = upper_state->OutputColumnVector();
     Execute(input_expr, input_state, input_output, count);
 
     ExecutorError("Between expression execution isn't implemented yet.");
@@ -201,9 +209,9 @@ ExpressionExecutor::Execute(const std::shared_ptr<BetweenExpression>& expr,
 }
 
 void
-ExpressionExecutor::Execute(const std::shared_ptr<ValueExpression>& expr,
-                            std::shared_ptr<ExpressionState>& state,
-                            ColumnVector& output_column_vector,
+ExpressionExecutor::Execute(const SharedPtr<ValueExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column_vector,
                             size_t count) {
 
 }

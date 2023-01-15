@@ -23,7 +23,10 @@ public:
     DataBlock() = default;
 
     void
-    Init(const std::vector<DataType>& types);
+    Init(const Vector<DataType>& types);
+
+    void
+    Init(const Vector<SharedPtr<ColumnVector>>& column_vectors);
 
     // Reset to just initialized state.
     void
@@ -57,15 +60,16 @@ public:
 
     [[nodiscard]] inline SizeT
     row_count() const {
-        if(row_count_ == 0) return 0;
-
         if(!finalized) {
             StorageError("Not finalized data block")
         }
+
+        if(row_count_ == 0) return 0;
+
         return row_count_;
     }
 
-    Vector<ColumnVector> column_vectors;
+    Vector<SharedPtr<ColumnVector>> column_vectors;
 
 private:
 

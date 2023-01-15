@@ -92,8 +92,8 @@ ExpressionState::CreateState(const SharedPtr<CastExpression>& cast_expr) {
 SharedPtr<ExpressionState>
 ExpressionState::CreateState(const SharedPtr<ColumnExpression>& column_expr) {
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
-
-    // TODO: output_block
+    SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(column_expr->Type());
+    result->output_data_block_.Init({column});
     return result;
 }
 
@@ -111,7 +111,7 @@ ExpressionState::CreateState(const SharedPtr<ConjunctionExpression>& conjunction
 
 SharedPtr<ExpressionState>
 ExpressionState::CreateState(const SharedPtr<FunctionExpression>& function_expr) {
-    SharedPtr<ExpressionState> result = SharedPtr<ExpressionState>();
+    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     for(auto& arg : function_expr->arguments()) {
         result->AddChild(arg);
     }
@@ -122,9 +122,11 @@ ExpressionState::CreateState(const SharedPtr<FunctionExpression>& function_expr)
 
 SharedPtr<ExpressionState>
 ExpressionState::CreateState(const SharedPtr<ValueExpression>& value_expr) {
-    SharedPtr<ExpressionState> result = SharedPtr<ExpressionState>();
-
-    // TODO: output_block, initialized here?
+    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
+    SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(value_expr->Type());
+    column->Initialize(0, ColumnVectorType::kConstant);
+    value_expr->AppendToChunk(column);
+    result->output_data_block_.Init({column});
     return result;
 }
 

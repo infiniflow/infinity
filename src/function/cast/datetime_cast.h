@@ -51,7 +51,7 @@ struct DateTimeTryCastToFixlen {
 struct DateTimeTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target, const ColumnVector* vector_ptr){
+    Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector>& vector_ptr){
         FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -83,7 +83,7 @@ DateTimeTryCastToFixlen::Run(DateTimeT source, TimestampTZT &target) {
 
 template<>
 inline bool
-DateTimeTryCastToVarlen::Run(DateTimeT source, VarcharType &target, const ColumnVector* vector_ptr) {
+DateTimeTryCastToVarlen::Run(DateTimeT source, VarcharType &target, const SharedPtr<ColumnVector>& vector_ptr) {
     NotImplementError("Not implemented");
 }
 

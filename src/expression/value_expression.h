@@ -24,8 +24,8 @@ public:
     }
 
     inline void
-    AppendToChunk(ColumnVector& column_vector) {
-        column_vector.AppendValue(value_);
+    AppendToChunk(SharedPtr<ColumnVector>& column_vector) {
+        column_vector->AppendValue(value_);
     }
 
 private:

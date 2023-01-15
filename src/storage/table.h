@@ -22,6 +22,12 @@ enum class TableType {
 
 class Table {
 public:
+    static inline SharedPtr<Table>
+    Make(SharedPtr<TableDef> table_def_ptr, TableType type) {
+        return MakeShared<Table>(std::move(table_def_ptr), type);
+    }
+
+public:
     explicit
     Table(SharedPtr<TableDef> table_def_ptr, TableType type)
         : definition_ptr_(std::move(table_def_ptr)),
@@ -56,14 +62,14 @@ public:
     }
 
     [[nodiscard]] SizeT
-    BlockCount() const {
+    DataBlockCount() const {
         return data_blocks_.size();
     }
 
     [[nodiscard]] SharedPtr<DataBlock>
     GetDataBlockById(SizeT idx) const {
         StorageAssert(idx < data_blocks_.size(), "Attempt to access invalid index: " +
-                      std::to_string(idx) + "/" + std::to_string(BlockCount()))
+                      std::to_string(idx) + "/" + std::to_string(DataBlockCount()))
         return data_blocks_[idx];
     }
 

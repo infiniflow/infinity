@@ -87,12 +87,12 @@ TEST_F(GreaterFunctionsTest, greater_func) {
             EXPECT_EQ(v2.value_.tiny_int, static_cast<i8>(i + i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<i8>(i) > static_cast<i8>(i + i)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -148,12 +148,12 @@ TEST_F(GreaterFunctionsTest, greater_func) {
             EXPECT_EQ(v2.value_.small_int, static_cast<i16>(i / 2));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<i16>(i) > static_cast<i16>(i / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -209,12 +209,12 @@ TEST_F(GreaterFunctionsTest, greater_func) {
             EXPECT_EQ(v2.value_.integer, static_cast<i32>(i / 2));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<i32>(i) > static_cast<i32>(i / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -270,12 +270,12 @@ TEST_F(GreaterFunctionsTest, greater_func) {
             EXPECT_EQ(v2.value_.big_int, static_cast<i64>(i / 2));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<i64>(i) > static_cast<i64>(i / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -331,12 +331,12 @@ TEST_F(GreaterFunctionsTest, greater_func) {
             EXPECT_EQ(v2.value_.huge_int, HugeIntT(static_cast<i64>(i / 2), static_cast<i64>(i / 2)));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(HugeIntT(static_cast<i64>(i), static_cast<i64>(i)) > HugeIntT(static_cast<i64>(i / 2), static_cast<i64>(i / 2))) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -392,12 +392,12 @@ TEST_F(GreaterFunctionsTest, greater_func) {
             EXPECT_FLOAT_EQ(v2.value_.float32, static_cast<f32>(i) / 2);
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<f32>(i) > (static_cast<f32>(i) / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -453,12 +453,12 @@ TEST_F(GreaterFunctionsTest, greater_func) {
             EXPECT_FLOAT_EQ(v2.value_.float64, static_cast<f64>(i) / 2);
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<f64>(i) > (static_cast<f64>(i) / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -528,12 +528,12 @@ TEST_F(GreaterFunctionsTest, greater_func) {
             }
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
                 String s1 = "Helloworld" + std::to_string(i);

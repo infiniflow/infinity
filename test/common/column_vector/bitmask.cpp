@@ -85,6 +85,14 @@ TEST_F(BitmaskTest, bitmask_a) {
         }
     }
 
+    bitmask1.SetAllFalse();
+    for(SizeT i = 0; i < bit_count; ++ i) {
+        EXPECT_FALSE(bitmask1.IsTrue(i));
+    }
+
+    EXPECT_EQ(bitmask1.CountFalse(), bit_count);
+    EXPECT_EQ(bitmask1.CountTrue(), 0);
+
     // test SetAllTrue
     bitmask1.SetAllTrue();
 

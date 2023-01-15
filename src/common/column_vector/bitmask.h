@@ -60,6 +60,9 @@ public:
     void
     SetAllTrue();
 
+    void
+    SetAllFalse();
+
     [[nodiscard]] size_t
     CountTrue() const;
 

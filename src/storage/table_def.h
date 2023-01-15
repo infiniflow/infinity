@@ -10,6 +10,12 @@ namespace infinity {
 
 class TableDef {
 public:
+    static inline SharedPtr<TableDef>
+    Make(String table_name, Vector<SharedPtr<ColumnDef>> columns, bool if_not_exists) {
+        return MakeShared<TableDef>(std::move(table_name), std::move(columns), if_not_exists);
+    }
+
+public:
     explicit
     TableDef(String table_name, Vector<SharedPtr<ColumnDef>> columns, bool if_not_exists)
             : columns_(std::move(columns)), name_(std::move(table_name)), if_not_exists_(if_not_exists) {

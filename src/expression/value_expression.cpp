@@ -10,7 +10,7 @@ namespace infinity {
 String
 ValueExpression::ToString() const {
     std::stringstream ss;
-    ss << value_.type_.ToString() << "_" << value_.ToString();
+    ss << value_.type_.ToString() << '(' << value_.ToString()<< ")";
     return ss.str();
 }
 

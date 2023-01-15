@@ -1246,16 +1246,16 @@ Value::Reset() {
 bool
 Value::TryCastAs(const DataType &target_type, Value &new_value) const {
     BoundCastFunc cast = CastFunction::GetBoundFunc(this->type_, target_type);
-    ColumnVector source(this->type_);
-    source.Initialize(1, ColumnVectorType::kConstant);
-    source.AppendValue(*this);
+    SharedPtr<ColumnVector> source_ptr = MakeShared<ColumnVector>(this->type_);
+    source_ptr->Initialize(1, ColumnVectorType::kConstant);
+    source_ptr->AppendValue(*this);
 
-    ColumnVector col_varchar(target_type);
-    col_varchar.Initialize(1, ColumnVectorType::kConstant);
+    SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(target_type);
+    col_varchar_ptr->Initialize(1, ColumnVectorType::kConstant);
 
     CastParameters parameters;
-    cast.function(source, col_varchar, 1, parameters);
-    new_value = col_varchar.GetValue(0);
+    cast.function(source_ptr, col_varchar_ptr, 1, parameters);
+    new_value = col_varchar_ptr->GetValue(0);
     return true;
 }
 

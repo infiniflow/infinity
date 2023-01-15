@@ -161,53 +161,53 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
 
         auto varchar_info = VarcharInfo::Make(65);
         DataType data_type(LogicalType::kVarchar, varchar_info);
-        ColumnVector col_varchar(data_type);
-        col_varchar.Initialize();
+        SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
+        col_varchar_ptr->Initialize();
 
         source = std::numeric_limits<TinyIntT>::min();
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, &col_varchar));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 4);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = std::numeric_limits<TinyIntT>::max();
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, &col_varchar));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 3);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 0;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, &col_varchar));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 1);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 9;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, &col_varchar));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 1);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 10;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, &col_varchar));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 2);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 99;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, &col_varchar));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 2);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = -100;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, &col_varchar));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 4);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 100;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, &col_varchar));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 3);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
@@ -218,34 +218,34 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
 TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
     using namespace infinity;
 
-    DataType tinyint_type(LogicalType::kTinyInt);
-    ColumnVector col_tinyint(tinyint_type);
-    col_tinyint.Initialize();
+    DataType source_type(LogicalType::kTinyInt);
+    SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
+    col_source->Initialize();
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeTinyInt(static_cast<TinyIntT>(i));
-        col_tinyint.AppendValue(v);
-        Value vx = col_tinyint.GetValue(i);
+        col_source->AppendValue(v);
+        Value vx = col_source->GetValue(i);
     }
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value vx = col_tinyint.GetValue(i);
+        Value vx = col_source->GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
     }
 
     // cast tiny int column vector to small column vector
     {
-        DataType smallint_data_type(LogicalType::kSmallInt);
-        auto tiny2small_ptr = BindIntegerCast<TinyIntT>(tinyint_type, smallint_data_type);
+        DataType target_type(LogicalType::kSmallInt);
+        auto tiny2small_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2small_ptr.function, nullptr);
 
-        ColumnVector col_smallint(smallint_data_type);
-        col_smallint.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        bool result = tiny2small_ptr.function(col_tinyint, col_smallint, DEFAULT_VECTOR_SIZE, cast_parameters);
+        bool result = tiny2small_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_smallint.GetValue(i);
+            Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
             i8 check_value = static_cast<i8>(i);
             EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(check_value));
@@ -254,18 +254,18 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to integer column vector
     {
-        DataType integer_data_type(LogicalType::kInteger);
-        auto tiny2integer_ptr = BindIntegerCast<TinyIntT>(tinyint_type, integer_data_type);
+        DataType target_type(LogicalType::kInteger);
+        auto tiny2integer_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2integer_ptr.function, nullptr);
 
-        ColumnVector col_int(integer_data_type);
-        col_int.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        bool result = tiny2integer_ptr.function(col_tinyint, col_int, DEFAULT_VECTOR_SIZE, cast_parameters);
+        bool result = tiny2integer_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_int.GetValue(i);
+            Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
             i8 check_value = static_cast<i8>(i);
             EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(check_value));
@@ -274,18 +274,18 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to big int column vector
     {
-        DataType bigint_data_type(LogicalType::kBigInt);
-        auto tiny2bigint_ptr = BindIntegerCast<TinyIntT>(tinyint_type, bigint_data_type);
+        DataType target_type(LogicalType::kBigInt);
+        auto tiny2bigint_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2bigint_ptr.function, nullptr);
 
-        ColumnVector col_bigint(bigint_data_type);
-        col_bigint.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        bool result = tiny2bigint_ptr.function(col_tinyint, col_bigint, DEFAULT_VECTOR_SIZE, cast_parameters);
+        bool result = tiny2bigint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_bigint.GetValue(i);
+            Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
             i8 check_value = static_cast<i8>(i);
             EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(check_value));
@@ -294,18 +294,18 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to huge int column vector
     {
-        DataType hugeint_data_type(LogicalType::kHugeInt);
-        auto tiny2hugeint_ptr = BindIntegerCast<TinyIntT>(tinyint_type, hugeint_data_type);
+        DataType target_type(LogicalType::kHugeInt);
+        auto tiny2hugeint_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2hugeint_ptr.function, nullptr);
 
-        ColumnVector col_hugeint(hugeint_data_type);
-        col_hugeint.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        bool result = tiny2hugeint_ptr.function(col_tinyint, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters);
+        bool result = tiny2hugeint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_hugeint.GetValue(i);
+            Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
             HugeIntT check_value((static_cast<i8>(i) < 0) * -1, static_cast<i8>(i));
             EXPECT_EQ(vx.value_.huge_int, check_value);
@@ -314,18 +314,18 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to float column vector
     {
-        DataType float_data_type(LogicalType::kFloat);
-        auto tiny2float_ptr = BindIntegerCast<TinyIntT>(tinyint_type, float_data_type);
+        DataType target_type(LogicalType::kFloat);
+        auto tiny2float_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2float_ptr.function, nullptr);
 
-        ColumnVector col_float(float_data_type);
-        col_float.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        bool result = tiny2float_ptr.function(col_tinyint, col_float, DEFAULT_VECTOR_SIZE, cast_parameters);
+        bool result = tiny2float_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_float.GetValue(i);
+            Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
             i8 check_value = static_cast<i8>(i);
             EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(check_value));
@@ -334,18 +334,18 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to double column vector
     {
-        DataType double_data_type(LogicalType::kDouble);
-        auto tiny2double_ptr = BindIntegerCast<TinyIntT>(tinyint_type, double_data_type);
+        DataType target_type(LogicalType::kDouble);
+        auto tiny2double_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2double_ptr.function, nullptr);
 
-        ColumnVector col_double(double_data_type);
-        col_double.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        bool result = tiny2double_ptr.function(col_tinyint, col_double, DEFAULT_VECTOR_SIZE, cast_parameters);
+        bool result = tiny2double_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_double.GetValue(i);
+            Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
             i8 check_value = static_cast<i8>(i);
             EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(check_value));
@@ -354,71 +354,71 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
 
     // cast tiny int column vector to decimal16 column vector
     {
-        DataType decimal_data_type(LogicalType::kDecimal16);
-        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(tinyint_type, decimal_data_type);
+        DataType target_type(LogicalType::kDecimal16);
+        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2decimal_ptr.function, nullptr);
 
-        ColumnVector col_decimal(decimal_data_type);
-        col_decimal.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(tiny2decimal_ptr.function(col_tinyint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(tiny2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
     }
 
     // cast tiny int column vector to decimal32 column vector
     {
-        DataType decimal_data_type(LogicalType::kDecimal32);
-        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(tinyint_type, decimal_data_type);
+        DataType target_type(LogicalType::kDecimal32);
+        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2decimal_ptr.function, nullptr);
 
-        ColumnVector col_decimal(decimal_data_type);
-        col_decimal.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(tiny2decimal_ptr.function(col_tinyint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(tiny2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
     }
 
     // cast tiny int column vector to decimal64 column vector
     {
-        DataType decimal_data_type(LogicalType::kDecimal64);
-        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(tinyint_type, decimal_data_type);
+        DataType target_type(LogicalType::kDecimal64);
+        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2decimal_ptr.function, nullptr);
 
-        ColumnVector col_decimal(decimal_data_type);
-        col_decimal.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(tiny2decimal_ptr.function(col_tinyint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(tiny2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
     }
 
     // cast tiny int column vector to decimal128 column vector
     {
-        DataType decimal_data_type(LogicalType::kDecimal128);
-        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(tinyint_type, decimal_data_type);
+        DataType target_type(LogicalType::kDecimal128);
+        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2decimal_ptr.function, nullptr);
 
-        ColumnVector col_decimal(decimal_data_type);
-        col_decimal.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(tiny2decimal_ptr.function(col_tinyint, col_decimal, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(tiny2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
     }
 
     // cast tiny int column vector to Varchar vector
     {
-        DataType varchar_data_type(LogicalType::kVarchar);
-        auto tiny2varchar_ptr = BindIntegerCast<TinyIntT>(tinyint_type, varchar_data_type);
+        DataType target_type(LogicalType::kVarchar);
+        auto tiny2varchar_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2varchar_ptr.function, nullptr);
 
-        ColumnVector col_varchar(varchar_data_type);
-        col_varchar.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
-        bool result = tiny2varchar_ptr.function(col_tinyint, col_varchar, DEFAULT_VECTOR_SIZE, cast_parameters);
+        bool result = tiny2varchar_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         // Not all values are cast, then it's false.
         EXPECT_TRUE(result);
         for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-            Value vx = col_varchar.GetValue(i);
+            Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             i8 check_value = static_cast<i8>(i);
             EXPECT_FALSE(vx.is_null());

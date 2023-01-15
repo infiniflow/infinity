@@ -47,10 +47,10 @@ TEST_F(UuidCastTest, uuid_cast0) {
 
         auto varchar_info = VarcharInfo::Make(65);
         DataType data_type(LogicalType::kVarchar, varchar_info);
-        ColumnVector col_varchar(data_type);
-        col_varchar.Initialize();
+        SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
+        col_varchar_ptr->Initialize();
 
-        EXPECT_TRUE(UuidTryCastToVarlen::Run(source, target, &col_varchar));
+        EXPECT_TRUE(UuidTryCastToVarlen::Run(source, target, col_varchar_ptr));
 
         target.Reset(false);
     }
@@ -66,19 +66,19 @@ TEST_F(UuidCastTest, uuid_cast1) {
     }
 
     DataType source_type(LogicalType::kUuid);
-    ColumnVector col_source(source_type);
-    col_source.Initialize();
+    SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
+    col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value v = Value::MakeUuid(uuid);
-        col_source.AppendValue(v);
+        col_source->AppendValue(v);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
-        Value vx = col_source.GetValue(i);
+        Value vx = col_source->GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
     }
@@ -88,8 +88,8 @@ TEST_F(UuidCastTest, uuid_cast1) {
         auto source2target_ptr = BindUuidCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type);
-        col_target.Initialize();
+        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
         CastParameters cast_parameters;
         EXPECT_TRUE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters));
@@ -99,7 +99,7 @@ TEST_F(UuidCastTest, uuid_cast1) {
             UuidT uuid(s.c_str());
             String uuid_str(uuid.body, 16);
 
-            Value vx = col_target.GetValue(i);
+            Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_FALSE(vx.is_null());
             EXPECT_STREQ(vx.value_.varchar.ToString().c_str(), uuid_str.c_str());

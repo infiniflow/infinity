@@ -86,17 +86,17 @@ TEST_F(ModuloFunctionsTest, mod_func) {
             EXPECT_EQ(v2.value_.tiny_int, static_cast<i8>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
 
             if(i % 256 == 0) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result.GetValue(i);
-                EXPECT_TRUE(result.nulls_ptr_->IsTrue(i));
+                Value v = result->GetValue(i);
+                EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
                 EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(i + 2) % static_cast<i8>(i));
             }
@@ -149,16 +149,16 @@ TEST_F(ModuloFunctionsTest, mod_func) {
             EXPECT_EQ(v2.value_.small_int, static_cast<i16>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
             if(i == 0) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result.GetValue(i);
-                EXPECT_TRUE(result.nulls_ptr_->IsTrue(i));
+                Value v = result->GetValue(i);
+                EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
                 EXPECT_EQ(v.value_.small_int, static_cast<i16>(i + 10) % static_cast<i16>(i));
             }
@@ -211,16 +211,16 @@ TEST_F(ModuloFunctionsTest, mod_func) {
             EXPECT_EQ(v2.value_.integer, static_cast<i32>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
             if(i == 0) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result.GetValue(i);
-                EXPECT_TRUE(result.nulls_ptr_->IsTrue(i));
+                Value v = result->GetValue(i);
+                EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
                 EXPECT_EQ(v.value_.integer, static_cast<i32>(i + 9) % static_cast<i32>(i));
             }
@@ -273,16 +273,16 @@ TEST_F(ModuloFunctionsTest, mod_func) {
             EXPECT_EQ(v2.value_.big_int, static_cast<i64>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
             if(i == 0) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result.GetValue(i);
-                EXPECT_TRUE(result.nulls_ptr_->IsTrue(i));
+                Value v = result->GetValue(i);
+                EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
                 EXPECT_EQ(v.value_.big_int, static_cast<i64>(i + 5) % static_cast<i64>(i));
             }
@@ -360,16 +360,16 @@ TEST_F(ModuloFunctionsTest, mod_func) {
             EXPECT_FLOAT_EQ(v2.value_.float32, static_cast<f32>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
             if(i == 0) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result.GetValue(i);
-                EXPECT_TRUE(result.nulls_ptr_->IsTrue(i));
+                Value v = result->GetValue(i);
+                EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
                 EXPECT_FLOAT_EQ(v.value_.float32, std::fmod(static_cast<f32>(i + 2), static_cast<f32>(i)));
             }
@@ -422,16 +422,16 @@ TEST_F(ModuloFunctionsTest, mod_func) {
             EXPECT_FLOAT_EQ(v2.value_.float64, static_cast<f64>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
             if(i == 0) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result.GetValue(i);
-                EXPECT_TRUE(result.nulls_ptr_->IsTrue(i));
+                Value v = result->GetValue(i);
+                EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
                 EXPECT_EQ(v.value_.float64, std::fmod(static_cast<f64>(i + 3), static_cast<f64>(i)));
             }

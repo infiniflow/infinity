@@ -27,5 +27,4 @@ PhysicalDropTable::Execute(std::shared_ptr<QueryContext>& query_context) {
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 
-
 }

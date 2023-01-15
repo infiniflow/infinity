@@ -48,7 +48,7 @@ QueryResult::ToString() const {
     ss << std::endl;
 
     // Get Block count
-    SizeT block_count = result_->BlockCount();
+    SizeT block_count = result_->DataBlockCount();
 
     // Iterate all blocks
     for(SizeT idx = 0; idx < block_count; ++ idx) {

@@ -87,16 +87,16 @@ TEST_F(AddFunctionsTest, add_func) {
             EXPECT_EQ(v2.value_.tiny_int, static_cast<i8>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             i16 res = static_cast<i16>(static_cast<i8>(i)) * 2;
             if(res < std::numeric_limits<i8>::min() || res > std::numeric_limits<i8>::max()) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
                 EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(res));
             }
@@ -149,16 +149,16 @@ TEST_F(AddFunctionsTest, add_func) {
             EXPECT_EQ(v2.value_.small_int, static_cast<i16>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             i32 res = static_cast<i32>(static_cast<i16>(i)) * 2;
             if(res < std::numeric_limits<i16>::min() || res > std::numeric_limits<i16>::max()) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
                 EXPECT_EQ(v.value_.small_int, static_cast<i16>(res));
             }
@@ -211,16 +211,16 @@ TEST_F(AddFunctionsTest, add_func) {
             EXPECT_EQ(v2.value_.integer, static_cast<i32>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             i64 res = static_cast<i64>(static_cast<i32>(i)) * 2;
             if(res < std::numeric_limits<i32>::min() || res > std::numeric_limits<i32>::max()) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
                 EXPECT_EQ(v.value_.integer, static_cast<i32>(res));
             }
@@ -273,16 +273,16 @@ TEST_F(AddFunctionsTest, add_func) {
             EXPECT_EQ(v2.value_.big_int, static_cast<i64>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             i64 res;
             if(__builtin_add_overflow(static_cast<i64>(i), static_cast<i64>(i), &res)) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
                 EXPECT_EQ(v.value_.big_int, static_cast<i64>(res));
             }
@@ -335,16 +335,16 @@ TEST_F(AddFunctionsTest, add_func) {
             EXPECT_FLOAT_EQ(v2.value_.float32, static_cast<f32>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             f32 res = static_cast<f32>(i) * 2;
             if(std::isinf(res) || std::isnan(res)) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
                 EXPECT_FLOAT_EQ(v.value_.float32, res);
             }
@@ -397,16 +397,16 @@ TEST_F(AddFunctionsTest, add_func) {
             EXPECT_FLOAT_EQ(v2.value_.float64, static_cast<f64>(i));
         }
 
-        ColumnVector result(result_type);
-        result.Initialize();
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
         func.function_(data_block, result);
 
         for (size_t i = 0; i < row_count; ++i) {
-            Value v = result.GetValue(i);
+            Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             f64 res = static_cast<f64>(i) * 2;
             if(std::isinf(res) || std::isnan(res)) {
-                EXPECT_FALSE(result.nulls_ptr_->IsTrue(i));
+                EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
                 EXPECT_FLOAT_EQ(v.value_.float64, res);
             }

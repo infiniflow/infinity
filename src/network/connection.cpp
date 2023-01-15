@@ -204,7 +204,7 @@ void
 Connection::SendQueryResponse(const SharedPtr<Table>& result_table) {
     SizeT column_count = result_table->ColumnCount();
     auto values_as_strings = std::vector<std::optional<String>>(column_count);
-    SizeT block_count = result_table->BlockCount();
+    SizeT block_count = result_table->DataBlockCount();
     for(SizeT idx = 0; idx < block_count; ++ idx) {
         auto block = result_table->GetDataBlockById(idx);
         SizeT row_count = block->row_count();
@@ -215,7 +215,7 @@ Connection::SendQueryResponse(const SharedPtr<Table>& result_table) {
             // iterate each column_vector of the block
             for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
                 auto& column_vector = block->column_vectors[column_id];
-                const String string_value = column_vector.ToString(row_id);
+                const String string_value = column_vector->ToString(row_id);
                 values_as_strings[column_id] = string_value;
                 string_length_sum += string_value.size();
             }

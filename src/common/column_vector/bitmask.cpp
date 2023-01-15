@@ -161,6 +161,14 @@ Bitmask::SetAllTrue() {
     data_ptr_ = nullptr;
 }
 
+void
+Bitmask::SetAllFalse() {
+    size_t u64_count = BitmaskBuffer::UnitCount(count_);
+    for(size_t i = 0; i < u64_count; ++ i) {
+        data_ptr_[i] = 0;
+    }
+}
+
 size_t
 Bitmask::CountTrue() const {
     if (data_ptr_ == nullptr) return count_;
