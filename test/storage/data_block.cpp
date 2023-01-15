@@ -158,7 +158,6 @@ TEST_F(DataBlockTest, test2) {
     }
     EXPECT_THROW(data_block.AppendValue(1, Value::MakeBool(true)), StorageException);
     EXPECT_THROW(data_block.AppendValue(0, Value::MakeBool(true)), StorageException);
-    EXPECT_THROW(data_block.row_count() == row_count, StorageException);
 
     EXPECT_FALSE(data_block.Finalized());
     data_block.Finalize();

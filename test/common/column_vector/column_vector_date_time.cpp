@@ -37,7 +37,7 @@ TEST_F(ColumnVectorTimeTest, flat_date) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -111,7 +111,7 @@ TEST_F(ColumnVectorTimeTest, flat_date) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -153,7 +153,7 @@ TEST_F(ColumnVectorTimeTest, contant_date) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -202,7 +202,7 @@ TEST_F(ColumnVectorTimeTest, contant_date) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -241,7 +241,7 @@ TEST_F(ColumnVectorTimeTest, flat_time) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -315,7 +315,7 @@ TEST_F(ColumnVectorTimeTest, flat_time) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -357,7 +357,7 @@ TEST_F(ColumnVectorTimeTest, contant_time) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -406,7 +406,7 @@ TEST_F(ColumnVectorTimeTest, contant_time) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -445,7 +445,7 @@ TEST_F(ColumnVectorTimeTest, flat_datetime) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -521,7 +521,7 @@ TEST_F(ColumnVectorTimeTest, flat_datetime) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -564,7 +564,7 @@ TEST_F(ColumnVectorTimeTest, contant_datetime) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -615,7 +615,7 @@ TEST_F(ColumnVectorTimeTest, contant_datetime) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -655,7 +655,7 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -731,7 +731,7 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -774,7 +774,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -825,7 +825,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -865,7 +865,7 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp_tz) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -941,7 +941,7 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp_tz) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -984,7 +984,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp_tz) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -1035,7 +1035,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp_tz) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -1075,7 +1075,7 @@ TEST_F(ColumnVectorTimeTest, flat_interval) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -1150,7 +1150,7 @@ TEST_F(ColumnVectorTimeTest, flat_interval) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -1193,7 +1193,7 @@ TEST_F(ColumnVectorTimeTest, contant_flat) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -1243,7 +1243,7 @@ TEST_F(ColumnVectorTimeTest, contant_flat) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);

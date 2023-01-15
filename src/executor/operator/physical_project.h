@@ -14,7 +14,7 @@ namespace infinity {
 
 class PhysicalProject : public PhysicalOperator {
 public:
-    explicit PhysicalProject(uint64_t id, std::shared_ptr<PhysicalOperator> left, std::vector<std::shared_ptr<BaseExpression>> expressions)
+    explicit PhysicalProject(uint64_t id, SharedPtr<PhysicalOperator> left, Vector<SharedPtr<BaseExpression>> expressions)
         : PhysicalOperator(PhysicalOperatorType::kProjection, std::move(left), nullptr, id),
           expressions_(std::move(expressions))
           {}
@@ -25,9 +25,9 @@ public:
     Init() override;
 
     void
-    Execute(std::shared_ptr<QueryContext>& query_context) override;
+    Execute(SharedPtr<QueryContext>& query_context) override;
 
-    std::vector<std::shared_ptr<BaseExpression>> expressions_;
+    Vector<SharedPtr<BaseExpression>> expressions_;
 
     ExpressionExecutor executor;
 };

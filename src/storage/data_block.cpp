@@ -85,7 +85,11 @@ DataBlock::Finalize() {
 
 String
 DataBlock::ToString() const {
-    NotImplementError("Not implemented.")
+    std::stringstream ss;
+    for(SizeT idx = 0; idx < column_count_; ++ idx) {
+        ss << column_vectors[idx]->ToString() << std::endl;
+    }
+    return ss.str();
 }
 
 }

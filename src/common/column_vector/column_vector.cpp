@@ -62,7 +62,11 @@ void ColumnVector::Initialize(SizeT capacity, ColumnVectorType vector_type) {
 String
 ColumnVector::ToString() const {
     StorageAssert(initialized, "Column vector isn't initialized.")
-    TypeError("Not implemented");
+    std::stringstream ss;
+    for(SizeT idx = 0; idx < tail_index_; ++ idx) {
+        ss << ToString(idx) << std::endl;
+    }
+    return ss.str();
 }
 
 String

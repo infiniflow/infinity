@@ -39,7 +39,7 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
@@ -138,7 +138,7 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
@@ -187,7 +187,7 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
@@ -253,7 +253,7 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);

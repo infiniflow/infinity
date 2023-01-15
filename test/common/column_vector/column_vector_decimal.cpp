@@ -42,7 +42,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal16) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 2);
@@ -115,7 +115,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal16) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 2);
@@ -158,7 +158,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal16) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 2);
@@ -207,7 +207,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal16) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 2);
@@ -247,7 +247,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal32) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -320,7 +320,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal32) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -363,7 +363,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal32) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -412,7 +412,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal32) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4);
@@ -452,7 +452,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal64) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -525,7 +525,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal64) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -568,7 +568,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal64) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -617,7 +617,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal64) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 8);
@@ -657,7 +657,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal128) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
@@ -730,7 +730,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal128) {
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
@@ -773,7 +773,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal128) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
@@ -822,7 +822,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal128) {
 
     EXPECT_EQ(column_vector.capacity(), 1);
     EXPECT_EQ(column_vector.Size(), 0);
-    EXPECT_THROW(column_vector.ToString(), TypeException);
+
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
