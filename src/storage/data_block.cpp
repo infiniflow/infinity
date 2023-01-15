@@ -64,11 +64,20 @@ DataBlock::AppendValue(SizeT column_index, const Value& value) {
 
 void
 DataBlock::Finalize() {
-    SizeT row_count = column_vectors[0]->Size();
-    for(SizeT i = 1; i < column_count(); ++ i) {
-        StorageAssert(column_vectors[i]->vector_type() == ColumnVectorType::kConstant
-                      || row_count == column_vectors[i]->Size(),
-                      "Column vectors in same data block have different size.")
+    bool first_flat_column_vector = false;
+    SizeT row_count = 0;
+    for(SizeT idx = 0; idx < column_count_; ++ idx) {
+        if(column_vectors[idx]->vector_type() == ColumnVectorType::kConstant) {
+            continue;
+        } else {
+            if(first_flat_column_vector) {
+                StorageAssert(row_count == column_vectors[idx]->Size(),
+                              "Column vectors in same data block have different size.")
+            } else {
+                first_flat_column_vector = true;
+                row_count = column_vectors[idx]->Size();
+            }
+        }
     }
     row_count_ = row_count;
     finalized = true;
