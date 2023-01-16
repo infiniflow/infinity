@@ -598,7 +598,7 @@ PlanBuilder::BuildSelect(SharedPtr<QueryContext>& query_context,
                 SharedPtr<BaseExpression> bound_expr;
                 if(select_item.expr_->getName() == nullptr) {
                     // Constant value in select list, call build value expression directly.
-                    bound_expr = project_binder->BuildValueExpr(*select_item.expr_, bind_context_ptr);
+                    bound_expr = project_binder->BuildExpression(*select_item.expr_, bind_context_ptr);
                     expr_name = bound_expr->ToString();
                     bind_context_ptr->project_by_name_.emplace(expr_name, bound_expr);
                 } else {

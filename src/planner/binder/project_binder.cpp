@@ -10,7 +10,7 @@ namespace infinity {
 
 std::shared_ptr<BaseExpression>
 ProjectBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext> &bind_context_ptr) {
-    std::string expr_name = expr.getName();
+    String expr_name = expr.getName();
 
     // If the expr is coming from group by lists.
     if (bind_context_ptr->group_by_name_.contains(expr_name)) {
@@ -49,7 +49,7 @@ ProjectBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindC
     auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
 
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
-        std::string expr_name = expr.getName();
+        String expr_name = expr.getName();
         bind_context_ptr->aggregate_by_name_[expr_name] = func_expr_ptr;
         func_expr_ptr->source_position_
             = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
