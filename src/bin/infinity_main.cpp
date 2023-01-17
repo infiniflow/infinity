@@ -9,7 +9,8 @@
 
 #include <iostream>
 
-void ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
+void
+ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
     cxxopts::Options options("./infinity_server", "");
 
     options.add_options()
@@ -33,7 +34,8 @@ void ParseArguments(int argc, char** argv, infinity::StartupParameter& parameter
     parameters.port = result["port"].as<uint16_t>();
 }
 
-int main(int argc, char** argv) {
+int
+main(int argc, char** argv) {
     std::cout << "Infinity, version: "
               << VERSION_MAJOR << "."
               << VERSION_MINOR << "."

@@ -2,7 +2,7 @@
 // Created by JinHai on 2022/7/28.
 //
 
-#pragma
+#pragma once
 
 #include "executor/physical_operator.h"
 

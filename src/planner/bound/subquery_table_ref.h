@@ -5,14 +5,15 @@
 #pragma once
 
 #include "table_ref.h"
+#include "planner/bound_statement.h"
 
 namespace infinity {
 class SubqueryTableRef: public TableRef {
 public:
-    explicit SubqueryTableRef(std::shared_ptr<BoundNode> subquery_node, std::string alias)
+    explicit SubqueryTableRef(SharedPtr<BoundStatement> subquery_node, String alias)
         : TableRef(TableRefType::kSubquery, std::move(alias)), subquery_node_(std::move(subquery_node)) {}
 
-    std::shared_ptr<BoundNode> subquery_node_{nullptr};
+    SharedPtr<BoundStatement> subquery_node_{nullptr};
 };
 
 }

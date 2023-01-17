@@ -14,7 +14,7 @@ public:
 
     void AddFunction(const AggregateFunction& func);
 
-    AggregateFunction GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>>& input_arguments);
+    AggregateFunction GetMostMatchFunction(const std::vector<SharedPtr<BaseExpression>>& input_arguments);
 
 private:
     std::vector<AggregateFunction> functions_;

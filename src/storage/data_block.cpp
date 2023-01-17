@@ -87,7 +87,11 @@ String
 DataBlock::ToString() const {
     std::stringstream ss;
     for(SizeT idx = 0; idx < column_count_; ++ idx) {
-        ss << column_vectors[idx]->ToString() << std::endl;
+        String end;
+        if(idx != column_count_ - 1) {
+            end = " ";
+        }
+        ss << column_vectors[idx]->ToString() << end;
     }
     return ss.str();
 }

@@ -15,13 +15,12 @@ namespace infinity {
 class LogicalInsert : public LogicalNode {
 public:
     explicit LogicalInsert(SharedPtr<Table> table_ptr,
-                           Vector<SharedPtr<BaseExpression>> value_list,
-                           SharedPtr<BindContext>& bind_context)
-            : LogicalNode(LogicalNodeType::kInsert, bind_context),
+                           Vector<SharedPtr<BaseExpression>> value_list)
+            : LogicalNode(LogicalNodeType::kInsert),
               table_ptr_(std::move(table_ptr)), value_list_(std::move(value_list)) {};
 
     String 
-    ToString(int64_t& space) final;
+    ToString(i64& space) final;
     
     void 
     set_value_list(const Vector<SharedPtr<BaseExpression>>& value_list) {
@@ -38,8 +37,8 @@ public:
     }
 
 private:
-    SharedPtr<Table> table_ptr_;
-    Vector<SharedPtr<BaseExpression>> value_list_;
+    SharedPtr<Table> table_ptr_{};
+    Vector<SharedPtr<BaseExpression>> value_list_{};
 };
 
 }

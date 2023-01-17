@@ -12,15 +12,17 @@ namespace infinity {
 class LogicalJoin: public LogicalNode {
 public:
     explicit
-    LogicalJoin(JoinType join_type, std::vector<std::shared_ptr<BaseExpression>> conditions,
-                const std::shared_ptr<LogicalNode>& left, const std::shared_ptr<LogicalNode>& right,
-                std::shared_ptr<BindContext>& bind_context);
+    LogicalJoin(JoinType join_type,
+                Vector<SharedPtr<BaseExpression>> conditions,
+                const SharedPtr<LogicalNode>& left,
+                const SharedPtr<LogicalNode>& right);
 
-    std::string ToString(int64_t& space) final;
+    String
+    ToString(i64& space) final;
 private:
 
     JoinType join_type_{JoinType::kInvalid};
-    std::vector<std::shared_ptr<BaseExpression>> conditions_;
+    Vector<SharedPtr<BaseExpression>> conditions_{};
 };
 
 }

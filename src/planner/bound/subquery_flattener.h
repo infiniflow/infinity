@@ -5,16 +5,15 @@
 #pragma once
 
 #include "expression/subquery_expression.h"
-#include "bound_select_node.h"
 
 namespace infinity {
 
 class SubqueryFlattener {
 public:
     explicit
-    SubqueryFlattener(std::shared_ptr<BoundSelectNode>& bound_select_node, std::shared_ptr<BindContext> &bind_context_ptr);
+    SubqueryFlattener(SharedPtr<BoundSelectStatement>& bound_select_statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    std::shared_ptr<BoundSelectNode>
+    SharedPtr<BoundSelectStatement>
     GetResult();
 private:
     void
@@ -26,14 +25,14 @@ private:
     void
     FlattenProjectList();
 
-    std::shared_ptr<BaseExpression>
-    TryToFlatten(std::shared_ptr<BaseExpression>& expr);
+    SharedPtr<BaseExpression>
+    TryToFlatten(SharedPtr<BaseExpression>& expr);
 
-    std::shared_ptr<BaseExpression>
-    FlattenSubquery(std::shared_ptr<SubqueryExpression>& subquery);
+    SharedPtr<BaseExpression>
+    FlattenSubquery(SharedPtr<SubqueryExpression>& subquery);
 
-    std::shared_ptr<BoundSelectNode>& bound_select_node_;
-    std::shared_ptr<BindContext> &bind_context_ptr_;
+    SharedPtr<BoundSelectStatement>& bound_select_statement_;
+    SharedPtr<BindContext> &bind_context_ptr_;
 };
 
 }

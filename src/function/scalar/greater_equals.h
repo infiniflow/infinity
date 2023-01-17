@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterGreaterEqualsFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+RegisterGreaterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

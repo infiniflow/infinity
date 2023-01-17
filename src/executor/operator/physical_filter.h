@@ -5,12 +5,21 @@
 #pragma once
 
 #include "executor/physical_operator.h"
+#include "expression/base_expression.h"
+#include "executor/expression/expression_executor.h"
 
 namespace infinity {
 
 class PhysicalFilter : public PhysicalOperator {
 public:
-    explicit PhysicalFilter(uint64_t id): PhysicalOperator(PhysicalOperatorType::kFilter, nullptr, nullptr, id) {}
+    explicit
+    PhysicalFilter(u64 id,
+                   SharedPtr<PhysicalOperator> left,
+                   const SharedPtr<BaseExpression>& condition)
+                   : PhysicalOperator(PhysicalOperatorType::kFilter, left, nullptr, id),
+                     condition_(condition)
+                     {}
+
     ~PhysicalFilter() override = default;
 
     void
@@ -18,6 +27,11 @@ public:
 
     void
     Execute(std::shared_ptr<QueryContext>& query_context) override;
+
+private:
+    const SharedPtr<BaseExpression>& condition_;
+
+    ExpressionExecutor executor;
 };
 
 

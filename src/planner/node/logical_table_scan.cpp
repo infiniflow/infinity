@@ -10,12 +10,11 @@
 namespace infinity {
 
 LogicalTableScan::LogicalTableScan(SharedPtr<Table> table_ptr,
-                                   SharedPtr<BindContext>& bind_context,
                                    SharedPtr<TableScanFunction> table_scan_func,
                                    String table_alias,
                                    Vector<String> column_names,
                                    Vector<DataType> column_types)
-    : LogicalNode(LogicalNodeType::kTableScan, bind_context),
+    : LogicalNode(LogicalNodeType::kTableScan),
     table_ptr_(std::move(table_ptr)),
     table_scan_func_ptr_(std::move(table_scan_func)),
     table_alias_(std::move(table_alias)),
@@ -47,6 +46,7 @@ LogicalTableScan::ToString(i64& space) {
     }
     ss << column_names_.back();
     space += arrow_str.size();
+
     return ss.str();
 }
 

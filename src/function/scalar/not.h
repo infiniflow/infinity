@@ -11,7 +11,7 @@
 namespace infinity {
 
 void
-RegisterNotFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+RegisterNotFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }
 

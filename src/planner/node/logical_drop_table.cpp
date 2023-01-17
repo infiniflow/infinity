@@ -7,16 +7,17 @@
 
 namespace infinity {
 
-std::string
-LogicalDropTable::ToString(int64_t& space) {
+String
+LogicalDropTable::ToString(i64& space) {
     std::stringstream ss;
-    std::string arrow_str;
+    String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "Drop Table: " << *schema_name_<< "." << *table_name_;
+    ss << String(space, ' ') << arrow_str << "Drop Table: " << *schema_name_<< "." << *table_name_;
     space += arrow_str.size();
+
     return ss.str();
 }
 

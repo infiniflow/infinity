@@ -12,7 +12,7 @@ void
 Catalog::CreateSchema(const SharedPtr<SchemaDefinition>& schema_definition) {
     const String& schema_name = schema_definition->name();
     if(schemas_.find(schema_name) == schemas_.end()) {
-        SharedPtr<Schema> schema_ptr = std::make_shared<Schema>(schema_name, schema_id_counter_ ++);
+        SharedPtr<Schema> schema_ptr = MakeShared<Schema>(schema_name, schema_id_counter_ ++);
         schemas_[schema_name] = schema_ptr;
     } else {
         CatalogError("Schema already exists: " + schema_name);
@@ -90,7 +90,12 @@ Catalog::DeleteView(const String& schema_name, const String& view_name) {
 }
 
 SharedPtr<FunctionSet>
-Catalog::GetFunctionSetByName(const String& function_name) {
+Catalog::GetFunctionSetByName(String& function_name) {
+    // Transfer the function to upper case.
+    std::transform(function_name.begin(), function_name.end(), function_name.begin(), [](const auto c) {
+        return std::toupper(c);
+    });
+
     if(!function_sets_.contains(function_name)) {
         CatalogError("No function name: " + function_name);
     }

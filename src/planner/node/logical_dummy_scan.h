@@ -11,11 +11,11 @@ namespace infinity {
 class LogicalDummyScan : public LogicalNode {
 public:
     explicit
-    LogicalDummyScan(std::shared_ptr<BindContext>& bind_context)
-        : LogicalNode(LogicalNodeType::kDummyScan, bind_context) {}
+    LogicalDummyScan()
+        : LogicalNode(LogicalNodeType::kDummyScan) {}
 
-    std::string
-    ToString(int64_t& space) final;
+    String
+    ToString(i64& space) final;
 };
 
 }

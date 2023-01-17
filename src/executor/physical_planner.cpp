@@ -37,6 +37,7 @@
 #include "executor/operator/physical_prepared_plan.h"
 #include "executor/operator/physical_dummy_operator.h"
 #include "executor/operator/physical_dummy_scan.h"
+#include "planner/node/logical_filter.h"
 
 #include <limits>
 
@@ -257,7 +258,18 @@ PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator)
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildFilter(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalFilter>(logical_operator->node_id());
+    auto input_logical_node = logical_operator->left_node();
+    PlannerAssert(input_logical_node != nullptr, "Logical filter node has no input node.");
+    PlannerAssert(logical_operator->right_node() == nullptr,
+                  "Logical project node shouldn't have right child.");
+
+    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
+
+    SharedPtr<LogicalFilter> logical_filter = std::static_pointer_cast<LogicalFilter>(logical_operator);
+
+    return MakeShared<PhysicalFilter>(logical_operator->node_id(),
+                                      input_physical_operator,
+                                      logical_filter->expression());
 }
 
 SharedPtr<PhysicalOperator>

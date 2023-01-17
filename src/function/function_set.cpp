@@ -4,31 +4,23 @@
 
 #include "function_set.h"
 #include "main/infinity.h"
-
-#include <sstream>
-//#include <format>
 #include <iostream>
 
 namespace infinity {
 
-std::shared_ptr<FunctionSet>
+SharedPtr<FunctionSet>
 FunctionSet::GetFunctionSet(const hsql::Expr &expr) {
-    std::string function_name = expr.name;
+    String function_name = expr.name;
 
-    // Transfer the function to upper case.
-    std::transform(function_name.begin(), function_name.end(), function_name.begin(), [](const auto c) {
-        return std::toupper(c);
-    });
-
-    // std::unique_ptr<Catalog>& catalog
+    // UniquePtr<Catalog>& catalog
     auto& catalog = Infinity::instance().catalog();
-    std::shared_ptr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(function_name);
+    SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(function_name);
 
     return function_set_ptr;
 }
 
-std::string
-FunctionSet::ToString(const std::string& name, const std::vector<std::shared_ptr<BaseExpression>>& arguments) {
+String
+FunctionSet::ToString(const String& name, const Vector<SharedPtr<BaseExpression>>& arguments) {
     std::stringstream ss;
 
     ss << name;

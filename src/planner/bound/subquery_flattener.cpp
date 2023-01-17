@@ -8,22 +8,22 @@
 
 namespace infinity {
 
-SubqueryFlattener::SubqueryFlattener(std::shared_ptr<BoundSelectNode>& bound_select_node,
-                                     std::shared_ptr<BindContext> &bind_context_ptr)
-                                     : bound_select_node_(bound_select_node), bind_context_ptr_(bind_context_ptr)
+SubqueryFlattener::SubqueryFlattener(SharedPtr<BoundSelectStatement>& bound_select_statement,
+                                     SharedPtr<BindContext> &bind_context_ptr)
+                                     : bound_select_statement_(bound_select_statement), bind_context_ptr_(bind_context_ptr)
                                      {}
 
-std::shared_ptr<BoundSelectNode>
+SharedPtr<BoundSelectStatement>
 SubqueryFlattener::GetResult() {
     FlattenWhereClause();
     FlattenHavingList();
     FlattenProjectList();
-    return bound_select_node_;
+    return bound_select_statement_;
 }
 
 void
 SubqueryFlattener::FlattenWhereClause() {
-    for(auto& condition: bound_select_node_->where_conditions_) {
+    for(auto& condition: bound_select_statement_->where_conditions_) {
         TryToFlatten(condition);
     }
 }
@@ -38,8 +38,8 @@ SubqueryFlattener::FlattenProjectList() {
 
 }
 
-std::shared_ptr<BaseExpression>
-SubqueryFlattener::TryToFlatten(std::shared_ptr<BaseExpression>& expression) {
+SharedPtr<BaseExpression>
+SubqueryFlattener::TryToFlatten(SharedPtr<BaseExpression>& expression) {
     switch(expression->type()) {
         case ExpressionType::kArithmetic:
         case ExpressionType::kConjunction:
@@ -51,12 +51,12 @@ SubqueryFlattener::TryToFlatten(std::shared_ptr<BaseExpression>& expression) {
             break;
         }
         case ExpressionType::kCase: {
-            std::shared_ptr<CaseExpression> case_expr = std::static_pointer_cast<CaseExpression>(expression);
+            SharedPtr<CaseExpression> case_expr = std::static_pointer_cast<CaseExpression>(expression);
             PlannerError("Case expression is special.");
             break;
         }
         case ExpressionType::kSubQuery: {
-            std::shared_ptr<SubqueryExpression> subquery_expr = std::static_pointer_cast<SubqueryExpression>(expression);
+            SharedPtr<SubqueryExpression> subquery_expr = std::static_pointer_cast<SubqueryExpression>(expression);
             return FlattenSubquery(subquery_expr);
         }
         case ExpressionType::kColumn: PlannerError("Column doesn't need to flatten subquery.");
@@ -69,8 +69,8 @@ SubqueryFlattener::TryToFlatten(std::shared_ptr<BaseExpression>& expression) {
     PlannerError("Shouldn't be here.");
 }
 
-std::shared_ptr<BaseExpression>
-SubqueryFlattener::FlattenSubquery(std::shared_ptr<SubqueryExpression>& subquery) {
+SharedPtr<BaseExpression>
+SubqueryFlattener::FlattenSubquery(SharedPtr<SubqueryExpression>& subquery) {
 
     // Pull up the correlated predicate
     PlannerError("Not implemented, yet.");

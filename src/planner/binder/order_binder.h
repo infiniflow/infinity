@@ -10,17 +10,17 @@ namespace infinity {
 
 class OrderBinder : public ExpressionBinder {
 public:
-    explicit OrderBinder(std::shared_ptr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
+    explicit OrderBinder(SharedPtr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
-    std::shared_ptr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) override;
+    SharedPtr<BaseExpression>
+    BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
 
-    std::shared_ptr<BaseExpression>
-    BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) override;
+    SharedPtr<BaseExpression>
+    BuildColExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
 
-    std::shared_ptr<BaseExpression>
-    BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) override;
+    SharedPtr<BaseExpression>
+    BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
 private:
 };
 

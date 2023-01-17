@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterDivFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

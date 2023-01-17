@@ -6,17 +6,17 @@
 
 namespace infinity {
 
-std::string
-Exception::BuildMessageInternal(std::vector<std::string>& values) {
+String
+Exception::BuildMessageInternal(Vector<String>& values) {
     auto values_count = values.size();
     if(values_count > 0) {
-        std::string msg(values[0]);
+        String msg(values[0]);
         for(size_t idx = 1; idx < values_count; ++ idx) {
             msg += (" " + values[idx]);
         }
         return msg;
     }
-    return std::string();
+    return String();
 }
 
 }

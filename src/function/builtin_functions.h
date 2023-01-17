@@ -11,13 +11,14 @@ namespace infinity {
 
 class BuiltinFunctions : public std::enable_shared_from_this<BuiltinFunctions> {
 public:
-    explicit BuiltinFunctions(std::unique_ptr<Catalog>& catalog_ptr);
+    explicit
+    BuiltinFunctions(UniquePtr<Catalog>& catalog_ptr);
 
     void Init();
 
 
 private:
-    std::unique_ptr<Catalog>& catalog_ptr_;
+    UniquePtr<Catalog>& catalog_ptr_;
 
 private:
 

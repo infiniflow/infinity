@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "common/types/internal_types.h"
 #include "SQLParser.h"
 #include "SQLParserResult.h"
 
@@ -11,24 +12,62 @@ namespace infinity {
 
 class Statement {
 public:
-    explicit Statement(hsql::SQLStatement* statement) : statement_(statement) {};
-    std::string ToString(size_t intent = 0);
+    static String
+    ExprAsColumnName(const hsql::Expr* expr);
 
 private:
-    std::string ToString(hsql::SelectStatement* select_stmt, size_t intent);
-    std::string ToString(hsql::ImportStatement* import_stmt, size_t intent);
-    std::string ToString(hsql::InsertStatement* insert_stmt, size_t intent);
-    std::string ToString(hsql::UpdateStatement* update_stmt, size_t intent);
-    std::string ToString(hsql::DeleteStatement* delete_stmt, size_t intent);
-    std::string ToString(hsql::CreateStatement* create_stmt, size_t intent);
-    std::string ToString(hsql::DropStatement* drop_stmt, size_t intent);
-    std::string ToString(hsql::PrepareStatement* prepare_stmt, size_t intent);
-    std::string ToString(hsql::ExecuteStatement* execute_stmt, size_t intent);
-    std::string ToString(hsql::ExportStatement* export_stmt, size_t intent);
-    std::string ToString(hsql::AlterStatement* alter_stmt, size_t intent);
-    std::string ToString(hsql::ShowStatement* show_stmt, size_t intent);
-    std::string ToString(hsql::TransactionStatement* transaction_stmt, size_t intent);
-    std::string ToString(hsql::Expr* expr, size_t intent);
+    static String
+    ToString(hsql::ColumnType column_type);
+
+public:
+    explicit
+    Statement(hsql::SQLStatement* statement) : statement_(statement) {};
+
+    String
+    ToString(size_t intent = 0);
+
+private:
+    String
+    ToString(hsql::SelectStatement* select_stmt, size_t intent);
+
+    String
+    ToString(hsql::ImportStatement* import_stmt, size_t intent);
+
+    String
+    ToString(hsql::InsertStatement* insert_stmt, size_t intent);
+
+    String
+    ToString(hsql::UpdateStatement* update_stmt, size_t intent);
+
+    String
+    ToString(hsql::DeleteStatement* delete_stmt, size_t intent);
+
+    String
+    ToString(hsql::CreateStatement* create_stmt, size_t intent);
+
+    String
+    ToString(hsql::DropStatement* drop_stmt, size_t intent);
+
+    String
+    ToString(hsql::PrepareStatement* prepare_stmt, size_t intent);
+
+    String
+    ToString(hsql::ExecuteStatement* execute_stmt, size_t intent);
+
+    String
+    ToString(hsql::ExportStatement* export_stmt, size_t intent);
+
+    String
+    ToString(hsql::AlterStatement* alter_stmt, size_t intent);
+
+    String
+    ToString(hsql::ShowStatement* show_stmt, size_t intent);
+
+    String
+    ToString(hsql::TransactionStatement* transaction_stmt, size_t intent);
+
+    String
+    ToString(hsql::Expr* expr, size_t intent);
 
 private:
     hsql::SQLStatement* statement_{nullptr};

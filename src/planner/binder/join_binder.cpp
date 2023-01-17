@@ -8,9 +8,9 @@
 
 namespace infinity {
 
-std::shared_ptr<BaseExpression>
-JoinBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext> &bind_context_ptr) {
-    std::shared_ptr<BaseExpression> result;
+SharedPtr<BaseExpression>
+JoinBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<BaseExpression> result;
     switch(expr.type) {
         case hsql::ExprType::kExprSelect: {
             PlannerError("Subquery isn't allowed in JOIN condition.");

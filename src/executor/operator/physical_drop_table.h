@@ -10,8 +10,8 @@ namespace infinity {
 
 class PhysicalDropTable : public PhysicalOperator {
 public:
-    explicit PhysicalDropTable(std::shared_ptr<std::string> schema_name,
-                               std::shared_ptr<std::string> tbl_name,
+    explicit PhysicalDropTable(SharedPtr<String> schema_name,
+                               SharedPtr<String> tbl_name,
                                uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kDropTable, nullptr, nullptr, id),
         schema_name_(std::move(schema_name)),
@@ -23,11 +23,11 @@ public:
     Init() override;
 
     void
-    Execute(std::shared_ptr<QueryContext>& query_context) override;
+    Execute(SharedPtr<QueryContext>& query_context) override;
 
 private:
-    std::shared_ptr<std::string> schema_name_;
-    std::shared_ptr<std::string> table_name_;
+    SharedPtr<String> schema_name_;
+    SharedPtr<String> table_name_;
 };
 
 }

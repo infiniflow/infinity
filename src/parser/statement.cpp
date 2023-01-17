@@ -10,7 +10,261 @@
 
 namespace infinity {
 
-std::string
+String
+Statement::ExprAsColumnName(const hsql::Expr* expr) {
+    switch(expr->type) {
+        case hsql::kExprLiteralFloat: {
+            return std::to_string(expr->fval);
+        }
+        case hsql::kExprLiteralString: {
+            return expr->name;
+        }
+        case hsql::kExprLiteralInt: {
+            return std::to_string(expr->ival);
+        }
+        case hsql::kExprLiteralNull: {
+            return "NULL";
+        }
+        case hsql::kExprLiteralDate: {
+            NotImplementError("No implementation of date")
+        }
+        case hsql::kExprLiteralInterval: {
+            NotImplementError("No implementation of interval")
+        }
+        case hsql::kExprStar: {
+            if(expr->table == nullptr) {
+                return "*";
+            } else {
+                std::stringstream ss;
+                ss << expr->table << ".*";
+                return ss.str();
+            }
+        }
+        case hsql::kExprParameter: {
+            NotImplementError("No implementation of parameter")
+        }
+        case hsql::kExprColumnRef: {
+            return expr->getName();
+        }
+        case hsql::kExprFunctionRef: {
+            std::stringstream ss;
+            if(expr->expr != nullptr && expr->expr2 != nullptr) {
+                // Binary function
+                ss << expr->getName() << "("
+                   << Statement::ExprAsColumnName(expr->expr)
+                   << ", " << Statement::ExprAsColumnName(expr->expr) << ")";
+            } else if (expr->expr != nullptr) {
+                // Unary function
+                ss << expr->getName() << "("
+                   << Statement::ExprAsColumnName(expr->expr)
+                   << ")";
+            }
+            return ss.str();
+        }
+        case hsql::kExprOperator: {
+            std::stringstream ss;
+            switch(expr->opType) {
+                case hsql::kOpNone: {
+                    NotImplementError("None operator")
+                }
+                case hsql::kOpBetween: {
+                    ss << Statement::ExprAsColumnName(expr->expr) << " BETWEEN "
+                       << Statement::ExprAsColumnName((*expr->exprList)[0]) << " AND "
+                       << Statement::ExprAsColumnName((*expr->exprList)[1]);
+                    break;
+                }
+                case hsql::kOpCase: {
+                    NotImplementError("Case operator")
+                }
+                case hsql::kOpCaseListElement: {
+                    NotImplementError("Cast List operator")
+                }
+                case hsql::kOpPlus: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " + " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpMinus: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " - " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpAsterisk: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " * " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpSlash: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " / " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpPercentage: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " % " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpCaret: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " ^ " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpEquals: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " = " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpNotEquals: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " <> " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpLess: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " < " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpLessEq: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " <= " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpGreater: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " > " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpGreaterEq: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " >= " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpLike: {
+                    NotImplementError("LIKE operator")
+                }
+                case hsql::kOpNotLike: {
+                    NotImplementError("NOT LIKE operator")
+                }
+                case hsql::kOpILike: {
+                    NotImplementError("ILIKE operator")
+                }
+                case hsql::kOpAnd: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " AND " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpOr: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " OR " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpIn: {
+                    ss << Statement::ExprAsColumnName(expr->expr)
+                       << " IN " << Statement::ExprAsColumnName(expr->expr);
+                    break;
+                }
+                case hsql::kOpConcat: {
+                    NotImplementError("Concat operator")
+                }
+                case hsql::kOpNot: {
+                    ss << "NOT(" << Statement::ExprAsColumnName(expr->expr) << ")";
+                    break;
+                }
+                case hsql::kOpUnaryMinus: {
+                    ss << "-(" << Statement::ExprAsColumnName(expr->expr) << ")";
+                    break;
+                }
+                case hsql::kOpIsNull: {
+                    ss << "ISNULL(" << Statement::ExprAsColumnName(expr->expr) << ")";
+                    break;
+                }
+                case hsql::kOpExists: {
+                    ss << "EXISTS(" << Statement::ExprAsColumnName(expr->expr) << ")";
+                    break;
+                }
+            }
+            return ss.str();
+        }
+        case hsql::kExprSelect: {
+            NotImplementError("No implementation of subquery")
+        }
+        case hsql::kExprHint: {
+            NotImplementError("No implementation of hint")
+        }
+        case hsql::kExprArray:{
+            NotImplementError("No implementation of array")
+        }
+        case hsql::kExprArrayIndex:{
+            NotImplementError("No implementation of array index")
+        }
+        case hsql::kExprExtract:{
+            NotImplementError("No implementation of extract")
+        }
+        case hsql::kExprCast:{
+            std::stringstream ss;
+            ss << "CAST(" << Statement::ExprAsColumnName(expr->expr) << " AS " << Statement::ToString(expr->columnType) << ")";
+            return ss.str();
+        }
+    }
+    NotImplementError("Unexpected here")
+}
+
+String
+Statement::ToString(hsql::ColumnType column_type) {
+    switch(column_type.data_type) {
+        case hsql::DataType::UNKNOWN: {
+            NotImplementError("Unknown type")
+        }
+        case hsql::DataType::BIGINT: {
+            return "BIGINT";
+        }
+        case hsql::DataType::BOOLEAN: {
+            return "BOOLEAN";
+        }
+        case hsql::DataType::CHAR: {
+            return "CHAR(" + std::to_string(column_type.length) + ")";
+        }
+        case hsql::DataType::DATE: {
+            NotImplementError("Date type")
+        }
+        case hsql::DataType::DATETIME: {
+            NotImplementError("DateTime type")
+        }
+        case hsql::DataType::DECIMAL: {
+            return "DECIMAL(" + std::to_string(column_type.scale) + ", " + std::to_string(column_type.precision) + ")";
+        }
+        case hsql::DataType::DOUBLE: {
+            return "DOUBLE";
+        }
+        case hsql::DataType::FLOAT: {
+            return "FLOAT";
+        }
+        case hsql::DataType::INT: {
+            return "INTEGER";
+        }
+        case hsql::DataType::LONG: {
+            return "BIGINT";
+        }
+        case hsql::DataType::REAL: {
+            return "FLOAT";
+        }
+        case hsql::DataType::SMALLINT: {
+            return "SMALLINT";
+        }
+        case hsql::DataType::TEXT: {
+            return "TEXT(" + std::to_string(column_type.length) + ")";
+        }
+        case hsql::DataType::TIME: {
+            NotImplementError("Time type")
+        }
+        case hsql::DataType::VARCHAR: {
+            return "VARCHAR(" + std::to_string(column_type.length) + ")";
+        }
+    }
+    NotImplementError("Unexpected here")
+}
+
+String
 Statement::ToString(size_t intent) {
     std::stringstream ss;
     switch(statement_->type()) {
@@ -92,7 +346,7 @@ Statement::ToString(size_t intent) {
             hsql::AlterStatement* alter_stmt = dynamic_cast<hsql::AlterStatement*>(statement_);
             if(alter_stmt == nullptr) {
                 ParserError("AlterStatement: invalid statement type");
-                return std::string();
+                return String();
             }
             break;
         }
@@ -111,81 +365,81 @@ Statement::ToString(size_t intent) {
             break;
         }
     }
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::SelectStatement* select_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::ImportStatement* import_stmt, size_t intent) {
     std::stringstream ss;
     ss << "Import statement: " << import_stmt->filePath
        << ", table: " << import_stmt->schema <<"." << import_stmt->tableName << std::endl;
-    std::string space(intent, ' ');
+    String space(intent, ' ');
     ss << space << "hints: " << std::endl;
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::InsertStatement* insert_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::UpdateStatement* update_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::DeleteStatement* delete_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::CreateStatement* create_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::DropStatement* drop_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::PrepareStatement* prepare_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
-std::string
+String
 Statement::ToString(hsql::ExecuteStatement* execute_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::ExportStatement* export_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::AlterStatement* alter_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::ShowStatement* show_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::TransactionStatement* transaction_stmt, size_t intent) {
-    return std::string();
+    return String();
 }
 
-std::string
+String
 Statement::ToString(hsql::Expr* expr, size_t intent) {
-    return std::string();
+    return String();
 }
 
 }

@@ -2,6 +2,8 @@
 // Created by JinHai on 2022/10/30.
 //
 
+#pragma once
+
 #include "common/types/internal_types.h"
 #include "common/types/geo/box_type.h"
 #include "common/utility/infinity_assert.h"

@@ -21,13 +21,13 @@ public:
     virtual
     ~BoundNode() = default;
 
-    virtual std::shared_ptr<LogicalNode>
+    virtual SharedPtr<LogicalNode>
     BuildPlan() = 0;
 
-    std::vector<std::string> names;
+    std::vector<String> names;
     std::vector<DataType> types;
 
-    virtual int64_t
+    virtual i64
     GetTableIndex() = 0;
 
 protected:

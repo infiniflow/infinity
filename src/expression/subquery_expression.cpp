@@ -9,9 +9,9 @@
 
 namespace infinity {
 
-SubqueryExpression::SubqueryExpression(SharedPtr<BoundSelectNode> select_node, SubqueryType subquery_type)
+SubqueryExpression::SubqueryExpression(SharedPtr<BoundSelectStatement> bound_select_statement, SubqueryType subquery_type)
     : BaseExpression(ExpressionType::kSubQuery, {}),
-    select_node_ptr_(std::move(select_node)),
+    bound_select_statement_ptr_(std::move(bound_select_statement)),
     subquery_type_(subquery_type)
     {}
 

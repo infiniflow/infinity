@@ -11,7 +11,7 @@
 namespace infinity {
 
 void
-RegisterMinusFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }
 

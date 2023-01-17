@@ -10,13 +10,13 @@ namespace infinity {
 
 class LogicalProject: public LogicalNode {
 public:
-    LogicalProject(std::vector<std::shared_ptr<BaseExpression>> expressions, std::shared_ptr<BindContext>& bind_context)
-        : LogicalNode(LogicalNodeType::kProjection, bind_context), expressions_(std::move(expressions)) {}
+    LogicalProject(Vector<SharedPtr<BaseExpression>> expressions)
+        : LogicalNode(LogicalNodeType::kProjection), expressions_(std::move(expressions)) {}
 
-    std::string
-    ToString(int64_t& space) final;
+    String
+    ToString(i64& space) final;
 
-    std::vector<std::shared_ptr<BaseExpression>> expressions_;
+    Vector<SharedPtr<BaseExpression>> expressions_{};
 };
 
 

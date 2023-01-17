@@ -18,7 +18,7 @@
 
 // SQL compile
 #include "parser/statement.h"
-#include "planner/planner.h"
+#include "planner/logical_planner.h"
 #include "planner/optimizer.h"
 #include "executor/physical_planner.h"
 #include "scheduler/operator_pipeline.h"
@@ -54,12 +54,12 @@ Console::UnInit() {
 }
 
 void
-Console::Register(const std::string& name, const std::function<void(const std::string&)>& func) { commands_[name] = func; }
+Console::Register(const String& name, const std::function<void(const String&)>& func) { commands_[name] = func; }
 
-std::string
+String
 Console::HandleCommand(const char* command) {
 
-    std::string input(command);
+    String input(command);
     trim(input);
 
     while(!input.empty() && input.back() == ';') {
@@ -75,17 +75,17 @@ Console::HandleCommand(const char* command) {
 }
 
 void
-Console::Execute(const std::string& statement) {
+Console::Execute(const String& statement) {
     if (statement.empty()) return;
 
-    std::unordered_map<std::string, std::function<void(const std::string&)>>::iterator iter;
+    HashMap<String, std::function<void(const String&)>>::iterator iter;
 
-    std::string command = statement.substr(0, statement.find_first_of(' '));
+    String command = statement.substr(0, statement.find_first_of(' '));
 
     // Transfer command to upper case
     std::transform(command.begin(),command.end(), command.begin(), toupper);
     if ((iter = commands_.find(command)) != std::end(commands_)) {
-        std::string args = statement.substr(statement.find_first_of(' ') + 1, statement.size());
+        String args = statement.substr(statement.find_first_of(' ') + 1, statement.size());
         iter->second(args);
         return ;
     }
@@ -94,7 +94,7 @@ Console::Execute(const std::string& statement) {
 }
 
 void
-Console::Exit(const std::string& command) {
+Console::Exit(const String& command) {
     if(command == "EXIT" || command == "QUIT") {
         std::cout << "Bye!" << std::endl;
         std::exit(0);
@@ -103,23 +103,23 @@ Console::Exit(const std::string& command) {
 }
 
 void
-Console::Explain(const std::string& arguments) {
+Console::Explain(const String& arguments) {
     hsql::SQLParserResult parse_result;
 
-    std::shared_ptr<Session> session_ptr = std::make_shared<Session>();
-    std::shared_ptr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
+    SharedPtr<Session> session_ptr = std::make_shared<Session>();
+    SharedPtr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
-    Planner logical_planner(query_context_ptr);
+    LogicalPlanner logical_planner(query_context_ptr);
     Optimizer optimizer(query_context_ptr);
     PhysicalPlanner physical_planner(query_context_ptr);
 
     size_t parameter_pos = arguments.find_first_of(' ');
-    std::string parameter = arguments.substr(0, parameter_pos);
+    String parameter = arguments.substr(0, parameter_pos);
     // Transfer second parameter to upper case
     std::transform(parameter.begin(),parameter.end(), parameter.begin(), toupper);
 
-    std::string query = arguments.substr(parameter_pos + 1, arguments.size());
+    String query = arguments.substr(parameter_pos + 1, arguments.size());
 
     // Parse sql
     hsql::SQLParser::parse(query, &parse_result);
@@ -136,7 +136,8 @@ Console::Explain(const std::string& arguments) {
     }
 
     // Build unoptimized logical plan for each SQL statement.
-    std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.BuildLogicalPlan(*parse_result.getStatements()[0]);
+    logical_planner.Build(*parse_result.getStatements()[0]);
+    SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 
     if(parameter == "LOGICAL") {
         std::cout << "Explain LOGICAL: " << query << std::endl;
@@ -147,7 +148,7 @@ Console::Explain(const std::string& arguments) {
     }
 
     // Apply optimized rule to the logical plan
-    std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
+    SharedPtr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
 
     if(parameter == "OPT") {
         std::cout << "Explain OPTIMIZED LOGICAL: " << query << std::endl;
@@ -158,7 +159,7 @@ Console::Explain(const std::string& arguments) {
     }
 
     // Build physical plan
-    std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
+    SharedPtr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
     if(parameter == "PHYSICAL") {
         std::cout << "Explain PHYSICAL: " << query << std::endl;
@@ -166,7 +167,7 @@ Console::Explain(const std::string& arguments) {
     }
 
     // Create execution pipeline
-    std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
+    SharedPtr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
 
     if(parameter == "PIPELINE") {
         std::cout << "Explain PIPELINE: " << query << std::endl;
@@ -177,21 +178,21 @@ Console::Explain(const std::string& arguments) {
 }
 
 void
-Console::Visualize(const std::string& arguments) {
+Console::Visualize(const String& arguments) {
     hsql::SQLParserResult parse_result;
 
-    std::shared_ptr<Session> session_ptr = std::make_shared<Session>();
-    std::shared_ptr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
+    SharedPtr<Session> session_ptr = std::make_shared<Session>();
+    SharedPtr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
-    Planner logical_planner(query_context_ptr);
+    LogicalPlanner logical_planner(query_context_ptr);
 
     Optimizer optimizer(query_context_ptr);
     PhysicalPlanner physical_planner(query_context_ptr);
 
     size_t option_pos = arguments.find_first_of(' ');
-    std::string option = arguments.substr(0, option_pos);
-    std::string query = arguments.substr(option_pos + 1, arguments.size());
+    String option = arguments.substr(0, option_pos);
+    String query = arguments.substr(option_pos + 1, arguments.size());
 
     // Parse sql
     hsql::SQLParser::parse(query, &parse_result);
@@ -207,7 +208,8 @@ Console::Visualize(const std::string& arguments) {
     }
 
     // Build unoptimized logical plan for each SQL statement.
-    std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.BuildLogicalPlan(*parse_result.getStatements()[0]);
+    logical_planner.Build(*parse_result.getStatements()[0]);
+    SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 
     if(option == "LOGICAL") {
         std::cout << "Visualize LOGICAL: " << query << std::endl;
@@ -215,7 +217,7 @@ Console::Visualize(const std::string& arguments) {
     }
 
     // Apply optimized rule to the logical plan
-    std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
+    SharedPtr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
 
     if(option == "OPT") {
         std::cout << "Visualize OPTIMIZED LOGICAL: " << query << std::endl;
@@ -223,7 +225,7 @@ Console::Visualize(const std::string& arguments) {
     }
 
     // Build physical plan
-    std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
+    SharedPtr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
     if(option == "PHYSICAL") {
         std::cout << "Visualize PHYSICAL: " << query << std::endl;
@@ -231,7 +233,7 @@ Console::Visualize(const std::string& arguments) {
     }
 
     // Create execution pipeline
-    std::shared_ptr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
+    SharedPtr<Pipeline> pipeline = physical_plan->GenerateOperatorPipeline();
 
     if(option == "PIPELINE") {
         std::cout << "Visualize PIPELINE: " << query << std::endl;
@@ -242,17 +244,17 @@ Console::Visualize(const std::string& arguments) {
 }
 
 void
-Console::VerifyScript(const std::string& arguments) {
+Console::VerifyScript(const String& arguments) {
     GeneralError("Verify script not supported now.");
 }
 
 void
-Console::RunScript(const std::string& arguments) {
+Console::RunScript(const String& arguments) {
     GeneralError("Run script not supported now.");
 }
 
 void
-Console::ExecuteSQL(const std::string& sql_text) {
+Console::ExecuteSQL(const String& sql_text) {
     hsql::SQLParserResult parse_result;
 
     // Parse sql
@@ -261,11 +263,11 @@ Console::ExecuteSQL(const std::string& sql_text) {
         ParserError(parse_result.errorMsg())
     }
 
-    std::shared_ptr<Session> session_ptr = std::make_shared<Session>();
-    std::shared_ptr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
+    SharedPtr<Session> session_ptr = std::make_shared<Session>();
+    SharedPtr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
-    Planner logical_planner(query_context_ptr);
+    LogicalPlanner logical_planner(query_context_ptr);
 
     Optimizer optimizer(query_context_ptr);
     PhysicalPlanner physical_planner(query_context_ptr);
@@ -273,16 +275,17 @@ Console::ExecuteSQL(const std::string& sql_text) {
     PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {
         // Build unoptimized logical plan for each SQL statement.
-        std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.BuildLogicalPlan(*statement);
+        logical_planner.Build(*statement);
+        SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 
         // Apply optimized rule to the logical plan
-        std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
+        SharedPtr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
 
         // Build physical plan
-        std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
+        SharedPtr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
         // Create execution pipeline
-        std::shared_ptr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
+        SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
 
         // Schedule the query pipeline
         Infinity::instance().scheduler()->Schedule(query_context_ptr, pipeline);

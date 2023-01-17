@@ -15,15 +15,24 @@ enum class BindingType { kInvalid, kTable, kSubquery, kCTE, kView };
 class Binding {
 public:
     Binding() = default;
-    virtual ~Binding() = default;
+
+    virtual
+    ~Binding() = default;
 
     static SharedPtr<Binding>
-    MakeBinding(BindingType binding_type, const String& name,
-                const Vector<DataType>& column_types, const Vector<String>& column_names);
+    MakeBinding(BindingType binding_type,
+                const String& name,
+                u64 table_index,
+                const Vector<DataType>& column_types,
+                const Vector<String>& column_names);
 
     static SharedPtr<Binding>
-    MakeBinding(BindingType binding_type, const String& name, SharedPtr<Table> table_ptr,
-                const Vector<DataType>& column_types, const Vector<String>& column_names);
+    MakeBinding(BindingType binding_type,
+                const String& name,
+                u64 table_index,
+                SharedPtr<Table> table_ptr,
+                const Vector<DataType>& column_types,
+                const Vector<String>& column_names);
 
     // Binding type
     BindingType binding_type_{ BindingType::kInvalid };
@@ -31,8 +40,10 @@ public:
     // Binding table alias or name
     String table_name_;
 
+    u64 table_index_{};
+
     // Node id of the corresponding logical node
-//    int64_t logical_node_id_{-1};
+//    i64 logical_node_id_{-1};
 
     // ptr to the corresponding logical node.
 //    SharedPtr<LogicalNode> logical_node_ptr_{nullptr};
@@ -47,7 +58,7 @@ public:
     Vector<String> column_names_;
 
     // Column name -> column index mapping
-    HashMap<String, int64_t> name2index_;
+    HashMap<String, i64> name2index_;
 };
 
 //class TableBinding: public GenericBinding {

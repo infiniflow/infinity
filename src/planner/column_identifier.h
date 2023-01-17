@@ -6,6 +6,7 @@
 
 #include "sql/Expr.h"
 #include "main/query_context.h"
+#include "parser/expression/parsed_column_expression.h"
 
 #include <string>
 
@@ -14,24 +15,31 @@ namespace infinity {
 struct ColumnIdentifier {
 public:
     static ColumnIdentifier
-    MakeColumnIdentifier(std::shared_ptr<QueryContext>& query_context, const hsql::Expr &expr);
+    MakeColumnIdentifier(SharedPtr<QueryContext>& query_context, const hsql::Expr &expr);
 
+    static ColumnIdentifier
+    MakeColumnIdentifier(SharedPtr<QueryContext>& query_context,
+                         const SharedPtr<ParsedColumnExpression>& parsed_expr);
+
+public:
     explicit
-    ColumnIdentifier(std::shared_ptr<std::string> schema_name,
-                              std::shared_ptr<std::string> table_name,
-                              std::shared_ptr<std::string> column_name,
-                              std::shared_ptr<std::string> alias_name);
+    ColumnIdentifier(SharedPtr<String> db_name,
+                     SharedPtr<String> schema_name,
+                     SharedPtr<String> table_name,
+                     SharedPtr<String> column_name,
+                     SharedPtr<String> alias_name);
 
-    [[nodiscard]] std::string
+    [[nodiscard]] String
     ToString() const;
 
     [[nodiscard]] bool
     operator==(const ColumnIdentifier& other) const;
 
-    std::shared_ptr<std::string> schema_name_ptr_;
-    std::shared_ptr<std::string> column_name_ptr_;
-    std::shared_ptr<std::string> table_name_ptr_;
-    std::shared_ptr<std::string> alias_name_ptr_;
+    SharedPtr<String> db_name_ptr_;
+    SharedPtr<String> schema_name_ptr_;
+    SharedPtr<String> column_name_ptr_;
+    SharedPtr<String> table_name_ptr_;
+    SharedPtr<String> alias_name_ptr_;
 };
 
 }

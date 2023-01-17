@@ -19,11 +19,15 @@ BindContext::Destroy() {
     parent_ = nullptr;
 }
 
-std::shared_ptr<CommonTableExpressionInfo>
+SharedPtr<CommonTableExpressionInfo>
 BindContext::GetCTE(const String& name) const {
     auto entry = CTE_map_.find(name);
     if(entry != CTE_map_.end()) {
-        return entry->second;
+        SharedPtr<CommonTableExpressionInfo> matched_cte_info = entry->second;
+        if(matched_cte_info->masked_name_set_.contains(name)) {
+            // name is visible in this scope.
+            return matched_cte_info;
+        }
     }
 
     if(parent_) {
@@ -33,7 +37,7 @@ BindContext::GetCTE(const String& name) const {
 }
 
 bool
-BindContext::IsCTEBound(const std::shared_ptr<CommonTableExpressionInfo>& cte) const {
+BindContext::IsCTEBound(const SharedPtr<CommonTableExpressionInfo>& cte) const {
 
     if(bound_cte_set_.contains(cte)) {
         return true;
@@ -74,18 +78,23 @@ BindContext::IsTableBound(const String& table_name) const {
     return false;
 }
 
-int64_t
+u64
 BindContext::GetNewLogicalNodeId() {
     return parent_ ? parent_->GetNewLogicalNodeId() : next_logical_node_id_ ++;
 }
 
-size_t
+u64
 BindContext::GenerateBindingContextIndex() {
     return parent_ ? parent_->GenerateBindingContextIndex() : next_bind_context_index_ ++;
 }
 
+u64
+BindContext::GenerateTableIndex() {
+    return parent_ ? parent_->GenerateTableIndex() : next_table_index_ ++;
+}
+
 void
-BindContext::AddBinding(const std::shared_ptr<Binding>& binding) {
+BindContext::AddBinding(const SharedPtr<Binding>& binding) {
     binding_by_name_.emplace(binding->table_name_, binding);
     for(auto& column_name: binding->column_names_) {
         auto iter = binding_names_by_column_.find(column_name);
@@ -100,60 +109,73 @@ BindContext::AddBinding(const std::shared_ptr<Binding>& binding) {
 
 void
 BindContext::AddSubqueryBinding(const String& name,
-                               const Vector<DataType>& column_types,
-                               const Vector<String>& column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kSubquery, name, column_types, column_names);
+                                u64 table_index,
+                                const Vector<DataType>& column_types,
+                                const Vector<String>& column_names) {
+    auto binding = Binding::MakeBinding(BindingType::kSubquery, name, table_index, column_types, column_names);
     AddBinding(binding);
 }
 
 void
-BindContext::AddCTEBinding(const String& name, const Vector<DataType>& column_types,
+BindContext::AddCTEBinding(const String& name,
+                           u64 table_index,
+                           const Vector<DataType>& column_types,
                            const Vector<String>& column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kCTE, name, column_types, column_names);
+    auto binding = Binding::MakeBinding(BindingType::kCTE, name, table_index, column_types, column_names);
     AddBinding(binding);
 }
 
 void
-BindContext::AddViewBinding(const String& name, const Vector<DataType>& column_types,
+BindContext::AddViewBinding(const String& name,
+                            u64 table_index,
+                            const Vector<DataType>& column_types,
                             const Vector<String>& column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kView, name, column_types, column_names);
+    auto binding = Binding::MakeBinding(BindingType::kView, name, table_index, column_types, column_names);
     AddBinding(binding);
 }
 
 void
-BindContext::AddTableBinding(const String& name, std::shared_ptr<Table> table_ptr,
-//                             int64_t logical_node_id,
-//                             std::shared_ptr<LogicalNode> logical_node_ptr,
+BindContext::AddTableBinding(const String& table_alias,
+                             u64 table_index,
+                             SharedPtr<Table> table_ptr,
                              const Vector<DataType>& column_types,
                              const Vector<String>& column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kTable, name, std::move(table_ptr),
+    auto binding = Binding::MakeBinding(BindingType::kTable,
+                                        table_alias,
+                                        table_index,
+                                        std::move(table_ptr),
 //                                        std::move(logical_node_ptr),
 //                                        logical_node_id,
                                         column_types, column_names);
     AddBinding(binding);
-    table_names_.emplace_back(name);
+    table_names_.emplace_back(table_alias);
 }
 
 void
-BindContext::AddLeftChild(const std::shared_ptr<BindContext>& left_child) {
+BindContext::AddLeftChild(const SharedPtr<BindContext>& left_child) {
     this->left_child_ = left_child;
     this->AddBindContext(left_child);
 }
 
 void
-BindContext::AddRightChild(const std::shared_ptr<BindContext>& right_child) {
+BindContext::AddRightChild(const SharedPtr<BindContext>& right_child) {
     this->right_child_ = right_child;
     this->AddBindContext(right_child);
 }
 
 void
-BindContext::AddSubQueryChild(const std::shared_ptr<BindContext>& child) {
+BindContext::AddSubQueryChild(const SharedPtr<BindContext>& child) {
     this->subquery_children_.emplace_back(child);
+
+    // Child query has only one row, parent query will also only have one row.
+    if(child->single_row) {
+        this->single_row = child->single_row;
+    }
     // TODO: need merge bind context?
 }
 
 void
-BindContext::AddBindContext(const std::shared_ptr<BindContext>& other_ptr) {
+BindContext::AddBindContext(const SharedPtr<BindContext>& other_ptr) {
 
     for(auto& name_binding_pair : other_ptr->binding_by_name_) {
         auto& binding_name = name_binding_pair.first;
@@ -177,10 +199,10 @@ BindContext::AddBindContext(const std::shared_ptr<BindContext>& other_ptr) {
     }
 }
 
-std::shared_ptr<BaseExpression>
-BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t depth) {
+SharedPtr<BaseExpression>
+BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 depth) {
 
-    std::shared_ptr<BaseExpression> bound_column_expr;
+    SharedPtr<BaseExpression> bound_column_expr;
 
     const String& column_name_ref = *column_identifier.column_name_ptr_;
 
@@ -199,8 +221,8 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t 
             auto binding = binding_by_name_[binding_name];
 
             if(binding->name2index_.contains(column_name_ref)) {
-                int64_t column_id = binding->name2index_[column_name_ref];
-                bound_column_expr = std::make_shared<ColumnExpression>(
+                i64 column_id = binding->name2index_[column_name_ref];
+                bound_column_expr = MakeShared<ColumnExpression>(
                         binding->column_types_[column_id],
                         binding_name,
                         column_name_ref,
@@ -223,8 +245,8 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t 
         if(binding != nullptr) {
             if(binding->name2index_.contains(column_name_ref)) {
                 // Find the table and column in the bind context.
-                int64_t column_id = binding->name2index_[column_name_ref];
-                bound_column_expr = std::make_shared<ColumnExpression>(
+                i64 column_id = binding->name2index_[column_name_ref];
+                bound_column_expr = MakeShared<ColumnExpression>(
                         binding->column_types_[column_id],
                         table_name_ref,
                         column_name_ref,
@@ -252,7 +274,7 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t 
 }
 
 //void
-//BindContext::AddChild(const std::shared_ptr<BindContext>& child) {
+//BindContext::AddChild(const SharedPtr<BindContext>& child) {
 //    child->binding_context_id_ = GenerateBindingContextIndex();
 //    children_.emplace_back(child);
 //}

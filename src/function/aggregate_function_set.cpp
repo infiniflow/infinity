@@ -12,7 +12,7 @@ AggregateFunctionSet::AddFunction(const infinity::AggregateFunction& func) {
 }
 
 AggregateFunction
-AggregateFunctionSet::GetMostMatchFunction(const std::vector<std::shared_ptr<BaseExpression>> &input_arguments) {
+AggregateFunctionSet::GetMostMatchFunction(const std::vector<SharedPtr<BaseExpression>> &input_arguments) {
     PlannerError("not implemented.");
 }
 

@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterAndFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+RegisterAndFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

@@ -34,7 +34,7 @@ ComposeExpressionWithDelimiter(const Vector<SharedPtr<BaseExpression>>& expressi
     }
     SharedPtr<BaseExpression> result = expressions[0];
     for(auto i = 1; i < expr_count; ++ i) {
-        result = std::make_shared<ConjunctionExpression>(conjunction_type, result, expressions[i]);
+        result = MakeShared<ConjunctionExpression>(conjunction_type, result, expressions[i]);
     }
     return result;
 }

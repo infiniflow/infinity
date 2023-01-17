@@ -7,21 +7,21 @@
 
 namespace infinity {
 
-std::string
-LogicalSort::ToString(int64_t& space) {
+String
+LogicalSort::ToString(i64& space) {
     std::stringstream ss;
-    std::string arrow_str;
+    String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "Sort" << std::endl;
+    ss << String(space, ' ') << arrow_str << "Sort" << std::endl;
     if(arrow_str.empty()) {
         space += 2;
-        ss << std::string(space , ' ') << "Sort Key: ";
+        ss << String(space , ' ') << "Sort Key: ";
     } else {
         space += 5;
-        ss << std::string(space , ' ') << "Sort Key: ";
+        ss << String(space , ' ') << "Sort Key: ";
     }
 
     size_t expression_count = expressions_.size();
@@ -30,6 +30,7 @@ LogicalSort::ToString(int64_t& space) {
     }
     ss << expressions_.back()->ToString() << " " << infinity::ToString(order_by_types_.back());
     space += arrow_str.size();
+
     return ss.str();
 }
 

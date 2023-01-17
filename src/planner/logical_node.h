@@ -7,7 +7,7 @@
 #include "logical_node_type.h"
 #include "column_identifier.h"
 #include "expression/base_expression.h"
-#include "bind_context.h"
+#include "planner/bind_context.h"
 
 #include <string>
 #include <vector>
@@ -19,7 +19,7 @@ namespace infinity {
 class LogicalNode {
 public:
     explicit
-    LogicalNode(LogicalNodeType node_type, SharedPtr<BindContext>& bind_context_ptr);
+    LogicalNode(LogicalNodeType node_type) : operator_type_(node_type) {}
 
     virtual
     ~LogicalNode() = default;
@@ -48,10 +48,6 @@ public:
 //    void RemoveOutputNode(const SharedPtr<LogicalNode>& output);
 //    void ClearOutputs();
 //    [[nodiscard]] std::vector<SharedPtr<LogicalNode>> outputs() const { return outputs_; }
-
-    virtual String
-    ToString(i64& space) = 0;
-
     [[nodiscard]] u64
     node_id() const {
         return node_id_;
@@ -61,6 +57,9 @@ public:
         node_id_ = node_id;
     }
 
+    virtual String
+    ToString(i64& space) = 0;
+
     [[nodiscard]] LogicalNodeType
     operator_type() const {
         return operator_type_;
@@ -69,15 +68,10 @@ public:
 protected:
     LogicalNodeType operator_type_ = LogicalNodeType::kInvalid;
 
-    SharedPtr<LogicalNode> left_node_;
-    SharedPtr<LogicalNode> right_node_;
+    SharedPtr<LogicalNode> left_node_{};
+    SharedPtr<LogicalNode> right_node_{};
 //    std::vector<SharedPtr<LogicalNode>> outputs_;
-
-    // Each node has an id which is unique in this plan tree.
-    u64 node_id_{0};
-
-    // bind_context_
-    SharedPtr<BindContext>& bind_context_ptr_;
+    u64 node_id_{};
 };
 
 }

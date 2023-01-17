@@ -7,16 +7,17 @@
 
 namespace infinity {
 
-std::string
-LogicalChunkScan::ToString(int64_t& space) {
+String
+LogicalChunkScan::ToString(i64& space) {
     std::stringstream ss;
-    std::string arrow_str;
+    String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << "-> " << "ChunkScan: ";
+    ss << String(space, ' ') << "-> " << "ChunkScan: ";
     space += arrow_str.size();
+
     return ss.str();
 }
 

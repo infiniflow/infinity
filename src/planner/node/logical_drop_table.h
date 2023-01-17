@@ -10,18 +10,27 @@ namespace infinity {
 
 class LogicalDropTable : public LogicalNode {
 public:
-    LogicalDropTable(std::shared_ptr<std::string> schema_name,
-                     std::shared_ptr<std::string> table_name, std::shared_ptr<BindContext>& bind_context)
-        : LogicalNode(LogicalNodeType::kDropTable, bind_context),
+    LogicalDropTable(SharedPtr<String> schema_name,
+                     SharedPtr<String> table_name)
+        : LogicalNode(LogicalNodeType::kDropTable),
           schema_name_(std::move(schema_name)),
           table_name_(std::move(table_name)) {}
 
-    std::string ToString(int64_t& space) final;
-    [[nodiscard]] std::shared_ptr<std::string> table_name() const { return table_name_; }
-    [[nodiscard]] std::shared_ptr<std::string> schema_name() const { return schema_name_; }
+    String
+    ToString(i64& space) final;
+
+    [[nodiscard]] SharedPtr<String>
+    table_name() const {
+        return table_name_;
+    }
+    [[nodiscard]] SharedPtr<String>
+    schema_name() const {
+        return schema_name_;
+    }
+
 private:
-    std::shared_ptr<std::string> table_name_;
-    std::shared_ptr<std::string> schema_name_;
+    SharedPtr<String> table_name_{};
+    SharedPtr<String> schema_name_{};
 };
 
 }

@@ -7,24 +7,25 @@
 
 namespace infinity {
 
-LogicalJoin::LogicalJoin(JoinType join_type, std::vector<std::shared_ptr<BaseExpression>> conditions,
-                         const std::shared_ptr<LogicalNode>& left, const std::shared_ptr<LogicalNode>& right,
-                         std::shared_ptr<BindContext>& bind_context)
-                         : LogicalNode(LogicalNodeType::kJoin, bind_context),
+LogicalJoin::LogicalJoin(JoinType join_type,
+                         Vector<SharedPtr<BaseExpression>> conditions,
+                         const SharedPtr<LogicalNode>& left,
+                         const SharedPtr<LogicalNode>& right)
+                         : LogicalNode(LogicalNodeType::kJoin),
                          join_type_(join_type), conditions_(std::move(conditions)){
     this->set_left_node(left);
     this->set_right_node(right);
 }
 
-std::string
-LogicalJoin::ToString(int64_t& space) {
+String
+LogicalJoin::ToString(i64& space) {
     std::stringstream ss;
-    std::string arrow_str;
+    String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << infinity::ToString(join_type_) << " on ";
+    ss << String(space, ' ') << arrow_str << infinity::ToString(join_type_) << " on ";
     for(auto& condition: conditions_) {
         ss << condition->ToString() << " ";
     }

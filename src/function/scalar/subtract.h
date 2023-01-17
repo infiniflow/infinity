@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterSubtractFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

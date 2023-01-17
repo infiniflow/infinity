@@ -16,7 +16,6 @@ class LogicalTableScan : public LogicalNode {
 public:
     explicit
     LogicalTableScan(SharedPtr<Table> table_ptr,
-                     SharedPtr<BindContext>& bind_context,
                      SharedPtr<TableScanFunction> table_scan_func,
                      String table_alias,
                      Vector<String> column_names,

@@ -2,6 +2,8 @@
 // Created by JinHai on 2022/11/8.
 //
 
+#pragma once
+
 #include "bitmask_buffer.h"
 
 namespace infinity {

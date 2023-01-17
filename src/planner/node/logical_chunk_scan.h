@@ -19,14 +19,16 @@ enum class ChunkScanType {
 
 class LogicalChunkScan: public LogicalNode {
 public:
-    explicit LogicalChunkScan(ChunkScanType type, std::shared_ptr<BindContext>& bind_context)
-        : LogicalNode(LogicalNodeType::kChunkScan, bind_context), scan_type_(type) {}
+    explicit
+    LogicalChunkScan(ChunkScanType type) : LogicalNode(LogicalNodeType::kChunkScan), scan_type_(type) {}
 
-    std::string
-    ToString(int64_t& space) final;
+    String
+    ToString(i64& space) final;
 
     [[nodiscard]] ChunkScanType
-    scan_type() const { return scan_type_; }
+    scan_type() const {
+        return scan_type_;
+    }
 
 private:
     ChunkScanType scan_type_{ChunkScanType::kInvalid};

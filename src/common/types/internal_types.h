@@ -11,6 +11,7 @@
 #include <cstring>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace infinity {
 
@@ -39,6 +40,9 @@ using Set = std::set<T>;
 
 template<typename S, typename T>
 using HashMap = std::unordered_map<S, T>;
+
+template<typename S>
+using HashSet = std::unordered_set<S>;
 
 using String = std::string;
 

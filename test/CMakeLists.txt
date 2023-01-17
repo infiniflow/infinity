@@ -3,11 +3,22 @@ include_directories(../third_party/googletest/googlemock/include)
 include_directories(./)
 
 
+file(GLOB_RECURSE
+        bin_src
+        CONFIGURE_DEPENDS
+        bin/*.cpp
+        )
 
 file(GLOB_RECURSE
         common_test_src
         CONFIGURE_DEPENDS
         common/*.cpp
+        )
+
+file(GLOB_RECURSE
+        executor_src
+        CONFIGURE_DEPENDS
+        executor/*.cpp
         )
 
 file(GLOB_RECURSE
@@ -23,15 +34,15 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
-        bin_src
+        parser_test_src
         CONFIGURE_DEPENDS
-        bin/*.cpp
+        parser/*.cpp
         )
 
 file(GLOB_RECURSE
-        executor_src
+        planner_test_src
         CONFIGURE_DEPENDS
-        executor/*.cpp
+        planner/*.cpp
         )
 
 file(GLOB_RECURSE
@@ -42,11 +53,13 @@ file(GLOB_RECURSE
 
 add_executable(test_main
         main.cpp
+        ${bin_src}
         ${common_test_src}
+        ${executor_src}
         ${function_test_src}
         ${main_test_src}
-        ${bin_src}
-        ${executor_src}
+        ${parser_test_src}
+        ${planner_test_src}
         ${storage_src}
         )
 

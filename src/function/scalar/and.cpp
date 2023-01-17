@@ -17,10 +17,10 @@ struct AndFunction {
 };
 
 static void
-GenerateAndFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr) {
-
+GenerateAndFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr) {
+    String func_name = "AND";
     ScalarFunction and_function(
-            "and",
+            func_name,
             { DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean) },
             { DataType(LogicalType::kBoolean) },
             &ScalarFunction::BinaryFunction<BooleanT, BooleanT, BooleanT, AndFunction>);
@@ -28,8 +28,9 @@ GenerateAndFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr) {
 }
 
 void
-RegisterAndFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
-    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("and");
+RegisterAndFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    String func_name = "AND";
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateAndFunction(function_set_ptr);
 

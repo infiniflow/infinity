@@ -13,14 +13,21 @@ namespace infinity {
 
 class LogicalCreateTable : public LogicalNode {
 public:
+    static inline SharedPtr<LogicalCreateTable>
+    Make(const SharedPtr<String>& schema_name,
+         const SharedPtr<TableDef>& table_def_ptr) {
+        return MakeShared<LogicalCreateTable>(schema_name, table_def_ptr);
+    }
+
+public:
     LogicalCreateTable(SharedPtr<String> schema_name,
-            SharedPtr<TableDef> table_def_ptr, SharedPtr<BindContext>& bind_context)
-        : LogicalNode(LogicalNodeType::kCreateTable, bind_context),
+                       SharedPtr<TableDef> table_def_ptr)
+        : LogicalNode(LogicalNodeType::kCreateTable),
           schema_name_(std::move(schema_name)),
           table_definitions_(std::move(table_def_ptr)) {}
 
     String 
-    ToString(int64_t& space) final;
+    ToString(i64& space) final;
 
     [[nodiscard]] SharedPtr<TableDef>
     table_definitions() const {
@@ -33,8 +40,8 @@ public:
     }
 
 private:
-    SharedPtr<String> schema_name_;
-    SharedPtr<TableDef> table_definitions_;
+    SharedPtr<String> schema_name_{};
+    SharedPtr<TableDef> table_definitions_{};
 };
 
 }

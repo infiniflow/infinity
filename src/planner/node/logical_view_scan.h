@@ -13,13 +13,18 @@ namespace infinity {
 class LogicalViewScan: public LogicalNode {
 
 public:
-    explicit LogicalViewScan(std::shared_ptr<View> view_ptr, std::shared_ptr<BindContext>& bind_context)
-    : LogicalNode(LogicalNodeType::kViewScan, bind_context), view_ptr_(std::move(view_ptr)) {}
+    explicit LogicalViewScan(SharedPtr<View> view_ptr)
+    : LogicalNode(LogicalNodeType::kViewScan), view_ptr_(std::move(view_ptr)) {}
 
-    [[nodiscard]] std::shared_ptr<View> view_ptr() const { return view_ptr_; }
-    std::string ToString(int64_t& space) final;
+    [[nodiscard]] SharedPtr<View>
+    view_ptr() const {
+        return view_ptr_;
+    }
+
+    String
+    ToString(i64& space) final;
 private:
-    std::shared_ptr<View> view_ptr_{nullptr};
+    SharedPtr<View> view_ptr_{nullptr};
 
 };
 

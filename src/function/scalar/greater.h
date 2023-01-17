@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterGreaterFunction(const std::unique_ptr<Catalog> &catalog_ptr);
+RegisterGreaterFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

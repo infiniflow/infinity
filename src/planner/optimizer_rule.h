@@ -11,13 +11,20 @@ namespace infinity {
 
 class OptimizerRule {
 public:
-    virtual ~OptimizerRule() = 0;
+    virtual
+    ~OptimizerRule() = 0;
 
-    virtual void ApplyToPlan(std::shared_ptr<QueryContext>& query_context_ptr,
-                             const std::shared_ptr<LogicalNode>& logical_plan) const = 0;
-    std::string name() const { return name_; };
+    virtual void
+    ApplyToPlan(SharedPtr<QueryContext>& query_context_ptr,
+                const SharedPtr<LogicalNode>& logical_plan) const = 0;
+
+    String
+    name() const {
+        return name_;
+    };
+
 private:
-    std::string name_;
+    String name_;
 };
 
 

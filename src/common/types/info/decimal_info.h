@@ -2,7 +2,7 @@
 // Created by JinHai on 2022/10/28.
 //
 
-#pragma
+#pragma once
 
 #include "common/types/type_info.h"
 #include "common/types/logical_type.h"

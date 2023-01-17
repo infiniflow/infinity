@@ -8,6 +8,7 @@
 #include "common/types/value.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
+#include "main/infinity.h"
 #include "executor/expression/expression_executor.h"
 #include "common/types/info/varchar_info.h"
 #include "storage/catalog.h"
@@ -19,13 +20,13 @@
 class ExpressionExecutorTest : public BaseTest {
     void
     SetUp() override {
-        infinity::Logger::Initialize();
         infinity::GlobalResourceUsage::Init();
+        infinity::Infinity::instance().Init();
     }
 
     void
     TearDown() override {
-        infinity::Logger::Shutdown();
+        infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -36,7 +37,9 @@ TEST_F(ExpressionExecutorTest, add_bigint_constant_1) {
     using namespace infinity;
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
     RegisterAddFunction(catalog_ptr);
-    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName("+");
+
+    String op = "+";
+    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -157,7 +160,9 @@ TEST_F(ExpressionExecutorTest, subtract_constant_8192_bigint) {
     using namespace infinity;
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
     RegisterSubtractFunction(catalog_ptr);
-    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName("-");
+
+    String op = "-";
+    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 

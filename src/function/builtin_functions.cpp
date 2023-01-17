@@ -35,7 +35,7 @@
 
 namespace infinity {
 
-BuiltinFunctions::BuiltinFunctions(std::unique_ptr<Catalog> &catalog_ptr) : catalog_ptr_(catalog_ptr) {}
+BuiltinFunctions::BuiltinFunctions(UniquePtr<Catalog> &catalog_ptr) : catalog_ptr_(catalog_ptr) {}
 
 void
 BuiltinFunctions::Init() {

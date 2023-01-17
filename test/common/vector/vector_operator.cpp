@@ -8,6 +8,7 @@
 #include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
+#include "main/infinity.h"
 
 class VectorOperationTest : public BaseTest {
     void

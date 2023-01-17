@@ -16,7 +16,7 @@ namespace infinity {
 class Session;
 
 struct QueryResult {
-    std::shared_ptr<Table> result_;
+    SharedPtr<Table> result_;
     LogicalNodeType root_operator_type_;
 
     [[nodiscard]] String
@@ -26,7 +26,7 @@ struct QueryResult {
 class QueryContext : public std::enable_shared_from_this<QueryContext> {
 public:
     explicit
-    QueryContext(const std::shared_ptr<Session>& session_ptr, UniquePtr<TransactionContext>& transaction);
+    QueryContext(SharedPtr<Session> session_ptr, UniquePtr<TransactionContext>& transaction);
 
     QueryResult
     Query(const String& query);
@@ -51,7 +51,7 @@ private:
     UniquePtr<TransactionContext>& transaction_;
     UniquePtr<QueryProfiler> query_metrics_;
 
-//    std::weak_ptr<Session> session_ptr_;
+    SharedPtr<Session> session_ptr_;
 
     // Get following information from session.
     // Current schema

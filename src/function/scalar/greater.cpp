@@ -76,10 +76,10 @@ GreaterFunction::Run(VarcharT left, MixedT right, bool& result) {
 
 template<typename CompareType>
 static void
-GenerateGreaterFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, DataType data_type) {
-
+GenerateGreaterFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr, DataType data_type) {
+    String func_name = ">";
     ScalarFunction greater_function(
-            ">",
+            func_name,
             { data_type, data_type },
             DataType(LogicalType::kBoolean),
             &ScalarFunction::BinaryFunction<CompareType, CompareType, bool, GreaterFunction>);
@@ -87,8 +87,9 @@ GenerateGreaterFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr, Da
 }
 
 void
-RegisterGreaterFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
-    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(">");
+RegisterGreaterFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    String func_name = ">";
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateGreaterFunction<TinyIntT>(function_set_ptr, DataType(LogicalType::kTinyInt));
     GenerateGreaterFunction<SmallIntT>(function_set_ptr, DataType(LogicalType::kSmallInt));
@@ -115,42 +116,42 @@ RegisterGreaterFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
 //    GenerateEqualsFunction<MixedT>(function_set_ptr, DataType(LogicalType::kMixed));
 
     ScalarFunction mix_greater_bigint(
-            ">",
+            func_name,
             { DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, BigIntT, BooleanT, GreaterFunction>);
     function_set_ptr->AddFunction(mix_greater_bigint);
 
     ScalarFunction bigint_greater_mixed(
-            ">",
+            func_name,
             { DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<BigIntT, MixedT, BooleanT, GreaterFunction>);
     function_set_ptr->AddFunction(bigint_greater_mixed);
 
     ScalarFunction mix_greater_double(
-            ">",
+            func_name,
             { DataType(LogicalType::kMixed), DataType(LogicalType::kDouble) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, DoubleT, BooleanT, GreaterFunction>);
     function_set_ptr->AddFunction(mix_greater_double);
 
     ScalarFunction double_greater_mixed(
-            ">",
+            func_name,
             { DataType(LogicalType::kDouble), DataType(LogicalType::kMixed) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<DoubleT, MixedT, BooleanT, GreaterFunction>);
     function_set_ptr->AddFunction(double_greater_mixed);
 
     ScalarFunction mix_greater_varchar(
-            ">",
+            func_name,
             { DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, VarcharT, BooleanT, GreaterFunction>);
     function_set_ptr->AddFunction(mix_greater_varchar);
 
     ScalarFunction varchar_greater_mixed(
-            ">",
+            func_name,
             { DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed) },
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, GreaterFunction>);

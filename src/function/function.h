@@ -15,7 +15,8 @@ enum class FunctionType {
     kInvalid,
     kScalar,
     kAggregate,
-    kTable
+    kTable,
+    kWindow,
 };
 
 class Function {

@@ -5,7 +5,7 @@
 #pragma once
 
 #include "base_expression.h"
-#include "planner/bound/bound_select_node.h"
+#include "planner/bound_select_statement.h"
 
 namespace infinity {
 
@@ -22,7 +22,7 @@ enum class SubqueryType {
 class SubqueryExpression : public BaseExpression {
 public:
     explicit
-    SubqueryExpression(SharedPtr<BoundSelectNode> select_node, SubqueryType subquery_type);
+    SubqueryExpression(SharedPtr<BoundSelectStatement> select_node, SubqueryType subquery_type);
 
     String
     ToString() const override;
@@ -30,12 +30,11 @@ public:
     DataType
     Type() const override;
 
-    std::shared_ptr<BoundSelectNode> select_node_ptr_;
+    SharedPtr<BoundSelectStatement> bound_select_statement_ptr_{};
     SubqueryType subquery_type_;
-    ExpressionType operator_type_;
 
     // Used in IN subquery, EXISTS won't use it.
-    std::shared_ptr<BaseExpression> left_{nullptr};
+    SharedPtr<BaseExpression> left_{nullptr};
 private:
 
 };

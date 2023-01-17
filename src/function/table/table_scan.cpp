@@ -16,7 +16,7 @@ TableScanFunc(SharedPtr<QueryContext>& query_context,
         = std::static_pointer_cast<TableScanFunctionData>(table_function_data_ptr);
 
     SharedPtr<Table>& table_ptr = table_scan_function_data_ptr->table_ptr_;
-    std::vector<size_t>& column_ids = table_scan_function_data_ptr->column_ids_;
+    Vector<size_t>& column_ids = table_scan_function_data_ptr->column_ids_;
     i64& current_block_id = table_scan_function_data_ptr->block_count_;
     if(current_block_id >= table_ptr->DataBlockCount()) {
         LOG_DEBUG("All blocks are read from storage.");
@@ -36,9 +36,9 @@ TableScanFunc(SharedPtr<QueryContext>& query_context,
 }
 
 void
-RegisterTableScanFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
+RegisterTableScanFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
-    SharedPtr<TableScanFunction> seq_scan_ptr = std::make_shared<TableScanFunction>("seq_scan", TableScanFunc);
+    SharedPtr<TableScanFunction> seq_scan_ptr = MakeShared<TableScanFunction>("seq_scan", TableScanFunc);
 
     catalog_ptr->AddTableFunction(seq_scan_ptr);
 

@@ -8,16 +8,17 @@
 
 namespace infinity {
 
-std::string
-LogicalViewScan::ToString(int64_t& space) {
+String
+LogicalViewScan::ToString(i64& space) {
     std::stringstream ss;
-    std::string arrow_str;
+    String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "ViewScan: " << view_ptr_->name();
+    ss << String(space, ' ') << arrow_str << "ViewScan: " << view_ptr_->name();
     space += arrow_str.size();
+
     return ss.str();
 }
 

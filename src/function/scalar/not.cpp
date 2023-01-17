@@ -17,10 +17,11 @@ struct NotFunction {
 };
 
 static void
-GenerateNotFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr) {
+GenerateNotFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr) {
+    String func_name = "NOT";
 
     ScalarFunction not_function(
-            "not",
+            func_name,
             { DataType(LogicalType::kBoolean) },
             { DataType(LogicalType::kBoolean) },
             &ScalarFunction::UnaryFunction<BooleanT, BooleanT, NotFunction>);
@@ -28,8 +29,10 @@ GenerateNotFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr) {
 }
 
 void
-RegisterNotFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
-    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("not");
+RegisterNotFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    String func_name = "NOT";
+
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateNotFunction(function_set_ptr);
 

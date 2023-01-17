@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "common/types/internal_types.h"
+
 #include <unordered_map>
 #include <string>
 #include <functional>
@@ -23,38 +25,38 @@ public:
     void
     UnInit();
 
-    std::string
+    String
     HandleCommand(const char *command);
 
 private:
     void
-    Execute(const std::string &command);
+    Execute(const String& command);
 
     void
-    Register(const std::string &name, const std::function<void(const std::string &)> &func);
+    Register(const String& name, const std::function<void(const String& )> &func);
 
     // Command functions
     void
-    Exit(const std::string &arguments);
+    Exit(const String& arguments);
 
     void
-    Explain(const std::string &arguments);
+    Explain(const String& arguments);
 
     void
-    Visualize(const std::string &arguments);
+    Visualize(const String& arguments);
 
     void
-    VerifyScript(const std::string &arguments);
+    VerifyScript(const String& arguments);
 
     void
-    RunScript(const std::string &arguments);
+    RunScript(const String& arguments);
 
     void
-    ExecuteSQL(const std::string &sql_text);
+    ExecuteSQL(const String& sql_text);
 
 private:
 
-    std::unordered_map<std::string, std::function<void(const std::string &)>> commands_;
+    HashMap<String, std::function<void(const String&)>> commands_;
 };
 
 }

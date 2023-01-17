@@ -7,8 +7,8 @@
 
 namespace infinity {
 
-std::shared_ptr<BaseExpression>
-LimitBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext> &bind_context_ptr) {
+SharedPtr<BaseExpression>
+LimitBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext> &bind_context_ptr) {
     switch(expr.type) {
         case hsql::kExprStar:
             PlannerError("Star expression isn't allowed in limit expression.");
@@ -29,9 +29,9 @@ LimitBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindC
     }
 }
 
-std::shared_ptr<BaseExpression>
-LimitBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
+SharedPtr<BaseExpression>
+LimitBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
     if(function_set_ptr->type_ != FunctionType::kScalar) {
         PlannerError("Only scalar function is supported in limit clause.");
     }

@@ -51,53 +51,55 @@ ModuloFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 }
 
 void
-RegisterModuloFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
-    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("%");
+RegisterModuloFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    String func_name = "%";
+
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction mod_function_int8(
-            "%",
+            func_name,
             { DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt) },
             { DataType(LogicalType::kTinyInt) },
             &ScalarFunction::BinaryFunctionWithFailure<TinyIntT, TinyIntT, TinyIntT, ModuloFunction>);
     function_set_ptr->AddFunction(mod_function_int8);
 
     ScalarFunction mod_function_int16(
-            "%",
+            func_name,
             { DataType(LogicalType::kSmallInt), DataType(LogicalType::kSmallInt) },
             { DataType(LogicalType::kSmallInt) },
             &ScalarFunction::BinaryFunctionWithFailure<SmallIntT, SmallIntT, SmallIntT, ModuloFunction>);
     function_set_ptr->AddFunction(mod_function_int16);
 
     ScalarFunction mod_function_int32(
-            "%",
+            func_name,
             { DataType(LogicalType::kInteger), DataType(LogicalType::kInteger) },
             { DataType(LogicalType::kInteger) },
             &ScalarFunction::BinaryFunctionWithFailure<IntegerT, IntegerT, IntegerT, ModuloFunction>);
     function_set_ptr->AddFunction(mod_function_int32);
 
     ScalarFunction mod_function_int64(
-            "%",
+            func_name,
             { DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt) },
             { DataType(LogicalType::kBigInt) },
             &ScalarFunction::BinaryFunctionWithFailure<BigIntT, BigIntT, BigIntT, ModuloFunction>);
     function_set_ptr->AddFunction(mod_function_int64);
 
     ScalarFunction mod_function_int128(
-            "%",
+            func_name,
             { DataType(LogicalType::kHugeInt), DataType(LogicalType::kHugeInt) },
             { DataType(LogicalType::kHugeInt) },
             &ScalarFunction::BinaryFunctionWithFailure<HugeIntT, HugeIntT, HugeIntT, ModuloFunction>);
     function_set_ptr->AddFunction(mod_function_int128);
 
     ScalarFunction mod_function_float(
-            "%",
+            func_name,
             { DataType(LogicalType::kFloat), DataType(LogicalType::kFloat) },
             { DataType(LogicalType::kFloat) },
             &ScalarFunction::BinaryFunctionWithFailure<FloatT, FloatT, FloatT, ModuloFunction>);
     function_set_ptr->AddFunction(mod_function_float);
 
     ScalarFunction mod_function_double(
-            "%",
+            func_name,
             { DataType(LogicalType::kDouble), DataType(LogicalType::kDouble) },
             { DataType(LogicalType::kDouble) },
             &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, ModuloFunction>);

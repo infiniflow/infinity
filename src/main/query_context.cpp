@@ -4,7 +4,7 @@
 
 #include "query_context.h"
 #include "infinity.h"
-#include "planner/planner.h"
+#include "planner/logical_planner.h"
 #include "planner/optimizer.h"
 #include "executor/physical_planner.h"
 #include "executor/physical_operator.h"
@@ -36,14 +36,18 @@ QueryResult::ToString() const {
             return "DELETE 0 1";
         }
         default: {
-            ;
+            ss << std::endl;
         }
     }
 
 
     SizeT column_count = result_->ColumnCount();
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        ss << result_->GetColumnNameById(idx);
+        String end;
+        if(idx != column_count - 1) {
+            end = " ";
+        }
+        ss << result_->GetColumnNameById(idx) << end;
     }
     ss << std::endl;
 
@@ -53,7 +57,7 @@ QueryResult::ToString() const {
     // Iterate all blocks
     for(SizeT idx = 0; idx < block_count; ++ idx) {
         // Get current block
-        std::shared_ptr<DataBlock> current_block = result_->GetDataBlockById(idx);
+        SharedPtr<DataBlock> current_block = result_->GetDataBlockById(idx);
 
         ss << current_block->ToString();
     }
@@ -61,9 +65,8 @@ QueryResult::ToString() const {
     return ss.str();
 }
 
-// Get get
-QueryContext::QueryContext(const std::shared_ptr<Session>& session_ptr, std::unique_ptr<TransactionContext>& transaction)
-    : transaction_(transaction) {}
+QueryContext::QueryContext(SharedPtr<Session> session_ptr, UniquePtr<TransactionContext>& transaction)
+    : session_ptr_(std::move(session_ptr)), transaction_(transaction) {}
 
 QueryResult
 QueryContext::Query(const std::string &query) {
@@ -75,25 +78,26 @@ QueryContext::Query(const std::string &query) {
         ParserError(parse_result.errorMsg())
     }
 
-    std::shared_ptr<QueryContext> query_context = shared_from_this();
+    SharedPtr<QueryContext> query_context = shared_from_this();
 
-    Planner logical_planner(query_context);
+    LogicalPlanner logical_planner(query_context);
     Optimizer optimizer(query_context);
     PhysicalPlanner physical_planner(query_context);
 
     PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
     for (hsql::SQLStatement *statement : parse_result.getStatements()) {
         // Build unoptimized logical plan for each SQL statement.
-        std::shared_ptr<LogicalNode> unoptimized_plan = logical_planner.BuildLogicalPlan(*statement);
+        logical_planner.Build(*statement);
+        SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 
         // Apply optimized rule to the logical plan
-        std::shared_ptr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
+        SharedPtr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
 
         // Build physical plan
-        std::shared_ptr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
+        SharedPtr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
         // Create execution pipeline
-        std::shared_ptr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
+        SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
 
         // Schedule the query pipeline
         Infinity::instance().scheduler()->Schedule(query_context, pipeline);

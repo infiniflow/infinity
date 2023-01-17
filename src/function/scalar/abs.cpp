@@ -32,45 +32,47 @@ struct AbsFunctionFloat {
 
 void
 RegisterAbsFunction(const UniquePtr<Catalog> &catalog_ptr) {
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>("abs");
+    String func_name = "ABS";
+
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction abs_int8(
-            "abs",
+            func_name,
             { DataType(LogicalType::kTinyInt) },
             DataType(LogicalType::kTinyInt),
             &ScalarFunction::UnaryFunctionWithFailure<TinyIntT, TinyIntT, AbsFunctionInt>);
     function_set_ptr->AddFunction(abs_int8);
 
     ScalarFunction abs_int16(
-            "abs",
+            func_name,
             { DataType(LogicalType::kSmallInt) },
             { DataType(LogicalType::kSmallInt) },
             &ScalarFunction::UnaryFunctionWithFailure<SmallIntT, SmallIntT, AbsFunctionInt>);
     function_set_ptr->AddFunction(abs_int16);
 
     ScalarFunction abs_int32(
-            "abs",
+            func_name,
             { DataType(LogicalType::kInteger) },
             { DataType(LogicalType::kInteger) },
             &ScalarFunction::UnaryFunctionWithFailure<IntegerT, IntegerT, AbsFunctionInt>);
     function_set_ptr->AddFunction(abs_int32);
 
     ScalarFunction abs_int64(
-            "abs",
+            func_name,
             { DataType(LogicalType::kBigInt) },
             { DataType(LogicalType::kBigInt) },
             &ScalarFunction::UnaryFunctionWithFailure<BigIntT, BigIntT, AbsFunctionInt>);
     function_set_ptr->AddFunction(abs_int64);
 
     ScalarFunction abs_float(
-            "abs",
+            func_name,
             { DataType(LogicalType::kFloat) },
             { DataType(LogicalType::kFloat) },
             &ScalarFunction::UnaryFunction<FloatT, FloatT, AbsFunctionFloat>);
     function_set_ptr->AddFunction(abs_float);
 
     ScalarFunction abs_double(
-            "abs",
+            func_name,
             { DataType(LogicalType::kDouble) },
             { DataType(LogicalType::kDouble) },
             &ScalarFunction::UnaryFunction<DoubleT, DoubleT, AbsFunctionFloat>);

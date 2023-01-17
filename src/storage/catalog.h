@@ -14,62 +14,62 @@ namespace infinity {
 class Catalog : public Singleton<Catalog> {
 public:
     void
-    CreateSchema(const std::shared_ptr<SchemaDefinition>& schema_definition);
+    CreateSchema(const SharedPtr<SchemaDefinition>& schema_definition);
 
     void
-    DeleteSchema(const std::string& schema_name);
+    DeleteSchema(const String& schema_name);
 
     // Table related methods
-    std::shared_ptr<Table>
-    GetTableByName(const std::string& schema_name, const std::string& table_name);
+    SharedPtr<Table>
+    GetTableByName(const String& schema_name, const String& table_name);
 
     void
-    AddTable(const std::string& schema_name, const std::shared_ptr<Table>& table_def);
+    AddTable(const String& schema_name, const SharedPtr<Table>& table_def);
 
     void
-    DeleteTable(const std::string& schema_name, const std::string& table_name);
+    DeleteTable(const String& schema_name, const String& table_name);
 
-    std::vector<std::shared_ptr<Table>>
-    GetTables(const std::string& schema_name);
+    std::vector<SharedPtr<Table>>
+    GetTables(const String& schema_name);
 
     // View related methods
-    std::shared_ptr<View>
-    GetViewByName(const std::string& schema_name, const std::string& view_name);
+    SharedPtr<View>
+    GetViewByName(const String& schema_name, const String& view_name);
 
     void
-    AddView(const std::string& schema_name, const std::shared_ptr<View>& view);
+    AddView(const String& schema_name, const SharedPtr<View>& view);
 
     void
-    DeleteView(const std::string& schema_name, const std::string& view_name);
+    DeleteView(const String& schema_name, const String& view_name);
 
     // Function related methods
-    std::shared_ptr<FunctionSet>
-    GetFunctionSetByName(const std::string& function_name);
+    SharedPtr<FunctionSet>
+    GetFunctionSetByName(String& function_name);
 
     void
-    AddFunctionSet(const std::shared_ptr<FunctionSet>& function_set);
+    AddFunctionSet(const SharedPtr<FunctionSet>& function_set);
 
     void
-    DeleteFunctionSet(const std::string& function_name);
+    DeleteFunctionSet(const String& function_name);
 
     // Table Function related methods
-    std::shared_ptr<TableFunction>
-    GetTableFunctionByName(const std::string& function_name);
+    SharedPtr<TableFunction>
+    GetTableFunctionByName(const String& function_name);
 
     void
-    AddTableFunction(const std::shared_ptr<TableFunction>& table_function);
+    AddTableFunction(const SharedPtr<TableFunction>& table_function);
 
     void
-    DeleteTableFunction(const std::string& function_name);
+    DeleteTableFunction(const String& function_name);
 
     ~Catalog() override = default;
 
 private:
-    std::unordered_map<std::string, std::shared_ptr<Schema>> schemas_;
-    std::unordered_map<std::string, std::shared_ptr<FunctionSet>> function_sets_;
-    std::unordered_map<std::string, std::shared_ptr<TableFunction>> table_functions_;
+    HashMap<String, SharedPtr<Schema>> schemas_;
+    HashMap<String, SharedPtr<FunctionSet>> function_sets_;
+    HashMap<String, SharedPtr<TableFunction>> table_functions_;
 
-    uint64_t schema_id_counter_{0};
+    u64 schema_id_counter_{0};
 };
 
 }

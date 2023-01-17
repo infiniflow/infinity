@@ -8,6 +8,7 @@
 #include "common/types/value.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
+#include "main/infinity.h"
 #include "common/types/info/varchar_info.h"
 #include "storage/catalog.h"
 #include "function/scalar/abs.h"
@@ -17,13 +18,13 @@
 class AbsFunctionsTest : public BaseTest {
     void
     SetUp() override {
-        infinity::Logger::Initialize();
         infinity::GlobalResourceUsage::Init();
+        infinity::Infinity::instance().Init();
     }
 
     void
     TearDown() override {
-        infinity::Logger::Shutdown();
+        infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -37,7 +38,8 @@ TEST_F(AbsFunctionsTest, abs_func) {
 
     RegisterAbsFunction(catalog_ptr);
 
-    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName("abs");
+    String op = "abs";
+    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -53,22 +55,22 @@ TEST_F(AbsFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(TinyInt)->TinyInt", func.ToString().c_str());
+        EXPECT_STREQ("ABS(TinyInt)->TinyInt", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
 
-        size_t row_count = DEFAULT_VECTOR_SIZE;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
         }
         data_block.Finalize();
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(i));
@@ -78,7 +80,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             i8 res = static_cast<i8>(i);
@@ -103,22 +105,22 @@ TEST_F(AbsFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(SmallInt)->SmallInt", func.ToString().c_str());
+        EXPECT_STREQ("ABS(SmallInt)->SmallInt", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
 
-        size_t row_count = DEFAULT_VECTOR_SIZE;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<i16>(-i)));
         }
         data_block.Finalize();
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v.value_.small_int, -static_cast<i16>(i));
@@ -128,7 +130,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             i16 res = static_cast<i16>(i);
@@ -149,22 +151,22 @@ TEST_F(AbsFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(Integer)->Integer", func.ToString().c_str());
+        EXPECT_STREQ("ABS(Integer)->Integer", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
 
-        size_t row_count = DEFAULT_VECTOR_SIZE;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<i32>(-i)));
         }
         data_block.Finalize();
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(v.value_.integer, -static_cast<i32>(i));
@@ -174,7 +176,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             i32 res = static_cast<i32>(i);
@@ -195,22 +197,22 @@ TEST_F(AbsFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(BigInt)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("ABS(BigInt)->BigInt", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
 
-        size_t row_count = DEFAULT_VECTOR_SIZE;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<i64>(-i)));
         }
         data_block.Finalize();
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, -static_cast<i64>(i));
@@ -220,7 +222,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             i64 res = static_cast<i64>(i);
@@ -241,9 +243,9 @@ TEST_F(AbsFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(Float)->Float", func.ToString().c_str());
+        EXPECT_STREQ("ABS(Float)->Float", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -293,9 +295,9 @@ TEST_F(AbsFunctionsTest, abs_func) {
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("abs(Double)->Double", func.ToString().c_str());
+        EXPECT_STREQ("ABS(Double)->Double", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -346,6 +348,6 @@ TEST_F(AbsFunctionsTest, abs_func) {
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
 
-        EXPECT_STREQ("abs(Float)->Float", func.ToString().c_str());
+        EXPECT_STREQ("ABS(Float)->Float", func.ToString().c_str());
     }
 }

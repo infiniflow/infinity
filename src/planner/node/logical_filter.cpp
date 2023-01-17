@@ -8,14 +8,14 @@
 
 namespace infinity {
 
-std::string LogicalFilter::ToString(int64_t& space) {
+String LogicalFilter::ToString(i64& space) {
     std::stringstream ss;
-    std::string arrow_str;
+    String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << std::string(space, ' ') << arrow_str << "Logical Filter: " << expression_->ToString();
+    ss << String(space, ' ') << arrow_str << "Logical Filter: " << expression_->ToString();
     space += arrow_str.size();
     return ss.str();
 }

@@ -5,19 +5,20 @@
 #pragma once
 
 #include "planner/expression_binder.h"
+#include "parser/parsed_expression.h"
 
 namespace infinity {
 
 class BindAliasProxy {
 public:
     explicit
-    BindAliasProxy(std::unordered_map<std::string, const hsql::Expr*> alias2expr) : alias2expr_(std::move(alias2expr)) {}
+    BindAliasProxy(HashMap<String, SharedPtr<ParsedExpression>> alias2expr) : alias2expr_(std::move(alias2expr)) {}
 
-    std::shared_ptr<BaseExpression>
-    BindAlias(ExpressionBinder& expression_binder, const hsql::Expr& expr, const std::shared_ptr<BindContext>& bind_context_ptr);
+    SharedPtr<BaseExpression>
+    BindAlias(ExpressionBinder& expression_binder, const hsql::Expr& expr, const SharedPtr<BindContext>& bind_context_ptr);
 private:
     bool binding_alias_{false};
-    std::unordered_map<std::string, const hsql::Expr*> alias2expr_;
+    HashMap<String, SharedPtr<ParsedExpression>> alias2expr_;
 };
 
 }

@@ -8,6 +8,7 @@
 #include "common/types/value.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
+#include "main/infinity.h"
 #include "common/types/info/varchar_info.h"
 #include "storage/catalog.h"
 #include "function/scalar/subtract.h"
@@ -17,13 +18,13 @@
 class SubtractFunctionsTest : public BaseTest {
     void
     SetUp() override {
-        infinity::Logger::Initialize();
         infinity::GlobalResourceUsage::Init();
+        infinity::Infinity::instance().Init();
     }
 
     void
     TearDown() override {
-        infinity::Logger::Shutdown();
+        infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -37,7 +38,8 @@ TEST_F(SubtractFunctionsTest, add_func) {
 
     RegisterSubtractFunction(catalog_ptr);
 
-    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName("-");
+    String op = "-";
+    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -63,22 +65,22 @@ TEST_F(SubtractFunctionsTest, add_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(TinyInt, TinyInt)->TinyInt", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        size_t row_count = DEFAULT_VECTOR_SIZE;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
             data_block.AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
         }
         data_block.Finalize();
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kTinyInt);
@@ -91,7 +93,7 @@ TEST_F(SubtractFunctionsTest, add_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(0));
@@ -120,22 +122,22 @@ TEST_F(SubtractFunctionsTest, add_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(SmallInt, SmallInt)->SmallInt", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        size_t row_count = DEFAULT_VECTOR_SIZE;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<i16>(i)));
             data_block.AppendValue(1, Value::MakeSmallInt(static_cast<i16>(i)));
         }
         data_block.Finalize();
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kSmallInt);
@@ -148,7 +150,7 @@ TEST_F(SubtractFunctionsTest, add_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v.value_.small_int, static_cast<i16>(0));
@@ -177,22 +179,22 @@ TEST_F(SubtractFunctionsTest, add_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(Integer, Integer)->Integer", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        size_t row_count = DEFAULT_VECTOR_SIZE;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<i32>(i)));
             data_block.AppendValue(1, Value::MakeInt(static_cast<i32>(i)));
         }
         data_block.Finalize();
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kInteger);
@@ -205,7 +207,7 @@ TEST_F(SubtractFunctionsTest, add_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(v.value_.integer, static_cast<i32>(0));
@@ -234,22 +236,22 @@ TEST_F(SubtractFunctionsTest, add_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(BigInt, BigInt)->BigInt", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        size_t row_count = DEFAULT_VECTOR_SIZE;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<i64>(i)));
             data_block.AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
         }
         data_block.Finalize();
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBigInt);
@@ -262,7 +264,7 @@ TEST_F(SubtractFunctionsTest, add_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, static_cast<i64>(0));
@@ -314,22 +316,22 @@ TEST_F(SubtractFunctionsTest, add_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(Float, Float)->Float", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        size_t row_count = DEFAULT_VECTOR_SIZE;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<f32>(i)));
             data_block.AppendValue(1, Value::MakeFloat(static_cast<f32>(i)));
         }
         data_block.Finalize();
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kFloat);
@@ -342,7 +344,7 @@ TEST_F(SubtractFunctionsTest, add_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(v.value_.float32, static_cast<f32>(0));
@@ -371,22 +373,22 @@ TEST_F(SubtractFunctionsTest, add_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(Double, Double)->Double", func.ToString().c_str());
 
-        std::vector<DataType> column_types;
+        Vector<DataType> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
-        size_t row_count = DEFAULT_VECTOR_SIZE;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<f64>(i)));
             data_block.AppendValue(1, Value::MakeDouble(static_cast<f64>(i)));
         }
         data_block.Finalize();
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kDouble);
@@ -399,7 +401,7 @@ TEST_F(SubtractFunctionsTest, add_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (size_t i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(v.value_.float64, static_cast<f64>(0));

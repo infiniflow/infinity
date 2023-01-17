@@ -12,7 +12,7 @@ namespace infinity {
 
 
 void
-OptimizerProfiler::StartRule(const std::string &rule_name) {
+OptimizerProfiler::StartRule(const String &rule_name) {
     profilers_.emplace_back(rule_name);
     profilers_.back().Begin();
 }
@@ -22,10 +22,10 @@ OptimizerProfiler::StopRule() {
     profilers_.back().End();
 }
 
-std::string
-OptimizerProfiler::ToString(size_t intent) const {
+String
+OptimizerProfiler::ToString(SizeT intent) const {
     std::stringstream ss;
-    std::string space(intent, ' ');
+    String space(intent, ' ');
     for(auto& profiler: profilers_) {
         ss << space << profiler.name() << ": " << profiler.ElapsedToString() << std::endl;
     }
@@ -33,7 +33,7 @@ OptimizerProfiler::ToString(size_t intent) const {
     return ss.str();
 }
 
-std::string
+String
 QueryProfiler::QueryPhaseToString(QueryPhase phase) {
     switch (phase) {
         case QueryPhase::kParser: return "Parser";
@@ -48,7 +48,7 @@ QueryProfiler::QueryPhaseToString(QueryPhase phase) {
 
 void
 QueryProfiler::StartPhase(QueryPhase phase) {
-    size_t phase_idx = magic_enum::enum_integer(phase);
+    SizeT phase_idx = magic_enum::enum_integer(phase);
 
     // Validate current query phase.
     if(current_phase_ == QueryPhase::kInvalid) {
@@ -73,13 +73,13 @@ QueryProfiler::StopPhase(QueryPhase phase) {
     profilers_[magic_enum::enum_integer(phase)].End();
 }
 
-std::string
+String
 QueryProfiler::ToString() const {
     std::stringstream ss;
-    constexpr size_t profilers_count = magic_enum::enum_integer(QueryPhase::kInvalid);
+    constexpr SizeT profilers_count = magic_enum::enum_integer(QueryPhase::kInvalid);
 
     double cost_sum = 0;
-    for(size_t idx = 0; idx < profilers_count; ++ idx) {
+    for(SizeT idx = 0; idx < profilers_count; ++ idx) {
         const BaseProfiler &profiler = profilers_[idx];
         cost_sum += static_cast<double>(profiler.Elapsed());
     }
@@ -87,7 +87,7 @@ QueryProfiler::ToString() const {
     ss.setf(std::ios_base::fixed, std::ios_base::floatfield);
     ss.setf(std::ios_base::showpoint);
     ss.precision(2);
-    for(size_t idx = 0; idx < profilers_count; ++ idx) {
+    for(SizeT idx = 0; idx < profilers_count; ++ idx) {
         const BaseProfiler& profiler = profilers_[idx];
         ss << profiler.name() << ": " << profiler.ElapsedToString()
            << "(" << static_cast<double>(profiler.Elapsed() * 100) / cost_sum << "%)" << std::endl;

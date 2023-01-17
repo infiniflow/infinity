@@ -26,9 +26,9 @@ public:
     optimize(const SharedPtr<LogicalNode>& unoptimized_plan);
 
 public:
-    SharedPtr<QueryContext> query_context_ptr_;
+    SharedPtr<QueryContext> query_context_ptr_{};
 
-    Vector<UniquePtr<OptimizerRule>> rules_;
+    Vector<UniquePtr<OptimizerRule>> rules_{};
 };
 
 }

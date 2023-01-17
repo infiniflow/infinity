@@ -22,15 +22,21 @@ class ExpressionBinder;
 class QueryContext;
 
 struct CommonTableExpressionInfo {
-    CommonTableExpressionInfo(String alias, hsql::SelectStatement* select_stmt, std::unordered_set<String> masked_name_set)
+    CommonTableExpressionInfo(String alias, hsql::SelectStatement* select_stmt, HashSet<String> masked_name_set)
         : alias_(std::move(alias)), select_statement_(select_stmt), masked_name_set_(std::move(masked_name_set)) {}
 
     String alias_;
     hsql::SelectStatement* select_statement_;
-    std::unordered_set<String> masked_name_set_;
+    HashSet<String> masked_name_set_;
 };
 
 class BindContext {
+public:
+    static inline SharedPtr<BindContext>
+    Make(SharedPtr<BindContext> parent) {
+        return MakeShared<BindContext>(std::move(parent));
+    }
+
 public:
     explicit BindContext(SharedPtr<BindContext> parent)
         : parent_(std::move(parent)) {
@@ -51,44 +57,42 @@ public:
     Vector<SharedPtr<BindContext>> subquery_children_;
 
     // CTE from CTE alias -> CTE statement
-    std::unordered_map<String, SharedPtr<CommonTableExpressionInfo>> CTE_map_;
+    HashMap<String, SharedPtr<CommonTableExpressionInfo>> CTE_map_;
 
     // Binding, all bindings include subquery, cte, view, table ...
-    std::unordered_map<String, SharedPtr<Binding>> binding_by_name_;
-    std::unordered_map<String, Vector<String>> binding_names_by_column_;
+    HashMap<String, SharedPtr<Binding>> binding_by_name_;
+    HashMap<String, Vector<String>> binding_names_by_column_;
 
     // Binding Table
     Vector<String> table_names_;
 
     // Bound expr in group by list
     Vector<String> group_names_;
-    std::unordered_map<String, SharedPtr<BaseExpression>> group_by_name_;
+    HashMap<String, SharedPtr<BaseExpression>> group_by_name_;
 
     // Bound aggregate function expr
-    std::unordered_map<String, SharedPtr<BaseExpression>> aggregate_by_name_;
+    HashMap<String, SharedPtr<BaseExpression>> aggregate_by_name_;
 
     // Bound expr in select list
     Vector<String> project_names_;
-    std::unordered_map<String, SharedPtr<BaseExpression>> project_by_name_;
+    HashMap<String, SharedPtr<BaseExpression>> project_by_name_;
 
     // Bound CTE
-    std::unordered_set<SharedPtr<CommonTableExpressionInfo>> bound_cte_set_;
+    HashSet<SharedPtr<CommonTableExpressionInfo>> bound_cte_set_;
 
     // Bound View
-    std::unordered_set<String> bound_view_set_;
+    HashSet<String> bound_view_set_;
 
     // Bound Table (base table)
-    std::unordered_set<String> bound_table_set_;
+    HashSet<String> bound_table_set_;
 
     // Bound subquery (TODO: How to get the subquery name?)
-    std::unordered_set<String> bound_subquery_set_;
+    HashSet<String> bound_subquery_set_;
 
     // An sequence id
-    size_t binding_context_id_{0};
+    u64 binding_context_id_{0};
 
-    // Output heading of this context
-    Vector<String> heading_;
-
+    bool single_row = false;
 public:
     void
     AddSubQueryChild(const SharedPtr<BindContext>& child);
@@ -99,8 +103,14 @@ public:
     void
     AddRightChild(const SharedPtr<BindContext>& right_child);
 
-    size_t
+    u64
+    GetNewLogicalNodeId();
+
+    u64
     GenerateBindingContextIndex();
+
+    u64
+    GenerateTableIndex();
 
     [[nodiscard]] SharedPtr<CommonTableExpressionInfo>
     GetCTE(const String& name) const;
@@ -129,20 +139,30 @@ public:
         bound_table_set_.insert(table_name);
     }
 
-    int64_t GetNewLogicalNodeId();
 
     void
-    AddSubqueryBinding(const String& name, const Vector<DataType>& column_types, const Vector<String>& column_names);
+    AddSubqueryBinding(const String& name,
+                       u64 table_index,
+                       const Vector<DataType>& column_types,
+                       const Vector<String>& column_names);
 
     void
-    AddCTEBinding(const String& name, const Vector<DataType>& column_types, const Vector<String>& column_names);
+    AddCTEBinding(const String& name,
+                  u64 table_index,
+                  const Vector<DataType>& column_types,
+                  const Vector<String>& column_names);
 
     void
-    AddViewBinding(const String& name, const Vector<DataType>& column_types, const Vector<String>& column_names);
+    AddViewBinding(const String& name,
+                   u64 table_index,
+                   const Vector<DataType>& column_types,
+                   const Vector<String>& column_names);
 
     void
-    AddTableBinding(const String& name, SharedPtr<Table> table_ptr,
-//                    int64_t logical_node_id,
+    AddTableBinding(const String& name,
+                    u64 table_index,
+                    SharedPtr<Table> table_ptr,
+//                    i64 logical_node_id,
 //                    SharedPtr<LogicalNode> logical_node_ptr,
                     const Vector<DataType>& column_types, const Vector<String>& column_names);
 
@@ -150,15 +170,16 @@ public:
     void AddBindContext(const SharedPtr<BindContext>& other_ptr);
 
     SharedPtr<BaseExpression>
-    ResolveColumnId(const ColumnIdentifier& column_identifier, int64_t depth);
+    ResolveColumnId(const ColumnIdentifier& column_identifier, i64 depth);
 
 private:
     void
     AddBinding(const SharedPtr<Binding>& binding);
 
 private:
-    int64_t next_logical_node_id_{1};
-    int64_t next_bind_context_index_{1};
+    SizeT next_logical_node_id_{1};
+    SizeT next_bind_context_index_{1};
+    SizeT next_table_index_{1};
 
 public:
 

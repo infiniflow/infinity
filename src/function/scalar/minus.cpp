@@ -89,88 +89,90 @@ MinusFunction::Run(MixedT value, MixedT &result) {
 
 void
 RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr) {
-    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>("-");
+    String func_name = "-";
+
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     // Minus operator
     ScalarFunction minus_int8(
-            "-",
+            func_name,
             {DataType(LogicalType::kTinyInt)},
             DataType(LogicalType::kTinyInt),
             &ScalarFunction::UnaryFunctionWithFailure<TinyIntT, TinyIntT, MinusFunction>);
     function_set_ptr->AddFunction(minus_int8);
 
     ScalarFunction minus_int16(
-            "-",
+            func_name,
             {DataType(LogicalType::kSmallInt)},
             DataType(LogicalType::kSmallInt),
             &ScalarFunction::UnaryFunctionWithFailure<SmallIntT, SmallIntT, MinusFunction>);
     function_set_ptr->AddFunction(minus_int16);
 
     ScalarFunction minus_int32(
-            "-",
+            func_name,
             {DataType(LogicalType::kInteger)},
             DataType(LogicalType::kInteger),
             &ScalarFunction::UnaryFunctionWithFailure<IntegerT, IntegerT, MinusFunction>);
     function_set_ptr->AddFunction(minus_int32);
 
     ScalarFunction minus_int64(
-            "-",
+            func_name,
             {DataType(LogicalType::kBigInt)},
             DataType(LogicalType::kBigInt),
             &ScalarFunction::UnaryFunctionWithFailure<BigIntT, BigIntT, MinusFunction>);
     function_set_ptr->AddFunction(minus_int64);
 
     ScalarFunction minus_int128(
-            "-",
+            func_name,
             {DataType(LogicalType::kHugeInt)},
             DataType(LogicalType::kHugeInt),
             &ScalarFunction::UnaryFunctionWithFailure<HugeIntT, HugeIntT, MinusFunction>);
     function_set_ptr->AddFunction(minus_int128);
 
     ScalarFunction minus_float(
-            "-",
+            func_name,
             {DataType(LogicalType::kFloat)},
             DataType(LogicalType::kFloat),
             &ScalarFunction::UnaryFunctionWithFailure<FloatT, FloatT, MinusFunction>);
     function_set_ptr->AddFunction(minus_float);
 
     ScalarFunction minus_double(
-            "-",
+            func_name,
             {DataType(LogicalType::kDouble)},
             DataType(LogicalType::kDouble),
             &ScalarFunction::UnaryFunctionWithFailure<DoubleT, DoubleT, MinusFunction>);
     function_set_ptr->AddFunction(minus_double);
 
     ScalarFunction minus_decimal16(
-            "-",
+            func_name,
             {DataType(LogicalType::kDecimal16)},
             DataType(LogicalType::kDecimal16),
             &ScalarFunction::UnaryFunctionWithFailure<Decimal16T, Decimal16T, MinusFunction>);
     function_set_ptr->AddFunction(minus_decimal16);
 
     ScalarFunction minus_decimal32(
-            "-",
+            func_name,
             {DataType(LogicalType::kDecimal32)},
             DataType(LogicalType::kDecimal32),
             &ScalarFunction::UnaryFunctionWithFailure<Decimal32T, Decimal32T, MinusFunction>);
     function_set_ptr->AddFunction(minus_decimal32);
 
     ScalarFunction minus_decimal64(
-            "-",
+            func_name,
             {DataType(LogicalType::kDecimal64)},
             DataType(LogicalType::kDecimal64),
             &ScalarFunction::UnaryFunctionWithFailure<Decimal64T, Decimal64T, MinusFunction>);
     function_set_ptr->AddFunction(minus_decimal64);
 
     ScalarFunction minus_decimal128(
-            "-",
+            func_name,
             {DataType(LogicalType::kDecimal128)},
             DataType(LogicalType::kDecimal128),
             &ScalarFunction::UnaryFunctionWithFailure<Decimal128T, Decimal128T, MinusFunction>);
     function_set_ptr->AddFunction(minus_decimal128);
 
     ScalarFunction minus_mixed(
-            "-",
+            func_name,
             {DataType(LogicalType::kMixed)},
             DataType(LogicalType::kMixed),
             &ScalarFunction::UnaryFunctionWithFailure<MixedT, MixedT, MinusFunction>);

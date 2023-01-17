@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "common/types/internal_types.h"
+
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -32,39 +34,39 @@ enum class ExceptionType {
 
 class Exception : public std::exception {
 public:
-    explicit Exception(std::string message) : message_(std::move(message)) {}
+    explicit Exception(String message) : message_(std::move(message)) {}
     [[nodiscard]] inline const char* what() const noexcept override {
         return message_.c_str();
     }
 
 protected:
     template<typename... Args>
-    static std::string
+    static String
     BuildMessage(Args... params);
 
 private:
 
     template<typename T, typename... Args>
-    static std::string
-    BuildMessageInternal(std::vector<std::string>& values, T param, Args... params);
+    static String
+    BuildMessageInternal(std::vector<String>& values, T param, Args... params);
 
-    static std::string
-    BuildMessageInternal(std::vector<std::string>& values);
+    static String
+    BuildMessageInternal(std::vector<String>& values);
 
-    std::string message_;
+    String message_;
 
 };
 
 template<typename... Args>
-std::string
+String
 Exception::BuildMessage(Args... params) {
-    std::vector<std::string> values;
+    std::vector<String> values;
     return BuildMessageInternal(values, params...);
 }
 
 template<typename T, typename... Args>
-std::string
-Exception::BuildMessageInternal(std::vector<std::string>& values, T param, Args... params) {
+String
+Exception::BuildMessageInternal(std::vector<String>& values, T param, Args... params) {
     values.push_back(std::move(param));
     return BuildMessageInternal(values, params...);
 }
@@ -72,67 +74,67 @@ Exception::BuildMessageInternal(std::vector<std::string>& values, T param, Args.
 class CatalogException: public Exception {
 public:
     template<typename... Args>
-    explicit CatalogException(Args... params) : Exception(BuildMessage(std::string("Catalog Error:"), params...)) {}
+    explicit CatalogException(Args... params) : Exception(BuildMessage(String("Catalog Error:"), params...)) {}
 };
 
 class NetworkException: public Exception {
 public:
     template<typename... Args>
-    explicit NetworkException(Args... params) : Exception(BuildMessage(std::string("Network Error:"), params...)) {}
+    explicit NetworkException(Args... params) : Exception(BuildMessage(String("Network Error:"), params...)) {}
 };
 
 class ParserException: public Exception {
 public:
     template<typename... Args>
-    explicit ParserException(Args... params) : Exception(BuildMessage(std::string("Parser Error:"), params...)) {}
+    explicit ParserException(Args... params) : Exception(BuildMessage(String("Parser Error:"), params...)) {}
 };
 
 class PlannerException: public Exception {
 public:
     template<typename... Args>
-    explicit PlannerException(Args... params) : Exception(BuildMessage(std::string("Planner Error:"), params...)) {}
+    explicit PlannerException(Args... params) : Exception(BuildMessage(String("Planner Error:"), params...)) {}
 };
 
 class OptimizerException: public Exception {
 public:
     template<typename... Args>
-    explicit OptimizerException(Args... params) : Exception(BuildMessage(std::string("Optimizer Error:"), params...)) {}
+    explicit OptimizerException(Args... params) : Exception(BuildMessage(String("Optimizer Error:"), params...)) {}
 };
 
 class ExecutorException: public Exception {
 public:
     template<typename... Args>
-    explicit ExecutorException(Args... params) : Exception(BuildMessage(std::string("Executor Error:"), params...)) {}
+    explicit ExecutorException(Args... params) : Exception(BuildMessage(String("Executor Error:"), params...)) {}
 };
 
 class SchedulerException: public Exception {
 public:
     template<typename... Args>
-    explicit SchedulerException(Args... params) : Exception(BuildMessage(std::string("Scheduler Error:"), params...)) {}
+    explicit SchedulerException(Args... params) : Exception(BuildMessage(String("Scheduler Error:"), params...)) {}
 };
 
 class StorageException: public Exception {
 public:
     template<typename... Args>
-    explicit StorageException(Args... params) : Exception(BuildMessage(std::string("Storage Error:"), params...)) {}
+    explicit StorageException(Args... params) : Exception(BuildMessage(String("Storage Error:"), params...)) {}
 };
 
 class TypeException: public Exception {
 public:
     template<typename... Args>
-    explicit TypeException(Args... params) : Exception(BuildMessage(std::string("Type Error:"), params...)) {}
+    explicit TypeException(Args... params) : Exception(BuildMessage(String("Type Error:"), params...)) {}
 };
 
 class FunctionException: public Exception {
 public:
     template<typename... Args>
-    explicit FunctionException(Args... params) : Exception(BuildMessage(std::string("Function Error:"), params...)) {}
+    explicit FunctionException(Args... params) : Exception(BuildMessage(String("Function Error:"), params...)) {}
 };
 
 class NotImplementException: public Exception {
 public:
     template<typename... Args>
-    explicit NotImplementException(Args... params) : Exception(BuildMessage(std::string("NotImplement Error:"), params...)) {}
+    explicit NotImplementException(Args... params) : Exception(BuildMessage(String("NotImplement Error:"), params...)) {}
 };
 
 }

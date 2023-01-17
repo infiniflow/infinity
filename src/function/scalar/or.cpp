@@ -17,10 +17,10 @@ struct OrFunction {
 };
 
 static void
-GenerateOrFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr) {
-
+GenerateOrFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr) {
+    String func_name = "OR";
     ScalarFunction or_function(
-            "or",
+            func_name,
             { DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean) },
             { DataType(LogicalType::kBoolean) },
             &ScalarFunction::BinaryFunction<BooleanT, BooleanT, BooleanT, OrFunction>);
@@ -28,8 +28,10 @@ GenerateOrFunction(std::shared_ptr<ScalarFunctionSet>& function_set_ptr) {
 }
 
 void
-RegisterOrFunction(const std::unique_ptr<Catalog> &catalog_ptr) {
-    std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>("or");
+RegisterOrFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    String func_name = "OR";
+
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateOrFunction(function_set_ptr);
 

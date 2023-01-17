@@ -2,6 +2,8 @@
 // Created by JinHai on 2022/11/7.
 //
 
+#pragma once
+
 #include "common/types/internal_types.h"
 
 namespace infinity {

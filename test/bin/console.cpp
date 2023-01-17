@@ -5,9 +5,9 @@
 #include <gtest/gtest.h>
 #include "base_test.h"
 #include "bin/console.h"
-#include "main/infinity.h"
 #include "common/utility/str.h"
 #include "main/stats/global_resource_usage.h"
+#include "main/infinity.h"
 
 #include <filesystem>
 #include <fstream>

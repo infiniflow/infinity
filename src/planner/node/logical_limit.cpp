@@ -7,16 +7,16 @@
 
 namespace infinity {
 
-std::string
-LogicalLimit::ToString(int64_t &space) {
+String
+LogicalLimit::ToString(i64 &space) {
     std::stringstream ss;
-    std::string arrow_str;
+    String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
 
-    ss << std::string(space, ' ') << arrow_str << "Limit (limit: " << limit_expression_->ToString();
+    ss << String(space, ' ') << arrow_str << "Limit (limit: " << limit_expression_->ToString();
     if(offset_expression_ != nullptr) {
         ss << ", offset: " << offset_expression_->ToString();
     }

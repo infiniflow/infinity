@@ -5,16 +5,18 @@
 #include "common/utility/infinity_assert.h"
 #include "function/function_set.h"
 #include "group_binder.h"
+#include "parser/statement.h"
 
 namespace infinity {
 
-std::shared_ptr<BaseExpression>
-GroupBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindContext> &bind_context_ptr) {
-    std::shared_ptr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
+SharedPtr<BaseExpression>
+GroupBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
 
     // if(root_expression) {  } why we need root expression flag?
     {
-        std::string expr_name = expr.getName();
+        String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();
+
         if(bind_context_ptr->group_by_name_.contains(expr_name)) {
             PlannerError("Duplicated group by expression: " + expr_name);
         }
@@ -27,8 +29,8 @@ GroupBinder::BuildExpression(const hsql::Expr &expr, const std::shared_ptr<BindC
     return result;
 }
 
-std::shared_ptr<BaseExpression>
-GroupBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
+SharedPtr<BaseExpression>
+GroupBinder::BuildColExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
 
     // Check if the column is using an alias from select list.
     auto result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr);
@@ -40,17 +42,22 @@ GroupBinder::BuildColExpr(const hsql::Expr &expr, const std::shared_ptr<BindCont
     return result;
 }
 
-std::shared_ptr<BaseExpression>
-GroupBinder::BuildFuncExpr(const hsql::Expr &expr, const std::shared_ptr<BindContext>& bind_context_ptr) {
-    std::shared_ptr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
+SharedPtr<BaseExpression>
+GroupBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
     if(function_set_ptr->type_ != FunctionType::kScalar) {
         PlannerError("Only scalar function is supported in group by list.");
     }
     return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
 }
 
-std::shared_ptr<SubqueryExpression>
-GroupBinder::BuildSubquery(const hsql::SelectStatement& select, const std::shared_ptr<BindContext>& bind_context_ptr, SubqueryType subquery_type) {
+void
+GroupBinder::CheckFuncType(FunctionType func_type) const {
+    PlannerAssert(func_type == FunctionType::kScalar, "Onlyl scalar function type are allowed in group by clause");
+}
+
+SharedPtr<SubqueryExpression>
+GroupBinder::BuildSubquery(const hsql::SelectStatement& select, const SharedPtr<BindContext>& bind_context_ptr, SubqueryType subquery_type) {
     PlannerError("Subquery isn't supported in group by list.");
 }
 
