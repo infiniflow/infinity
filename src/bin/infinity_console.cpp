@@ -17,7 +17,8 @@ int main(int argc, char** argv) {
               << VERSION_MINOR << "."
               << VERSION_PATCH << " built on "
               << BUILD_TIME << " from branch: "
-              << GIT_BRANCH_NAME << std::endl;
+              << GIT_BRANCH_NAME << ", commit-id: "
+              << GIT_COMMIT_ID << std::endl;
 
     std::string history_file("command_history.log");
 

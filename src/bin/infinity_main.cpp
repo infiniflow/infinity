@@ -9,8 +9,7 @@
 
 #include <iostream>
 
-void
-ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
+void ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
     cxxopts::Options options("./infinity_server", "");
 
     options.add_options()
@@ -34,15 +33,15 @@ ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
     parameters.port = result["port"].as<uint16_t>();
 }
 
-int
-main(int argc, char** argv) {
+int main(int argc, char** argv) {
     std::cout << "Infinity, version: "
               << VERSION_MAJOR << "."
               << VERSION_MINOR << "."
               << VERSION_PATCH << " built on "
               << BUILD_TIME << " with "
               << BUILD_TYPE << " mode from branch: "
-              << GIT_BRANCH_NAME << std::endl;
+              << GIT_BRANCH_NAME << ", commit-id: "
+              << GIT_COMMIT_ID << std::endl;
 
     infinity::StartupParameter parameters;
     ParseArguments(argc, argv, parameters);

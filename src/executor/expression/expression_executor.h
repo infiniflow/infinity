@@ -7,6 +7,7 @@
 #include "storage/table.h"
 #include "expression/base_expression.h"
 #include "expression_state.h"
+#include "common/column_vector/selection.h"
 
 #include <unordered_map>
 
@@ -17,7 +18,34 @@ public:
     ExpressionExecutor() = default;
 
     void
-    Init(const std::vector<SharedPtr<BaseExpression>>& expressions);
+    Init(const Vector<SharedPtr<BaseExpression>>& expressions);
+
+    void
+    Select(SharedPtr<Table>& input, SharedPtr<Table>& output);
+
+    void
+    Select(const SharedPtr<DataBlock>& input_data_block, SharedPtr<DataBlock>& output_data_block);
+
+    void
+    Select(const SharedPtr<BaseExpression>& expr,
+           SharedPtr<ExpressionState>& state,
+           SizeT count,
+           const SharedPtr<Selection>& input_select,
+           SharedPtr<Selection>& output_true_select,
+           SharedPtr<Selection>& output_false_select);
+
+    void
+    Select(SharedPtr<BaseExpression>& expr,
+           SharedPtr<ExpressionState>& state,
+           SizeT count,
+           SharedPtr<Selection>& output_true_select);
+
+    void
+    Select(const u8 *__restrict bool_column,
+           const SharedPtr<Bitmask>& null_mask,
+           SizeT count,
+           SharedPtr<Selection>& output_true_select,
+           bool nullable);
 
     // Evaluate all expressions
     void
@@ -31,60 +59,60 @@ public:
     Execute(SharedPtr<BaseExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
-            size_t count);
+            SizeT count);
 
     void
     Execute(const SharedPtr<AggregateExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
-            size_t count);
+            SizeT count);
 
     void
     Execute(const SharedPtr<CastExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
-            size_t count);
+            SizeT count);
 
     void
     Execute(const SharedPtr<CaseExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
-            size_t count);
+            SizeT count);
 
     void
     Execute(const SharedPtr<ConjunctionExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
-            size_t count);
+            SizeT count);
 
     void
     Execute(const SharedPtr<ColumnExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
-            size_t count);
+            SizeT count);
 
     void
     Execute(const SharedPtr<FunctionExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
-            size_t count);
+            SizeT count);
 
     void
     Execute(const SharedPtr<BetweenExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
-            size_t count);
+            SizeT count);
 
     void
     Execute(const SharedPtr<ValueExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
-            size_t count);
+            SizeT count);
 
 private:
-    std::vector<SharedPtr<BaseExpression>> expressions;
-    std::vector<SharedPtr<ExpressionState>> states;
-    std::unordered_map<std::string, SharedPtr<Table>> table_map_;
+    Vector<SharedPtr<BaseExpression>> expressions;
+    Vector<SharedPtr<ExpressionState>> states;
+    HashMap<String, SharedPtr<Table>> table_map_;
     SharedPtr<DataBlock> input_data_{nullptr};
 };
 

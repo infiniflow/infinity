@@ -16,6 +16,121 @@ ExpressionExecutor::Init(const Vector<SharedPtr<BaseExpression>> &exprs) {
 }
 
 void
+ExpressionExecutor::Select(SharedPtr<Table>& input_table, SharedPtr<Table>& output_table) {
+    ExecutorAssert(!expressions.empty(), "No expression.");
+    SizeT expression_count = expressions.size();
+    ExecutorAssert(expression_count == 1, "Only need one expressions during expression selection");
+
+    // Output data block column types
+    Vector<DataType> output_types;
+    SizeT column_count = output_table->ColumnCount();
+    output_types.reserve(column_count);
+    for(SizeT idx = 0; idx < column_count; ++ idx) {
+        output_types.emplace_back(output_table->GetColumnTypeById(idx));
+    }
+
+    SizeT input_data_block_count = input_table->DataBlockCount();
+    for(SizeT idx = 0; idx < input_data_block_count; ++ idx) {
+        SharedPtr<DataBlock> output_data_block = DataBlock::Make();
+        output_data_block->Init(output_types);
+
+        Select(input_table->GetDataBlockById(idx), output_data_block);
+
+        output_data_block->Finalize();
+        output_table->Append(output_data_block);
+    }
+}
+
+void
+ExpressionExecutor::Select(const SharedPtr<DataBlock>& input_data_block, SharedPtr<DataBlock>& output_data_block) {
+    this->input_data_ = input_data_block;
+    SharedPtr<Selection> input_select = nullptr;
+    SharedPtr<Selection> output_true_select = MakeShared<Selection>();
+    SharedPtr<Selection> output_false_select = nullptr;
+    Select(expressions[0], states[0], input_data_block->row_count(), input_select, output_true_select, output_false_select);
+}
+
+void
+ExpressionExecutor::Select(const SharedPtr<BaseExpression>& expr,
+       SharedPtr<ExpressionState>& state,
+       SizeT count,
+       const SharedPtr<Selection>& input_select,
+       SharedPtr<Selection>& output_true_select,
+       SharedPtr<Selection>& output_false_select) {
+    if(count == 0) return ; // All data are false;
+    ExecutorAssert(output_true_select != nullptr || output_false_select != nullptr,
+                   "No output select column vector is given")
+    ExecutorAssert(expr->Type().type() == LogicalType::kBoolean, "Attempting to select non-boolean expression")
+
+}
+
+void
+ExpressionExecutor::Select(SharedPtr<BaseExpression>& expr,
+                           SharedPtr<ExpressionState>& state,
+                           SizeT count,
+                           SharedPtr<Selection>& output_true_select) {
+    SharedPtr<ColumnVector> bool_column = MakeShared<ColumnVector>(DataType(LogicalType::kBoolean));
+    bool_column->Initialize();
+
+    Execute(expr, state, bool_column, count);
+
+    const auto* bool_column_ptr = (const u8*)(bool_column->data_ptr_);
+    SharedPtr<Bitmask>& null_mask = bool_column->nulls_ptr_;
+
+    Select(bool_column_ptr, null_mask, count, output_true_select, true);
+}
+
+void
+ExpressionExecutor::Select(const u8 *__restrict bool_column,
+                           const SharedPtr<Bitmask>& null_mask,
+                           SizeT count,
+                           SharedPtr<Selection>& output_true_select,
+                           bool nullable) {
+    if(nullable) {
+        if(null_mask->IsAllTrue()) {
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                if(bool_column[idx] > 0) {
+                    output_true_select->Append(idx);
+                }
+            }
+        } else {
+            const u64* result_null_data = null_mask->GetData();
+            SizeT unit_count = BitmaskBuffer::UnitCount(count);
+            for(SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++ i, end_index += BitmaskBuffer::UNIT_BITS) {
+                if(result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
+                    // all data of 64 rows are not null
+                    while(start_index < end_index) {
+                        if(bool_column[start_index] > 0) {
+                            output_true_select->Append(start_index);
+                        }
+                        ++ start_index;
+                    }
+                } else if(result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
+                    // all data of 64 rows are null
+                    ;
+                } else {
+                    SizeT original_start = start_index;
+                    while(start_index < end_index) {
+                        if(null_mask->IsTrue(start_index - original_start)) {
+                            if(bool_column[start_index] > 0) {
+                                output_true_select->Append(start_index);
+                            }
+                        }
+                        ++ start_index;
+                    }
+                }
+            }
+        }
+    } else {
+        for(SizeT idx = 0; idx < count; ++ idx) {
+            if(bool_column[idx] > 0) {
+                output_true_select->Append(idx);
+            }
+        }
+    }
+}
+
+void
 ExpressionExecutor::Execute(SharedPtr<Table> &input_table, SharedPtr<Table> &output_table) {
     ExecutorAssert(!expressions.empty(), "No expression.");
     SizeT expression_count = expressions.size();
@@ -23,7 +138,7 @@ ExpressionExecutor::Execute(SharedPtr<Table> &input_table, SharedPtr<Table> &out
 
 //    table_map_.emplace(input_table->TableName(), input_table);
 
-    // Output data block types
+    // Output data block column types
     Vector<DataType> output_types;
     output_types.reserve(expression_count);
 
@@ -58,7 +173,7 @@ void
 ExpressionExecutor::Execute(SharedPtr<BaseExpression>& expr,
                             SharedPtr<ExpressionState>& state,
                             SharedPtr<ColumnVector>& output_column,
-                            size_t count) {
+                            SizeT count) {
 
     switch(expr->type()) {
         case ExpressionType::kAggregate:
@@ -86,7 +201,7 @@ void
 ExpressionExecutor::Execute(const SharedPtr<AggregateExpression>& expr,
                             SharedPtr<ExpressionState>& state,
                             SharedPtr<ColumnVector>& output_column_vector,
-                            size_t count) {
+                            SizeT count) {
     SharedPtr<ExpressionState>& child_state = state->Children()[0];
     SharedPtr<BaseExpression>& child_expr = expr->arguments()[0];
     // Create output chunk.
@@ -102,7 +217,7 @@ void
 ExpressionExecutor::Execute(const SharedPtr<CastExpression>& expr,
                             SharedPtr<ExpressionState>& state,
                             SharedPtr<ColumnVector>& output_column_vector,
-                            size_t count) {
+                            SizeT count) {
     SharedPtr<ExpressionState>& child_state = state->Children()[0];
     SharedPtr<BaseExpression>& child_expr = expr->arguments()[0];
     // Create output chunk.
@@ -118,7 +233,7 @@ void
 ExpressionExecutor::Execute(const SharedPtr<CaseExpression>& expr,
                             SharedPtr<ExpressionState>& state,
                             SharedPtr<ColumnVector>& output_column_vector,
-                            size_t count) {
+                            SizeT count) {
     ExecutorError("Case execution isn't implemented yet.");
 }
 
@@ -126,7 +241,7 @@ void
 ExpressionExecutor::Execute(const SharedPtr<ConjunctionExpression>& expr,
                             SharedPtr<ExpressionState>& state,
                             SharedPtr<ColumnVector>& output_column_vector,
-                            size_t count) {
+                            SizeT count) {
     // Process left child expression
     SharedPtr<ExpressionState>& left_state = state->Children()[0];
     SharedPtr<BaseExpression>& left_expr = expr->arguments()[0];
@@ -152,7 +267,7 @@ void
 ExpressionExecutor::Execute(const SharedPtr<ColumnExpression>& expr,
                             SharedPtr<ExpressionState>& state,
                             SharedPtr<ColumnVector>& output_column_vector,
-                            size_t count) {
+                            SizeT count) {
 
     i64 column_index = expr->column_index();
     ExecutorAssert(column_index < this->input_data_->column_count(), "Invalid column index");
@@ -163,12 +278,12 @@ void
 ExpressionExecutor::Execute(const SharedPtr<FunctionExpression>& expr,
                             SharedPtr<ExpressionState>& state,
                             SharedPtr<ColumnVector>& output_column_vector,
-                            size_t count) {
+                            SizeT count) {
 
-    size_t argument_count = expr->arguments().size();
+    SizeT argument_count = expr->arguments().size();
     Vector<SharedPtr<ColumnVector>> output_columns;
     output_columns.reserve(argument_count);
-    for(size_t i = 0; i < argument_count; ++ i) {
+    for(SizeT i = 0; i < argument_count; ++ i) {
         SharedPtr<ExpressionState>& argument_state = state->Children()[i];
         SharedPtr<BaseExpression>& argument_expr = expr->arguments()[i];
         SharedPtr<ColumnVector>& argument_output = argument_state->OutputColumnVector();
@@ -184,7 +299,7 @@ void
 ExpressionExecutor::Execute(const SharedPtr<BetweenExpression>& expr,
                             SharedPtr<ExpressionState>& state,
                             SharedPtr<ColumnVector>& output_column_vector,
-                            size_t count) {
+                            SizeT count) {
 
     // Lower expression execution
     SharedPtr<ExpressionState>& lower_state = state->Children()[0];
@@ -212,7 +327,7 @@ void
 ExpressionExecutor::Execute(const SharedPtr<ValueExpression>& expr,
                             SharedPtr<ExpressionState>& state,
                             SharedPtr<ColumnVector>& output_column_vector,
-                            size_t count) {
+                            SizeT count) {
 
 }
 

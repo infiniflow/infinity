@@ -65,7 +65,7 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
-        new_planner_src
+        planner_src
         CONFIGURE_DEPENDS
         planner/*.cpp
         )
@@ -97,7 +97,7 @@ set(INFINITY_CORE_SOURCE
         ${infinity_src}
         ${network_src}
         ${parser_src}
-        ${new_planner_src}
+        ${planner_src}
         ${scheduler_src}
         ${storage_src}
 )
