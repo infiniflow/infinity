@@ -11,6 +11,7 @@
 #include "common/types/value.h"
 #include "common/default_values.h"
 #include "main/stats/global_resource_usage.h"
+#include "selection.h"
 
 namespace infinity {
 
@@ -66,6 +67,9 @@ public:
     }
 
     void
+    Initialize(const ColumnVector& other, const Selection& input_select);
+
+    void
     Initialize(SizeT capacity = DEFAULT_VECTOR_SIZE, ColumnVectorType vector_type = ColumnVectorType::kFlat);
 
     [[nodiscard]] String
@@ -114,6 +118,14 @@ public:
     void
     Reset();
 
+private:
+    template<typename DataT>
+    inline void
+    CopyFrom(const_ptr_t __restrict src,
+             ptr_t __restrict dst,
+             SizeT count,
+             const Selection& input_select);
+
 public:
     [[nodiscard]] const inline ColumnVectorType&
     vector_type() const {
@@ -137,5 +149,168 @@ public:
         return tail_index_;
     }
 };
+
+template<typename DataT>
+inline void
+ColumnVector::CopyFrom(const_ptr_t __restrict src,
+                       ptr_t __restrict dst,
+                       SizeT count,
+                       const Selection& input_select) {
+    for(SizeT idx = 0; idx < count; ++ idx) {
+        SizeT row_id = input_select[idx];
+        ((DataT *) (dst))[idx] = ((const DataT *) (src))[row_id];
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<VarcharT>(const_ptr_t __restrict src,
+                                 ptr_t __restrict dst,
+                                 SizeT count,
+                                 const Selection& input_select) {
+    for(SizeT idx = 0; idx < count; ++ idx) {
+        SizeT row_id = input_select[idx];
+
+        VarcharT *dst_ptr = &(((VarcharT *) dst)[idx]);
+        const VarcharT *src_ptr = &(((const VarcharT *) src)[row_id]);
+
+        u16 varchar_len = src_ptr->length;
+        if(varchar_len <= VarcharType::INLINE_LENGTH) {
+            // Only prefix is enough to contain all string data.
+            memcpy(dst_ptr->prefix, src_ptr->prefix, varchar_len);
+        } else {
+            memcpy(dst_ptr->prefix, src_ptr->prefix, VarcharType::PREFIX_LENGTH);
+            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(varchar_len);
+            memcpy(ptr, src_ptr->ptr, varchar_len);
+            dst_ptr->ptr = ptr;
+        }
+        dst_ptr->length = varchar_len;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<CharT>(const_ptr_t __restrict src,
+                              ptr_t __restrict dst,
+                              SizeT count,
+                              const Selection& input_select) {
+    ExecutorAssert(tail_index_ == 0, "Column Vector already been set some values")
+    for(SizeT idx = 0; idx < count; ++ idx) {
+        SizeT row_id = input_select[idx];
+        const_ptr_t src_ptr = src + idx * data_type_.Size();
+        ptr_t dst_ptr = dst + row_id * data_type_.Size();
+        memcpy(dst_ptr, src_ptr, data_type_.Size());
+    }
+    this->tail_index_ = count;
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<PathT>(const_ptr_t __restrict src,
+                              ptr_t __restrict dst,
+                              SizeT count,
+                              const Selection& input_select) {
+    for(SizeT idx = 0; idx < count; ++ idx) {
+        SizeT row_id = input_select[idx];
+
+        PathT *dst_ptr = &(((PathT *) dst)[idx]);
+        const PathT *src_ptr = &(((const PathT *) src)[row_id]);
+
+        u32 point_count = src_ptr->point_count;
+
+        SizeT point_area_size = point_count * sizeof(PointT);
+        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+        memcpy(ptr, src_ptr->ptr, point_area_size);
+
+        dst_ptr->ptr = ptr;
+        dst_ptr->point_count = point_count;
+        dst_ptr->closed = src_ptr->closed;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<PolygonT>(const_ptr_t __restrict src,
+                                 ptr_t __restrict dst,
+                                 SizeT count,
+                                 const Selection& input_select) {
+    for(SizeT idx = 0; idx < count; ++ idx) {
+        SizeT row_id = input_select[idx];
+
+        PolygonT *dst_ptr = &(((PolygonT *) dst)[idx]);
+        const PolygonT *src_ptr = &(((const PolygonT *) src)[row_id]);
+
+        u64 point_count = src_ptr->point_count;
+
+        SizeT point_area_size = point_count * sizeof(PointT);
+        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+        memcpy(ptr, src_ptr->ptr, point_area_size);
+
+        dst_ptr->ptr = ptr;
+        dst_ptr->point_count = point_count;
+        dst_ptr->bounding_box = src_ptr->bounding_box;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<BitmapT>(const_ptr_t __restrict src,
+                                ptr_t __restrict dst,
+                                SizeT count,
+                                const Selection& input_select) {
+    for(SizeT idx = 0; idx < count; ++ idx) {
+        SizeT row_id = input_select[idx];
+
+        BitmapT *dst_ptr = &(((BitmapT *) dst)[idx]);
+        const BitmapT *src_ptr = &(((const BitmapT *) src)[row_id]);
+
+        u64 bit_count = src_ptr->count;
+        u64 unit_count = BitmapT::UnitCount(bit_count);
+
+        SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
+        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
+        memcpy(ptr, (void*)(src_ptr->ptr), bit_area_size);
+
+        dst_ptr->ptr = (u64*)ptr;
+        dst_ptr->count = bit_count;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<BlobT>(const_ptr_t __restrict src,
+                              ptr_t __restrict dst,
+                              SizeT count,
+                              const Selection& input_select) {
+    for(SizeT idx = 0; idx < count; ++ idx) {
+        SizeT row_id = input_select[idx];
+
+        BlobT *dst_ptr = &(((BlobT *) dst)[idx]);
+        const BlobT *src_ptr = &(((const BlobT *) src)[row_id]);
+
+        u64 blob_size = src_ptr->size;
+        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(blob_size);
+        memcpy(ptr, (void*)(src_ptr->ptr), blob_size);
+
+        dst_ptr->ptr = ptr;
+        dst_ptr->size = blob_size;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<EmbeddingT>(const_ptr_t __restrict src,
+                                   ptr_t __restrict dst,
+                                   SizeT count,
+                                   const Selection& input_select) {
+    ExecutorAssert(tail_index_ == 0, "Column Vector already been set some values")
+    for(SizeT idx = 0; idx < count; ++ idx) {
+        SizeT row_id = input_select[idx];
+
+        const_ptr_t src_ptr = src + idx * data_type_.Size();
+        ptr_t dst_ptr = dst + row_id * data_type_.Size();
+        memcpy(dst_ptr, src_ptr, data_type_.Size());
+    }
+}
 
 }

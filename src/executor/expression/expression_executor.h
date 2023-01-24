@@ -23,7 +23,7 @@ public:
     void
     Select(SharedPtr<Table>& input, SharedPtr<Table>& output);
 
-    void
+    SizeT
     Select(const SharedPtr<DataBlock>& input_data_block, SharedPtr<DataBlock>& output_data_block);
 
     void
@@ -35,12 +35,12 @@ public:
            SharedPtr<Selection>& output_false_select);
 
     void
-    Select(SharedPtr<BaseExpression>& expr,
+    Select(const SharedPtr<BaseExpression>& expr,
            SharedPtr<ExpressionState>& state,
            SizeT count,
            SharedPtr<Selection>& output_true_select);
 
-    void
+    static void
     Select(const u8 *__restrict bool_column,
            const SharedPtr<Bitmask>& null_mask,
            SizeT count,
@@ -56,7 +56,7 @@ public:
 
     // Method to evaluate each expression recursively
     void
-    Execute(SharedPtr<BaseExpression>& expr,
+    Execute(const SharedPtr<BaseExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
             SizeT count);

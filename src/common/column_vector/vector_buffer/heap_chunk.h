@@ -48,13 +48,13 @@ public:
     }
 
     ptr_t
-    Allocate(size_t nbytes);
+    Allocate(SizeT nbytes);
 
     [[nodiscard]] String
     Stats() const;
 
 public:
-    [[nodiscard]] inline size_t
+    [[nodiscard]] inline SizeT
     chunks() const { return chunks_.size(); }
 
     [[nodiscard]] inline u64

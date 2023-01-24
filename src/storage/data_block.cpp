@@ -7,13 +7,26 @@
 namespace infinity {
 
 void
+DataBlock::Init(const SharedPtr<DataBlock>& input, const SharedPtr<Selection>& input_select) {
+    StorageAssert(!initialized, "Data block was initialized before.");
+    StorageAssert(input != nullptr && input_select != nullptr, "Invalid input data block or select")
+    column_count_ = input->column_count();
+    column_vectors.reserve(column_count_);
+    for(SizeT idx = 0; idx < column_count_; ++ idx) {
+        column_vectors.emplace_back(MakeShared<ColumnVector>(input->column_vectors[idx]->data_type()));
+        column_vectors.back()->Initialize(*(input->column_vectors[idx]), *input_select);
+    }
+    input->Finalize();
+}
+
+void
 DataBlock::Init(const std::vector<DataType> &types) {
     StorageAssert(!initialized, "Data block was initialized before.");
     column_count_ = types.size();
     column_vectors.reserve(column_count_);
-    for(SizeT i = 0; i < column_count_; ++ i) {
-        column_vectors.emplace_back(MakeShared<ColumnVector>(types[i]));
-        column_vectors[i]->Initialize();
+    for(SizeT idx = 0; idx < column_count_; ++ idx) {
+        column_vectors.emplace_back(MakeShared<ColumnVector>(types[idx]));
+        column_vectors[idx]->Initialize();
     }
     initialized = true;
 }

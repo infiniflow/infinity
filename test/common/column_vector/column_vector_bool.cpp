@@ -235,3 +235,37 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
+
+TEST_F(ColumnVectorBoolTest, bool_column_vector_select) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kBoolean);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+        Value v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
+        column_vector.AppendValue(v);
+    }
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
+        EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
+    }
+
+    Selection input_select;
+    input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+        input_select.Append(idx * 2);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    target_column_vector.Initialize(column_vector, input_select);
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
+        EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(true));
+    }
+}

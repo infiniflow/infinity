@@ -9,7 +9,207 @@
 
 namespace infinity {
 
-void ColumnVector::Initialize(SizeT capacity, ColumnVectorType vector_type) {
+void
+ColumnVector::Initialize(const ColumnVector& other, const Selection& input_select) {
+    StorageAssert(!initialized, "Column vector is already initialized.")
+    StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
+
+    vector_type_ = other.vector_type_;
+    if(vector_type_ == ColumnVectorType::kConstant) {
+        capacity_ = 1;
+    } else {
+        capacity_ = input_select.Size();
+    }
+
+    data_type_size_ = data_type_.Size();
+    VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
+    switch(data_type_.type()) {
+        case LogicalType::kBlob:
+        case LogicalType::kBitmap:
+        case LogicalType::kPolygon:
+        case LogicalType::kPath:
+        case LogicalType::kVarchar: {
+            vector_buffer_type = VectorBufferType::kHeap;
+
+            break;
+        }
+        case LogicalType::kInvalid:
+        case LogicalType::kNull:
+        case LogicalType::kMissing: {
+            TypeError("Unexpected data type for column vector.")
+        }
+        default: {
+            vector_buffer_type = VectorBufferType::kStandard;
+        }
+    }
+
+    if(buffer_ == nullptr) {
+        buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
+        data_ptr_ = buffer_->GetData();
+        nulls_ptr_ = Bitmask::Make(capacity_);
+    } else {
+        // Initialize after reset will come to this branch
+        if(vector_buffer_type == VectorBufferType::kHeap) {
+            StorageAssert(buffer_->heap_mgr_ == nullptr, "Vector heap should be null.")
+            buffer_->heap_mgr_ = MakeUnique<StringHeapMgr>();
+        }
+    }
+
+    initialized = true;
+    tail_index_ = input_select.Size();
+
+    // Copy data from other column vector to here according to the select
+    switch(data_type_.type()) {
+        case kBoolean: {
+            CopyFrom<BooleanT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kTinyInt: {
+            CopyFrom<TinyIntT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kSmallInt: {
+            CopyFrom<SmallIntT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kInteger: {
+            CopyFrom<IntegerT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kBigInt: {
+            CopyFrom<BigIntT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kHugeInt: {
+            CopyFrom<HugeIntT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kFloat: {
+            CopyFrom<FloatT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kDouble: {
+            CopyFrom<DoubleT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kDecimal16: {
+            CopyFrom<Decimal16T>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kDecimal32: {
+            CopyFrom<Decimal32T>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kDecimal64: {
+            CopyFrom<Decimal64T>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kDecimal128: {
+            CopyFrom<Decimal128T>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kVarchar: {
+            CopyFrom<VarcharT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kChar: {
+            CopyFrom<CharT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kDate: {
+            CopyFrom<DateT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kTime: {
+            CopyFrom<TimeT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kDateTime: {
+            CopyFrom<DateTimeT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kTimestamp: {
+            CopyFrom<TimestampT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kTimestampTZ: {
+            CopyFrom<TimestampTZT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kInterval: {
+            CopyFrom<IntervalT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kArray: {
+            CopyFrom<ArrayT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kTuple: {
+            CopyFrom<TupleT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kPoint: {
+            CopyFrom<PointT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kLine: {
+            CopyFrom<LineT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kLineSeg: {
+            CopyFrom<LineSegT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kBox: {
+            CopyFrom<BoxT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kPath: {
+            CopyFrom<PathT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kPolygon: {
+            CopyFrom<PolygonT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kCircle: {
+            CopyFrom<CircleT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kBitmap: {
+            CopyFrom<BitmapT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kUuid: {
+            CopyFrom<UuidT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kBlob: {
+            CopyFrom<BlobT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kEmbedding: {
+            CopyFrom<EmbeddingT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kMixed: {
+            CopyFrom<MixedT>(other.data(), this->data(), input_select.Size(), input_select);
+            break;
+        }
+        case kNull: {
+            ExecutorError("Not implemented")
+        }
+        case kMissing: {
+            ExecutorError("Not implemented")
+        }
+        case kInvalid: {
+            ExecutorError("Invalid data type")
+        }
+    }
+}
+
+void
+ColumnVector::Initialize(SizeT capacity, ColumnVectorType vector_type) {
     StorageAssert(!initialized, "Column vector is already initialized.")
     StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
     StorageAssert(vector_type != ColumnVectorType::kInvalid, "Attempt to initialize column vector to invalid type.")
@@ -384,7 +584,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
         }
         case kVarchar: {
             // Copy string
-            SizeT varchar_len = value.value_.varchar.length;
+            u16 varchar_len = value.value_.varchar.length;
             if(varchar_len <= VarcharType::INLINE_LENGTH) {
                 // Only prefix is enough to contain all string data.
                 memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.prefix, varchar_len);
@@ -394,7 +594,7 @@ ColumnVector::SetValue(idx_t index, const Value &value) {
                 memcpy(ptr, value.value_.varchar.ptr, varchar_len);
                 ((VarcharT *) data_ptr_)[index].ptr = ptr;
             }
-            ((VarcharT *) data_ptr_)[index].length = static_cast<u16>(varchar_len);
+            ((VarcharT *) data_ptr_)[index].length = varchar_len;
             break;
         }
         case kChar: {

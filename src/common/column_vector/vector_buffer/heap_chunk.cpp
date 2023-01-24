@@ -9,7 +9,7 @@
 namespace infinity {
 
 ptr_t
-StringHeapMgr::Allocate(size_t nbytes) {
+StringHeapMgr::Allocate(SizeT nbytes) {
     ExecutorAssert(nbytes > 0, "Attempt to allocate zero size memory.")
     if(current_chunk_idx_ == std::numeric_limits<u64>::max()) {
         // First chunk

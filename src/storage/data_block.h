@@ -6,6 +6,7 @@
 
 #include "common/types/internal_types.h"
 #include "common/column_vector/column_vector.h"
+#include "common/column_vector/selection.h"
 
 namespace infinity {
 
@@ -21,6 +22,9 @@ public:
 public:
 
     DataBlock() = default;
+
+    void
+    Init(const SharedPtr<DataBlock>& input, const SharedPtr<Selection>& input_select);
 
     void
     Init(const Vector<DataType>& types);

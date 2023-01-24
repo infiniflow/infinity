@@ -7,6 +7,7 @@
 #include "common/types/internal_types.h"
 #include "common/default_values.h"
 #include "common/utility/infinity_assert.h"
+#include "main/stats/global_resource_usage.h"
 
 namespace infinity {
 
@@ -15,6 +16,11 @@ struct SelectionData {
     SelectionData(SizeT count) : capacity_(count) {
         ExecutorAssert(count <= std::numeric_limits<u16>::max(), "Too large size for selection data.")
         data_ = MakeUnique<u16[]>(count);
+        GlobalResourceUsage::IncrObjectCount();
+    }
+
+    ~SelectionData() {
+        GlobalResourceUsage::DecrObjectCount();
     }
 
     UniquePtr<u16[]> data_{};
@@ -23,9 +29,16 @@ struct SelectionData {
 
 class Selection {
 public:
-    Selection() = default;
+    Selection() {
+        GlobalResourceUsage::IncrObjectCount();
+    }
 
-    void Initialize(SizeT count = DEFAULT_VECTOR_SIZE) {
+    ~Selection() {
+        GlobalResourceUsage::DecrObjectCount();
+    }
+
+    void
+    Initialize(SizeT count = DEFAULT_VECTOR_SIZE) {
         storage_ = MakeShared<SelectionData>(count);
         selection_vector = storage_->data_.get();
     }
@@ -33,7 +46,7 @@ public:
     inline void
     Set(SizeT selection_idx, SizeT row_idx) {
         ExecutorAssert(selection_vector != nullptr, "Selection container isn't initialized")
-        ExecutorAssert(latest_selection_idx_ < storage_->capacity_, "Exceed the selection vector capacity.")
+        ExecutorAssert(selection_idx < storage_->capacity_, "Exceed the selection vector capacity.")
         selection_vector[selection_idx] = row_idx;
     }
 
@@ -45,13 +58,19 @@ public:
 
     [[nodiscard]] inline SizeT
     Get(SizeT idx) const {
-        ExecutorAssert(latest_selection_idx_ < storage_->capacity_, "Exceed the selection vector capacity.")
-        return selection_vector ? selection_vector[idx] : idx;
+        if(selection_vector == nullptr) {
+            return idx;
+        }
+        ExecutorAssert(idx < latest_selection_idx_,
+                       "Exceed the last row of the selection vector.")
+        return selection_vector[idx];
     }
 
     inline u16&
-    operator[](SizeT index) const {
-        return selection_vector[index];
+    operator[](SizeT idx) const {
+        ExecutorAssert(idx < latest_selection_idx_,
+                       "Exceed the last row of the selection vector.")
+        return selection_vector[idx];
     }
 
     [[nodiscard]] inline SizeT
@@ -64,6 +83,13 @@ public:
     Size() const {
         ExecutorAssert(selection_vector != nullptr, "Selection container isn't initialized")
         return latest_selection_idx_;
+    }
+
+    void
+    Reset() {
+        storage_.reset();
+        latest_selection_idx_ = 0;
+        selection_vector = nullptr;
     }
 
 private:

@@ -32,22 +32,28 @@ ExpressionExecutor::Select(SharedPtr<Table>& input_table, SharedPtr<Table>& outp
     SizeT input_data_block_count = input_table->DataBlockCount();
     for(SizeT idx = 0; idx < input_data_block_count; ++ idx) {
         SharedPtr<DataBlock> output_data_block = DataBlock::Make();
-        output_data_block->Init(output_types);
 
-        Select(input_table->GetDataBlockById(idx), output_data_block);
-
-        output_data_block->Finalize();
-        output_table->Append(output_data_block);
+        SizeT selected_count = Select(input_table->GetDataBlockById(idx), output_data_block);
+        if(selected_count > 0) {
+            output_table->Append(output_data_block);
+        }
     }
 }
 
-void
+SizeT
 ExpressionExecutor::Select(const SharedPtr<DataBlock>& input_data_block, SharedPtr<DataBlock>& output_data_block) {
+    SizeT input_data_rows = input_data_block->row_count();
+
     this->input_data_ = input_data_block;
     SharedPtr<Selection> input_select = nullptr;
     SharedPtr<Selection> output_true_select = MakeShared<Selection>();
+    output_true_select->Initialize(input_data_rows);
     SharedPtr<Selection> output_false_select = nullptr;
-    Select(expressions[0], states[0], input_data_block->row_count(), input_select, output_true_select, output_false_select);
+
+    Select(expressions[0], states[0], input_data_rows, input_select, output_true_select, output_false_select);
+
+    // Shrink the input data block into output data block
+    return output_true_select->Size();
 }
 
 void
@@ -61,11 +67,11 @@ ExpressionExecutor::Select(const SharedPtr<BaseExpression>& expr,
     ExecutorAssert(output_true_select != nullptr || output_false_select != nullptr,
                    "No output select column vector is given")
     ExecutorAssert(expr->Type().type() == LogicalType::kBoolean, "Attempting to select non-boolean expression")
-
+    Select(expr, state, count, output_true_select);
 }
 
 void
-ExpressionExecutor::Select(SharedPtr<BaseExpression>& expr,
+ExpressionExecutor::Select(const SharedPtr<BaseExpression>& expr,
                            SharedPtr<ExpressionState>& state,
                            SizeT count,
                            SharedPtr<Selection>& output_true_select) {
@@ -170,7 +176,7 @@ ExpressionExecutor::Execute(const SharedPtr<DataBlock>& input_data_block, Shared
 }
 
 void
-ExpressionExecutor::Execute(SharedPtr<BaseExpression>& expr,
+ExpressionExecutor::Execute(const SharedPtr<BaseExpression>& expr,
                             SharedPtr<ExpressionState>& state,
                             SharedPtr<ColumnVector>& output_column,
                             SizeT count) {
