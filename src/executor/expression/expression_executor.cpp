@@ -53,6 +53,7 @@ ExpressionExecutor::Select(const SharedPtr<DataBlock>& input_data_block, SharedP
     Select(expressions[0], states[0], input_data_rows, input_select, output_true_select, output_false_select);
 
     // Shrink the input data block into output data block
+    output_data_block->Init(input_data_block, output_true_select);
     return output_true_select->Size();
 }
 

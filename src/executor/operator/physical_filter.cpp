@@ -44,9 +44,9 @@ PhysicalFilter::Execute(SharedPtr<QueryContext>& query_context) {
     SharedPtr<Table> selected_table = Table::Make(table_def, TableType::kIntermediate);
 
     // Execute the expression on the input table
-    executor.Execute(input_table, selected_table);
+    executor.Select(input_table, selected_table);
 
-    output_ = left_->output();
+    output_ = selected_table;
 }
 
 }
