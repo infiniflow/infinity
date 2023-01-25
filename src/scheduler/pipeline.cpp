@@ -12,7 +12,7 @@ namespace infinity {
 Pipeline::~Pipeline() = default;
 
 void
-Pipeline::SetPredecessorOf(const std::shared_ptr<Pipeline> &successor) {
+Pipeline::SetPredecessorOf(const SharedPtr<Pipeline> &successor) {
     // Prevents add a duplicated successor.
     if(std::find(successors_.cbegin(), successors_.cend(), &*successor) != successors_.cend()) {
         LOG_WARN("Trying to insert a duplicated pipeline id: {}", successor->Id());
@@ -33,7 +33,7 @@ Pipeline::Schedule() {
 }
 
 void
-Pipeline::Execute(std::shared_ptr<QueryContext>& query_context) {
+Pipeline::Execute(SharedPtr<QueryContext>& query_context) {
     OnExecute(query_context);
 }
 

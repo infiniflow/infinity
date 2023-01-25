@@ -7,6 +7,7 @@
 #include "planner/node/logical_drop_table.h"
 #include "planner/node/logical_insert.h"
 #include "planner/node/logical_project.h"
+#include "planner/node/logical_sort.h"
 #include "planner/node/logical_table_scan.h"
 #include "planner/node/logical_dummy_scan.h"
 
@@ -232,7 +233,19 @@ PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildSort(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalSort>(logical_operator->node_id());
+    auto input_logical_node = logical_operator->left_node();
+    PlannerAssert(input_logical_node != nullptr, "Logical sort node has no input node.");
+    PlannerAssert(logical_operator->right_node() == nullptr,
+                  "Logical sort node shouldn't have right child.");
+
+    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
+
+    SharedPtr<LogicalSort> logical_sort = std::static_pointer_cast<LogicalSort>(logical_operator);
+
+    return MakeShared<PhysicalSort>(logical_operator->node_id(),
+                                    input_physical_operator,
+                                    logical_sort->expressions_,
+                                    logical_sort->order_by_types_);
 }
 
 SharedPtr<PhysicalOperator>

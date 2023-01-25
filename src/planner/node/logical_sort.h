@@ -21,7 +21,6 @@ public:
     String
     ToString(i64& space) final;
 
-private:
     Vector<SharedPtr<BaseExpression>> expressions_{};
     Vector<OrderByType> order_by_types_{};
 };

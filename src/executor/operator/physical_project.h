@@ -4,8 +4,6 @@
 
 #pragma once
 
-//#include <utility>
-
 #include "expression/base_expression.h"
 #include "executor/physical_operator.h"
 #include "executor/expression/expression_executor.h"
@@ -14,10 +12,13 @@ namespace infinity {
 
 class PhysicalProject : public PhysicalOperator {
 public:
-    explicit PhysicalProject(uint64_t id, SharedPtr<PhysicalOperator> left, Vector<SharedPtr<BaseExpression>> expressions)
-        : PhysicalOperator(PhysicalOperatorType::kProjection, std::move(left), nullptr, id),
-          expressions_(std::move(expressions))
-          {}
+    explicit
+    PhysicalProject(u64 id,
+                    SharedPtr<PhysicalOperator> left,
+                    Vector<SharedPtr<BaseExpression>> expressions)
+                    : PhysicalOperator(PhysicalOperatorType::kProjection, std::move(left), nullptr, id),
+                    expressions_(std::move(expressions))
+                    {}
 
     ~PhysicalProject() override = default;
 

@@ -4,21 +4,33 @@
 
 #pragma once
 
+#include "expression/base_expression.h"
 #include "executor/physical_operator.h"
+#include "common/types.h"
 
 namespace infinity {
 
 class PhysicalSort : public PhysicalOperator {
 public:
-    explicit PhysicalSort(uint64_t id)
-        : PhysicalOperator(PhysicalOperatorType::kSort, nullptr, nullptr, id) {}
+    explicit
+    PhysicalSort(u64 id,
+                 SharedPtr<PhysicalOperator> left,
+                 Vector<SharedPtr<BaseExpression>> expressions,
+                 Vector<OrderByType> order_by_types)
+                 : PhysicalOperator(PhysicalOperatorType::kSort, std::move(left), nullptr, id),
+                   expressions_(std::move(expressions)),
+                   order_by_types_(std::move(order_by_types))
+                   {}
     ~PhysicalSort() override = default;
 
     void
     Init() override;
 
     void
-    Execute(std::shared_ptr<QueryContext>& query_context) override;
+    Execute(SharedPtr<QueryContext>& query_context) override;
+
+    Vector<SharedPtr<BaseExpression>> expressions_;
+    Vector<OrderByType> order_by_types_{};
 };
 
 }

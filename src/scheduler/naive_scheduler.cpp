@@ -11,10 +11,10 @@ namespace infinity {
 
 
 void
-NaiveScheduler::Schedule(std::shared_ptr<QueryContext>& query_context, const std::shared_ptr<Pipeline> &pipeline) {
-    std::stack<std::shared_ptr<Pipeline>> pipeline_stack;
+NaiveScheduler::Schedule(SharedPtr<QueryContext>& query_context, const SharedPtr<Pipeline> &pipeline) {
+    std::stack<SharedPtr<Pipeline>> pipeline_stack;
 
-    std::shared_ptr<Pipeline> current_pipeline = nullptr;
+    SharedPtr<Pipeline> current_pipeline = nullptr;
     std::set<uint64_t> visited;
 //    uint64_t last_visited_pipeline_id = std::numeric_limits<uint64_t>::max();
     pipeline_stack.push(pipeline);
@@ -23,10 +23,10 @@ NaiveScheduler::Schedule(std::shared_ptr<QueryContext>& query_context, const std
 
         if( !current_pipeline->predecessors().empty() ) {
             // this pipeline has predecessors
-            const std::vector<std::shared_ptr<Pipeline>>& children = current_pipeline->predecessors();
+            const std::vector<SharedPtr<Pipeline>>& children = current_pipeline->predecessors();
 
             bool has_child = false;
-            for(const std::shared_ptr<Pipeline>& shared_child: children) {
+            for(const SharedPtr<Pipeline>& shared_child: children) {
                 if(visited.contains(shared_child->Id())) {
                     continue;
                 }
