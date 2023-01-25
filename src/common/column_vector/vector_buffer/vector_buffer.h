@@ -19,7 +19,7 @@ enum class VectorBufferType {
 class VectorBuffer {
 public:
     static SharedPtr<VectorBuffer>
-    Make(size_t data_type_size, size_t capacity, VectorBufferType buffer_type);
+    Make(SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
 
 public:
     explicit VectorBuffer() {
@@ -31,13 +31,13 @@ public:
     }
 
     void
-    Initialize(size_t type_size, size_t capacity);
+    Initialize(SizeT type_size, SizeT capacity);
 
     void
     ResetToInit();
 
     void
-    Copy(ptr_t input, size_t size);
+    Copy(ptr_t input, SizeT size);
 
     [[nodiscard]] ptr_t
     GetData() const { return data_.get(); }
@@ -45,8 +45,8 @@ public:
 public:
     bool initialized_ {false};
     UniquePtr<char[]> data_ {nullptr};
-    size_t data_size_ {0};
-    size_t capacity_ {0};
+    SizeT data_size_ {0};
+    SizeT capacity_ {0};
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
 
     UniquePtr<StringHeapMgr> heap_mgr_{nullptr};

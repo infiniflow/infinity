@@ -1325,7 +1325,7 @@ Value::ToString() const {
         case kUuid:
             break;
         case kBlob:
-            break;
+            return value_.blob.ToString();
         case kEmbedding:
             break;
         case kMixed:

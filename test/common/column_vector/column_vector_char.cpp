@@ -259,3 +259,46 @@ TEST_F(ColumnVectorCharTest, contant_char) {
     }
 }
 
+TEST_F(ColumnVectorCharTest, char_column_vector_select) {
+    using namespace infinity;
+
+    auto char_info = CharInfo::Make(128);
+    DataType data_type(LogicalType::kChar, char_info);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeChar(std::to_string(i), char_info);
+        column_vector.AppendValue(v);
+        v.value_.char_n.Reset();
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kChar);
+        EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kChar);
+        EXPECT_EQ(vx.type().type_info()->Size(), 128);
+
+        EXPECT_STREQ(vx.value_.char_n.ptr, std::to_string(i).c_str());
+    }
+
+    Selection input_select;
+    input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+        input_select.Append(idx * 2);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    target_column_vector.Initialize(column_vector, input_select);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kChar);
+        EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kChar);
+        EXPECT_EQ(vx.type().type_info()->Size(), 128);
+
+        EXPECT_STREQ(vx.value_.char_n.ptr, std::to_string(2 * i).c_str());
+    }
+}
+

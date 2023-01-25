@@ -235,6 +235,43 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal16) {
     }
 }
 
+TEST_F(ColumnVectorDecimalTest, decimal16_column_vector_select) {
+    using namespace infinity;
+
+    auto decimal16_info = Decimal16Info::Make(4, 4);
+    DataType data_type(LogicalType::kDecimal16, decimal16_info);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Decimal16T decimal16(static_cast<i16>(i));
+        Value v = Value::MakeDecimal16(decimal16, decimal16_info);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDecimal16);
+        EXPECT_EQ(vx.value_.decimal16.value, static_cast<i16>(i));
+    }
+
+    Selection input_select;
+    input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+        input_select.Append(idx * 2);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    target_column_vector.Initialize(column_vector, input_select);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDecimal16);
+        EXPECT_EQ(vx.value_.decimal16.value, static_cast<i16>(2 * i));
+    }
+}
+
 TEST_F(ColumnVectorDecimalTest, flat_decimal32) {
     using namespace infinity;
 
@@ -437,6 +474,43 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal32) {
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal32);
         EXPECT_EQ(vx.value_.decimal32.value, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
+TEST_F(ColumnVectorDecimalTest, decimal32_column_vector_select) {
+    using namespace infinity;
+
+    auto decimal32_info = Decimal32Info::Make(9, 9);
+    DataType data_type(LogicalType::kDecimal32, decimal32_info);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Decimal32T decimal32(static_cast<i32>(i));
+        Value v = Value::MakeDecimal32(decimal32, decimal32_info);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDecimal32);
+        EXPECT_EQ(vx.value_.decimal32.value, static_cast<i32>(i));
+    }
+
+    Selection input_select;
+    input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+        input_select.Append(idx * 2);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    target_column_vector.Initialize(column_vector, input_select);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDecimal32);
+        EXPECT_EQ(vx.value_.decimal32.value, static_cast<i32>(2 * i));
     }
 }
 
@@ -645,6 +719,43 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal64) {
     }
 }
 
+TEST_F(ColumnVectorDecimalTest, decimal64_column_vector_select) {
+    using namespace infinity;
+
+    auto decimal64_info = Decimal64Info::Make(18, 18);
+    DataType data_type(LogicalType::kDecimal64, decimal64_info);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Decimal64T decimal64(static_cast<i64>(i));
+        Value v = Value::MakeDecimal64(decimal64, decimal64_info);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDecimal64);
+        EXPECT_EQ(vx.value_.decimal64.value, static_cast<i64>(i));
+    }
+
+    Selection input_select;
+    input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+        input_select.Append(idx * 2);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    target_column_vector.Initialize(column_vector, input_select);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDecimal64);
+        EXPECT_EQ(vx.value_.decimal64.value, static_cast<i64>(2 * i));
+    }
+}
+
 TEST_F(ColumnVectorDecimalTest, flat_decimal128) {
     using namespace infinity;
 
@@ -847,5 +958,42 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal128) {
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal128);
         EXPECT_EQ(vx.value_.decimal128.lower, static_cast<i64>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+    }
+}
+
+TEST_F(ColumnVectorDecimalTest, decimal128_column_vector_select) {
+    using namespace infinity;
+
+    auto decimal128_info = Decimal128Info::Make(38, 38);
+    DataType data_type(LogicalType::kDecimal128, decimal128_info);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Decimal128T decimal128(0, static_cast<i64>(i));
+        Value v = Value::MakeDecimal128(decimal128, decimal128_info);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDecimal128);
+        EXPECT_EQ(vx.value_.decimal128.lower, static_cast<i64>(i));
+    }
+
+    Selection input_select;
+    input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+        input_select.Append(idx * 2);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    target_column_vector.Initialize(column_vector, input_select);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDecimal128);
+        EXPECT_EQ(vx.value_.decimal128.lower, static_cast<i64>(2 * i));
     }
 }

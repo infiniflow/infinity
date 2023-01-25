@@ -294,3 +294,67 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
+
+TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kBlob);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        i64 blob_len = i + 1;
+        auto blob_ptr = new char[blob_len]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
+        for (i64 j = 0; j < blob_len; ++j) {
+            blob_ptr[j] = 'a' + static_cast<char_t>(j);
+        }
+        blob_ptr[blob_len - 1] = 0;
+        BlobT b1(blob_ptr, blob_len);
+
+        Value v = Value::MakeBlob(b1);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        i64 blob_len = i + 1;
+        auto blob_ptr = new char[blob_len]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
+        for(i64 j = 0; j < blob_len; ++ j) {
+            blob_ptr[j] = 'a' + static_cast<char_t>(j);
+        }
+        blob_ptr[blob_len - 1] = 0;
+        BlobT b1(blob_ptr, blob_len);
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
+        EXPECT_EQ(vx.value_.blob, b1);
+    }
+
+    Selection input_select;
+    input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+        input_select.Append(idx * 2);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    target_column_vector.Initialize(column_vector, input_select);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+        i64 blob_len = 2 * i + 1;
+        auto blob_ptr = new char[blob_len]{0};
+        GlobalResourceUsage::IncrRawMemCount();
+
+        for(i64 j = 0; j < blob_len; ++ j) {
+            blob_ptr[j] = 'a' + static_cast<char_t>(j);
+        }
+        blob_ptr[blob_len - 1] = 0;
+        BlobT b1(blob_ptr, blob_len);
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
+        EXPECT_EQ(vx.value_.blob, b1);
+    }
+}
+

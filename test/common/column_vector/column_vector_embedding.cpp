@@ -302,3 +302,67 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
+
+TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
+    using namespace infinity;
+
+    auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
+    DataType data_type(LogicalType::kEmbedding, embedding_info);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
+        for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
+            ((float*)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
+        }
+        column_vector.AppendValue(v);
+        v.value_.embedding.Reset();
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
+        for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
+            ((float*)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
+        }
+
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kEmbedding);
+        EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kEmbedding);
+        EXPECT_EQ(vx.type().type_info()->Size(), 64);
+
+        for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
+            EXPECT_FLOAT_EQ(((float*)(vx.value_.embedding.ptr))[j], ((float*)(v.value_.embedding.ptr))[j]);
+        }
+
+        v.value_.embedding.Reset();
+    }
+
+    Selection input_select;
+    input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+        input_select.Append(idx * 2);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    target_column_vector.Initialize(column_vector, input_select);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+        Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
+        for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
+            ((float*)(v.value_.embedding.ptr))[j] = static_cast<float>(2 * i) + static_cast<float>(j) + 0.5f;
+        }
+
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kEmbedding);
+        EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kEmbedding);
+        EXPECT_EQ(vx.type().type_info()->Size(), 64);
+
+        for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
+            EXPECT_FLOAT_EQ(((float*)(vx.value_.embedding.ptr))[j], ((float*)(v.value_.embedding.ptr))[j]);
+        }
+
+        v.value_.embedding.Reset();
+    }
+}

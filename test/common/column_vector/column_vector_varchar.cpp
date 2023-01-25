@@ -294,6 +294,64 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     }
 }
 
+TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
+    using namespace infinity;
+
+    auto varchar_info = VarcharInfo::Make(65);
+    DataType data_type(LogicalType::kVarchar, varchar_info);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        String s = "hello" + std::to_string(i);
+        VarcharT varchar_value(s);
+        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
+
+        String s = "hello" + std::to_string(i);
+
+        EXPECT_TRUE(vx.value_.varchar.IsInlined());
+        if(vx.value_.varchar.IsInlined()) {
+            String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), s.c_str());
+        } else {
+            String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), s.c_str());
+        }
+    }
+
+    Selection input_select;
+    input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+        input_select.Append(idx * 2);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    target_column_vector.Initialize(column_vector, input_select);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
+
+        String s = "hello" + std::to_string(2 * i);
+
+        EXPECT_TRUE(vx.value_.varchar.IsInlined());
+        if(vx.value_.varchar.IsInlined()) {
+            String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), s.c_str());
+        } else {
+            String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), s.c_str());
+        }
+    }
+}
+
 TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     using namespace infinity;
 

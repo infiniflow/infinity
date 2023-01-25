@@ -29,9 +29,14 @@ public:
     }
 
     BlobType(const BlobType& other);
+
     BlobType(BlobType&& other) noexcept;
-    BlobType& operator=(const BlobType& other);
-    BlobType& operator=(BlobType&& other) noexcept;
+
+    BlobType&
+    operator=(const BlobType& other);
+
+    BlobType&
+    operator=(BlobType&& other) noexcept;
 
     bool
     operator==(const BlobType& other) const;
@@ -58,6 +63,11 @@ public:
 
             ptr = nullptr;
         }
+    }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        return {this->ptr, this->size};
     }
 };
 

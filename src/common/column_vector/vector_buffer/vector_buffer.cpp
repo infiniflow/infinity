@@ -8,7 +8,7 @@
 namespace infinity {
 
 SharedPtr<VectorBuffer>
-VectorBuffer::Make(size_t data_type_size, size_t capacity, VectorBufferType buffer_type) {
+VectorBuffer::Make(SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type) {
     SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
     buffer_ptr->buffer_type_ = buffer_type;
     buffer_ptr->Initialize(data_type_size, capacity);
@@ -16,9 +16,9 @@ VectorBuffer::Make(size_t data_type_size, size_t capacity, VectorBufferType buff
 }
 
 void
-VectorBuffer::Initialize(size_t type_size, size_t capacity) {
+VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     GeneralAssert(!initialized_, "Vector buffer is already initialized.");
-    size_t data_size = type_size * capacity;
+    SizeT data_size = type_size * capacity;
     if(data_size > 0) {
         data_ = MakeUnique<char[]>(data_size);
     }
@@ -38,7 +38,7 @@ VectorBuffer::ResetToInit() {
 }
 
 void
-VectorBuffer::Copy(ptr_t input, size_t size) {
+VectorBuffer::Copy(ptr_t input, SizeT size) {
     GeneralAssert(data_size_ >= size,
                   "Attempt to copy an amount of data that cannot currently be accommodated");
     memcpy(data_.get(), input, size);

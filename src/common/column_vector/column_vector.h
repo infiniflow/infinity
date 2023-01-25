@@ -194,14 +194,12 @@ ColumnVector::CopyFrom<CharT>(const_ptr_t __restrict src,
                               ptr_t __restrict dst,
                               SizeT count,
                               const Selection& input_select) {
-    ExecutorAssert(tail_index_ == 0, "Column Vector already been set some values")
     for(SizeT idx = 0; idx < count; ++ idx) {
         SizeT row_id = input_select[idx];
-        const_ptr_t src_ptr = src + idx * data_type_.Size();
-        ptr_t dst_ptr = dst + row_id * data_type_.Size();
-        memcpy(dst_ptr, src_ptr, data_type_.Size());
+        const_ptr_t src_ptr = src + row_id * data_type_size_;
+        ptr_t dst_ptr = dst + idx * data_type_size_;
+        memcpy(dst_ptr, src_ptr, data_type_size_);
     }
-    this->tail_index_ = count;
 }
 
 template<>
@@ -303,13 +301,12 @@ ColumnVector::CopyFrom<EmbeddingT>(const_ptr_t __restrict src,
                                    ptr_t __restrict dst,
                                    SizeT count,
                                    const Selection& input_select) {
-    ExecutorAssert(tail_index_ == 0, "Column Vector already been set some values")
     for(SizeT idx = 0; idx < count; ++ idx) {
         SizeT row_id = input_select[idx];
 
-        const_ptr_t src_ptr = src + idx * data_type_.Size();
-        ptr_t dst_ptr = dst + row_id * data_type_.Size();
-        memcpy(dst_ptr, src_ptr, data_type_.Size());
+        const_ptr_t src_ptr = src + row_id * data_type_size_;
+        ptr_t dst_ptr = dst + idx * data_type_size_;
+        memcpy(dst_ptr, src_ptr, data_type_size_);
     }
 }
 
