@@ -7,6 +7,7 @@
 #include "expression/base_expression.h"
 #include "executor/physical_operator.h"
 #include "common/types.h"
+#include "executor/expression/expression_executor.h"
 
 namespace infinity {
 
@@ -31,6 +32,13 @@ public:
 
     Vector<SharedPtr<BaseExpression>> expressions_;
     Vector<OrderByType> order_by_types_{};
+private:
+
+    SharedPtr<Table>
+    GetOrderTable() const;
+
+private:
+    ExpressionExecutor executor;
 };
 
 }

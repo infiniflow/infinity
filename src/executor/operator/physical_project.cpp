@@ -22,12 +22,16 @@ PhysicalProject::Init() {
 }
 
 void
-PhysicalProject::Execute(std::shared_ptr<QueryContext>& query_context) {
-    // Get input from left child
-    auto input_table = left_->output();
+PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
+    if(left_ == nullptr) {
+        NotImplementError("Only select list.")
+    } else {
+        // Get input from left child
+        auto input_table = left_->output();
 
-    // Execute the expression on the input table
-    executor.Execute(input_table, output_);
+        // Execute the expression on the input table
+        executor.Execute(input_table, output_);
+    }
 }
 
 }

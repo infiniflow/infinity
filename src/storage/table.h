@@ -17,6 +17,7 @@ enum class TableType {
     kInvalid,
     kDataTable,
     kIntermediate,
+    kOrderBy,
     kResult,
 };
 
@@ -88,11 +89,15 @@ public:
         data_blocks_.emplace_back(data_block);
         row_count_ += data_block->row_count();
     }
+
 public:
     [[nodiscard]] String
     ToString() const;
 
-private:
+    [[nodiscard]] Vector<SharedPtr<Vector<i32>>>
+    GetOffsetVectors() const;
+
+protected:
     SharedPtr<TableDef> definition_ptr_;
     SizeT row_count_{0};
     TableType type_{TableType::kInvalid};

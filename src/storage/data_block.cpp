@@ -20,7 +20,7 @@ DataBlock::Init(const SharedPtr<DataBlock>& input, const SharedPtr<Selection>& i
 }
 
 void
-DataBlock::Init(const std::vector<DataType> &types) {
+DataBlock::Init(const Vector<DataType> &types) {
     StorageAssert(!initialized, "Data block was initialized before.");
     column_count_ = types.size();
     column_vectors.reserve(column_count_);
@@ -107,6 +107,16 @@ DataBlock::ToString() const {
         ss << column_vectors[idx]->ToString() << end;
     }
     return ss.str();
+}
+
+SharedPtr<Vector<i32>>
+DataBlock::GenerateOffset() const {
+    StorageAssert(finalized, "DataBlock isn't finalized.")
+    SharedPtr<Vector<i32>> offset_vector = MakeShared<Vector<i32>>(row_count_);
+    for(SizeT idx = 0; idx < row_count_; ++ idx) {
+        (*offset_vector)[idx] = static_cast<i32>(idx);
+    }
+    return offset_vector;
 }
 
 }

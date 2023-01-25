@@ -9,21 +9,14 @@ namespace infinity {
 
 String
 LogicalSort::ToString(i64& space) {
+
     std::stringstream ss;
     String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Sort" << std::endl;
-    if(arrow_str.empty()) {
-        space += 2;
-        ss << String(space , ' ') << "Sort Key: ";
-    } else {
-        space += 5;
-        ss << String(space , ' ') << "Sort Key: ";
-    }
-
+    ss << String(space, ' ') << arrow_str << "Order by: ";
     size_t expression_count = expressions_.size();
     for(size_t i = 0; i < expression_count - 1; ++ i) {
         ss << expressions_[i]->ToString() << " " << infinity::ToString(order_by_types_[i]) << ", ";

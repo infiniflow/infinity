@@ -49,7 +49,7 @@ public:
 
     // Evaluate all expressions
     void
-    Execute(SharedPtr<Table>& input, SharedPtr<Table>& output);
+    Execute(const SharedPtr<Table>& input, SharedPtr<Table>& output);
 
     void
     Execute(const SharedPtr<DataBlock>& input_data_block, SharedPtr<DataBlock>& output_data_block);

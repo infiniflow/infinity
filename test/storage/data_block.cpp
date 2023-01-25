@@ -97,31 +97,31 @@ TEST_F(DataBlockTest, test1) {
     // Heterogeneous type * 1
     column_types.emplace_back(LogicalType::kMixed);
 
-    size_t row_count = DEFAULT_VECTOR_SIZE;
+    SizeT row_count = DEFAULT_VECTOR_SIZE;
 
     data_block.Init(column_types);
 
     // Boolean: Test DataBlock::AppendValue
-    constexpr size_t BoolColumnIndex = 0;
-    for(size_t i = 0; i < row_count; ++ i) {
+    constexpr SizeT BoolColumnIndex = 0;
+    for(SizeT i = 0; i < row_count; ++ i) {
         data_block.AppendValue(BoolColumnIndex, Value::MakeBool(i % 2 == 0));
     }
 
     // Boolean: Test DataBlock::GetValue
-    for(size_t i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++ i) {
         Value value = data_block.GetValue(BoolColumnIndex, i);
         EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
     }
 
     // TinyInt: Test DataBlock::AppendValue
-    constexpr size_t TinyIntColumnIndex = 1;
-    for(size_t i = 0; i < row_count; ++ i) {
+    constexpr SizeT TinyIntColumnIndex = 1;
+    for(SizeT i = 0; i < row_count; ++ i) {
         data_block.AppendValue(TinyIntColumnIndex, Value::MakeTinyInt(static_cast<i8>(i)));
     }
 
     // Test DataBlock::GetValue
-    for(size_t i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++ i) {
         Value value = data_block.GetValue(TinyIntColumnIndex, i);
         EXPECT_EQ(value.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(value.value_.tiny_int, i8(i));
@@ -129,17 +129,15 @@ TEST_F(DataBlockTest, test1) {
 
     // Test DataBlock::Reset
     data_block.Reset();
-    for(size_t i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++ i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
 
-    for(size_t i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++ i) {
         Value value = data_block.GetValue(0, i);
         EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
     }
-
-
 }
 
 TEST_F(DataBlockTest, test2) {
@@ -149,12 +147,12 @@ TEST_F(DataBlockTest, test2) {
     std::vector<DataType> column_types;
     column_types.emplace_back(LogicalType::kBoolean);
 
-    size_t row_count = DEFAULT_VECTOR_SIZE;
+    SizeT row_count = DEFAULT_VECTOR_SIZE;
 
     data_block.Init(column_types);
 
     // Test DataBlock::AppendValue
-    for(size_t i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++ i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
     EXPECT_THROW(data_block.AppendValue(1, Value::MakeBool(true)), StorageException);
@@ -165,6 +163,11 @@ TEST_F(DataBlockTest, test2) {
     EXPECT_TRUE(data_block.Finalized());
 
     EXPECT_EQ(data_block.row_count(), row_count);
+
+    SharedPtr<Vector<i32>> offset_vector = data_block.GenerateOffset();
+    for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
+        EXPECT_EQ((*offset_vector)[row_id], row_id);
+    }
 }
 
 TEST_F(DataBlockTest, test3) {
@@ -178,7 +181,7 @@ TEST_F(DataBlockTest, test3) {
     std::vector<DataType> column_types;
     column_types.emplace_back(LogicalType::kTinyInt);
 
-    size_t row_count = DEFAULT_VECTOR_SIZE;
+    SizeT row_count = DEFAULT_VECTOR_SIZE;
 
     data_block.Init(column_types);
 
@@ -193,14 +196,16 @@ TEST_F(DataBlockTest, test3) {
 
     // Test DataBlock::AppendValue
     profiler.Begin();
-    for(size_t i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++ i) {
         data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
     }
     profiler.End();
     std::cout << "Append data to data block cost: " << profiler.ElapsedToString() << std::endl;
 
+    data_block.Finalize();
+
     // Validate the inserted data.
-    for(size_t i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++ i) {
         auto v = Value::MakeTinyInt(static_cast<i8>(i));
         auto vx = data_block.GetValue(0, i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);

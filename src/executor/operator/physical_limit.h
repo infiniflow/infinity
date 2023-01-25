@@ -4,21 +4,34 @@
 
 #pragma once
 
+#include <utility>
+
 #include "executor/physical_operator.h"
+#include "expression/base_expression.h"
 
 namespace infinity {
 
 class PhysicalLimit : public PhysicalOperator {
 public:
-    explicit PhysicalLimit(uint64_t id)
-        : PhysicalOperator(PhysicalOperatorType::kLimit, nullptr, nullptr, id) {}
+    explicit
+    PhysicalLimit(u64 id,
+                  SharedPtr<PhysicalOperator> left,
+                  SharedPtr<BaseExpression> limit_expr,
+                  SharedPtr<BaseExpression> offset_expr)
+        : PhysicalOperator(PhysicalOperatorType::kLimit, std::move(left), nullptr, id),
+          limit_expr_(std::move(limit_expr)),
+          offset_expr_(std::move(offset_expr)){}
     ~PhysicalLimit() override = default;
 
     void
     Init() override;
 
     void
-    Execute(std::shared_ptr<QueryContext>& query_context) override;
+    Execute(SharedPtr<QueryContext>& query_context) override;
+
+private:
+    SharedPtr<BaseExpression> limit_expr_{};
+    SharedPtr<BaseExpression> offset_expr_{};
 };
 
 }

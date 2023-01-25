@@ -48,13 +48,16 @@ public:
     void
     Finalize();
 
-    String
+    [[nodiscard]] String
     ToString() const;
 
     [[nodiscard]] bool
     Finalized() const {
         return finalized;
     }
+
+    SharedPtr<Vector<i32>>
+    GenerateOffset() const;
 
 public:
     [[nodiscard]] inline SizeT

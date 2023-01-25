@@ -39,6 +39,7 @@
 #include "executor/operator/physical_dummy_operator.h"
 #include "executor/operator/physical_dummy_scan.h"
 #include "planner/node/logical_filter.h"
+#include "planner/node/logical_limit.h"
 
 #include <limits>
 
@@ -250,23 +251,32 @@ PhysicalPlanner::BuildSort(const SharedPtr<LogicalNode> &logical_operator) const
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildLimit(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalLimit>(logical_operator->node_id());
+    auto input_logical_node = logical_operator->left_node();
+    PlannerAssert(input_logical_node != nullptr, "Logical limit node has no input node.");
+    PlannerAssert(logical_operator->right_node() == nullptr,
+                  "Logical project node shouldn't have right child.");
+    SharedPtr<LogicalLimit> logical_limit = std::static_pointer_cast<LogicalLimit>(logical_operator);
+    SharedPtr<PhysicalOperator> input_physical_operator = BuildPhysicalOperator(input_logical_node);
+    return MakeShared<PhysicalLimit>(logical_operator->node_id(),
+                                     input_physical_operator,
+                                     logical_limit->limit_expression_,
+                                     logical_limit->offset_expression_);
 }
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
-    PlannerAssert(input_logical_node != nullptr, "Logical project node has no input node.");
+//    PlannerAssert(input_logical_node != nullptr, "Logical project node has no input node.");
     PlannerAssert(logical_operator->right_node() == nullptr,
                   "Logical project node shouldn't have right child.");
-
-    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
-
     SharedPtr<LogicalProject> logical_project = std::static_pointer_cast<LogicalProject>(logical_operator);
-
+    SharedPtr<PhysicalOperator> input_physical_operator{};
+    if(input_logical_node != nullptr) {
+        input_physical_operator = BuildPhysicalOperator(input_logical_node);
+    }
     return MakeShared<PhysicalProject>(logical_operator->node_id(),
-                                             input_physical_operator,
-                                             logical_project->expressions_);
+                                       input_physical_operator,
+                                       logical_project->expressions_);
 }
 
 SharedPtr<PhysicalOperator>

@@ -20,7 +20,6 @@ public:
     String
     ToString(i64& space) final;
 
-private:
     SharedPtr<BaseExpression> limit_expression_{};
     SharedPtr<BaseExpression> offset_expression_{};
 };

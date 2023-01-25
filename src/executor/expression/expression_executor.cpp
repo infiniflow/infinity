@@ -138,7 +138,7 @@ ExpressionExecutor::Select(const u8 *__restrict bool_column,
 }
 
 void
-ExpressionExecutor::Execute(SharedPtr<Table> &input_table, SharedPtr<Table> &output_table) {
+ExpressionExecutor::Execute(const SharedPtr<Table> &input_table, SharedPtr<Table> &output_table) {
     ExecutorAssert(!expressions.empty(), "No expression.");
     SizeT expression_count = expressions.size();
     ExecutorAssert(expression_count == output_table->ColumnCount(), "Expression execution output columns count is mismatched.");

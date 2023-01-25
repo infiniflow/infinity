@@ -395,7 +395,7 @@ ColumnVector::ToString(SizeT row_index) const {
 }
 
 Value
-ColumnVector::GetValue(idx_t index) const {
+ColumnVector::GetValue(SizeT index) const {
     StorageAssert(initialized, "Column vector isn't initialized.")
     if(index >= tail_index_) {
         TypeError("Attempt to access an invalid index of column vector: " + std::to_string(index));
@@ -520,7 +520,7 @@ ColumnVector::GetValue(idx_t index) const {
 }
 
 void
-ColumnVector::SetValue(idx_t index, const Value &value) {
+ColumnVector::SetValue(SizeT index, const Value &value) {
     StorageAssert(initialized, "Column vector isn't initialized.")
     StorageAssert(index <= tail_index_,
                   "Attempt to store value into unavailable row of column vector: "

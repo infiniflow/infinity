@@ -82,11 +82,11 @@ public:
     // Since it will construct a new Value object, this function shouldn't be used in vectorized computation.
     // Directly uses data_ptr in vectorized computation.
     [[nodiscard]] Value
-    GetValue(idx_t index) const;
+    GetValue(SizeT index) const;
 
     // Set the <index> element of the vector to the specified value.
     void
-    SetValue(idx_t index, const Value& Value);
+    SetValue(SizeT index, const Value& Value);
 
     void
     AppendValue(const Value& value);
@@ -137,15 +137,18 @@ public:
         return data_type_;
     }
 
-    [[nodiscard]] inline ptr_t data() const {
+    [[nodiscard]] inline ptr_t
+    data() const {
         return data_ptr_;
     }
 
-    [[nodiscard]] inline SizeT capacity() const {
+    [[nodiscard]] inline SizeT
+    capacity() const {
         return capacity_;
     }
 
-    [[nodiscard]] inline SizeT Size() const {
+    [[nodiscard]] inline SizeT
+    Size() const {
         return tail_index_;
     }
 };

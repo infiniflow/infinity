@@ -30,4 +30,14 @@ Table::ToString() const {
     return ss.str();
 }
 
+Vector<SharedPtr<Vector<i32>>>
+Table::GetOffsetVectors() const {
+    SizeT block_count = data_blocks_.size();
+    Vector<SharedPtr<Vector<i32>>> result(block_count);
+    for(SizeT idx = 0; idx < block_count; ++ idx) {
+        result[idx] = data_blocks_[idx]->GenerateOffset();
+    }
+    return result;
+}
+
 }
