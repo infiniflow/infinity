@@ -94,10 +94,10 @@ public:
     [[nodiscard]] String
     ToString() const;
 
-    [[nodiscard]] Vector<SharedPtr<Vector<i32>>>
-    GetOffsetVectors() const;
+    [[nodiscard]] SharedPtr<Vector<RowID>>
+    GetRowIDVector() const;
 
-protected:
+public:
     SharedPtr<TableDef> definition_ptr_;
     SizeT row_count_{0};
     TableType type_{TableType::kInvalid};

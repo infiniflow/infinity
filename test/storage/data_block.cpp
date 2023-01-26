@@ -164,9 +164,12 @@ TEST_F(DataBlockTest, test2) {
 
     EXPECT_EQ(data_block.row_count(), row_count);
 
-    SharedPtr<Vector<i32>> offset_vector = data_block.GenerateOffset();
+    SharedPtr<Vector<RowID>> row_ids = MakeShared<Vector<RowID>>();
+    row_ids->reserve(row_count);
+    data_block.FillRowIDVector(row_ids, 1);
     for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
-        EXPECT_EQ((*offset_vector)[row_id], row_id);
+        EXPECT_EQ((*row_ids)[row_id].offset, row_id);
+        EXPECT_EQ((*row_ids)[row_id].block, 1);
     }
 }
 

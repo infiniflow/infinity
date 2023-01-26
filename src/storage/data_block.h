@@ -56,8 +56,8 @@ public:
         return finalized;
     }
 
-    SharedPtr<Vector<i32>>
-    GenerateOffset() const;
+    void
+    FillRowIDVector(SharedPtr<Vector<RowID>>& row_ids, u32 block_id) const;
 
 public:
     [[nodiscard]] inline SizeT

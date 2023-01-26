@@ -73,8 +73,8 @@ TEST_F(TableTest, test1) {
         order_by_table->Append(data_block);
     }
 
-    Vector<SharedPtr<Vector<i32>>> offset_column_vector = order_by_table->GetOffsetVectors();
-    EXPECT_EQ(offset_column_vector.size(), block_count);
+    SharedPtr<Vector<RowID>> offset_column_vector = order_by_table->GetRowIDVector();
+    EXPECT_EQ(offset_column_vector->size(), block_count * DEFAULT_VECTOR_SIZE);
     for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
         // Check Column1 data
         SharedPtr<ColumnVector> column1 = order_by_table->GetDataBlockById(block_id)->column_vectors[0];
@@ -91,9 +91,10 @@ TEST_F(TableTest, test1) {
         }
 
         // Check offset
-        SharedPtr<Vector<i32>> offset = offset_column_vector[block_id];
         for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
-            EXPECT_EQ((*offset)[row_id], row_id);
+            const RowID& row = (*offset_column_vector)[block_id * DEFAULT_VECTOR_SIZE + row_id];
+            EXPECT_EQ(row.block, block_id);
+            EXPECT_EQ(row.offset, row_id);
         }
     }
 }

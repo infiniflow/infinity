@@ -67,4 +67,11 @@ using ptr_t = char *;
 using const_ptr_t = const char *;
 using char_t = char;
 using SizeT = size_t;
+
+struct RowID {
+    RowID(u32 blk, u32 off) : block(blk), offset(off) {}
+    u32 block {};
+    u32 offset {};
+};
+
 }

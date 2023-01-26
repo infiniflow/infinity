@@ -109,14 +109,12 @@ DataBlock::ToString() const {
     return ss.str();
 }
 
-SharedPtr<Vector<i32>>
-DataBlock::GenerateOffset() const {
+void
+DataBlock::FillRowIDVector(SharedPtr<Vector<RowID>>& row_ids, u32 block_id) const {
     StorageAssert(finalized, "DataBlock isn't finalized.")
-    SharedPtr<Vector<i32>> offset_vector = MakeShared<Vector<i32>>(row_count_);
-    for(SizeT idx = 0; idx < row_count_; ++ idx) {
-        (*offset_vector)[idx] = static_cast<i32>(idx);
+    for(u32 offset = 0; offset < row_count_; ++ offset) {
+        row_ids->emplace_back(block_id, offset);
     }
-    return offset_vector;
 }
 
 }

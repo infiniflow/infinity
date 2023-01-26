@@ -30,6 +30,10 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    void
+    Sort(const SharedPtr<Table>& order_by_table,
+         const Vector<OrderByType>& order_by_types_);
+
     Vector<SharedPtr<BaseExpression>> expressions_;
     Vector<OrderByType> order_by_types_{};
 private:
