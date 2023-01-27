@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/types/internal_types.h"
+#include "common/utility/infinity_assert.h"
 #include <cmath>
 
 namespace infinity {
@@ -31,6 +32,11 @@ struct PointType {
     Reset() {
         x = 0;
         y = 0;
+    }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
     }
 
     f64 x{};

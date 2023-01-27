@@ -66,7 +66,7 @@ public:
 
 String
 HugeInt::ToString() const {
-    TypeError("Not implemented");
+    TypeError("ToString() isn't implemented");
 }
 
 }

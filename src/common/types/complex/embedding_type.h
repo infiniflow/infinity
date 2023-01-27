@@ -167,6 +167,11 @@ public:
     SetNull() {
         ptr = nullptr;
     }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
 };
 
 }

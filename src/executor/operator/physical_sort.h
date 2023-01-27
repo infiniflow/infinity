@@ -34,6 +34,10 @@ public:
     Sort(const SharedPtr<Table>& order_by_table,
          const Vector<OrderByType>& order_by_types_);
 
+    static SharedPtr<Table>
+    GenerateOutput(const SharedPtr<Table>& input_table,
+                   const SharedPtr<Vector<RowID>>& rowid_vector);
+
     Vector<SharedPtr<BaseExpression>> expressions_;
     Vector<OrderByType> order_by_types_{};
 private:

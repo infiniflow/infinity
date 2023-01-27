@@ -32,6 +32,11 @@ struct LineSegmentType {
         point1.Reset();
         point2.Reset();
     }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
 };
 
 }

@@ -62,7 +62,7 @@ TEST_F(TableTest, test1) {
         SharedPtr<DataBlock> data_block = DataBlock::Make();
         data_block->Init(column_types);
 
-        // Column 1
+        // Column 1 & 2
         for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
             Value v1 = Value::MakeBool(row_id % 2 == 0);
             data_block->column_vectors[0]->AppendValue(v1);

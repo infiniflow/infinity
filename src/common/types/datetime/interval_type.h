@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/types/internal_types.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -24,14 +25,19 @@ struct IntervalType {
     inline explicit
     IntervalType(i32 v) : value(v) {}
 
-    TimeUnit unit {TimeUnit::kInvalidUnit};
-    i32 value {};
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
 
     inline void
     Reset() {
         unit = TimeUnit::kInvalidUnit;
         value = 0;
     }
+
+    TimeUnit unit {TimeUnit::kInvalidUnit};
+    i32 value {};
 };
 
 }

@@ -25,7 +25,13 @@ String
 Table::ToString() const {
     std::stringstream ss;
     ss << definition_ptr_->ToString();
-    ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_;
+    ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_ << std::endl;
+
+    SizeT block_count = data_blocks_.size();
+    for(SizeT idx = 0; idx < block_count; ++ idx) {
+        ss << "Block " << idx << std::endl;
+        ss << data_blocks_[idx]->ToString();
+    }
 
     return ss.str();
 }

@@ -100,11 +100,8 @@ String
 DataBlock::ToString() const {
     std::stringstream ss;
     for(SizeT idx = 0; idx < column_count_; ++ idx) {
-        String end;
-        if(idx != column_count_ - 1) {
-            end = " ";
-        }
-        ss << column_vectors[idx]->ToString() << end;
+        ss << "column " << idx << std::endl;
+        ss << column_vectors[idx]->ToString() << std::endl;
     }
     return ss.str();
 }

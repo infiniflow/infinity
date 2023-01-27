@@ -78,6 +78,10 @@ public:
     void
     SetBit(u64 row_index, bool value);
 
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
 };
 
 }

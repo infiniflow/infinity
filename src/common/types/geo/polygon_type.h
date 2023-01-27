@@ -110,6 +110,11 @@ public:
         bounding_box.lower_right.x = -std::numeric_limits<f64>::max();
         bounding_box.lower_right.y = std::numeric_limits<f64>::max();
     }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
 };
 
 }

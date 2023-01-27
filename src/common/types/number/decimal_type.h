@@ -21,6 +21,11 @@ struct Decimal16Type {
         return other.value == value;
     }
 
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
+
     i16 value{0};
 };
 
@@ -36,6 +41,11 @@ struct Decimal32Type {
         return other.value == value;
     }
 
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
+
     i32 value{0};
 };
 
@@ -49,6 +59,11 @@ struct Decimal64Type {
     operator==(const Decimal64Type& other) const {
         if(this == &other) return true;
         return other.value == value;
+    }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
     }
 
     i64 value{0};
@@ -70,6 +85,11 @@ public:
     Reset() {
         upper = 0;
         lower = 0;
+    }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
     }
 
     i64 upper{0};

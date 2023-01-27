@@ -32,6 +32,11 @@ struct BoxType {
         upper_left.Reset();
         lower_right.Reset();
     }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
 };
 
 }

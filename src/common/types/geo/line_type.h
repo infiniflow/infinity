@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/types/internal_types.h"
+#include "common/utility/infinity_assert.h"
 #include <cmath>
 
 namespace infinity {
@@ -36,6 +37,11 @@ struct LineType {
         a = 0;
         b = 0;
         c = 0;
+    }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
     }
 };
 

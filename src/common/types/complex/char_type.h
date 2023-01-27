@@ -99,6 +99,11 @@ public:
         StorageAssert(this->ptr != nullptr, "Char type isn't initialized.")
         return std::strlen(ptr) + 1;
     }
+
+    [[nodiscard]] String
+    ToString() const {
+        return {ptr, std::strlen(ptr)};
+    }
 };
 
 }

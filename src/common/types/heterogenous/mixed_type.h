@@ -5,6 +5,8 @@
 #pragma once
 
 #include "common/types/internal_types.h"
+#include "common/utility/infinity_assert.h"
+
 #include "mixed_value_type.h"
 #include "base_mixed_type.h"
 #include "integer_mixed_type.h"
@@ -125,6 +127,11 @@ public:
 
     void
     Reset(bool in_constructor = false);
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
 
 private:
     static void

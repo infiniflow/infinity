@@ -205,24 +205,6 @@ PhysicalSort::Execute(SharedPtr<QueryContext>& query_context) {
     this->executor.Execute(left_->output(), order_by_table);
 
     Sort(order_by_table, order_by_types_);
-    // Sort by each table data block and get sorted offset
-
-    // merge each sorted data block and generated row id selection
-
-    // Scatter the input table as the row id selection into output table
-
-    output_ = left_->output();
-}
-
-void
-PhysicalSort::Sort(const SharedPtr<Table>& order_by_table,
-                   const Vector<OrderByType>& order_by_types) {
-    // Generate row id vector
-    SharedPtr<Vector<RowID>> rowid_vector = order_by_table->GetRowIDVector();
-
-    std::sort(rowid_vector->begin(), rowid_vector->end(), Comparator(order_by_table, order_by_types));
-
-    // Generate
 }
 
 SharedPtr<Table>
@@ -249,6 +231,154 @@ PhysicalSort::GetOrderTable() const {
     SharedPtr<TableDef> table_def = TableDef::Make("order_by_key_table", columns, false);
 
     return Table::Make(table_def, TableType::kIntermediate);
+}
+
+void
+PhysicalSort::Sort(const SharedPtr<Table>& order_by_table,
+                   const Vector<OrderByType>& order_by_types) {
+    // Generate row id vector
+    SharedPtr<Vector<RowID>> rowid_vector = order_by_table->GetRowIDVector();
+
+    std::sort(rowid_vector->begin(), rowid_vector->end(), Comparator(order_by_table, order_by_types));
+
+    // Generate
+    output_ = GenerateOutput(left_->output(), rowid_vector);
+}
+
+SharedPtr<Table>
+PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
+                             const SharedPtr<Vector<RowID>>& rowid_vector) {
+    // output table definition is same as input
+    SizeT column_count = input_table->ColumnCount();
+    Vector<DataType> types;
+    types.reserve(column_count);
+    Vector<SharedPtr<ColumnDef>> columns;
+    columns.reserve(column_count);
+    for(SizeT idx = 0; idx < column_count; ++ idx) {
+        DataType col_type = input_table->GetColumnTypeById(idx);
+        types.emplace_back(col_type);
+
+        String col_name = input_table->GetColumnNameById(idx);
+
+        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
+        columns.emplace_back(col_def);
+    }
+
+    SharedPtr<TableDef> table_def = TableDef::Make("sort", columns, false);
+    SharedPtr<Table> output_table = Table::Make(table_def, TableType::kIntermediate);
+
+    const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;
+
+//    SizeT vector_count = rowid_vector->size();
+    SizeT vector_idx = 0;
+
+    SizeT block_count = input_table->data_blocks_.size();
+    for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
+        SharedPtr<DataBlock> output_datablock = DataBlock::Make();
+        output_datablock->Init(types);
+        const Vector<SharedPtr<ColumnVector>>& output_column_vectors = output_datablock->column_vectors;
+
+        SizeT block_row_count = input_datablocks[block_id]->row_count();
+        for(SizeT block_row_idx = 0; block_row_idx < block_row_count; ++ block_row_idx) {
+            RowID row_id = rowid_vector->at(vector_idx ++);
+            u32 input_block_id = row_id.block;
+            u32 input_offset = row_id.offset;
+
+            for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+                switch(types[column_id].type()) {
+                    case LogicalType::kBoolean: {
+                        ((BooleanT *)(output_column_vectors[column_id]->data()))[block_row_idx]
+                            = ((BooleanT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                        break;
+                    }
+                    case LogicalType::kTinyInt: {
+                        ((TinyIntT *)(output_column_vectors[column_id]->data()))[block_row_idx]
+                                = ((TinyIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                        break;
+                    }
+                    case LogicalType::kSmallInt: {
+                        ((SmallIntT *)(output_column_vectors[column_id]->data()))[block_row_idx]
+                                = ((SmallIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                        break;
+                    }
+                    case LogicalType::kInteger: {
+                        ((IntegerT *)(output_column_vectors[column_id]->data()))[block_row_idx]
+                                = ((IntegerT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                        break;
+                    }
+                    case LogicalType::kBigInt: {
+                        ((BigIntT *)(output_column_vectors[column_id]->data()))[block_row_idx]
+                                = ((BigIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                        break;
+                    }
+                    case kHugeInt: {
+                        NotImplementError("HugeInt data shuffle isn't implemented.")
+                    }
+                    case kFloat: {
+                        ((FloatT *)(output_column_vectors[column_id]->data()))[block_row_idx]
+                                = ((FloatT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                        break;
+                    }
+                    case kDouble: {
+                        ((DoubleT *)(output_column_vectors[column_id]->data()))[block_row_idx]
+                                = ((DoubleT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                        break;
+                    }
+                    case kDecimal16: {
+                        NotImplementError("Decimal16 data shuffle isn't implemented.")
+                    }
+                    case kDecimal32: {
+                        NotImplementError("Decimal32 data shuffle isn't implemented.")
+                    }
+                    case kDecimal64: {
+                        NotImplementError("Decimal64 data shuffle isn't implemented.")
+                    }
+                    case kDecimal128: {
+                        NotImplementError("Decimal128 data shuffle isn't implemented.")
+                    }
+                    case kVarchar: {
+                        NotImplementError("Varchar data shuffle isn't implemented.")
+                    }
+                    case kChar: {
+                        NotImplementError("Char data shuffle isn't implemented.")
+                    }
+                    case kDate: {
+                        NotImplementError("Date data shuffle isn't implemented.")
+                    }
+                    case kTime: {
+                        NotImplementError("Time data shuffle isn't implemented.")
+                    }
+                    case kDateTime: {
+                        NotImplementError("Datetime data shuffle isn't implemented.")
+                    }
+                    case kTimestamp: {
+                        NotImplementError("Timestamp data shuffle isn't implemented.")
+                    }
+                    case kTimestampTZ: {
+                        NotImplementError("TimestampTZ data shuffle isn't implemented.")
+                    }
+                    case kInterval: {
+                        NotImplementError("Interval data shuffle isn't implemented.")
+                    }
+                    case kMixed: {
+                        NotImplementError("Heterogeneous data shuffle isn't implemented.")
+                    }
+                    default: {
+                        ExecutorError("Unexpected data type")
+                    }
+                }
+            }
+        }
+
+        for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+            output_column_vectors[column_id]->tail_index_ = block_row_count;
+        }
+
+        output_datablock->Finalize();
+
+        output_table->Append(output_datablock);
+    }
+    return output_table;
 }
 
 }

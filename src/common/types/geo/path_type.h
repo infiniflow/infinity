@@ -104,6 +104,11 @@ public:
     Closed() const {
         return closed != 0;
     }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
 };
 
 }

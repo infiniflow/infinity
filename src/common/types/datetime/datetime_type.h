@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/types/internal_types.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -14,14 +15,19 @@ struct DateTimeType {
     explicit
     DateTimeType(i32 date_value, i32 time_value): date(date_value), time(time_value) {};
 
-    i32 date{};
-    i32 time{};
-
     inline void
     Reset() {
         date = 0;
         time = 0;
     }
+
+    [[nodiscard]] inline String
+    ToString() const {
+        TypeError("ToString() isn't implemented");
+    }
+
+    i32 date{};
+    i32 time{};
 };
 
 }
