@@ -28,6 +28,10 @@ public:
         column_vector->AppendValue(value_);
     }
 
+    const Value&
+    GetValue() const {
+        return value_;
+    }
 private:
     Value value_;
 };

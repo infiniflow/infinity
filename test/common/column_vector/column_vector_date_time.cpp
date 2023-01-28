@@ -266,6 +266,41 @@ TEST_F(ColumnVectorTimeTest, date_column_vector_select) {
     }
 }
 
+TEST_F(ColumnVectorTimeTest, date_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kDate);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        DateT date(static_cast<i32>(i));
+        Value v = Value::MakeDate(date);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDate);
+        EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDate);
+        EXPECT_EQ(vx.value_.date.value, static_cast<i32>(src_idx));
+    }
+}
+
 TEST_F(ColumnVectorTimeTest, flat_time) {
     using namespace infinity;
 
@@ -503,6 +538,41 @@ TEST_F(ColumnVectorTimeTest, time_column_vector_select) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTime);
         EXPECT_EQ(vx.value_.time.value, static_cast<i32>(2 * i));
+    }
+}
+
+TEST_F(ColumnVectorTimeTest, time_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kTime);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        TimeT time(static_cast<i32>(i));
+        Value v = Value::MakeTime(time);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTime);
+        EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTime);
+        EXPECT_EQ(vx.value_.time.value, static_cast<i32>(src_idx));
     }
 }
 
@@ -754,6 +824,43 @@ TEST_F(ColumnVectorTimeTest, datetime_column_vector_select) {
     }
 }
 
+TEST_F(ColumnVectorTimeTest, datetime_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kDateTime);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
+        Value v = Value::MakeDateTime(datetime);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDateTime);
+        EXPECT_EQ(vx.value_.datetime.date, static_cast<i32>(i));
+        EXPECT_EQ(vx.value_.datetime.time, static_cast<i32>(i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDateTime);
+        EXPECT_EQ(vx.value_.datetime.date, static_cast<i32>(src_idx));
+        EXPECT_EQ(vx.value_.datetime.time, static_cast<i32>(src_idx));
+    }
+}
+
 TEST_F(ColumnVectorTimeTest, flat_timestamp) {
     using namespace infinity;
 
@@ -999,6 +1106,43 @@ TEST_F(ColumnVectorTimeTest, timestamp_column_vector_select) {
         EXPECT_EQ(vx.type().type(), LogicalType::kTimestamp);
         EXPECT_EQ(vx.value_.timestamp.date, static_cast<i32>(2 * i));
         EXPECT_EQ(vx.value_.timestamp.time, static_cast<i32>(2 * i));
+    }
+}
+
+TEST_F(ColumnVectorTimeTest, timestamp_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kTimestamp);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
+        Value v = Value::MakeTimestamp(timestamp);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTimestamp);
+        EXPECT_EQ(vx.value_.timestamp.date, static_cast<i32>(i));
+        EXPECT_EQ(vx.value_.timestamp.time, static_cast<i32>(i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTimestamp);
+        EXPECT_EQ(vx.value_.timestamp.date, static_cast<i32>(src_idx));
+        EXPECT_EQ(vx.value_.timestamp.time, static_cast<i32>(src_idx));
     }
 }
 
@@ -1250,6 +1394,43 @@ TEST_F(ColumnVectorTimeTest, timestamp_tz_column_vector_select) {
     }
 }
 
+TEST_F(ColumnVectorTimeTest, timestamp_tz_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kTimestampTZ);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        TimestampTZT timestamp_tz(static_cast<i32>(i), static_cast<i32>(i));
+        Value v = Value::MakeTimestampTz(timestamp_tz);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTimestampTZ);
+        EXPECT_EQ(vx.value_.timestamp_tz.date, static_cast<i32>(i));
+        EXPECT_EQ(vx.value_.timestamp_tz.time, static_cast<i32>(i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTimestampTZ);
+        EXPECT_EQ(vx.value_.timestamp_tz.date, static_cast<i32>(src_idx));
+        EXPECT_EQ(vx.value_.timestamp_tz.time, static_cast<i32>(src_idx));
+    }
+}
+
 TEST_F(ColumnVectorTimeTest, flat_interval) {
     using namespace infinity;
 
@@ -1492,5 +1673,41 @@ TEST_F(ColumnVectorTimeTest, interval_column_vector_select) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kInterval);
         EXPECT_EQ(vx.value_.interval.value, static_cast<i32>(2 * i));
+    }
+}
+
+TEST_F(ColumnVectorTimeTest, interval_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kInterval);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        IntervalT interval;
+        interval.value = static_cast<i32>(i);
+        Value v = Value::MakeInterval(interval);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kInterval);
+        EXPECT_EQ(vx.value_.interval.value, static_cast<i32>(i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kInterval);
+        EXPECT_EQ(vx.value_.interval.value, static_cast<i32>(src_idx));
     }
 }

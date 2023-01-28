@@ -266,6 +266,40 @@ TEST_F(ColumnVectorFloatTest, float_column_vector_select) {
     }
 }
 
+TEST_F(ColumnVectorFloatTest, float_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kFloat);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
+        EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
+        EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(src_idx) + 0.5f);
+    }
+}
+
 TEST_F(ColumnVectorFloatTest, flat_double) {
     using namespace infinity;
 
@@ -495,5 +529,39 @@ TEST_F(ColumnVectorFloatTest, double_column_vector_select) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(2 * i) + 0.8f);
+    }
+}
+
+TEST_F(ColumnVectorFloatTest, double_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kDouble);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
+        EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
+        EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(src_idx) + 0.8f);
     }
 }

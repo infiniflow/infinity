@@ -270,6 +270,40 @@ TEST_F(ColumnVectorIntegerTest, tinyint_column_vector_select) {
     }
 }
 
+TEST_F(ColumnVectorIntegerTest, tinyint_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kTinyInt);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeTinyInt(static_cast<TinyIntT>(i));
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(src_idx));
+    }
+}
+
 TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     using namespace infinity;
 
@@ -506,6 +540,40 @@ TEST_F(ColumnVectorIntegerTest, smallint_column_vector_select) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
         EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(2 * i));
+    }
+}
+
+TEST_F(ColumnVectorIntegerTest, smallint_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kSmallInt);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeSmallInt(static_cast<SmallIntT>(i));
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
+        EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
+        EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(src_idx));
     }
 }
 
@@ -748,6 +816,40 @@ TEST_F(ColumnVectorIntegerTest, integer_column_vector_select) {
     }
 }
 
+TEST_F(ColumnVectorIntegerTest, integer_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kInteger);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeInt(static_cast<IntegerT>(i));
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
+        EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
+        EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(src_idx));
+    }
+}
+
 TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     using namespace infinity;
 
@@ -984,6 +1086,40 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_vector_select) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
         EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(2 * i));
+    }
+}
+
+TEST_F(ColumnVectorIntegerTest, bigint_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kBigInt);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value v = Value::MakeBigInt(static_cast<BigIntT>(i));
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
+        EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
+        EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(src_idx));
     }
 }
 
@@ -1231,5 +1367,40 @@ TEST_F(ColumnVectorIntegerTest, hugeint_column_vector_select) {
         EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
 //        LOG_TRACE("{}", vx.value_.huge_int.lower);
         EXPECT_EQ(vx.value_.huge_int, HugeIntT(0, 2 * i));
+    }
+}
+
+TEST_F(ColumnVectorIntegerTest, hugeint_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kHugeInt);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        HugeIntT input(0, i);
+        Value v = Value::MakeHugeInt(input);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
+        EXPECT_EQ(vx.value_.huge_int, HugeIntT(0, i));
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
+        EXPECT_EQ(vx.value_.huge_int, HugeIntT(0, src_idx));
     }
 }

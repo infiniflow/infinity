@@ -288,3 +288,46 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
         EXPECT_EQ(vx.value_.uuid, uuid);
     }
 }
+
+TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kUuid);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        String s('a' + i % 26, 16);
+        UuidT uuid(s.c_str());
+
+        Value v = Value::MakeUuid(uuid);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        String s('a' + i % 26, 16);
+        UuidT uuid(s.c_str());
+
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
+        EXPECT_EQ(vx.value_.uuid, uuid);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        i64 src_idx = start_idx + i;
+        String s('a' + src_idx % 26, 16);
+        UuidT uuid(s.c_str());
+
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
+        EXPECT_EQ(vx.value_.uuid, uuid);
+    }
+}

@@ -27,7 +27,10 @@ public:
     Init(const SharedPtr<DataBlock>& input, const SharedPtr<Selection>& input_select);
 
     void
-    Init(const Vector<DataType>& types);
+    Init(const SharedPtr<DataBlock>& input, SizeT start_idx, SizeT end_idx);
+
+    void
+    Init(const Vector<DataType>& types, SizeT capacity = DEFAULT_VECTOR_SIZE);
 
     void
     Init(const Vector<SharedPtr<ColumnVector>>& column_vectors);
@@ -77,12 +80,18 @@ public:
         return row_count_;
     }
 
+    [[nodiscard]] inline SizeT
+    capacity() const {
+        return capacity_;
+    }
+
     Vector<SharedPtr<ColumnVector>> column_vectors;
 
 private:
 
     SizeT row_count_ {0};
     SizeT column_count_ {0};
+    SizeT capacity_ {0};
     bool initialized = false;
     bool finalized = false;
 };

@@ -70,6 +70,9 @@ public:
     Initialize(const ColumnVector& other, const Selection& input_select);
 
     void
+    Initialize(const ColumnVector& other, SizeT start_idx, SizeT end_idx);
+
+    void
     Initialize(SizeT capacity = DEFAULT_VECTOR_SIZE, ColumnVectorType vector_type = ColumnVectorType::kFlat);
 
     [[nodiscard]] String
@@ -125,6 +128,14 @@ private:
              ptr_t __restrict dst,
              SizeT count,
              const Selection& input_select);
+
+    template<typename DataT>
+    inline void
+    CopyFrom(const_ptr_t __restrict src,
+             ptr_t __restrict dst,
+             SizeT source_start_idx,
+             SizeT dest_start_idx,
+             SizeT count);
 
 public:
     [[nodiscard]] const inline ColumnVectorType&
@@ -310,6 +321,184 @@ ColumnVector::CopyFrom<EmbeddingT>(const_ptr_t __restrict src,
         const_ptr_t src_ptr = src + row_id * data_type_size_;
         ptr_t dst_ptr = dst + idx * data_type_size_;
         memcpy(dst_ptr, src_ptr, data_type_size_);
+    }
+}
+
+template<typename DataT>
+inline void
+ColumnVector::CopyFrom(const_ptr_t __restrict src,
+                       ptr_t __restrict dst,
+                       SizeT source_start_idx,
+                       SizeT dest_start_idx,
+                       SizeT count) {
+    SizeT source_end_idx = source_start_idx + count;
+
+    for(SizeT idx = source_start_idx; idx < source_end_idx; ++ idx) {
+        ((DataT *) (dst))[dest_start_idx ++] = ((const DataT *) (src))[idx];
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<VarcharT>(const_ptr_t __restrict src,
+                                 ptr_t __restrict dst,
+                                 SizeT source_start_idx,
+                                 SizeT dest_start_idx,
+                                 SizeT count) {
+
+    SizeT source_end_idx = source_start_idx + count;
+    for(SizeT idx = source_start_idx; idx < source_end_idx; ++ idx) {
+        VarcharT *dst_ptr = &(((VarcharT *) dst)[dest_start_idx]);
+        const VarcharT *src_ptr = &(((const VarcharT *) src)[idx]);
+
+        u16 varchar_len = src_ptr->length;
+        if(varchar_len <= VarcharType::INLINE_LENGTH) {
+            // Only prefix is enough to contain all string data.
+            memcpy(dst_ptr->prefix, src_ptr->prefix, varchar_len);
+        } else {
+            memcpy(dst_ptr->prefix, src_ptr->prefix, VarcharType::PREFIX_LENGTH);
+            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(varchar_len);
+            memcpy(ptr, src_ptr->ptr, varchar_len);
+            dst_ptr->ptr = ptr;
+        }
+        dst_ptr->length = varchar_len;
+        ++ dest_start_idx;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<CharT>(const_ptr_t __restrict src,
+                              ptr_t __restrict dst,
+                              SizeT source_start_idx,
+                              SizeT dest_start_idx,
+                              SizeT count) {
+    SizeT source_end_idx = source_start_idx + count;
+    for(SizeT idx = source_start_idx; idx < source_end_idx; ++ idx) {
+        const_ptr_t src_ptr = src + idx * data_type_size_;
+        ptr_t dst_ptr = dst + dest_start_idx * data_type_size_;
+        memcpy(dst_ptr, src_ptr, data_type_size_);
+        ++ dest_start_idx;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<PathT>(const_ptr_t __restrict src,
+                              ptr_t __restrict dst,
+                              SizeT source_start_idx,
+                              SizeT dest_start_idx,
+                              SizeT count) {
+    SizeT source_end_idx = source_start_idx + count;
+    for(SizeT idx = source_start_idx; idx < source_end_idx; ++ idx) {
+        PathT *dst_ptr = &(((PathT *) dst)[dest_start_idx]);
+        const PathT *src_ptr = &(((const PathT *) src)[idx]);
+
+        u32 point_count = src_ptr->point_count;
+
+        SizeT point_area_size = point_count * sizeof(PointT);
+        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+        memcpy(ptr, src_ptr->ptr, point_area_size);
+
+        dst_ptr->ptr = ptr;
+        dst_ptr->point_count = point_count;
+        dst_ptr->closed = src_ptr->closed;
+
+        ++ dest_start_idx;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<PolygonT>(const_ptr_t __restrict src,
+                                 ptr_t __restrict dst,
+                                 SizeT source_start_idx,
+                                 SizeT dest_start_idx,
+                                 SizeT count) {
+    SizeT source_end_idx = source_start_idx + count;
+    for(SizeT idx = source_start_idx; idx < source_end_idx; ++ idx) {
+        PolygonT *dst_ptr = &(((PolygonT *) dst)[dest_start_idx]);
+        const PolygonT *src_ptr = &(((const PolygonT *) src)[idx]);
+
+        u64 point_count = src_ptr->point_count;
+
+        SizeT point_area_size = point_count * sizeof(PointT);
+        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+        memcpy(ptr, src_ptr->ptr, point_area_size);
+
+        dst_ptr->ptr = ptr;
+        dst_ptr->point_count = point_count;
+        dst_ptr->bounding_box = src_ptr->bounding_box;
+        ++ dest_start_idx;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<BitmapT>(const_ptr_t __restrict src,
+                                ptr_t __restrict dst,
+                                SizeT source_start_idx,
+                                SizeT dest_start_idx,
+                                SizeT count) {
+    SizeT source_end_idx = source_start_idx + count;
+    for(SizeT idx = source_start_idx; idx < source_end_idx; ++ idx) {
+
+        BitmapT *dst_ptr = &(((BitmapT *) dst)[dest_start_idx]);
+        const BitmapT *src_ptr = &(((const BitmapT *) src)[idx]);
+
+        u64 bit_count = src_ptr->count;
+        u64 unit_count = BitmapT::UnitCount(bit_count);
+
+        SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
+        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
+        memcpy(ptr, (void*)(src_ptr->ptr), bit_area_size);
+
+        dst_ptr->ptr = (u64*)ptr;
+        dst_ptr->count = bit_count;
+
+        ++ dest_start_idx;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<BlobT>(const_ptr_t __restrict src,
+                              ptr_t __restrict dst,
+                              SizeT source_start_idx,
+                              SizeT dest_start_idx,
+                              SizeT count) {
+    SizeT source_end_idx = source_start_idx + count;
+    for(SizeT idx = source_start_idx; idx < source_end_idx; ++ idx) {
+
+        BlobT *dst_ptr = &(((BlobT *) dst)[dest_start_idx]);
+        const BlobT *src_ptr = &(((const BlobT *) src)[idx]);
+
+        u64 blob_size = src_ptr->size;
+        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(blob_size);
+        memcpy(ptr, (void*)(src_ptr->ptr), blob_size);
+
+        dst_ptr->ptr = ptr;
+        dst_ptr->size = blob_size;
+
+        ++ dest_start_idx;
+    }
+}
+
+template<>
+inline void
+ColumnVector::CopyFrom<EmbeddingT>(const_ptr_t __restrict src,
+                                   ptr_t __restrict dst,
+                                   SizeT source_start_idx,
+                                   SizeT dest_start_idx,
+                                   SizeT count) {
+    SizeT source_end_idx = source_start_idx + count;
+    for(SizeT idx = source_start_idx; idx < source_end_idx; ++ idx) {
+
+        const_ptr_t src_ptr = src + idx * data_type_size_;
+        ptr_t dst_ptr = dst + dest_start_idx * data_type_size_;
+        memcpy(dst_ptr, src_ptr, data_type_size_);
+
+        ++ dest_start_idx;
     }
 }
 

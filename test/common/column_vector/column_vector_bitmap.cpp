@@ -288,3 +288,122 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
+
+TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kBitmap);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        BitmapT bitmap;
+        bitmap.Initialize(i + 10);
+        for(i64 j = 0; j <= i; ++ j) {
+            if(j % 2 == 0) {
+                bitmap.SetBit(j, true);
+            } else {
+                bitmap.SetBit(j, false);
+            }
+        }
+        Value v = Value::MakeBitmap(bitmap);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        BitmapT bitmap;
+        bitmap.Initialize(i + 10);
+        for(i64 j = 0; j <= i; ++ j) {
+            if(j % 2 == 0) {
+                bitmap.SetBit(j, true);
+            } else {
+                bitmap.SetBit(j, false);
+            }
+        }
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.value_.bitmap, bitmap);
+    }
+
+    Selection input_select;
+    input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+        input_select.Append(idx * 2);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    target_column_vector.Initialize(column_vector, input_select);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+        BitmapT bitmap;
+        bitmap.Initialize(2 * i + 10);
+        for(i64 j = 0; j <= 2 * i; ++ j) {
+            if(j % 2 == 0) {
+                bitmap.SetBit(j, true);
+            } else {
+                bitmap.SetBit(j, false);
+            }
+        }
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.value_.bitmap, bitmap);
+    }
+}
+
+TEST_F(ColumnVectorBitmapTest, bitmap_column_slice_init) {
+    using namespace infinity;
+
+    DataType data_type(LogicalType::kBitmap);
+    ColumnVector column_vector(data_type);
+    column_vector.Initialize();
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        BitmapT bitmap;
+        bitmap.Initialize(i + 10);
+        for(i64 j = 0; j <= i; ++ j) {
+            if(j % 2 == 0) {
+                bitmap.SetBit(j, true);
+            } else {
+                bitmap.SetBit(j, false);
+            }
+        }
+        Value v = Value::MakeBitmap(bitmap);
+        column_vector.AppendValue(v);
+    }
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        BitmapT bitmap;
+        bitmap.Initialize(i + 10);
+        for(i64 j = 0; j <= i; ++ j) {
+            if(j % 2 == 0) {
+                bitmap.SetBit(j, true);
+            } else {
+                bitmap.SetBit(j, false);
+            }
+        }
+        Value vx = column_vector.GetValue(i);
+        EXPECT_EQ(vx.value_.bitmap, bitmap);
+    }
+
+    ColumnVector target_column_vector(data_type);
+    i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 count = end_idx - start_idx;
+    target_column_vector.Initialize(column_vector, start_idx, end_idx);
+    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
+
+    for (i64 i = 0; i < count; ++ i) {
+        BitmapT bitmap;
+        i64 src_idx = start_idx + i;
+        bitmap.Initialize(src_idx + 10);
+        for(i64 j = 0; j <= src_idx; ++ j) {
+            if(j % 2 == 0) {
+                bitmap.SetBit(j, true);
+            } else {
+                bitmap.SetBit(j, false);
+            }
+        }
+        Value vx = target_column_vector.GetValue(i);
+        EXPECT_EQ(vx.value_.bitmap, bitmap);
+    }
+}

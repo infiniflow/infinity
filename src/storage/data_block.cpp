@@ -11,30 +11,53 @@ DataBlock::Init(const SharedPtr<DataBlock>& input, const SharedPtr<Selection>& i
     StorageAssert(!initialized, "Data block was initialized before.");
     StorageAssert(input != nullptr && input_select != nullptr, "Invalid input data block or select")
     column_count_ = input->column_count();
+    StorageAssert(column_count_ > 0, "Empty column vectors.")
     column_vectors.reserve(column_count_);
     for(SizeT idx = 0; idx < column_count_; ++ idx) {
         column_vectors.emplace_back(MakeShared<ColumnVector>(input->column_vectors[idx]->data_type()));
         column_vectors.back()->Initialize(*(input->column_vectors[idx]), *input_select);
     }
-    input->Finalize();
+    capacity_ = column_vectors[0]->capacity();
+    initialized = true;
+    this->Finalize();
 }
 
 void
-DataBlock::Init(const Vector<DataType> &types) {
+DataBlock::Init(const SharedPtr<DataBlock>& input, SizeT start_idx, SizeT end_idx) {
     StorageAssert(!initialized, "Data block was initialized before.");
+    StorageAssert(input != nullptr, "Invalid input data block");
+    column_count_ = input->column_count();
+    StorageAssert(column_count_ > 0, "Empty column vectors.")
+    column_vectors.reserve(column_count_);
+    for(SizeT idx = 0; idx < column_count_; ++ idx) {
+        column_vectors.emplace_back(MakeShared<ColumnVector>(input->column_vectors[idx]->data_type()));
+        column_vectors.back()->Initialize(*(input->column_vectors[idx]), start_idx, end_idx);
+    }
+    capacity_ = column_vectors[0]->capacity();
+    initialized = true;
+    this->Finalize();
+}
+
+void
+DataBlock::Init(const Vector<DataType> &types, SizeT capacity) {
+    StorageAssert(!initialized, "Data block was initialized before.");
+    StorageAssert(!types.empty(), "Empty data types collection.")
     column_count_ = types.size();
     column_vectors.reserve(column_count_);
     for(SizeT idx = 0; idx < column_count_; ++ idx) {
         column_vectors.emplace_back(MakeShared<ColumnVector>(types[idx]));
-        column_vectors[idx]->Initialize();
+        column_vectors[idx]->Initialize(capacity);
     }
+    capacity_ = capacity;
     initialized = true;
 }
 
 void
 DataBlock::Init(const Vector<SharedPtr<ColumnVector>>& input_vectors) {
+    StorageAssert(!input_vectors.empty(), "Empty column vectors.")
     column_count_ = input_vectors.size();
     column_vectors = input_vectors;
+    capacity_ = column_vectors[0]->capacity();
     initialized = true;
     Finalize();
 }
