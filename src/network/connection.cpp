@@ -5,6 +5,7 @@
 #include "connection.h"
 #include "main/query_context.h"
 #include "main/logger.h"
+#include "common/utility/infinity_assert.h"
 
 #include <iostream>
 
@@ -23,6 +24,9 @@ Connection::Run() {
     while(!terminate_connection_) {
         try {
             HandleRequest();
+        } catch (const infinity::ClientException& e) {
+            LOG_DEBUG("Client is closed");
+            return ;
         } catch (const std::exception& e) {
             std::map<PGMessageType, String> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();

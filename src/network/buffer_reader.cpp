@@ -91,7 +91,7 @@ void BufferReader::receive_more(size_t bytes) {
     }
 
     if(boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_read == 0) {
-        NetworkAssert(false, "Client close the connection.");
+        ClientError("Client close the connection.");
     }
 
     NetworkAssert(!boost_error, boost_error.message());

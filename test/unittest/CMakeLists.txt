@@ -1,5 +1,5 @@
-include_directories(../third_party/googletest/googletest/include)
-include_directories(../third_party/googletest/googlemock/include)
+include_directories(${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include)
+include_directories(${CMAKE_SOURCE_DIR}/third_party/googletest/googlemock/include)
 include_directories(./)
 
 

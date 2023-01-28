@@ -65,7 +65,7 @@ TEST_F(ConsoleTest, explain_unopt_logical) {
         console.Init();
 
         std::filesystem::path current_path = std::filesystem::current_path();
-        std::filesystem::path test_data = current_path / "../../test/bin/test_data";
+        std::filesystem::path test_data = current_path / "../../../test/unittest/bin/test_data";
         std::vector<std::filesystem::path> file_names;
         recurse_dir(test_data, file_names);
         for(auto& path: file_names) {

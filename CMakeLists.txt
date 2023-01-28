@@ -33,7 +33,7 @@ add_subdirectory(third_party EXCLUDE_FROM_ALL)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
 
 # Compile the unit test
-add_subdirectory(test)
+add_subdirectory(test/unittest)
 
 # Compile benchmark
 add_subdirectory(benchmark)

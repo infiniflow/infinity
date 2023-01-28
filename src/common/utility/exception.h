@@ -71,6 +71,12 @@ Exception::BuildMessageInternal(std::vector<String>& values, T param, Args... pa
     return BuildMessageInternal(values, params...);
 }
 
+class ClientException: public Exception {
+public:
+    template<typename... Args>
+    explicit ClientException(Args... params) : Exception(BuildMessage(String("Client Error:"), params...)) {}
+};
+
 class CatalogException: public Exception {
 public:
     template<typename... Args>

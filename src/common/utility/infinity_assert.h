@@ -13,6 +13,12 @@ namespace infinity {
 
 #ifdef INFINITY_DEBUG
 
+#define ClientAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
+    throw ClientException(errmsg);                                       \
+} \
+
 #define NetworkAssert(is_true, message)                                              \
 if(!(is_true)) {                                                            \
     std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
@@ -86,6 +92,12 @@ if(!(is_true)) {                                                            \
 }
 
 #else
+
+#define ClientAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = (message);                                         \
+    throw NetworkException(errmsg);                                       \
+}
 
 #define NetworkAssert(is_true, message)                                              \
 if(!(is_true)) {                                                            \
@@ -167,6 +179,7 @@ if(!(is_true)) {                                                            \
 
 #endif
 
+#define ClientError(message) ClientAssert(false, message)
 #define NetworkError(message) NetworkAssert(false, message)
 #define ParserError(message) ParserAssert(false, message)
 #define PlannerError(message) PlannerAssert(false, message)
