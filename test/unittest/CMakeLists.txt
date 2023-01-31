@@ -1,7 +1,7 @@
-include_directories(${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include)
-include_directories(${CMAKE_SOURCE_DIR}/third_party/googletest/googlemock/include)
-include_directories(./)
-
+include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include)
+include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/third_party/googletest/googlemock/include)
+include_directories(BEFORE SYSTEM ./)
+include_directories(AFTER SYSTEM /usr/local/include)
 
 file(GLOB_RECURSE
         bin_src
