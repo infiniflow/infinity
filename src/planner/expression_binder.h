@@ -31,50 +31,87 @@ public:
     virtual
     ~ExpressionBinder() = default;
 
+    SharedPtr<BaseExpression>
+    Bind(const hsql::Expr &expr,
+         const SharedPtr<BindContext>& bind_context_ptr,
+         i64 depth,
+         bool root);
+
     // Bind expression entry
     virtual SharedPtr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr);
+    BuildExpression(const hsql::Expr &expr,
+                    const SharedPtr<BindContext>& bind_context_ptr,
+                    i64 depth,
+                    bool root);
 
     virtual SharedPtr<BaseExpression>
-    BuildValueExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr);
+    BuildValueExpr(const hsql::Expr &expr,
+                   const SharedPtr<BindContext>& bind_context_ptr,
+                   i64 depth,
+                   bool root);
 
     // Bind column reference expression also include correlated column reference.
     virtual SharedPtr<BaseExpression>
-    BuildColExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr);
+    BuildColExpr(const hsql::Expr &expr,
+                 const SharedPtr<BindContext>& bind_context_ptr,
+                 i64 depth,
+                 bool root);
 
     SharedPtr<BaseExpression>
-    BuildColExpr(const SharedPtr<ParsedColumnExpression>& expr, const SharedPtr<BindContext>& bind_context_ptr);
+    BuildColExpr(const SharedPtr<ParsedColumnExpression>& expr,
+                 const SharedPtr<BindContext>& bind_context_ptr,
+                 i64 depth,
+                 bool root);
 
     virtual SharedPtr<BaseExpression>
-    BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr);
+    BuildFuncExpr(const hsql::Expr &expr,
+                  const SharedPtr<BindContext>& bind_context_ptr,
+                  i64 depth,
+                  bool root);
 
     virtual void
     CheckFuncType(FunctionType func_type) const {}
 
     virtual SharedPtr<BaseExpression>
-    BuildOperatorExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr);
+    BuildOperatorExpr(const hsql::Expr &expr,
+                      const SharedPtr<BindContext>& bind_context_ptr,
+                      i64 depth,
+                      bool root);
 
     virtual SharedPtr<BaseExpression>
-    BuildCastExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr);
+    BuildCastExpr(const hsql::Expr &expr,
+                  const SharedPtr<BindContext>& bind_context_ptr,
+                  i64 depth,
+                  bool root);
 
     virtual SharedPtr<BaseExpression>
-    BuildCaseExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr);
+    BuildCaseExpr(const hsql::Expr &expr,
+                  const SharedPtr<BindContext>& bind_context_ptr,
+                  i64 depth,
+                  bool root);
 
     virtual SharedPtr<BaseExpression>
     BuildBinaryScalarExpr(String& op,
                           const hsql::Expr* left,
                           const hsql::Expr* right,
-                          const SharedPtr<BindContext>& bind_context_ptr);
+                          const SharedPtr<BindContext>& bind_context_ptr,
+                          i64 depth,
+                          bool root);
 
     virtual SharedPtr<BaseExpression>
     BuildUnaryScalarExpr(String& op,
                          const hsql::Expr* expr,
-                         const SharedPtr<BindContext>& bind_context_ptr);
+                         const SharedPtr<BindContext>& bind_context_ptr,
+                         i64 depth,
+                         bool root);
 
     // Bind subquery expression.
     virtual SharedPtr<SubqueryExpression>
     BuildSubquery(const hsql::SelectStatement& select,
-                  const SharedPtr<BindContext>& bind_context_ptr, SubqueryType subquery_type);
+                  const SharedPtr<BindContext>& bind_context_ptr,
+                  SubqueryType subquery_type,
+                  i64 depth,
+                  bool root);
 
 //    // Bind window function.
 //    virtual SharedPtr<BaseExpression>

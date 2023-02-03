@@ -10,8 +10,14 @@
 namespace infinity {
 
 SharedPtr<BaseExpression>
-GroupBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext> &bind_context_ptr) {
-    SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr);
+GroupBinder::BuildExpression(const hsql::Expr &expr,
+                             const SharedPtr<BindContext> &bind_context_ptr,
+                             i64 depth,
+                             bool root) {
+    SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr,
+                                                                         bind_context_ptr,
+                                                                         depth,
+                                                                         root);
 
     // if(root_expression) {  } why we need root expression flag?
     {
@@ -30,25 +36,31 @@ GroupBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext
 }
 
 SharedPtr<BaseExpression>
-GroupBinder::BuildColExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+GroupBinder::BuildColExpr(const hsql::Expr &expr,
+                          const SharedPtr<BindContext>& bind_context_ptr,
+                          i64 depth,
+                          bool root) {
 
     // Check if the column is using an alias from select list.
-    auto result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr);
+    auto result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr, depth, root);
 
     if(result == nullptr) {
-        result = ExpressionBinder::BuildColExpr(expr, bind_context_ptr);
+        result = ExpressionBinder::BuildColExpr(expr, bind_context_ptr, depth, root);
     }
 
     return result;
 }
 
 SharedPtr<BaseExpression>
-GroupBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+GroupBinder::BuildFuncExpr(const hsql::Expr &expr,
+                           const SharedPtr<BindContext>& bind_context_ptr,
+                           i64 depth,
+                           bool root) {
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
     if(function_set_ptr->type_ != FunctionType::kScalar) {
         PlannerError("Only scalar function is supported in group by list.");
     }
-    return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
+    return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 }
 
 void
@@ -57,7 +69,11 @@ GroupBinder::CheckFuncType(FunctionType func_type) const {
 }
 
 SharedPtr<SubqueryExpression>
-GroupBinder::BuildSubquery(const hsql::SelectStatement& select, const SharedPtr<BindContext>& bind_context_ptr, SubqueryType subquery_type) {
+GroupBinder::BuildSubquery(const hsql::SelectStatement& select,
+                           const SharedPtr<BindContext>& bind_context_ptr,
+                           SubqueryType subquery_type,
+                           i64 depth,
+                           bool root) {
     PlannerError("Subquery isn't supported in group by list.");
 }
 

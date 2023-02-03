@@ -11,6 +11,9 @@ namespace infinity {
 
 class GroupBinder : public ExpressionBinder {
 public:
+    i64 group_by_expr_index {-1};
+
+public:
     explicit GroupBinder(SharedPtr<QueryContext>& query_context,
                          const SharedPtr<BindAliasProxy>& bind_alias_proxy)
                          : ExpressionBinder(query_context),
@@ -18,19 +21,31 @@ public:
 
     // Bind expression entry
     SharedPtr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
+    BuildExpression(const hsql::Expr &expr,
+                    const SharedPtr<BindContext>& bind_context_ptr,
+                    i64 depth,
+                    bool root) override;
 
     SharedPtr<BaseExpression>
-    BuildColExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
+    BuildColExpr(const hsql::Expr &expr,
+                 const SharedPtr<BindContext>& bind_context_ptr,
+                 i64 depth,
+                 bool root) override;
 
     SharedPtr<BaseExpression>
-    BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
+    BuildFuncExpr(const hsql::Expr &expr,
+                  const SharedPtr<BindContext>& bind_context_ptr,
+                  i64 depth,
+                  bool root) override;
 
     void
     CheckFuncType(FunctionType func_type) const override;
 
     SharedPtr<SubqueryExpression>
-    BuildSubquery(const hsql::SelectStatement& select, const SharedPtr<BindContext>& bind_context_ptr, SubqueryType subquery_type) override;
+    BuildSubquery(const hsql::SelectStatement& select,
+                  const SharedPtr<BindContext>& bind_context_ptr, SubqueryType subquery_type,
+                  i64 depth,
+                  bool root) override;
 private:
 
     const SharedPtr<BindAliasProxy>& bind_alias_proxy_;

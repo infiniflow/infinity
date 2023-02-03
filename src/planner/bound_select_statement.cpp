@@ -32,6 +32,10 @@ BoundSelectStatement::BuildPlan() {
         root = filter;
     }
 
+    if(!group_by_expressions_.empty()) {
+        ;
+    }
+
     auto project = MakeShared<LogicalProject>(projection_expressions_);
     project->set_left_node(root);
     root = project;
@@ -145,7 +149,7 @@ BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef>& table_ref) {
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildFilter(SharedPtr<LogicalNode> root,
-                             std::vector<SharedPtr<BaseExpression>>& conditions) {
+                                  Vector<SharedPtr<BaseExpression>>& conditions) {
     for(auto& cond: conditions) {
         // 1. Go through all the expression to find subquery
         VisitExpression(cond,

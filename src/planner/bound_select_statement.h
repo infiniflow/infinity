@@ -49,6 +49,9 @@ public:
     // Where conditions
     Vector<SharedPtr<BaseExpression>> where_conditions_{};
 
+    // Aggregate expression
+    Vector<SharedPtr<BaseExpression>> aggregate_expressions_{};
+
     // Group by expression list
     Vector<SharedPtr<BaseExpression>> group_by_expressions_{};
 

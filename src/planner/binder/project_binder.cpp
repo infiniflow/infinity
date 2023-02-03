@@ -10,7 +10,10 @@
 namespace infinity {
 
 SharedPtr<BaseExpression>
-ProjectBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext> &bind_context_ptr) {
+ProjectBinder::BuildExpression(const hsql::Expr &expr,
+                               const SharedPtr<BindContext> &bind_context_ptr,
+                               i64 depth,
+                               bool root) {
     String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();
 
     // If the expr is coming from group by lists.
@@ -33,11 +36,14 @@ ProjectBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindConte
         return agg_expr_ptr;
     }
 
-    return ExpressionBinder::BuildExpression(expr, bind_context_ptr);
+    return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
 }
 
 SharedPtr<BaseExpression>
-ProjectBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+ProjectBinder::BuildFuncExpr(const hsql::Expr &expr,
+                             const SharedPtr<BindContext>& bind_context_ptr,
+                             i64 depth,
+                             bool root) {
 
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
@@ -47,7 +53,7 @@ ProjectBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext
             this->binding_agg_func_ = true;
         }
     }
-    auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
+    auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
         String expr_name = expr.getName();
@@ -61,8 +67,11 @@ ProjectBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext
 }
 
 SharedPtr<BaseExpression>
-ProjectBinder::BuildColExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
-    auto bound_column_expr = ExpressionBinder::BuildColExpr(expr, bind_context_ptr);
+ProjectBinder::BuildColExpr(const hsql::Expr &expr,
+                            const SharedPtr<BindContext>& bind_context_ptr,
+                            i64 depth,
+                            bool root) {
+    auto bound_column_expr = ExpressionBinder::BuildColExpr(expr, bind_context_ptr, depth, root);
     if(bound_column_expr != nullptr && bound_column_name_.empty()) {
         bound_column_name_ = bound_column_expr->ToString();
     }

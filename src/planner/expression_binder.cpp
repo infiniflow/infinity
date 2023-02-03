@@ -18,11 +18,34 @@
 #include "main/infinity.h"
 #include "expression_binder.h"
 #include "query_binder.h"
+#include "parser/statement.h"
 
 namespace infinity {
 
 SharedPtr<BaseExpression>
-ExpressionBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext> &bind_context_ptr) {
+ExpressionBinder::Bind(const hsql::Expr &expr,
+                       const SharedPtr<BindContext>& bind_context_ptr,
+                       i64 depth,
+                       bool root) {
+    // Call implemented BuildExpression
+    SharedPtr<BaseExpression> result = BuildExpression(expr,
+                                                       bind_context_ptr,
+                                                       depth,
+                                                       root);
+    if(result == nullptr) {
+        PlannerAssert(result != nullptr, "Fail to bind the expression: " + Statement::ExprAsColumnName(&expr));
+
+        // Maybe the correlated expression, trying to bind it in the parent context.
+        result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
+    }
+    return result;
+}
+
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildExpression(const hsql::Expr &expr,
+                                  const SharedPtr<BindContext> &bind_context_ptr,
+                                  i64 depth,
+                                  bool root) {
 
     switch(expr.type) {
         case hsql::kExprLiteralFloat:
@@ -31,13 +54,13 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindCo
         case hsql::kExprLiteralDate:
         case hsql::kExprLiteralInterval:
         case hsql::kExprLiteralNull: {
-            return BuildValueExpr(expr, bind_context_ptr);
+            return BuildValueExpr(expr, bind_context_ptr, depth, root);
         }
         case hsql::kExprColumnRef: {
-            return BuildColExpr(expr, bind_context_ptr);
+            return BuildColExpr(expr, bind_context_ptr, depth, root);
         }
         case hsql::kExprFunctionRef: {
-            return BuildFuncExpr(expr, bind_context_ptr);
+            return BuildFuncExpr(expr, bind_context_ptr, depth, root);
         }
         case hsql::kExprStar:
             PlannerError("Star expression shouldn't be bound here.");
@@ -46,10 +69,10 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindCo
             PlannerError("Used in prepare and execute? Not supported now.");
             break;
         case hsql::kExprOperator:
-            return BuildOperatorExpr(expr, bind_context_ptr);
+            return BuildOperatorExpr(expr, bind_context_ptr, depth, root);
         case hsql::kExprSelect:
             // subquery expression
-            return BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kScalar);
+            return BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kScalar, depth, root);
         case hsql::kExprHint:
             PlannerError("Hint isn't supported now.");
             break;
@@ -64,7 +87,7 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindCo
             break;
         case hsql::kExprCast:
             // cast function expression
-            BuildCastExpr(expr, bind_context_ptr);
+            BuildCastExpr(expr, bind_context_ptr, depth, root);
             break;
         default:
             PlannerError("Unsupported expr type");
@@ -74,7 +97,10 @@ ExpressionBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindCo
 }
 
 SharedPtr<BaseExpression>
-ExpressionBinder::BuildValueExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+ExpressionBinder::BuildValueExpr(const hsql::Expr &expr,
+                                 const SharedPtr<BindContext>& bind_context_ptr,
+                                 i64 depth,
+                                 bool root) {
     switch(expr.type) {
         case hsql::kExprLiteralFloat: {
             Value value = Value::MakeDouble(expr.fval);
@@ -116,7 +142,9 @@ ExpressionBinder::BuildValueExpr(const hsql::Expr &expr, const SharedPtr<BindCon
 
 SharedPtr<BaseExpression>
 ExpressionBinder::BuildColExpr(const hsql::Expr &expr,
-                               const SharedPtr<BindContext>& bind_context_ptr) {
+                               const SharedPtr<BindContext>& bind_context_ptr,
+                               i64 depth,
+                               bool root) {
     ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, expr);
     SharedPtr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, 0);
     return column_expr;
@@ -124,14 +152,19 @@ ExpressionBinder::BuildColExpr(const hsql::Expr &expr,
 
 SharedPtr<BaseExpression>
 ExpressionBinder::BuildColExpr(const SharedPtr<ParsedColumnExpression>& expr,
-                               const SharedPtr<BindContext>& bind_context_ptr) {
+                               const SharedPtr<BindContext>& bind_context_ptr,
+                               i64 depth,
+                               bool root) {
     ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, expr);
     SharedPtr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, 0);
     return column_expr;
 }
 
 SharedPtr<BaseExpression>
-ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr,
+                                const SharedPtr<BindContext>& bind_context_ptr,
+                                i64 depth,
+                                bool root) {
 
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
 
@@ -140,8 +173,9 @@ ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindCont
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(expr.exprList->size());
     for(const auto* arg_expr : *expr.exprList) {
+        // The argument expression isn't root expression.
         // SharedPtr<BaseExpression> expr_ptr
-        auto expr_ptr = BuildExpression(*arg_expr, bind_context_ptr);
+        auto expr_ptr = BuildExpression(*arg_expr, bind_context_ptr, depth, false);
         arguments.emplace_back(expr_ptr);
     }
 
@@ -170,123 +204,126 @@ ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindCont
 }
 
 SharedPtr<BaseExpression>
-ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr,
+                                    const SharedPtr<BindContext>& bind_context_ptr,
+                                    i64 depth,
+                                    bool root) {
 
     String op;
     switch (expr.opType) {
         case hsql::kOpBetween: {
-            SharedPtr<BaseExpression> value = BuildExpression(*expr.expr, bind_context_ptr);
-            SharedPtr<BaseExpression> left_bound = BuildExpression(*(*expr.exprList)[0], bind_context_ptr);
-            SharedPtr<BaseExpression> right_bound = BuildExpression(*(*expr.exprList)[1], bind_context_ptr);
+            SharedPtr<BaseExpression> value = BuildExpression(*expr.expr, bind_context_ptr, depth, false);
+            SharedPtr<BaseExpression> left_bound = BuildExpression(*(*expr.exprList)[0], bind_context_ptr, depth, false);
+            SharedPtr<BaseExpression> right_bound = BuildExpression(*(*expr.exprList)[1], bind_context_ptr, depth, false);
             return MakeShared<BetweenExpression>(value, left_bound, right_bound, true, true);
         }
         case hsql::kOpCase: {
-            return BuildCaseExpr(expr, bind_context_ptr);
+            return BuildCaseExpr(expr, bind_context_ptr, depth, root);
         }
         case hsql::kOpCaseListElement:
             PlannerError("Unexpected expression type");
         case hsql::kOpPlus: {
             // +
             op = "+";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpMinus: {
             // -
             op = "-";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpAsterisk: {
             // *
             op = "*";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpSlash: {
             // /
             op = "/";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpPercentage: {
             // %
             op = "%";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpCaret: {
             // ^
             op = "^";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpEquals: {
             // =
             op = "=";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpNotEquals: {
             // <>
             op = "<>";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpLess: {
             // <
             op = "<";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpLessEq: {
             // <=
             op = "<=";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpGreater: {
             // >
             op = ">";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpGreaterEq: {
             // >=
             op = ">=";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpLike: {
             // like
             op = "like";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpNotLike: {
             // not like
             op = "not like";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpILike: {
             // ilike
             op = "ilike";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpAnd: {
             // AND
             op = "and";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpOr: {
             // OR
             op = "or";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpIn: { // IN
             if(expr.select != nullptr) {
                 // In subquery
                 PlannerAssert(expr.select, "No select statement in IN statement");
-                auto subquery = BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kIn);
-                subquery->left_ = BuildExpression(*expr.expr, bind_context_ptr);
+                auto subquery = BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kIn, depth, false);
+                subquery->left_ = BuildExpression(*expr.expr, bind_context_ptr, depth, false);
                 return subquery;
             } else {
                 PlannerAssert(expr.exprList && !expr.exprList->empty(), "IN operation with emtpy list");
 
-                SharedPtr<BaseExpression> left_operand_ptr = BuildExpression(*expr.expr, bind_context_ptr);
+                SharedPtr<BaseExpression> left_operand_ptr = BuildExpression(*expr.expr, bind_context_ptr, depth, false);
 
                 Vector<SharedPtr<BaseExpression>> arguments;
                 arguments.reserve(expr.exprList->size());
 
                 for (const auto* arg : *expr.exprList) {
-                    auto arg_expr_ptr = BuildExpression(*arg, bind_context_ptr);
+                    auto arg_expr_ptr = BuildExpression(*arg, bind_context_ptr, depth, false);
                     arguments.emplace_back(arg_expr_ptr);
                 }
 
@@ -296,28 +333,28 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const SharedPtr<Bind
         case hsql::kOpConcat: {
             // Concat
             op = "concat";
-            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr);
+            return BuildBinaryScalarExpr(op, expr.expr, expr.expr2, bind_context_ptr, depth, root);
         }
         case hsql::kOpNot: {
             // Not
             op = "not";
-            return BuildUnaryScalarExpr(op, expr.expr, bind_context_ptr);
+            return BuildUnaryScalarExpr(op, expr.expr, bind_context_ptr, depth, root);
         }
         case hsql::kOpUnaryMinus: {
             // -
             op = "-";
-            return BuildUnaryScalarExpr(op, expr.expr, bind_context_ptr);
+            return BuildUnaryScalarExpr(op, expr.expr, bind_context_ptr, depth, root);
         }
         case hsql::kOpIsNull: {
             // IsNull
             op = "isnull";
-            return BuildUnaryScalarExpr(op, expr.expr, bind_context_ptr);
+            return BuildUnaryScalarExpr(op, expr.expr, bind_context_ptr, depth, root);
         }
         case hsql::kOpExists: {
             // Exists
             PlannerAssert(expr.select, "No select statement in Exists");
-            auto subquery = BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kExists);
-            subquery->left_ = BuildExpression(*expr.expr, bind_context_ptr);
+            auto subquery = BuildSubquery(*expr.select, bind_context_ptr, SubqueryType::kExists, depth, false);
+            subquery->left_ = BuildExpression(*expr.expr, bind_context_ptr, depth, false);
             return subquery;
         }
         default: {
@@ -329,14 +366,20 @@ ExpressionBinder::BuildOperatorExpr(const hsql::Expr &expr, const SharedPtr<Bind
 }
 
 SharedPtr<BaseExpression>
-ExpressionBinder::BuildCastExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
-    SharedPtr<BaseExpression> source_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr);
+ExpressionBinder::BuildCastExpr(const hsql::Expr &expr,
+                                const SharedPtr<BindContext>& bind_context_ptr,
+                                i64 depth,
+                                bool root) {
+    SharedPtr<BaseExpression> source_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr, depth, false);
     DataType target_type = DataType::ConvertType(expr.columnType.data_type);
     return CastExpression::AddCastToType(source_expr_ptr, target_type);
 }
 
 SharedPtr<BaseExpression>
-ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr,
+                                const SharedPtr<BindContext>& bind_context_ptr,
+                                i64 depth,
+                                bool root) {
     PlannerAssert(expr.exprList, "No when and then expression");
     PlannerAssert(!expr.exprList->empty(), "No when and then expression list");
 
@@ -346,7 +389,7 @@ ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const SharedPtr<BindCont
 
     if(expr.expr) {
         // Simple case
-        SharedPtr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr);
+        SharedPtr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr, depth, false);
 
         String function_name = "=";
         auto &catalog = Infinity::instance().catalog();
@@ -358,7 +401,7 @@ ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const SharedPtr<BindCont
             Vector<SharedPtr<BaseExpression>> arguments;
             arguments.reserve(2);
             // SharedPtr<BaseExpression> value_expr
-            auto value_expr = BuildExpression(*case_when_expr->expr, bind_context_ptr);
+            auto value_expr = BuildExpression(*case_when_expr->expr, bind_context_ptr, depth, false);
             arguments.emplace_back(left_expr_ptr);
             arguments.emplace_back(value_expr);
             ScalarFunction equal_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
@@ -367,7 +410,7 @@ ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const SharedPtr<BindCont
 
             // Construct then expression
             // SharedPtr<BaseExpression> then_expr
-            SharedPtr<BaseExpression> then_expr_ptr = BuildExpression(*case_when_expr->expr2, bind_context_ptr);
+            SharedPtr<BaseExpression> then_expr_ptr = BuildExpression(*case_when_expr->expr2, bind_context_ptr, depth, false);
             case_expression_ptr->AddCaseCheck(when_expr_ptr, then_expr_ptr);
         }
     } else {
@@ -375,18 +418,18 @@ ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const SharedPtr<BindCont
         for (const auto *case_when_expr : *expr.exprList) {
             // Construct when expression: left_expr = value_expr
             // SharedPtr<BaseExpression> when_expr
-            auto when_expr_ptr = BuildExpression(*case_when_expr->expr, bind_context_ptr);
+            auto when_expr_ptr = BuildExpression(*case_when_expr->expr, bind_context_ptr, depth, false);
 
             // Construct then expression
             // SharedPtr<BaseExpression> then_expr
-            SharedPtr<BaseExpression> then_expr_ptr = BuildExpression(*case_when_expr->expr2, bind_context_ptr);
+            SharedPtr<BaseExpression> then_expr_ptr = BuildExpression(*case_when_expr->expr2, bind_context_ptr, depth, false);
             case_expression_ptr->AddCaseCheck(when_expr_ptr, then_expr_ptr);
         }
     }
     // Construct else expression
     SharedPtr<BaseExpression> else_expr_ptr;
     if (expr.expr2 != nullptr) {
-        else_expr_ptr = BuildExpression(*expr.expr2, bind_context_ptr);
+        else_expr_ptr = BuildExpression(*expr.expr2, bind_context_ptr, depth, false);
     } else {
         else_expr_ptr = MakeShared<ValueExpression>(Value::MakeNull());
     }
@@ -396,8 +439,12 @@ ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr, const SharedPtr<BindCont
 }
 
 SharedPtr<BaseExpression>
-ExpressionBinder::BuildBinaryScalarExpr(String& op, const hsql::Expr* left,
-                                  const hsql::Expr* right, const SharedPtr<BindContext>& bind_context_ptr) {
+ExpressionBinder::BuildBinaryScalarExpr(String& op,
+                                        const hsql::Expr* left,
+                                        const hsql::Expr* right,
+                                        const SharedPtr<BindContext>& bind_context_ptr,
+                                        i64 depth,
+                                        bool root) {
     PlannerAssert(left != nullptr, "No left expression");
     PlannerAssert(right != nullptr , "No right expression");
 
@@ -406,8 +453,8 @@ ExpressionBinder::BuildBinaryScalarExpr(String& op, const hsql::Expr* left,
     auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
 
     Vector<SharedPtr<BaseExpression>> arguments(2);
-    arguments[0] = BuildExpression(*left, bind_context_ptr);
-    arguments[1] = BuildExpression(*right, bind_context_ptr);
+    arguments[0] = BuildExpression(*left, bind_context_ptr, depth, false);
+    arguments[1] = BuildExpression(*right, bind_context_ptr, depth, false);
     ScalarFunction binary_op_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
     SharedPtr<FunctionExpression> result
             = MakeShared<FunctionExpression>(binary_op_function, arguments);
@@ -419,14 +466,16 @@ ExpressionBinder::BuildBinaryScalarExpr(String& op, const hsql::Expr* left,
 SharedPtr<BaseExpression>
 ExpressionBinder::BuildUnaryScalarExpr(String& op,
                                        const hsql::Expr* expr,
-                                       const SharedPtr<BindContext>& bind_context_ptr) {
+                                       const SharedPtr<BindContext>& bind_context_ptr,
+                                       i64 depth,
+                                       bool root) {
 
     auto &catalog = Infinity::instance().catalog();
     SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(op);
     auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
 
     Vector<SharedPtr<BaseExpression>> arguments(1);
-    arguments[0] = BuildExpression(*expr, bind_context_ptr);
+    arguments[0] = BuildExpression(*expr, bind_context_ptr, depth, false);
 
     ScalarFunction unary_op_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
 
@@ -440,7 +489,9 @@ ExpressionBinder::BuildUnaryScalarExpr(String& op,
 SharedPtr<SubqueryExpression>
 ExpressionBinder::BuildSubquery(const hsql::SelectStatement& select,
                                 const SharedPtr<BindContext>& bind_context_ptr,
-                                SubqueryType subquery_type) {
+                                SubqueryType subquery_type,
+                                i64 depth,
+                                bool root) {
 
 //    SharedPtr<BindContext> subquery_binding_context_ptr = MakeShared<BindContext>(bind_context_ptr);
 //    SharedPtr<BoundSelectNode> select_node_ptr

@@ -20,10 +20,16 @@ public:
 
     // Bind expression entry
     SharedPtr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
+    BuildExpression(const hsql::Expr &expr,
+                    const SharedPtr<BindContext>& bind_context_ptr,
+                    i64 depth,
+                    bool root) override;
 
     SharedPtr<BaseExpression>
-    BuildColExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
+    BuildColExpr(const hsql::Expr &expr,
+                 const SharedPtr<BindContext>& bind_context_ptr,
+                 i64 depth,
+                 bool root) override;
 
     void
     CheckFuncType(FunctionType func_type) const override;

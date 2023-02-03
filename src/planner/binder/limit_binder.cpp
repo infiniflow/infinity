@@ -8,7 +8,10 @@
 namespace infinity {
 
 SharedPtr<BaseExpression>
-LimitBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext> &bind_context_ptr) {
+LimitBinder::BuildExpression(const hsql::Expr &expr,
+                             const SharedPtr<BindContext> &bind_context_ptr,
+                             i64 depth,
+                             bool root) {
     switch(expr.type) {
         case hsql::kExprStar:
             PlannerError("Star expression isn't allowed in limit expression.");
@@ -25,17 +28,20 @@ LimitBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext
         case hsql::kExprArrayIndex:
             PlannerError("Array Index expression isn't allowed in limit expression.");
         default:
-            return ExpressionBinder::BuildExpression(expr, bind_context_ptr);
+            return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
     }
 }
 
 SharedPtr<BaseExpression>
-LimitBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+LimitBinder::BuildFuncExpr(const hsql::Expr &expr,
+                           const SharedPtr<BindContext>& bind_context_ptr,
+                           i64 depth,
+                           bool root) {
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
     if(function_set_ptr->type_ != FunctionType::kScalar) {
         PlannerError("Only scalar function is supported in limit clause.");
     }
-    return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
+    return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 }
 
 }

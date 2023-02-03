@@ -80,7 +80,6 @@ private:
 
     void
     BuildSelectList(SharedPtr<QueryContext>& query_context,
-                    const Vector<SharedPtr<ParsedExpression>>& select_exprs,
                     SharedPtr<BoundSelectStatement>& select_statement);
 
     void

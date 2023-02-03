@@ -12,13 +12,17 @@ namespace infinity {
 SharedPtr<BaseExpression>
 BindAliasProxy::BindAlias(ExpressionBinder& expression_binder,
                           const hsql::Expr& expr,
-                          const SharedPtr<BindContext>& bind_context_ptr) {
+                          const SharedPtr<BindContext>& bind_context_ptr,
+                          i64 depth,
+                          bool root) {
     String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();
 
-    auto alias_pair = alias2expr_.find(expr_name);
-    if(alias_pair == alias2expr_.end()) {
+    auto alias_pair = bind_context_ptr->select_alias2index_.find(expr_name);
+    if(alias_pair == bind_context_ptr->select_alias2index_.end()) {
         return nullptr;
     }
+
+    const SharedPtr<ParsedExpression>& select_expr = bind_context_ptr->select_expression_[alias_pair->second];
 
     if(binding_alias_) {
         PlannerError("Trying to bind an alias name: " + expr_name + " in another alias");
@@ -26,14 +30,20 @@ BindAliasProxy::BindAlias(ExpressionBinder& expression_binder,
 
     SharedPtr<BaseExpression> bound_alias_expr = nullptr;
     binding_alias_ = true;
-    if(alias_pair->second->type_ == ExpressionType::kRaw) {
+    if(select_expr->type_ == ExpressionType::kRaw) {
         SharedPtr<ParsedRawExpression> parsed_raw_expr
-                = std::static_pointer_cast<ParsedRawExpression>(alias_pair->second);
-        bound_alias_expr = expression_binder.BuildExpression(*parsed_raw_expr->raw_expr_, bind_context_ptr);
+                = std::static_pointer_cast<ParsedRawExpression>(select_expr);
+        bound_alias_expr = expression_binder.BuildExpression(*parsed_raw_expr->raw_expr_,
+                                                             bind_context_ptr,
+                                                             depth,
+                                                             root);
     } else {
         SharedPtr<ParsedColumnExpression> parsed_col_expr
-                = std::static_pointer_cast<ParsedColumnExpression>(alias_pair->second);
-        bound_alias_expr = expression_binder.BuildColExpr(parsed_col_expr, bind_context_ptr);
+                = std::static_pointer_cast<ParsedColumnExpression>(select_expr);
+        bound_alias_expr = expression_binder.BuildColExpr(parsed_col_expr,
+                                                          bind_context_ptr,
+                                                          depth,
+                                                          root);
     }
     binding_alias_ = false;
 

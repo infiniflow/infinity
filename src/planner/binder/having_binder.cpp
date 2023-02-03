@@ -10,7 +10,10 @@
 namespace infinity {
 
 SharedPtr<BaseExpression>
-HavingBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContext> &bind_context_ptr) {
+HavingBinder::BuildExpression(const hsql::Expr &expr,
+                              const SharedPtr<BindContext> &bind_context_ptr,
+                              i64 depth,
+                              bool root) {
 
     String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();
 
@@ -40,18 +43,21 @@ HavingBinder::BuildExpression(const hsql::Expr &expr, const SharedPtr<BindContex
         }
     }
 
-    return ExpressionBinder::BuildExpression(expr, bind_context_ptr);
+    return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
 }
 
 SharedPtr<BaseExpression>
-HavingBinder::BuildColExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+HavingBinder::BuildColExpr(const hsql::Expr &expr,
+                           const SharedPtr<BindContext>& bind_context_ptr,
+                           i64 depth,
+                           bool root) {
     if(this->binding_agg_func_) {
 
         // Check if the column is using an alias from select list.
-        auto result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr);
+        auto result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr, depth, root);
 
         if(result == nullptr) {
-            result = ExpressionBinder::BuildColExpr(expr, bind_context_ptr);
+            result = ExpressionBinder::BuildColExpr(expr, bind_context_ptr, depth, root);
         }
 
         return result;
@@ -62,7 +68,10 @@ HavingBinder::BuildColExpr(const hsql::Expr &expr, const SharedPtr<BindContext>&
 }
 
 SharedPtr<BaseExpression>
-HavingBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+HavingBinder::BuildFuncExpr(const hsql::Expr &expr,
+                            const SharedPtr<BindContext>& bind_context_ptr,
+                            i64 depth,
+                            bool root) {
 
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
@@ -72,7 +81,7 @@ HavingBinder::BuildFuncExpr(const hsql::Expr &expr, const SharedPtr<BindContext>
             this->binding_agg_func_ = true;
         }
     }
-    auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr);
+    auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
         String expr_name = expr.getName();

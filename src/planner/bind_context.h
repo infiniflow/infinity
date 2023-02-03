@@ -66,14 +66,21 @@ public:
     // Binding Table
     Vector<String> table_names_;
 
+    // Select list
+    Vector<SharedPtr<ParsedExpression>> select_expression_;
+    HashMap<String, i64> select_alias2index_;
+
     // Bound expr in group by list
+    u64 group_by_table_index_{0};
     Vector<String> group_names_;
     HashMap<String, SharedPtr<BaseExpression>> group_by_name_;
 
     // Bound aggregate function expr
+    u64 aggregate_table_index_{0};
     HashMap<String, SharedPtr<BaseExpression>> aggregate_by_name_;
 
     // Bound expr in select list
+    u64 project_table_index_{0};
     Vector<String> project_names_;
     HashMap<String, SharedPtr<BaseExpression>> project_by_name_;
 

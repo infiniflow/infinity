@@ -120,7 +120,7 @@ LogicalPlanner::BuildInsertValue(const hsql::InsertStatement &statement) {
     value_list.reserve(statement.values->size());
     for (const auto* expr : *statement.values) {
         SharedPtr<BaseExpression> value_expr
-                = bind_context_ptr->expression_binder_->BuildExpression(*expr, bind_context_ptr);
+                = bind_context_ptr->expression_binder_->BuildExpression(*expr, bind_context_ptr, 0, true);
         value_list.emplace_back(value_expr);
     }
 

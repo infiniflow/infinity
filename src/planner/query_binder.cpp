@@ -71,29 +71,31 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     // 5. SELECT list (aliases)
     // Unfold the star expression in the select list.
     // Star expression will be unfolded and bound as column expressions.
-    Vector<SharedPtr<ParsedExpression>> select_exprs = UnfoldStarExpression(query_context_ptr_, *statement.selectList);
+    bind_context_ptr_->select_expression_ = UnfoldStarExpression(query_context_ptr_, *statement.selectList);
 
-    HashMap<String, SharedPtr<ParsedExpression>> alias2expr;
-    for (const SharedPtr<ParsedExpression>& select_expr : select_exprs) {
+    i64 column_count = bind_context_ptr_->select_expression_.size();
+    for(i64 column_index = 0; column_index < column_count; ++ column_index) {
+        const SharedPtr<ParsedExpression>& select_expr = bind_context_ptr_->select_expression_[column_index];
         // Bound column expression is bound due to the star expression, which won't be referenced in other place.
         // Only consider the Raw Expression case.
         if(!select_expr->alias_.empty()) {
-            if(alias2expr.contains(select_expr->alias_)) {
-                PlannerError(alias2expr[select_expr->alias_]->ToString() + " and " + select_expr->ToString()
-                             + " have same alias: " + select_expr->alias_);
+            if(bind_context_ptr_->select_alias2index_.contains(select_expr->alias_)) {
+                i64 bound_column_index = bind_context_ptr_->select_alias2index_[select_expr->alias_];
+                PlannerError(bind_context_ptr_->select_expression_[bound_column_index]->ToString() + " and "
+                             + select_expr->ToString() + " have same alias: " + select_expr->alias_);
             } else {
-                alias2expr[select_expr->alias_] = select_expr;
+                bind_context_ptr_->select_alias2index_[select_expr->alias_] = column_index;
             }
         }
     }
 
-    SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>(alias2expr);
+    SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
 
     // 6. WHERE
     if (statement.whereClause) {
         auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr =
-                where_binder->BuildExpression(*statement.whereClause, this->bind_context_ptr_);
+                where_binder->Bind(*statement.whereClause, this->bind_context_ptr_, 0, true);
 
         bound_select_statement->where_conditions_ =
                 SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
@@ -108,7 +110,7 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     bound_select_statement->distinct_ = statement.selectDistinct;
 
     // 11. SELECT (not flatten subquery)
-    BuildSelectList(query_context_ptr_, select_exprs, bound_select_statement);
+    BuildSelectList(query_context_ptr_, bound_select_statement);
 
     // 12. ORDER BY
     if(statement.order != nullptr) {
@@ -548,7 +550,10 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
     auto join_binder = MakeShared<JoinBinder>(query_context);
 
     // SharedPtr<BaseExpression> on_condition_ptr
-    auto on_condition_ptr = join_binder->BuildExpression(*from_table->join->condition, this->bind_context_ptr_);
+    auto on_condition_ptr = join_binder->BuildExpression(*from_table->join->condition,
+                                                         this->bind_context_ptr_,
+                                                         0,
+                                                         true);
 
     result->on_conditions_ = SplitExpressionByDelimiter(on_condition_ptr, ConjunctionType::kAnd);
 
@@ -614,18 +619,22 @@ QueryBinder::BuildGroupByHaving(SharedPtr<QueryContext>& query_context,
                                 const SharedPtr<BindAliasProxy>& bind_alias_proxy,
                                 SharedPtr<BoundSelectStatement>& select_statement) {
     if(select.groupBy != nullptr) {
+        bind_context_ptr_->group_by_table_index_ = bind_context_ptr_->GenerateTableIndex();
         // Start to bind GROUP BY clause
         // Set group binder
         auto group_binder = MakeShared<GroupBinder>(query_context, bind_alias_proxy);
 
         // Reserve the group names used in GroupBinder::BuildExpression
         this->bind_context_ptr_->group_names_.reserve(select.groupBy->columns->size());
-        for (const hsql::Expr* expr: *select.groupBy->columns) {
+        for (i64 idx = 0; const hsql::Expr* expr: *select.groupBy->columns) {
+            // set group-by expression index
+            group_binder->group_by_expr_index = idx;
 
             // Call GroupBinder BuildExpression
-            SharedPtr<BaseExpression> group_by_expr = group_binder->BuildExpression(*expr, this->bind_context_ptr_);
+            SharedPtr<BaseExpression> group_by_expr = group_binder->Bind(*expr, this->bind_context_ptr_, 0, true);
             select_statement->group_by_expressions_.emplace_back(group_by_expr);
 
+            ++ idx;
         }
     }
 
@@ -637,7 +646,7 @@ QueryBinder::BuildGroupByHaving(SharedPtr<QueryContext>& query_context,
         for (const hsql::Expr* expr: *select.groupBy->having->exprList) {
 
             // Call HavingBinder BuildExpression
-            SharedPtr<BaseExpression> having_expr = having_binder->BuildExpression(*expr, this->bind_context_ptr_);
+            SharedPtr<BaseExpression> having_expr = having_binder->Bind(*expr, this->bind_context_ptr_, 0, true);
             select_statement->having_expressions_.emplace_back(having_expr);
 
         }
@@ -646,19 +655,21 @@ QueryBinder::BuildGroupByHaving(SharedPtr<QueryContext>& query_context,
 
 void
 QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
-                             const Vector<SharedPtr<ParsedExpression>>& select_exprs,
                              SharedPtr<BoundSelectStatement>& bound_select_statement) {
     auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
-    this->bind_context_ptr_->project_names_.reserve(select_exprs.size());
-    bound_select_statement->projection_expressions_.reserve(select_exprs.size());
-    for (const SharedPtr<ParsedExpression>& select_expr : select_exprs) {
+    this->bind_context_ptr_->project_names_.reserve(bind_context_ptr_->select_expression_.size());
+    bound_select_statement->projection_expressions_.reserve(bind_context_ptr_->select_expression_.size());
+    for (const SharedPtr<ParsedExpression>& select_expr : bind_context_ptr_->select_expression_) {
         switch(select_expr->type_) {
             case ExpressionType::kColumn: {
                 // This part is from unfold star expression, no alias
                 SharedPtr<ParsedColumnExpression> parsed_col_expr
                         = std::static_pointer_cast<ParsedColumnExpression>(select_expr);
                 const String& expr_name_ref = parsed_col_expr->ToString();
-                SharedPtr<BaseExpression> bound_expr = project_binder->ExpressionBinder::BuildColExpr(parsed_col_expr, this->bind_context_ptr_);
+                SharedPtr<BaseExpression> bound_expr = project_binder->ExpressionBinder::BuildColExpr(parsed_col_expr,
+                                                                                                      this->bind_context_ptr_,
+                                                                                                      0,
+                                                                                                      true);
                 if(!this->bind_context_ptr_->project_by_name_.contains(expr_name_ref)) {
                     this->bind_context_ptr_->project_by_name_.emplace(expr_name_ref, bound_expr);
                 }
@@ -676,7 +687,10 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
 
                 if(parsed_raw_expr->raw_expr_->getName() == nullptr) {
                     // Constant value in select list, call build value expression directly.
-                    bound_expr = project_binder->BuildExpression(*parsed_raw_expr->raw_expr_, this->bind_context_ptr_);
+                    bound_expr = project_binder->Bind(*parsed_raw_expr->raw_expr_,
+                                                      this->bind_context_ptr_,
+                                                      0,
+                                                      true);
                     expr_name = bound_expr->ToString();
                     this->bind_context_ptr_->project_by_name_.emplace(expr_name, bound_expr);
                 } else {
@@ -685,7 +699,10 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
                     // Alias already been bound and insert into project_by_name_ of bind context;
                     bound_expr = this->bind_context_ptr_->project_by_name_[expr_name];
                     if(bound_expr == nullptr) {
-                        bound_expr = project_binder->BuildExpression(*parsed_raw_expr->raw_expr_, this->bind_context_ptr_);
+                        bound_expr = project_binder->Bind(*parsed_raw_expr->raw_expr_,
+                                                          this->bind_context_ptr_,
+                                                          0,
+                                                          true);
                         this->bind_context_ptr_->project_by_name_.emplace(expr_name, bound_expr);
                     }
                 }
@@ -727,7 +744,10 @@ QueryBinder::BuildOrderBy(SharedPtr<QueryContext>& query_context,
                 bound_statement->order_by_types_.emplace_back(OrderByType::kDescending);
                 break;
         }
-        auto bound_order_expr = order_binder->BuildExpression(*order_desc->expr, this->bind_context_ptr_);
+        auto bound_order_expr = order_binder->Bind(*order_desc->expr,
+                                                   this->bind_context_ptr_,
+                                                   0,
+                                                   true);
         bound_statement->order_by_expressions_.emplace_back(bound_order_expr);
     }
 }
@@ -738,11 +758,11 @@ QueryBinder::BuildLimit(SharedPtr<QueryContext>& query_context,
                         SharedPtr<BoundSelectStatement>& bound_statement) {
     auto limit_binder = MakeShared<LimitBinder>(query_context);
     bound_statement->limit_expression_
-            = limit_binder->BuildExpression(*statement.limit->limit, this->bind_context_ptr_);
+            = limit_binder->Bind(*statement.limit->limit, this->bind_context_ptr_, 0, true);
 
     if(statement.limit->offset != nullptr) {
         bound_statement->offset_expression_
-                = limit_binder->BuildExpression(*statement.limit->offset, this->bind_context_ptr_);
+                = limit_binder->Bind(*statement.limit->offset, this->bind_context_ptr_, 0, true);
     }
 }
 
