@@ -6,6 +6,7 @@
 #include "function/function_set.h"
 #include "project_binder.h"
 #include "parser/statement.h"
+#include "expression/column_expression.h"
 
 namespace infinity {
 
@@ -17,23 +18,34 @@ ProjectBinder::BuildExpression(const hsql::Expr &expr,
     String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();
 
     // If the expr is coming from group by lists.
-    if (bind_context_ptr->group_by_name_.contains(expr_name)) {
-        auto group_by_expr_ptr = bind_context_ptr->group_by_name_[expr_name];
+    if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
+        i64 groupby_index = bind_context_ptr->group_index_by_name_[expr_name];
+        const SharedPtr<BaseExpression>& group_expr = bind_context_ptr->group_exprs_[groupby_index];
 
-        group_by_expr_ptr->source_position_
-                = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kGroupBy);
+        SharedPtr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
+                                                                    bind_context_ptr->group_by_table_name_,
+                                                                    std::to_string(groupby_index),
+                                                                    groupby_index,
+                                                                    depth);
 
-        return group_by_expr_ptr;
+
+        result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kGroupBy);
+        return result;
     }
 
     // If the expr is coming from aggregate function list
-    if(bind_context_ptr->aggregate_by_name_.contains(expr_name)) {
-        auto agg_expr_ptr = bind_context_ptr->aggregate_by_name_[expr_name];
+    if(bind_context_ptr->aggregate_index_by_name_.contains(expr_name)) {
+        i64 aggregate_index = bind_context_ptr->aggregate_index_by_name_[expr_name];
+        const SharedPtr<BaseExpression>& aggregate_expr = bind_context_ptr->group_exprs_[aggregate_index];
 
-        agg_expr_ptr->source_position_
-                = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+        SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
+                                                                    bind_context_ptr->aggregate_table_name_,
+                                                                    std::to_string(aggregate_index),
+                                                                    aggregate_index,
+                                                                    depth);
 
-        return agg_expr_ptr;
+        result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+        return result;
     }
 
     return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
@@ -57,9 +69,10 @@ ProjectBinder::BuildFuncExpr(const hsql::Expr &expr,
 
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
         String expr_name = expr.getName();
-        bind_context_ptr->aggregate_by_name_[expr_name] = func_expr_ptr;
-        func_expr_ptr->source_position_
-            = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+        i64 aggregate_index = bind_context_ptr->aggregate_exprs_.size();
+        bind_context_ptr->aggregate_exprs_.emplace_back(func_expr_ptr);
+        bind_context_ptr->aggregate_index_by_name_[expr_name] = aggregate_index;
+
         this->binding_agg_func_ = false;
     }
 

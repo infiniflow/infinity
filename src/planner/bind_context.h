@@ -68,16 +68,25 @@ public:
 
     // Select list
     Vector<SharedPtr<ParsedExpression>> select_expression_;
-    HashMap<String, i64> select_alias2index_;
+    HashMap<String, i64> select_alias2index_;  // Some select item has alias, alias_name -> index
+    HashMap<String, i64> select_expr_name2index_; // Select expr name -> index
+    HashMap<i64, i64> select_index_to_group_by_index_; // select index -> group by index
+    HashMap<i64, i64> select_index_to_aggregate_index_; // select index -> aggregate index
 
     // Bound expr in group by list
     u64 group_by_table_index_{0};
-    Vector<String> group_names_;
-    HashMap<String, SharedPtr<BaseExpression>> group_by_name_;
+    String group_by_table_name_{};
+//    Vector<String> group_names_;
+    Vector<SharedPtr<BaseExpression>> group_exprs_;
+//    HashMap<String, SharedPtr<BaseExpression>> group_by_name_;
+    HashMap<String, i64> group_index_by_name_;
 
     // Bound aggregate function expr
     u64 aggregate_table_index_{0};
-    HashMap<String, SharedPtr<BaseExpression>> aggregate_by_name_;
+    String aggregate_table_name_{};
+    Vector<SharedPtr<BaseExpression>> aggregate_exprs_;
+//    HashMap<String, SharedPtr<BaseExpression>> aggregate_by_name_;
+    HashMap<String, i64> aggregate_index_by_name_;
 
     // Bound expr in select list
     u64 project_table_index_{0};

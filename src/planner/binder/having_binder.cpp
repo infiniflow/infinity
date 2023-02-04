@@ -6,6 +6,7 @@
 #include "function/function_set.h"
 #include "having_binder.h"
 #include "parser/statement.h"
+#include "expression/column_expression.h"
 
 namespace infinity {
 
@@ -17,33 +18,45 @@ HavingBinder::BuildExpression(const hsql::Expr &expr,
 
     String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();
 
+    // Trying to bind in group by
     if(!this->binding_agg_func_) {
-        if (bind_context_ptr->group_by_name_.contains(expr_name)) {
-            auto group_by_expr_ptr = bind_context_ptr->group_by_name_[expr_name];
+        if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
+            i64 groupby_index = bind_context_ptr->group_index_by_name_[expr_name];
+            const SharedPtr<BaseExpression>& group_expr = bind_context_ptr->group_exprs_[groupby_index];
 
-            group_by_expr_ptr->source_position_
-                = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kGroupBy);
+            SharedPtr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
+                                                                        bind_context_ptr->group_by_table_name_,
+                                                                        std::to_string(groupby_index),
+                                                                        groupby_index,
+                                                                        depth);
 
-            return group_by_expr_ptr;
+
+            result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kGroupBy);
+            return result;
         }
     }
 
-    if(bind_context_ptr->aggregate_by_name_.contains(expr_name)) {
+    if(bind_context_ptr->aggregate_index_by_name_.contains(expr_name)) {
         if(!this->binding_agg_func_) {
             // not in an aggregate function
-            auto agg_expr_ptr = bind_context_ptr->aggregate_by_name_[expr_name];
+            i64 aggregate_index = bind_context_ptr->aggregate_index_by_name_[expr_name];
+            const SharedPtr<BaseExpression>& aggregate_expr = bind_context_ptr->group_exprs_[aggregate_index];
 
-            agg_expr_ptr->source_position_
-                = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+            SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
+                                                                        bind_context_ptr->aggregate_table_name_,
+                                                                        std::to_string(aggregate_index),
+                                                                        aggregate_index,
+                                                                        depth);
 
-            return agg_expr_ptr;
+            result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+            return result;
         } else {
             // in an aggregate function, which means aggregate function nested, which is error.
             PlannerError("Aggregate function is called in another aggregate function.");
         }
     }
 
-    return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
+    return ExpressionBinder::Bind(expr, bind_context_ptr, 0, false);
 }
 
 SharedPtr<BaseExpression>
@@ -51,6 +64,8 @@ HavingBinder::BuildColExpr(const hsql::Expr &expr,
                            const SharedPtr<BindContext>& bind_context_ptr,
                            i64 depth,
                            bool root) {
+
+    // SELECT sum(a) from t1 group by b having sum(a) > 0;
     if(this->binding_agg_func_) {
 
         // Check if the column is using an alias from select list.
@@ -85,9 +100,10 @@ HavingBinder::BuildFuncExpr(const hsql::Expr &expr,
 
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
         String expr_name = expr.getName();
-        bind_context_ptr->aggregate_by_name_[expr_name] = func_expr_ptr;
-        func_expr_ptr->source_position_
-                = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+        i64 aggregate_index = bind_context_ptr->aggregate_exprs_.size();
+        bind_context_ptr->aggregate_exprs_.emplace_back(func_expr_ptr);
+        bind_context_ptr->aggregate_index_by_name_[expr_name] = aggregate_index;
+
         this->binding_agg_func_ = false;
     }
 

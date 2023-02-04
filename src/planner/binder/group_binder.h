@@ -13,6 +13,8 @@ class GroupBinder : public ExpressionBinder {
 public:
     i64 group_by_expr_index {-1};
 
+    HashSet<i64> bound_select_index_;
+
 public:
     explicit GroupBinder(SharedPtr<QueryContext>& query_context,
                          const SharedPtr<BindAliasProxy>& bind_alias_proxy)
@@ -25,6 +27,14 @@ public:
                     const SharedPtr<BindContext>& bind_context_ptr,
                     i64 depth,
                     bool root) override;
+
+    SharedPtr<BaseExpression>
+    BindColumnReference(const hsql::Expr &expr,
+                         const SharedPtr<BindContext>& bind_context_ptr);
+
+    SharedPtr<BaseExpression>
+    BindConstantExpression(const hsql::Expr &expr,
+                           const SharedPtr<BindContext>& bind_context_ptr);
 
     SharedPtr<BaseExpression>
     BuildColExpr(const hsql::Expr &expr,

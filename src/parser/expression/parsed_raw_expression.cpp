@@ -3,12 +3,14 @@
 //
 
 #include "parsed_raw_expression.h"
+#include "parser/statement.h"
 
 namespace infinity {
 
 String
 ParsedRawExpression::ToString() const {
-    return raw_expr_->getName();
+    String expr_name = raw_expr_->getName() == nullptr ? Statement::ExprAsColumnName(raw_expr_) : raw_expr_->getName();
+    return expr_name;
 }
 
 }

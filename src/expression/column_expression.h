@@ -11,6 +11,20 @@ namespace infinity {
 
 class ColumnExpression : public BaseExpression {
 public:
+    static inline SharedPtr<ColumnExpression>
+    Make(DataType data_type,
+         String table_name,
+         String column_name,
+         i64 column_index,
+         i64 depth) {
+        return MakeShared<ColumnExpression>(std::move(data_type),
+                                            std::move(table_name),
+                                            std::move(column_name),
+                                            column_index,
+                                            depth);
+    }
+
+public:
     ColumnExpression(DataType data_type, String table_name,
                      String column_name, i64 column_index, i64 depth);
 

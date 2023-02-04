@@ -86,6 +86,16 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
             } else {
                 bind_context_ptr_->select_alias2index_[select_expr->alias_] = column_index;
             }
+        } else {
+            const String select_expr_name = select_expr->GetName();
+            if(bind_context_ptr_->select_expr_name2index_.contains(select_expr_name)) {
+                LOG_TRACE("Same expression: {} had already been found in select list index: {}",
+                          select_expr_name,
+                          bind_context_ptr_->select_expr_name2index_[select_expr_name]);
+                // TODO: create an map from secondary expression to the primary one.
+            } else {
+                bind_context_ptr_->select_expr_name2index_[select_expr_name] = column_index;
+            }
         }
     }
 
@@ -618,23 +628,30 @@ QueryBinder::BuildGroupByHaving(SharedPtr<QueryContext>& query_context,
                                 const hsql::SelectStatement& select,
                                 const SharedPtr<BindAliasProxy>& bind_alias_proxy,
                                 SharedPtr<BoundSelectStatement>& select_statement) {
+    u64 table_index = bind_context_ptr_->GenerateTableIndex();
+    bind_context_ptr_->group_by_table_index_ = table_index;
+    bind_context_ptr_->group_by_table_name_ = "groupby" + std::to_string(table_index);
+
+    table_index = bind_context_ptr_->GenerateTableIndex();
+    bind_context_ptr_->aggregate_table_index_ = table_index;
+    bind_context_ptr_->aggregate_table_name_ = "aggregate" + std::to_string(table_index);
+
     if(select.groupBy != nullptr) {
-        bind_context_ptr_->group_by_table_index_ = bind_context_ptr_->GenerateTableIndex();
         // Start to bind GROUP BY clause
         // Set group binder
         auto group_binder = MakeShared<GroupBinder>(query_context, bind_alias_proxy);
 
         // Reserve the group names used in GroupBinder::BuildExpression
-        this->bind_context_ptr_->group_names_.reserve(select.groupBy->columns->size());
-        for (i64 idx = 0; const hsql::Expr* expr: *select.groupBy->columns) {
+        SizeT group_count = select.groupBy->columns->size();
+        bind_context_ptr_->group_exprs_.reserve(group_count);
+        for(i64 idx = 0; idx < group_count; ++ idx) {
             // set group-by expression index
             group_binder->group_by_expr_index = idx;
+            const hsql::Expr& expr = *(*select.groupBy->columns)[0];
 
             // Call GroupBinder BuildExpression
-            SharedPtr<BaseExpression> group_by_expr = group_binder->Bind(*expr, this->bind_context_ptr_, 0, true);
+            SharedPtr<BaseExpression> group_by_expr = group_binder->Bind(expr, this->bind_context_ptr_, 0, true);
             select_statement->group_by_expressions_.emplace_back(group_by_expr);
-
-            ++ idx;
         }
     }
 

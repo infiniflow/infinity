@@ -151,11 +151,11 @@ ExpressionBinder::BuildColExpr(const hsql::Expr &expr,
 }
 
 SharedPtr<BaseExpression>
-ExpressionBinder::BuildColExpr(const SharedPtr<ParsedColumnExpression>& expr,
+ExpressionBinder::BuildColExpr(const SharedPtr<ParsedColumnExpression>& parsed_column_expr,
                                const SharedPtr<BindContext>& bind_context_ptr,
                                i64 depth,
                                bool root) {
-    ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, expr);
+    ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, parsed_column_expr);
     SharedPtr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, 0);
     return column_expr;
 }
