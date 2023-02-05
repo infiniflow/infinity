@@ -39,7 +39,7 @@ OrderBinder::BuildExpression(const hsql::Expr &expr,
                              bool root) {
     i64 column_id = -1;
 
-    // If the expr is from project, then create a column reference from project.
+    // If the expr is from projection, then create a column reference from projection.
     if(expr.type == hsql::kExprLiteralInt) {
         column_id = expr.ival;
         if (column_id >= bind_context_ptr->project_exprs_.size()) {

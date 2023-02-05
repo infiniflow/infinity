@@ -69,6 +69,12 @@ public:
     SharedPtr<BaseExpression> limit_expression_{};
     SharedPtr<BaseExpression> offset_expression_{};
 
+    // Pruned output expression list
+    Vector<SharedPtr<BaseExpression>> pruned_expression_{};
+
+    // Output name
+    Vector<String> output_names_{};
+
     bool distinct_ = false;
 
     i64

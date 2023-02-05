@@ -55,6 +55,12 @@ BoundSelectStatement::BuildPlan() {
         root = limit;
     }
 
+    if(!pruned_expression_.empty()) {
+        auto pruned_project = MakeShared<LogicalProject>(pruned_expression_);
+        pruned_project->set_left_node(root);
+        root = pruned_project;
+    }
+
     return root;
 }
 

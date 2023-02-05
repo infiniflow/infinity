@@ -73,8 +73,9 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     // Star expression will be unfolded and bound as column expressions.
     bind_context_ptr_->select_expression_ = UnfoldStarExpression(query_context_ptr_, *statement.selectList);
 
-    i64 column_count = bind_context_ptr_->select_expression_.size();
-    for(i64 column_index = 0; column_index < column_count; ++ column_index) {
+    i64 select_column_count = bind_context_ptr_->select_expression_.size();
+    bound_select_statement->output_names_.reserve(select_column_count);
+    for(i64 column_index = 0; column_index < select_column_count; ++ column_index) {
         const SharedPtr<ParsedExpression>& select_expr = bind_context_ptr_->select_expression_[column_index];
         // Bound column expression is bound due to the star expression, which won't be referenced in other place.
         // Only consider the Raw Expression case.
@@ -97,6 +98,8 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
                 bind_context_ptr_->select_expr_name2index_[select_expr_name] = column_index;
             }
         }
+
+        bound_select_statement->output_names_.emplace_back(select_expr->ToString());
     }
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
@@ -135,6 +138,11 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     // 13. LIMIT
     if(statement.limit !=nullptr) {
         BuildLimit(query_context_ptr_, statement, bound_select_statement);
+    }
+
+    // Trying to check if order by import new invisible column in project
+    if(select_column_count < bound_select_statement->projection_expressions_.size()) {
+        PruneOutput(query_context_ptr_, select_column_count, bound_select_statement);
     }
 
     // 14. TOP
@@ -769,7 +777,7 @@ QueryBinder::BuildOrderBy(SharedPtr<QueryContext>& query_context,
 void
 QueryBinder::BuildLimit(SharedPtr<QueryContext>& query_context,
                         const hsql::SelectStatement& statement,
-                        SharedPtr<BoundSelectStatement>& bound_statement) {
+                        SharedPtr<BoundSelectStatement>& bound_statement) const {
     auto limit_binder = MakeShared<LimitBinder>(query_context);
     bound_statement->limit_expression_
             = limit_binder->Bind(*statement.limit->limit, this->bind_context_ptr_, 0, true);
@@ -777,6 +785,28 @@ QueryBinder::BuildLimit(SharedPtr<QueryContext>& query_context,
     if(statement.limit->offset != nullptr) {
         bound_statement->offset_expression_
                 = limit_binder->Bind(*statement.limit->offset, this->bind_context_ptr_, 0, true);
+    }
+}
+
+void
+QueryBinder::PruneOutput(SharedPtr<QueryContext>& query_context,
+                         i64 select_column_count,
+                         SharedPtr<BoundSelectStatement>& bound_statement) {
+    Vector<SharedPtr<BaseExpression>>& pruned_expressions = bound_statement->pruned_expression_;
+    Vector<SharedPtr<BaseExpression>>& projection_expressions = bound_statement->projection_expressions_;
+    Vector<String>& output_names = bound_statement->output_names_;
+
+    pruned_expressions.reserve(select_column_count);
+
+    for(i64 column_id = 0; column_id < select_column_count; ++ column_id) {
+        const SharedPtr<BaseExpression>& expr = projection_expressions[column_id];
+        SharedPtr<ColumnExpression> result = ColumnExpression::Make(expr->Type(),
+                                                                    bind_context_ptr_->project_table_name_,
+                                                                    output_names[column_id],
+                                                                    column_id,
+                                                                    0);
+        result->source_position_ = SourcePosition(bind_context_ptr_->binding_context_id_, ExprSourceType::kProjection);
+        pruned_expressions.emplace_back(result);
     }
 }
 
