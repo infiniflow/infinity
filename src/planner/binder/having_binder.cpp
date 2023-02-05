@@ -56,7 +56,7 @@ HavingBinder::BuildExpression(const hsql::Expr &expr,
         }
     }
 
-    return ExpressionBinder::Bind(expr, bind_context_ptr, 0, false);
+    return ExpressionBinder::BuildExpression(expr, bind_context_ptr, 0, false);
 }
 
 SharedPtr<BaseExpression>

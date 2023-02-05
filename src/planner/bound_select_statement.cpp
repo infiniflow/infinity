@@ -43,6 +43,13 @@ BoundSelectStatement::BuildPlan() {
         root = aggregate;
     }
 
+    if(!having_expressions_.empty()) {
+        // Build logical filter
+        auto having_filter = BuildFilter(root, having_expressions_);
+        having_filter->set_left_node(root);
+        root = having_filter;
+    }
+
     auto project = MakeShared<LogicalProject>(projection_expressions_, projection_index_);
     project->set_left_node(root);
     root = project;

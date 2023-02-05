@@ -685,13 +685,11 @@ QueryBinder::BuildHaving(SharedPtr<QueryContext>& query_context,
         // Start to bind Having clause
         // Set having binder
         auto having_binder = MakeShared<HavingBinder>(query_context, bind_alias_proxy);
-        for (const hsql::Expr* expr: *select.groupBy->having->exprList) {
-
-            // Call HavingBinder BuildExpression
-            SharedPtr<BaseExpression> having_expr = having_binder->Bind(*expr, this->bind_context_ptr_, 0, true);
-            select_statement->having_expressions_.emplace_back(having_expr);
-
-        }
+        SharedPtr<BaseExpression> having_expr = having_binder->Bind(*(select.groupBy->having),
+                                                                    bind_context_ptr_,
+                                                                    0,
+                                                                    true);
+        select_statement->having_expressions_ = SplitExpressionByDelimiter(having_expr, ConjunctionType::kAnd);
     }
 }
 
