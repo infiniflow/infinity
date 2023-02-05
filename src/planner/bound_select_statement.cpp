@@ -19,6 +19,7 @@
 #include "planner/node/logical_dummy_scan.h"
 #include "expression/expression_transformer.h"
 #include "planner/node/logical_sort.h"
+#include "planner/node/logical_aggregate.h"
 
 namespace infinity {
 
@@ -32,11 +33,17 @@ BoundSelectStatement::BuildPlan() {
         root = filter;
     }
 
-    if(!group_by_expressions_.empty()) {
-        ;
+    if(!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
+        // Build logical aggregate
+        auto aggregate = MakeShared<LogicalAggregate>(group_by_expressions_,
+                                                      groupby_index_,
+                                                      aggregate_expressions_,
+                                                      aggregate_index_);
+        aggregate->set_left_node(root);
+        root = aggregate;
     }
 
-    auto project = MakeShared<LogicalProject>(projection_expressions_);
+    auto project = MakeShared<LogicalProject>(projection_expressions_, projection_index_);
     project->set_left_node(root);
     root = project;
 
@@ -56,7 +63,7 @@ BoundSelectStatement::BuildPlan() {
     }
 
     if(!pruned_expression_.empty()) {
-        auto pruned_project = MakeShared<LogicalProject>(pruned_expression_);
+        auto pruned_project = MakeShared<LogicalProject>(pruned_expression_, result_index_);
         pruned_project->set_left_node(root);
         root = pruned_project;
     }

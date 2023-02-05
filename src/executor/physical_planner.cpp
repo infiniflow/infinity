@@ -40,6 +40,7 @@
 #include "executor/operator/physical_dummy_scan.h"
 #include "planner/node/logical_filter.h"
 #include "planner/node/logical_limit.h"
+#include "planner/node/logical_aggregate.h"
 
 #include <limits>
 
@@ -224,7 +225,19 @@ PhysicalPlanner::BuildAlter(const SharedPtr<LogicalNode> &logical_operator) cons
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalAggregate>(logical_operator->node_id());
+    auto input_logical_node = logical_operator->left_node();
+    PlannerAssert(logical_operator->right_node() == nullptr,
+                  "Aggregate project node shouldn't have right child.");
+    SharedPtr<LogicalAggregate> logical_aggregate = std::static_pointer_cast<LogicalAggregate>(logical_operator);
+    SharedPtr<PhysicalOperator> input_physical_operator{};
+    if(input_logical_node != nullptr) {
+        input_physical_operator = BuildPhysicalOperator(input_logical_node);
+    }
+
+    return MakeShared<PhysicalAggregate>(logical_aggregate->node_id(),
+                                         input_physical_operator,
+                                         logical_aggregate->groups_,
+                                         logical_aggregate->aggregates_);
 }
 
 SharedPtr<PhysicalOperator>

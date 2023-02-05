@@ -115,9 +115,10 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     }
 
     // 7. GROUP BY
+    BuildGroupBy(query_context_ptr_, statement, bind_alias_proxy, bound_select_statement);
     // 8. WITH CUBE / WITH ROLLUP
     // 9. HAVING
-    BuildGroupByHaving(query_context_ptr_, statement, bind_alias_proxy, bound_select_statement);
+    BuildHaving(query_context_ptr_, statement, bind_alias_proxy, bound_select_statement);
 
     // 10. DISTINCT
     bound_select_statement->distinct_ = statement.selectDistinct;
@@ -150,6 +151,11 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     // 16. LIMIT
     // 17. ORDER BY
     // 18. TOP
+
+    bound_select_statement->projection_index_ = bind_context_ptr_->project_table_index_;
+    bound_select_statement->groupby_index_ = bind_context_ptr_->group_by_table_index_;
+    bound_select_statement->aggregate_index_ = bind_context_ptr_->aggregate_table_index_;
+    bound_select_statement->result_index_ = bind_context_ptr_->result_index_;
 
     return bound_select_statement;
 }
@@ -637,17 +643,13 @@ QueryBinder::UnfoldStarExpression(SharedPtr<QueryContext>& query_context,
 }
 
 void
-QueryBinder::BuildGroupByHaving(SharedPtr<QueryContext>& query_context,
-                                const hsql::SelectStatement& select,
-                                const SharedPtr<BindAliasProxy>& bind_alias_proxy,
-                                SharedPtr<BoundSelectStatement>& select_statement) {
+QueryBinder::BuildGroupBy(SharedPtr<QueryContext>& query_context,
+                          const hsql::SelectStatement& select,
+                          const SharedPtr<BindAliasProxy>& bind_alias_proxy,
+                          SharedPtr<BoundSelectStatement>& select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->group_by_table_index_ = table_index;
     bind_context_ptr_->group_by_table_name_ = "groupby" + std::to_string(table_index);
-
-    table_index = bind_context_ptr_->GenerateTableIndex();
-    bind_context_ptr_->aggregate_table_index_ = table_index;
-    bind_context_ptr_->aggregate_table_name_ = "aggregate" + std::to_string(table_index);
 
     if(select.groupBy != nullptr) {
         // Start to bind GROUP BY clause
@@ -667,6 +669,16 @@ QueryBinder::BuildGroupByHaving(SharedPtr<QueryContext>& query_context,
             select_statement->group_by_expressions_.emplace_back(group_by_expr);
         }
     }
+}
+
+void
+QueryBinder::BuildHaving(SharedPtr<QueryContext>& query_context,
+                         const hsql::SelectStatement& select,
+                         const SharedPtr<BindAliasProxy>& bind_alias_proxy,
+                         SharedPtr<BoundSelectStatement>& select_statement) {
+    u64 table_index = bind_context_ptr_->GenerateTableIndex();
+    bind_context_ptr_->aggregate_table_index_ = table_index;
+    bind_context_ptr_->aggregate_table_name_ = "aggregate" + std::to_string(table_index);
 
     // All having expr must appear in group by list or aggregate function list.
     if(select.groupBy != nullptr && select.groupBy->having != nullptr) {
@@ -706,6 +718,7 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
     for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
         const SharedPtr<ParsedExpression>& select_expr = bind_context_ptr_->select_expression_[column_id];
         SharedPtr<BaseExpression> bound_expr = nullptr;
+        String expr_name;
         switch(select_expr->type_) {
             case ExpressionType::kColumn: {
                 // This part is from unfold star expression, no alias
@@ -715,6 +728,7 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
                                                                             this->bind_context_ptr_,
                                                                             0,
                                                                             true);
+                expr_name = parsed_col_expr->ToString();
                 break;
             }
             case ExpressionType::kRaw: {
@@ -725,13 +739,13 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
                                                   this->bind_context_ptr_,
                                                   0,
                                                   true);
+                expr_name = parsed_raw_expr->ToString();
                 break;
             }
             default: {
                 PlannerError("Invalid type in select list.")
             }
         }
-        const String& expr_name = bound_expr->ToString();
         if(!(bind_context_ptr_->project_index_by_name_.contains(expr_name))) {
             bind_context_ptr_->project_index_by_name_[expr_name] = column_id;
         }

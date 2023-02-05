@@ -13,7 +13,7 @@ PhysicalAggregate::Init() {
 
 void
 PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
-
+    this->output_ = this->left_->output();
 }
 
 }

@@ -73,10 +73,16 @@ private:
                          const Vector<hsql::Expr *> &select_list);
 
     void
-    BuildGroupByHaving(SharedPtr<QueryContext>& query_context,
-                       const hsql::SelectStatement& select,
-                       const SharedPtr<BindAliasProxy>& bind_alias_proxy,
-                       SharedPtr<BoundSelectStatement>& select_statement);
+    BuildGroupBy(SharedPtr<QueryContext>& query_context,
+                 const hsql::SelectStatement& select,
+                 const SharedPtr<BindAliasProxy>& bind_alias_proxy,
+                 SharedPtr<BoundSelectStatement>& select_statement);
+
+    void
+    BuildHaving(SharedPtr<QueryContext>& query_context,
+                const hsql::SelectStatement& select,
+                const SharedPtr<BindAliasProxy>& bind_alias_proxy,
+                SharedPtr<BoundSelectStatement>& select_statement);
 
     void
     PushOrderByToProject(SharedPtr<QueryContext>& query_context,

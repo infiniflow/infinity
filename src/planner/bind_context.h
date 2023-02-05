@@ -95,6 +95,7 @@ public:
     HashMap<String, i64> project_index_by_name_;
 //    Vector<String> project_names_;
 //    HashMap<String, SharedPtr<BaseExpression>> project_by_name_;
+    u64 result_index_{0};
 
     // Bound CTE
     HashSet<SharedPtr<CommonTableExpressionInfo>> bound_cte_set_;

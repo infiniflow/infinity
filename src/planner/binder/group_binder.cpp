@@ -15,25 +15,32 @@ GroupBinder::BuildExpression(const hsql::Expr &expr,
                              const SharedPtr<BindContext>& bind_context_ptr,
                              i64 depth,
                              bool root) {
+    SharedPtr<BaseExpression> result = nullptr;
+
     if(depth == 0 && root) {
         switch(expr.type) {
             case hsql::kExprLiteralInt: {
                 // Group by the expression of the given index in select list;
                 // For example: select a, sum(a) from t1 group by 1; # group by a
-                return BindConstantExpression(expr, bind_context_ptr);
+                result = BindConstantExpression(expr, bind_context_ptr);
+                break;
             }
             case hsql::kExprColumnRef: {
                 // Group by the column expression.
                 // For example: select a as x from t1 group by x;
-                return BindColumnReference(expr, bind_context_ptr);
+                result = BindColumnReference(expr, bind_context_ptr);
+                break;
             }
         }
     }
 
-    SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr,
-                                                                         bind_context_ptr,
-                                                                         depth,
-                                                                         root);
+    if(result == nullptr) {
+        // Group by expr isn't constant int or column expression same as select list.
+        result = ExpressionBinder::BuildExpression(expr,
+                                                   bind_context_ptr,
+                                                   depth,
+                                                   root);
+    }
 
     if(root) {
         String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();

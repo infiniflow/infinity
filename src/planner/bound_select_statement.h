@@ -87,6 +87,11 @@ public:
 //    BuildPlan() override {
 //        return this->logical_plan_;
 //    }
+
+    u64 groupby_index_{0};
+    u64 aggregate_index_{0};
+    u64 projection_index_{0};
+    u64 result_index_{0};
 };
 
 }
