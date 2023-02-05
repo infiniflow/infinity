@@ -11,7 +11,7 @@ namespace infinity {
 class SubqueryFlattener {
 public:
     explicit
-    SubqueryFlattener(SharedPtr<BoundSelectStatement>& bound_select_statement, SharedPtr<BindContext> &bind_context_ptr);
+    SubqueryFlattener(SharedPtr<BoundSelectStatement>& bound_select_statement, SharedPtr<BindContext>& bind_context_ptr);
 
     SharedPtr<BoundSelectStatement>
     GetResult();

@@ -12,7 +12,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 HavingBinder::BuildExpression(const hsql::Expr &expr,
-                              const SharedPtr<BindContext> &bind_context_ptr,
+                              const SharedPtr<BindContext>& bind_context_ptr,
                               i64 depth,
                               bool root) {
 

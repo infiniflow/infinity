@@ -9,7 +9,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 LimitBinder::BuildExpression(const hsql::Expr &expr,
-                             const SharedPtr<BindContext> &bind_context_ptr,
+                             const SharedPtr<BindContext>& bind_context_ptr,
                              i64 depth,
                              bool root) {
     switch(expr.type) {

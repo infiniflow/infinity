@@ -12,7 +12,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 GroupBinder::BuildExpression(const hsql::Expr &expr,
-                             const SharedPtr<BindContext> &bind_context_ptr,
+                             const SharedPtr<BindContext>& bind_context_ptr,
                              i64 depth,
                              bool root) {
     if(depth == 0 && root) {

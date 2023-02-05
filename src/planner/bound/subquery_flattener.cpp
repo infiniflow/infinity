@@ -9,7 +9,7 @@
 namespace infinity {
 
 SubqueryFlattener::SubqueryFlattener(SharedPtr<BoundSelectStatement>& bound_select_statement,
-                                     SharedPtr<BindContext> &bind_context_ptr)
+                                     SharedPtr<BindContext>& bind_context_ptr)
                                      : bound_select_statement_(bound_select_statement), bind_context_ptr_(bind_context_ptr)
                                      {}
 

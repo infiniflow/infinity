@@ -79,13 +79,17 @@ private:
                        SharedPtr<BoundSelectStatement>& select_statement);
 
     void
+    PushOrderByToProject(SharedPtr<QueryContext>& query_context,
+                         const hsql::SelectStatement& statement);
+
+    void
     BuildSelectList(SharedPtr<QueryContext>& query_context,
                     SharedPtr<BoundSelectStatement>& select_statement);
 
     void
     BuildOrderBy(SharedPtr<QueryContext>& query_context,
                  const hsql::SelectStatement& statement,
-                 SharedPtr<BoundSelectStatement>& bound_statement);
+                 SharedPtr<BoundSelectStatement>& bound_statement) const;
 
     void
     BuildLimit(SharedPtr<QueryContext>& query_context,

@@ -132,6 +132,10 @@ TEST_F(LogicalPlannerTest, test1) {
         const String sql_text = "select a+1 from t1;";
         RunSQL(sql_text, true);
     }
+    {
+        const String sql_text = "select a+1 from t1 order by b;";
+        RunSQL(sql_text, true);
+    }
 //    {
 //        // Only check the ast.
 //        const String sql_text = "(SELECT * FROM students INTERSECT SELECT * FROM students_2) UNION SELECT * FROM students_3 ORDER BY grade ASC;";

@@ -119,6 +119,11 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     // 10. DISTINCT
     bound_select_statement->distinct_ = statement.selectDistinct;
 
+    // Push order by expression to projection
+    if(statement.order != nullptr) {
+        PushOrderByToProject(query_context_ptr_, statement);
+    }
+
     // 11. SELECT (not flatten subquery)
     BuildSelectList(query_context_ptr_, bound_select_statement);
 
@@ -671,69 +676,61 @@ QueryBinder::BuildGroupByHaving(SharedPtr<QueryContext>& query_context,
 }
 
 void
+QueryBinder::PushOrderByToProject(SharedPtr<QueryContext>& query_context,
+                                  const hsql::SelectStatement& statement) {
+    for(const hsql::OrderDescription* order_desc: *statement.order) {
+        OrderBinder::PushExtraExprToSelectList(order_desc->expr, bind_context_ptr_);
+    }
+}
+
+void
 QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
                              SharedPtr<BoundSelectStatement>& bound_select_statement) {
+    u64 table_index = bind_context_ptr_->GenerateTableIndex();
+    bind_context_ptr_->project_table_index_ = table_index;
+    bind_context_ptr_->project_table_name_ = "project" + std::to_string(table_index);
+
     auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
-    this->bind_context_ptr_->project_names_.reserve(bind_context_ptr_->select_expression_.size());
-    bound_select_statement->projection_expressions_.reserve(bind_context_ptr_->select_expression_.size());
-    for (const SharedPtr<ParsedExpression>& select_expr : bind_context_ptr_->select_expression_) {
+
+    SizeT column_count = bind_context_ptr_->select_expression_.size();
+    bind_context_ptr_->project_exprs_.reserve(column_count);
+    bound_select_statement->projection_expressions_.reserve(column_count);
+    for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+        const SharedPtr<ParsedExpression>& select_expr = bind_context_ptr_->select_expression_[column_id];
+        SharedPtr<BaseExpression> bound_expr = nullptr;
         switch(select_expr->type_) {
             case ExpressionType::kColumn: {
                 // This part is from unfold star expression, no alias
                 SharedPtr<ParsedColumnExpression> parsed_col_expr
                         = std::static_pointer_cast<ParsedColumnExpression>(select_expr);
-                const String& expr_name_ref = parsed_col_expr->ToString();
-                SharedPtr<BaseExpression> bound_expr = project_binder->ExpressionBinder::BuildColExpr(parsed_col_expr,
-                                                                                                      this->bind_context_ptr_,
-                                                                                                      0,
-                                                                                                      true);
-                if(!this->bind_context_ptr_->project_by_name_.contains(expr_name_ref)) {
-                    this->bind_context_ptr_->project_by_name_.emplace(expr_name_ref, bound_expr);
-                }
-                this->bind_context_ptr_->project_names_.emplace_back(expr_name_ref);
-
-                // Insert the bound expression into projection expressions of select node.
-                bound_select_statement->projection_expressions_.emplace_back(bound_expr);
+                bound_expr = project_binder->ExpressionBinder::BuildColExpr(parsed_col_expr,
+                                                                            this->bind_context_ptr_,
+                                                                            0,
+                                                                            true);
                 break;
             }
             case ExpressionType::kRaw: {
-                String expr_name;
-                SharedPtr<BaseExpression> bound_expr;
                 SharedPtr<ParsedRawExpression> parsed_raw_expr
                         = std::static_pointer_cast<ParsedRawExpression>(select_expr);
 
-                if(parsed_raw_expr->raw_expr_->getName() == nullptr) {
-                    // Constant value in select list, call build value expression directly.
-                    bound_expr = project_binder->Bind(*parsed_raw_expr->raw_expr_,
-                                                      this->bind_context_ptr_,
-                                                      0,
-                                                      true);
-                    expr_name = bound_expr->ToString();
-                    this->bind_context_ptr_->project_by_name_.emplace(expr_name, bound_expr);
-                } else {
-                    expr_name = parsed_raw_expr->raw_expr_->getName();
-
-                    // Alias already been bound and insert into project_by_name_ of bind context;
-                    bound_expr = this->bind_context_ptr_->project_by_name_[expr_name];
-                    if(bound_expr == nullptr) {
-                        bound_expr = project_binder->Bind(*parsed_raw_expr->raw_expr_,
-                                                          this->bind_context_ptr_,
-                                                          0,
-                                                          true);
-                        this->bind_context_ptr_->project_by_name_.emplace(expr_name, bound_expr);
-                    }
-                }
-
-                this->bind_context_ptr_->project_names_.emplace_back(expr_name);
-
-                // Insert the bound expression into projection expressions of select node.
-                bound_select_statement->projection_expressions_.emplace_back(bound_expr);
+                bound_expr = project_binder->Bind(*parsed_raw_expr->raw_expr_,
+                                                  this->bind_context_ptr_,
+                                                  0,
+                                                  true);
                 break;
             }
             default: {
                 PlannerError("Invalid type in select list.")
             }
         }
+        const String& expr_name = bound_expr->ToString();
+        if(!(bind_context_ptr_->project_index_by_name_.contains(expr_name))) {
+            bind_context_ptr_->project_index_by_name_[expr_name] = column_id;
+        }
+        bind_context_ptr_->project_exprs_.emplace_back(bound_expr);
+
+        // Insert the bound expression into projection expressions of select node.
+        bound_select_statement->projection_expressions_.emplace_back(bound_expr);
     }
 
     if(!bound_select_statement->having_expressions_.empty() || !bound_select_statement->group_by_expressions_.empty()) {
@@ -747,9 +744,9 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
 void
 QueryBinder::BuildOrderBy(SharedPtr<QueryContext>& query_context,
                           const hsql::SelectStatement& statement,
-                          SharedPtr<BoundSelectStatement>& bound_statement) {
+                          SharedPtr<BoundSelectStatement>& bound_statement) const {
     auto order_binder = MakeShared<OrderBinder>(query_context);
-    size_t order_by_count = statement.order->size();
+    SizeT order_by_count = statement.order->size();
     bound_statement->order_by_expressions_.reserve(order_by_count);
     bound_statement->order_by_types_.reserve(order_by_count);
     for(const hsql::OrderDescription* order_desc: *statement.order) {

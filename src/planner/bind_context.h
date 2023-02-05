@@ -90,8 +90,11 @@ public:
 
     // Bound expr in select list
     u64 project_table_index_{0};
-    Vector<String> project_names_;
-    HashMap<String, SharedPtr<BaseExpression>> project_by_name_;
+    String project_table_name_{};
+    Vector<SharedPtr<BaseExpression>> project_exprs_;
+    HashMap<String, i64> project_index_by_name_;
+//    Vector<String> project_names_;
+//    HashMap<String, SharedPtr<BaseExpression>> project_by_name_;
 
     // Bound CTE
     HashSet<SharedPtr<CommonTableExpressionInfo>> bound_cte_set_;

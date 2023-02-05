@@ -12,7 +12,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 ProjectBinder::BuildExpression(const hsql::Expr &expr,
-                               const SharedPtr<BindContext> &bind_context_ptr,
+                               const SharedPtr<BindContext>& bind_context_ptr,
                                i64 depth,
                                bool root) {
     String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();

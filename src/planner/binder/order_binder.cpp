@@ -5,61 +5,73 @@
 #include "order_binder.h"
 #include "function/function_set.h"
 #include "parser/statement.h"
+#include "parser/expression/parsed_raw_expression.h"
+#include "expression/column_expression.h"
 
 namespace infinity {
 
+void
+OrderBinder::PushExtraExprToSelectList(const hsql::Expr *expr, const SharedPtr<BindContext>& bind_context_ptr) {
+    if(expr->type == hsql::kExprLiteralInt) {
+        // Order by 1, means order by 1st select list item.
+        return ;
+    }
+
+    String expr_name = Statement::ExprAsColumnName(expr);
+
+    if(bind_context_ptr->select_alias2index_.contains(expr_name)) {
+        return ;
+    }
+
+    if(bind_context_ptr->select_expr_name2index_.contains(expr_name)) {
+        return ;
+    }
+
+    bind_context_ptr->select_expr_name2index_[expr_name] = bind_context_ptr->select_expression_.size();
+    SharedPtr<ParsedRawExpression> raw_expr = MakeShared<ParsedRawExpression>(expr);
+    bind_context_ptr->select_expression_.emplace_back(raw_expr);
+}
+
 SharedPtr<BaseExpression>
 OrderBinder::BuildExpression(const hsql::Expr &expr,
-                             const SharedPtr<BindContext> &bind_context_ptr,
+                             const SharedPtr<BindContext>& bind_context_ptr,
                              i64 depth,
                              bool root) {
+    i64 column_id = -1;
+
+    // If the expr is from project, then create a column reference from project.
     if(expr.type == hsql::kExprLiteralInt) {
-        i64 column_id = expr.ival;
-        if(column_id >= bind_context_ptr->project_names_.size()) {
+        column_id = expr.ival;
+        if (column_id >= bind_context_ptr->project_exprs_.size()) {
             PlannerError("Order by are going to use nonexistent column from select list.")
         }
-        const String& column_name_of_project = bind_context_ptr->project_names_[column_id];
-        return bind_context_ptr->project_by_name_[column_name_of_project];
+
+
     }
 
-    SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
+    String expr_name = Statement::ExprAsColumnName(&expr);
+
+    if(bind_context_ptr->select_alias2index_.contains(expr_name)) {
+        column_id = bind_context_ptr->select_alias2index_[expr_name];
+    }
+
+    if(bind_context_ptr->select_expr_name2index_.contains(expr_name)) {
+        column_id = bind_context_ptr->select_expr_name2index_[expr_name];
+    }
+
+    if(column_id == -1) {
+        PlannerError(expr_name + " isn't found in project list.")
+    }
+
+    const SharedPtr<BaseExpression>& project_expr = bind_context_ptr->project_exprs_[column_id - 1];
+
+    SharedPtr<ColumnExpression> result = ColumnExpression::Make(project_expr->Type(),
+                                                                bind_context_ptr->project_table_name_,
+                                                                std::to_string(column_id),
+                                                                column_id - 1,
+                                                                depth);
+    result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kProjection);
     return result;
-}
-
-SharedPtr<BaseExpression>
-OrderBinder::BuildColExpr(const hsql::Expr &expr,
-                          const SharedPtr<BindContext>& bind_context_ptr,
-                          i64 depth,
-                          bool root) {
-    // Order by related column must come from project list
-    String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();
-
-    auto bound_expr_ptr = bind_context_ptr->project_by_name_[expr_name];
-
-    if(bound_expr_ptr) {
-        return bound_expr_ptr;
-    }
-
-    // Not found in current project list
-    bound_expr_ptr = ExpressionBinder::BuildColExpr(expr, bind_context_ptr, depth, root);
-
-    // Store the new bound expression into project list;
-    bind_context_ptr->project_by_name_[expr_name] = bound_expr_ptr;
-    bind_context_ptr->project_names_.emplace_back(expr_name);
-
-    return bound_expr_ptr;
-}
-
-SharedPtr<BaseExpression>
-OrderBinder::BuildFuncExpr(const hsql::Expr &expr,
-                           const SharedPtr<BindContext>& bind_context_ptr,
-                           i64 depth,
-                           bool root) {
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
-    if(function_set_ptr->type_ != FunctionType::kScalar) {
-        PlannerError("Only scalar function is supported in order by list.");
-    }
-    return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 }
 
 }
