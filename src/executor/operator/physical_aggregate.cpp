@@ -70,9 +70,167 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
     GenerateGroupByResult(groupby_table, output_groupby_table);
 
 
+    // input table after group by, each block belong to one group. This is the prerequisites to execute aggregate function.
+    SharedPtr<Table> grouped_input_table;
+    {
+        SizeT column_count = input_table->ColumnCount();
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.reserve(column_count);
+        for(SizeT idx = 0; idx < column_count; ++ idx) {
+            DataType col_type = input_table->GetColumnTypeById(idx);
+            String col_name = input_table->GetColumnNameById(idx);
+
+            SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
+            columns.emplace_back(col_def);
+        }
+
+        SharedPtr<TableDef> table_def = TableDef::Make("grouped_input", columns, false);
+
+        grouped_input_table = Table::Make(table_def, TableType::kGroupBy);
+    }
+    GroupByInputTable(input_table, grouped_input_table);
+
     // 4. generate the result to output
 
     this->output_ = output_groupby_table;
+}
+
+void
+PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, SharedPtr<Table>& grouped_input_table) {
+    SizeT column_count = input_table->ColumnCount();
+
+    // 1. Get output table column types.
+    Vector<DataType> types;
+    types.reserve(column_count);
+    for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+        DataType input_type = input_table->GetColumnTypeById(column_id);
+        DataType output_type = grouped_input_table->GetColumnTypeById(column_id);
+        ExecutorAssert(input_type == output_type,
+                       "Column type doesn't matched: " + input_type.ToString() + " and " + output_type.ToString());
+        types.emplace_back(input_type);
+    }
+
+    // 2. Generate data blocks and append it into output table according to the group by hash table.
+    const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;
+    for(const auto& item: hash_table_.hash_table_) {
+
+        // 2.1 Each hash bucket will be insert in to one data block
+        SharedPtr<DataBlock> output_datablock = DataBlock::Make();
+        SizeT datablock_size = 0;
+        for(const auto& vec_pair: item.second) {
+            datablock_size += vec_pair.second.size();
+        }
+        output_datablock->Init(types, datablock_size);
+
+        // Loop each block
+        SizeT output_row_idx = 0;
+        for(const auto& vec_pair: item.second) {
+            SizeT input_block_id = vec_pair.first;
+
+            // Loop each row of same block
+            for(const auto input_offset: vec_pair.second) {
+
+                // Forloop each column
+                for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+                    switch (types[column_id].type()) {
+                        case LogicalType::kBoolean: {
+                            ((BooleanT *) (output_datablock->column_vectors[column_id]->data()))[output_row_idx]
+                                    = ((BooleanT *) (input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            break;
+                        }
+                        case LogicalType::kTinyInt: {
+                            ((TinyIntT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
+                                    = ((TinyIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            break;
+                        }
+                        case LogicalType::kSmallInt: {
+                            ((SmallIntT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
+                                    = ((SmallIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            break;
+                        }
+                        case LogicalType::kInteger: {
+                            ((IntegerT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
+                                    = ((IntegerT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            break;
+                        }
+                        case LogicalType::kBigInt: {
+                            ((BigIntT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
+                                    = ((BigIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            break;
+                        }
+                        case kHugeInt: {
+                            NotImplementError("HugeInt data shuffle isn't implemented.")
+                        }
+                        case kFloat: {
+                            ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
+                                    = ((FloatT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            break;
+                        }
+                        case kDouble: {
+                            ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
+                                    = ((DoubleT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            break;
+                        }
+                        case kDecimal16: {
+                            NotImplementError("Decimal16 data shuffle isn't implemented.")
+                        }
+                        case kDecimal32: {
+                            NotImplementError("Decimal32 data shuffle isn't implemented.")
+                        }
+                        case kDecimal64: {
+                            NotImplementError("Decimal64 data shuffle isn't implemented.")
+                        }
+                        case kDecimal128: {
+                            NotImplementError("Decimal128 data shuffle isn't implemented.")
+                        }
+                        case kVarchar: {
+                            NotImplementError("Varchar data shuffle isn't implemented.")
+                        }
+                        case kChar: {
+                            NotImplementError("Char data shuffle isn't implemented.")
+                        }
+                        case kDate: {
+                            NotImplementError("Date data shuffle isn't implemented.")
+                        }
+                        case kTime: {
+                            NotImplementError("Time data shuffle isn't implemented.")
+                        }
+                        case kDateTime: {
+                            NotImplementError("Datetime data shuffle isn't implemented.")
+                        }
+                        case kTimestamp: {
+                            NotImplementError("Timestamp data shuffle isn't implemented.")
+                        }
+                        case kTimestampTZ: {
+                            NotImplementError("TimestampTZ data shuffle isn't implemented.")
+                        }
+                        case kInterval: {
+                            NotImplementError("Interval data shuffle isn't implemented.")
+                        }
+                        case kMixed: {
+                            NotImplementError("Heterogeneous data shuffle isn't implemented.")
+                        }
+                        default: {
+                            ExecutorError("Unexpected data type")
+                        }
+                    }
+                }
+
+                ++ output_row_idx;
+            }
+        }
+
+        ExecutorAssert(output_row_idx == datablock_size,
+                       "Expected block size: " + std::to_string(datablock_size)
+                       + ", but only copied data size: " + std::to_string(output_row_idx));
+
+        for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+            output_datablock->column_vectors[column_id]->tail_index_ = datablock_size;
+        }
+
+        output_datablock->Finalize();
+        grouped_input_table->Append(output_datablock);
+    }
 }
 
 void

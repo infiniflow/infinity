@@ -32,6 +32,9 @@ public:
     Execute(SharedPtr<QueryContext>& query_context) override;
 
     void
+    GroupByInputTable(const SharedPtr<Table>& input_table, SharedPtr<Table>& output_table);
+
+    void
     GenerateGroupByResult(const SharedPtr<Table>& input_table, SharedPtr<Table>& output_table);
 
     Vector<SharedPtr<BaseExpression>> groups_{};

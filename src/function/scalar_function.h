@@ -127,10 +127,11 @@ using ScalarFunctionType = std::function<void(const DataBlock&, SharedPtr<Column
 
 class ScalarFunction : public Function {
 public:
-    explicit ScalarFunction(String name,
-                            Vector<DataType> argument_types,
-                            DataType return_type,
-                            ScalarFunctionType function);
+    explicit
+    ScalarFunction(String name,
+                   Vector<DataType> argument_types,
+                   DataType return_type,
+                   ScalarFunctionType function);
 
     void
     CastArgumentTypes(Vector<BaseExpression>& input_arguments);
