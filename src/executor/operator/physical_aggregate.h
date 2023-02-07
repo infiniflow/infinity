@@ -8,6 +8,7 @@
 
 #include "executor/physical_operator.h"
 #include "expression/base_expression.h"
+#include "executor/hash_table.h"
 
 namespace infinity {
 
@@ -30,8 +31,12 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    void
+    GenerateGroupByResult(const SharedPtr<Table>& input_table, SharedPtr<Table>& output_table);
+
     Vector<SharedPtr<BaseExpression>> groups_{};
     Vector<SharedPtr<BaseExpression>> aggregates_{};
+    HashTable hash_table_;
 };
 
 }

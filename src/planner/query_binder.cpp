@@ -662,7 +662,7 @@ QueryBinder::BuildGroupBy(SharedPtr<QueryContext>& query_context,
         for(i64 idx = 0; idx < group_count; ++ idx) {
             // set group-by expression index
             group_binder->group_by_expr_index = idx;
-            const hsql::Expr& expr = *(*select.groupBy->columns)[0];
+            const hsql::Expr& expr = *(*select.groupBy->columns)[idx];
 
             // Call GroupBinder BuildExpression
             SharedPtr<BaseExpression> group_by_expr = group_binder->Bind(expr, this->bind_context_ptr_, 0, true);
