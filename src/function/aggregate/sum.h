@@ -10,6 +10,6 @@
 namespace infinity {
 
 void
-RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr);
+RegisterSumFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

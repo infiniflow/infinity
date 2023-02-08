@@ -4,7 +4,7 @@
 
 #pragma once
 
-
+#include "common/types/internal_types.h"
 
 #include <string>
 #include <functional>
@@ -21,14 +21,30 @@ enum class FunctionType {
 
 class Function {
 public:
-    explicit Function(std::string name, FunctionType type) : name_(std::move(name)), type_(type) {}
-    virtual ~Function() = default;
-    [[nodiscard]] FunctionType type() const { return type_; }
-    [[nodiscard]] const std::string& name() const { return name_; }
+    explicit
+    Function(String name, FunctionType type)
+        : name_(std::move(name)),
+        type_(type)
+        {}
 
-    virtual std::string ToString() const = 0;
+    virtual
+    ~Function() = default;
+
+    [[nodiscard]] inline FunctionType
+    type() const {
+        return type_;
+    }
+
+    [[nodiscard]] inline const String&
+    name() const {
+        return name_;
+    }
+
+    [[nodiscard]] virtual String
+    ToString() const = 0;
+
 protected:
-    std::string name_;
+    String name_;
     FunctionType type_{FunctionType::kInvalid};
 
 };

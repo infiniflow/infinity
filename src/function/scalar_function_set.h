@@ -20,7 +20,7 @@ public:
     GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>>& input_arguments);
 
 private:
-    int64_t
+    static int64_t
     MatchFunctionCost(const ScalarFunction& func,  const Vector<SharedPtr<BaseExpression>>& arguments);
 
     Vector<ScalarFunction> functions_;

@@ -191,7 +191,7 @@ ExpressionBinder::BuildFuncExpr(const hsql::Expr &expr,
         case FunctionType::kAggregate: {
             // SharedPtr<AggregateFunctionSet> aggregate_function_set_ptr
             auto aggregate_function_set_ptr = std::static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
-            AggregateFunction aggregate_function = aggregate_function_set_ptr->GetMostMatchFunction(arguments);
+            AggregateFunction aggregate_function = aggregate_function_set_ptr->GetMostMatchFunction(arguments[0]);
             auto aggregate_function_ptr = MakeShared<AggregateExpression>(aggregate_function, arguments);
             return aggregate_function_ptr;
         }

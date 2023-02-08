@@ -10,14 +10,20 @@ namespace infinity {
 
 class AggregateFunctionSet: public FunctionSet {
 public:
-    explicit AggregateFunctionSet(std::string name): FunctionSet(std::move(name), FunctionType::kAggregate) {}
+    explicit
+    AggregateFunctionSet(String name): FunctionSet(std::move(name),FunctionType::kAggregate) {}
 
-    void AddFunction(const AggregateFunction& func);
+    void
+    AddFunction(const AggregateFunction& func);
 
-    AggregateFunction GetMostMatchFunction(const std::vector<SharedPtr<BaseExpression>>& input_arguments);
+    AggregateFunction
+    GetMostMatchFunction(const SharedPtr<BaseExpression>& input_argument);
 
 private:
-    std::vector<AggregateFunction> functions_;
+    static int64_t
+    MatchFunctionCost(const AggregateFunction& func,  const SharedPtr<BaseExpression>& argument);
+
+    Vector<AggregateFunction> functions_;
 };
 
 }

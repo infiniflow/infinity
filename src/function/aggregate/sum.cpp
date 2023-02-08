@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-struct CountState {
+struct SumState {
 public:
     u64 count;
 
@@ -25,21 +25,21 @@ public:
 };
 
 void
-RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr) {
-    String func_name = "COUNT";
+RegisterSumFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    String func_name = "SUM";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
 
-    AggregateFunction count_boolean
-            = AggregateFunction::UnaryAggregate<CountState, BooleanT, BigIntT>(func_name,
+    AggregateFunction sum_boolean
+            = AggregateFunction::UnaryAggregate<SumState, BooleanT, BigIntT>(func_name,
                                                                                DataType(LogicalType::kBoolean),
                                                                                DataType(LogicalType::kBigInt));
-    function_set_ptr->AddFunction(count_boolean);
-    AggregateFunction count_tinyint
-            = AggregateFunction::UnaryAggregate<CountState, TinyIntT, BigIntT>(func_name,
+    function_set_ptr->AddFunction(sum_boolean);
+    AggregateFunction sum_tinyint
+            = AggregateFunction::UnaryAggregate<SumState, TinyIntT, BigIntT>(func_name,
                                                                                DataType(LogicalType::kTinyInt),
                                                                                DataType(LogicalType::kBigInt));
-    function_set_ptr->AddFunction(count_tinyint);
+    function_set_ptr->AddFunction(sum_tinyint);
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }
 
