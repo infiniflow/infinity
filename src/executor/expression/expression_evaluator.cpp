@@ -17,7 +17,6 @@ ExpressionEvaluator::Execute(const SharedPtr<BaseExpression>& expression,
     input_data_block_ = std::move(input_data_block);
     ExecutorAssert(state != nullptr, "Expression state need to be initialized before.")
     ExecutorAssert(expression != nullptr, "No expression.")
-    ExecutorAssert(output_column_vector->initialized, "column vector should be initialized.")
 
     SizeT row_count = input_data_block_->row_count() == 0 ? 1 : input_data_block_->row_count();
     output_column_vector->Initialize(row_count);
@@ -80,8 +79,8 @@ ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression>& expr,
 
     // 3. Get the aggregate result and append to output column vector.
 
-    // func.finalize_func_(func.GetState(), (ptr_t)(&result));
-
+    ptr_t result_ptr = expr->aggregate_function_.finalize_func_(expr->aggregate_function_.GetState());
+    output_column_vector->AppendByPtr(result_ptr);
 
     in_aggregate_ = false;
     ExecutorError("Aggregate function isn't implemented yet.");

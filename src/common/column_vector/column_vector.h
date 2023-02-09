@@ -32,6 +32,12 @@ enum class ColumnVectorType : i8 {
 // Basic unit of column data vector
 struct ColumnVector {
 public:
+    static inline SharedPtr<ColumnVector>
+    Make(DataType data_type) {
+        return MakeShared<ColumnVector>(std::move(data_type));
+    }
+
+public:
     ColumnVectorType vector_type_ {ColumnVectorType::kInvalid};
 
     DataType data_type_;
