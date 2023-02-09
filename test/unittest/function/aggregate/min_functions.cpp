@@ -11,11 +11,11 @@
 #include "main/infinity.h"
 #include "common/types/info/varchar_info.h"
 #include "storage/catalog.h"
-#include "function/aggregate/max.h"
+#include "function/aggregate/min.h"
 #include "function/aggregate_function_set.h"
 #include "expression/column_expression.h"
 
-class MaxFunctionTest : public BaseTest {
+class MinFunctionTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
@@ -31,14 +31,14 @@ class MaxFunctionTest : public BaseTest {
     }
 };
 
-TEST_F(MaxFunctionTest, max_func) {
+TEST_F(MinFunctionTest, min_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
-    RegisterMaxFunction(catalog_ptr);
+    RegisterMinFunction(catalog_ptr);
 
-    String op = "max";
+    String op = "min";
     SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     SharedPtr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
@@ -51,7 +51,7 @@ TEST_F(MaxFunctionTest, max_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("MAX(Boolean)->Boolean", func.ToString().c_str());
+        EXPECT_STREQ("MIN(Boolean)->Boolean", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -71,7 +71,7 @@ TEST_F(MaxFunctionTest, max_func) {
         BooleanT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_EQ(result, true);
+        EXPECT_FLOAT_EQ(result, false);
     }
 
     {
@@ -83,7 +83,7 @@ TEST_F(MaxFunctionTest, max_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("MAX(TinyInt)->TinyInt", func.ToString().c_str());
+        EXPECT_STREQ("MIN(TinyInt)->TinyInt", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -93,9 +93,8 @@ TEST_F(MaxFunctionTest, max_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        double sum = 0;
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeTinyInt(static_cast<TinyIntT>(i)));
+            data_block.AppendValue(0, Value::MakeTinyInt(i - std::numeric_limits<TinyIntT>::max()));
         }
         data_block.Finalize();
 
@@ -104,7 +103,7 @@ TEST_F(MaxFunctionTest, max_func) {
         TinyIntT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_EQ(result, 127);
+        EXPECT_FLOAT_EQ(result, -128);
     }
 
     {
@@ -116,7 +115,7 @@ TEST_F(MaxFunctionTest, max_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("MAX(SmallInt)->SmallInt", func.ToString().c_str());
+        EXPECT_STREQ("MIN(SmallInt)->SmallInt", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -127,24 +126,16 @@ TEST_F(MaxFunctionTest, max_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeSmallInt(static_cast<SmallIntT>(i)));
+            data_block.AppendValue(0, Value::MakeSmallInt(i - std::numeric_limits<SmallIntT>::max()));
         }
         data_block.Finalize();
-
-        for (SizeT i = 0; i < row_count; ++i) {
-            Value v = data_block.GetValue(0, i);
-            EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
-            EXPECT_EQ(v.value_.small_int, static_cast<SmallIntT>(i));
-        }
-
-        data_block.column_vectors[0];
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         SmallIntT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_EQ(result, row_count - 1);
+        EXPECT_FLOAT_EQ(result, - std::numeric_limits<SmallIntT>::max());
     }
 
     {
@@ -156,7 +147,7 @@ TEST_F(MaxFunctionTest, max_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("MAX(Integer)->Integer", func.ToString().c_str());
+        EXPECT_STREQ("MIN(Integer)->Integer", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -167,7 +158,7 @@ TEST_F(MaxFunctionTest, max_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeInt(static_cast<IntegerT>(2 * i)));
+            data_block.AppendValue(0, Value::MakeInt(i - std::numeric_limits<IntegerT>::max()));
         }
         data_block.Finalize();
 
@@ -176,7 +167,7 @@ TEST_F(MaxFunctionTest, max_func) {
         IntegerT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_EQ(result, 2 * (row_count - 1));
+        EXPECT_EQ(result, - std::numeric_limits<IntegerT>::max());
     }
 
     {
@@ -188,7 +179,7 @@ TEST_F(MaxFunctionTest, max_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("MAX(BigInt)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("MIN(BigInt)->BigInt", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -199,7 +190,7 @@ TEST_F(MaxFunctionTest, max_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeBigInt(static_cast<BigIntT>(2 * i)));
+            data_block.AppendValue(0, Value::MakeBigInt(i - std::numeric_limits<BigIntT>::max()));
         }
         data_block.Finalize();
 
@@ -208,7 +199,7 @@ TEST_F(MaxFunctionTest, max_func) {
         BigIntT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_EQ(result, 2 * (row_count - 1));
+        EXPECT_EQ(result, - std::numeric_limits<BigIntT>::max());
     }
 
     {
@@ -220,7 +211,7 @@ TEST_F(MaxFunctionTest, max_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("MAX(Float)->Float", func.ToString().c_str());
+        EXPECT_STREQ("MIN(Float)->Float", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -231,7 +222,7 @@ TEST_F(MaxFunctionTest, max_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeFloat(static_cast<FloatT>(2 * i)));
+            data_block.AppendValue(0, Value::MakeFloat(static_cast<FloatT>(-2 * (i64)i)));
         }
         data_block.Finalize();
 
@@ -240,7 +231,7 @@ TEST_F(MaxFunctionTest, max_func) {
         FloatT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_FLOAT_EQ(result, 2 * (row_count - 1));
+        EXPECT_FLOAT_EQ(result, FloatT(-2 * (i64)(row_count - 1)));
     }
 
     {
@@ -252,7 +243,7 @@ TEST_F(MaxFunctionTest, max_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("MAX(Double)->Double", func.ToString().c_str());
+        EXPECT_STREQ("MIN(Double)->Double", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -263,7 +254,7 @@ TEST_F(MaxFunctionTest, max_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeDouble(static_cast<DoubleT>(2 * i)));
+            data_block.AppendValue(0, Value::MakeDouble(static_cast<DoubleT>(-2 * (i64)i)));
         }
         data_block.Finalize();
 
@@ -272,7 +263,7 @@ TEST_F(MaxFunctionTest, max_func) {
         DoubleT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_FLOAT_EQ(result, 2 * (row_count - 1));
+        EXPECT_FLOAT_EQ(result, DoubleT(-2 * (i64)(row_count - 1)));
     }
 
     {
@@ -284,7 +275,7 @@ TEST_F(MaxFunctionTest, max_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("MAX(HugeInt)->HugeInt", func.ToString().c_str());
+        EXPECT_STREQ("MIN(HugeInt)->HugeInt", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -295,7 +286,7 @@ TEST_F(MaxFunctionTest, max_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            HugeIntT input(0, 2 * i);
+            HugeIntT input(0, 2 * -i);
             Value v = Value::MakeHugeInt(input);
             data_block.AppendValue(0, v);
         }
@@ -306,7 +297,7 @@ TEST_F(MaxFunctionTest, max_func) {
         HugeIntT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_EQ(result.lower, 2 * (row_count - 1));
+        EXPECT_EQ(result.lower, -2 * (row_count - 1));
     }
 
     {
