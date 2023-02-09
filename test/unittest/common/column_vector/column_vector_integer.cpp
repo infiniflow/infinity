@@ -139,8 +139,8 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value v = Value::MakeTinyInt(static_cast<TinyIntT>(i));
-        column_vector.AppendValue(v);
+        TinyIntT value = static_cast<TinyIntT>(i);
+        column_vector.AppendByPtr((ptr_t)(&value));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
@@ -412,8 +412,8 @@ TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value v = Value::MakeSmallInt(static_cast<SmallIntT>(i));
-        column_vector.AppendValue(v);
+        SmallIntT value = static_cast<SmallIntT>(i);
+        column_vector.AppendByPtr((ptr_t)(&value));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
         EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
@@ -685,8 +685,8 @@ TEST_F(ColumnVectorIntegerTest, flat_int) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value v = Value::MakeInt(static_cast<IntegerT>(i));
-        column_vector.AppendValue(v);
+        IntegerT value = static_cast<IntegerT>(i);
+        column_vector.AppendByPtr((ptr_t)(&value));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
         EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(i));
@@ -958,8 +958,8 @@ TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value v = Value::MakeBigInt(static_cast<BigIntT>(i));
-        column_vector.AppendValue(v);
+        BigIntT value = static_cast<BigIntT>(i);
+        column_vector.AppendByPtr((ptr_t)(&value));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
         EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
@@ -1233,12 +1233,11 @@ TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        HugeIntT input(0, i);
-        Value v = Value::MakeHugeInt(input);
-        column_vector.AppendValue(v);
+        HugeIntT value(0, i);
+        column_vector.AppendByPtr((ptr_t)(&value));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
-        EXPECT_EQ(vx.value_.huge_int, input);
+        EXPECT_EQ(vx.value_.huge_int, value);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }

@@ -1125,10 +1125,226 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
 }
 
 void
+ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
+    StorageAssert(initialized, "Column vector isn't initialized.")
+    StorageAssert(index <= tail_index_,
+                  "Attempt to store value into unavailable row of column vector: "
+                  + std::to_string(index) + ", current column tail index: " + std::to_string(tail_index_)
+                  + ", capacity: " + std::to_string(capacity_))
+
+    // We assume the value_ptr point to the same type data.
+
+    switch(data_type_.type()) {
+
+        case kBoolean: {
+            ((BooleanT*)data_ptr_)[index] = *(BooleanT*)(value_ptr);
+            break;
+        }
+        case kTinyInt: {
+            ((TinyIntT*)data_ptr_)[index] = *(TinyIntT*)(value_ptr);
+            break;
+        }
+        case kSmallInt: {
+            ((SmallIntT*)data_ptr_)[index] = *(SmallIntT*)(value_ptr);
+            break;
+        }
+        case kInteger: {
+            ((IntegerT*)data_ptr_)[index] = *(IntegerT*)(value_ptr);
+            break;
+        }
+        case kBigInt: {
+            ((BigIntT*)data_ptr_)[index] = *(BigIntT*)(value_ptr);
+            break;
+        }
+        case kHugeInt: {
+            ((HugeIntT*)data_ptr_)[index] = *(HugeIntT*)(value_ptr);
+            break;
+        }
+        case kFloat: {
+            ((FloatT*)data_ptr_)[index] = *(FloatT*)(value_ptr);
+            break;
+        }
+        case kDouble: {
+            ((DoubleT*)data_ptr_)[index] = *(DoubleT*)(value_ptr);
+            break;
+        }
+        case kDecimal16: {
+            ((Decimal16T*)data_ptr_)[index] = *(Decimal16T*)(value_ptr);
+            break;
+        }
+        case kDecimal32: {
+            ((Decimal32T*)data_ptr_)[index] = *(Decimal32T*)(value_ptr);
+            break;
+        }
+        case kDecimal64: {
+            ((Decimal64T*)data_ptr_)[index] = *(Decimal64T*)(value_ptr);
+            break;
+        }
+        case kDecimal128: {
+            ((Decimal128T*)data_ptr_)[index] = *(Decimal128T*)(value_ptr);
+            break;
+        }
+        case kVarchar: {
+            // Copy string
+            auto* varchar_ptr = (VarcharT*)(value_ptr);
+            u16 varchar_len = varchar_ptr->length;
+            if(varchar_len <= VarcharType::INLINE_LENGTH) {
+                // Only prefix is enough to contain all string data.
+                memcpy(((VarcharT *) data_ptr_)[index].prefix, varchar_ptr->prefix, varchar_len);
+            } else {
+                memcpy(((VarcharT *) data_ptr_)[index].prefix, varchar_ptr->ptr, VarcharType::PREFIX_LENGTH);
+                ptr_t ptr = this->buffer_->heap_mgr_->Allocate(varchar_len);
+                memcpy(ptr, varchar_ptr->ptr, varchar_len);
+                ((VarcharT *) data_ptr_)[index].ptr = ptr;
+            }
+            ((VarcharT *) data_ptr_)[index].length = varchar_len;
+            break;
+        }
+        case kChar: {
+            auto* char_ptr = (CharT*)(value_ptr);
+            ptr_t ptr = data_ptr_ + index * data_type_.Size();
+            memcpy(ptr, char_ptr->ptr, data_type_.Size());
+            break;
+        }
+        case kDate: {
+            ((DateT*)data_ptr_)[index] = *(DateT*)(value_ptr);
+            break;
+        }
+        case kTime: {
+            ((TimeT*)data_ptr_)[index] = *(TimeT*)(value_ptr);
+            break;
+        }
+        case kDateTime: {
+            ((DateTimeT*)data_ptr_)[index] = *(DateTimeT*)(value_ptr);
+            break;
+        }
+        case kTimestamp: {
+            ((TimestampT*)data_ptr_)[index] = *(TimestampT*)(value_ptr);
+            break;
+        }
+        case kTimestampTZ: {
+            ((TimestampTZT*)data_ptr_)[index] = *(TimestampTZT*)(value_ptr);
+            break;
+        }
+        case kInterval: {
+            ((IntervalT*)data_ptr_)[index] = *(IntervalT*)(value_ptr);
+            break;
+        }
+        case kArray: {
+            ((ArrayT*)data_ptr_)[index] = *(ArrayT*)(value_ptr);
+            break;
+        }
+        case kTuple: {
+            TypeError("Shouldn't store tuple directly, a tuple is flatten as many columns");
+        }
+        case kPoint: {
+            ((PointT*)data_ptr_)[index] = *(PointT*)(value_ptr);
+            break;
+        }
+        case kLine: {
+            ((LineT*)data_ptr_)[index] = *(LineT*)(value_ptr);
+            break;
+        }
+        case kLineSeg: {
+            ((LineSegT*)data_ptr_)[index] = *(LineSegT*)(value_ptr);
+            break;
+        }
+        case kBox: {
+            ((BoxT*)data_ptr_)[index] = *(BoxT*)(value_ptr);
+            break;
+        }
+        case kPath: {
+            auto* point_ptr = (PathT*)(value_ptr);
+            u32 point_count = point_ptr->point_count;
+
+            SizeT point_area_size = point_count * sizeof(PointT);
+            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+            memcpy(ptr, point_ptr->ptr, point_area_size);
+
+            // Why not use value.GetValue<PathT>(); ?
+            // It will call PathT operator= to allocate new memory for point area.
+            // In this case, we need the point area in memory vector buffer.
+            ((PathT *) data_ptr_)[index].ptr = ptr;
+            ((PathT *) data_ptr_)[index].point_count = point_count;
+            ((PathT *) data_ptr_)[index].closed = point_ptr->closed;
+            break;
+        }
+        case kPolygon: {
+            auto* polygon_ptr = (PolygonT*)(value_ptr);
+            u64 point_count = polygon_ptr->point_count;
+
+            SizeT point_area_size = point_count * sizeof(PointT);
+            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+            memcpy(ptr, polygon_ptr->ptr, point_area_size);
+
+            // Why not use value.GetValue<PolygonT>(); ?
+            // It will call PolygonT operator= to allocate new memory for point area.
+            // In this case, we need the point area in memory vector buffer.
+            ((PolygonT *) data_ptr_)[index].ptr = ptr;
+            ((PolygonT *) data_ptr_)[index].point_count = point_count;
+            ((PolygonT *) data_ptr_)[index].bounding_box = polygon_ptr->bounding_box;
+            break;
+        }
+        case kCircle: {
+            ((CircleT*)data_ptr_)[index] = *(CircleT*)(value_ptr);
+            break;
+        }
+        case kBitmap: {
+            auto* bitmap_ptr = (BitmapT*)(value_ptr);
+            u64 bit_count = bitmap_ptr->count;
+            u64 unit_count = BitmapT::UnitCount(bit_count);
+
+            SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
+            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
+            memcpy(ptr, (void*)(bitmap_ptr->ptr), bit_area_size);
+
+            ((BitmapT *) data_ptr_)[index].ptr = (u64*)ptr;
+            ((BitmapT *) data_ptr_)[index].count = bit_count;
+            break;
+        }
+        case kUuid: {
+            ((UuidT*)data_ptr_)[index] = *(UuidT*)(value_ptr);
+            break;
+        }
+        case kBlob: {
+            auto* blob_ptr = (BlobT*)(value_ptr);
+            u64 blob_size = blob_ptr->size;
+            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(blob_size);
+            memcpy(ptr, (void*)(blob_ptr->ptr), blob_size);
+
+            ((BlobT *) data_ptr_)[index].ptr = ptr;
+            ((BlobT *) data_ptr_)[index].size = blob_size;
+            break;
+        }
+        case kEmbedding: {
+            auto* embedding_ptr = (EmbeddingT*)(value_ptr);
+            ptr_t ptr = data_ptr_ + index * data_type_.Size();
+            memcpy(ptr, embedding_ptr->ptr, data_type_.Size());
+            break;
+        }
+        case kMixed: {
+            ((MixedT*)data_ptr_)[index] = *(MixedT*)(value_ptr);
+            break;
+        }
+        default: {
+            TypeError("Attempt to store an unaccepted type");
+            // Null/Missing/Invalid
+        }
+    }
+}
+
+void
 ColumnVector::AppendValue(const Value& value) {
     StorageAssert(initialized, "Column vector isn't initialized.")
     StorageAssert(tail_index_ < capacity_, "Exceed the column vector capacity.");
     SetValue(tail_index_ ++, value);
+}
+
+void
+ColumnVector::AppendByPtr(const ptr_t value_ptr) {
+    StorageAssert(initialized, "Column vector isn't initialized.")
+    StorageAssert(tail_index_ < capacity_, "Exceed the column vector capacity.");
+    SetByPtr(tail_index_ ++, value_ptr);
 }
 
 void

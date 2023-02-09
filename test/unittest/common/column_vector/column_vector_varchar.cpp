@@ -161,8 +161,8 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "hello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&varchar_value));
+
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
@@ -546,8 +546,8 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "hellohellohello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&varchar_value));
+
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 

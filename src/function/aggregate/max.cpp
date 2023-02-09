@@ -30,7 +30,7 @@ public:
         NotImplementError("Constant update max state.")
     }
 
-    [[nodiscard]] ResultType
+    [[nodiscard]] ptr_t
     Finalize() const {
         NotImplementError("Finalize max state.")
     }
@@ -61,14 +61,14 @@ public:
         value_ = value_ < input[idx] ? input[idx]: value_;
     }
 
-    [[nodiscard]] BooleanT
-    Finalize() const {
-        return value_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&value_;
     }
 
     inline static SizeT
     Size(const DataType& data_type) {
-        return 1;
+        return sizeof(BooleanT);
     }
 };
 
@@ -92,9 +92,9 @@ public:
         value_ = value_ < input[idx] ? input[idx]: value_;
     }
 
-    [[nodiscard]] TinyIntT
-    Finalize() const {
-        return value_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&value_;
     }
 
     inline static SizeT
@@ -123,9 +123,9 @@ public:
         value_ = value_ < input[idx] ? input[idx]: value_;
     }
 
-    [[nodiscard]] SmallIntT
-    Finalize() const {
-        return value_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&value_;
     }
 
     inline static SizeT
@@ -154,9 +154,9 @@ public:
         value_ = value_ < input[idx] ? input[idx]: value_;
     }
 
-    [[nodiscard]] IntegerT
-    Finalize() const {
-        return value_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&value_;
     }
 
     inline static SizeT
@@ -185,9 +185,9 @@ public:
         value_ = value_ < input[idx] ? input[idx]: value_;
     }
 
-    [[nodiscard]] BigIntT
-    Finalize() const {
-        return value_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&value_;
     }
 
     inline static SizeT
@@ -216,9 +216,9 @@ public:
         value_ = value_ < input[idx] ? input[idx]: value_;
     }
 
-    [[nodiscard]] HugeIntT
-    Finalize() const {
-        return value_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&value_;
     }
 
     inline static SizeT
@@ -247,9 +247,9 @@ public:
         value_ = value_ < input[idx] ? input[idx]: value_;
     }
 
-    [[nodiscard]] FloatT
-    Finalize() const {
-        return value_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&value_;
     }
 
     inline static SizeT
@@ -278,9 +278,9 @@ public:
         value_ = value_ < input[idx] ? input[idx]: value_;
     }
 
-    [[nodiscard]] DoubleT
-    Finalize() const {
-        return value_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&value_;
     }
 
     inline static SizeT

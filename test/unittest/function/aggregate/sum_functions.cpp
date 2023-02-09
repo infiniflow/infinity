@@ -70,8 +70,8 @@ TEST_F(SumFunctionTest, avg_func) {
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        i64 result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        BigIntT result;
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_EQ(sum, result);
     }
@@ -104,8 +104,8 @@ TEST_F(SumFunctionTest, avg_func) {
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        i64 result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        BigIntT result;
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_EQ(sum, result);
     }
@@ -138,8 +138,8 @@ TEST_F(SumFunctionTest, avg_func) {
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        i64 result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        BigIntT result;
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_EQ(sum, result);
     }
@@ -172,8 +172,8 @@ TEST_F(SumFunctionTest, avg_func) {
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        i64 result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        BigIntT result;
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_EQ(sum, result);
     }
@@ -206,8 +206,8 @@ TEST_F(SumFunctionTest, avg_func) {
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        double result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        DoubleT result;
+        result = *(DoubleT*)func.finalize_func_(func.GetState());
 
         EXPECT_FLOAT_EQ(sum, result);
     }
@@ -240,8 +240,8 @@ TEST_F(SumFunctionTest, avg_func) {
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        double result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        DoubleT result;
+        result = *(DoubleT*)func.finalize_func_(func.GetState());
 
         EXPECT_FLOAT_EQ(sum, result);
     }

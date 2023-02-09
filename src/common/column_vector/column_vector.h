@@ -92,7 +92,13 @@ public:
     SetValue(SizeT index, const Value& Value);
 
     void
+    SetByPtr(SizeT index, const ptr_t value_ptr);
+
+    void
     AppendValue(const Value& value);
+
+    void
+    AppendByPtr(const ptr_t value_ptr);
 
     void
     ShallowCopy(const ColumnVector &other);

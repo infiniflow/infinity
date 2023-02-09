@@ -165,8 +165,7 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
                 bitmap.SetBit(j, false);
             }
         }
-        Value v = Value::MakeBitmap(bitmap);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&bitmap));
         Value vx = column_vector.GetValue(i);
 
         EXPECT_EQ(vx.value_.bitmap, bitmap);

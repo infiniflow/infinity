@@ -23,7 +23,7 @@ public:
     bool
     IsCountStar() const;
 
-private:
+public:
     AggregateFunction aggregate_function_;
 };
 

@@ -138,9 +138,8 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
+        column_vector.AppendByPtr((ptr_t)(&uuid));
 
-        Value v = Value::MakeUuid(uuid);
-        column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);

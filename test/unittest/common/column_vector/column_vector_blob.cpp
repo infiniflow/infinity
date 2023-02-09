@@ -168,8 +168,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
         blob_ptr[blob_len - 1] = 0;
         BlobT b1(blob_ptr, blob_len);
 
-        Value v = Value::MakeBlob(b1);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&b1));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
         EXPECT_EQ(vx.value_.blob, b1);

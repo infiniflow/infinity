@@ -28,9 +28,9 @@ public:
         count_ += count;
     }
 
-    ResultType
+    inline ptr_t
     Finalize() {
-        return count_;
+        return (ptr_t)&count_;
     }
 
     inline static SizeT

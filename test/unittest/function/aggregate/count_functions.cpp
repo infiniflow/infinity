@@ -69,7 +69,7 @@ TEST_F(CountFunctionTest, count_func) {
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         BigIntT result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_FLOAT_EQ(result, row_count);
     }
@@ -100,7 +100,7 @@ TEST_F(CountFunctionTest, count_func) {
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         BigIntT result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_FLOAT_EQ(result, row_count);
     }
@@ -131,7 +131,7 @@ TEST_F(CountFunctionTest, count_func) {
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         BigIntT result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_FLOAT_EQ(result, row_count);
     }
@@ -163,7 +163,7 @@ TEST_F(CountFunctionTest, count_func) {
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         BigIntT result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_FLOAT_EQ(result, row_count);
     }
@@ -195,7 +195,7 @@ TEST_F(CountFunctionTest, count_func) {
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         BigIntT result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_FLOAT_EQ(result, row_count);
     }
@@ -229,7 +229,7 @@ TEST_F(CountFunctionTest, count_func) {
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         BigIntT result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_FLOAT_EQ(result, row_count);
     }
@@ -261,7 +261,7 @@ TEST_F(CountFunctionTest, count_func) {
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         BigIntT result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_FLOAT_EQ(result, row_count);
     }
@@ -293,7 +293,7 @@ TEST_F(CountFunctionTest, count_func) {
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         BigIntT result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+        result = *(BigIntT*)func.finalize_func_(func.GetState());
 
         EXPECT_FLOAT_EQ(result, row_count);
     }

@@ -139,8 +139,8 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
-        column_vector.AppendValue(v);
+        BooleanT boolean = static_cast<BooleanT>(i % 2 == 0);
+        column_vector.AppendByPtr((ptr_t)(&boolean));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));

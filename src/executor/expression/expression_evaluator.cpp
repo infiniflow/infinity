@@ -67,11 +67,21 @@ ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression>& expr,
     SharedPtr<ColumnVector>& child_output = child_state->OutputColumnVector();
     Execute(child_expr, child_state, child_output, count);
 
+    ExecutorAssert(expr->aggregate_function_.argument_type_ == child_output->data_type(),
+                   "Argument type isn't matched with the child expression output");
+    ExecutorAssert(expr->aggregate_function_.return_type_ == output_column_vector->data_type(),
+                   "Return type isn't matched");
+
     // 1. Initialize the aggregate state.
+    expr->aggregate_function_.init_func_(expr->aggregate_function_.GetState());
 
     // 2. Loop to fill the aggregate state
+    expr->aggregate_function_.update_func_(expr->aggregate_function_.GetState(), child_output);
 
     // 3. Get the aggregate result and append to output column vector.
+
+    // func.finalize_func_(func.GetState(), (ptr_t)(&result));
+
 
     in_aggregate_ = false;
     ExecutorError("Aggregate function isn't implemented yet.");

@@ -26,7 +26,7 @@ public:
         NotImplementError("Constant update average state.")
     }
 
-    inline ResultType
+    inline ptr_t
     Finalize() {
         NotImplementError("Finalize average state.")
     }
@@ -42,6 +42,7 @@ struct AvgState<TinyIntT, DoubleT> {
 public:
     double value_{};
     i64 count_{};
+    double result_{};
 
     inline void
     Initialize() {
@@ -64,14 +65,15 @@ public:
         value_ += (input[idx] * count);
     }
 
-    [[nodiscard]] inline DoubleT
-    Finalize() const {
-        return value_ / count_;
+    [[nodiscard]] inline ptr_t
+    Finalize() {
+        result_ = value_ / count_;
+        return (ptr_t)&result_;
     }
 
     inline static SizeT
     Size(const DataType& data_type) {
-        return sizeof(double) + sizeof(count_);
+        return sizeof(value_) + sizeof(count_) + sizeof(result_);
     }
 };
 
@@ -80,6 +82,7 @@ struct AvgState<SmallIntT, DoubleT> {
 public:
     double value_{};
     i64 count_{};
+    double result_{};
 
     inline void
     Initialize() {
@@ -103,14 +106,15 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline DoubleT
+    inline ptr_t
     Finalize() {
-        return value_ / count_;
+        result_ = value_ / count_;
+        return (ptr_t)&result_;
     }
 
     inline static SizeT
     Size(const DataType& data_type) {
-        return sizeof(double) + sizeof(count_);
+        return sizeof(value_) + sizeof(count_) + sizeof(result_);
     }
 };
 
@@ -119,6 +123,7 @@ struct AvgState<IntegerT, DoubleT> {
 public:
     double value_{};
     i64 count_{};
+    double result_{};
 
     inline void
     Initialize() {
@@ -142,14 +147,15 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline DoubleT
+    inline ptr_t
     Finalize() {
-        return value_ / count_;
+        result_ = value_ / count_;
+        return (ptr_t)&result_;
     }
 
     inline static SizeT
     Size(const DataType& data_type) {
-        return sizeof(double) + sizeof(count_);
+        return sizeof(value_) + sizeof(count_) + sizeof(result_);
     }
 };
 
@@ -158,6 +164,7 @@ struct AvgState<BigIntT, DoubleT> {
 public:
     double value_{};
     i64 count_{};
+    double result_{};
 
     inline void
     Initialize() {
@@ -181,14 +188,15 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline DoubleT
+    inline ptr_t
     Finalize() {
-        return value_ / count_;
+        result_ = value_ / count_;
+        return (ptr_t)&result_;
     }
 
     inline static SizeT
     Size(const DataType& data_type) {
-        return sizeof(double) + sizeof(count_);
+        return sizeof(value_) + sizeof(count_) + sizeof(result_);
     }
 };
 
@@ -197,6 +205,7 @@ struct AvgState<FloatT, DoubleT> {
 public:
     double value_{};
     i64 count_{};
+    double result_{};
 
     inline void
     Initialize() {
@@ -220,14 +229,15 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline DoubleT
+    inline ptr_t
     Finalize() {
-        return value_ / count_;
+        result_ = value_ / count_;
+        return (ptr_t)&result_;
     }
 
     inline static SizeT
     Size(const DataType& data_type) {
-        return sizeof(double) + sizeof(count_);
+        return sizeof(value_) + sizeof(count_) + sizeof(result_);
     }
 };
 
@@ -236,6 +246,7 @@ struct AvgState<DoubleT, DoubleT> {
 public:
     double value_{};
     i64 count_{};
+    double result_{};
 
     inline void
     Initialize() {
@@ -259,14 +270,15 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline DoubleT
+    inline ptr_t
     Finalize() {
-        return value_ / count_;
+        result_ = value_ / count_;
+        return (ptr_t)&result_;
     }
 
     inline static SizeT
     Size(const DataType& data_type) {
-        return sizeof(double) + sizeof(count_);
+        return sizeof(value_) + sizeof(count_) + sizeof(result_);
     }
 };
 

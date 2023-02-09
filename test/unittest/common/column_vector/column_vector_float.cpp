@@ -134,8 +134,8 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
-        column_vector.AppendValue(v);
+        FloatT f = static_cast<FloatT>(i) + 0.5f;
+        column_vector.AppendByPtr((ptr_t)(&f));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
@@ -400,8 +400,8 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
-        Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
-        column_vector.AppendValue(v);
+        DoubleT f = static_cast<DoubleT>(i) + 0.8f;
+        column_vector.AppendByPtr((ptr_t)(&f));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);

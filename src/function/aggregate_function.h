@@ -15,25 +15,25 @@ namespace infinity {
 
 using AggregateInitializeFuncType = std::function<void(ptr_t)>;
 using AggregateUpdateFuncType = std::function<void(ptr_t, const SharedPtr<ColumnVector>&)>;
-using AggregateFinalizeFuncType = std::function<void(ptr_t, ptr_t)>;
+using AggregateFinalizeFuncType = std::function<ptr_t(ptr_t)>;
 
 class AggregateOperation {
 public:
     template<typename AggregateState>
     static inline void
-    StateInitialize(ptr_t state) {
+    StateInitialize(const ptr_t state) {
         ((AggregateState*)state)->Initialize();
     }
 
     template<typename AggregateState, typename InputType>
     static inline void
-    StateUpdate(ptr_t state,
+    StateUpdate(const ptr_t state,
                 const SharedPtr<ColumnVector>& input_column_vector) {
         // Loop execute state update according to the input column vector
 
         if(input_column_vector->vector_type_ == ColumnVectorType::kFlat) {
             SizeT row_count = input_column_vector->Size();
-            InputType* input_ptr = (InputType*)(input_column_vector->data());
+            auto* input_ptr = (InputType*)(input_column_vector->data());
             for(SizeT idx = 0; idx < row_count; ++ idx) {
                 ((AggregateState*)state)->Update(input_ptr, idx);
             }
@@ -41,15 +41,14 @@ public:
         } else {
             NotImplementError("Other type of column vector isn't implemented")
         }
-
     }
 
     template<typename AggregateState, typename ResultType>
-    static inline void
-    StateFinalize(ptr_t state,
-                  ptr_t result) {
+    static inline ptr_t
+    StateFinalize(const ptr_t state) {
         // Loop execute state update according to the input column vector
-        *(ResultType*)result = ((AggregateState*)state)->Finalize();
+        ptr_t result = ((AggregateState*)state)->Finalize();
+        return result;
     }
 };
 

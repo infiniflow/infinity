@@ -29,6 +29,11 @@
 #include "scalar/and.h"
 
 // Aggregate function
+#include "aggregate/avg.h"
+#include "aggregate/count.h"
+#include "aggregate/max.h"
+#include "aggregate/min.h"
+#include "aggregate/sum.h"
 
 // Table function
 #include "table/table_scan.h"
@@ -46,7 +51,11 @@ BuiltinFunctions::Init() {
 
 void
 BuiltinFunctions::RegisterAggregateFunction() {
-
+    RegisterAvgFunction(catalog_ptr_);
+    RegisterCountFunction(catalog_ptr_);
+    RegisterMaxFunction(catalog_ptr_);
+    RegisterMinFunction(catalog_ptr_);
+    RegisterSumFunction(catalog_ptr_);
 }
 
 void

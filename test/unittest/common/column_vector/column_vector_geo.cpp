@@ -132,8 +132,7 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         PointT point(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
-        Value v = Value::MakePoint(point);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&point));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kPoint);
         EXPECT_FLOAT_EQ(vx.value_.point.x, static_cast<f64>(i) + 0.5f);
@@ -343,8 +342,7 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
         LineT line(static_cast<f64>(i) + 0.5f,
                    static_cast<f64>(i) - 0.8f,
                    static_cast<f64>(i) - 5.3f);
-        Value v = Value::MakeLine(line);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&line));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kLine);
         EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
@@ -652,8 +650,7 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
         PointT p2(static_cast<f64>(i) - 5.3f, static_cast<f64>(i) + 7.9f);
         LineSegT line_seg(p1, p2);
-        Value v = Value::MakeLineSegment(line_seg);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&line_seg));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kLineSeg);
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.x, static_cast<f64>(i) + 0.5f);
@@ -1057,8 +1054,7 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
         PointT p2(static_cast<f64>(i) - 5.3f, static_cast<f64>(i) + 7.9f);
         BoxT box(p1, p2);
-        Value v = Value::MakeBox(box);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&box));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBox);
         EXPECT_FLOAT_EQ(vx.value_.box.upper_left.x, static_cast<f64>(i) + 0.5f);
@@ -1416,8 +1412,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
         path.SetPoint(1, p2);
         path.SetPoint(2, p3);
         path.SetPoint(3, p4);
-        Value v = Value::MakePath(path);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&path));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kPath);
         EXPECT_EQ(vx.value_.path.point_count, 4);
@@ -1862,8 +1857,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
         polygon.SetPoint(1, p2);
         polygon.SetPoint(2, p3);
         polygon.SetPoint(3, p4);
-        Value v = Value::MakePolygon(polygon);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&polygon));
         Value vx = column_vector.GetValue(i);
         BoxT bounding_box(PointT(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f),
                           PointT(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f));
@@ -2293,8 +2287,7 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
         f64 r = static_cast<f64>(i) + 7.9f;
         CircleT circle(p1, r);
-        Value v = Value::MakeCircle(circle);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&circle));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kCircle);
         EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);

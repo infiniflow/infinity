@@ -144,7 +144,7 @@ TEST_F(ColumnVectorCharTest, flat_char) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         Value v = Value::MakeChar(std::to_string(i), char_info);
-        column_vector.AppendValue(v);
+        column_vector.AppendByPtr((ptr_t)(&(v.value_.char_n)));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kChar);
         EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kChar);

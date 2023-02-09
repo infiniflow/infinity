@@ -27,7 +27,7 @@ public:
         NotImplementError("Constant update sum state.")
     }
 
-    inline ResultType
+    inline ptr_t
     Finalize() {
         NotImplementError("Finalize sum state.")
     }
@@ -58,9 +58,9 @@ public:
         sum_ += input[idx] * count;
     }
 
-    inline BigIntT
-    Finalize() const {
-        return sum_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&sum_;
     }
 
     inline static SizeT
@@ -89,9 +89,9 @@ public:
         sum_ += input[idx] * count;
     }
 
-    inline BigIntT
-    Finalize() const {
-        return sum_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&sum_;
     }
 
     inline static SizeT
@@ -120,9 +120,9 @@ public:
         sum_ += input[idx] * count;
     }
 
-    inline BigIntT
-    Finalize() const {
-        return sum_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&sum_;
     }
 
     inline static SizeT
@@ -151,9 +151,9 @@ public:
         sum_ += input[idx] * count;
     }
 
-    inline BigIntT
-    Finalize() const {
-        return sum_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&sum_;
     }
 
     inline static SizeT
@@ -182,9 +182,9 @@ public:
         sum_ += input[idx] * count;
     }
 
-    inline DoubleT
-    Finalize() const {
-        return sum_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&sum_;
     }
 
     inline static SizeT
@@ -213,9 +213,9 @@ public:
         sum_ += input[idx] * count;
     }
 
-    inline DoubleT
-    Finalize() const {
-        return sum_;
+    inline ptr_t
+    Finalize() {
+        return (ptr_t)&sum_;
     }
 
     inline static SizeT
