@@ -11,7 +11,7 @@ namespace infinity {
 template<typename ValueType, typename ResultType>
 struct CountState {
 public:
-    u64 count_;
+    i64 count_;
 
     void
     Initialize() {
