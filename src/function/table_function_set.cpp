@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-TableFunctionSet::AddFunction(const infinity::TableFunction& func) {
+TableFunctionSet::AddFunction(const TableFunction& func) {
     functions_.emplace_back(func);
 }
 

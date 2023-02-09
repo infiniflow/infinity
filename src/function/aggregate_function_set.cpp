@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-AggregateFunctionSet::AddFunction(const infinity::AggregateFunction& func) {
+AggregateFunctionSet::AddFunction(const AggregateFunction& func) {
     functions_.emplace_back(func);
 }
 

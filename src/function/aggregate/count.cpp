@@ -8,19 +8,34 @@
 
 namespace infinity {
 
+template<typename ValueType, typename ResultType>
 struct CountState {
 public:
-    u64 count;
+    u64 count_;
 
-    void Initialize() {
-        this->count = 0;
+    void
+    Initialize() {
+        this->count_ = 0;
     }
 
-    void Update() {
-
+    void
+    Update(ValueType *__restrict input, SizeT idx) {
+        this->count_ ++;
     }
 
-    void Finalize() {
+    inline void
+    ConstantUpdate(ValueType *__restrict input, SizeT idx, SizeT count) {
+        this->count_ =+ count;
+    }
+
+    ResultType
+    Finalize() {
+        return count_;
+    }
+
+    inline static SizeT
+    Size(DataType data_type) {
+        return sizeof(ValueType);
     }
 };
 
@@ -31,12 +46,12 @@ RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr) {
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
 
     AggregateFunction count_boolean
-            = AggregateFunction::UnaryAggregate<CountState, BooleanT, BigIntT>(func_name,
+            = UnaryAggregate<CountState<BooleanT, BigIntT>, BooleanT, BigIntT>(func_name,
                                                                                DataType(LogicalType::kBoolean),
                                                                                DataType(LogicalType::kBigInt));
     function_set_ptr->AddFunction(count_boolean);
     AggregateFunction count_tinyint
-            = AggregateFunction::UnaryAggregate<CountState, TinyIntT, BigIntT>(func_name,
+            = UnaryAggregate<CountState<TinyIntT, BigIntT>, TinyIntT, BigIntT>(func_name,
                                                                                DataType(LogicalType::kTinyInt),
                                                                                DataType(LogicalType::kBigInt));
     function_set_ptr->AddFunction(count_tinyint);

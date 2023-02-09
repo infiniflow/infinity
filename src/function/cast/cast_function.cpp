@@ -11,7 +11,7 @@ namespace infinity {
 
 template <typename SourceType>
 static BoundCastFunc
-NumericCast(const infinity::DataType &target) {
+NumericCast(const DataType &target) {
     switch (target.type()) {
         case kTinyInt: {
             NotImplementError("Can't cast to " + target.ToString());

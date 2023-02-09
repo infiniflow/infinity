@@ -11,11 +11,11 @@
 #include "main/infinity.h"
 #include "common/types/info/varchar_info.h"
 #include "storage/catalog.h"
-#include "function/aggregate/avg.h"
+#include "function/aggregate/sum.h"
 #include "function/aggregate_function_set.h"
 #include "expression/column_expression.h"
 
-class AvgFunctionTest : public BaseTest {
+class SumFunctionTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
@@ -31,14 +31,14 @@ class AvgFunctionTest : public BaseTest {
     }
 };
 
-TEST_F(AvgFunctionTest, avg_func) {
+TEST_F(SumFunctionTest, avg_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
-    RegisterAvgFunction(catalog_ptr);
+    RegisterSumFunction(catalog_ptr);
 
-    String op = "avg";
+    String op = "sum";
     SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     SharedPtr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
@@ -51,7 +51,7 @@ TEST_F(AvgFunctionTest, avg_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("AVG(TinyInt)->Double", func.ToString().c_str());
+        EXPECT_STREQ("SUM(TinyInt)->BigInt", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -71,6 +71,7 @@ TEST_F(AvgFunctionTest, avg_func) {
         }
         data_block.Finalize();
 
+        i64 expected_result = 0;
         for (SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
@@ -79,15 +80,16 @@ TEST_F(AvgFunctionTest, avg_func) {
             } else {
                 EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(100));
             }
+            expected_result += v.value_.tiny_int;
         }
 
         data_block.column_vectors[0];
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        DoubleT result;
+        i64 result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_FLOAT_EQ(result, 75);
+        EXPECT_EQ(expected_result, result);
     }
 }

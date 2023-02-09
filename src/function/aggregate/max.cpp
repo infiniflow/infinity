@@ -2,25 +2,42 @@
 // Created by JinHai on 2022/9/14.
 //
 
+#include <utility>
+
 #include "count.h"
 #include "function/aggregate_function.h"
 #include "function/aggregate_function_set.h"
 
 namespace infinity {
 
+template<typename ValueType, typename ResultType>
 struct MaxState {
 public:
-    u64 count;
+    ValueType value_;
 
-    void Initialize() {
-        this->count = 0;
+    void
+    Initialize() {
+        this->value_ = 0;
     }
 
-    void Update() {
-
+    void
+    Update(ValueType *__restrict input, SizeT idx) {
+        value_ = value_ < input[idx] ? input[idx]: value_;
     }
 
-    void Finalize() {
+    inline void
+    ConstantUpdate(ValueType *__restrict input, SizeT idx, SizeT count) {
+        value_ = value_ < input[idx] ? input[idx]: value_;
+    }
+
+    ResultType
+    Finalize() {
+        return value_;
+    }
+
+    inline static SizeT
+    Size(DataType data_type) {
+        return sizeof(ValueType);
     }
 };
 
@@ -31,14 +48,14 @@ RegisterMaxFunction(const UniquePtr<Catalog> &catalog_ptr) {
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
 
     AggregateFunction max_boolean
-            = AggregateFunction::UnaryAggregate<MaxState, BooleanT, BigIntT>(func_name,
+            = UnaryAggregate<MaxState<BooleanT, BooleanT>, BooleanT, BooleanT>(func_name,
                                                                                DataType(LogicalType::kBoolean),
-                                                                               DataType(LogicalType::kBigInt));
+                                                                               DataType(LogicalType::kBoolean));
     function_set_ptr->AddFunction(max_boolean);
     AggregateFunction max_tinyint
-            = AggregateFunction::UnaryAggregate<MaxState, TinyIntT, BigIntT>(func_name,
+            = UnaryAggregate<MaxState<TinyIntT, TinyIntT>, TinyIntT, TinyIntT>(func_name,
                                                                                DataType(LogicalType::kTinyInt),
-                                                                               DataType(LogicalType::kBigInt));
+                                                                               DataType(LogicalType::kTinyInt));
     function_set_ptr->AddFunction(max_tinyint);
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }

@@ -8,19 +8,34 @@
 
 namespace infinity {
 
+template<typename ValueType, typename ResultType>
 struct MinState {
 public:
-    u64 count;
+    ValueType value_;
 
-    void Initialize() {
-        this->count = 0;
+    inline void
+    Initialize() {
+        this->value_ = 0;
     }
 
-    void Update() {
-
+    inline void
+    Update(ValueType *__restrict input, SizeT idx) {
+        value_ = input[idx] < value_ ? input[idx]: value_;
     }
 
-    void Finalize() {
+    inline void
+    ConstantUpdate(ValueType *__restrict input, SizeT idx, SizeT count) {
+        value_ = input[idx] < value_ ? input[idx]: value_;
+    }
+
+    inline ResultType
+    Finalize() {
+        return value_;
+    }
+
+    inline static SizeT
+    Size(DataType data_type) {
+        return sizeof(ValueType);
     }
 };
 
@@ -31,14 +46,14 @@ RegisterMaxFunction(const UniquePtr<Catalog> &catalog_ptr) {
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
 
     AggregateFunction min_boolean
-            = AggregateFunction::UnaryAggregate<MinState, BooleanT, BigIntT>(func_name,
+            = UnaryAggregate<MinState<BooleanT, BooleanT>, BooleanT, BooleanT>(func_name,
                                                                                DataType(LogicalType::kBoolean),
-                                                                               DataType(LogicalType::kBigInt));
+                                                                               DataType(LogicalType::kBoolean));
     function_set_ptr->AddFunction(min_boolean);
     AggregateFunction min_tinyint
-            = AggregateFunction::UnaryAggregate<MinState, TinyIntT, BigIntT>(func_name,
+            = UnaryAggregate<MinState<TinyIntT, TinyIntT>, TinyIntT, TinyIntT>(func_name,
                                                                                DataType(LogicalType::kTinyInt),
-                                                                               DataType(LogicalType::kBigInt));
+                                                                               DataType(LogicalType::kTinyInt));
     function_set_ptr->AddFunction(min_tinyint);
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }
