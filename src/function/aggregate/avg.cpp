@@ -11,9 +11,6 @@ namespace infinity {
 template<typename ValueType, typename ResultType>
 struct AvgState {
 public:
-    double value_{};
-    u64 count_{};
-
     inline void
     Initialize() {
         NotImplementError("Initialize average state.")

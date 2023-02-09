@@ -202,6 +202,7 @@ template <> String DataType::TypeToString<Decimal32T>();
 template <> String DataType::TypeToString<Decimal64T>();
 template <> String DataType::TypeToString<Decimal128T>();
 template <> String DataType::TypeToString<VarcharT>();
+template <> String DataType::TypeToString<CharT>();
 template <> String DataType::TypeToString<DateT>();
 template <> String DataType::TypeToString<TimeT>();
 template <> String DataType::TypeToString<DateTimeT>();

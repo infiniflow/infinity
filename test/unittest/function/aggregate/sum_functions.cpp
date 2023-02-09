@@ -61,35 +61,199 @@ TEST_F(SumFunctionTest, avg_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
+        i64 sum = 0;
         for (SizeT i = 0; i < row_count; ++i) {
-            if(i % 2 == 0) {
-                data_block.AppendValue(0, Value::MakeTinyInt(50));
-            } else {
-                data_block.AppendValue(0, Value::MakeTinyInt(100));
-            }
-
+            data_block.AppendValue(0, Value::MakeTinyInt(static_cast<TinyIntT>(i)));
+            sum += static_cast<TinyIntT>(i);
         }
         data_block.Finalize();
-
-        i64 expected_result = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
-            Value v = data_block.GetValue(0, i);
-            EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
-            if(i % 2 == 0) {
-                EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(50));
-            } else {
-                EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(100));
-            }
-            expected_result += v.value_.tiny_int;
-        }
-
-        data_block.column_vectors[0];
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         i64 result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_EQ(expected_result, result);
+        EXPECT_EQ(sum, result);
+    }
+
+    {
+        DataType data_type(LogicalType::kSmallInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
+        EXPECT_STREQ("SUM(SmallInt)->BigInt", func.ToString().c_str());
+
+        Vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        i64 sum = 0;
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeSmallInt(static_cast<SmallIntT>(i)));
+            sum += static_cast<SmallIntT>(i);
+        }
+        data_block.Finalize();
+
+        func.init_func_(func.GetState());
+        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        i64 result;
+        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+
+        EXPECT_EQ(sum, result);
+    }
+
+    {
+        DataType data_type(LogicalType::kInteger);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
+        EXPECT_STREQ("SUM(Integer)->BigInt", func.ToString().c_str());
+
+        Vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        i64 sum = 0;
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeInt(static_cast<IntegerT>(i)));
+            sum += static_cast<IntegerT>(i);
+        }
+        data_block.Finalize();
+
+        func.init_func_(func.GetState());
+        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        i64 result;
+        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+
+        EXPECT_EQ(sum, result);
+    }
+
+    {
+        DataType data_type(LogicalType::kBigInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
+        EXPECT_STREQ("SUM(BigInt)->BigInt", func.ToString().c_str());
+
+        Vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        i64 sum = 0;
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeBigInt(static_cast<BigIntT>(i)));
+            sum += static_cast<BigIntT>(i);
+        }
+        data_block.Finalize();
+
+        func.init_func_(func.GetState());
+        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        i64 result;
+        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+
+        EXPECT_EQ(sum, result);
+    }
+
+    {
+        DataType data_type(LogicalType::kFloat);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
+        EXPECT_STREQ("SUM(Float)->Double", func.ToString().c_str());
+
+        Vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        double sum = 0;
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeFloat(static_cast<FloatT>(i)));
+            sum += static_cast<FloatT>(i);
+        }
+        data_block.Finalize();
+
+        func.init_func_(func.GetState());
+        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        double result;
+        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+
+        EXPECT_FLOAT_EQ(sum, result);
+    }
+
+    {
+        DataType data_type(LogicalType::kDouble);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
+        EXPECT_STREQ("SUM(Double)->Double", func.ToString().c_str());
+
+        Vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        double sum = 0;
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeDouble(static_cast<DoubleT>(i)));
+            sum += static_cast<DoubleT>(i);
+        }
+        data_block.Finalize();
+
+        func.init_func_(func.GetState());
+        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        double result;
+        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+
+        EXPECT_FLOAT_EQ(sum, result);
+    }
+
+    {
+        DataType data_type(LogicalType::kBoolean);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        EXPECT_THROW(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), PlannerException);
     }
 }

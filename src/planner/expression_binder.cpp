@@ -383,7 +383,7 @@ ExpressionBinder::BuildCaseExpr(const hsql::Expr &expr,
     PlannerAssert(expr.exprList, "No when and then expression");
     PlannerAssert(!expr.exprList->empty(), "No when and then expression list");
 
-    SharedPtr<CaseExpression> case_expression_ptr;
+    SharedPtr<CaseExpression> case_expression_ptr = MakeShared<CaseExpression>();
     // two kinds of case statement, please check:
     // https://docs.oracle.com/en/database/oracle/oracle-database/21/lnpls/CASE-statement.html
 
