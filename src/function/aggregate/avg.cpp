@@ -67,8 +67,8 @@ public:
         value_ += (input[idx] * count);
     }
 
-    inline DoubleT
-    Finalize() {
+    [[nodiscard]] inline DoubleT
+    Finalize() const {
         return value_ / count_;
     }
 

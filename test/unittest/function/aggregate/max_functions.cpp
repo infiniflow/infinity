@@ -11,11 +11,11 @@
 #include "main/infinity.h"
 #include "common/types/info/varchar_info.h"
 #include "storage/catalog.h"
-#include "function/aggregate/count.h"
+#include "function/aggregate/max.h"
 #include "function/aggregate_function_set.h"
 #include "expression/column_expression.h"
 
-class CountFunctionTest : public BaseTest {
+class MaxFunctionTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
@@ -31,14 +31,14 @@ class CountFunctionTest : public BaseTest {
     }
 };
 
-TEST_F(CountFunctionTest, count_func) {
+TEST_F(MaxFunctionTest, max_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
-    RegisterCountFunction(catalog_ptr);
+    RegisterMaxFunction(catalog_ptr);
 
-    String op = "count";
+    String op = "max";
     SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     SharedPtr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
@@ -51,7 +51,7 @@ TEST_F(CountFunctionTest, count_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("COUNT(Boolean)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("MAX(Boolean)->Boolean", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -68,11 +68,12 @@ TEST_F(CountFunctionTest, count_func) {
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        BigIntT result;
+        BooleanT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_FLOAT_EQ(result, row_count);
+        EXPECT_FLOAT_EQ(result, true);
     }
+
     {
         DataType data_type(LogicalType::kTinyInt);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
@@ -82,7 +83,7 @@ TEST_F(CountFunctionTest, count_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("COUNT(TinyInt)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("MAX(TinyInt)->TinyInt", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -92,18 +93,20 @@ TEST_F(CountFunctionTest, count_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
+        double sum = 0;
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeTinyInt(i));
+            data_block.AppendValue(0, Value::MakeTinyInt(static_cast<TinyIntT>(i)));
         }
         data_block.Finalize();
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        BigIntT result;
+        TinyIntT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_FLOAT_EQ(result, row_count);
+        EXPECT_FLOAT_EQ(result, 127);
     }
+
     {
         DataType data_type(LogicalType::kSmallInt);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
@@ -113,7 +116,7 @@ TEST_F(CountFunctionTest, count_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("COUNT(SmallInt)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("MAX(SmallInt)->SmallInt", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -128,12 +131,20 @@ TEST_F(CountFunctionTest, count_func) {
         }
         data_block.Finalize();
 
+        for (SizeT i = 0; i < row_count; ++i) {
+            Value v = data_block.GetValue(0, i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
+            EXPECT_EQ(v.value_.small_int, static_cast<SmallIntT>(i));
+        }
+
+        data_block.column_vectors[0];
+
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        BigIntT result;
+        SmallIntT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_FLOAT_EQ(result, row_count);
+        EXPECT_FLOAT_EQ(result, row_count - 1);
     }
 
     {
@@ -145,7 +156,7 @@ TEST_F(CountFunctionTest, count_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("COUNT(Integer)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("MAX(Integer)->Integer", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -162,10 +173,10 @@ TEST_F(CountFunctionTest, count_func) {
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        BigIntT result;
+        IntegerT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_FLOAT_EQ(result, row_count);
+        EXPECT_FLOAT_EQ(result, 2 * (row_count - 1));
     }
 
     {
@@ -177,7 +188,7 @@ TEST_F(CountFunctionTest, count_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("COUNT(BigInt)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("MAX(BigInt)->BigInt", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -197,41 +208,7 @@ TEST_F(CountFunctionTest, count_func) {
         BigIntT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_FLOAT_EQ(result, row_count);
-    }
-
-    {
-        DataType data_type(LogicalType::kHugeInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
-                                                                                "t1",
-                                                                                "c1",
-                                                                                0,
-                                                                                0);
-
-        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("COUNT(HugeInt)->BigInt", func.ToString().c_str());
-
-        Vector<DataType> column_types;
-        column_types.emplace_back(data_type);
-
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
-
-        DataBlock data_block;
-        data_block.Init(column_types);
-
-        for (SizeT i = 0; i < row_count; ++i) {
-            HugeIntT input(0, i);
-            Value v = Value::MakeHugeInt(input);
-            data_block.AppendValue(0, v);
-        }
-        data_block.Finalize();
-
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        BigIntT result;
-        func.finalize_func_(func.GetState(), (ptr_t)(&result));
-
-        EXPECT_FLOAT_EQ(result, row_count);
+        EXPECT_FLOAT_EQ(result, 2 * (row_count - 1));
     }
 
     {
@@ -243,7 +220,7 @@ TEST_F(CountFunctionTest, count_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("COUNT(Float)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("MAX(Float)->Float", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -260,10 +237,10 @@ TEST_F(CountFunctionTest, count_func) {
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        BigIntT result;
+        FloatT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_FLOAT_EQ(result, row_count);
+        EXPECT_FLOAT_EQ(result, 2 * (row_count - 1));
     }
 
     {
@@ -275,7 +252,7 @@ TEST_F(CountFunctionTest, count_func) {
                                                                                 0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
-        EXPECT_STREQ("COUNT(Double)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("MAX(Double)->Double", func.ToString().c_str());
 
         Vector<DataType> column_types;
         column_types.emplace_back(data_type);
@@ -292,9 +269,54 @@ TEST_F(CountFunctionTest, count_func) {
 
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
-        BigIntT result;
+        DoubleT result;
         func.finalize_func_(func.GetState(), (ptr_t)(&result));
 
-        EXPECT_FLOAT_EQ(result, row_count);
+        EXPECT_FLOAT_EQ(result, 2 * (row_count - 1));
+    }
+
+    {
+        DataType data_type(LogicalType::kHugeInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
+        EXPECT_STREQ("MAX(HugeInt)->HugeInt", func.ToString().c_str());
+
+        Vector<DataType> column_types;
+        column_types.emplace_back(data_type);
+
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            HugeIntT input(0, 2 * i);
+            Value v = Value::MakeHugeInt(input);
+            data_block.AppendValue(0, v);
+        }
+        data_block.Finalize();
+
+        func.init_func_(func.GetState());
+        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        HugeIntT result;
+        func.finalize_func_(func.GetState(), (ptr_t)(&result));
+
+        EXPECT_FLOAT_EQ(result.lower, 2 * (row_count - 1));
+    }
+
+    {
+        DataType data_type(LogicalType::kVarchar);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+                                                                                "t1",
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
+
+        EXPECT_THROW(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), PlannerException);
     }
 }

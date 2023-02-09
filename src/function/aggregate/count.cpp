@@ -34,7 +34,7 @@ public:
     }
 
     inline static SizeT
-    Size(DataType data_type) {
+    Size(const DataType& data_type) {
         return sizeof(ValueType);
     }
 };
