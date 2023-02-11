@@ -18,7 +18,7 @@ public:
                     SharedPtr<PhysicalOperator> left,
                     Vector<SharedPtr<BaseExpression>> expressions)
                     : PhysicalOperator(PhysicalOperatorType::kProjection, std::move(left), nullptr, id),
-                    output_table_index_(table_index),
+                    projection_table_index_(table_index),
                     expressions_(std::move(expressions))
                     {}
 
@@ -33,11 +33,8 @@ public:
     Vector<SharedPtr<BaseExpression>> expressions_{};
 
 private:
-    ExpressionExecutor executor;
-    u64 output_table_index_{};
-
-    SharedPtr<Table> input_table_{};
-    u64 input_table_index_{};
+//    ExpressionExecutor executor;
+    u64 projection_table_index_{};
 
 };
 

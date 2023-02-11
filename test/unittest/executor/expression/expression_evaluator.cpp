@@ -48,7 +48,12 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     Vector<SharedPtr<BaseExpression>> exprs;
     // Column expression
     SharedPtr<ColumnExpression> col_expr =
-            ColumnExpression::Make(DataType(LogicalType::kBigInt), "t1", 1, "c1", 0, 0);
+            ColumnExpression::Make(DataType(LogicalType::kBigInt),
+                                   "t1",
+                                   1,
+                                   "c1",
+                                   0,
+                                   0);
     // Value expression
     Value v = Value::MakeBigInt(1);
     SharedPtr<ValueExpression> value_expr = MakeShared<ValueExpression>(v);
@@ -80,9 +85,17 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
         DataType data_type(LogicalType::kBigInt);
         data_block->Init({data_type});
 
+        HashMap<u64, SharedPtr<DataBlock>> block_map;
+        block_map[1] = data_block;
+
         SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
 
-        expr_evaluator.Execute(func_expr, expr_state, data_block, output_column_vector);
+        output_column_vector->Initialize();
+        expr_evaluator.Execute(func_expr,
+                               expr_state,
+                               block_map,
+                               0,
+                               output_column_vector);
         EXPECT_EQ(output_column_vector->Size(), 0);
     }
 
@@ -105,8 +118,12 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
             EXPECT_EQ(value.value_.big_int, i64(i));
         }
 
+        HashMap<u64, SharedPtr<DataBlock>> block_map;
+        block_map[1] = data_block;
+
         SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
-        expr_evaluator.Execute(func_expr, expr_state, data_block, output_column_vector);
+        output_column_vector->Initialize();
+        expr_evaluator.Execute(func_expr, expr_state, block_map, row_count, output_column_vector);
         EXPECT_EQ(output_column_vector->Size(), row_count);
 
         for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
@@ -166,9 +183,12 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
         DataType data_type(LogicalType::kBigInt);
         data_block->Init({data_type});
 
-        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
+        HashMap<u64, SharedPtr<DataBlock>> block_map;
+        block_map[1] = data_block;
 
-        expr_evaluator.Execute(func_expr, expr_state, data_block, output_column_vector);
+        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
+        output_column_vector->Initialize();
+        expr_evaluator.Execute(func_expr, expr_state, block_map, 0, output_column_vector);
         EXPECT_EQ(output_column_vector->Size(), 0);
     }
 
@@ -191,8 +211,12 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
             EXPECT_EQ(value.value_.big_int, i64(i));
         }
 
+        HashMap<u64, SharedPtr<DataBlock>> block_map;
+        block_map[1] = data_block;
+
         SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
-        expr_evaluator.Execute(func_expr, expr_state, data_block, output_column_vector);
+        output_column_vector->Initialize();
+        expr_evaluator.Execute(func_expr, expr_state, block_map, row_count, output_column_vector);
         EXPECT_EQ(output_column_vector->Size(), row_count);
 
         for(SizeT row_id = 0; row_id < row_count; ++ row_id) {

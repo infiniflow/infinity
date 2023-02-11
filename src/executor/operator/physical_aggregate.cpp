@@ -4,6 +4,7 @@
 
 #include "physical_aggregate.h"
 #include "executor/expression/expression_executor.h"
+#include "executor/expression/expression_evaluator.h"
 
 namespace infinity {
 
@@ -71,6 +72,7 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
 
     // 3. forlop each aggregates function on each group by bucket, to calculate the result according to the row list
     SharedPtr<Table> output_groupby_table = Table::Make(groupby_tabledef, TableType::kIntermediate);
+    u64 output_groupby_table_index = input_table_index_;
     GenerateGroupByResult(groupby_table, output_groupby_table);
 
 
@@ -94,8 +96,71 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
     }
     GroupByInputTable(input_table_, grouped_input_table);
 
+    // generate output aggregate table
+    SizeT aggregates_count = aggregates_.size();
+    if(aggregates_count > 0) {
+        SharedPtr<Table> output_aggregate_table{};
+
+        // Prepare the output table columns
+        Vector<SharedPtr<ColumnDef>> aggregate_columns;
+        aggregate_columns.reserve(aggregates_count);
+
+        // Prepare the expression states
+        Vector<SharedPtr<ExpressionState>> expr_states;
+        expr_states.reserve(aggregates_.size());
+
+        // Prepare the output block
+        Vector<DataType> output_types;
+        output_types.reserve(aggregates_count);
+
+        for(i64 idx = 0; auto& expr: aggregates_) {
+            // expression state
+            expr_states.emplace_back(ExpressionState::CreateState(expr));
+
+            // column definition
+            SharedPtr<ColumnDef> col_def = ColumnDef::Make(expr->ToString(), idx, expr->Type(), Set<ConstrainType>());
+            aggregate_columns.emplace_back(col_def);
+
+            // for output block
+            output_types.emplace_back(expr->Type());
+
+            ++ idx;
+        }
+
+        // output aggregate table definition
+        SharedPtr<TableDef> aggregate_tabledef = TableDef::Make("aggregate", groupby_columns, false);
+        output_aggregate_table = Table::Make(aggregate_tabledef, TableType::kAggregate);
+
+        // Loop blocks
+        HashMap<u64, SharedPtr<DataBlock>> block_map;
+        SizeT input_data_block_count = grouped_input_table->DataBlockCount();
+        for(SizeT block_idx = 0; block_idx < input_data_block_count; ++ block_idx) {
+            SharedPtr<DataBlock> output_data_block = DataBlock::Make();
+            output_data_block->Init(output_types);
+
+            const SharedPtr<DataBlock>& block_ptr = grouped_input_table->GetDataBlockById(block_idx);
+            block_map[output_groupby_table_index] = block_ptr;
+            // Loop aggregate expression
+            ExpressionEvaluator evaluator;
+            for(SizeT expr_idx = 0; expr_idx < aggregates_count; ++ expr_idx) {
+                evaluator.Execute(aggregates_[expr_idx],
+                                  expr_states[expr_idx],
+                                  block_map,
+                                  block_ptr->row_count(),
+                                  output_data_block->column_vectors[expr_idx]);
+            }
+
+            output_data_block->Finalize();
+            output_aggregate_table->Append(output_data_block);
+        }
+
+        // Set output aggregate table
+        this->outputs_[aggregate_index_] = output_aggregate_table;
+    }
+
     // 4. generate the result to output
     this->outputs_[groupby_index_] = output_groupby_table;
+
 }
 
 void

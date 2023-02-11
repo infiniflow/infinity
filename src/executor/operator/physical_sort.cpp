@@ -175,6 +175,12 @@ private:
 
 void
 PhysicalSort::Init() {
+
+}
+
+void
+PhysicalSort::Execute(SharedPtr<QueryContext>& query_context) {
+
     executor_.Init(this->expressions_);
 
     ExecutorAssert(left()->outputs().size() == 1, "Input table count isn't matched.");
@@ -199,10 +205,6 @@ PhysicalSort::Init() {
     SharedPtr<TableDef> table_def = TableDef::Make("sort", columns, false);
 
     outputs_[input_table_index_] = Table::Make(table_def, TableType::kIntermediate);
-}
-
-void
-PhysicalSort::Execute(SharedPtr<QueryContext>& query_context) {
 
     // Generate table before getting the order of row id.
     SharedPtr<Table> order_by_table = GetOrderTable();

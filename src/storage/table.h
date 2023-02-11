@@ -19,6 +19,7 @@ enum class TableType {
     kIntermediate,
     kOrderBy,
     kGroupBy,
+    kAggregate,
     kResult,
 };
 

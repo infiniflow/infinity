@@ -130,6 +130,7 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
 
     // 11. SELECT (not flatten subquery)
     BuildSelectList(query_context_ptr_, bound_select_statement);
+    bound_select_statement->aggregate_expressions_ = bind_context_ptr_->aggregate_exprs_;
 
     // 12. ORDER BY
     if(statement.order != nullptr) {
@@ -685,8 +686,9 @@ QueryBinder::BuildGroupBy(SharedPtr<QueryContext>& query_context,
 
             // Call GroupBinder BuildExpression
             SharedPtr<BaseExpression> group_by_expr = group_binder->Bind(expr, this->bind_context_ptr_, 0, true);
-            select_statement->group_by_expressions_.emplace_back(group_by_expr);
         }
+
+        select_statement->group_by_expressions_ = bind_context_ptr_->group_exprs_;
     }
 }
 

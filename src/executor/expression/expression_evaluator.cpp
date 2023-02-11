@@ -11,15 +11,21 @@ namespace infinity {
 void
 ExpressionEvaluator::Execute(const SharedPtr<BaseExpression>& expression,
                              SharedPtr<ExpressionState>& state,
-                             SharedPtr<DataBlock> input_data_block,
+                             HashMap<u64, SharedPtr<DataBlock>> input_block_map,
+                             SizeT row_count,
                              SharedPtr<ColumnVector>& output_column_vector) {
-    ExecutorAssert(input_data_block != nullptr, "Input data is null")
-    input_data_block_ = std::move(input_data_block);
+    // Validate the input data block map
+    ExecutorAssert(!input_block_map.empty(), "No input data block");
+
+    blocks_map_ = std::move(input_block_map);
     ExecutorAssert(state != nullptr, "Expression state need to be initialized before.")
     ExecutorAssert(expression != nullptr, "No expression.")
 
-    SizeT row_count = input_data_block_->row_count() == 0 ? 1 : input_data_block_->row_count();
-    output_column_vector->Initialize(row_count);
+    if(row_count == 0) {
+        row_count = 1;
+    }
+
+    // output_column_vector needs to be initialized before.
     Execute(expression, state, output_column_vector, row_count);
 }
 
@@ -83,7 +89,6 @@ ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression>& expr,
     output_column_vector->AppendByPtr(result_ptr);
 
     in_aggregate_ = false;
-    ExecutorError("Aggregate function isn't implemented yet.");
 }
 
 void
@@ -143,8 +148,11 @@ ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression>& expr,
                              SizeT count) {
 
     i64 column_index = expr->column_index();
-    ExecutorAssert(column_index < this->input_data_block_->column_count(), "Invalid column index");
-    output_column_vector = this->input_data_block_->column_vectors[column_index];
+    u64 table_index = expr->table_index();
+    ExecutorAssert(blocks_map_.contains(table_index), fmt::format("No table index: {}", table_index))
+    const SharedPtr<DataBlock>& block_ptr = blocks_map_[table_index];
+    ExecutorAssert(column_index < block_ptr->column_count(), "Invalid column index");
+    output_column_vector = block_ptr->column_vectors[column_index];
 }
 
 void

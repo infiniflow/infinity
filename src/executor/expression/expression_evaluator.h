@@ -14,7 +14,8 @@ public:
     void
     Execute(const SharedPtr<BaseExpression>& expression,
             SharedPtr<ExpressionState>& state,
-            SharedPtr<DataBlock> input_data_block,
+            HashMap<u64, SharedPtr<DataBlock>> input_block_map,
+            SizeT block_row_count,
             SharedPtr<ColumnVector>& output_column_vector);
 
     void
@@ -71,7 +72,7 @@ public:
             SharedPtr<ColumnVector>& output_column_vector,
             SizeT count);
 private:
-    SharedPtr<DataBlock> input_data_block_{nullptr};
+    HashMap<u64, SharedPtr<DataBlock>> blocks_map_{};
     bool in_aggregate_{false};
 };
 
