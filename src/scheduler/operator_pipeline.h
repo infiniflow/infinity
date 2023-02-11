@@ -30,7 +30,6 @@ protected:
 
 private:
     SharedPtr<PhysicalOperator> operator_;
-
 };
 
 }

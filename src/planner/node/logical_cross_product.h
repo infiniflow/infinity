@@ -11,11 +11,16 @@ namespace infinity {
 class LogicalCrossProduct: public LogicalNode {
 public:
     explicit
-    LogicalCrossProduct(const SharedPtr<LogicalNode>& left,
+    LogicalCrossProduct(String alias,
+                        u64 join_index,
+                        const SharedPtr<LogicalNode>& left,
                         const SharedPtr<LogicalNode>& right);
 
     String
     ToString(i64& space) final;
+
+    String alias_{};
+    u64 table_index_{};
 };
 
 }

@@ -10,7 +10,8 @@ namespace infinity {
 
 class LogicalProject: public LogicalNode {
 public:
-    LogicalProject(Vector<SharedPtr<BaseExpression>> expressions, u64 projection_index)
+    LogicalProject(Vector<SharedPtr<BaseExpression>> expressions,
+                   u64 projection_index)
         : LogicalNode(LogicalNodeType::kProjection),
         expressions_(std::move(expressions)),
         table_index_(projection_index)

@@ -13,12 +13,17 @@ namespace infinity {
 
 class PhysicalCreateTable : public PhysicalOperator {
 public:
-    explicit PhysicalCreateTable(SharedPtr<String> schema_name,
-                                 SharedPtr<TableDef> table_def_ptr,
-                                 uint64_t id);
-    explicit PhysicalCreateTable(SharedPtr<String> schema_name,
-                                 const SharedPtr<PhysicalOperator>& input,
-                                 uint64_t id);
+    explicit
+    PhysicalCreateTable(SharedPtr<String> schema_name,
+                        SharedPtr<TableDef> table_def_ptr,
+                        u64 table_index,
+                        uint64_t id);
+
+    explicit
+    PhysicalCreateTable(SharedPtr<String> schema_name,
+                        const SharedPtr<PhysicalOperator>& input,
+                        u64 table_index,
+                        uint64_t id);
 
     ~PhysicalCreateTable() override = default;
 
@@ -28,9 +33,15 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline u64
+    table_index() const {
+        return table_index_;
+    }
+
 private:
-    SharedPtr<TableDef> table_def_ptr_;
-    SharedPtr<String> schema_name_;
+    SharedPtr<TableDef> table_def_ptr_{};
+    SharedPtr<String> schema_name_{};
+    u64 table_index_{};
 
 };
 

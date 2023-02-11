@@ -70,7 +70,6 @@ protected:
 
     SharedPtr<LogicalNode> left_node_{};
     SharedPtr<LogicalNode> right_node_{};
-//    std::vector<SharedPtr<LogicalNode>> outputs_;
     u64 node_id_{};
 };
 

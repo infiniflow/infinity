@@ -35,6 +35,9 @@ public:
 private:
     SharedPtr<BaseExpression> limit_expr_{};
     SharedPtr<BaseExpression> offset_expr_{};
+
+    SharedPtr<Table> input_table_{};
+    u64 input_table_index_{};
 };
 
 }

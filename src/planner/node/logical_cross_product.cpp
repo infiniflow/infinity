@@ -8,9 +8,13 @@
 
 namespace infinity {
 
-LogicalCrossProduct::LogicalCrossProduct(const SharedPtr<LogicalNode>& left,
+LogicalCrossProduct::LogicalCrossProduct(String alias,
+                                         u64 join_index,
+                                         const SharedPtr<LogicalNode>& left,
                                          const SharedPtr<LogicalNode>& right)
-                                         : LogicalNode(LogicalNodeType::kCrossProduct)
+                                         : LogicalNode(LogicalNodeType::kCrossProduct),
+                                         alias_(std::move(alias)),
+                                         table_index_(join_index)
                                          {
     this->set_left_node(left);
     this->set_right_node(right);

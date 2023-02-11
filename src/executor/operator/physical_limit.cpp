@@ -10,13 +10,19 @@ namespace infinity {
 void
 PhysicalLimit::Init() {
     // output table definition is same as input
-    SharedPtr<Table> output_table = left_->output();
-    SizeT column_count = output_table->ColumnCount();
+    ExecutorAssert(left()->outputs().size() == 1, "Input table count isn't matched.");
+
+    for(const auto& input_table: left()->outputs()) {
+        input_table_ = input_table.second;
+        input_table_index_ = input_table.first;
+    }
+
+    SizeT column_count = input_table_->ColumnCount();
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType col_type = output_table->GetColumnTypeById(idx);
-        String col_name = output_table->GetColumnNameById(idx);
+        DataType col_type = input_table_->GetColumnTypeById(idx);
+        String col_name = input_table_->GetColumnNameById(idx);
 
         SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
         columns.emplace_back(col_def);
@@ -24,7 +30,7 @@ PhysicalLimit::Init() {
 
     SharedPtr<TableDef> table_def = TableDef::Make("limit", columns, false);
 
-    output_ = Table::Make(table_def, TableType::kIntermediate);
+    outputs_[input_table_index_] = Table::Make(table_def, TableType::kIntermediate);
 }
 
 void
@@ -45,10 +51,10 @@ PhysicalLimit::Execute(SharedPtr<QueryContext>& query_context) {
     i64 limit = (std::static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
 
     ExecutorAssert(limit > 0, "Limit should be larger than 0")
-    ExecutorAssert(offset >= 0 && offset < left_->output()->row_count(),
+    ExecutorAssert(offset >= 0 && offset < input_table_->row_count(),
                    "Offset should be larger or equal than 0 and less than row number")
 
-    output_ = GetLimitOutput(left_->output(), limit, offset);
+    outputs_[input_table_index_] = GetLimitOutput(input_table_, limit, offset);
 }
 
 SharedPtr<Table>

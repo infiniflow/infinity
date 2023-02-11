@@ -77,12 +77,6 @@ public:
 
     bool distinct_ = false;
 
-    i64
-    GetTableIndex() override {
-        // Should return the last node output table index;
-        return 0;
-    };
-
 //    SharedPtr<LogicalNode>
 //    BuildPlan() override {
 //        return this->logical_plan_;

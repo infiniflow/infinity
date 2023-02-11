@@ -16,7 +16,7 @@ LogicalDummyScan::ToString(i64 &space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << "-> " << "DummyScan: ";
+    ss << String(space, ' ') << "-> " << "DummyScan: " << this->table_alias_ << "(" << this->table_index_ << ")";
     space += arrow_str.size();
 
     return ss.str();

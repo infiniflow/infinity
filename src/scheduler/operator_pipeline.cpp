@@ -9,31 +9,39 @@
 
 namespace infinity {
 
-std::shared_ptr<OperatorPipeline> OperatorPipeline::Create(const std::shared_ptr<PhysicalOperator>& op) {
-    std::shared_ptr<OperatorPipeline> root_pipeline = op->GenerateOperatorPipeline();
+SharedPtr<OperatorPipeline> OperatorPipeline::Create(const SharedPtr<PhysicalOperator>& op) {
+    SharedPtr<OperatorPipeline> root_pipeline = op->GenerateOperatorPipeline();
 
     if(op->left()) {
-        std::shared_ptr<OperatorPipeline> left_root = OperatorPipeline::Create(op->left());
+        SharedPtr<OperatorPipeline> left_root = OperatorPipeline::Create(op->left());
         left_root->SetPredecessorOf(root_pipeline);
     }
 
     if(op->right()) {
-        std::shared_ptr<OperatorPipeline> right_root = OperatorPipeline::Create(op->right());
+        SharedPtr<OperatorPipeline> right_root = OperatorPipeline::Create(op->right());
         right_root->SetPredecessorOf(root_pipeline);
     }
     return root_pipeline;
 }
 
-OperatorPipeline::OperatorPipeline(std::shared_ptr<PhysicalOperator> op)
+OperatorPipeline::OperatorPipeline(SharedPtr<PhysicalOperator> op)
     : Pipeline(op->operator_id()), operator_(std::move(op)) {}
 
 void
-OperatorPipeline::OnExecute(std::shared_ptr<QueryContext>& query_context) {
+OperatorPipeline::OnExecute(SharedPtr<QueryContext>& query_context) {
     operator_->Execute(query_context);
 }
 
-std::shared_ptr<Table>
-OperatorPipeline::GetResult() { return operator_->output(); }
+SharedPtr<Table>
+OperatorPipeline::GetResult() {
+    ExecutorAssert(operator_->outputs().size() == 1, "Input table count isn't matched.");
+
+    SharedPtr<Table> result{};
+    for(const auto& input_table: operator_->outputs()) {
+        result = input_table.second;
+    }
+    return result;
+}
 
 }
 

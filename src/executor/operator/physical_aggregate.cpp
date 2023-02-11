@@ -9,27 +9,32 @@ namespace infinity {
 
 void
 PhysicalAggregate::Init() {
-    SharedPtr<Table> output_table = left_->output();
-    SizeT column_count = output_table->ColumnCount();
-    Vector<SharedPtr<ColumnDef>> columns;
-    columns.reserve(column_count);
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType col_type = output_table->GetColumnTypeById(idx);
-        String col_name = output_table->GetColumnNameById(idx);
 
-        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
-        columns.emplace_back(col_def);
+    ExecutorAssert(left()->outputs().size() == 1, "Input table count isn't matched.");
+
+    for(const auto& input_table: left()->outputs()) {
+        input_table_ = input_table.second;
+        input_table_index_ = input_table.first;
     }
 
-    SharedPtr<TableDef> table_def = TableDef::Make("aggregate", columns, false);
-
-    output_ = Table::Make(table_def, TableType::kIntermediate);
+//    SizeT column_count = input_table_->ColumnCount();
+//    Vector<SharedPtr<ColumnDef>> columns;
+//    columns.reserve(column_count);
+//    for(SizeT idx = 0; idx < column_count; ++ idx) {
+//        DataType col_type = input_table_->GetColumnTypeById(idx);
+//        String col_name = input_table_->GetColumnNameById(idx);
+//
+//        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
+//        columns.emplace_back(col_def);
+//    }
+//
+//    SharedPtr<TableDef> table_def = TableDef::Make("aggregate", columns, false);
+//
+//    output_ = Table::Make(table_def, TableType::kIntermediate);
 }
 
 void
 PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
-    this->output_ = this->left_->output();
-
     // 1. Execute group-by expressions to generate unique key.
     ExpressionExecutor groupby_executor;
     groupby_executor.Init(groups_);
@@ -53,8 +58,7 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
     SharedPtr<TableDef> groupby_tabledef = TableDef::Make("groupby", groupby_columns, false);
     SharedPtr<Table> groupby_table = Table::Make(groupby_tabledef, TableType::kIntermediate);
 
-    auto input_table = left_->output();
-    groupby_executor.Execute(input_table, groupby_table);
+    groupby_executor.Execute(input_table_, groupby_table);
 
     // 2. Use the unique key to get the row list of the same key.
     hash_table_.Init(types);
@@ -73,12 +77,12 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
     // input table after group by, each block belong to one group. This is the prerequisites to execute aggregate function.
     SharedPtr<Table> grouped_input_table;
     {
-        SizeT column_count = input_table->ColumnCount();
+        SizeT column_count = input_table_->ColumnCount();
         Vector<SharedPtr<ColumnDef>> columns;
         columns.reserve(column_count);
         for(SizeT idx = 0; idx < column_count; ++ idx) {
-            DataType col_type = input_table->GetColumnTypeById(idx);
-            String col_name = input_table->GetColumnNameById(idx);
+            DataType col_type = input_table_->GetColumnTypeById(idx);
+            String col_name = input_table_->GetColumnNameById(idx);
 
             SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
             columns.emplace_back(col_def);
@@ -88,11 +92,10 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
 
         grouped_input_table = Table::Make(table_def, TableType::kGroupBy);
     }
-    GroupByInputTable(input_table, grouped_input_table);
+    GroupByInputTable(input_table_, grouped_input_table);
 
     // 4. generate the result to output
-
-    this->output_ = output_groupby_table;
+    this->outputs_[groupby_index_] = output_groupby_table;
 }
 
 void

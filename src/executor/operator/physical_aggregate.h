@@ -12,15 +12,19 @@
 
 namespace infinity {
 
-class PhysicalAggregate : public PhysicalOperator{
+class PhysicalAggregate : public PhysicalOperator {
 public:
     explicit PhysicalAggregate(u64 id,
                                SharedPtr<PhysicalOperator> left,
                                Vector<SharedPtr<BaseExpression>> groups,
-                               Vector<SharedPtr<BaseExpression>> aggregates)
+                               u64 groupby_index,
+                               Vector<SharedPtr<BaseExpression>> aggregates,
+                               u64 aggregate_index)
                                : PhysicalOperator(PhysicalOperatorType::kAggregate, std::move(left), nullptr, id),
                                groups_(std::move(groups)),
-                               aggregates_(std::move(aggregates))
+                               groupby_index_(groupby_index),
+                               aggregates_(std::move(aggregates)),
+                               aggregate_index_(aggregate_index)
                                {}
 
     ~PhysicalAggregate() override = default;
@@ -40,6 +44,12 @@ public:
     Vector<SharedPtr<BaseExpression>> groups_{};
     Vector<SharedPtr<BaseExpression>> aggregates_{};
     HashTable hash_table_;
+
+private:
+    SharedPtr<Table> input_table_{};
+    u64 input_table_index_{};
+    u64 groupby_index_{};
+    u64 aggregate_index_{};
 };
 
 }

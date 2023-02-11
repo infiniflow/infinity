@@ -20,7 +20,11 @@ enum class ChunkScanType {
 class LogicalChunkScan: public LogicalNode {
 public:
     explicit
-    LogicalChunkScan(ChunkScanType type) : LogicalNode(LogicalNodeType::kChunkScan), scan_type_(type) {}
+    LogicalChunkScan(ChunkScanType type, u64 table_index)
+        : LogicalNode(LogicalNodeType::kChunkScan),
+        scan_type_(type),
+        table_index_(table_index)
+        {}
 
     String
     ToString(i64& space) final;
@@ -30,8 +34,14 @@ public:
         return scan_type_;
     }
 
+    [[nodiscard]] inline u64
+    table_index() const {
+        return table_index_;
+    }
+
 private:
     ChunkScanType scan_type_{ChunkScanType::kInvalid};
+    u64 table_index_{};
 
 };
 

@@ -177,7 +177,9 @@ LogicalPlanner::BuildInsertValue(const hsql::InsertStatement &statement) {
 
     // Create logical insert node.
     SharedPtr<LogicalNode> logical_insert =
-            MakeShared<LogicalInsert>(table_ptr, value_list);
+            MakeShared<LogicalInsert>(table_ptr,
+                                      bind_context_ptr->GenerateTableIndex(),
+                                      value_list);
 
     // FIXME: check if we need to append operator
 //    this->AppendOperator(logical_insert, bind_context_ptr);
@@ -307,7 +309,9 @@ LogicalPlanner::BuildCreateTable(const hsql::CreateStatement &statement) {
 
     SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
     SharedPtr<LogicalNode> logical_create_table_operator
-            = LogicalCreateTable::Make(schema_name_ptr, table_def_ptr);
+            = LogicalCreateTable::Make(schema_name_ptr,
+                                       table_def_ptr,
+                                       bind_context_ptr->GenerateTableIndex());
 
     // FIXME: check if we need to append operator
 //    this->AppendOperator(logical_create_table_operator, bind_context_ptr);
@@ -379,7 +383,8 @@ LogicalPlanner::BuildDropTable(const hsql::DropStatement &statement) {
 
     SharedPtr<LogicalNode> logical_drop_table
             = MakeShared<LogicalDropTable>(schema_name_ptr,
-                                           MakeShared<String>(statement.name));
+                                           MakeShared<String>(statement.name),
+                                           bind_context_ptr->GenerateTableIndex());
     // FIXME: check if we need to append operator
     //    this->AppendOperator(logical_drop_table, bind_context_ptr);
 
@@ -489,7 +494,8 @@ LogicalPlanner::BuildShowTables(const hsql::ShowStatement& statement) {
     SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
 
     SharedPtr<LogicalNode> logical_chunk_scan =
-            MakeShared<LogicalChunkScan>(ChunkScanType::kShowTables);
+            MakeShared<LogicalChunkScan>(ChunkScanType::kShowTables,
+                                         bind_context_ptr->GenerateTableIndex());
 
     // FIXME: check if we need to append operator
 //    this->AppendOperator(logical_chunk_scan, bind_context_ptr);

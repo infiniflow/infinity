@@ -114,10 +114,11 @@ BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef>& table_ref) {
 
     SharedPtr<LogicalTableScan> table_scan_node
             = MakeShared<LogicalTableScan>(base_table_ref->table_scan_function_data_->table_ptr_,
-                                                 base_table_ref->table_scan_func_,
-                                                 base_table_ref->alias_,
-                                                 base_table_ref->column_names_,
-                                                 base_table_ref->column_types_);
+                                           base_table_ref->table_scan_func_,
+                                           base_table_ref->alias_,
+                                           base_table_ref->table_index_,
+                                           base_table_ref->column_names_,
+                                           base_table_ref->column_types_);
     return table_scan_node;
 }
 
@@ -138,9 +139,12 @@ BoundSelectStatement::BuildCrossProductTable(SharedPtr<TableRef>& table_ref) {
     auto right_node = BuildFrom(cross_product_table_ref->right_table_ref_);
 
     // TODO: Merge bind context ?
-
+    String alias("cross_product" + std::to_string(cross_product_table_ref->table_index_));
     SharedPtr<LogicalCrossProduct> logical_cross_product_node =
-            MakeShared<LogicalCrossProduct>(left_node, right_node);
+            MakeShared<LogicalCrossProduct>(alias,
+                                            cross_product_table_ref->table_index_,
+                                            left_node,
+                                            right_node);
     return logical_cross_product_node;
 }
 
@@ -153,17 +157,23 @@ BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef>& table_ref) {
     auto right_node = BuildFrom(join_table_ref->right_table_ref_);
 
     // TODO: Merge bind context ?
-
+    String alias("join" + std::to_string(join_table_ref->table_index_));
     SharedPtr<LogicalJoin> logical_join_node =
-            MakeShared<LogicalJoin>(join_table_ref->join_type_, join_table_ref->on_conditions_,
-                                          left_node, right_node);
+            MakeShared<LogicalJoin>(join_table_ref->join_type_,
+                                    alias,
+                                    join_table_ref->table_index_,
+                                    join_table_ref->on_conditions_,
+                                    left_node,
+                                    right_node);
     return logical_join_node;
 }
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef>& table_ref) {
 //    auto dummy_table_ref = std::static_pointer_cast<DummyTableRef>(table_ref);
-    SharedPtr<LogicalDummyScan> dummy_scan_node = MakeShared<LogicalDummyScan>();
+    String alias("DummyTable" + std::to_string(table_ref->table_index_));
+    SharedPtr<LogicalDummyScan> dummy_scan_node = MakeShared<LogicalDummyScan>(alias,
+                                                                               table_ref->table_index_);
     return dummy_scan_node;
 }
 

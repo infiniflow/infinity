@@ -8,11 +8,16 @@
 namespace infinity {
 
 LogicalJoin::LogicalJoin(JoinType join_type,
+                         String alias,
+                         u64 join_index,
                          Vector<SharedPtr<BaseExpression>> conditions,
                          const SharedPtr<LogicalNode>& left,
                          const SharedPtr<LogicalNode>& right)
                          : LogicalNode(LogicalNodeType::kJoin),
-                         join_type_(join_type), conditions_(std::move(conditions)){
+                         join_type_(join_type),
+                         alias_(std::move(alias)),
+                         table_index_(join_index),
+                         conditions_(std::move(conditions)) {
     this->set_left_node(left);
     this->set_right_node(right);
 }

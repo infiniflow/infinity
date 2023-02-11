@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class PhysicalAlter : public PhysicalOperator{
+class PhysicalAlter : public PhysicalOperator {
 public:
     explicit PhysicalAlter(u64 id) : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id) {}
     ~PhysicalAlter() override = default;

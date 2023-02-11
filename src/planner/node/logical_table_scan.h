@@ -18,6 +18,7 @@ public:
     LogicalTableScan(SharedPtr<Table> table_ptr,
                      SharedPtr<TableScanFunction> table_scan_func,
                      String table_alias,
+                     u64 table_index,
                      Vector<String> column_names,
                      Vector<DataType> column_types);
 
@@ -30,6 +31,7 @@ public:
     ToString(i64& space) final;
 
     String table_alias_;
+    u64 table_index_;
     Vector<String> column_names_;
     Vector<DataType> column_types_;
 

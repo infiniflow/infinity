@@ -175,16 +175,22 @@ private:
 
 void
 PhysicalSort::Init() {
-    executor.Init(this->expressions_);
+    executor_.Init(this->expressions_);
+
+    ExecutorAssert(left()->outputs().size() == 1, "Input table count isn't matched.");
+
+    for(const auto& input_table: left()->outputs()) {
+        input_table_ = input_table.second;
+        input_table_index_ = input_table.first;
+    }
 
     // output table definition is same as input
-    SharedPtr<Table> output_table = left_->output();
-    SizeT column_count = output_table->ColumnCount();
+    SizeT column_count = input_table_->ColumnCount();
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType col_type = output_table->GetColumnTypeById(idx);
-        String col_name = output_table->GetColumnNameById(idx);
+        DataType col_type = input_table_->GetColumnTypeById(idx);
+        String col_name = input_table_->GetColumnNameById(idx);
 
         SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
         columns.emplace_back(col_def);
@@ -192,7 +198,7 @@ PhysicalSort::Init() {
 
     SharedPtr<TableDef> table_def = TableDef::Make("sort", columns, false);
 
-    output_ = Table::Make(table_def, TableType::kIntermediate);
+    outputs_[input_table_index_] = Table::Make(table_def, TableType::kIntermediate);
 }
 
 void
@@ -202,7 +208,7 @@ PhysicalSort::Execute(SharedPtr<QueryContext>& query_context) {
     SharedPtr<Table> order_by_table = GetOrderTable();
 
     // Fill the order by table
-    this->executor.Execute(left_->output(), order_by_table);
+    this->executor_.Execute(input_table_, order_by_table);
 
     Sort(order_by_table, order_by_types_);
 }
@@ -242,7 +248,7 @@ PhysicalSort::Sort(const SharedPtr<Table>& order_by_table,
     std::sort(rowid_vector->begin(), rowid_vector->end(), Comparator(order_by_table, order_by_types));
 
     // Generate
-    output_ = GenerateOutput(left_->output(), rowid_vector);
+    outputs_[input_table_index_] = GenerateOutput(input_table_, rowid_vector);
 }
 
 SharedPtr<Table>

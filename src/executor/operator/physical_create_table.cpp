@@ -13,18 +13,22 @@ namespace infinity {
 
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          SharedPtr<TableDef> table_def_ptr,
+                                         u64 table_index,
                                          u64 id)
     : PhysicalOperator(PhysicalOperatorType::kCreateTable, nullptr, nullptr, id),
       schema_name_(std::move(schema_name)),
-    table_def_ptr_(std::move(table_def_ptr)) {
+      table_index_(table_index),
+      table_def_ptr_(std::move(table_def_ptr)) {
 
 }
 
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          const SharedPtr<PhysicalOperator>& input,
+                                         u64 table_index,
                                          u64 id)
     : PhysicalOperator(PhysicalOperatorType::kCreateTable, input, nullptr, id),
-      schema_name_(std::move(schema_name)) {
+      schema_name_(std::move(schema_name)),
+      table_index_(table_index) {
 
 }
 
@@ -46,7 +50,7 @@ PhysicalCreateTable::Execute(SharedPtr<QueryContext>& query_context) {
 
     SharedPtr<TableDef> result_table_def_ptr
         = MakeShared<TableDef>("Tables", column_defs, false);
-    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
+    outputs_[table_index_] = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 
 

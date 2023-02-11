@@ -13,9 +13,13 @@ namespace infinity {
 
 class PhysicalInsert : public PhysicalOperator {
 public:
-    explicit PhysicalInsert(uint64_t id, std::shared_ptr<Table> table_ptr, std::vector<std::shared_ptr<BaseExpression>> value_list)
+    explicit PhysicalInsert(u64 id,
+                            SharedPtr<Table> table_ptr,
+                            u64 table_index,
+                            Vector<SharedPtr<BaseExpression>> value_list)
         : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr, id),
           table_ptr_(std::move(table_ptr)),
+          table_index_(table_index),
           value_list_(std::move(value_list)) {}
     ~PhysicalInsert() override = default;
 
@@ -23,11 +27,12 @@ public:
     Init() override;
 
     void
-    Execute(std::shared_ptr<QueryContext>& query_context) override;
+    Execute(SharedPtr<QueryContext>& query_context) override;
 
 private:
-    std::shared_ptr<Table> table_ptr_;
-    std::vector<std::shared_ptr<BaseExpression>> value_list_;
+    SharedPtr<Table> table_ptr_{};
+    Vector<SharedPtr<BaseExpression>> value_list_{};
+    u64 table_index_{};
 };
 
 }

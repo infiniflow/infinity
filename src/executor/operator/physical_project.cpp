@@ -18,7 +18,7 @@ PhysicalProject::Init() {
     }
     SharedPtr<TableDef> table_def = TableDef::Make("project", columns, false);
 
-    output_ = Table::Make(table_def, TableType::kIntermediate);
+    outputs_[output_table_index_] = Table::Make(table_def, TableType::kIntermediate);
 }
 
 void
@@ -27,10 +27,14 @@ PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
         NotImplementError("Only select list.")
     } else {
         // Get input from left child
-        auto input_table = left_->output();
+        ExecutorAssert(left()->outputs().size() == 1, "Input table count isn't matched.");
 
+        for(const auto& input_table: left()->outputs()) {
+            input_table_ = input_table.second;
+            input_table_index_ = input_table.first;
+        }
         // Execute the expression on the input table
-        executor.Execute(input_table, output_);
+        executor.Execute(input_table_, outputs_[output_table_index_]);
     }
 }
 

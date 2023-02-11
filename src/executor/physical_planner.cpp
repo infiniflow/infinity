@@ -163,6 +163,7 @@ PhysicalPlanner::BuildCreateTable(const SharedPtr<LogicalNode> &logical_operator
     return MakeShared<PhysicalCreateTable>(
             logical_create_table->schema_name(),
             logical_create_table->table_definitions(),
+            logical_create_table->table_index(),
             logical_operator->node_id());
 }
 
@@ -183,6 +184,7 @@ PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) 
     return MakeShared<PhysicalDropTable>(
             logical_drop_table->schema_name(),
             logical_drop_table->table_name(),
+            logical_drop_table->table_index(),
             logical_drop_table->node_id());
 }
 
@@ -195,7 +197,10 @@ SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildInsert(const SharedPtr<LogicalNode> &logical_operator) const {
 
     SharedPtr<LogicalInsert> logical_insert_ptr = std::dynamic_pointer_cast<LogicalInsert>(logical_operator);
-    return MakeShared<PhysicalInsert>(logical_operator->node_id(), logical_insert_ptr->table_ptr(), logical_insert_ptr->value_list());
+    return MakeShared<PhysicalInsert>(logical_operator->node_id(),
+                                      logical_insert_ptr->table_ptr(),
+                                      logical_insert_ptr->table_index(),
+                                      logical_insert_ptr->value_list());
 }
 
 SharedPtr<PhysicalOperator>
@@ -237,7 +242,9 @@ PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) 
     return MakeShared<PhysicalAggregate>(logical_aggregate->node_id(),
                                          input_physical_operator,
                                          logical_aggregate->groups_,
-                                         logical_aggregate->aggregates_);
+                                         logical_aggregate->groupby_index_,
+                                         logical_aggregate->aggregates_,
+                                         logical_aggregate->aggregate_index_);
 }
 
 SharedPtr<PhysicalOperator>
@@ -288,6 +295,7 @@ PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator)
         input_physical_operator = BuildPhysicalOperator(input_logical_node);
     }
     return MakeShared<PhysicalProject>(logical_operator->node_id(),
+                                       logical_project->table_index_,
                                        input_physical_operator,
                                        logical_project->expressions_);
 }
@@ -328,7 +336,8 @@ PhysicalPlanner::BuildChunkScan(const SharedPtr<LogicalNode> &logical_operator) 
     SharedPtr<LogicalChunkScan> logical_chunk_scan =
             std::static_pointer_cast<LogicalChunkScan>(logical_operator);
     return MakeShared<PhysicalChunkScan>(logical_chunk_scan->node_id(),
-                                               logical_chunk_scan->scan_type());
+                                         logical_chunk_scan->scan_type(),
+                                         logical_chunk_scan->table_index());
 }
 
 SharedPtr<PhysicalOperator>
@@ -356,11 +365,12 @@ PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) 
         = MakeShared<TableScanFunctionData>(logical_table_scan->table_ptr(), column_ids);
 
     return MakeShared<PhysicalTableScan>(logical_operator->node_id(),
-                                               logical_table_scan->table_alias_,
-                                               logical_table_scan->column_names_,
-                                               logical_table_scan->column_types_,
-                                               logical_table_scan->table_scan_func_ptr_,
-                                               table_scan_function_data_ptr);
+                                         logical_table_scan->table_alias_,
+                                         logical_table_scan->table_index_,
+                                         logical_table_scan->column_names_,
+                                         logical_table_scan->column_types_,
+                                         logical_table_scan->table_scan_func_ptr_,
+                                         table_scan_function_data_ptr);
 }
 
 SharedPtr<PhysicalOperator>

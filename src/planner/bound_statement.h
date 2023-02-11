@@ -17,8 +17,6 @@ public:
 
     virtual SharedPtr<LogicalNode>
     BuildPlan() = 0;
-
-    virtual i64 GetTableIndex() = 0;
 };
 
 }

@@ -42,7 +42,7 @@ PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
     Vector<SharedPtr<ColumnDef>> column_defs;
     SharedPtr<TableDef> table_def_ptr
             = MakeShared<TableDef>("Tables", column_defs, false);
-    output_ = MakeShared<Table>(table_def_ptr, TableType::kResult);
+    outputs_[table_index_] = MakeShared<Table>(table_def_ptr, TableType::kResult);
 }
 
 }

@@ -257,7 +257,7 @@ QueryBinder::BuildSubquery(SharedPtr<QueryContext>& query_context,
     this->bind_context_ptr_->AddSubQueryChild(subquery_bind_context_ptr);
 
     // Get the table index of the sub query output
-    u64 subquery_table_index = bound_statement_ptr->GetTableIndex();
+    u64 subquery_table_index = bind_context_ptr_->GenerateTableIndex();
 
     String binding_name = table_alias.empty() ? "subquery" + std::to_string(subquery_table_index) : table_alias;
     // Add binding into bind context
@@ -267,7 +267,9 @@ QueryBinder::BuildSubquery(SharedPtr<QueryContext>& query_context,
                                                 *bound_statement_ptr->names_ptr_);
 
     // Use binding name as the subquery table reference name
-    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr, binding_name);
+    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr,
+                                                               subquery_table_index,
+                                                               binding_name);
 
     // TODO: Not care about the correlated expression
 
@@ -301,7 +303,7 @@ QueryBinder::BuildCTE(SharedPtr<QueryContext>& query_context,
 
     this->bind_context_ptr_->AddSubQueryChild(subquery_bind_context_ptr);
 
-    u64 cte_table_index = bound_statement_ptr->GetTableIndex();
+    u64 cte_table_index = bind_context_ptr_->GenerateTableIndex();
     // Add binding into bind context
     this->bind_context_ptr_->AddCTEBinding(name,
                                            cte_table_index,
@@ -309,7 +311,9 @@ QueryBinder::BuildCTE(SharedPtr<QueryContext>& query_context,
                                            *bound_statement_ptr->names_ptr_);
 
     // Use CTE name as the subquery table reference name
-    auto cte_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr, name);
+    auto cte_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr,
+                                                          cte_table_index,
+                                                          name);
 
     // TODO: Not care about the correlated expression
 
@@ -330,7 +334,7 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
     // TODO: Handle table and column alias
 
     u64 table_index = this->bind_context_ptr_->GenerateTableIndex();
-    String alias = from_table->getName();
+    String alias = from_table->getName() != nullptr ? from_table->getName() : String();
     Vector<DataType> types;
     Vector<String> names;
     Vector<SizeT> columns;
@@ -398,7 +402,9 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
                                             *bound_statement_ptr->names_ptr_);
 
     // Use view name as the subquery table reference name
-    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr, view_name);
+    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr,
+                                                               bind_context_ptr_->GenerateTableIndex(),
+                                                               view_name);
 
     // TODO: Not care about the correlated expression
 
@@ -444,7 +450,7 @@ QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
         SharedPtr<TableRef> right_bound_table_ref = right_query_binder->BuildFromClause(query_context, right_table_ptr);
 
         // Cross product node with dummy name
-        auto cross_product_table_ref = MakeShared<CrossProductTableRef>(String());
+        auto cross_product_table_ref = MakeShared<CrossProductTableRef>(bind_context_ptr_->GenerateTableIndex(), String());
         cross_product_table_ref->left_bind_context_ = left_query_binder->bind_context_ptr_;
         cross_product_table_ref->left_table_ref_ = left_bound_table_ref;
         cross_product_table_ref->right_bind_context_ = right_query_binder->bind_context_ptr_;
@@ -467,8 +473,8 @@ SharedPtr<TableRef>
 QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
                        const hsql::TableRef *from_table) {
 
-    String alias = from_table->getName();
-    auto result = MakeShared<JoinTableRef>(alias);
+    String alias = from_table->getName() != nullptr ? from_table->getName() : String();
+    auto result = MakeShared<JoinTableRef>(bind_context_ptr_->GenerateTableIndex(), alias);
 
     switch (from_table->join->type) {
         case hsql::JoinType::kJoinCross: result->join_type_ = JoinType::kCross; break;
@@ -519,7 +525,10 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
 
         if(using_column_names.empty()) {
             // It is cross product, but not a natural join with dummy name
-            auto cross_product_table_ref = MakeShared<CrossProductTableRef>(String());
+            u64 cross_product_table_index = bind_context_ptr_->GenerateTableIndex();
+            String cross_product_table_name = "cross_product" + std::to_string(cross_product_table_index);
+            auto cross_product_table_ref = MakeShared<CrossProductTableRef>(cross_product_table_index,
+                                                                            cross_product_table_name);
             cross_product_table_ref->left_bind_context_ = result->left_bind_context_;
             cross_product_table_ref->left_table_ref_ = left_bound_table_ref;
 

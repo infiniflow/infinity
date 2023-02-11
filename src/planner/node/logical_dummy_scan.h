@@ -11,11 +11,18 @@ namespace infinity {
 class LogicalDummyScan : public LogicalNode {
 public:
     explicit
-    LogicalDummyScan()
-        : LogicalNode(LogicalNodeType::kDummyScan) {}
+    LogicalDummyScan(String table_alias,
+                     u64 table_index)
+        : LogicalNode(LogicalNodeType::kDummyScan),
+          table_alias_(std::move(table_alias)),
+          table_index_(table_index)
+          {}
 
     String
     ToString(i64& space) final;
+
+    String table_alias_;
+    u64 table_index_;
 };
 
 }

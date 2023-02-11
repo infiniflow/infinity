@@ -13,14 +13,19 @@ class LogicalJoin: public LogicalNode {
 public:
     explicit
     LogicalJoin(JoinType join_type,
+                String alias,
+                u64 join_index,
                 Vector<SharedPtr<BaseExpression>> conditions,
                 const SharedPtr<LogicalNode>& left,
                 const SharedPtr<LogicalNode>& right);
 
     String
     ToString(i64& space) final;
-private:
 
+    String alias_{};
+    u64 table_index_{};
+
+public:
     JoinType join_type_{JoinType::kInvalid};
     Vector<SharedPtr<BaseExpression>> conditions_{};
 };

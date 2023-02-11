@@ -46,7 +46,9 @@ private:
     GetOrderTable() const;
 
 private:
-    ExpressionExecutor executor;
+    ExpressionExecutor executor_;
+    SharedPtr<Table> input_table_{};
+    u64 input_table_index_{};
 };
 
 }
