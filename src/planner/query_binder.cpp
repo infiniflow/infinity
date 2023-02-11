@@ -548,7 +548,12 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
                 auto left_column_type = left_binding_ptr->column_types_[left_column_index];
 
                 SharedPtr<ColumnExpression> left_column_expression_ptr =
-                        MakeShared<ColumnExpression>(left_column_type, left_binding_ptr->table_name_, column_name, left_column_index, 0);
+                        MakeShared<ColumnExpression>(left_column_type,
+                                                     left_binding_ptr->table_name_,
+                                                     left_binding_ptr->table_index_,
+                                                     column_name,
+                                                     left_column_index,
+                                                     0);
 
                 PlannerAssert(result->right_bind_context_->binding_names_by_column_.contains(column_name), "Column: " + column_name + " doesn't exist in right table");
 
@@ -564,7 +569,12 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
                 auto right_column_type = right_binding_ptr->column_types_[right_column_index];
 
                 SharedPtr<ColumnExpression> right_column_expression_ptr =
-                        MakeShared<ColumnExpression>(right_column_type, right_binding_ptr->table_name_, column_name, right_column_index, 0);
+                        MakeShared<ColumnExpression>(right_column_type,
+                                                     right_binding_ptr->table_name_,
+                                                     right_binding_ptr->table_index_,
+                                                     column_name,
+                                                     right_column_index,
+                                                     0);
 
                 auto condition = MakeShared<ConjunctionExpression>(ConjunctionType::kAnd, left_column_expression_ptr, right_column_expression_ptr);
                 result->on_conditions_.emplace_back(condition);
@@ -814,6 +824,7 @@ QueryBinder::PruneOutput(SharedPtr<QueryContext>& query_context,
         const SharedPtr<BaseExpression>& expr = projection_expressions[column_id];
         SharedPtr<ColumnExpression> result = ColumnExpression::Make(expr->Type(),
                                                                     bind_context_ptr_->project_table_name_,
+                                                                    bind_context_ptr_->project_table_index_,
                                                                     output_names[column_id],
                                                                     column_id,
                                                                     0);

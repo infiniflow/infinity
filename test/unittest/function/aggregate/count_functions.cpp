@@ -46,6 +46,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataType data_type(LogicalType::kBoolean);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                 "t1",
+                                                                                1,
                                                                                 "c1",
                                                                                 0,
                                                                                 0);
@@ -77,6 +78,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataType data_type(LogicalType::kTinyInt);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                 "t1",
+                                                                                1,
                                                                                 "c1",
                                                                                 0,
                                                                                 0);
@@ -108,6 +110,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataType data_type(LogicalType::kSmallInt);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                 "t1",
+                                                                                1,
                                                                                 "c1",
                                                                                 0,
                                                                                 0);
@@ -140,6 +143,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataType data_type(LogicalType::kInteger);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                 "t1",
+                                                                                1,
                                                                                 "c1",
                                                                                 0,
                                                                                 0);
@@ -172,6 +176,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataType data_type(LogicalType::kBigInt);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                 "t1",
+                                                                                1,
                                                                                 "c1",
                                                                                 0,
                                                                                 0);
@@ -204,6 +209,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataType data_type(LogicalType::kHugeInt);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                 "t1",
+                                                                                1,
                                                                                 "c1",
                                                                                 0,
                                                                                 0);
@@ -238,6 +244,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataType data_type(LogicalType::kFloat);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                 "t1",
+                                                                                1,
                                                                                 "c1",
                                                                                 0,
                                                                                 0);
@@ -270,6 +277,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataType data_type(LogicalType::kDouble);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                 "t1",
+                                                                                1,
                                                                                 "c1",
                                                                                 0,
                                                                                 0);

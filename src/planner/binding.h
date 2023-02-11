@@ -38,7 +38,7 @@ public:
     BindingType binding_type_{ BindingType::kInvalid };
 
     // Binding table alias or name
-    String table_name_;
+    String table_name_{};
 
     u64 table_index_{};
 
@@ -52,13 +52,13 @@ public:
     SharedPtr<Table> table_ptr_{nullptr};
 
     // Column types of the binding
-    Vector<DataType> column_types_;
+    Vector<DataType> column_types_{};
 
     // Column names of the binding
-    Vector<String> column_names_;
+    Vector<String> column_names_{};
 
     // Column name -> column index mapping
-    HashMap<String, i64> name2index_;
+    HashMap<String, i64> name2index_{};
 };
 
 //class TableBinding: public GenericBinding {

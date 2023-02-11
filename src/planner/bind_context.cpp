@@ -144,11 +144,11 @@ BindContext::AddTableBinding(const String& table_alias,
                                         table_alias,
                                         table_index,
                                         std::move(table_ptr),
-//                                        std::move(logical_node_ptr),
-//                                        logical_node_id,
                                         column_types, column_names);
     AddBinding(binding);
     table_names_.emplace_back(table_alias);
+    table_name2table_index_[table_alias] = table_index;
+    table_table_index2table_name_[table_index] = table_alias;
 }
 
 void
@@ -222,9 +222,10 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
 
             if(binding->name2index_.contains(column_name_ref)) {
                 i64 column_id = binding->name2index_[column_name_ref];
-                bound_column_expr = MakeShared<ColumnExpression>(
+                bound_column_expr = ColumnExpression::Make(
                         binding->column_types_[column_id],
                         binding_name,
+                        binding->table_index_,
                         column_name_ref,
                         column_id,
                         depth);
@@ -246,9 +247,10 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
             if(binding->name2index_.contains(column_name_ref)) {
                 // Find the table and column in the bind context.
                 i64 column_id = binding->name2index_[column_name_ref];
-                bound_column_expr = MakeShared<ColumnExpression>(
+                bound_column_expr = ColumnExpression::Make(
                         binding->column_types_[column_id],
                         table_name_ref,
+                        binding->table_index_,
                         column_name_ref,
                         column_id,
                         depth);

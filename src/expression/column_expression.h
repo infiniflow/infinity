@@ -14,19 +14,25 @@ public:
     static inline SharedPtr<ColumnExpression>
     Make(DataType data_type,
          String table_name,
+         u64 table_index,
          String column_name,
          i64 column_index,
          i64 depth) {
         return MakeShared<ColumnExpression>(std::move(data_type),
                                             std::move(table_name),
+                                            table_index,
                                             std::move(column_name),
                                             column_index,
                                             depth);
     }
 
 public:
-    ColumnExpression(DataType data_type, String table_name,
-                     String column_name, i64 column_index, i64 depth);
+    ColumnExpression(DataType data_type,
+                     String table_name,
+                     u64 table_index,
+                     String column_name,
+                     i64 column_index,
+                     i64 depth);
 
     DataType
     Type() const override {
@@ -39,6 +45,11 @@ public:
     const String&
     table_name() const {
         return table_name_;
+    }
+
+    u64
+    table_index() const {
+        return table_index_;
     }
 
     const String&
@@ -54,10 +65,15 @@ public:
 private:
 
     DataType data_type_;
-    String table_name_;
-    String column_name_;
 
-    i64 column_index_;
+    String table_name_{};
+
+    u64 table_index_{};
+
+    String column_name_{};
+
+    i64 column_index_{};
+
     i64 depth_;
 };
 

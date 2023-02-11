@@ -26,6 +26,7 @@ HavingBinder::BuildExpression(const hsql::Expr &expr,
 
             SharedPtr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
                                                                         bind_context_ptr->group_by_table_name_,
+                                                                        bind_context_ptr->group_by_table_index_,
                                                                         std::to_string(groupby_index),
                                                                         groupby_index,
                                                                         depth);
@@ -44,6 +45,7 @@ HavingBinder::BuildExpression(const hsql::Expr &expr,
 
             SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
                                                                         bind_context_ptr->aggregate_table_name_,
+                                                                        bind_context_ptr->aggregate_table_index_,
                                                                         std::to_string(aggregate_index),
                                                                         aggregate_index,
                                                                         depth);

@@ -9,11 +9,16 @@
 
 namespace infinity {
 
-ColumnExpression::ColumnExpression(DataType data_type, String table_name,
-                                   String column_name, i64 column_index, i64 depth)
+ColumnExpression::ColumnExpression(DataType data_type,
+                                   String table_name,
+                                   u64 table_index,
+                                   String column_name,
+                                   i64 column_index,
+                                   i64 depth)
                                    : BaseExpression(ExpressionType::kColumn, {}),
                                    data_type_(std::move(data_type)),
                                    table_name_(std::move(table_name)),
+                                   table_index_(table_index),
                                    column_name_(std::move(column_name)),
                                    column_index_(column_index),
                                    depth_(depth)

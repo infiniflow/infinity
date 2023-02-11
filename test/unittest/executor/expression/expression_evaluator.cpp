@@ -47,7 +47,8 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     // Input expressions
     Vector<SharedPtr<BaseExpression>> exprs;
     // Column expression
-    SharedPtr<ColumnExpression> col_expr = MakeShared<ColumnExpression>(DataType(LogicalType::kBigInt), "t1", "c1", 0, 0);
+    SharedPtr<ColumnExpression> col_expr =
+            ColumnExpression::Make(DataType(LogicalType::kBigInt), "t1", 1, "c1", 0, 0);
     // Value expression
     Value v = Value::MakeBigInt(1);
     SharedPtr<ValueExpression> value_expr = MakeShared<ValueExpression>(v);
@@ -128,7 +129,12 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     // Input expressions
     Vector<SharedPtr<BaseExpression>> exprs;
     // Column expression
-    SharedPtr<ColumnExpression> col_expr = MakeShared<ColumnExpression>(DataType(LogicalType::kBigInt), "t1", "c1", 0, 0);
+    SharedPtr<ColumnExpression> col_expr = MakeShared<ColumnExpression>(DataType(LogicalType::kBigInt),
+                                                                        "t1",
+                                                                        1,
+                                                                        "c1",
+                                                                        0,
+                                                                        0);
     // Value expression
     Value v = Value::MakeBigInt(8192);
     SharedPtr<ValueExpression> value_expr = MakeShared<ValueExpression>(v);

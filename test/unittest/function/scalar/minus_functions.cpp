@@ -50,6 +50,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kTinyInt);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                 "t1",
+                                                                                1,
                                                                                 "c1",
                                                                                 0,
                                                                                 0);
@@ -100,6 +101,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kSmallInt);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
@@ -146,6 +148,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kInteger);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
@@ -192,6 +195,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kBigInt);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
@@ -238,6 +242,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kHugeInt);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
@@ -257,6 +262,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kFloat);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
@@ -303,6 +309,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kDouble);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
@@ -349,6 +356,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kDecimal16);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
@@ -368,6 +376,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kDecimal32);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
@@ -387,6 +396,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kDecimal64);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
@@ -406,6 +416,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kDecimal128);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
@@ -425,6 +436,7 @@ TEST_F(MinusFunctionsTest, plus_func) {
         DataType result_type(LogicalType::kMixed);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);

@@ -50,11 +50,13 @@ TEST_F(PowFunctionsTest, mul_func) {
         DataType result_type(LogicalType::kFloat);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                 "t1",
+                                                                                1,
                                                                                 "c1",
                                                                                 0,
                                                                                 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c2",
                                                                                  1,
                                                                                  0);
@@ -107,11 +109,13 @@ TEST_F(PowFunctionsTest, mul_func) {
         DataType result_type(LogicalType::kDouble);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c2",
                                                                                  1,
                                                                                  0);
@@ -165,11 +169,13 @@ TEST_F(PowFunctionsTest, mul_func) {
         DataType result_type(LogicalType::kDouble);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type1,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type2,
                                                                                  "t1",
+                                                                                 1,
                                                                                  "c2",
                                                                                  1,
                                                                                  0);

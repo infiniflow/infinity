@@ -65,6 +65,8 @@ public:
 
     // Binding Table
     Vector<String> table_names_;
+    HashMap<String, u64> table_name2table_index_;
+    HashMap<u64, String> table_table_index2table_name_;
 
     // Select list
     Vector<SharedPtr<ParsedExpression>> select_expression_;

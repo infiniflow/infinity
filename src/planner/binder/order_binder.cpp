@@ -68,6 +68,7 @@ OrderBinder::BuildExpression(const hsql::Expr &expr,
 
     SharedPtr<ColumnExpression> result = ColumnExpression::Make(project_expr->Type(),
                                                                 bind_context_ptr->project_table_name_,
+                                                                bind_context_ptr->project_table_index_,
                                                                 std::to_string(column_id),
                                                                 column_id,
                                                                 depth);
