@@ -46,7 +46,7 @@ public:
 
     void
     Initialize() {
-        this->value_ = 0;
+        this->value_ = true;
     }
 
     void
@@ -77,7 +77,7 @@ public:
 
     void
     Initialize() {
-        this->value_ = 0;
+        this->value_ = std::numeric_limits<TinyIntT>::max();
     }
 
     void
@@ -108,7 +108,7 @@ public:
 
     void
     Initialize() {
-        this->value_ = 0;
+        this->value_ = std::numeric_limits<SmallIntT>::max();
     }
 
     void
@@ -139,7 +139,7 @@ public:
 
     void
     Initialize() {
-        this->value_ = 0;
+        this->value_ = std::numeric_limits<IntegerT>::max();
     }
 
     void
@@ -170,7 +170,7 @@ public:
 
     void
     Initialize() {
-        this->value_ = 0;
+        this->value_ = std::numeric_limits<BigIntT>::max();
     }
 
     void
@@ -201,7 +201,8 @@ public:
 
     void
     Initialize() {
-        this->value_.Reset();
+        this->value_.lower = std::numeric_limits<BigIntT>::max();
+        this->value_.upper = std::numeric_limits<BigIntT>::max();
     }
 
     void
@@ -232,7 +233,7 @@ public:
 
     void
     Initialize() {
-        this->value_ = 0;
+        this->value_ = std::numeric_limits<FloatT>::max();
     }
 
     void
@@ -263,7 +264,7 @@ public:
 
     void
     Initialize() {
-        this->value_ = 0;
+        this->value_ = std::numeric_limits<DoubleT>::max();
     }
 
     void

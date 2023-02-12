@@ -43,7 +43,7 @@ GroupBinder::BuildExpression(const hsql::Expr &expr,
     }
 
     if(root) {
-        String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();
+        String expr_name = Statement::ExprAsColumnName(&expr);
 
         if(bind_context_ptr->group_index_by_name_.contains(expr_name)) {
             PlannerError("Duplicated group by expression: " + expr_name);

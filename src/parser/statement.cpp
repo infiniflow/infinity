@@ -48,16 +48,16 @@ Statement::ExprAsColumnName(const hsql::Expr* expr) {
         }
         case hsql::kExprFunctionRef: {
             std::stringstream ss;
-            if(expr->expr != nullptr && expr->expr2 != nullptr) {
-                // Binary function
-                ss << expr->getName() << "("
-                   << Statement::ExprAsColumnName(expr->expr)
-                   << ", " << Statement::ExprAsColumnName(expr->expr) << ")";
-            } else if (expr->expr != nullptr) {
-                // Unary function
-                ss << expr->getName() << "("
-                   << Statement::ExprAsColumnName(expr->expr)
-                   << ")";
+            SizeT argument_count = expr->exprList->size();
+            ss << expr->getName() << "(";
+            for(SizeT idx = 0; idx < argument_count; ++ idx) {
+                ss << Statement::ExprAsColumnName((*(expr->exprList))[idx]);
+                if(idx == argument_count - 1) {
+                    // the last one
+                    ss << ")";
+                } else {
+                    ss << ", ";
+                }
             }
             return ss.str();
         }

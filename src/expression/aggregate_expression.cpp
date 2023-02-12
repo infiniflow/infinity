@@ -21,7 +21,19 @@ AggregateExpression::IsCountStar() const {
 
 String
 AggregateExpression::ToString() const {
-    return aggregate_function_.name();
+    std::stringstream ss;
+    ss << aggregate_function_.name() << "(";
+    if(arguments_.empty()) {
+        ss << ")";
+    } else {
+        auto arguments_count = arguments_.size();
+        for(auto i = 0; i < arguments_count - 1; ++ i) {
+            ss << arguments_[i]->ToString() << ", ";
+        }
+        ss << arguments_.back()->ToString() << ")";
+    }
+
+    return ss.str();
 }
 
 DataType
