@@ -80,8 +80,9 @@ LogicalPlanner::Build(const hsql::SQLStatement& statement) {
 void
 LogicalPlanner::BuildSelect(const hsql::SelectStatement& statement) {
     SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
-    QueryBinder query_binder(this->query_context_ptr_, bind_context_ptr);
-    SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(statement);
+    SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_,
+                                                                      bind_context_ptr);
+    SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(statement);
     this->logical_plan_ = bound_statement_ptr->BuildPlan();
 }
 
