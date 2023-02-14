@@ -418,9 +418,27 @@ QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
                             const hsql::TableRef *from_table) {
     const Vector<hsql::TableRef*>& tables = *from_table->list;
 
+    Vector<SharedPtr<BindContext>> bind_contexts;
+    {
+        SharedPtr<BindContext> current_bind_context = this->bind_context_ptr_;
+        auto table_count = tables.size();
+        bind_contexts.reserve(table_count * 2);
+        for(auto i = 0; i < table_count - 1; ++ i) {
+            SharedPtr<BindContext> right_bind_context = BindContext::Make(current_bind_context);
+            SharedPtr<BindContext> left_bind_context = BindContext::Make(current_bind_context);
+            bind_contexts.emplace_back(right_bind_context);
+            bind_contexts.emplace_back(left_bind_context);
+
+            current_bind_context = left_bind_context;
+        }
+    }
+
+    SizeT bind_context_idx = bind_contexts.size() - 1;
+
+
     SharedPtr<CrossProductTableRef> cross_product_table_ref{};
 
-    SharedPtr<BindContext> left_bind_context = BindContext::Make(nullptr);
+    SharedPtr<BindContext> left_bind_context = bind_contexts[bind_context_idx --];
     SharedPtr<QueryBinder> left_query_binder = MakeShared<QueryBinder>(query_context, left_bind_context);
     SharedPtr<TableRef> left_table_ref = left_query_binder->BuildFromClause(query_context, tables[0]);
 
@@ -430,11 +448,11 @@ QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
 
     auto table_count = tables.size();
     for(auto i = 1; i < table_count - 1; ++ i) {
-        right_bind_context = BindContext::Make(nullptr);
+        right_bind_context = bind_contexts[bind_context_idx --];
         right_query_binder = MakeShared<QueryBinder>(query_context, right_bind_context);
         right_table_ref = right_query_binder->BuildFromClause(query_context, tables[i]);
 
-        SharedPtr<BindContext> cross_product_bind_context = BindContext::Make(nullptr);
+        SharedPtr<BindContext> cross_product_bind_context = bind_contexts[bind_context_idx --];
         cross_product_bind_context->AddLeftChild(left_bind_context);
         cross_product_bind_context->AddRightChild(right_bind_context);
 
@@ -450,7 +468,8 @@ QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
         left_table_ref = cross_product_table_ref;
     }
 
-    right_bind_context = BindContext::Make(nullptr);
+    right_bind_context = bind_contexts[bind_context_idx];
+    PlannerAssert(bind_context_idx == 0, "Mismatched bind context count.");
     right_query_binder = MakeShared<QueryBinder>(query_context, right_bind_context);
     right_table_ref = right_query_binder->BuildFromClause(query_context, tables[table_count - 1]);
 
