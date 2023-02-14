@@ -415,59 +415,55 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
 
 SharedPtr<TableRef>
 QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
-                               const hsql::TableRef* from_table) {
-    // Create left and right bind context
-    // Build left and right table with new bind context
-    // Merge two bind context into their parent context
-
-    Vector<SharedPtr<QueryBinder>> binder_stack;
-    SharedPtr<QueryBinder> left_query_binder = shared_from_this();
-    binder_stack.push_back(left_query_binder);
-
-    SharedPtr<QueryBinder> cross_product_query_binder = nullptr;
+                            const hsql::TableRef *from_table) {
     const Vector<hsql::TableRef*>& tables = *from_table->list;
+
+    SharedPtr<CrossProductTableRef> cross_product_table_ref{};
+
+    SharedPtr<BindContext> left_bind_context = BindContext::Make(nullptr);
+    SharedPtr<QueryBinder> left_query_binder = MakeShared<QueryBinder>(query_context, left_bind_context);
+    SharedPtr<TableRef> left_table_ref = left_query_binder->BuildFromClause(query_context, tables[0]);
+
+    SharedPtr<BindContext> right_bind_context{};
+    SharedPtr<QueryBinder> right_query_binder{};
+    SharedPtr<TableRef> right_table_ref{};
+
     auto table_count = tables.size();
-    for(auto i = table_count - 1; i > 0 ; -- i) {
+    for(auto i = 1; i < table_count - 1; ++ i) {
+        right_bind_context = BindContext::Make(nullptr);
+        right_query_binder = MakeShared<QueryBinder>(query_context, right_bind_context);
+        right_table_ref = right_query_binder->BuildFromClause(query_context, tables[i]);
 
-        SharedPtr<QueryBinder> right_query_binder = MakeShared<QueryBinder>(query_context, left_query_binder->bind_context_ptr_);
-        binder_stack.emplace_back(right_query_binder);
+        SharedPtr<BindContext> cross_product_bind_context = BindContext::Make(nullptr);
+        cross_product_bind_context->AddLeftChild(left_bind_context);
+        cross_product_bind_context->AddRightChild(right_bind_context);
 
-        cross_product_query_binder = MakeShared<QueryBinder>(query_context, left_query_binder->bind_context_ptr_);
+        SharedPtr<QueryBinder> cross_product_query_binder = MakeShared<QueryBinder>(query_context, cross_product_bind_context);
+
+        cross_product_table_ref = MakeShared<CrossProductTableRef>(cross_product_bind_context->GenerateTableIndex(),
+                                                                   "cross product");
+        cross_product_table_ref->left_table_ref_ = left_table_ref;
+        cross_product_table_ref->right_table_ref_ = right_table_ref;
+
+        left_bind_context = cross_product_bind_context;
         left_query_binder = cross_product_query_binder;
-        binder_stack.emplace_back(left_query_binder);
+        left_table_ref = cross_product_table_ref;
     }
 
-    left_query_binder = binder_stack.back();
-    binder_stack.pop_back();
+    right_bind_context = BindContext::Make(nullptr);
+    right_query_binder = MakeShared<QueryBinder>(query_context, right_bind_context);
+    right_table_ref = right_query_binder->BuildFromClause(query_context, tables[table_count - 1]);
 
-    hsql::TableRef* left_table_ptr = tables[0];
-    SharedPtr<TableRef> left_bound_table_ref = left_query_binder->BuildFromClause(query_context, left_table_ptr);
+    this->bind_context_ptr_->AddLeftChild(left_bind_context);
+    this->bind_context_ptr_->AddRightChild(right_bind_context);
 
-    for(auto i = 1; i < table_count; ++ i) {
-        // Right node
-        auto right_query_binder = binder_stack.back();
-        binder_stack.pop_back();
-        hsql::TableRef* right_table_ptr = tables[i];
-        SharedPtr<TableRef> right_bound_table_ref = right_query_binder->BuildFromClause(query_context, right_table_ptr);
+    cross_product_table_ref = MakeShared<CrossProductTableRef>(bind_context_ptr_->GenerateTableIndex(),
+                                                               "cross product");
+    cross_product_table_ref->left_table_ref_ = left_table_ref;
+    cross_product_table_ref->right_table_ref_ = right_table_ref;
 
-        // Cross product node with dummy name
-        auto cross_product_table_ref = MakeShared<CrossProductTableRef>(bind_context_ptr_->GenerateTableIndex(), String());
-        cross_product_table_ref->left_bind_context_ = left_query_binder->bind_context_ptr_;
-        cross_product_table_ref->left_table_ref_ = left_bound_table_ref;
-        cross_product_table_ref->right_bind_context_ = right_query_binder->bind_context_ptr_;
-        cross_product_table_ref->right_table_ref_ = right_bound_table_ref;
-
-        cross_product_query_binder = binder_stack.back();
-        binder_stack.pop_back();
-        cross_product_query_binder->bind_context_ptr_->AddLeftChild(left_query_binder->bind_context_ptr_);
-        cross_product_query_binder->bind_context_ptr_->AddRightChild(right_query_binder->bind_context_ptr_);
-
-        left_query_binder = cross_product_query_binder;
-        left_bound_table_ref = cross_product_table_ref;
-    }
-
-    this->bind_context_ptr_ = left_query_binder->bind_context_ptr_;
-    return left_bound_table_ref;
+    SharedPtr<TableRef> result = cross_product_table_ref;
+    return result;
 }
 
 SharedPtr<TableRef>
@@ -530,10 +526,10 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
             String cross_product_table_name = "cross_product" + std::to_string(cross_product_table_index);
             auto cross_product_table_ref = MakeShared<CrossProductTableRef>(cross_product_table_index,
                                                                             cross_product_table_name);
-            cross_product_table_ref->left_bind_context_ = result->left_bind_context_;
+//            cross_product_table_ref->left_bind_context_ = result->left_bind_context_;
             cross_product_table_ref->left_table_ref_ = left_bound_table_ref;
 
-            cross_product_table_ref->right_bind_context_ = result->right_bind_context_;
+//            cross_product_table_ref->right_bind_context_ = result->right_bind_context_;
             cross_product_table_ref->right_table_ref_ = right_bound_table_ref;
             return cross_product_table_ref;
         } else {

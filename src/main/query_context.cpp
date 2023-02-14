@@ -21,7 +21,7 @@ namespace infinity {
 
 class Pipeline;
 
-std::string
+String
 QueryResult::ToString() const {
     std::stringstream ss;
 
@@ -69,7 +69,7 @@ QueryContext::QueryContext(SharedPtr<Session> session_ptr, UniquePtr<Transaction
     : session_ptr_(std::move(session_ptr)), transaction_(transaction) {}
 
 QueryResult
-QueryContext::Query(const std::string &query) {
+QueryContext::Query(const String &query) {
     hsql::SQLParserResult parse_result;
 
     // Parse sql

@@ -20,7 +20,8 @@ class QueryBinder : public std::enable_shared_from_this<QueryBinder> {
 public:
     explicit
     QueryBinder(SharedPtr<QueryContext> query_context, SharedPtr<BindContext> bind_context_ptr)
-        : query_context_ptr_(std::move(query_context)), bind_context_ptr_(std::move(bind_context_ptr)) {}
+        : query_context_ptr_(std::move(query_context)), bind_context_ptr_(std::move(bind_context_ptr))
+        {}
 
     SharedPtr<BoundSelectStatement>
     BindSelect(const hsql::SelectStatement& statement);

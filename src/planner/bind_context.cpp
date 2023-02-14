@@ -16,7 +16,10 @@ BindContext::~BindContext() {
 void
 BindContext::Destroy() {
     // TODO: Bind context need to release the resource carefully.
-    parent_ = nullptr;
+    if(parent_ != nullptr) {
+        parent_->Destroy();
+        parent_ = nullptr;
+    }
 }
 
 SharedPtr<CommonTableExpressionInfo>
@@ -177,11 +180,29 @@ BindContext::AddSubQueryChild(const SharedPtr<BindContext>& child) {
 void
 BindContext::AddBindContext(const SharedPtr<BindContext>& other_ptr) {
 
+    table_names_.reserve(table_names_.size() + other_ptr->table_names_.size());
+    for(const auto& table_name: other_ptr->table_names_) {
+        table_names_.emplace_back(table_name);
+    }
+
+    for(const auto& table_name2index_pair: other_ptr->table_name2table_index_) {
+        const String& table_name = table_name2index_pair.first;
+        PlannerAssert(!table_name2table_index_.contains(table_name),
+                      fmt::format("{} was bound before", table_name));
+        table_name2table_index_[table_name] = table_name2index_pair.second;
+    }
+
+    for(const auto& table_index2name_pair: other_ptr->table_table_index2table_name_) {
+        u64 table_index = table_index2name_pair.first;
+        PlannerAssert(!table_table_index2table_name_.contains(table_index),
+                      fmt::format("Table index: {} is bound before", table_index));
+        table_table_index2table_name_[table_index] = table_index2name_pair.second;
+    }
+
     for(auto& name_binding_pair : other_ptr->binding_by_name_) {
         auto& binding_name = name_binding_pair.first;
-        if(this->binding_by_name_.contains(binding_name)) {
-            PlannerError("Table: " + binding_name + " has already been bound before.");
-        }
+        PlannerAssert(!binding_by_name_.contains(binding_name),
+                      fmt::format("Table: {} was bound before", binding_name));
         this->binding_by_name_.emplace(name_binding_pair);
     }
 
