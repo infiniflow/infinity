@@ -210,17 +210,80 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
 
 void
 ColumnVector::Initialize(const ColumnVector& other, SizeT start_idx, SizeT end_idx) {
-    StorageAssert(!initialized, "Column vector is already initialized.")
-    StorageAssert(data_type_.type() == other.data_type().type(), "Data type isn't matched.")
+    Initialize(other.vector_type_, other, start_idx, end_idx);
+}
 
-    vector_type_ = other.vector_type_;
+void
+ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
+    StorageAssert(!initialized, "Column vector is already initialized.")
+    StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
+    StorageAssert(vector_type != ColumnVectorType::kInvalid, "Attempt to initialize column vector to invalid type.")
+    // TODO: No check on capacity value.
+
+    vector_type_ = vector_type;
+    if(vector_type_ == ColumnVectorType::kConstant) {
+        capacity_ = 1;
+    } else {
+        capacity_ = capacity;
+    }
+
+    tail_index_ = 0;
+    data_type_size_ = data_type_.Size();
+    VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
+    switch(data_type_.type()) {
+        case LogicalType::kBlob:
+        case LogicalType::kBitmap:
+        case LogicalType::kPolygon:
+        case LogicalType::kPath:
+        case LogicalType::kVarchar: {
+            vector_buffer_type = VectorBufferType::kHeap;
+
+            break;
+        }
+        case LogicalType::kInvalid:
+        case LogicalType::kNull:
+        case LogicalType::kMissing: {
+            TypeError("Unexpected data type for column vector.")
+        }
+        default: {
+            vector_buffer_type = VectorBufferType::kStandard;
+        }
+    }
+    if(buffer_ == nullptr) {
+        buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
+        data_ptr_ = buffer_->GetData();
+        nulls_ptr_ = Bitmask::Make(capacity_);
+    } else {
+        // Initialize after reset will come to this branch
+        if(vector_buffer_type == VectorBufferType::kHeap) {
+            StorageAssert(buffer_->heap_mgr_ == nullptr, "Vector heap should be null.")
+            buffer_->heap_mgr_ = MakeUnique<StringHeapMgr>();
+        }
+    }
+
+    initialized = true;
+}
+
+void
+ColumnVector::Initialize(ColumnVectorType vector_type,
+                         const ColumnVector& other,
+                         SizeT start_idx,
+                         SizeT end_idx) {
+
+    StorageAssert(!initialized, "Column vector isn't initialized.")
+    StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
+    // TODO: No check on capacity value.
+
+    vector_type_ = vector_type;
     if(vector_type_ == ColumnVectorType::kConstant) {
         capacity_ = 1;
     } else {
         capacity_ = end_idx - start_idx;
     }
 
+    tail_index_ = 0;
     data_type_size_ = data_type_.Size();
+
     VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
     switch(data_type_.type()) {
         case LogicalType::kBlob:
@@ -405,57 +468,6 @@ ColumnVector::Initialize(const ColumnVector& other, SizeT start_idx, SizeT end_i
             ExecutorError("Invalid data type")
         }
     }
-}
-
-void
-ColumnVector::Initialize(SizeT capacity, ColumnVectorType vector_type) {
-    StorageAssert(!initialized, "Column vector is already initialized.")
-    StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
-    StorageAssert(vector_type != ColumnVectorType::kInvalid, "Attempt to initialize column vector to invalid type.")
-    // TODO: No check on capacity value.
-
-    vector_type_ = vector_type;
-    if(vector_type_ == ColumnVectorType::kConstant) {
-        capacity_ = 1;
-    } else {
-        capacity_ = capacity;
-    }
-
-    tail_index_ = 0;
-    data_type_size_ = data_type_.Size();
-    VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
-    switch(data_type_.type()) {
-        case LogicalType::kBlob:
-        case LogicalType::kBitmap:
-        case LogicalType::kPolygon:
-        case LogicalType::kPath:
-        case LogicalType::kVarchar: {
-            vector_buffer_type = VectorBufferType::kHeap;
-
-            break;
-        }
-        case LogicalType::kInvalid:
-        case LogicalType::kNull:
-        case LogicalType::kMissing: {
-            TypeError("Unexpected data type for column vector.")
-        }
-        default: {
-            vector_buffer_type = VectorBufferType::kStandard;
-        }
-    }
-    if(buffer_ == nullptr) {
-        buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
-        data_ptr_ = buffer_->GetData();
-        nulls_ptr_ = Bitmask::Make(capacity_);
-    } else {
-        // Initialize after reset will come to this branch
-        if(vector_buffer_type == VectorBufferType::kHeap) {
-            StorageAssert(buffer_->heap_mgr_ == nullptr, "Vector heap should be null.")
-            buffer_->heap_mgr_ = MakeUnique<StringHeapMgr>();
-        }
-    }
-
-    initialized = true;
 }
 
 String

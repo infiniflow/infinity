@@ -190,7 +190,7 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     DataType data_type(LogicalType::kEmbedding, embedding_info);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
@@ -261,7 +261,7 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kEmbedding)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 

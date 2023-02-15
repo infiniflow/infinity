@@ -1247,11 +1247,11 @@ bool
 Value::TryCastAs(const DataType &target_type, Value &new_value) const {
     BoundCastFunc cast = CastFunction::GetBoundFunc(this->type_, target_type);
     SharedPtr<ColumnVector> source_ptr = MakeShared<ColumnVector>(this->type_);
-    source_ptr->Initialize(1, ColumnVectorType::kConstant);
+    source_ptr->Initialize(ColumnVectorType::kConstant, 1);
     source_ptr->AppendValue(*this);
 
     SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(target_type);
-    col_varchar_ptr->Initialize(1, ColumnVectorType::kConstant);
+    col_varchar_ptr->Initialize(ColumnVectorType::kConstant, 1);
 
     CastParameters parameters;
     cast.function(source_ptr, col_varchar_ptr, 1, parameters);

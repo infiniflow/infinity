@@ -183,7 +183,7 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
     DataType data_type(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBlob)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
@@ -252,7 +252,7 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBlob)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 

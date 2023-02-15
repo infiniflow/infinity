@@ -20,6 +20,7 @@ enum class TableType {
     kOrderBy,
     kGroupBy,
     kAggregate,
+    kCrossProduct,
     kResult,
 };
 

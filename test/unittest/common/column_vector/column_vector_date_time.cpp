@@ -146,7 +146,7 @@ TEST_F(ColumnVectorTimeTest, contant_date) {
     DataType data_type(LogicalType::kDate);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDate)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
@@ -196,7 +196,7 @@ TEST_F(ColumnVectorTimeTest, contant_date) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDate)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
@@ -420,7 +420,7 @@ TEST_F(ColumnVectorTimeTest, contant_time) {
     DataType data_type(LogicalType::kTime);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTime)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
@@ -470,7 +470,7 @@ TEST_F(ColumnVectorTimeTest, contant_time) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTime)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
@@ -697,7 +697,7 @@ TEST_F(ColumnVectorTimeTest, contant_datetime) {
     DataType data_type(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDateTime)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
@@ -749,7 +749,7 @@ TEST_F(ColumnVectorTimeTest, contant_datetime) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDateTime)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
@@ -981,7 +981,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp) {
     DataType data_type(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestamp)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
@@ -1033,7 +1033,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestamp)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
@@ -1265,7 +1265,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp_tz) {
     DataType data_type(LogicalType::kTimestampTZ);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestampTZ)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
@@ -1317,7 +1317,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp_tz) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestampTZ)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
@@ -1549,7 +1549,7 @@ TEST_F(ColumnVectorTimeTest, contant_flat) {
     DataType data_type(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInterval)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
@@ -1600,7 +1600,7 @@ TEST_F(ColumnVectorTimeTest, contant_flat) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInterval)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 

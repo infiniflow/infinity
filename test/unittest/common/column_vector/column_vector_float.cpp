@@ -150,7 +150,7 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
     DataType data_type(LogicalType::kFloat);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kFloat)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
@@ -199,7 +199,7 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBoolean)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
@@ -416,7 +416,7 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
     DataType data_type(LogicalType::kDouble);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDouble)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
@@ -465,7 +465,7 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(1, ColumnVectorType::kConstant);
+    column_vector.Initialize(ColumnVectorType::kConstant, 1);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDouble)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 

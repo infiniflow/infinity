@@ -79,7 +79,13 @@ public:
     Initialize(const ColumnVector& other, SizeT start_idx, SizeT end_idx);
 
     void
-    Initialize(SizeT capacity = DEFAULT_VECTOR_SIZE, ColumnVectorType vector_type = ColumnVectorType::kFlat);
+    Initialize(ColumnVectorType vector_type = ColumnVectorType::kFlat, SizeT capacity = DEFAULT_VECTOR_SIZE);
+
+    void
+    Initialize(ColumnVectorType vector_type,
+               const ColumnVector& other,
+               SizeT start_idx,
+               SizeT end_idx);
 
     [[nodiscard]] String
     ToString() const;
@@ -121,7 +127,7 @@ public:
             return ;
         }
         this->Reset();
-        this->Initialize(DEFAULT_VECTOR_SIZE, vector_type);
+        this->Initialize(vector_type, DEFAULT_VECTOR_SIZE);
     }
 
     void

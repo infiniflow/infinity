@@ -46,7 +46,7 @@ DataBlock::Init(const Vector<DataType> &types, SizeT capacity) {
     column_vectors.reserve(column_count_);
     for(SizeT idx = 0; idx < column_count_; ++ idx) {
         column_vectors.emplace_back(MakeShared<ColumnVector>(types[idx]));
-        column_vectors[idx]->Initialize(capacity);
+        column_vectors[idx]->Initialize(ColumnVectorType::kFlat, capacity);
     }
     capacity_ = capacity;
     initialized = true;

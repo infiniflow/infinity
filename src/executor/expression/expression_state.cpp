@@ -124,7 +124,7 @@ SharedPtr<ExpressionState>
 ExpressionState::CreateState(const SharedPtr<ValueExpression>& value_expr) {
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(value_expr->Type());
-    column->Initialize(0, ColumnVectorType::kConstant);
+    column->Initialize(ColumnVectorType::kConstant, 0);
     value_expr->AppendToChunk(column);
     result->output_data_block_.Init({column});
     return result;

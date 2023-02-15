@@ -106,7 +106,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
         SharedPtr<ColumnVector> column_ptr = MakeShared<ColumnVector>(data_type);
         SizeT row_count = DEFAULT_VECTOR_SIZE;
-        column_ptr->Initialize(row_count, ColumnVectorType::kFlat);
+        column_ptr->Initialize(ColumnVectorType::kFlat, row_count);
         for(i64 i = 0; i < row_count; ++ i) {
             Value value = Value::MakeBigInt(static_cast<BigIntT>(i));
             column_ptr->AppendValue(value);
@@ -199,7 +199,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
 
         SharedPtr<ColumnVector> column_ptr = MakeShared<ColumnVector>(data_type);
         SizeT row_count = DEFAULT_VECTOR_SIZE;
-        column_ptr->Initialize(row_count, ColumnVectorType::kFlat);
+        column_ptr->Initialize(ColumnVectorType::kFlat, row_count);
         for(i64 i = 0; i < row_count; ++ i) {
             Value value = Value::MakeBigInt(static_cast<BigIntT>(i));
             column_ptr->AppendValue(value);
