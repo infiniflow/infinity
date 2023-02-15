@@ -33,6 +33,11 @@ public:
     String 
     ToString(i64& space) final;
 
+    inline String
+    name() final {
+        return "LogicalCreateTable";
+    }
+
     [[nodiscard]] SharedPtr<TableDef>
     table_definitions() const {
         return table_definitions_;

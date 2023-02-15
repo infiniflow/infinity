@@ -21,6 +21,11 @@ public:
     String
     ToString(i64& space) final;
 
+    inline String
+    name() final {
+        return "LogicalSort";
+    }
+
     Vector<SharedPtr<BaseExpression>> expressions_{};
     Vector<OrderByType> order_by_types_{};
 };

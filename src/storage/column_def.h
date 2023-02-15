@@ -28,7 +28,7 @@ public:
 
 public:
     explicit
-    ColumnDef(std::string name, i64 column_id, DataType data_type, Set<ConstrainType> constrains)
+    ColumnDef(String name, i64 column_id, DataType data_type, Set<ConstrainType> constrains)
         : name_(std::move(name)),
         id_(column_id),
         type_(std::move(data_type)),
@@ -37,7 +37,7 @@ public:
     [[nodiscard]] String
     ToString() const;
 
-    [[nodiscard]] std::string
+    [[nodiscard]] String
     name() const {
         return name_;
     }
@@ -51,6 +51,12 @@ public:
     type() const {
         return type_;
     }
+
+    [[maybe_unused]] Set<ConstrainType>
+    constrains() const {
+        return constrains_;
+    }
+
 private:
     String name_;
     i64 id_{-1};

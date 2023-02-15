@@ -26,7 +26,7 @@
 #include "executor/operator/physical_index_scan.h"
 #include "executor/operator/physical_insert.h"
 #include "executor/operator/physical_nested_loop_join.h"
-#include "executor/operator/physical_product.h"
+#include "executor/operator/physical_cross_product.h"
 #include "executor/operator/physical_project.h"
 #include "executor/operator/physical_sort.h"
 #include "executor/operator/physical_limit.h"
@@ -41,6 +41,7 @@
 #include "planner/node/logical_filter.h"
 #include "planner/node/logical_limit.h"
 #include "planner/node/logical_aggregate.h"
+#include "planner/node/logical_cross_product.h"
 
 #include <limits>
 
@@ -104,6 +105,9 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
             result = BuildTableScan(logical_operator);
             break;
         }
+        case LogicalNodeType::kViewScan: {
+            break;
+        }
         case LogicalNodeType::kDummyScan: {
             result = BuildDummyScan(logical_operator);
             break;
@@ -116,6 +120,9 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
         }
         case LogicalNodeType::kJoin: {
             result = BuildJoin(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCrossProduct: {
             break;
         }
         case LogicalNodeType::kSort: {
@@ -147,7 +154,8 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
             break;
         }
         default: {
-            result = MakeShared<PhysicalDummyOperator>(std::numeric_limits<uint64_t>::max());
+            PlannerError("Unknown logical node type: " + logical_operator->name());
+//            result = MakeShared<PhysicalDummyOperator>(std::numeric_limits<uint64_t>::max());
         }
     }
     // Initialize the physical plan node
@@ -250,6 +258,29 @@ PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const {
     return MakeShared<PhysicalHashJoin>(logical_operator->node_id());
+}
+
+SharedPtr<PhysicalOperator>
+PhysicalPlanner::BuildCrossProduct(const SharedPtr<LogicalNode> &logical_operator) const {
+
+    auto left_node = logical_operator->left_node();
+    auto right_node = logical_operator->right_node();
+    PlannerAssert(left_node != nullptr, "Cross product node has no left child.");
+    PlannerAssert(right_node != nullptr, "Cross product node has no right child.");
+
+    SharedPtr<LogicalCrossProduct> logical_cross_product
+                                        = std::static_pointer_cast<LogicalCrossProduct>(logical_operator);
+
+    SharedPtr<PhysicalOperator> left_physical_operator{};
+    SharedPtr<PhysicalOperator> right_physical_operator{};
+
+    left_physical_operator = BuildPhysicalOperator(left_node);
+    right_physical_operator = BuildPhysicalOperator(right_node);
+
+    return MakeShared<PhysicalCrossProduct>(logical_operator->node_id(),
+                                            logical_cross_product->table_index_,
+                                            left_physical_operator,
+                                            right_physical_operator);
 }
 
 SharedPtr<PhysicalOperator>
@@ -371,6 +402,11 @@ PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) 
                                          logical_table_scan->column_types_,
                                          logical_table_scan->table_scan_func_ptr_,
                                          table_scan_function_data_ptr);
+}
+
+SharedPtr<PhysicalOperator>
+PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {
+    NotImplementError("BuildViewScan");
 }
 
 SharedPtr<PhysicalOperator>

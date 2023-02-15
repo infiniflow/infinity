@@ -632,40 +632,25 @@ QueryBinder::UnfoldStarExpression(SharedPtr<QueryContext>& query_context,
     for(const hsql::Expr* select_expr: input_select_list) {
         switch (select_expr->type) {
             case hsql::kExprStar: {
-                SharedPtr<Binding> binding;
-                String table_name;
+
                 if (select_expr->table == nullptr) {
                     // select * from t1;
-                    PlannerAssert(!this->bind_context_ptr_->table_names_.empty(), "No table is bound.");
+                    PlannerAssert(!this->bind_context_ptr_->table_names_.empty(), "No table was bound.");
 
-                    // Use first table as the default table: select * from t1, t2; means select t1.* from t1, t2;
-                    table_name = this->bind_context_ptr_->table_names_[0];
-                    binding = this->bind_context_ptr_->binding_by_name_[table_name];
+                    // select * from t1, t2; means select t1.*, t2.* from t1, t2;
+                    for(const auto& table_name: this->bind_context_ptr_->table_names_) {
+                        SharedPtr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
+                        PlannerAssert(binding != nullptr, fmt::format("Table: {} wasn't bound before.", table_name));
+                        GenerateColumns(binding, table_name, output_select_list);
+                    }
                 } else {
                     // select t1.* from t1;
-                    table_name = select_expr->table;
-                    if (this->bind_context_ptr_->binding_by_name_.contains(table_name)) {
-                        binding = this->bind_context_ptr_->binding_by_name_[table_name];
-                    } else {
-                        PlannerAssert(!this->bind_context_ptr_->table_names_.empty(),
-                                      "Table: '" + table_name + "' not found in select list.");
-                    }
+
+                    String table_name = select_expr->table;
+                    SharedPtr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
+                    PlannerAssert(binding != nullptr, fmt::format("Table: {} wasn't bound before.", table_name));
+                    GenerateColumns(binding, table_name, output_select_list);
                 }
-
-                SizeT column_count = binding->table_ptr_->ColumnCount();
-
-                // Reserve more data in select list
-                output_select_list.reserve(output_select_list.size() + column_count);
-
-                // Build select list
-                SharedPtr<String> table_name_ptr = MakeShared<String>(table_name);
-                for(SizeT idx = 0; idx < column_count; ++ idx) {
-                    String column_name = binding->table_ptr_->GetColumnNameById(idx);
-                    SharedPtr<ParsedColumnExpression> bound_column_expr
-                            = MakeShared<ParsedColumnExpression>(String(), String(), table_name, column_name);
-                    output_select_list.emplace_back(bound_column_expr);
-                }
-
                 break;
             }
             default: {
@@ -675,6 +660,24 @@ QueryBinder::UnfoldStarExpression(SharedPtr<QueryContext>& query_context,
         }
     }
     return output_select_list;
+}
+
+void
+QueryBinder::GenerateColumns(const SharedPtr<Binding>& binding,
+                             const String& table_name,
+                             Vector<SharedPtr<ParsedExpression>>& output_select_list) {
+    SizeT column_count = binding->table_ptr_->ColumnCount();
+
+    // Reserve more data in select list
+    output_select_list.reserve(output_select_list.size() + column_count);
+
+    // Build select list
+    for(SizeT idx = 0; idx < column_count; ++ idx) {
+        String column_name = binding->table_ptr_->GetColumnNameById(idx);
+        SharedPtr<ParsedColumnExpression> bound_column_expr
+                = MakeShared<ParsedColumnExpression>(String(), String(), table_name, column_name);
+        output_select_list.emplace_back(bound_column_expr);
+    }
 }
 
 void

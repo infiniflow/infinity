@@ -20,6 +20,11 @@ public:
     String
     ToString(i64& space) final;
 
+    inline String
+    name() final {
+        return "LogicalProject";
+    }
+
     Vector<SharedPtr<BaseExpression>> expressions_{};
 
     u64 table_index_{};

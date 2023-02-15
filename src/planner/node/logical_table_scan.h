@@ -30,6 +30,11 @@ public:
     String
     ToString(i64& space) final;
 
+    inline String
+    name() final {
+        return "LogicalTableScan";
+    }
+
     String table_alias_;
     u64 table_index_;
     Vector<String> column_names_;

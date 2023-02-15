@@ -19,6 +19,11 @@ public:
     String
     ToString(i64& space) final;
 
+    inline String
+    name() final {
+        return "LogicalFilter";
+    }
+
     [[nodiscard]] inline const SharedPtr<BaseExpression>&
     expression() const {
         return expression_;

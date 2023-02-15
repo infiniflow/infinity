@@ -23,6 +23,12 @@ public:
 
     String
     ToString(i64& space) final;
+
+    inline String
+    name() final {
+        return "LogicalViewScan";
+    }
+
 private:
     SharedPtr<View> view_ptr_{nullptr};
 

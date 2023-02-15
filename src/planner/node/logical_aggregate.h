@@ -25,6 +25,11 @@ public:
     String
     ToString(i64 &space) final;
 
+    inline String
+    name() final {
+        return "LogicalAggregate";
+    }
+
     Vector<SharedPtr<BaseExpression>> groups_{};
     u64 groupby_index_{};
 

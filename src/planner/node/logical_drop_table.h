@@ -22,10 +22,16 @@ public:
     String
     ToString(i64& space) final;
 
+    inline String
+    name() final {
+        return "LogicalDropTable";
+    }
+
     [[nodiscard]] SharedPtr<String>
     table_name() const {
         return table_name_;
     }
+
     [[nodiscard]] SharedPtr<String>
     schema_name() const {
         return schema_name_;

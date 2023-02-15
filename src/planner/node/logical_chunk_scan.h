@@ -29,6 +29,11 @@ public:
     String
     ToString(i64& space) final;
 
+    inline String
+    name() final {
+        return "LogicalChunkScan";
+    }
+
     [[nodiscard]] ChunkScanType
     scan_type() const {
         return scan_type_;

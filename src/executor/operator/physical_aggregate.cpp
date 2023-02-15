@@ -17,21 +17,6 @@ PhysicalAggregate::Init() {
         input_table_ = input_table.second;
         input_table_index_ = input_table.first;
     }
-
-//    SizeT column_count = input_table_->ColumnCount();
-//    Vector<SharedPtr<ColumnDef>> columns;
-//    columns.reserve(column_count);
-//    for(SizeT idx = 0; idx < column_count; ++ idx) {
-//        DataType col_type = input_table_->GetColumnTypeById(idx);
-//        String col_name = input_table_->GetColumnNameById(idx);
-//
-//        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
-//        columns.emplace_back(col_def);
-//    }
-//
-//    SharedPtr<TableDef> table_def = TableDef::Make("aggregate", columns, false);
-//
-//    output_ = Table::Make(table_def, TableType::kIntermediate);
 }
 
 void

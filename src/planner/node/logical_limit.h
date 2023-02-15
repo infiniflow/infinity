@@ -20,6 +20,11 @@ public:
     String
     ToString(i64& space) final;
 
+    inline String
+    name() final {
+        return "LogicalLimit";
+    }
+
     SharedPtr<BaseExpression> limit_expression_{};
     SharedPtr<BaseExpression> offset_expression_{};
 };

@@ -13,57 +13,100 @@ class QueryContext;
 
 class PhysicalPlanner {
 public:
-    explicit PhysicalPlanner(std::shared_ptr<QueryContext> query_context_ptr)
+    explicit PhysicalPlanner(SharedPtr<QueryContext> query_context_ptr)
         : query_context_ptr_(std::move(query_context_ptr)) {}
 
-    std::shared_ptr<PhysicalOperator> BuildPhysicalOperator(const std::shared_ptr<LogicalNode>& logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_operator) const;
 
 private:
-    std::shared_ptr<QueryContext> query_context_ptr_;
+    SharedPtr<QueryContext> query_context_ptr_;
 
     // Create operator
-    std::shared_ptr<PhysicalOperator> BuildCreateTable(const std::shared_ptr<LogicalNode>& logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildPreparedPlan(const std::shared_ptr<LogicalNode>& logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildCreateView(const std::shared_ptr<LogicalNode>& logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildCreateTable(const SharedPtr<LogicalNode>& logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildPreparedPlan(const SharedPtr<LogicalNode>& logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildCreateView(const SharedPtr<LogicalNode>& logical_operator) const;
 
     // Drop operator
-    std::shared_ptr<PhysicalOperator> BuildDropTable(const std::shared_ptr<LogicalNode>& logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildDropView(const std::shared_ptr<LogicalNode>& logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildDropTable(const SharedPtr<LogicalNode>& logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildDropView(const SharedPtr<LogicalNode>& logical_operator) const;
 
     // Insert operator
-    std::shared_ptr<PhysicalOperator> BuildInsert(const std::shared_ptr<LogicalNode>& logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildInsert(const SharedPtr<LogicalNode>& logical_operator) const;
 
     // Delete operator
-    std::shared_ptr<PhysicalOperator> BuildDelete(const std::shared_ptr<LogicalNode>& logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildDelete(const SharedPtr<LogicalNode>& logical_operator) const;
 
     // Update operator
-    std::shared_ptr<PhysicalOperator> BuildUpdate(const std::shared_ptr<LogicalNode>& logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildUpdate(const SharedPtr<LogicalNode>& logical_operator) const;
 
     // Import operator
-    std::shared_ptr<PhysicalOperator> BuildImport(const std::shared_ptr<LogicalNode>& logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildImport(const SharedPtr<LogicalNode>& logical_operator) const;
 
     // Export operator
-    std::shared_ptr<PhysicalOperator> BuildExport(const std::shared_ptr<LogicalNode>& logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildExport(const SharedPtr<LogicalNode>& logical_operator) const;
 
     // Alter operator
-    std::shared_ptr<PhysicalOperator> BuildAlter(const std::shared_ptr<LogicalNode>& logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildAlter(const SharedPtr<LogicalNode>& logical_operator) const;
 
     // Select operator
-    std::shared_ptr<PhysicalOperator> BuildAggregate(const std::shared_ptr<LogicalNode>& logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildAggregate(const SharedPtr<LogicalNode>& logical_operator) const;
 
-    std::shared_ptr<PhysicalOperator> BuildJoin(const std::shared_ptr<LogicalNode> &logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildSort(const std::shared_ptr<LogicalNode> &logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildLimit(const std::shared_ptr<LogicalNode> &logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildProjection(const std::shared_ptr<LogicalNode> &logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildFilter(const std::shared_ptr<LogicalNode> &logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildIntersect(const std::shared_ptr<LogicalNode> &logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildUnion(const std::shared_ptr<LogicalNode> &logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildExcept(const std::shared_ptr<LogicalNode> &logical_operator) const;
+    // Operator
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildCrossProduct(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildSort(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildLimit(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildFilter(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildIntersect(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildUnion(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildExcept(const SharedPtr<LogicalNode> &logical_operator) const;
 
     // Scan
-    std::shared_ptr<PhysicalOperator> BuildChunkScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildTableScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
-    std::shared_ptr<PhysicalOperator> BuildDummyScan(const std::shared_ptr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildChunkScan(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const;
+    
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const;
 };
 
 

@@ -24,7 +24,12 @@ public:
 
     String 
     ToString(i64& space) final;
-    
+
+    inline String
+    name() final {
+        return "LogicalInsert";
+    }
+
     void 
     set_value_list(const Vector<SharedPtr<BaseExpression>>& value_list) {
         value_list_ = value_list;

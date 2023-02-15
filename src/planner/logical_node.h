@@ -60,6 +60,9 @@ public:
     virtual String
     ToString(i64& space) = 0;
 
+    virtual String
+    name() = 0;
+
     [[nodiscard]] LogicalNodeType
     operator_type() const {
         return operator_type_;

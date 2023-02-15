@@ -74,6 +74,11 @@ private:
                          const Vector<hsql::Expr *> &select_list);
 
     void
+    GenerateColumns(const SharedPtr<Binding>& binding,
+                    const String& table_name,
+                    Vector<SharedPtr<ParsedExpression>>& output_select_list);
+
+    void
     BuildGroupBy(SharedPtr<QueryContext>& query_context,
                  const hsql::SelectStatement& select,
                  const SharedPtr<BindAliasProxy>& bind_alias_proxy,
