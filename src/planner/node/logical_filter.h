@@ -13,6 +13,7 @@ namespace infinity {
 
 class LogicalFilter : public LogicalNode {
 public:
+    explicit
     LogicalFilter(SharedPtr<BaseExpression> expression)
         : LogicalNode(LogicalNodeType::kFilter), expression_(std::move(expression)) {}
 
@@ -24,8 +25,8 @@ public:
         return "LogicalFilter";
     }
 
-    [[nodiscard]] inline const SharedPtr<BaseExpression>&
-    expression() const {
+    [[nodiscard]] inline SharedPtr<BaseExpression>&
+    expression() {
         return expression_;
     }
 private:

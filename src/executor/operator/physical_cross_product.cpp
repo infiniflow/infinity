@@ -63,31 +63,43 @@ PhysicalCrossProduct::Execute(std::shared_ptr<QueryContext>& query_context) {
             // each row of left block will generate the constant column vectors and corresponding right column vectors
             SizeT output_row_count = right_block->row_count();
 
-            SizeT row_count = left_block->row_count();
-            for(SizeT row_idx = 0; row_idx < row_count; ++ row_idx) {
+            SizeT left_row_count = left_block->row_count();
+            for(SizeT row_idx = 0; row_idx < left_row_count; ++ row_idx) {
                 // left block column vectors
                 Vector<SharedPtr<ColumnVector>> output_columns;
                 output_columns.reserve(left_column_count + right_column_count);
+
+                // Prepare the left columns
                 for(SizeT column_idx = 0; column_idx < left_column_count; ++ column_idx) {
                     const SharedPtr<ColumnVector>& left_column_vector = left_block->column_vectors[column_idx];
+
+                    // Generate output column vector
                     SharedPtr<ColumnVector> column_vector = ColumnVector::Make(left_column_vector->data_type());
-                    column_vector->Initialize(ColumnVectorType::kConstant, *left_column_vector, row_idx, row_idx + 1);
+
+                    // From left block, it will be constant column vector, with right block capacity(DEFAULT_VECTOR_SIZE)
+                    column_vector->Initialize(ColumnVectorType::kConstant, right_block->capacity());
+
+                    // Fill the value.
+                    column_vector->CopyRow(*left_column_vector, 0, row_idx);
+
                     output_columns.emplace_back(column_vector);
                 }
 
+                // Prepare the right columns
                 for(SizeT column_idx = 0; column_idx < right_column_count; ++ column_idx) {
                     const SharedPtr<ColumnVector>& right_column_vector = right_block->column_vectors[column_idx];
+                    output_columns.emplace_back(right_column_vector);
                 }
+
+                SharedPtr<DataBlock> output_block = DataBlock::Make();
+                output_block->Init(output_columns);
+                output_block->Finalize();
+                cross_product_table->Append(output_block);
             }
-
-
-
-            for(const auto& input_column_vector: left_block->column_vectors) {
-                SharedPtr<ColumnVector> column_vector = ColumnVector::Make(input_column_vector->data_type());
-            }
-
         }
     }
+
+    outputs_[output_table_index_] = cross_product_table;
 }
 
 }

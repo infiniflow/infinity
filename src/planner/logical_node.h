@@ -24,13 +24,13 @@ public:
     virtual
     ~LogicalNode() = default;
 
-    [[nodiscard]] SharedPtr<LogicalNode>
-    left_node() const {
+    [[nodiscard]] inline SharedPtr<LogicalNode>&
+    left_node() {
         return left_node_;
     }
 
-    [[nodiscard]] SharedPtr<LogicalNode>
-    right_node() const {
+    [[nodiscard]] inline SharedPtr<LogicalNode>&
+    right_node() {
         return right_node_;
     }
 

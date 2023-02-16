@@ -123,6 +123,7 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
             break;
         }
         case LogicalNodeType::kCrossProduct: {
+            result = BuildCrossProduct(logical_operator);
             break;
         }
         case LogicalNodeType::kSort: {
