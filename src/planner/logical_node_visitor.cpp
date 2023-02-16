@@ -4,6 +4,13 @@
 
 #include "logical_node_visitor.h"
 #include "planner/node/logical_filter.h"
+#include "planner/node/logical_project.h"
+#include "planner/node/logical_sort.h"
+#include "planner/node/logical_limit.h"
+#include "planner/node/logical_cross_product.h"
+#include "planner/node/logical_join.h"
+#include "planner/node/logical_aggregate.h"
+#include "planner/node/logical_insert.h"
 
 namespace infinity {
 
@@ -20,73 +27,58 @@ LogicalNodeVisitor::VisitNodeChildren(LogicalNode &op) {
 void
 LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
     switch (op.operator_type()) {
-        case LogicalNodeType::kInvalid:
-            break;
-        case LogicalNodeType::kAggregate:
-            break;
-        case LogicalNodeType::kExcept:
-            break;
-        case LogicalNodeType::kUnion:
-            break;
-        case LogicalNodeType::kIntersect:
-            break;
-        case LogicalNodeType::kJoin:
-            break;
-        case LogicalNodeType::kCrossProduct:
-            break;
-        case LogicalNodeType::kLimit:
-            break;
-        case LogicalNodeType::kFilter: {
-            auto& filter = (LogicalFilter&)op;
-            VisitExpression(filter.expression());
+        case LogicalNodeType::kAggregate: {
+            auto& node = (LogicalAggregate&)op;
+            for(auto& expression: node.groups_) {
+                VisitExpression(expression);
+            }
+            for(auto& expression: node.aggregates_) {
+                VisitExpression(expression);
+            }
             break;
         }
-        case LogicalNodeType::kProjection:
+        case LogicalNodeType::kJoin: {
+            auto& node = (LogicalJoin&)op;
+            for(auto& expression: node.conditions_) {
+                VisitExpression(expression);
+            }
             break;
-        case LogicalNodeType::kSort:
+        }
+        case LogicalNodeType::kLimit: {
+            auto& node = (LogicalLimit&)op;
+            VisitExpression(node.limit_expression_);
+            VisitExpression(node.offset_expression_);
             break;
-        case LogicalNodeType::kDelete:
+        }
+        case LogicalNodeType::kFilter: {
+            auto& node = (LogicalFilter&)op;
+            VisitExpression(node.expression());
             break;
-        case LogicalNodeType::kUpdate:
+        }
+        case LogicalNodeType::kProjection: {
+            auto& node = (LogicalProject&)op;
+            for(auto& expression: node.expressions_) {
+                VisitExpression(expression);
+            }
             break;
-        case LogicalNodeType::kInsert:
+        }
+        case LogicalNodeType::kSort: {
+            auto& node = (LogicalSort&)op;
+            for(auto& expression: node.expressions_) {
+                VisitExpression(expression);
+            }
             break;
-        case LogicalNodeType::kImport:
+        }
+        case LogicalNodeType::kInsert: {
+            auto& node = (LogicalInsert&)op;
+            for(auto& expression: node.value_list()) {
+                VisitExpression(expression);
+            }
             break;
-        case LogicalNodeType::kExport:
-            break;
-        case LogicalNodeType::kAlter:
-            break;
-        case LogicalNodeType::kCreateTable:
-            break;
-        case LogicalNodeType::kCreateView:
-            break;
-        case LogicalNodeType::kDropTable:
-            break;
-        case LogicalNodeType::kDropView:
-            break;
-        case LogicalNodeType::kChunkScan:
-            break;
-        case LogicalNodeType::kTableScan:
-            break;
-        case LogicalNodeType::kViewScan:
-            break;
-        case LogicalNodeType::kDummyScan:
-            break;
-        case LogicalNodeType::kAlias:
-            break;
-        case LogicalNodeType::kMock:
-            break;
-        case LogicalNodeType::kValidate:
-            break;
-        case LogicalNodeType::kStoredTable:
-            break;
-        case LogicalNodeType::kStaticTable:
-            break;
-        case LogicalNodeType::kRoot:
-            break;
-        case LogicalNodeType::kPrepare:
-            break;
+        }
+        default: {
+            LOG_TRACE("Visit logical node: {}", op.name());
+        }
     }
 
 }
@@ -94,16 +86,188 @@ LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
 void
 LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
 
+    SharedPtr<BaseExpression> result;
     switch (expression->type()) {
 
-        case ExpressionType::kAggregate:
+        case ExpressionType::kAggregate: {
+            auto aggregate_expression = std::static_pointer_cast<AggregateExpression>(expression);
+            for(auto& argument: aggregate_expression->arguments()) {
+                VisitExpression(argument);
+            }
+
+            result = VisitReplace(aggregate_expression);
+            if(result != nullptr) {
+                expression = result;
+            }
             break;
+        }
         case ExpressionType::kGroupingFunction:
             break;
         case ExpressionType::kArithmetic:
             break;
-        case ExpressionType::kCast:
+        case ExpressionType::kCast: {
+            auto cast_expression = std::static_pointer_cast<CastExpression>(expression);
+            for(auto& argument: cast_expression->arguments()) {
+                VisitExpression(argument);
+            }
+
+            result = VisitReplace(cast_expression);
+            if(result != nullptr) {
+                expression = result;
+            }
             break;
+        }
+        case ExpressionType::kCase: {
+            auto case_expression = std::static_pointer_cast<CaseExpression>(expression);
+            PlannerAssert(case_expression->arguments().empty(), "Case expression shouldn't have arguments");
+            for(auto& case_expr: case_expression->CaseExpr()) {
+                VisitExpression(case_expr.then_expr_);
+                VisitExpression(case_expr.when_expr_);
+            }
+
+            VisitExpression(case_expression->ElseExpr());
+
+            result = VisitReplace(case_expression);
+            if(result != nullptr) {
+                expression = result;
+            }
+            break;
+        }
+        case ExpressionType::kAnd:
+            break;
+        case ExpressionType::kConjunction: {
+            auto conjunction_expression = std::static_pointer_cast<ConjunctionExpression>(expression);
+            for(auto& argument: conjunction_expression->arguments()) {
+                VisitExpression(argument);
+            }
+
+            result = VisitReplace(conjunction_expression);
+            if(result != nullptr) {
+                expression = result;
+            }
+            break;
+        }
+        case ExpressionType::kOr:
+            break;
+        case ExpressionType::kNot:
+            break;
+        case ExpressionType::kColumn: {
+            auto column_expression = std::static_pointer_cast<ColumnExpression>(expression);
+            PlannerAssert(column_expression->arguments().empty(), "Column expression shouldn't have arguments");
+
+            result = VisitReplace(column_expression);
+            PlannerAssert(result != nullptr, "Visit column expression will always rewrite the expression");
+            expression = result;
+            break;
+        }
+        case ExpressionType::kCorrelatedColumn:
+            break;
+        case ExpressionType::kExists:
+            break;
+        case ExpressionType::kExtract:
+            break;
+        case ExpressionType::kInterval:
+            break;
+        case ExpressionType::kFunction: {
+            auto function_expression = std::static_pointer_cast<FunctionExpression>(expression);
+            for(auto& argument: function_expression->arguments()) {
+                VisitExpression(argument);
+            }
+
+            result = VisitReplace(function_expression);
+            if(result != nullptr) {
+                expression = result;
+            }
+            break;
+        }
+        case ExpressionType::kList:
+            break;
+        case ExpressionType::kLogical:
+            break;
+        case ExpressionType::kEqual:
+            break;
+        case ExpressionType::kNotEqual:
+            break;
+        case ExpressionType::kLessThan:
+            break;
+        case ExpressionType::kGreaterThan:
+            break;
+        case ExpressionType::kLessThanEqual:
+            break;
+        case ExpressionType::kGreaterThanEqual:
+            break;
+        case ExpressionType::kBetween:
+            break;
+        case ExpressionType::kNotBetween:
+            break;
+        case ExpressionType::kSubQuery:
+            break;
+        case ExpressionType::kUnaryMinus:
+            break;
+        case ExpressionType::kIsNull:
+            break;
+        case ExpressionType::kIsNotNull:
+            break;
+        case ExpressionType::kValue: {
+            auto value_expression = std::static_pointer_cast<ValueExpression>(expression);
+            PlannerAssert(value_expression->arguments().empty(), "Column expression shouldn't have arguments");
+
+            result = VisitReplace(value_expression);
+            if(result != nullptr) {
+                expression = result;
+            }
+            break;
+        }
+        case ExpressionType::kDefault:
+            break;
+        case ExpressionType::kParameter:
+            break;
+        case ExpressionType::kIn:
+            break;
+        case ExpressionType::kNotIn:
+            break;
+        case ExpressionType::kWindowRank:
+            break;
+        case ExpressionType::kWindowRowNumber:
+            break;
+        case ExpressionType::kDistinctFrom:
+            break;
+        case ExpressionType::kNotDistinctFrom:
+            break;
+        case ExpressionType::kPlaceholder:
+            break;
+        case ExpressionType::kPredicate:
+            break;
+        case ExpressionType::kRaw:
+            break;
+    }
+    if(result == nullptr) {
+
+    }
+}
+
+void
+LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression>& expression) {
+    switch (expression->type()) {
+
+        case ExpressionType::kAggregate: {
+            auto aggregate_expression = std::static_pointer_cast<AggregateExpression>(expression);
+            for(auto& argument: aggregate_expression->arguments()) {
+                VisitExpression(argument);
+            }
+            break;
+        }
+        case ExpressionType::kGroupingFunction:
+            break;
+        case ExpressionType::kArithmetic:
+            break;
+        case ExpressionType::kCast: {
+            auto cast_expression = std::static_pointer_cast<CastExpression>(expression);
+            for (auto &argument: cast_expression->arguments()) {
+                VisitExpression(argument);
+            }
+            break;
+        }
         case ExpressionType::kCase:
             break;
         case ExpressionType::kAnd:
@@ -179,11 +343,6 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
         case ExpressionType::kRaw:
             break;
     }
-}
-
-void
-LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression>& expression) {
-
 }
 
 SharedPtr<BaseExpression>
