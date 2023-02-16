@@ -145,6 +145,18 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
         EXPECT_EQ(vx.value_.uuid, uuid);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        String s('a' + i % 26, 16);
+        UuidT uuid(s.c_str());
+
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_EQ(vx.value_.uuid, uuid);
+        column_constant.Reset();
+    }
 }
 
 TEST_F(ColumnVectorUuidTest, contant_uuid) {
@@ -154,12 +166,12 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
     DataType data_type(LogicalType::kUuid);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kUuid)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -175,7 +187,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -209,11 +221,11 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kUuid)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);

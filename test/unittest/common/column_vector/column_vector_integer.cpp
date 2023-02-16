@@ -155,12 +155,12 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
     DataType data_type(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -176,7 +176,7 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -204,11 +204,11 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -428,12 +428,12 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
     DataType data_type(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kSmallInt)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -449,7 +449,7 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -477,11 +477,11 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kSmallInt)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -701,12 +701,12 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
     DataType data_type(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInteger)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -722,7 +722,7 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -750,11 +750,11 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInteger)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -974,12 +974,12 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
     DataType data_type(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBigInt)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -995,7 +995,7 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -1023,11 +1023,11 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBigInt)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1249,12 +1249,12 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
     DataType data_type(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kHugeInt)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1270,7 +1270,7 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -1299,11 +1299,11 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kHugeInt)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);

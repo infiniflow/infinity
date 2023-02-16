@@ -139,6 +139,16 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
         EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_FLOAT_EQ(vx.value_.point.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
+        column_constant.Reset();
+    }
 }
 
 TEST_F(ColumnVectorGeoTest, contant_point) {
@@ -148,12 +158,12 @@ TEST_F(ColumnVectorGeoTest, contant_point) {
     DataType data_type(LogicalType::kPoint);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPoint)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -169,7 +179,7 @@ TEST_F(ColumnVectorGeoTest, contant_point) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -200,11 +210,11 @@ TEST_F(ColumnVectorGeoTest, contant_point) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPoint)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -432,6 +442,17 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
         EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
+        column_constant.Reset();
+    }
 }
 
 TEST_F(ColumnVectorGeoTest, contant_line) {
@@ -441,12 +462,12 @@ TEST_F(ColumnVectorGeoTest, contant_line) {
     DataType data_type(LogicalType::kLine);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kLine)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -462,7 +483,7 @@ TEST_F(ColumnVectorGeoTest, contant_line) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -497,11 +518,11 @@ TEST_F(ColumnVectorGeoTest, contant_line) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kLine)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -744,6 +765,18 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.x, static_cast<f64>(i) - 5.3f);
+        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
+        column_constant.Reset();
+    }
 }
 
 TEST_F(ColumnVectorGeoTest, contant_line_seg) {
@@ -753,12 +786,12 @@ TEST_F(ColumnVectorGeoTest, contant_line_seg) {
     DataType data_type(LogicalType::kLineSeg);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kLineSeg)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -774,7 +807,7 @@ TEST_F(ColumnVectorGeoTest, contant_line_seg) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -811,11 +844,11 @@ TEST_F(ColumnVectorGeoTest, contant_line_seg) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kLineSeg)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1063,6 +1096,18 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
         EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_FLOAT_EQ(vx.value_.box.upper_left.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.box.upper_left.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.box.lower_right.x, static_cast<f64>(i) - 5.3f);
+        EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
+        column_constant.Reset();
+    }
 }
 
 TEST_F(ColumnVectorGeoTest, contant_box) {
@@ -1072,12 +1117,12 @@ TEST_F(ColumnVectorGeoTest, contant_box) {
     DataType data_type(LogicalType::kBox);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBox)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1093,7 +1138,7 @@ TEST_F(ColumnVectorGeoTest, contant_box) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -1130,11 +1175,11 @@ TEST_F(ColumnVectorGeoTest, contant_box) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBox)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1424,6 +1469,25 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
 
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_EQ(vx.value_.path.point_count, 4);
+        EXPECT_EQ(vx.value_.path.closed, 0);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.path.ptr) + 3), p4);
+        column_constant.Reset();
+    }
 }
 
 TEST_F(ColumnVectorGeoTest, contant_path) {
@@ -1433,12 +1497,12 @@ TEST_F(ColumnVectorGeoTest, contant_path) {
     DataType data_type(LogicalType::kPath);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPath)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1454,7 +1518,7 @@ TEST_F(ColumnVectorGeoTest, contant_path) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -1508,11 +1572,11 @@ TEST_F(ColumnVectorGeoTest, contant_path) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPath)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1874,6 +1938,29 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
 
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
+        PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
+        PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
+        PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
+        BoxT bounding_box(PointT(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f),
+                          PointT(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f));
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_EQ(vx.value_.polygon.point_count, 4);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr)), p1);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 1), p2);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 2), p3);
+        EXPECT_EQ(*((PointT*)(vx.value_.polygon.ptr) + 3), p4);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.x, bounding_box.upper_left.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.upper_left.y, bounding_box.upper_left.y);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.x, bounding_box.lower_right.x);
+        EXPECT_DOUBLE_EQ(vx.value_.polygon.bounding_box.lower_right.y, bounding_box.lower_right.y);
+        column_constant.Reset();
+    }
 }
 
 TEST_F(ColumnVectorGeoTest, contant_polygon) {
@@ -1883,12 +1970,12 @@ TEST_F(ColumnVectorGeoTest, contant_polygon) {
     DataType data_type(LogicalType::kPolygon);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPolygon)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1904,7 +1991,7 @@ TEST_F(ColumnVectorGeoTest, contant_polygon) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -1968,11 +2055,11 @@ TEST_F(ColumnVectorGeoTest, contant_polygon) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kPolygon)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -2295,6 +2382,17 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
         EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);
+        EXPECT_FLOAT_EQ(vx.value_.circle.center.y, static_cast<f64>(i) - 0.8f);
+        EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
+        column_constant.Reset();
+    }
 }
 
 TEST_F(ColumnVectorGeoTest, contant_circle) {
@@ -2304,12 +2402,12 @@ TEST_F(ColumnVectorGeoTest, contant_circle) {
     DataType data_type(LogicalType::kCircle);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kCircle)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -2325,7 +2423,7 @@ TEST_F(ColumnVectorGeoTest, contant_circle) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -2360,11 +2458,11 @@ TEST_F(ColumnVectorGeoTest, contant_circle) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kCircle)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);

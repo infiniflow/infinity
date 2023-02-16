@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-class ColumnVectorTimeTest : public BaseTest {
+class ColumnVectorDateTimeTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
@@ -26,7 +26,7 @@ class ColumnVectorTimeTest : public BaseTest {
     }
 };
 
-TEST_F(ColumnVectorTimeTest, flat_date) {
+TEST_F(ColumnVectorDateTimeTest, flat_date) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kDate);
@@ -137,21 +137,30 @@ TEST_F(ColumnVectorTimeTest, flat_date) {
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
+        column_constant.Reset();
+    }
 }
 
-TEST_F(ColumnVectorTimeTest, contant_date) {
+TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     using namespace infinity;
 
     DataType data_type(LogicalType::kDate);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDate)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -167,7 +176,7 @@ TEST_F(ColumnVectorTimeTest, contant_date) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -196,11 +205,11 @@ TEST_F(ColumnVectorTimeTest, contant_date) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDate)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -229,7 +238,7 @@ TEST_F(ColumnVectorTimeTest, contant_date) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, date_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kDate);
@@ -265,7 +274,7 @@ TEST_F(ColumnVectorTimeTest, date_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, date_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kDate);
@@ -300,7 +309,7 @@ TEST_F(ColumnVectorTimeTest, date_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, flat_time) {
+TEST_F(ColumnVectorDateTimeTest, flat_time) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTime);
@@ -411,21 +420,30 @@ TEST_F(ColumnVectorTimeTest, flat_time) {
         EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
+        column_constant.Reset();
+    }
 }
 
-TEST_F(ColumnVectorTimeTest, contant_time) {
+TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     using namespace infinity;
 
     DataType data_type(LogicalType::kTime);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTime)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -441,7 +459,7 @@ TEST_F(ColumnVectorTimeTest, contant_time) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -470,11 +488,11 @@ TEST_F(ColumnVectorTimeTest, contant_time) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTime)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -503,7 +521,7 @@ TEST_F(ColumnVectorTimeTest, contant_time) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, time_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTime);
@@ -539,7 +557,7 @@ TEST_F(ColumnVectorTimeTest, time_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, time_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, time_column_slice_init) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTime);
@@ -574,7 +592,7 @@ TEST_F(ColumnVectorTimeTest, time_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, flat_datetime) {
+TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kDateTime);
@@ -688,21 +706,31 @@ TEST_F(ColumnVectorTimeTest, flat_datetime) {
         EXPECT_EQ(vx.value_.datetime.time, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_EQ(vx.value_.datetime.date, static_cast<i32>(i));
+        EXPECT_EQ(vx.value_.datetime.time, static_cast<i32>(i));
+        column_constant.Reset();
+    }
 }
 
-TEST_F(ColumnVectorTimeTest, contant_datetime) {
+TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     using namespace infinity;
 
     DataType data_type(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDateTime)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -718,7 +746,7 @@ TEST_F(ColumnVectorTimeTest, contant_datetime) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -749,11 +777,11 @@ TEST_F(ColumnVectorTimeTest, contant_datetime) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDateTime)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -783,7 +811,7 @@ TEST_F(ColumnVectorTimeTest, contant_datetime) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, datetime_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kDateTime);
@@ -821,7 +849,7 @@ TEST_F(ColumnVectorTimeTest, datetime_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, datetime_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kDateTime);
@@ -858,7 +886,7 @@ TEST_F(ColumnVectorTimeTest, datetime_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, flat_timestamp) {
+TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTimestamp);
@@ -972,21 +1000,31 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp) {
         EXPECT_EQ(vx.value_.timestamp.time, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_EQ(vx.value_.timestamp.date, static_cast<i32>(i));
+        EXPECT_EQ(vx.value_.timestamp.time, static_cast<i32>(i));
+        column_constant.Reset();
+    }
 }
 
-TEST_F(ColumnVectorTimeTest, contant_timestamp) {
+TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     using namespace infinity;
 
     DataType data_type(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestamp)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1002,7 +1040,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -1033,11 +1071,11 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestamp)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1067,7 +1105,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, timestamp_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTimestamp);
@@ -1105,7 +1143,7 @@ TEST_F(ColumnVectorTimeTest, timestamp_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, timestamp_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTimestamp);
@@ -1142,7 +1180,7 @@ TEST_F(ColumnVectorTimeTest, timestamp_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, flat_timestamp_tz) {
+TEST_F(ColumnVectorDateTimeTest, flat_timestamp_tz) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTimestampTZ);
@@ -1256,21 +1294,31 @@ TEST_F(ColumnVectorTimeTest, flat_timestamp_tz) {
         EXPECT_EQ(vx.value_.timestamp_tz.time, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_EQ(vx.value_.timestamp_tz.date, static_cast<i32>(i));
+        EXPECT_EQ(vx.value_.timestamp_tz.time, static_cast<i32>(i));
+        column_constant.Reset();
+    }
 }
 
-TEST_F(ColumnVectorTimeTest, contant_timestamp_tz) {
+TEST_F(ColumnVectorDateTimeTest, contant_timestamp_tz) {
 
     using namespace infinity;
 
     DataType data_type(LogicalType::kTimestampTZ);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestampTZ)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1286,7 +1334,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp_tz) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -1317,11 +1365,11 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp_tz) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestampTZ)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1351,7 +1399,7 @@ TEST_F(ColumnVectorTimeTest, contant_timestamp_tz) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, timestamp_tz_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, timestamp_tz_column_vector_select) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTimestampTZ);
@@ -1389,7 +1437,7 @@ TEST_F(ColumnVectorTimeTest, timestamp_tz_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, timestamp_tz_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, timestamp_tz_column_slice_init) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kTimestampTZ);
@@ -1426,7 +1474,7 @@ TEST_F(ColumnVectorTimeTest, timestamp_tz_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, flat_interval) {
+TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kInterval);
@@ -1540,21 +1588,30 @@ TEST_F(ColumnVectorTimeTest, flat_interval) {
         EXPECT_EQ(vx.value_.interval.value, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
+
+    ColumnVector column_constant(data_type);
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+        column_constant.CopyRow(column_vector, 0, i);
+        Value vx = column_constant.GetValue(0);
+        EXPECT_EQ(vx.value_.interval.value, static_cast<i32>(i));
+        column_constant.Reset();
+    }
 }
 
-TEST_F(ColumnVectorTimeTest, contant_flat) {
+TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     using namespace infinity;
 
     DataType data_type(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
 
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInterval)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1570,7 +1627,7 @@ TEST_F(ColumnVectorTimeTest, contant_flat) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for(i64 i = 0; i < 1; ++ i) {
@@ -1600,11 +1657,11 @@ TEST_F(ColumnVectorTimeTest, contant_flat) {
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
-    column_vector.Initialize(ColumnVectorType::kConstant, 1);
+    column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInterval)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
-    EXPECT_EQ(column_vector.capacity(), 1);
+    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
@@ -1634,7 +1691,7 @@ TEST_F(ColumnVectorTimeTest, contant_flat) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, interval_column_vector_select) {
+TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kInterval);
@@ -1671,7 +1728,7 @@ TEST_F(ColumnVectorTimeTest, interval_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorTimeTest, interval_column_slice_init) {
+TEST_F(ColumnVectorDateTimeTest, interval_column_slice_init) {
     using namespace infinity;
 
     DataType data_type(LogicalType::kInterval);

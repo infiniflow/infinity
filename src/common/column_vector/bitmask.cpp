@@ -27,7 +27,7 @@ Bitmask::Reset() {
 }
 
 void
-Bitmask::Initialize(size_t count) {
+Bitmask::Initialize(SizeT count) {
     TypeAssert(count_ == 0, "Bitmask is already initialized.")
     TypeAssert((count & (count - 1)) == 0, "Capacity need to be N power of 2.");
     count_ = count;
@@ -58,7 +58,7 @@ Bitmask::ShallowCopy(const Bitmask& ref) {
 }
 
 void
-Bitmask::Resize(size_t new_count) {
+Bitmask::Resize(SizeT new_count) {
     u64 bit_count = new_count & (new_count - 1);
     TypeAssert(bit_count == 0, "New capacity need to be N power of 2.");
     TypeAssert(new_count >= count_, "New capacity <= old capacity.");
@@ -82,15 +82,15 @@ Bitmask::Resize(size_t new_count) {
 }
 
 String
-Bitmask::ToString(size_t from, size_t to) {
+Bitmask::ToString(SizeT from, SizeT to) {
     std::stringstream ss;
     ss << "BITMASK(" << to - from << "): ";
     if(data_ptr_ == nullptr) {
-        for(size_t i = from; i <= to; ++ i) {
+        for(SizeT i = from; i <= to; ++ i) {
             ss << 1;
         }
     } else {
-        for(size_t i = from; i < to; ++ i) {
+        for(SizeT i = from; i < to; ++ i) {
             ss << (IsTrue(i) ? 1 : 0);
         }
     }
@@ -101,52 +101,52 @@ bool
 Bitmask::IsAllTrue() const {
     if (data_ptr_ == nullptr) return true;
 
-    size_t u64_count = BitmaskBuffer::UnitCount(count_);
+    SizeT u64_count = BitmaskBuffer::UnitCount(count_);
 
-    for(size_t i = 0; i < u64_count; ++ i) {
+    for(SizeT i = 0; i < u64_count; ++ i) {
         if(data_ptr_[i] != BitmaskBuffer::UNIT_MAX) return false;
     }
     return true;
 }
 
 bool
-Bitmask::IsTrue(size_t row_index) {
+Bitmask::IsTrue(SizeT row_index) {
     if(data_ptr_ == nullptr) {
         // All is true
         return true;
     }
 
-    size_t u64_index = row_index / BitmaskBuffer::UNIT_BITS;
-    size_t index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
+    SizeT u64_index = row_index / BitmaskBuffer::UNIT_BITS;
+    SizeT index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
     return data_ptr_[u64_index] & ((u64(1)) << index_in_u64);
 }
 
 void
-Bitmask::SetTrue(size_t row_index) {
+Bitmask::SetTrue(SizeT row_index) {
     if (data_ptr_ == nullptr) return ;
 
-    size_t u64_index = row_index / BitmaskBuffer::UNIT_BITS;
-    size_t index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
+    SizeT u64_index = row_index / BitmaskBuffer::UNIT_BITS;
+    SizeT index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
 
     data_ptr_[u64_index] |= ((u64(1)) << index_in_u64);
 }
 
 void
-Bitmask::SetFalse(size_t row_index) {
+Bitmask::SetFalse(SizeT row_index) {
     if(buffer_ptr == nullptr) {
         buffer_ptr = BitmaskBuffer::Make(count_);
         // Set raw pointer;
         data_ptr_ = buffer_ptr->data_ptr_.get();
     }
 
-    size_t u64_index = row_index / BitmaskBuffer::UNIT_BITS;
-    size_t index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
+    SizeT u64_index = row_index / BitmaskBuffer::UNIT_BITS;
+    SizeT index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
 
     data_ptr_[u64_index] &= ~(((u64(1))) << index_in_u64);
 }
 
 void
-Bitmask::Set(size_t row_index, bool valid) {
+Bitmask::Set(SizeT row_index, bool valid) {
     if(valid) {
         SetTrue(row_index);
     } else {
@@ -163,20 +163,20 @@ Bitmask::SetAllTrue() {
 
 void
 Bitmask::SetAllFalse() {
-    size_t u64_count = BitmaskBuffer::UnitCount(count_);
-    for(size_t i = 0; i < u64_count; ++ i) {
+    SizeT u64_count = BitmaskBuffer::UnitCount(count_);
+    for(SizeT i = 0; i < u64_count; ++ i) {
         data_ptr_[i] = 0;
     }
 }
 
-size_t
+SizeT
 Bitmask::CountTrue() const {
     if (data_ptr_ == nullptr) return count_;
 
-    size_t u64_count = BitmaskBuffer::UnitCount(count_);
+    SizeT u64_count = BitmaskBuffer::UnitCount(count_);
 
-    size_t count_true = 0;
-    for(size_t i = 0; i < u64_count; ++ i) {
+    SizeT count_true = 0;
+    for(SizeT i = 0; i < u64_count; ++ i) {
 
         if(data_ptr_[i] == BitmaskBuffer::UNIT_MAX) {
             // All bits of u64 variable are 1.
@@ -212,8 +212,8 @@ Bitmask::Merge(const Bitmask &other) {
 
     GeneralAssert(count() == other.count(), "Attempt to merge two bitmasks with different size.")
 
-    size_t u64_count = BitmaskBuffer::UnitCount(count_);
-    for(size_t i = 0; i < u64_count; ++ i) {
+    SizeT u64_count = BitmaskBuffer::UnitCount(count_);
+    for(SizeT i = 0; i < u64_count; ++ i) {
         data_ptr_[i] &= other.data_ptr_[i];
     }
 }

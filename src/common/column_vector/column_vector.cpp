@@ -15,13 +15,16 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
     StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
 
     vector_type_ = other.vector_type_;
+    data_type_size_ = data_type_.Size();
+
     if(vector_type_ == ColumnVectorType::kConstant) {
-        capacity_ = 1;
+        // If the vector is constant, all elements are the same, so the select is meaningless.
+        capacity_ = other.capacity();
     } else {
         capacity_ = input_select.Size();
     }
 
-    data_type_size_ = data_type_.Size();
+
     VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
     switch(data_type_.type()) {
         case LogicalType::kBlob:
@@ -44,9 +47,14 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
     }
 
     if(buffer_ == nullptr) {
-        buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
+        if(vector_type_ == ColumnVectorType::kConstant) {
+            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_type);
+            nulls_ptr_ = Bitmask::Make(8);
+        } else {
+            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
+            nulls_ptr_ = Bitmask::Make(capacity_);
+        }
         data_ptr_ = buffer_->GetData();
-        nulls_ptr_ = Bitmask::Make(capacity_);
     } else {
         // Initialize after reset will come to this branch
         if(vector_buffer_type == VectorBufferType::kHeap) {
@@ -56,154 +64,161 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
     }
 
     initialized = true;
-    tail_index_ = input_select.Size();
 
-    // Copy data from other column vector to here according to the select
-    switch(data_type_.type()) {
-        case kBoolean: {
-            CopyFrom<BooleanT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kTinyInt: {
-            CopyFrom<TinyIntT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kSmallInt: {
-            CopyFrom<SmallIntT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kInteger: {
-            CopyFrom<IntegerT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kBigInt: {
-            CopyFrom<BigIntT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kHugeInt: {
-            CopyFrom<HugeIntT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kFloat: {
-            CopyFrom<FloatT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kDouble: {
-            CopyFrom<DoubleT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kDecimal16: {
-            CopyFrom<Decimal16T>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kDecimal32: {
-            CopyFrom<Decimal32T>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kDecimal64: {
-            CopyFrom<Decimal64T>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kDecimal128: {
-            CopyFrom<Decimal128T>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kVarchar: {
-            CopyFrom<VarcharT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kChar: {
-            CopyFrom<CharT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kDate: {
-            CopyFrom<DateT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kTime: {
-            CopyFrom<TimeT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kDateTime: {
-            CopyFrom<DateTimeT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kTimestamp: {
-            CopyFrom<TimestampT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kTimestampTZ: {
-            CopyFrom<TimestampTZT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kInterval: {
-            CopyFrom<IntervalT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kArray: {
-            CopyFrom<ArrayT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kTuple: {
-            CopyFrom<TupleT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kPoint: {
-            CopyFrom<PointT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kLine: {
-            CopyFrom<LineT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kLineSeg: {
-            CopyFrom<LineSegT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kBox: {
-            CopyFrom<BoxT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kPath: {
-            CopyFrom<PathT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kPolygon: {
-            CopyFrom<PolygonT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kCircle: {
-            CopyFrom<CircleT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kBitmap: {
-            CopyFrom<BitmapT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kUuid: {
-            CopyFrom<UuidT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kBlob: {
-            CopyFrom<BlobT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kEmbedding: {
-            CopyFrom<EmbeddingT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kMixed: {
-            CopyFrom<MixedT>(other.data(), this->data(), input_select.Size(), input_select);
-            break;
-        }
-        case kNull: {
-            ExecutorError("Not implemented")
-        }
-        case kMissing: {
-            ExecutorError("Not implemented")
-        }
-        case kInvalid: {
-            ExecutorError("Invalid data type")
+    if(vector_type_ == ColumnVectorType::kConstant) {
+        tail_index_ = other.tail_index_;
+        if(tail_index_ == 0) return ;
+        CopyRow(other, 0, 0);
+    } else {
+        tail_index_ = input_select.Size();
+
+        // Copy data from other column vector to here according to the select
+        switch(data_type_.type()) {
+            case kBoolean: {
+                CopyFrom<BooleanT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kTinyInt: {
+                CopyFrom<TinyIntT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kSmallInt: {
+                CopyFrom<SmallIntT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kInteger: {
+                CopyFrom<IntegerT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kBigInt: {
+                CopyFrom<BigIntT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kHugeInt: {
+                CopyFrom<HugeIntT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kFloat: {
+                CopyFrom<FloatT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kDouble: {
+                CopyFrom<DoubleT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kDecimal16: {
+                CopyFrom<Decimal16T>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kDecimal32: {
+                CopyFrom<Decimal32T>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kDecimal64: {
+                CopyFrom<Decimal64T>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kDecimal128: {
+                CopyFrom<Decimal128T>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kVarchar: {
+                CopyFrom<VarcharT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kChar: {
+                CopyFrom<CharT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kDate: {
+                CopyFrom<DateT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kTime: {
+                CopyFrom<TimeT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kDateTime: {
+                CopyFrom<DateTimeT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kTimestamp: {
+                CopyFrom<TimestampT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kTimestampTZ: {
+                CopyFrom<TimestampTZT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kInterval: {
+                CopyFrom<IntervalT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kArray: {
+                CopyFrom<ArrayT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kTuple: {
+                CopyFrom<TupleT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kPoint: {
+                CopyFrom<PointT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kLine: {
+                CopyFrom<LineT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kLineSeg: {
+                CopyFrom<LineSegT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kBox: {
+                CopyFrom<BoxT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kPath: {
+                CopyFrom<PathT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kPolygon: {
+                CopyFrom<PolygonT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kCircle: {
+                CopyFrom<CircleT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kBitmap: {
+                CopyFrom<BitmapT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kUuid: {
+                CopyFrom<UuidT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kBlob: {
+                CopyFrom<BlobT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kEmbedding: {
+                CopyFrom<EmbeddingT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kMixed: {
+                CopyFrom<MixedT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
+            case kNull: {
+                ExecutorError("Not implemented")
+            }
+            case kMissing: {
+                ExecutorError("Not implemented")
+            }
+            case kInvalid: {
+                ExecutorError("Invalid data type")
+            }
         }
     }
 }
@@ -221,11 +236,7 @@ ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
     // TODO: No check on capacity value.
 
     vector_type_ = vector_type;
-    if(vector_type_ == ColumnVectorType::kConstant) {
-        capacity_ = 1;
-    } else {
-        capacity_ = capacity;
-    }
+    capacity_ = capacity;
 
     tail_index_ = 0;
     data_type_size_ = data_type_.Size();
@@ -250,9 +261,14 @@ ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
         }
     }
     if(buffer_ == nullptr) {
-        buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
+        if(vector_type_ == ColumnVectorType::kConstant) {
+            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_type);
+            nulls_ptr_ = Bitmask::Make(8);
+        } else {
+            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
+            nulls_ptr_ = Bitmask::Make(capacity_);
+        }
         data_ptr_ = buffer_->GetData();
-        nulls_ptr_ = Bitmask::Make(capacity_);
     } else {
         // Initialize after reset will come to this branch
         if(vector_buffer_type == VectorBufferType::kHeap) {
@@ -270,16 +286,12 @@ ColumnVector::Initialize(ColumnVectorType vector_type,
                          SizeT start_idx,
                          SizeT end_idx) {
 
-    StorageAssert(!initialized, "Column vector isn't initialized.")
+    StorageAssert(!initialized, "Column vector was already initialized.")
     StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
-    // TODO: No check on capacity value.
+    StorageAssert(end_idx > start_idx, "End index should larger than start index.")
 
     vector_type_ = vector_type;
-    if(vector_type_ == ColumnVectorType::kConstant) {
-        capacity_ = 1;
-    } else {
-        capacity_ = end_idx - start_idx;
-    }
+    capacity_ = end_idx - start_idx;
 
     tail_index_ = 0;
     data_type_size_ = data_type_.Size();
@@ -306,9 +318,14 @@ ColumnVector::Initialize(ColumnVectorType vector_type,
     }
 
     if(buffer_ == nullptr) {
-        buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
+        if(vector_type_ == ColumnVectorType::kConstant) {
+            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_type);
+            nulls_ptr_ = Bitmask::Make(8);
+        } else {
+            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
+            nulls_ptr_ = Bitmask::Make(capacity_);
+        }
         data_ptr_ = buffer_->GetData();
-        nulls_ptr_ = Bitmask::Make(capacity_);
     } else {
         // Initialize after reset will come to this branch
         if(vector_buffer_type == VectorBufferType::kHeap) {
@@ -318,144 +335,312 @@ ColumnVector::Initialize(ColumnVectorType vector_type,
     }
 
     initialized = true;
-    tail_index_ = capacity_;
 
-    // Copy data from other column vector to here according to the range
+
+    if(vector_type_ == ColumnVectorType::kConstant) {
+        tail_index_ = 1;
+        CopyRow(other, 0, 0);
+    } else {
+        tail_index_ = capacity_;
+        // Copy data from other column vector to here according to the range
+        switch(data_type_.type()) {
+            case kBoolean: {
+                CopyFrom<BooleanT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kTinyInt: {
+                CopyFrom<TinyIntT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kSmallInt: {
+                CopyFrom<SmallIntT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kInteger: {
+                CopyFrom<IntegerT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kBigInt: {
+                CopyFrom<BigIntT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kHugeInt: {
+                CopyFrom<HugeIntT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kFloat: {
+                CopyFrom<FloatT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kDouble: {
+                CopyFrom<DoubleT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kDecimal16: {
+                CopyFrom<Decimal16T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kDecimal32: {
+                CopyFrom<Decimal32T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kDecimal64: {
+                CopyFrom<Decimal64T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kDecimal128: {
+                CopyFrom<Decimal128T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kVarchar: {
+                CopyFrom<VarcharT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kChar: {
+                CopyFrom<CharT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kDate: {
+                CopyFrom<DateT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kTime: {
+                CopyFrom<TimeT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kDateTime: {
+                CopyFrom<DateTimeT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kTimestamp: {
+                CopyFrom<TimestampT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kTimestampTZ: {
+                CopyFrom<TimestampTZT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kInterval: {
+                CopyFrom<IntervalT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kArray: {
+                CopyFrom<ArrayT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kTuple: {
+                CopyFrom<TupleT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kPoint: {
+                CopyFrom<PointT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kLine: {
+                CopyFrom<LineT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kLineSeg: {
+                CopyFrom<LineSegT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kBox: {
+                CopyFrom<BoxT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kPath: {
+                CopyFrom<PathT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kPolygon: {
+                CopyFrom<PolygonT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kCircle: {
+                CopyFrom<CircleT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kBitmap: {
+                CopyFrom<BitmapT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kUuid: {
+                CopyFrom<UuidT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kBlob: {
+                CopyFrom<BlobT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kEmbedding: {
+                CopyFrom<EmbeddingT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kMixed: {
+                CopyFrom<MixedT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kNull: {
+                ExecutorError("Not implemented")
+            }
+            case kMissing: {
+                ExecutorError("Not implemented")
+            }
+            case kInvalid: {
+                ExecutorError("Invalid data type")
+            }
+        }
+    }
+}
+
+void
+ColumnVector::CopyRow(const ColumnVector& other, SizeT dst_idx, SizeT src_idx) {
+    StorageAssert(initialized, "Column vector isn't initialized.")
+    StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
+    StorageAssert(data_type_ == other.data_type_, "Data type is mismatched.")
+    if(vector_type_ == ColumnVectorType::kConstant) {
+        StorageAssert(dst_idx == 0, "Attempting to access non-zero position of constant vector");
+        tail_index_ = 1;
+    } else {
+        StorageAssert(dst_idx < tail_index_, "Attempting to access invalid position of target column vector");
+    }
+
+    StorageAssert(src_idx < other.tail_index_, "Attempting to access invalid position of source column vector");
     switch(data_type_.type()) {
         case kBoolean: {
-            CopyFrom<BooleanT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<BooleanT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kTinyInt: {
-            CopyFrom<TinyIntT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<TinyIntT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kSmallInt: {
-            CopyFrom<SmallIntT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<SmallIntT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kInteger: {
-            CopyFrom<IntegerT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<IntegerT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kBigInt: {
-            CopyFrom<BigIntT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<BigIntT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kHugeInt: {
-            CopyFrom<HugeIntT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<HugeIntT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kFloat: {
-            CopyFrom<FloatT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<FloatT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kDouble: {
-            CopyFrom<DoubleT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<DoubleT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kDecimal16: {
-            CopyFrom<Decimal16T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<Decimal16T>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kDecimal32: {
-            CopyFrom<Decimal32T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<Decimal32T>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kDecimal64: {
-            CopyFrom<Decimal64T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<Decimal64T>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kDecimal128: {
-            CopyFrom<Decimal128T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<Decimal128T>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kVarchar: {
-            CopyFrom<VarcharT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<VarcharT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kChar: {
-            CopyFrom<CharT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<CharT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kDate: {
-            CopyFrom<DateT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<DateT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kTime: {
-            CopyFrom<TimeT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<TimeT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kDateTime: {
-            CopyFrom<DateTimeT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<DateTimeT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kTimestamp: {
-            CopyFrom<TimestampT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<TimestampT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kTimestampTZ: {
-            CopyFrom<TimestampTZT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<TimestampTZT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kInterval: {
-            CopyFrom<IntervalT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<IntervalT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kArray: {
-            CopyFrom<ArrayT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<ArrayT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kTuple: {
-            CopyFrom<TupleT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<TupleT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kPoint: {
-            CopyFrom<PointT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<PointT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kLine: {
-            CopyFrom<LineT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<LineT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kLineSeg: {
-            CopyFrom<LineSegT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<LineSegT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kBox: {
-            CopyFrom<BoxT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<BoxT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kPath: {
-            CopyFrom<PathT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<PathT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kPolygon: {
-            CopyFrom<PolygonT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<PolygonT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kCircle: {
-            CopyFrom<CircleT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<CircleT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kBitmap: {
-            CopyFrom<BitmapT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<BitmapT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kUuid: {
-            CopyFrom<UuidT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<UuidT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kBlob: {
-            CopyFrom<BlobT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<BlobT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kEmbedding: {
-            CopyFrom<EmbeddingT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<EmbeddingT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kMixed: {
-            CopyFrom<MixedT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            CopyRowFrom<MixedT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kNull: {
@@ -465,7 +650,7 @@ ColumnVector::Initialize(ColumnVectorType vector_type,
             ExecutorError("Not implemented")
         }
         case kInvalid: {
-            ExecutorError("Invalid data type")
+            ExecutorError("Not implemented")
         }
     }
 }
@@ -1348,14 +1533,24 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
 void
 ColumnVector::AppendValue(const Value& value) {
     StorageAssert(initialized, "Column vector isn't initialized.")
-    StorageAssert(tail_index_ < capacity_, "Exceed the column vector capacity.");
+    if(vector_type_ == ColumnVectorType::kConstant) {
+        StorageAssert(tail_index_ < 1,
+                      fmt::format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
+    }
+    StorageAssert(tail_index_ < capacity_,
+                  fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
     SetValue(tail_index_ ++, value);
 }
 
 void
 ColumnVector::AppendByPtr(const ptr_t value_ptr) {
     StorageAssert(initialized, "Column vector isn't initialized.")
-    StorageAssert(tail_index_ < capacity_, "Exceed the column vector capacity.");
+    if(vector_type_ == ColumnVectorType::kConstant) {
+        StorageAssert(tail_index_ < 1,
+                      fmt::format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
+    }
+    StorageAssert(tail_index_ < capacity_,
+                  fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
     SetByPtr(tail_index_ ++, value_ptr);
 }
 
