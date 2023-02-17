@@ -12,7 +12,7 @@ class CastExpression: public BaseExpression {
 public:
     CastExpression(const SharedPtr<BaseExpression>& argument, DataType target_type);
 
-    DataType
+    inline DataType
     Type() const override {
         return target_type_;
     }

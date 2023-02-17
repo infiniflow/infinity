@@ -18,9 +18,8 @@ ColumnExpression::ColumnExpression(DataType data_type,
                                    : BaseExpression(ExpressionType::kColumn, {}),
                                    data_type_(std::move(data_type)),
                                    table_name_(std::move(table_name)),
-                                   table_index_(table_index),
                                    column_name_(std::move(column_name)),
-                                   column_index_(column_index),
+                                   binding_(table_index, column_index),
                                    depth_(depth)
 {}
 

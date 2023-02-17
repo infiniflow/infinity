@@ -47,7 +47,6 @@ public:
 
 private:
     SharedPtr<Table> input_table_{};
-    u64 input_table_index_{};
     u64 groupby_index_{};
     u64 aggregate_index_{};
 };

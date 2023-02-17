@@ -31,7 +31,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
                     ColumnDef::Make("block_size", 4, DataType(LogicalType::kBigInt), Set<ConstrainType>()),
             };
 
-            outputs_[1] = MakeShared<Table>(MakeShared<TableDef>("Tables", column_defs, false), TableType::kResult);
+            output_ = MakeShared<Table>(MakeShared<TableDef>("Tables", column_defs, false), TableType::kResult);
 
             // Get tables from catalog
             // TODO: Use context to carry runtime information, such as current schema
@@ -95,7 +95,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
             }
 
             output_block_ptr->Finalize();
-            outputs_[table_index_]->Append(output_block_ptr);
+            output_->Append(output_block_ptr);
             break;
         }
         case ChunkScanType::kShowColumn: {

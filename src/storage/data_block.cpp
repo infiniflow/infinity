@@ -137,6 +137,17 @@ DataBlock::FillRowIDVector(SharedPtr<Vector<RowID>>& row_ids, u32 block_id) cons
     }
 }
 
+void
+DataBlock::UnionWith(const SharedPtr<DataBlock>& other) {
+    StorageAssert(this->row_count_ == other->row_count_, "Attempt to union two block with different row count");
+    StorageAssert(this->capacity_ == other->capacity_, "Attempt to union two block with different row count");
+    StorageAssert(this->initialized && other->initialized, "Attempt to union two uninitialized blocks");
+    StorageAssert(this->finalized == other->finalized, "Attempt to union two block with different finalized status");
+    column_count_ += other->column_count_;
+    column_vectors.reserve(column_count_);
+    column_vectors.insert(column_vectors.end(), other->column_vectors.begin(), other->column_vectors.end());
+}
+
 }
 
 

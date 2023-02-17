@@ -6,6 +6,7 @@
 
 #include "expression/base_expression.h"
 #include "expression_state.h"
+#include "expression/reference_expression.h"
 
 namespace infinity {
 
@@ -14,7 +15,7 @@ public:
     void
     Execute(const SharedPtr<BaseExpression>& expression,
             SharedPtr<ExpressionState>& state,
-            HashMap<u64, SharedPtr<DataBlock>> input_block_map,
+            const SharedPtr<DataBlock>& input_data_block,
             SizeT block_row_count,
             SharedPtr<ColumnVector>& output_column_vector);
 
@@ -71,8 +72,15 @@ public:
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
             SizeT count);
+
+    void
+    Execute(const SharedPtr<ReferenceExpression>& expr,
+            SharedPtr<ExpressionState>& state,
+            SharedPtr<ColumnVector>& output_column_vector,
+            SizeT count);
+
 private:
-    HashMap<u64, SharedPtr<DataBlock>> blocks_map_{};
+    SharedPtr<DataBlock> input_data_block_;
     bool in_aggregate_{false};
 };
 

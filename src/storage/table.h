@@ -50,7 +50,7 @@ public:
         return definition_ptr_->name();
     }
 
-    i64
+    SizeT
     GetColumnIdByName(const String& column_name) {
         return definition_ptr_->GetColIdByName(column_name);
     }
@@ -100,6 +100,9 @@ public:
     [[nodiscard]] SharedPtr<Vector<RowID>>
     GetRowIDVector() const;
 
+    // Currently this method is used in aggregate operator.
+    void
+    UnionWith(const SharedPtr<Table>& other);
 public:
     SharedPtr<TableDef> definition_ptr_;
     SizeT row_count_{0};

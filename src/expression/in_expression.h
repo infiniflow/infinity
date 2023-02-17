@@ -23,7 +23,7 @@ public:
     String
     ToString() const override;
 
-    DataType
+    inline DataType
     Type() const override {
         return DataType{LogicalType::kBoolean};
     }

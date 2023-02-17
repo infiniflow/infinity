@@ -18,7 +18,7 @@ public:
     String
     ToString() const override;
 
-    DataType
+    inline DataType
     Type() const override {
         return value_.type();
     }

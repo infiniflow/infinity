@@ -183,12 +183,9 @@ PhysicalSort::Execute(SharedPtr<QueryContext>& query_context) {
 
     executor_.Init(this->expressions_);
 
-    ExecutorAssert(left()->outputs().size() == 1, "Input table count isn't matched.");
+    input_table_ = left_->output();
 
-    for(const auto& input_table: left()->outputs()) {
-        input_table_ = input_table.second;
-        input_table_index_ = input_table.first;
-    }
+    ExecutorAssert(input_table_ != nullptr, "Input table count isn't matched.");
 
     // output table definition is same as input
     SizeT column_count = input_table_->ColumnCount();
@@ -204,7 +201,7 @@ PhysicalSort::Execute(SharedPtr<QueryContext>& query_context) {
 
     SharedPtr<TableDef> table_def = TableDef::Make("sort", columns, false);
 
-    outputs_[input_table_index_] = Table::Make(table_def, TableType::kIntermediate);
+    output_ = Table::Make(table_def, TableType::kIntermediate);
 
     // Generate table before getting the order of row id.
     SharedPtr<Table> order_by_table = GetOrderTable();
@@ -250,7 +247,7 @@ PhysicalSort::Sort(const SharedPtr<Table>& order_by_table,
     std::sort(rowid_vector->begin(), rowid_vector->end(), Comparator(order_by_table, order_by_types));
 
     // Generate
-    outputs_[input_table_index_] = GenerateOutput(input_table_, rowid_vector);
+    output_ = GenerateOutput(input_table_, rowid_vector);
 }
 
 SharedPtr<Table>

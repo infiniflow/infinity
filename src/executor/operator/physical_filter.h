@@ -34,7 +34,6 @@ private:
     ExpressionExecutor executor;
 
     SharedPtr<Table> input_table_{};
-    u64 input_table_index_{};
 };
 
 

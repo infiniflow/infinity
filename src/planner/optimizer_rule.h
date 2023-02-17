@@ -11,20 +11,12 @@ namespace infinity {
 
 class OptimizerRule {
 public:
-    virtual
-    ~OptimizerRule() = 0;
-
     virtual void
     ApplyToPlan(SharedPtr<QueryContext>& query_context_ptr,
-                const SharedPtr<LogicalNode>& logical_plan) const = 0;
+                const SharedPtr<LogicalNode>& logical_plan) = 0;
 
-    String
-    name() const {
-        return name_;
-    };
-
-private:
-    String name_;
+    virtual String
+    name() const = 0;
 };
 
 

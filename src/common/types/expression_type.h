@@ -28,6 +28,7 @@ enum class ExpressionType {
 
     // Column
     kColumn,
+    kReference,
 
     // Correlated column expression
     kCorrelatedColumn,

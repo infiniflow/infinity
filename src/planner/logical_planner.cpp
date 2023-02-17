@@ -117,7 +117,7 @@ LogicalPlanner::BuildInsertValue(const hsql::InsertStatement &statement) {
     if(table_ptr == nullptr) { PlannerError(schema_name + "." + table_name + " not exists.")}
 
     // Create value list
-    std::vector<SharedPtr<BaseExpression>> value_list;
+    Vector<SharedPtr<BaseExpression>> value_list;
     value_list.reserve(statement.values->size());
     for (const auto* expr : *statement.values) {
         SharedPtr<BaseExpression> value_expr
@@ -128,22 +128,22 @@ LogicalPlanner::BuildInsertValue(const hsql::InsertStatement &statement) {
     // Rearrange the inserted value to match the table.
     // SELECT INTO TABLE (c, a) VALUES (1, 2); => SELECT INTO TABLE (a, b, c) VALUES( 2, NULL, 1);
     if (statement.columns != nullptr) {
-        size_t statement_column_count = statement.columns->size();
+        SizeT statement_column_count = statement.columns->size();
         PlannerAssert(statement_column_count == value_list.size(),
                       "INSERT: Target column count and input column count mismatch");
 
 //        Value null_value = Value::MakeNullData();
 //        SharedPtr<BaseExpression> null_value_expr = MakeShared<ValueExpression>(null_value);
 
-        size_t table_column_count = table_ptr->ColumnCount();
+        SizeT table_column_count = table_ptr->ColumnCount();
 
         // Create value list with table column size and null value
-        std::vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
+        Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
-        size_t column_idx = 0;
+        SizeT column_idx = 0;
         for(const auto& column_name : *statement.columns) {
             // Get table index from the inserted value column name;
-            size_t table_column_id = table_ptr->GetColumnIdByName(column_name);
+            SizeT table_column_id = table_ptr->GetColumnIdByName(column_name);
             DataType table_column_type = table_ptr->GetColumnTypeById(table_column_id);
             DataType value_type = value_list[column_idx]->Type();
             if(value_type == table_column_type) {
@@ -161,7 +161,7 @@ LogicalPlanner::BuildInsertValue(const hsql::InsertStatement &statement) {
         SizeT table_column_count = table_ptr->ColumnCount();
 
         // Create value list with table column size and null value
-        std::vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
+        Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
         for(SizeT column_idx = 0; column_idx < table_column_count; ++ column_idx) {
             DataType table_column_type = table_ptr->GetColumnTypeById(column_idx);
@@ -177,10 +177,9 @@ LogicalPlanner::BuildInsertValue(const hsql::InsertStatement &statement) {
     }
 
     // Create logical insert node.
-    SharedPtr<LogicalNode> logical_insert =
-            MakeShared<LogicalInsert>(table_ptr,
-                                      bind_context_ptr->GenerateTableIndex(),
-                                      value_list);
+    SharedPtr<LogicalNode> logical_insert = MakeShared<LogicalInsert>(table_ptr,
+                                                                      bind_context_ptr->GenerateTableIndex(),
+                                                                      value_list);
 
     // FIXME: check if we need to append operator
 //    this->AppendOperator(logical_insert, bind_context_ptr);
@@ -266,7 +265,7 @@ void
 LogicalPlanner::BuildCreateTable(const hsql::CreateStatement &statement) {
     // Check if columns is given.
     Vector<SharedPtr<ColumnDef>> columns;
-    for(size_t idx = 0; idx < statement.columns->size(); ++ idx) {
+    for(SizeT idx = 0; idx < statement.columns->size(); ++ idx) {
         const hsql::ColumnDefinition* statement_column = statement.columns->at(idx);
         String column_name(statement_column->name);
         bool nullable = statement_column->nullable;

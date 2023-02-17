@@ -34,13 +34,8 @@ OperatorPipeline::OnExecute(SharedPtr<QueryContext>& query_context) {
 
 SharedPtr<Table>
 OperatorPipeline::GetResult() {
-    ExecutorAssert(operator_->outputs().size() == 1, "Input table count isn't matched.");
-
-    SharedPtr<Table> result{};
-    for(const auto& input_table: operator_->outputs()) {
-        result = input_table.second;
-    }
-    return result;
+    ExecutorAssert(operator_->output() != nullptr, "No input table.");
+    return operator_->output();
 }
 
 }

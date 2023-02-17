@@ -9,32 +9,15 @@ namespace infinity {
 
 void
 PhysicalLimit::Init() {
-    // output table definition is same as input
-    ExecutorAssert(left()->outputs().size() == 1, "Input table count isn't matched.");
 
-    for(const auto& input_table: left()->outputs()) {
-        input_table_ = input_table.second;
-        input_table_index_ = input_table.first;
-    }
-
-    SizeT column_count = input_table_->ColumnCount();
-    Vector<SharedPtr<ColumnDef>> columns;
-    columns.reserve(column_count);
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType col_type = input_table_->GetColumnTypeById(idx);
-        String col_name = input_table_->GetColumnNameById(idx);
-
-        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
-        columns.emplace_back(col_def);
-    }
-
-    SharedPtr<TableDef> table_def = TableDef::Make("limit", columns, false);
-
-    outputs_[input_table_index_] = Table::Make(table_def, TableType::kIntermediate);
 }
 
 void
 PhysicalLimit::Execute(SharedPtr<QueryContext>& query_context) {
+
+    // output table definition is same as input
+    input_table_ = left_->output();
+    ExecutorAssert(input_table_ != nullptr, "No input");
 
     ExecutorAssert(limit_expr_->type() == ExpressionType::kValue,
                    "Currently, only support constant limit expression");
@@ -54,7 +37,7 @@ PhysicalLimit::Execute(SharedPtr<QueryContext>& query_context) {
     ExecutorAssert(offset >= 0 && offset < input_table_->row_count(),
                    "Offset should be larger or equal than 0 and less than row number")
 
-    outputs_[input_table_index_] = GetLimitOutput(input_table_, limit, offset);
+    output_ = GetLimitOutput(input_table_, limit, offset);
 }
 
 SharedPtr<Table>

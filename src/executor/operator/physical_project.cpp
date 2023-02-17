@@ -28,18 +28,7 @@ PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
         NotImplementError("Only select list.")
     } else {
         // Get input from left child
-        ExecutorAssert(!left()->outputs().empty(), "No input table for projection");
-
-        // Validate input and get block count;
-        SizeT input_block_count{};
-        for(bool first = true; const auto& input_table: left()->outputs()) {
-            if(first) {
-                input_block_count = input_table.second->DataBlockCount();
-                first = false;
-            } else {
-                ExecutorAssert(input_block_count == input_table.second->DataBlockCount(), "Table block count mismatches");
-            }
-        }
+        ExecutorAssert(left_->output() != nullptr, "No input table for projection");
 
         SizeT expression_count = expressions_.size();
 
@@ -74,27 +63,23 @@ PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
         SharedPtr<Table> projection_table = Table::Make(projection_tabledef, TableType::kAggregate);
 
         // Loop blocks
-        HashMap<u64, SharedPtr<DataBlock>> block_map;
+        SharedPtr<Table> input_table = left_->output();
+        // Get block count;
+        SizeT input_block_count = input_table->DataBlockCount();
         for(SizeT block_idx = 0; block_idx < input_block_count; ++ block_idx) {
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_types);
 
-            SizeT block_row_count{};
-            for(const auto& input_table: left()->outputs()) {
-                u64 table_index = input_table.first;
-                const SharedPtr<Table>& table_ptr = input_table.second;
-                const SharedPtr<DataBlock>& block_ptr = table_ptr->GetDataBlockById(block_idx);
-                block_map[table_index] = block_ptr;
-                block_row_count = block_ptr->row_count();
-            }
+            SharedPtr<DataBlock> input_data_block = input_table->GetDataBlockById(block_idx);
+            SizeT input_block_row_count = -input_data_block->row_count();
 
             // Loop aggregate expression
             ExpressionEvaluator evaluator;
             for(SizeT expr_idx = 0; expr_idx < expression_count; ++ expr_idx) {
                 evaluator.Execute(expressions_[expr_idx],
                                   expr_states[expr_idx],
-                                  block_map,
-                                  block_row_count,
+                                  input_data_block,
+                                  input_block_row_count,
                                   output_data_block->column_vectors[expr_idx]);
             }
 
@@ -102,7 +87,7 @@ PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
             projection_table->Append(output_data_block);
         }
 
-        outputs_[projection_table_index_] = projection_table;
+        output_ = projection_table;
     }
 }
 

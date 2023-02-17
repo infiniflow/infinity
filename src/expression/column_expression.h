@@ -5,6 +5,7 @@
 #pragma once
 
 #include "base_expression.h"
+#include "planner/column_binding.h"
 
 namespace infinity {
 
@@ -34,7 +35,7 @@ public:
                      i64 column_index,
                      i64 depth);
 
-    DataType
+    inline DataType
     Type() const override {
         return data_type_;
     };
@@ -47,32 +48,35 @@ public:
         return table_name_;
     }
 
-    u64
-    table_index() const {
-        return table_index_;
-    }
+//    inline u64
+//    table_index() const {
+//        return binding_.table_idx;
+//    }
 
     const String&
     column_name() const {
         return column_name_;
     }
 
-    i64
-    column_index() const {
-        return column_index_;
+//    inline i64
+//    column_index() const {
+//        return binding_.column_idx;
+//    }
+
+    inline ColumnBinding
+    binding() const {
+        return binding_;
     }
 
 private:
 
     DataType data_type_;
 
+    ColumnBinding binding_;
+
     String table_name_{};
 
-    u64 table_index_{};
-
     String column_name_{};
-
-    i64 column_index_{};
 
     i64 depth_;
 };

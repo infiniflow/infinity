@@ -19,14 +19,14 @@ ExpressionState::CreateState(const SharedPtr<BaseExpression> &expression) {
             return CreateState(std::static_pointer_cast<CaseExpression>(expression));
         case ExpressionType::kConjunction:
             return CreateState(std::static_pointer_cast<ConjunctionExpression>(expression));
-        case ExpressionType::kColumn:
-            return CreateState(std::static_pointer_cast<ColumnExpression>(expression));
         case ExpressionType::kFunction:
             return CreateState(std::static_pointer_cast<FunctionExpression>(expression));
         case ExpressionType::kBetween:
             return CreateState(std::static_pointer_cast<BetweenExpression>(expression));
         case ExpressionType::kValue:
             return CreateState(std::static_pointer_cast<ValueExpression>(expression));
+        case ExpressionType::kReference:
+            return CreateState(std::static_pointer_cast<ReferenceExpression>(expression));
         default:
             ExecutorError("Unknown expression type: " + expression->ToString());
     }
@@ -90,7 +90,7 @@ ExpressionState::CreateState(const SharedPtr<CastExpression>& cast_expr) {
 }
 
 SharedPtr<ExpressionState>
-ExpressionState::CreateState(const SharedPtr<ColumnExpression>& column_expr) {
+ExpressionState::CreateState(const SharedPtr<ReferenceExpression>& column_expr) {
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(column_expr->Type());
     result->output_data_block_.Init({column});

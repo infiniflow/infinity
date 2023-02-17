@@ -8,6 +8,7 @@
 #include "expression/base_expression.h"
 #include "expression_state.h"
 #include "common/column_vector/selection.h"
+#include "expression/reference_expression.h"
 
 #include <unordered_map>
 
@@ -105,6 +106,12 @@ public:
 
     void
     Execute(const SharedPtr<ValueExpression>& expr,
+            SharedPtr<ExpressionState>& state,
+            SharedPtr<ColumnVector>& output_column_vector,
+            SizeT count);
+
+    void
+    Execute(const SharedPtr<ReferenceExpression>& expr,
             SharedPtr<ExpressionState>& state,
             SharedPtr<ColumnVector>& output_column_vector,
             SizeT count);

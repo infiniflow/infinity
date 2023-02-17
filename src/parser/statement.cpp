@@ -81,62 +81,62 @@ Statement::ExprAsColumnName(const hsql::Expr* expr) {
                 }
                 case hsql::kOpPlus: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " + " << Statement::ExprAsColumnName(expr->expr);
+                       << " + " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpMinus: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " - " << Statement::ExprAsColumnName(expr->expr);
+                       << " - " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpAsterisk: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " * " << Statement::ExprAsColumnName(expr->expr);
+                       << " * " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpSlash: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " / " << Statement::ExprAsColumnName(expr->expr);
+                       << " / " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpPercentage: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " % " << Statement::ExprAsColumnName(expr->expr);
+                       << " % " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpCaret: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " ^ " << Statement::ExprAsColumnName(expr->expr);
+                       << " ^ " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpEquals: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " = " << Statement::ExprAsColumnName(expr->expr);
+                       << " = " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpNotEquals: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " <> " << Statement::ExprAsColumnName(expr->expr);
+                       << " <> " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpLess: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " < " << Statement::ExprAsColumnName(expr->expr);
+                       << " < " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpLessEq: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " <= " << Statement::ExprAsColumnName(expr->expr);
+                       << " <= " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpGreater: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " > " << Statement::ExprAsColumnName(expr->expr);
+                       << " > " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpGreaterEq: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " >= " << Statement::ExprAsColumnName(expr->expr);
+                       << " >= " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpLike: {
@@ -150,17 +150,17 @@ Statement::ExprAsColumnName(const hsql::Expr* expr) {
                 }
                 case hsql::kOpAnd: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " AND " << Statement::ExprAsColumnName(expr->expr);
+                       << " AND " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpOr: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " OR " << Statement::ExprAsColumnName(expr->expr);
+                       << " OR " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpIn: {
                     ss << Statement::ExprAsColumnName(expr->expr)
-                       << " IN " << Statement::ExprAsColumnName(expr->expr);
+                       << " IN " << Statement::ExprAsColumnName(expr->expr2);
                     break;
                 }
                 case hsql::kOpConcat: {

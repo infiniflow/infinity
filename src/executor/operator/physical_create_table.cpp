@@ -50,7 +50,7 @@ PhysicalCreateTable::Execute(SharedPtr<QueryContext>& query_context) {
 
     SharedPtr<TableDef> result_table_def_ptr
         = MakeShared<TableDef>("Tables", column_defs, false);
-    outputs_[table_index_] = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
+    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 
 

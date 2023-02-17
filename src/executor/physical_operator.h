@@ -55,9 +55,9 @@ public:
     virtual void
     Execute(SharedPtr<QueryContext>& query_context) = 0;
 
-    const HashMap<u64, SharedPtr<Table>>&
-    outputs() const {
-        return outputs_;
+    const SharedPtr<Table>&
+    output() const {
+        return output_;
     }
 
 protected:
@@ -68,7 +68,8 @@ protected:
 
     std::weak_ptr<OperatorPipeline> operator_pipeline_{};
 
-    HashMap<u64, SharedPtr<Table>> outputs_{};
+
+    SharedPtr<Table> output_{};
 };
 
 

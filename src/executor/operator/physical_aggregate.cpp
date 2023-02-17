@@ -5,18 +5,14 @@
 #include "physical_aggregate.h"
 #include "executor/expression/expression_executor.h"
 #include "executor/expression/expression_evaluator.h"
+#include "common/utility/utility.h"
 
 namespace infinity {
 
 void
 PhysicalAggregate::Init() {
-
-    ExecutorAssert(left()->outputs().size() == 1, "Input table count isn't matched.");
-
-    for(const auto& input_table: left()->outputs()) {
-        input_table_ = input_table.second;
-        input_table_index_ = input_table.first;
-    }
+    input_table_ = left_->output();
+    ExecutorAssert(input_table_ != nullptr, "No left input.");
 }
 
 void
@@ -123,14 +119,14 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
             output_data_block->Init(output_types);
 
             const SharedPtr<DataBlock>& block_ptr = grouped_input_table->GetDataBlockById(block_idx);
-            block_map[groupby_index_] = block_ptr;
-            block_map[input_table_index_] = block_ptr;
+//            block_map[groupby_index_] = block_ptr;
+//            block_map[input_table_index_] = block_ptr;
             // Loop aggregate expression
             ExpressionEvaluator evaluator;
             for(SizeT expr_idx = 0; expr_idx < aggregates_count; ++ expr_idx) {
                 evaluator.Execute(aggregates_[expr_idx],
                                   expr_states[expr_idx],
-                                  block_map,
+                                  block_ptr,
                                   block_ptr->row_count(),
                                   output_data_block->column_vectors[expr_idx]);
             }
@@ -139,13 +135,12 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
             output_aggregate_table->Append(output_data_block);
         }
 
-        // Set output aggregate table
-        this->outputs_[aggregate_index_] = output_aggregate_table;
+        // Union output group by table with aggregate table
+        output_groupby_table->UnionWith(output_aggregate_table);
     }
 
     // 4. generate the result to output
-    this->outputs_[groupby_index_] = output_groupby_table;
-
+    this->output_ = output_groupby_table;
 }
 
 void
@@ -173,7 +168,8 @@ PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, Shared
         for(const auto& vec_pair: item.second) {
             datablock_size += vec_pair.second.size();
         }
-        output_datablock->Init(types, datablock_size);
+        SizeT datablock_capacity = NextPowerOfTwo(datablock_size);
+        output_datablock->Init(types, datablock_capacity);
 
         // Loop each block
         SizeT output_row_idx = 0;
@@ -304,9 +300,8 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
     const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;
     SizeT row_count = hash_table_.hash_table_.size();
 #if 1
-    for(SizeT row_id = 0, block_row_idx = 0; const auto& item: hash_table_.hash_table_) {
+    for(SizeT block_row_idx = 0; const auto& item: hash_table_.hash_table_) {
         // Each hash bucket will generate one data block.
-        block_row_idx = 0;
         output_datablock = DataBlock::Make();
         output_datablock->Init(types);
 
@@ -314,6 +309,7 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
         SizeT input_block_id = item.second.begin()->first;
         SizeT input_offset = item.second.begin()->second.front();
 
+        // Only the first position of the column vector has value.
         for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
             switch (types[column_id].type()) {
                 case LogicalType::kBoolean: {
@@ -400,9 +396,6 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
 
             output_datablock->column_vectors[column_id]->tail_index_ = block_row_idx + 1;
         }
-
-        ++ block_row_idx;
-        ++ row_id;
 
         output_datablock->Finalize();
         output_table->Append(output_datablock);

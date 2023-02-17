@@ -11,13 +11,13 @@ namespace infinity {
 void
 ExpressionEvaluator::Execute(const SharedPtr<BaseExpression>& expression,
                              SharedPtr<ExpressionState>& state,
-                             HashMap<u64, SharedPtr<DataBlock>> input_block_map,
+                             const SharedPtr<DataBlock>& input_data_block,
                              SizeT row_count,
                              SharedPtr<ColumnVector>& output_column_vector) {
     // Validate the input data block map
-    ExecutorAssert(!input_block_map.empty(), "No input data block");
+    ExecutorAssert(input_data_block != nullptr, "Input data block is NULL");
 
-    blocks_map_ = std::move(input_block_map);
+    input_data_block_ = input_data_block;
     ExecutorAssert(state != nullptr, "Expression state need to be initialized before.")
     ExecutorAssert(expression != nullptr, "No expression.")
 
@@ -52,6 +52,8 @@ ExpressionEvaluator::Execute(const SharedPtr<BaseExpression>& expr,
             return Execute(std::static_pointer_cast<BetweenExpression>(expr), state, output_column, count);
         case ExpressionType::kValue:
             return Execute(std::static_pointer_cast<ValueExpression>(expr), state, output_column, count);
+        case ExpressionType::kReference:
+            return Execute(std::static_pointer_cast<ReferenceExpression>(expr), state, output_column, count);
         default:
             ExecutorError("Unknown expression type: " + expr->ToString());
     }
@@ -147,12 +149,7 @@ ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression>& expr,
                              SharedPtr<ColumnVector>& output_column_vector,
                              SizeT count) {
 
-    i64 column_index = expr->column_index();
-    u64 table_index = expr->table_index();
-    ExecutorAssert(blocks_map_.contains(table_index), fmt::format("No table index: {}", table_index))
-    const SharedPtr<DataBlock>& block_ptr = blocks_map_[table_index];
-    ExecutorAssert(column_index < block_ptr->column_count(), "Invalid column index");
-    output_column_vector = block_ptr->column_vectors[column_index];
+    ExecutorError("ColumnExpression isn't expected here.");
 }
 
 void
@@ -209,7 +206,16 @@ ExpressionEvaluator::Execute(const SharedPtr<ValueExpression>& expr,
                              SharedPtr<ExpressionState>& state,
                              SharedPtr<ColumnVector>& output_column_vector,
                              SizeT count) {
+}
 
+void
+ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column_vector,
+                            SizeT count) {
+    SizeT column_index = expr->column_index();
+    ExecutorAssert(column_index < this->input_data_block_->column_count(), "Invalid column index");
+    output_column_vector = this->input_data_block_->column_vectors[column_index];
 }
 
 }

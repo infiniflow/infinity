@@ -47,4 +47,24 @@ Table::GetRowIDVector() const {
     return result;
 }
 
+void
+Table::UnionWith(const SharedPtr<Table>& other) {
+    StorageAssert(this->row_count_ == other->row_count_,
+                  fmt::format("Can't union two table with different row count {}:{}",
+                              this->row_count_,
+                              other->row_count_));
+
+    StorageAssert(this->data_blocks_.size() == other->data_blocks_.size(),
+                  fmt::format("Can't union two table with different block count {}:{}",
+                              this->data_blocks_.size(),
+                              other->data_blocks_.size()));
+
+    SizeT block_count = this->data_blocks_.size();
+    for(SizeT idx = 0; idx < block_count; ++ idx) {
+        this->data_blocks_[idx]->UnionWith(other->data_blocks_[idx]);
+    }
+
+    this->definition_ptr_->UnionWith(other->definition_ptr_);
+}
+
 }

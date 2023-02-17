@@ -22,12 +22,11 @@ PhysicalTableScan::Init() {
     SharedPtr<TableDef> table_def_ptr
             = MakeShared<TableDef>(table_alias_, column_defs, false);
 
-    outputs_[this->table_index_] = MakeShared<Table>(table_def_ptr, TableType::kResult);
+    output_ = MakeShared<Table>(table_def_ptr, TableType::kResult);
 }
 
 void
 PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
-    SharedPtr<Table> output_table = outputs_[this->table_index_];
     while(true) {
          SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
          output_block->Init(column_types_);
@@ -36,7 +35,7 @@ PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
                  table_scan_function_data_ptr_,
                  *output_block);
         if(output_block->row_count() > 0) {
-            output_table->Append(output_block);
+            output_->Append(output_block);
         } else {
             break;
         }

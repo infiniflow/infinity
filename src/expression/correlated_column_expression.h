@@ -12,7 +12,7 @@ class CorrelatedColumnExpression: public BaseExpression {
 public:
     CorrelatedColumnExpression(DataType data_type, String column_name);
 
-    DataType
+    inline DataType
     Type() const override {
         return data_type_;
     }

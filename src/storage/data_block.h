@@ -62,6 +62,9 @@ public:
     void
     FillRowIDVector(SharedPtr<Vector<RowID>>& row_ids, u32 block_id) const;
 
+    void
+    UnionWith(const SharedPtr<DataBlock>& other);
+
 public:
     [[nodiscard]] inline SizeT
     column_count() const {

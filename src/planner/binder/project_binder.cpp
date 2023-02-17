@@ -17,8 +17,8 @@ ProjectBinder::BuildExpression(const hsql::Expr &expr,
                                bool root) {
     String expr_name = Statement::ExprAsColumnName(&expr);
 
-    // If the expr is coming from group by lists.
-    if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
+    // If the expr isn't from aggregate function and coming from group by lists.
+    if (!this->binding_agg_func_ && bind_context_ptr->group_index_by_name_.contains(expr_name)) {
         i64 groupby_index = bind_context_ptr->group_index_by_name_[expr_name];
         const SharedPtr<BaseExpression>& group_expr = bind_context_ptr->group_exprs_[groupby_index];
 

@@ -21,4 +21,17 @@ TableDef::ToString() const {
     return ss.str();
 }
 
+void
+TableDef::UnionWith(const SharedPtr<TableDef>& other) {
+    SizeT this_column_count = this->column_count();
+    SizeT other_column_count = other->column_count();
+    this->columns_.reserve(this_column_count + other_column_count);
+    this->columns_.insert(this->columns_.end(), other->columns_.begin(), other->columns_.end());
+
+    SizeT total_column_count = this_column_count + other_column_count;
+    for(SizeT idx = this_column_count; idx < total_column_count; ++ idx) {
+        column_name2id_[columns_[idx]->name()] = idx;
+    }
+}
+
 }

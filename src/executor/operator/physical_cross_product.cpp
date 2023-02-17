@@ -8,18 +8,10 @@ namespace infinity {
 
 void
 PhysicalCrossProduct::Init() {
-    ExecutorAssert(left()->outputs().size() == 1, "Left Input table count isn't matched.");
-    ExecutorAssert(right()->outputs().size() == 1, "Right Input table count isn't matched.");
-
-    for(const auto& input_table: left()->outputs()) {
-        left_table_ = input_table.second;
-        left_table_index_ = input_table.first;
-    }
-
-    for(const auto& input_table: left()->outputs()) {
-        right_table_ = input_table.second;
-        right_table_index_ = input_table.first;
-    }
+    ExecutorAssert(left_->output() != nullptr, "No left input.");
+    ExecutorAssert(right_->output() != nullptr, "No right input.");
+    left_table_ = left_->output();
+    right_table_ = right_->output();
 }
 
 void
@@ -99,7 +91,7 @@ PhysicalCrossProduct::Execute(std::shared_ptr<QueryContext>& query_context) {
         }
     }
 
-    outputs_[output_table_index_] = cross_product_table;
+    output_ = cross_product_table;
 }
 
 }

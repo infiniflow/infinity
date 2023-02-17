@@ -34,8 +34,6 @@ public:
 private:
     SharedPtr<Table> left_table_{};
     SharedPtr<Table> right_table_{};
-    u64 left_table_index_{};
-    u64 right_table_index_{};
     u64 output_table_index_{};
 };
 

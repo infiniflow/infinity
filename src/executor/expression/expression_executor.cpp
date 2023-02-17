@@ -199,6 +199,8 @@ ExpressionExecutor::Execute(const SharedPtr<BaseExpression>& expr,
             return Execute(std::static_pointer_cast<BetweenExpression>(expr), state, output_column, count);
         case ExpressionType::kValue:
             return Execute(std::static_pointer_cast<ValueExpression>(expr), state, output_column, count);
+        case ExpressionType::kReference:
+            return Execute(std::static_pointer_cast<ReferenceExpression>(expr), state, output_column, count);
         default:
             ExecutorError("Unknown expression type: " + expr->ToString());
     }
@@ -276,9 +278,7 @@ ExpressionExecutor::Execute(const SharedPtr<ColumnExpression>& expr,
                             SharedPtr<ColumnVector>& output_column_vector,
                             SizeT count) {
 
-    i64 column_index = expr->column_index();
-    ExecutorAssert(column_index < this->input_data_->column_count(), "Invalid column index");
-    output_column_vector = this->input_data_->column_vectors[column_index];
+    ExecutorError("ColumnExpression isn't expected here.");
 }
 
 void
@@ -336,6 +336,16 @@ ExpressionExecutor::Execute(const SharedPtr<ValueExpression>& expr,
                             SharedPtr<ColumnVector>& output_column_vector,
                             SizeT count) {
 
+}
+
+void
+ExpressionExecutor::Execute(const SharedPtr<ReferenceExpression>& expr,
+                            SharedPtr<ExpressionState>& state,
+                            SharedPtr<ColumnVector>& output_column_vector,
+                            SizeT count) {
+    SizeT column_index = expr->column_index();
+    ExecutorAssert(column_index < this->input_data_->column_count(), "Invalid column index");
+    output_column_vector = this->input_data_->column_vectors[column_index];
 }
 
 }

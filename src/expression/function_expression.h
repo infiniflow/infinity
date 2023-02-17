@@ -14,7 +14,7 @@ public:
     FunctionExpression(ScalarFunction function,
                        Vector<SharedPtr<BaseExpression>> arguments);
 
-    DataType
+    inline DataType
     Type() const override {
         return func_.return_type();
     }

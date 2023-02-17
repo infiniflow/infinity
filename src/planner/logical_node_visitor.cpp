@@ -46,8 +46,12 @@ LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kLimit: {
             auto& node = (LogicalLimit&)op;
-            VisitExpression(node.limit_expression_);
-            VisitExpression(node.offset_expression_);
+            if(node.limit_expression_ != nullptr) {
+                VisitExpression(node.limit_expression_);
+            }
+            if(node.offset_expression_ != nullptr) {
+                VisitExpression(node.offset_expression_);
+            }
             break;
         }
         case LogicalNodeType::kFilter: {
@@ -173,7 +177,7 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             break;
         }
         default: {
-            PlannerError("Unexpected expression type")
+            PlannerError("Unexpected expression type: " + expression->ToString())
         }
     }
 }

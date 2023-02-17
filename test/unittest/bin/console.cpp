@@ -76,7 +76,4 @@ TEST_F(ConsoleTest, explain_unopt_logical) {
 
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-
-
-
 }

@@ -20,7 +20,7 @@ public:
                           const SharedPtr<BaseExpression>& left_operand,
                           const SharedPtr<BaseExpression>& right_operand);
 
-    DataType
+    inline DataType
     Type() const override {
         return DataType{LogicalType::kBoolean};
     }

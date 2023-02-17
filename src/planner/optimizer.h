@@ -16,11 +16,10 @@ class QueryContext;
 class Optimizer {
 public:
     explicit
-    Optimizer(SharedPtr<QueryContext> query_context_ptr)
-        : query_context_ptr_(std::move(query_context_ptr)) {}
+    Optimizer(SharedPtr<QueryContext> query_context_ptr);
 
     void
-    AddRule(UniquePtr<OptimizerRule> rule);
+    AddRule(SharedPtr<OptimizerRule> rule);
 
     SharedPtr<LogicalNode>
     optimize(const SharedPtr<LogicalNode>& unoptimized_plan);
@@ -28,7 +27,7 @@ public:
 public:
     SharedPtr<QueryContext> query_context_ptr_{};
 
-    Vector<UniquePtr<OptimizerRule>> rules_{};
+    Vector<SharedPtr<OptimizerRule>> rules_{};
 };
 
 }

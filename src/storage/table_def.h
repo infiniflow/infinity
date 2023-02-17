@@ -19,8 +19,9 @@ public:
     explicit
     TableDef(String table_name, Vector<SharedPtr<ColumnDef>> columns, bool if_not_exists)
             : columns_(std::move(columns)), name_(std::move(table_name)), if_not_exists_(if_not_exists) {
-        for(i64 i = 0; i < columns_.size(); ++ i) {
-            column_name2id_[columns_[i]->name()] = i;
+        SizeT column_count = columns_.size();
+        for(SizeT idx = 0; idx < column_count; ++ idx) {
+            column_name2id_[columns_[idx]->name()] = idx;
         }
     }
 
@@ -29,7 +30,7 @@ public:
         return columns_;
     }
 
-    [[nodiscard]] inline size_t
+    [[nodiscard]] inline SizeT
     column_count() const {
         return columns_.size();
     }
@@ -39,7 +40,7 @@ public:
         return name_;
     }
 
-    [[nodiscard]] inline i64
+    [[nodiscard]] inline SizeT
     GetColIdByName(const String& name) const {
         if(column_name2id_.contains(name)) {
             return column_name2id_.at(name);
@@ -51,9 +52,12 @@ public:
     String
     ToString() const;
 
+    void
+    UnionWith(const SharedPtr<TableDef>& other);
+
 private:
     Vector<SharedPtr<ColumnDef>> columns_;
-    HashMap<String, i64> column_name2id_;
+    HashMap<String, SizeT> column_name2id_;
     String name_;
     bool if_not_exists_{false};
 };

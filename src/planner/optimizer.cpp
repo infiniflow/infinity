@@ -3,11 +3,16 @@
 //
 
 #include "optimizer.h"
+#include "planner/optimizer/column_remapper.h"
 
 namespace infinity {
 
+Optimizer::Optimizer(SharedPtr<QueryContext> query_context_ptr) : query_context_ptr_(std::move(query_context_ptr)) {
+    AddRule(MakeShared<ColumnRemapper>());
+}
+
 void
-Optimizer::AddRule(UniquePtr<OptimizerRule> rule) {
+Optimizer::AddRule(SharedPtr<OptimizerRule> rule) {
     rules_.emplace_back(std::move(rule));
 }
 
