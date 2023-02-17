@@ -17,6 +17,11 @@ public:
             limit_expression_(std::move(limit_expression)),
             offset_expression_(std::move(offset_expression)) {}
 
+    [[nodiscard]] inline Vector<ColumnBinding>
+    GetColumnBindings() const final {
+        return left_node_->GetColumnBindings();
+    }
+
     String
     ToString(i64& space) final;
 

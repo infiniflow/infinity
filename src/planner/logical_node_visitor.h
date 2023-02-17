@@ -36,18 +36,25 @@ public:
 
     virtual SharedPtr<BaseExpression>
     VisitReplace(const SharedPtr<AggregateExpression>& expression);
+
     virtual SharedPtr<BaseExpression>
     VisitReplace(const SharedPtr<BetweenExpression>& expression);
+
     virtual SharedPtr<BaseExpression>
     VisitReplace(const SharedPtr<CaseExpression>& expression);
+
     virtual SharedPtr<BaseExpression>
     VisitReplace(const SharedPtr<CastExpression>& expression);
+
     virtual SharedPtr<BaseExpression>
     VisitReplace(const SharedPtr<ColumnExpression>& expression);
+
     virtual SharedPtr<BaseExpression>
     VisitReplace(const SharedPtr<ConjunctionExpression>& expression);
+
     virtual SharedPtr<BaseExpression>
     VisitReplace(const SharedPtr<FunctionExpression>& expression);
+
     virtual SharedPtr<BaseExpression>
     VisitReplace(const SharedPtr<ValueExpression>& expression);
 };

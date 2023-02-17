@@ -22,6 +22,11 @@ public:
               table_index_(table_index),
               value_list_(std::move(value_list)) {};
 
+    [[nodiscard]] inline Vector<ColumnBinding>
+    GetColumnBindings() const final {
+        return {};
+    }
+
     String 
     ToString(i64& space) final;
 

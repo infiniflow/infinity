@@ -101,10 +101,6 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             }
             break;
         }
-        case ExpressionType::kGroupingFunction:
-            break;
-        case ExpressionType::kArithmetic:
-            break;
         case ExpressionType::kCast: {
             auto cast_expression = std::static_pointer_cast<CastExpression>(expression);
             for(auto& argument: cast_expression->arguments()) {
@@ -133,8 +129,6 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             }
             break;
         }
-        case ExpressionType::kAnd:
-            break;
         case ExpressionType::kConjunction: {
             auto conjunction_expression = std::static_pointer_cast<ConjunctionExpression>(expression);
             for(auto& argument: conjunction_expression->arguments()) {
@@ -147,10 +141,6 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             }
             break;
         }
-        case ExpressionType::kOr:
-            break;
-        case ExpressionType::kNot:
-            break;
         case ExpressionType::kColumn: {
             auto column_expression = std::static_pointer_cast<ColumnExpression>(expression);
             PlannerAssert(column_expression->arguments().empty(), "Column expression shouldn't have arguments");
@@ -160,14 +150,6 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             expression = result;
             break;
         }
-        case ExpressionType::kCorrelatedColumn:
-            break;
-        case ExpressionType::kExists:
-            break;
-        case ExpressionType::kExtract:
-            break;
-        case ExpressionType::kInterval:
-            break;
         case ExpressionType::kFunction: {
             auto function_expression = std::static_pointer_cast<FunctionExpression>(expression);
             for(auto& argument: function_expression->arguments()) {
@@ -180,34 +162,6 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             }
             break;
         }
-        case ExpressionType::kList:
-            break;
-        case ExpressionType::kLogical:
-            break;
-        case ExpressionType::kEqual:
-            break;
-        case ExpressionType::kNotEqual:
-            break;
-        case ExpressionType::kLessThan:
-            break;
-        case ExpressionType::kGreaterThan:
-            break;
-        case ExpressionType::kLessThanEqual:
-            break;
-        case ExpressionType::kGreaterThanEqual:
-            break;
-        case ExpressionType::kBetween:
-            break;
-        case ExpressionType::kNotBetween:
-            break;
-        case ExpressionType::kSubQuery:
-            break;
-        case ExpressionType::kUnaryMinus:
-            break;
-        case ExpressionType::kIsNull:
-            break;
-        case ExpressionType::kIsNotNull:
-            break;
         case ExpressionType::kValue: {
             auto value_expression = std::static_pointer_cast<ValueExpression>(expression);
             PlannerAssert(value_expression->arguments().empty(), "Column expression shouldn't have arguments");
@@ -218,31 +172,9 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             }
             break;
         }
-        case ExpressionType::kDefault:
-            break;
-        case ExpressionType::kParameter:
-            break;
-        case ExpressionType::kIn:
-            break;
-        case ExpressionType::kNotIn:
-            break;
-        case ExpressionType::kWindowRank:
-            break;
-        case ExpressionType::kWindowRowNumber:
-            break;
-        case ExpressionType::kDistinctFrom:
-            break;
-        case ExpressionType::kNotDistinctFrom:
-            break;
-        case ExpressionType::kPlaceholder:
-            break;
-        case ExpressionType::kPredicate:
-            break;
-        case ExpressionType::kRaw:
-            break;
-    }
-    if(result == nullptr) {
-
+        default: {
+            PlannerError("Unexpected expression type")
+        }
     }
 }
 

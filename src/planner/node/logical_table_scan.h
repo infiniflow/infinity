@@ -22,6 +22,9 @@ public:
                      Vector<String> column_names,
                      Vector<DataType> column_types);
 
+    [[nodiscard]] Vector<ColumnBinding>
+    GetColumnBindings() const final;
+
     [[nodiscard]] SharedPtr<Table>
     table_ptr() const {
         return table_ptr_;

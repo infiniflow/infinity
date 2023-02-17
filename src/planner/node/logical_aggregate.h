@@ -22,6 +22,9 @@ public:
               aggregate_index_(aggregate_index)
               {}
 
+    [[nodiscard]] Vector<ColumnBinding>
+    GetColumnBindings() const final;
+
     String
     ToString(i64 &space) final;
 

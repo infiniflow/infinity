@@ -16,6 +16,11 @@ public:
     explicit LogicalViewScan(SharedPtr<View> view_ptr)
     : LogicalNode(LogicalNodeType::kViewScan), view_ptr_(std::move(view_ptr)) {}
 
+    [[nodiscard]] inline Vector<ColumnBinding>
+    GetColumnBindings() const final {
+        return {};
+    }
+
     [[nodiscard]] SharedPtr<View>
     view_ptr() const {
         return view_ptr_;

@@ -19,6 +19,9 @@ public:
                 const SharedPtr<LogicalNode>& left,
                 const SharedPtr<LogicalNode>& right);
 
+    [[nodiscard]] Vector<ColumnBinding>
+    GetColumnBindings() const final;
+
     String
     ToString(i64& space) final;
 

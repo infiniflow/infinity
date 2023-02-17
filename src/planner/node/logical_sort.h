@@ -18,6 +18,11 @@ public:
     expressions_(std::move(expressions)),
     order_by_types_(std::move(order_by_types)) {}
 
+    [[nodiscard]] Vector<ColumnBinding>
+    GetColumnBindings() const final {
+        return left_node_->GetColumnBindings();
+    }
+
     String
     ToString(i64& space) final;
 

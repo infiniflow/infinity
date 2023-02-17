@@ -6,6 +6,21 @@
 
 namespace infinity {
 
+Vector<ColumnBinding>
+LogicalAggregate::GetColumnBindings() const {
+    Vector<ColumnBinding> result;
+    SizeT groups_count = groups_.size();
+    SizeT aggregates_count = groups_.size();
+    result.reserve(groups_count + aggregates_count);
+    for(SizeT i = 0; i < groups_count; ++ i) {
+        result.emplace_back(groupby_index_, i);
+    }
+    for(SizeT i = 0; i < aggregates_count; ++ i) {
+        result.emplace_back(aggregate_index_, i);
+    }
+    return result;
+}
+
 String
 LogicalAggregate::ToString(i64 &space) {
 

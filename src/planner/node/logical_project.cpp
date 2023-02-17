@@ -7,6 +7,17 @@
 
 namespace infinity {
 
+Vector<ColumnBinding>
+LogicalProject::GetColumnBindings() const {
+    Vector<ColumnBinding> result;
+    SizeT expression_count = expressions_.size();
+    result.reserve(expression_count);
+    for(SizeT i = 0; i < expression_count; ++ i) {
+        result.emplace_back(table_index_, i);
+    }
+    return result;
+}
+
 String
 LogicalProject::ToString(i64& space) {
     std::stringstream ss;

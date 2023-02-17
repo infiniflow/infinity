@@ -17,6 +17,11 @@ public:
     LogicalFilter(SharedPtr<BaseExpression> expression)
         : LogicalNode(LogicalNodeType::kFilter), expression_(std::move(expression)) {}
 
+    [[nodiscard]] inline Vector<ColumnBinding>
+    GetColumnBindings() const final {
+        return left_node_->GetColumnBindings();
+    }
+
     String
     ToString(i64& space) final;
 

@@ -8,6 +8,7 @@
 #include "column_identifier.h"
 #include "expression/base_expression.h"
 #include "planner/bind_context.h"
+#include "column_binding.h"
 
 #include <string>
 #include <vector>
@@ -23,6 +24,9 @@ public:
 
     virtual
     ~LogicalNode() = default;
+
+    virtual Vector<ColumnBinding>
+    GetColumnBindings() const = 0;
 
     [[nodiscard]] inline SharedPtr<LogicalNode>&
     left_node() {
@@ -44,10 +48,6 @@ public:
         right_node_ = right;
     };
 
-//    void AddOutputNode(const SharedPtr<LogicalNode>& output);
-//    void RemoveOutputNode(const SharedPtr<LogicalNode>& output);
-//    void ClearOutputs();
-//    [[nodiscard]] std::vector<SharedPtr<LogicalNode>> outputs() const { return outputs_; }
     [[nodiscard]] u64
     node_id() const {
         return node_id_;

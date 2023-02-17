@@ -22,6 +22,14 @@ LogicalJoin::LogicalJoin(JoinType join_type,
     this->set_right_node(right);
 }
 
+Vector<ColumnBinding>
+LogicalJoin::GetColumnBindings() const {
+    Vector<ColumnBinding> left_binding = this->left_node_->GetColumnBindings();
+    Vector<ColumnBinding> right_binding = this->left_node_->GetColumnBindings();
+    left_binding.insert(left_binding.end(), right_binding.begin(), right_binding.end());
+    return left_binding;
+}
+
 String
 LogicalJoin::ToString(i64& space) {
     std::stringstream ss;

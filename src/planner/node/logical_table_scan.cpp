@@ -33,6 +33,17 @@ LogicalTableScan::LogicalTableScan(SharedPtr<Table> table_ptr,
 //    }
 }
 
+[[nodiscard]] Vector<ColumnBinding>
+LogicalTableScan::GetColumnBindings() const {
+    Vector<ColumnBinding> result;
+    SizeT column_count = column_names_.size();
+    result.reserve(column_count);
+    for(SizeT i = 0; i < column_count; ++ i) {
+        result.emplace_back(table_index_, i);
+    }
+    return result;
+}
+
 String
 LogicalTableScan::ToString(i64& space) {
     std::stringstream ss;

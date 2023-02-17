@@ -18,6 +18,11 @@ public:
           table_index_(table_index)
           {}
 
+    [[nodiscard]] inline Vector<ColumnBinding>
+    GetColumnBindings() const final {
+        return {};
+    }
+
     String
     ToString(i64& space) final;
 
