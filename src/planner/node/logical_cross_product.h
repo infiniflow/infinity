@@ -11,7 +11,8 @@ namespace infinity {
 class LogicalCrossProduct: public LogicalNode {
 public:
     explicit
-    LogicalCrossProduct(String alias,
+    LogicalCrossProduct(u64 node_id,
+                        String alias,
                         u64 join_index,
                         const SharedPtr<LogicalNode>& left,
                         const SharedPtr<LogicalNode>& right);

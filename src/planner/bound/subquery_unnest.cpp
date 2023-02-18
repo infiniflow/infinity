@@ -10,20 +10,24 @@
 namespace infinity {
 
 void
-SubqueryUnnest::UnnestSubqueries(SharedPtr<BaseExpression> &expr_ptr, SharedPtr<LogicalNode> &root) {
+SubqueryUnnest::UnnestSubqueries(SharedPtr<BaseExpression> &expr_ptr,
+                                 SharedPtr<LogicalNode> &root,
+                                 const SharedPtr<BindContext>& bind_context) {
     // 2. Call Unnest Subquery to resolve subquery
     if (expr_ptr->type() == ExpressionType::kSubQuery) {
         // Subquery, need to be unnested.
-        UnnestSubquery(expr_ptr, root);
+        UnnestSubquery(expr_ptr, root, bind_context);
     }
 }
 
 SharedPtr<BaseExpression>
-SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpression>& expr_ptr, SharedPtr<LogicalNode>& root) {
+SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpression>& expr_ptr,
+                               SharedPtr<LogicalNode>& root,
+                               const SharedPtr<BindContext>& bind_context) {
     // 1. Check the subquery type: uncorrelated subquery or correlated subquery.
     auto subquery_expr = std::static_pointer_cast<SubqueryExpression>(expr_ptr);
 
-    auto right = subquery_expr->bound_select_statement_ptr_->BuildPlan();
+    auto right = subquery_expr->bound_select_statement_ptr_->BuildPlan(bind_context);
     // TODO: if the correlated information of the subquery should be stored in bind context.
     // Check the correlated information
     auto result = UnnestUncorrelated(subquery_expr, root, right);

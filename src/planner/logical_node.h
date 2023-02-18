@@ -20,7 +20,8 @@ namespace infinity {
 class LogicalNode {
 public:
     explicit
-    LogicalNode(LogicalNodeType node_type) : operator_type_(node_type) {}
+    LogicalNode(u64 node_id, LogicalNodeType node_type)
+        : node_id_(node_id), operator_type_(node_type) {}
 
     virtual
     ~LogicalNode() = default;

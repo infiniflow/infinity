@@ -15,7 +15,8 @@ namespace infinity {
 class LogicalTableScan : public LogicalNode {
 public:
     explicit
-    LogicalTableScan(SharedPtr<Table> table_ptr,
+    LogicalTableScan(u64 node_id,
+                     SharedPtr<Table> table_ptr,
                      SharedPtr<TableScanFunction> table_scan_func,
                      String table_alias,
                      u64 table_index,

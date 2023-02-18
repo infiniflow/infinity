@@ -7,13 +7,14 @@
 
 namespace infinity {
 
-LogicalJoin::LogicalJoin(JoinType join_type,
+LogicalJoin::LogicalJoin(u64 node_id,
+                         JoinType join_type,
                          String alias,
                          u64 join_index,
                          Vector<SharedPtr<BaseExpression>> conditions,
                          const SharedPtr<LogicalNode>& left,
                          const SharedPtr<LogicalNode>& right)
-                         : LogicalNode(LogicalNodeType::kJoin),
+                         : LogicalNode(node_id, LogicalNodeType::kJoin),
                          join_type_(join_type),
                          alias_(std::move(alias)),
                          table_index_(join_index),

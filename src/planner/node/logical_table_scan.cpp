@@ -9,13 +9,14 @@
 
 namespace infinity {
 
-LogicalTableScan::LogicalTableScan(SharedPtr<Table> table_ptr,
+LogicalTableScan::LogicalTableScan(u64 node_id,
+                                   SharedPtr<Table> table_ptr,
                                    SharedPtr<TableScanFunction> table_scan_func,
                                    String table_alias,
                                    u64 table_index,
                                    Vector<String> column_names,
                                    Vector<DataType> column_types)
-    : LogicalNode(LogicalNodeType::kTableScan),
+    : LogicalNode(node_id, LogicalNodeType::kTableScan),
     table_ptr_(std::move(table_ptr)),
     table_scan_func_ptr_(std::move(table_scan_func)),
     table_alias_(std::move(table_alias)),

@@ -8,29 +8,33 @@ namespace infinity {
 
 void
 PhysicalFilter::Init() {
-    executor.Init({condition_});
-    input_table_ = left_->output();
-    ExecutorAssert(input_table_ != nullptr, "No input.");
-
-    SizeT column_count = input_table_->ColumnCount();
-    Vector<SharedPtr<ColumnDef>> columns;
-    columns.reserve(column_count);
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType col_type = input_table_->GetColumnTypeById(idx);
-        String col_name = input_table_->GetColumnNameById(idx);
-
-        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
-        columns.emplace_back(col_def);
-    }
-
-    SharedPtr<TableDef> table_def = TableDef::Make("filter", columns, false);
-
-    output_ = Table::Make(table_def, TableType::kIntermediate);
+//    executor.Init({condition_});
+//    input_table_ = left_->output();
+//    ExecutorAssert(input_table_ != nullptr, "No input.");
+//
+//    SizeT column_count = input_table_->ColumnCount();
+//    Vector<SharedPtr<ColumnDef>> columns;
+//    columns.reserve(column_count);
+//    for(SizeT idx = 0; idx < column_count; ++ idx) {
+//        DataType col_type = input_table_->GetColumnTypeById(idx);
+//        String col_name = input_table_->GetColumnNameById(idx);
+//
+//        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
+//        columns.emplace_back(col_def);
+//    }
+//
+//    SharedPtr<TableDef> table_def = TableDef::Make("filter", columns, false);
+//
+//    output_ = Table::Make(table_def, TableType::kIntermediate);
 }
 
 void
 PhysicalFilter::Execute(SharedPtr<QueryContext>& query_context) {
     // Get input from left child
+    executor.Init({condition_});
+    input_table_ = left_->output();
+    ExecutorAssert(input_table_ != nullptr, "No input.");
+
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(1);
     for(SizeT idx = 0; idx < 1; ++ idx) {

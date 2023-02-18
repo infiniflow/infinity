@@ -8,11 +8,12 @@
 
 namespace infinity {
 
-LogicalCrossProduct::LogicalCrossProduct(String alias,
+LogicalCrossProduct::LogicalCrossProduct(u64 node_id,
+                                         String alias,
                                          u64 join_index,
                                          const SharedPtr<LogicalNode>& left,
                                          const SharedPtr<LogicalNode>& right)
-                                         : LogicalNode(LogicalNodeType::kCrossProduct),
+                                         : LogicalNode(node_id, LogicalNodeType::kCrossProduct),
                                          alias_(std::move(alias)),
                                          table_index_(join_index)
                                          {
@@ -23,7 +24,7 @@ LogicalCrossProduct::LogicalCrossProduct(String alias,
 Vector<ColumnBinding>
 LogicalCrossProduct::GetColumnBindings() const {
     Vector<ColumnBinding> left_binding = this->left_node_->GetColumnBindings();
-    Vector<ColumnBinding> right_binding = this->left_node_->GetColumnBindings();
+    Vector<ColumnBinding> right_binding = this->right_node_->GetColumnBindings();
     left_binding.insert(left_binding.end(), right_binding.begin(), right_binding.end());
     return left_binding;
 }

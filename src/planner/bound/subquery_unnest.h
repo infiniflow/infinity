@@ -13,10 +13,14 @@ namespace infinity {
 class SubqueryUnnest {
 public:
     static void
-    UnnestSubqueries(SharedPtr<BaseExpression>& expr_ptr, SharedPtr<LogicalNode>& root);
+    UnnestSubqueries(SharedPtr<BaseExpression>& expr_ptr,
+                     SharedPtr<LogicalNode>& root,
+                     const SharedPtr<BindContext>& bind_context);
 
     static SharedPtr<BaseExpression>
-    UnnestSubquery(SharedPtr<BaseExpression>& expr_ptr, SharedPtr<LogicalNode>& root);
+    UnnestSubquery(SharedPtr<BaseExpression>& expr_ptr,
+                   SharedPtr<LogicalNode>& root,
+                   const SharedPtr<BindContext>& bind_context);
 
     static SharedPtr<BaseExpression>
     UnnestUncorrelated(SharedPtr<SubqueryExpression>& expr_ptr,

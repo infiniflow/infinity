@@ -12,9 +12,10 @@ namespace infinity {
 
 class LogicalSort : public LogicalNode {
 public:
-    LogicalSort(Vector<SharedPtr<BaseExpression>> expressions,
+    LogicalSort(u64 node_id,
+                Vector<SharedPtr<BaseExpression>> expressions,
                 Vector<OrderByType> order_by_types)
-    : LogicalNode(LogicalNodeType::kSort),
+    : LogicalNode(node_id, LogicalNodeType::kSort),
     expressions_(std::move(expressions)),
     order_by_types_(std::move(order_by_types)) {}
 

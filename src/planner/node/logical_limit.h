@@ -11,9 +11,10 @@ namespace infinity {
 class LogicalLimit: public LogicalNode {
 public:
     explicit
-    LogicalLimit(SharedPtr<BaseExpression> limit_expression,
+    LogicalLimit(u64 node_id,
+                 SharedPtr<BaseExpression> limit_expression,
                  SharedPtr<BaseExpression> offset_expression)
-            : LogicalNode(LogicalNodeType::kLimit),
+            : LogicalNode(node_id, LogicalNodeType::kLimit),
             limit_expression_(std::move(limit_expression)),
             offset_expression_(std::move(offset_expression)) {}
 

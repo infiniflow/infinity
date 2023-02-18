@@ -12,7 +12,8 @@ namespace infinity {
 class LogicalJoin: public LogicalNode {
 public:
     explicit
-    LogicalJoin(JoinType join_type,
+    LogicalJoin(u64 node_id,
+                JoinType join_type,
                 String alias,
                 u64 join_index,
                 Vector<SharedPtr<BaseExpression>> conditions,

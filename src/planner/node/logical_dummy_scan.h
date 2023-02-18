@@ -11,9 +11,10 @@ namespace infinity {
 class LogicalDummyScan : public LogicalNode {
 public:
     explicit
-    LogicalDummyScan(String table_alias,
+    LogicalDummyScan(u64 node_id,
+                     String table_alias,
                      u64 table_index)
-        : LogicalNode(LogicalNodeType::kDummyScan),
+        : LogicalNode(node_id, LogicalNodeType::kDummyScan),
           table_alias_(std::move(table_alias)),
           table_index_(table_index)
           {}

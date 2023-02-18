@@ -20,8 +20,10 @@ enum class ChunkScanType {
 class LogicalChunkScan: public LogicalNode {
 public:
     explicit
-    LogicalChunkScan(ChunkScanType type, u64 table_index)
-        : LogicalNode(LogicalNodeType::kChunkScan),
+    LogicalChunkScan(u64 node_id,
+                     ChunkScanType type,
+                     u64 table_index)
+        : LogicalNode(node_id, LogicalNodeType::kChunkScan),
         scan_type_(type),
         table_index_(table_index)
         {}

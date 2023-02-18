@@ -10,10 +10,11 @@ namespace infinity {
 
 class LogicalDropTable : public LogicalNode {
 public:
-    LogicalDropTable(SharedPtr<String> schema_name,
+    LogicalDropTable(u64 node_id,
+                     SharedPtr<String> schema_name,
                      SharedPtr<String> table_name,
                      u64 table_index)
-        : LogicalNode(LogicalNodeType::kDropTable),
+        : LogicalNode(node_id, LogicalNodeType::kDropTable),
           schema_name_(std::move(schema_name)),
           table_name_(std::move(table_name)),
           table_index_(table_index)

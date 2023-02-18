@@ -19,28 +19,28 @@ public:
 
 public:
     SharedPtr<LogicalNode>
-    BuildPlan() override;
+    BuildPlan(const SharedPtr<BindContext>& bind_context) override;
 
     SharedPtr<LogicalNode>
-    BuildFrom(SharedPtr<TableRef>& table_ref);
+    BuildFrom(SharedPtr<TableRef>& table_ref, const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
-    BuildBaseTable(SharedPtr<TableRef>& table_ref);
+    BuildBaseTable(SharedPtr<TableRef>& table_ref, const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
-    BuildSubqueryTable(SharedPtr<TableRef>& table_ref);
+    BuildSubqueryTable(SharedPtr<TableRef>& table_ref, const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
-    BuildCrossProductTable(SharedPtr<TableRef>& table_ref);
+    BuildCrossProductTable(SharedPtr<TableRef>& table_ref, const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
-    BuildJoinTable(SharedPtr<TableRef>& table_ref);
+    BuildJoinTable(SharedPtr<TableRef>& table_ref, const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
-    BuildDummyTable(SharedPtr<TableRef>& table_ref);
+    BuildDummyTable(SharedPtr<TableRef>& table_ref, const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
-    BuildFilter(SharedPtr<LogicalNode> root, Vector<SharedPtr<BaseExpression>>& conditions);
+    BuildFilter(SharedPtr<LogicalNode> root, Vector<SharedPtr<BaseExpression>>& conditions, const SharedPtr<BindContext>& bind_context);
 
 public:
     // From clause

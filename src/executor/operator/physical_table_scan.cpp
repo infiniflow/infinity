@@ -9,6 +9,10 @@ namespace infinity {
 
 void
 PhysicalTableScan::Init() {
+}
+
+void
+PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
     // Generate the result table definition
     Vector<SharedPtr<ColumnDef>> column_defs;
     size_t column_count = column_names_.size();
@@ -23,10 +27,7 @@ PhysicalTableScan::Init() {
             = MakeShared<TableDef>(table_alias_, column_defs, false);
 
     output_ = MakeShared<Table>(table_def_ptr, TableType::kResult);
-}
 
-void
-PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
     while(true) {
          SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
          output_block->Init(column_types_);

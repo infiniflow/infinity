@@ -83,7 +83,7 @@ LogicalPlanner::BuildSelect(const hsql::SelectStatement& statement) {
     SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_,
                                                                       bind_context_ptr);
     SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(statement);
-    this->logical_plan_ = bound_statement_ptr->BuildPlan();
+    this->logical_plan_ = bound_statement_ptr->BuildPlan(bind_context_ptr);
 }
 
 void
@@ -177,7 +177,8 @@ LogicalPlanner::BuildInsertValue(const hsql::InsertStatement &statement) {
     }
 
     // Create logical insert node.
-    SharedPtr<LogicalNode> logical_insert = MakeShared<LogicalInsert>(table_ptr,
+    SharedPtr<LogicalNode> logical_insert = MakeShared<LogicalInsert>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                      table_ptr,
                                                                       bind_context_ptr->GenerateTableIndex(),
                                                                       value_list);
 
@@ -309,7 +310,8 @@ LogicalPlanner::BuildCreateTable(const hsql::CreateStatement &statement) {
 
     SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
     SharedPtr<LogicalNode> logical_create_table_operator
-            = LogicalCreateTable::Make(schema_name_ptr,
+            = LogicalCreateTable::Make(bind_context_ptr->GetNewLogicalNodeId(),
+                                       schema_name_ptr,
                                        table_def_ptr,
                                        bind_context_ptr->GenerateTableIndex());
 
@@ -382,7 +384,8 @@ LogicalPlanner::BuildDropTable(const hsql::DropStatement &statement) {
     }
 
     SharedPtr<LogicalNode> logical_drop_table
-            = MakeShared<LogicalDropTable>(schema_name_ptr,
+            = MakeShared<LogicalDropTable>(bind_context_ptr->GetNewLogicalNodeId(),
+                                           schema_name_ptr,
                                            MakeShared<String>(statement.name),
                                            bind_context_ptr->GenerateTableIndex());
     // FIXME: check if we need to append operator
@@ -494,7 +497,8 @@ LogicalPlanner::BuildShowTables(const hsql::ShowStatement& statement) {
     SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
 
     SharedPtr<LogicalNode> logical_chunk_scan =
-            MakeShared<LogicalChunkScan>(ChunkScanType::kShowTables,
+            MakeShared<LogicalChunkScan>(bind_context_ptr->GetNewLogicalNodeId(),
+                                         ChunkScanType::kShowTables,
                                          bind_context_ptr->GenerateTableIndex());
 
     // FIXME: check if we need to append operator

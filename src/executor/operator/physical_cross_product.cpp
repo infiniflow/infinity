@@ -8,14 +8,16 @@ namespace infinity {
 
 void
 PhysicalCrossProduct::Init() {
-    ExecutorAssert(left_->output() != nullptr, "No left input.");
-    ExecutorAssert(right_->output() != nullptr, "No right input.");
-    left_table_ = left_->output();
-    right_table_ = right_->output();
+
 }
 
 void
 PhysicalCrossProduct::Execute(std::shared_ptr<QueryContext>& query_context) {
+    ExecutorAssert(left_->output() != nullptr, "No left input.");
+    ExecutorAssert(right_->output() != nullptr, "No right input.");
+    left_table_ = left_->output();
+    right_table_ = right_->output();
+
     Vector<SharedPtr<ColumnDef>> columns_def;
     SizeT left_column_count = left_table_->ColumnCount();
     SizeT right_column_count = right_table_->ColumnCount();
