@@ -1322,6 +1322,13 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
 }
 
 void
+ColumnVector::Finalize(SizeT index) {
+    StorageAssert(index <= capacity_, fmt::format("Attempt to set column vector tail index to {}, capacity: {}",
+                                                  index, capacity_));
+    tail_index_ = index;
+}
+
+void
 ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
     StorageAssert(initialized, "Column vector isn't initialized.")
     StorageAssert(index <= tail_index_,

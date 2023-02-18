@@ -107,6 +107,9 @@ public:
     SetValue(SizeT index, const Value& Value);
 
     void
+    Finalize(SizeT index);
+
+    void
     SetByPtr(SizeT index, const ptr_t value_ptr);
 
     void

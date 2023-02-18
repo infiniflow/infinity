@@ -14,9 +14,6 @@ ExpressionEvaluator::Execute(const SharedPtr<BaseExpression>& expression,
                              const SharedPtr<DataBlock>& input_data_block,
                              SizeT row_count,
                              SharedPtr<ColumnVector>& output_column_vector) {
-    // Validate the input data block map
-    ExecutorAssert(input_data_block != nullptr, "Input data block is NULL");
-
     input_data_block_ = input_data_block;
     ExecutorAssert(state != nullptr, "Expression state need to be initialized before.")
     ExecutorAssert(expression != nullptr, "No expression.")
@@ -206,6 +203,8 @@ ExpressionEvaluator::Execute(const SharedPtr<ValueExpression>& expr,
                              SharedPtr<ExpressionState>& state,
                              SharedPtr<ColumnVector>& output_column_vector,
                              SizeT count) {
+    output_column_vector->SetValue(0, expr->GetValue());
+    output_column_vector->Finalize(1);
 }
 
 void
@@ -214,6 +213,7 @@ ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression>& expr,
                             SharedPtr<ColumnVector>& output_column_vector,
                             SizeT count) {
     SizeT column_index = expr->column_index();
+    ExecutorAssert(input_data_block_ != nullptr, "Input data block is NULL");
     ExecutorAssert(column_index < this->input_data_block_->column_count(), "Invalid column index");
     output_column_vector = this->input_data_block_->column_vectors[column_index];
 }
