@@ -117,6 +117,10 @@ BindContext::AddSubqueryBinding(const String& name,
                                 const Vector<String>& column_names) {
     auto binding = Binding::MakeBinding(BindingType::kSubquery, name, table_index, column_types, column_names);
     AddBinding(binding);
+    // Consider the subquery as the table
+    table_names_.emplace_back(name);
+    table_name2table_index_[name] = table_index;
+    table_table_index2table_name_[table_index] = name;
 }
 
 void
@@ -126,6 +130,10 @@ BindContext::AddCTEBinding(const String& name,
                            const Vector<String>& column_names) {
     auto binding = Binding::MakeBinding(BindingType::kCTE, name, table_index, column_types, column_names);
     AddBinding(binding);
+    // Consider the CTE as the table
+    table_names_.emplace_back(name);
+    table_name2table_index_[name] = table_index;
+    table_table_index2table_name_[table_index] = name;
 }
 
 void
@@ -147,7 +155,8 @@ BindContext::AddTableBinding(const String& table_alias,
                                         table_alias,
                                         table_index,
                                         std::move(table_ptr),
-                                        column_types, column_names);
+                                        column_types,
+                                        column_names);
     AddBinding(binding);
     table_names_.emplace_back(table_alias);
     table_name2table_index_[table_alias] = table_index;

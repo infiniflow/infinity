@@ -74,7 +74,6 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     bind_context_ptr_->select_expression_ = UnfoldStarExpression(query_context_ptr_, *statement.selectList);
 
     i64 select_column_count = bind_context_ptr_->select_expression_.size();
-    bound_select_statement->output_names_.reserve(select_column_count);
     for(i64 column_index = 0; column_index < select_column_count; ++ column_index) {
         const SharedPtr<ParsedExpression>& select_expr = bind_context_ptr_->select_expression_[column_index];
         // Bound column expression is bound due to the star expression, which won't be referenced in other place.
@@ -98,8 +97,6 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
                 bind_context_ptr_->select_expr_name2index_[select_expr_name] = column_index;
             }
         }
-
-        bound_select_statement->output_names_.emplace_back(select_expr->ToString());
     }
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
@@ -144,7 +141,11 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
 
     // Trying to check if order by import new invisible column in project
     if(select_column_count < bound_select_statement->projection_expressions_.size()) {
+        bind_context_ptr_->result_index_ = bind_context_ptr_->GenerateTableIndex();
         PruneOutput(query_context_ptr_, select_column_count, bound_select_statement);
+    } else {
+        // Last table index is the project table index
+        bind_context_ptr_->result_index_ = bind_context_ptr_->project_table_index_;
     }
 
     // 14. TOP
@@ -257,8 +258,8 @@ QueryBinder::BuildSubquery(SharedPtr<QueryContext>& query_context,
 //    auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, select_stmt, subquery_bind_context_ptr);
     this->bind_context_ptr_->AddSubQueryChild(subquery_bind_context_ptr);
 
-    // Get the table index of the sub query output
-    u64 subquery_table_index = bind_context_ptr_->GenerateTableIndex();
+    // Get the subquery result table index as the new from table index
+    u64 subquery_table_index = bound_statement_ptr->result_index_;
 
     String binding_name = table_alias.empty() ? "subquery" + std::to_string(subquery_table_index) : table_alias;
     // Add binding into bind context
@@ -304,7 +305,7 @@ QueryBinder::BuildCTE(SharedPtr<QueryContext>& query_context,
 
     this->bind_context_ptr_->AddSubQueryChild(subquery_bind_context_ptr);
 
-    u64 cte_table_index = bind_context_ptr_->GenerateTableIndex();
+    u64 cte_table_index = bound_statement_ptr->result_index_;
     // Add binding into bind context
     this->bind_context_ptr_->AddCTEBinding(name,
                                            cte_table_index,
@@ -333,7 +334,6 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
     }
 
     // TODO: Handle table and column alias
-
     u64 table_index = this->bind_context_ptr_->GenerateTableIndex();
     String alias = from_table->getName() != nullptr ? from_table->getName() : String();
     Vector<DataType> types;
@@ -666,17 +666,47 @@ void
 QueryBinder::GenerateColumns(const SharedPtr<Binding>& binding,
                              const String& table_name,
                              Vector<SharedPtr<ParsedExpression>>& output_select_list) {
-    SizeT column_count = binding->table_ptr_->ColumnCount();
+    switch(binding->binding_type_) {
 
-    // Reserve more data in select list
-    output_select_list.reserve(output_select_list.size() + column_count);
+        case BindingType::kInvalid: {
+            PlannerError("Invalid binding type.");
+            break;
+        }
+        case BindingType::kTable: {
+            SizeT column_count = binding->table_ptr_->ColumnCount();
 
-    // Build select list
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
-        String column_name = binding->table_ptr_->GetColumnNameById(idx);
-        SharedPtr<ParsedColumnExpression> bound_column_expr
-                = MakeShared<ParsedColumnExpression>(String(), String(), table_name, column_name);
-        output_select_list.emplace_back(bound_column_expr);
+            // Reserve more data in select list
+            output_select_list.reserve(output_select_list.size() + column_count);
+
+            // Build select list
+            for(SizeT idx = 0; idx < column_count; ++ idx) {
+                String column_name = binding->table_ptr_->GetColumnNameById(idx);
+                SharedPtr<ParsedColumnExpression> bound_column_expr
+                        = MakeShared<ParsedColumnExpression>(String(), String(), table_name, column_name);
+                output_select_list.emplace_back(bound_column_expr);
+            }
+            break;
+        }
+        case BindingType::kSubquery:
+        case BindingType::kCTE: {
+            SizeT column_count = binding->column_names_.size();
+
+            // Reserve more data in select list
+            output_select_list.reserve(output_select_list.size() + column_count);
+
+            // Build select list
+            for(SizeT idx = 0; idx < column_count; ++ idx) {
+                String column_name = binding->column_names_[idx];
+                SharedPtr<ParsedColumnExpression> bound_column_expr
+                        = MakeShared<ParsedColumnExpression>(String(), String(), table_name, column_name);
+                output_select_list.emplace_back(bound_column_expr);
+            }
+            break;
+        }
+        case BindingType::kView: {
+            NotImplementError("Not implemented")
+            break;
+        }
     }
 }
 
@@ -750,6 +780,11 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
     auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
 
     SizeT column_count = bind_context_ptr_->select_expression_.size();
+    bound_select_statement->names_ptr_ = MakeShared<Vector<String>>();
+    bound_select_statement->names_ptr_->reserve(column_count);
+
+    bound_select_statement->types_ptr_ = MakeShared<Vector<DataType>>();
+    bound_select_statement->types_ptr_->reserve(column_count);
     bind_context_ptr_->project_exprs_.reserve(column_count);
     bound_select_statement->projection_expressions_.reserve(column_count);
     for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
@@ -790,6 +825,9 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
 
         // Insert the bound expression into projection expressions of select node.
         bound_select_statement->projection_expressions_.emplace_back(bound_expr);
+
+        bound_select_statement->names_ptr_->emplace_back(expr_name);
+        bound_select_statement->types_ptr_->emplace_back(bound_expr->Type());
     }
 
     if(!bound_select_statement->having_expressions_.empty() || !bound_select_statement->group_by_expressions_.empty()) {
@@ -845,7 +883,7 @@ QueryBinder::PruneOutput(SharedPtr<QueryContext>& query_context,
                          SharedPtr<BoundSelectStatement>& bound_statement) {
     Vector<SharedPtr<BaseExpression>>& pruned_expressions = bound_statement->pruned_expression_;
     Vector<SharedPtr<BaseExpression>>& projection_expressions = bound_statement->projection_expressions_;
-    Vector<String>& output_names = bound_statement->output_names_;
+    Vector<String>& output_names = *bound_statement->names_ptr_;
 
     pruned_expressions.reserve(select_column_count);
 

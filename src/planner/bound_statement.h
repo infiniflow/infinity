@@ -11,7 +11,6 @@ namespace infinity {
 
 struct BoundStatement {
 public:
-    SharedPtr<LogicalNode> logical_plan_{};
     SharedPtr<Vector<String>> names_ptr_{};
     SharedPtr<Vector<DataType>> types_ptr_{};
 

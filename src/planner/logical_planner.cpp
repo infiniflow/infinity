@@ -322,7 +322,7 @@ LogicalPlanner::BuildCreateTable(const hsql::CreateStatement &statement) {
         SharedPtr<BindContext> select_bind_context_ptr = BindContext::Make(nullptr);
         QueryBinder select_query_binder(this->query_context_ptr_, select_bind_context_ptr);
         SharedPtr<BoundSelectStatement> bound_statement_ptr = select_query_binder.BindSelect(*statement.select);
-        logical_create_table_operator->set_left_node(bound_statement_ptr->logical_plan_);
+        logical_create_table_operator->set_left_node(bound_statement_ptr->BuildPlan(bind_context_ptr));
     }
 
     this->logical_plan_ = logical_create_table_operator;

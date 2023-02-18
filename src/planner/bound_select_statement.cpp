@@ -139,7 +139,7 @@ BoundSelectStatement::BuildSubqueryTable(SharedPtr<TableRef>& table_ref,
                                          const SharedPtr<BindContext>& bind_context) {
     // SharedPtr<SubqueryTableRef> subquery_table_ref
     auto subquery_table_ref = std::static_pointer_cast<SubqueryTableRef>(table_ref);
-    SharedPtr<LogicalNode> subquery = subquery_table_ref->subquery_node_->logical_plan_;
+    SharedPtr<LogicalNode> subquery = subquery_table_ref->subquery_node_->BuildPlan(bind_context);
     return subquery;
 }
 
