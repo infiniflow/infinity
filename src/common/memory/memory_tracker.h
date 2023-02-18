@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/types/internal_types.h"
 #include "memory_usage.h"
 

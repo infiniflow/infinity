@@ -1,4 +1,5 @@
 #include "common/memory/arena.h"
+#include "common/memory/stream_arena.h"
 #include "common/memory/memory_tracker.h"
 
 #include <cstdint>
@@ -237,5 +238,21 @@ TEST(TestArena, TestSTLAllocator) {
         ASSERT_EQ(i, v[i]);
     }
 }
+
+template<class T>
+using pmr_vector = std::vector<T, std::pmr::polymorphic_allocator<T>>;
+
+TEST(TestArena, TestStreamArenaSTLAllocator) {
+    StreamArenaMemoryResource memoryResource;
+
+    pmr_vector<int> vec(&memoryResource);
+    for (int i = 0; i < 10000000; i++) {
+        vec.push_back(i);
+    }
+    for (int i = 0; i < 10000000; i++) {
+        ASSERT_EQ(i, vec[i]);
+    }
+}
+
 
 } // namespace infinity

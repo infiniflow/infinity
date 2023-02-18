@@ -40,5 +40,12 @@ target_compile_options(
         -fPIC
 )
 
+set(TLSF_DIR tlsf)
+add_library(
+        tlsf
+        ${TLSF_DIR}/tlsf.cpp
+)
+
+
 #add_library(libhv INTERFACE)
 #target_include_directories(libhv INTERFACE libhv/include)

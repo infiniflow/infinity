@@ -70,4 +70,5 @@ target_link_libraries(test_main
         gmock_main
         infinity_core
         sql-parser
+        tlsf
         )
