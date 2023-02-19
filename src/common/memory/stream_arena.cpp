@@ -1,9 +1,12 @@
 #include "stream_arena.h"
 
-StreamArena::StreamArena()
+namespace infinity {
+
+StreamArena::StreamArena(std::shared_ptr<MemoryTracker> mem_tracker)
     : tlsf_()
     , runtime_size_(0)
-    , used_size_(0) {
+    , used_size_(0)
+    , mem_tracker_(mem_tracker) {
     size_t tlsfSize = tlsf_size();
     void* mem = std::aligned_alloc(8, tlsfSize);
     tlsf_ = tlsf_create(mem);
@@ -24,6 +27,7 @@ void* StreamArena::Allocate( size_t size ) {
             void* allocMem = malloc(DefaultPoolSize);
             auto pool = tlsf_add_pool(tlsf_, allocMem, DefaultPoolSize);
             runtime_size_ += DefaultPoolSize;
+            mem_tracker_->Consume(DefaultPoolSize);
             mem = tlsf_malloc(tlsf_, size);
             assert(mem != nullptr);
         } else {
@@ -31,6 +35,7 @@ void* StreamArena::Allocate( size_t size ) {
             alignedSize += tlsf_pool_overhead();
             void* allocMem = malloc(alignedSize);
             auto pool = tlsf_add_pool(tlsf_, allocMem, alignedSize);
+            mem_tracker_->Consume(alignedSize);
             runtime_size_ += alignedSize;
             mem = tlsf_malloc(tlsf_, size);
             assert(mem != nullptr);
@@ -47,12 +52,14 @@ void* StreamArena::AllocateAligned( size_t size, size_t alignment ) {
             void* allocMem = malloc(DefaultPoolSize);
             auto pool = tlsf_add_pool(tlsf_, allocMem, DefaultPoolSize);
             runtime_size_ += DefaultPoolSize;
+            mem_tracker_->Consume(DefaultPoolSize);
         } else {
             size_t alignedSize = MakeAlignedSize(size);
             alignedSize += tlsf_pool_overhead();
             void* allocMem = malloc(alignedSize);
             auto pool = tlsf_add_pool(tlsf_, allocMem, alignedSize);
             runtime_size_ += alignedSize;
+            mem_tracker_->Consume(alignedSize);
         }
         mem = tlsf_memalign(tlsf_, alignment, size);
         assert(mem != nullptr);
@@ -73,4 +80,7 @@ void StreamArena::Reset() {
 StreamArena::~StreamArena() {
     tlsf_destroy(tlsf_);
     free(tlsf_);
+    mem_tracker_->Release(runtime_size_);
+}
+
 }

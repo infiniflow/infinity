@@ -243,7 +243,8 @@ template<class T>
 using pmr_vector = std::vector<T, std::pmr::polymorphic_allocator<T>>;
 
 TEST(TestArena, TestStreamArenaSTLAllocator) {
-    StreamArenaMemoryResource memoryResource;
+    shared_ptr<MemoryTracker> mem_tracker = MemoryTracker::Create(1024);
+    StreamArenaMemoryResource memoryResource(mem_tracker);
 
     pmr_vector<int> vec(&memoryResource);
     for (int i = 0; i < 10000000; i++) {

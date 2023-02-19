@@ -1,17 +1,22 @@
 #pragma once
 
 #include "tlsf.h"
+#include "memory_tracker.h"
 
 #include <cstdlib>
 #include <cassert>
 #include <memory_resource>
 #include <iostream>
 
+namespace infinity{
 /*
 * Based on Two Level Segregated Fit memory allocator to provide
 * fast allocation with less memory fragmentation for allcoations 
 * with variable lengths. This is used for stream allocation used
-* during aggregation. It's not thread safe.
+* during aggregation. It's not thread safe. 
+* Initially, the stream arena contains a pool with size of 
+* DefaultPoolSize, when the pool is used up, it will automatically
+* grow
 */
 class StreamArena {
 private:
@@ -19,8 +24,9 @@ private:
     size_t runtime_size_;
     size_t used_size_;
     size_t DefaultPoolSize = 2 * 1024 * 1024;
+    std::shared_ptr<MemoryTracker> mem_tracker_;
 public:
-    StreamArena();
+    StreamArena(std::shared_ptr<MemoryTracker> mem_tracker );
     ~StreamArena();
 
     void SetDefaultPoolSize(size_t size) { DefaultPoolSize = size;}
@@ -41,9 +47,11 @@ private:
     uint64_t bytes_allocated_;
     uint64_t bytes_freed_;
 public:
-    explicit StreamArenaMemoryResource(std::pmr::memory_resource* upstream = std::pmr::get_default_resource() )
-        : upstream_(upstream) {
-    }
+    explicit StreamArenaMemoryResource(
+    	std::shared_ptr<MemoryTracker> mem_tracker,
+    	std::pmr::memory_resource* upstream = std::pmr::get_default_resource() )
+        : arena_(mem_tracker),
+          upstream_(upstream) {}
 
     void SetDefaultPoolSize(size_t size) {
     	arena_.SetDefaultPoolSize(size);
@@ -70,3 +78,5 @@ private:
         return false;
     }
 };
+
+}
