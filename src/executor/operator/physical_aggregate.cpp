@@ -11,12 +11,13 @@ namespace infinity {
 
 void
 PhysicalAggregate::Init() {
-    input_table_ = left_->output();
-    ExecutorAssert(input_table_ != nullptr, "No left input.");
 }
 
 void
 PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
+    input_table_ = left_->output();
+    ExecutorAssert(input_table_ != nullptr, "No left input.");
+
     // 1. Execute group-by expressions to generate unique key.
     ExpressionExecutor groupby_executor;
     groupby_executor.Init(groups_);
