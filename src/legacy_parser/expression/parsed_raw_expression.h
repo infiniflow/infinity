@@ -8,7 +8,7 @@
 
 #include "sql/Expr.h"
 #include "common/types/internal_types.h"
-#include "parser/parsed_expression.h"
+#include "legacy_parser/parsed_expression.h"
 
 namespace infinity {
 

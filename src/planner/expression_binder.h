@@ -9,7 +9,7 @@
 #include "expression/base_expression.h"
 #include "expression/subquery_expression.h"
 #include "function/function.h"
-#include "parser/parsed_expression.h"
+#include "legacy_parser/parsed_expression.h"
 
 #include <memory>
 

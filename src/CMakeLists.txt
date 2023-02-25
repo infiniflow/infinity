@@ -61,7 +61,7 @@ file(GLOB_RECURSE
 file(GLOB_RECURSE
         parser_src
         CONFIGURE_DEPENDS
-        parser/*.cpp
+        legacy_parser/*.cpp
         )
 
 file(GLOB_RECURSE

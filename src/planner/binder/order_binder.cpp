@@ -4,8 +4,8 @@
 
 #include "order_binder.h"
 #include "function/function_set.h"
-#include "parser/statement.h"
-#include "parser/expression/parsed_raw_expression.h"
+#include "legacy_parser/statement.h"
+#include "legacy_parser/expression/parsed_raw_expression.h"
 #include "expression/column_expression.h"
 
 namespace infinity {

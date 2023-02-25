@@ -5,8 +5,8 @@
 #include "common/utility/infinity_assert.h"
 #include "function/function_set.h"
 #include "group_binder.h"
-#include "parser/statement.h"
-#include "parser/expression/parsed_raw_expression.h"
+#include "legacy_parser/statement.h"
+#include "legacy_parser/expression/parsed_raw_expression.h"
 
 namespace infinity {
 

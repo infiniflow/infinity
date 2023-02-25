@@ -18,7 +18,7 @@
 #include "main/infinity.h"
 #include "expression_binder.h"
 #include "query_binder.h"
-#include "parser/statement.h"
+#include "legacy_parser/statement.h"
 
 namespace infinity {
 

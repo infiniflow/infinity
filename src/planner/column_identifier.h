@@ -6,7 +6,7 @@
 
 #include "sql/Expr.h"
 #include "main/query_context.h"
-#include "parser/expression/parsed_column_expression.h"
+#include "legacy_parser/expression/parsed_column_expression.h"
 
 #include <string>
 

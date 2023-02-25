@@ -5,7 +5,7 @@
 #pragma once
 
 #include "planner/expression_binder.h"
-#include "parser/parsed_expression.h"
+#include "legacy_parser/parsed_expression.h"
 
 namespace infinity {
 

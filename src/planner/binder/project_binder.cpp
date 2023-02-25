@@ -5,7 +5,7 @@
 #include "common/utility/infinity_assert.h"
 #include "function/function_set.h"
 #include "project_binder.h"
-#include "parser/statement.h"
+#include "legacy_parser/statement.h"
 #include "expression/column_expression.h"
 
 namespace infinity {

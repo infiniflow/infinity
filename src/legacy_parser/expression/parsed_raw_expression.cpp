@@ -3,7 +3,7 @@
 //
 
 #include "parsed_raw_expression.h"
-#include "parser/statement.h"
+#include "legacy_parser/statement.h"
 
 namespace infinity {
 

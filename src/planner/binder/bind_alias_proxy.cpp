@@ -4,8 +4,8 @@
 
 #include "bind_alias_proxy.h"
 #include "common/utility/infinity_assert.h"
-#include "parser/expression/parsed_raw_expression.h"
-#include "parser/statement.h"
+#include "legacy_parser/expression/parsed_raw_expression.h"
+#include "legacy_parser/statement.h"
 
 namespace infinity {
 

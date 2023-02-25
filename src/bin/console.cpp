@@ -17,7 +17,7 @@
 #include "util/sqlhelper.h"
 
 // SQL compile
-#include "parser/statement.h"
+#include "legacy_parser/statement.h"
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
 #include "executor/physical_planner.h"

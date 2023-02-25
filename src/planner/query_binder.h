@@ -6,7 +6,7 @@
 
 #include <utility>
 
-#include "parser/parsed_expression.h"
+#include "legacy_parser/parsed_expression.h"
 #include "planner/bind_context.h"
 #include "planner/select_expression.h"
 #include "bound_select_statement.h"

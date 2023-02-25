@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "common/types/internal_types.h"
-#include "parser/parsed_expression.h"
+#include "legacy_parser/parsed_expression.h"
 
 namespace infinity {
 class ParsedColumnExpression : public ParsedExpression {
