@@ -10,7 +10,7 @@
 #include "main/infinity.h"
 //#include "common/types/info/varchar_info.h"
 //#include "storage/catalog.h"
-#include "parser/expression/parsed_column_expression.h"
+#include "legacy_parser/expression/parsed_column_expression.h"
 
 class ParsedColumnExpressionTest : public BaseTest {
     void

@@ -1,4 +1,31 @@
-#add_subdirectory(bin)
+
+find_package(BISON REQUIRED)
+find_package(FLEX REQUIRED)
+
+flex_target(LEXER
+            ${CMAKE_CURRENT_SOURCE_DIR}/parser/lexer.l
+            ${CMAKE_CURRENT_SOURCE_DIR}/parser/lexer.cpp
+            DEFINES_FILE
+            ${CMAKE_CURRENT_SOURCE_DIR}/parser/lexer.h)
+bison_target(PARSER
+            ${CMAKE_CURRENT_SOURCE_DIR}/parser/parser.y
+            ${CMAKE_CURRENT_SOURCE_DIR}/parser/parser.cpp
+            DEFINES_FILE
+            ${CMAKE_CURRENT_SOURCE_DIR}/parser/parser.h
+            COMPILE_FLAGS "-d -v")
+
+ADD_FLEX_BISON_DEPENDENCY(LEXER PARSER)
+
+file(GLOB_RECURSE
+        parser_src
+        CONFIGURE_DEPENDS
+        parser/*.cpp
+        parser/*.h
+        )
+
+add_library(infinity_parser STATIC ${parser_src} ${BISON_PARSER_OUTPUTS} ${FLEX_LEXER_OUTPUTS})
+target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_include_directories(infinity_parser PUBLIC "/usr/local/include")
 
 # Configure the version file
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h)
@@ -59,7 +86,7 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
-        parser_src
+        legacy_parser_src
         CONFIGURE_DEPENDS
         legacy_parser/*.cpp
         )
@@ -96,7 +123,7 @@ set(INFINITY_CORE_SOURCE
         ${function_src}
         ${infinity_src}
         ${network_src}
-        ${parser_src}
+        ${legacy_parser_src}
         ${planner_src}
         ${scheduler_src}
         ${storage_src}
@@ -124,6 +151,7 @@ target_include_directories(infinity_console PUBLIC "${CMAKE_SOURCE_DIR}/third_pa
 target_link_libraries(
         infinity_main
         infinity_core
+        infinity_parser
         sql-parser
         tlsf
 )
@@ -131,6 +159,7 @@ target_link_libraries(
 target_link_libraries(
         infinity_console
         infinity_core
+        infinity_parser
         sql-parser
         tlsf
         linenoise

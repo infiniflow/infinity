@@ -50,3 +50,6 @@ src/bin/compilation_config.h
 
 # log file
 *.log
+
+# bison output file
+parser.output
