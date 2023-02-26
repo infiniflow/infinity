@@ -3,3 +3,15 @@
 //
 
 #include "create_table_info.h"
+
+namespace infinity {
+
+String
+CreateTableInfo::ToString() const {
+    std::stringstream ss;
+    return ss.str();
+}
+
+
+}
+

@@ -5,7 +5,6 @@
 #pragma once
 
 #include "common/types/internal_types.h"
-#include "main/stats/global_resource_usage.h"
 #include <iostream>
 
 namespace infinity {
@@ -47,12 +46,10 @@ class TypeInfo {
 public:
     explicit
     TypeInfo(TypeInfoType type) : type_(type) {
-        GlobalResourceUsage::IncrObjectCount();
     };
 
     virtual
     ~TypeInfo() {
-        GlobalResourceUsage::DecrObjectCount();
     }
 
     virtual bool

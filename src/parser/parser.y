@@ -90,12 +90,21 @@ struct SQL_LTYPE {
     DropStatement*   drop_stmt;
     PrepareStatement* prepare_stmt;
     ExecuteStatement* execute_stmt;
-    AlterStatement* alter_stmt;
-    ShowStatement* show_stmt;
+    AlterStatement*   alter_stmt;
+    ShowStatement*    show_stmt;
     ExplainStatement* explain_stmt;
-    SetStatement* set_stmt;
+    SetStatement*     set_stmt;
 
     Vector<BaseStatement*>* stmt_array;
+
+    Vector<TableElement*>*  table_element_array_t;
+    TableElement*           table_element_t;
+    ColumnDef*              table_column_t;
+    ColumnType              column_type_t;
+    ConstraintType          column_constraint_t;
+    HashSet<ConstraintType>* column_constraints_t;
+    Vector<String>*         identifier_array_t;
+    TableConstraint*        table_constraint_t;
 
     TableName* table_name_t;
     CopyOption* copy_option_t;
@@ -124,17 +133,32 @@ struct SQL_LTYPE {
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE
 %token SCHEMA TABLE COLLECTION TABLES
 %token IF NOT EXISTS FROM TO WITH DELIMITER FORMAT HEADER
+%token INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL
+%token PRIMARY KEY UNIQUE NULLABLE
 
 %token NUMBER
 
 /* nonterminal symbol */
 
-%type <stmt_array>        statement_list
+
 %type <base_stmt>         statement
 %type <create_stmt>       create_statement
 %type <drop_stmt>         drop_statement
 %type <copy_stmt>         copy_statement
 %type <show_stmt>         show_statement
+
+%type <stmt_array>        statement_list
+
+%type <table_element_t>         table_element
+%type <table_column_t>          table_column
+%type <column_type_t>           column_type
+%type <identifier_array_t>      identifier_array
+%type <table_constraint_t>      table_constraint
+%type <column_constraint_t>     column_constraint
+%type <column_constraints_t>    column_constraints
+
+
+%type <table_element_array_t>   table_element_array
 
 %type <table_name_t>      table_name
 %type <copy_option_array> copy_option_list
@@ -143,8 +167,8 @@ struct SQL_LTYPE {
 %type <str_value>         file_path
 
 
-%type <bool_value>   if_not_exists
-%type <bool_value>   if_exists
+%type <bool_value>        if_not_exists
+%type <bool_value>        if_exists
 
 %%
 
@@ -158,7 +182,7 @@ input_pattern : statement_list semicolon {
 statement_list : statement {
     $1->stmt_length_ = yylloc.string_length;
     yylloc.string_length = 0;
-    $$ = new std::vector<BaseStatement*>();
+    $$ = new Vector<BaseStatement*>();
     $$->push_back($1);
 }
 | statement_list ';' statement {
@@ -200,7 +224,6 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 }
 
 /* CREATE TABLE table_name ( column list ); */
-/*
 | CREATE TABLE if_not_exists table_name '(' table_element_array ')' {
       if(result->IsError()) {
           delete($4);
@@ -208,48 +231,50 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
       }
 
       $$ = new CreateStatement();
-      UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo();
-      if($4->schema_name_ptr != nullptr) {
-          create_table_info_->schema_name_ = $4->schema_name_ptr_;
+      UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
+      if($4->schema_name_ptr_ != nullptr) {
+          create_table_info->schema_name_ = $4->schema_name_ptr_;
       }
-      create_table_info_->table_name_ = $4->table_name_ptr_;
-      $$->create_info_ = std::move(create_collection_info);
+      create_table_info->table_name_ = $4->table_name_ptr_;
+      $$->create_info_ = std::move(create_table_info);
       $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
       delete $4;
 
-
-      $$->ifNotExists = $3;
-      $$->schema = $4.schema;
-      $$->tableName = $4.name;
-      $$->setColumnDefsAndConstraints($6);
-      delete $6;
-      if (result->errorMsg()) {
+      if (result->IsError()) {
         delete $$;
         YYERROR;
       }
-}
+};
 
 table_element_array : table_element {
-  $$ = new Vector<TableElement*>();
-  $$->push_back($1);
+    $$ = new Vector<TableElement*>();
+    $$->push_back($1);
 }
 | table_element_array ',' table_element {
-  $1->push_back($3);
-  $$ = $1;
+    $1->push_back($3);
+    $$ = $1;
 };
 
 
-table_element : table_column { $$ = $1; }
-| table_constraint { $$ = $1; };
+table_element : table_column {
+    $$ = $1;
+}
+| table_constraint {
+    $$ = $1;
+};
+
 
 table_column : IDENTIFIER column_type column_constraints {
-  $$ = new ColumnDefinition($1, $2, $3);
-  if (!$$->trySetNullableExplicit()) {
-    yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
-  }
+    $$ = new ColumnDef($2.logical_type_, nullptr);
+    /*
+    if (!$$->trySetNullableExplicit()) {
+        yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
+    }
+    */
 };
 
-column_type : BIGINT { $$ = ColumnType{DataType::BIGINT}; }
+column_type : BIGINT { $$ = ColumnType{LogicalType::kBigInt}; }
+/*
 | BOOLEAN { $$ = ColumnType{DataType::BOOLEAN}; }
 | CHAR '(' INTVAL ')' { $$ = ColumnType{DataType::CHAR, $3}; }
 | CHARACTER_VARYING '(' INTVAL ')' { $$ = ColumnType{DataType::VARCHAR, $3}; }
@@ -277,27 +302,47 @@ opt_time_precision : '(' INTVAL ')' { $$ = $2; }
 opt_decimal_specification : '(' INTVAL ',' INTVAL ')' { $$ = new std::pair<int64_t, int64_t>{$2, $4}; }
 | '(' INTVAL ')' { $$ = new std::pair<int64_t, int64_t>{$2, 0}; }
 |  { $$ = new std::pair<int64_t, int64_t>{0, 0}; };
-
-column_constraints : column_constraint_set { $$ = $1; }
-|  { $$ = new std::unordered_set<ConstraintType>(); };
-
-column_constraint_set : column_constraint {
-  $$ = new std::unordered_set<ConstraintType>();
-  $$->insert($1);
-}
-| column_constraint_set column_constraint {
-  $1->insert($2);
-  $$ = $1;
-}
-
-column_constraint : PRIMARY KEY { $$ = ConstraintType::PrimaryKey; }
-| UNIQUE { $$ = ConstraintType::Unique; }
-| NULL { $$ = ConstraintType::Null; }
-| NOT NULL { $$ = ConstraintType::NotNull; };
-
-table_constraint : PRIMARY KEY '(' ident_commalist ')' { $$ = new TableConstraint(ConstraintType::PrimaryKey, $4); }
-| UNIQUE '(' ident_commalist ')' { $$ = new TableConstraint(ConstraintType::Unique, $3); };
 */
+
+column_constraints : column_constraint {
+    $$ = new std::unordered_set<ConstraintType>();
+    $$->insert($1);
+}
+| column_constraints column_constraint {
+    $1->insert($2);
+    $$ = $1;
+}
+
+column_constraint : PRIMARY KEY {
+    $$ = ConstraintType::kPrimaryKey;
+}
+| UNIQUE {
+    $$ = ConstraintType::kUnique;
+}
+| NULLABLE {
+    $$ = ConstraintType::kNull;
+}
+| NOT NULLABLE {
+    $$ = ConstraintType::kNotNull;
+};
+
+table_constraint : PRIMARY KEY '(' identifier_array ')' {
+    $$ = new TableConstraint();
+}
+| UNIQUE '(' identifier_array ')' {
+    $$ = new TableConstraint();
+};
+
+
+identifier_array : IDENTIFIER {
+    $$ = new Vector<String>();
+    $$->emplace_back($1);
+}
+| identifier_array ',' IDENTIFIER {
+    $1->emplace_back($3);
+    $$ = $1;
+};
+
 /*
  * DROP STATEMENT
  */

@@ -139,7 +139,22 @@ struct SQL_LTYPE {
     DELIMITER = 287,               /* DELIMITER  */
     FORMAT = 288,                  /* FORMAT  */
     HEADER = 289,                  /* HEADER  */
-    NUMBER = 290                   /* NUMBER  */
+    INTEGER = 290,                 /* INTEGER  */
+    TINYINT = 291,                 /* TINYINT  */
+    SMALLINT = 292,                /* SMALLINT  */
+    BIGINT = 293,                  /* BIGINT  */
+    HUGEINT = 294,                 /* HUGEINT  */
+    CHAR = 295,                    /* CHAR  */
+    VARCHAR = 296,                 /* VARCHAR  */
+    FLOAT = 297,                   /* FLOAT  */
+    DOUBLE = 298,                  /* DOUBLE  */
+    REAL = 299,                    /* REAL  */
+    DECIMAL = 300,                 /* DECIMAL  */
+    PRIMARY = 301,                 /* PRIMARY  */
+    KEY = 302,                     /* KEY  */
+    UNIQUE = 303,                  /* UNIQUE  */
+    NULLABLE = 304,                /* NULLABLE  */
+    NUMBER = 305                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -165,18 +180,27 @@ union SQLSTYPE
     DropStatement*   drop_stmt;
     PrepareStatement* prepare_stmt;
     ExecuteStatement* execute_stmt;
-    AlterStatement* alter_stmt;
-    ShowStatement* show_stmt;
+    AlterStatement*   alter_stmt;
+    ShowStatement*    show_stmt;
     ExplainStatement* explain_stmt;
-    SetStatement* set_stmt;
+    SetStatement*     set_stmt;
 
     Vector<BaseStatement*>* stmt_array;
+
+    Vector<TableElement*>*  table_element_array_t;
+    TableElement*           table_element_t;
+    ColumnDef*              table_column_t;
+    ColumnType              column_type_t;
+    ConstraintType          column_constraint_t;
+    HashSet<ConstraintType>* column_constraints_t;
+    Vector<String>*         identifier_array_t;
+    TableConstraint*        table_constraint_t;
 
     TableName* table_name_t;
     CopyOption* copy_option_t;
     Vector<CopyOption*>* copy_option_array;
 
-#line 180 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 204 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;
