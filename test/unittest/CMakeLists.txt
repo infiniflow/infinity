@@ -34,6 +34,12 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        legacy_parser_test_src
+        CONFIGURE_DEPENDS
+        legacy_parser/*.cpp
+        )
+
+file(GLOB_RECURSE
         parser_test_src
         CONFIGURE_DEPENDS
         parser/*.cpp
@@ -58,7 +64,7 @@ add_executable(test_main
         ${executor_src}
         ${function_test_src}
         ${main_test_src}
-        ${parser_test_src}
+        ${legacy_parser_test_src}
         ${planner_test_src}
         ${storage_src}
         )
@@ -71,4 +77,18 @@ target_link_libraries(test_main
         infinity_core
         sql-parser
         tlsf
+        )
+
+
+add_executable(test_parser
+        main.cpp
+        ${parser_test_src}
+        )
+
+target_link_libraries(test_parser
+        gtest
+        gtest_main
+        gmock
+        gmock_main
+        infinity_parser
         )

@@ -19,6 +19,7 @@
 #include "expression_binder.h"
 #include "query_binder.h"
 #include "legacy_parser/statement.h"
+#include "common/types/data_type_builder.h"
 
 namespace infinity {
 
@@ -371,7 +372,7 @@ ExpressionBinder::BuildCastExpr(const hsql::Expr &expr,
                                 i64 depth,
                                 bool root) {
     SharedPtr<BaseExpression> source_expr_ptr = BuildExpression(*expr.expr, bind_context_ptr, depth, false);
-    DataType target_type = DataType::ConvertType(expr.columnType.data_type);
+    DataType target_type = DataTypeBuilder::ConvertType(expr.columnType.data_type);
     return CastExpression::AddCastToType(source_expr_ptr, target_type);
 }
 

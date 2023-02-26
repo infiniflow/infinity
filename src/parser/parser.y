@@ -189,7 +189,7 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 /* CREATE COLLECTION collection_name; */
 | CREATE COLLECTION if_not_exists table_name {
     $$ = new CreateStatement();
-    std::unique_ptr<CreateCollectionInfo> create_collection_info = std::make_unique<CreateCollectionInfo>();
+    UniquePtr<CreateCollectionInfo> create_collection_info = std::make_unique<CreateCollectionInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         create_collection_info->schema_name_ = $4->schema_name_ptr_;
     }
@@ -201,8 +201,23 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 
 /* CREATE TABLE table_name ( column list ); */
 /*
-| CREATE TABLE if_not_exists table_name '(' table_elem_commalist ')' {
-      $$ = new CreateStatement(kCreateTable);
+| CREATE TABLE if_not_exists table_name '(' table_element_array ')' {
+      if(result->IsError()) {
+          delete($4);
+          YYERROR;
+      }
+
+      $$ = new CreateStatement();
+      UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo();
+      if($4->schema_name_ptr != nullptr) {
+          create_table_info_->schema_name_ = $4->schema_name_ptr_;
+      }
+      create_table_info_->table_name_ = $4->table_name_ptr_;
+      $$->create_info_ = std::move(create_collection_info);
+      $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+      delete $4;
+
+
       $$->ifNotExists = $3;
       $$->schema = $4.schema;
       $$->tableName = $4.name;
@@ -213,9 +228,76 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
         YYERROR;
       }
 }
+
+table_element_array : table_element {
+  $$ = new Vector<TableElement*>();
+  $$->push_back($1);
+}
+| table_element_array ',' table_element {
+  $1->push_back($3);
+  $$ = $1;
+};
+
+
+table_element : table_column { $$ = $1; }
+| table_constraint { $$ = $1; };
+
+table_column : IDENTIFIER column_type column_constraints {
+  $$ = new ColumnDefinition($1, $2, $3);
+  if (!$$->trySetNullableExplicit()) {
+    yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
+  }
+};
+
+column_type : BIGINT { $$ = ColumnType{DataType::BIGINT}; }
+| BOOLEAN { $$ = ColumnType{DataType::BOOLEAN}; }
+| CHAR '(' INTVAL ')' { $$ = ColumnType{DataType::CHAR, $3}; }
+| CHARACTER_VARYING '(' INTVAL ')' { $$ = ColumnType{DataType::VARCHAR, $3}; }
+| DATE { $$ = ColumnType{DataType::DATE}; };
+| DATETIME { $$ = ColumnType{DataType::DATETIME}; }
+| DECIMAL opt_decimal_specification {
+  $$ = ColumnType{DataType::DECIMAL, 0, $2->first, $2->second};
+  delete $2;
+}
+| DOUBLE { $$ = ColumnType{DataType::DOUBLE}; }
+| FLOAT { $$ = ColumnType{DataType::FLOAT}; }
+| INT { $$ = ColumnType{DataType::INT}; }
+| INTEGER { $$ = ColumnType{DataType::INT}; }
+| LONG { $$ = ColumnType{DataType::LONG}; }
+| REAL { $$ = ColumnType{DataType::REAL}; }
+| SMALLINT { $$ = ColumnType{DataType::SMALLINT}; }
+| TEXT { $$ = ColumnType{DataType::TEXT}; }
+| TIME opt_time_precision { $$ = ColumnType{DataType::TIME, 0, $2}; }
+| TIMESTAMP { $$ = ColumnType{DataType::DATETIME}; }
+| VARCHAR '(' INTVAL ')' { $$ = ColumnType{DataType::VARCHAR, $3}; }
+
+opt_time_precision : '(' INTVAL ')' { $$ = $2; }
+| { $$ = 0; };
+
+opt_decimal_specification : '(' INTVAL ',' INTVAL ')' { $$ = new std::pair<int64_t, int64_t>{$2, $4}; }
+| '(' INTVAL ')' { $$ = new std::pair<int64_t, int64_t>{$2, 0}; }
+|  { $$ = new std::pair<int64_t, int64_t>{0, 0}; };
+
+column_constraints : column_constraint_set { $$ = $1; }
+|  { $$ = new std::unordered_set<ConstraintType>(); };
+
+column_constraint_set : column_constraint {
+  $$ = new std::unordered_set<ConstraintType>();
+  $$->insert($1);
+}
+| column_constraint_set column_constraint {
+  $1->insert($2);
+  $$ = $1;
+}
+
+column_constraint : PRIMARY KEY { $$ = ConstraintType::PrimaryKey; }
+| UNIQUE { $$ = ConstraintType::Unique; }
+| NULL { $$ = ConstraintType::Null; }
+| NOT NULL { $$ = ConstraintType::NotNull; };
+
+table_constraint : PRIMARY KEY '(' ident_commalist ')' { $$ = new TableConstraint(ConstraintType::PrimaryKey, $4); }
+| UNIQUE '(' ident_commalist ')' { $$ = new TableConstraint(ConstraintType::Unique, $3); };
 */
-
-
 /*
  * DROP STATEMENT
  */

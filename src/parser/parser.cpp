@@ -560,9 +560,9 @@ static const yytype_int8 yytranslate[] =
 static const yytype_int16 yyrline[] =
 {
        0,   151,   151,   158,   164,   171,   172,   173,   174,   181,
-     190,   224,   233,   249,   295,   345,   349,   363,   369,   377,
-     381,   386,   396,   402,   408,   412,   413,   415,   416,   418,
-     419
+     190,   306,   315,   331,   377,   427,   431,   445,   451,   459,
+     463,   468,   478,   484,   490,   494,   495,   497,   498,   500,
+     501
 };
 #endif
 
@@ -1668,7 +1668,7 @@ yyreduce:
 #line 190 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                              {
     (yyval.create_stmt) = new CreateStatement();
-    std::unique_ptr<CreateCollectionInfo> create_collection_info = std::make_unique<CreateCollectionInfo>();
+    UniquePtr<CreateCollectionInfo> create_collection_info = std::make_unique<CreateCollectionInfo>();
     if((yyvsp[0].table_name_t)->schema_name_ptr_ != nullptr) {
         create_collection_info->schema_name_ = (yyvsp[0].table_name_t)->schema_name_ptr_;
     }
@@ -1681,7 +1681,7 @@ yyreduce:
     break;
 
   case 11: /* drop_statement: DROP SCHEMA if_exists IDENTIFIER  */
-#line 224 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 306 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                  {
     (yyval.drop_stmt) = new DropStatement();
     std::unique_ptr<DropSchemaInfo> drop_schema_info = std::make_unique<DropSchemaInfo>();
@@ -1693,7 +1693,7 @@ yyreduce:
     break;
 
   case 12: /* drop_statement: DROP COLLECTION if_exists table_name  */
-#line 233 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 315 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        {
     (yyval.drop_stmt) = new DropStatement();
     std::unique_ptr<DropCollectionInfo> drop_collection_info = std::make_unique<DropCollectionInfo>();
@@ -1709,7 +1709,7 @@ yyreduce:
     break;
 
   case 13: /* copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')'  */
-#line 249 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 331 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                            {
     if(result->IsError()) {
         delete((yyvsp[-6].table_name_t));
@@ -1760,7 +1760,7 @@ yyreduce:
     break;
 
   case 14: /* copy_statement: COPY table_name FROM file_path WITH '(' copy_option_list ')'  */
-#line 295 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 377 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                {
     if(result->IsError()) {
         delete((yyvsp[-6].table_name_t));
@@ -1811,7 +1811,7 @@ yyreduce:
     break;
 
   case 15: /* show_statement: SHOW TABLES  */
-#line 345 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 427 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                             {
     (yyval.show_stmt) = new ShowStatement();
     (yyval.show_stmt)->show_type_ = ShowStmtType::kTables;
@@ -1820,7 +1820,7 @@ yyreduce:
     break;
 
   case 16: /* show_statement: DESCRIBE table_name  */
-#line 349 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 431 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     (yyval.show_stmt) = new ShowStatement();
     (yyval.show_stmt)->show_type_ = ShowStmtType::kColumns;
@@ -1834,7 +1834,7 @@ yyreduce:
     break;
 
   case 17: /* table_name: IDENTIFIER  */
-#line 363 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 445 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                         {
     if(!result->IsError()) {
         (yyval.table_name_t) = new TableName();
@@ -1845,7 +1845,7 @@ yyreduce:
     break;
 
   case 18: /* table_name: IDENTIFIER '.' IDENTIFIER  */
-#line 369 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 451 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                             {
     if(!result->IsError()) {
         (yyval.table_name_t) = new TableName();
@@ -1857,7 +1857,7 @@ yyreduce:
     break;
 
   case 19: /* copy_option_list: copy_option  */
-#line 377 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 459 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                {
     (yyval.copy_option_array) = new Vector<CopyOption*>();
     (yyval.copy_option_array)->push_back((yyvsp[0].copy_option_t));
@@ -1866,7 +1866,7 @@ yyreduce:
     break;
 
   case 20: /* copy_option_list: copy_option_list ',' copy_option  */
-#line 381 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 463 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                    {
     (yyvsp[-2].copy_option_array)->push_back((yyvsp[0].copy_option_t));
     (yyval.copy_option_array) = (yyvsp[-2].copy_option_array);
@@ -1875,7 +1875,7 @@ yyreduce:
     break;
 
   case 21: /* copy_option: FORMAT IDENTIFIER  */
-#line 386 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 468 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                 {
     (yyval.copy_option_t) = new CopyOption();
     (yyval.copy_option_t)->option_type_ = CopyOptionType::kFormat;
@@ -1890,7 +1890,7 @@ yyreduce:
     break;
 
   case 22: /* copy_option: DELIMITER STRING  */
-#line 396 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 478 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     (yyval.copy_option_t) = new CopyOption();
     (yyval.copy_option_t)->option_type_ = CopyOptionType::kDelimiter;
@@ -1901,7 +1901,7 @@ yyreduce:
     break;
 
   case 23: /* copy_option: HEADER  */
-#line 402 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 484 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
          {
     (yyval.copy_option_t) = new CopyOption();
     (yyval.copy_option_t)->option_type_ = CopyOptionType::kHeader;
@@ -1911,7 +1911,7 @@ yyreduce:
     break;
 
   case 24: /* file_path: STRING  */
-#line 408 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 490 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     (yyval.str_value) = (yyvsp[0].str_value);
 }
@@ -1919,25 +1919,25 @@ yyreduce:
     break;
 
   case 25: /* if_exists: IF EXISTS  */
-#line 412 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 494 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                      { (yyval.bool_value) = true; }
 #line 1925 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 26: /* if_exists: %empty  */
-#line 413 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 495 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
   { (yyval.bool_value) = false; }
 #line 1931 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 27: /* if_not_exists: IF NOT EXISTS  */
-#line 415 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 497 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                               { (yyval.bool_value) = true; }
 #line 1937 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 28: /* if_not_exists: %empty  */
-#line 416 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 498 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
   { (yyval.bool_value) = false; }
 #line 1943 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
@@ -2172,7 +2172,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 422 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 504 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
 
 
 void

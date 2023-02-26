@@ -26,6 +26,10 @@ file(GLOB_RECURSE
 add_library(infinity_parser STATIC ${parser_src} ${BISON_PARSER_OUTPUTS} ${FLEX_LEXER_OUTPUTS})
 target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(infinity_parser PUBLIC "/usr/local/include")
+#target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/sql-parser/src")
+#target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tlsf")
+target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
+#target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 
 # Configure the version file
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h)

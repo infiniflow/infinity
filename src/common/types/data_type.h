@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "sql/ColumnType.h"
-
 #include "logical_type.h"
 #include "type_info.h"
 
@@ -97,10 +95,6 @@ using MixedT = MixedType;
 
 class DataType {
 public:
-    static DataType
-    Make(hsql::ColumnType type);
-
-public:
     explicit
     DataType(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr) :
         type_(logical_type), type_info_(std::move(type_info_ptr)) {
@@ -174,9 +168,6 @@ private:
 public:
     static i64
     CastRule(const DataType& from, const DataType& to);
-
-    static DataType
-    ConvertType(hsql::ColumnType type);
 
     template<typename T>
     static String

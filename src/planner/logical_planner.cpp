@@ -12,6 +12,7 @@
 #include "planner/node/logical_insert.h"
 #include "planner/node/logical_chunk_scan.h"
 #include "common/types/info/varchar_info.h"
+#include "common/types/data_type_builder.h"
 
 namespace infinity {
 
@@ -270,7 +271,7 @@ LogicalPlanner::BuildCreateTable(const hsql::CreateStatement &statement) {
         const hsql::ColumnDefinition* statement_column = statement.columns->at(idx);
         String column_name(statement_column->name);
         bool nullable = statement_column->nullable;
-        DataType column_data_type = DataType::ConvertType(statement_column->type);
+        DataType column_data_type = DataTypeBuilder::ConvertType(statement_column->type);
         std::set<ConstrainType> constraints;
         for(hsql::ConstraintType constraint_type: *(statement_column->column_constraints)) {
             switch (constraint_type) {
