@@ -20,7 +20,7 @@ ParserResult::ToString() {
     std::stringstream ss;
     if (error_message_.empty()) {
         // Success
-        for (const auto &statement: statements_) {
+        for (const auto &statement: *statements_ptr_) {
             ss << statement->ToString() << std::endl;
         }
         return ss.str();

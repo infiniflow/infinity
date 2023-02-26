@@ -17,24 +17,6 @@ bison_target(PARSER
 ADD_FLEX_BISON_DEPENDENCY(LEXER PARSER)
 
 file(GLOB_RECURSE
-        parser_src
-        CONFIGURE_DEPENDS
-        parser/*.cpp
-        parser/*.h
-        )
-
-add_library(infinity_parser STATIC ${parser_src} ${BISON_PARSER_OUTPUTS} ${FLEX_LEXER_OUTPUTS})
-target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_include_directories(infinity_parser PUBLIC "/usr/local/include")
-#target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/sql-parser/src")
-#target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tlsf")
-target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
-#target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
-
-# Configure the version file
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h)
-
-file(GLOB_RECURSE
         infinity_main_src
         CONFIGURE_DEPENDS
         bin/infinity_main.cpp
@@ -119,6 +101,30 @@ file(GLOB_RECURSE
         storage/*.cpp
         )
 
+file(GLOB_RECURSE
+        parser_src
+        CONFIGURE_DEPENDS
+        parser/*.cpp
+        parser/*.h
+        )
+
+add_library(infinity_parser STATIC
+            ${parser_src}
+            ${BISON_PARSER_OUTPUTS}
+            ${FLEX_LEXER_OUTPUTS})
+
+target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_include_directories(infinity_parser PUBLIC "/usr/local/include")
+#target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/sql-parser/src")
+#target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tlsf")
+target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
+#target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
+
+# Configure the version file
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h)
+
+
+
 set(INFINITY_CORE_SOURCE
         ${console_src}
         ${common_src}
@@ -128,6 +134,7 @@ set(INFINITY_CORE_SOURCE
         ${infinity_src}
         ${network_src}
         ${legacy_parser_src}
+        ${parser_src}
         ${planner_src}
         ${scheduler_src}
         ${storage_src}

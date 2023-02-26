@@ -90,5 +90,5 @@ target_link_libraries(test_parser
         gtest_main
         gmock
         gmock_main
-        infinity_parser
+        infinity_core
         )

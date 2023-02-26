@@ -20,7 +20,7 @@ class SQLParserTest : public BaseTest {
     }
 };
 
-TEST_F(SQLParserTest, test1) {
+TEST_F(SQLParserTest, good_test1) {
     using namespace infinity;
 
     Vector<String> inputs;
@@ -56,27 +56,82 @@ TEST_F(SQLParserTest, test1) {
     }
 }
 
-TEST_F(SQLParserTest, test2) {
+TEST_F(SQLParserTest, good_test2) {
     using namespace infinity;
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
     {
-        String input_sql = "create table t1 (a boolean);";
+        String input_sql = "create table t1 (a boolean primary key not null null unique,"
+                           "                 b tinyint not null null unique, "
+                           "                 c smallint null not null);";
+
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
-        for(auto& statement: result->statements_) {
+        for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kCreate);
-            SharedPtr<CreateStatement> create_statement = std::static_pointer_cast<CreateStatement>(statement);
+            auto* create_statement = (CreateStatement*)(statement);
             EXPECT_EQ(create_statement->create_info_->type_, DDLType::kTable);
             EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kError);
 
-            CreateTableInfo* create_table_info = (CreateTableInfo*)(create_statement->create_info_.get());
+            auto* create_table_info = (CreateTableInfo*)(create_statement->create_info_.get());
             EXPECT_EQ(create_table_info->schema_name_, String("Default"));
             EXPECT_EQ(create_table_info->table_name_, String("t1"));
-            EXPECT_EQ(create_table_info->column_defs_.size(), 1);
+            EXPECT_EQ(create_table_info->column_defs_.size(), 3);
+
+            {
+                auto& column_def = create_table_info->column_defs_[0];
+                EXPECT_EQ(column_def->name_, "a");
+                DataType column_type(LogicalType::kBoolean, nullptr);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_->size(), 4);
+                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kPrimaryKey), true);
+                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNull), true);
+                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kUnique), true);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[1];
+                EXPECT_EQ(column_def->name_, "b");
+                DataType column_type(LogicalType::kTinyInt, nullptr);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_->size(), 3);
+                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNull), true);
+                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kUnique), true);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[2];
+                EXPECT_EQ(column_def->name_, "c");
+                DataType column_type(LogicalType::kSmallInt, nullptr);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_->size(), 2);
+                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNull), true);
+            }
+
+            EXPECT_EQ(create_table_info->constraints_.size(), 0);
         }
+
+        result->Reset();
+    }
+}
+
+TEST_F(SQLParserTest, bad_test1) {
+    using namespace infinity;
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+    {
+        String input_sql = "create table t1 (a boolean primary key not null null unique,"
+                           "                 b tinyint not null null unique,";
+        parser->Parse(input_sql, result);
+
+        EXPECT_FALSE(result->error_message_.empty());
+        EXPECT_TRUE(result->statements_ptr_ == nullptr);
 
         result->Reset();
     }

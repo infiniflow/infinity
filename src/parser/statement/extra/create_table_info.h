@@ -27,6 +27,9 @@ public:
     explicit
     TableElement(TableElementType type): type_(type) {}
 
+    virtual
+    ~TableElement() = default;
+
     TableElementType type_;
 };
 
@@ -35,9 +38,17 @@ public:
     ColumnDef(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr)
             : TableElement(TableElementType::kColumn), column_type_(logical_type, std::move(type_info_ptr)) {}
 
+    inline
+    ~ColumnDef() override {
+        if(constraints_ != nullptr) {
+            delete constraints_;
+            constraints_ = nullptr;
+        }
+    }
+
     DataType column_type_;
     String name_{};
-    HashSet<ConstraintType> constraints_{};
+    HashSet<ConstraintType>* constraints_{nullptr};
 };
 
 struct ColumnType {
@@ -54,6 +65,10 @@ struct ColumnType {
 class TableConstraint : public TableElement {
 public:
     TableConstraint() : TableElement(TableElementType::kConstraint) {}
+
+    inline
+    ~TableConstraint() override = default;
+
     Vector<String> names_{};
     ConstraintType constraint_{ConstraintType::kNotNull};
 };

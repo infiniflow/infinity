@@ -6,11 +6,6 @@
 #include "function/cast/cast_table.h"
 #include "common/utility/infinity_assert.h"
 
-#include "common/types/info/decimal_info.h"
-#include "common/types/info/varchar_info.h"
-#include "common/types/info/embedding_info.h"
-#include "common/types/info/char_info.h"
-
 namespace infinity {
 
 static const char* type2name[] = {

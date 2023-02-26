@@ -112,16 +112,40 @@ struct SQL_LTYPE {
 }
 
 %destructor {
-    fprintf(stderr, "destructor array\n");
+    fprintf(stderr, "destroy table element array\n");
     if (($$) != nullptr) {
         for (auto ptr : *($$)) {
             delete ptr;
         }
         delete ($$);
     }
-} <stmt_array> <table_element_array_t>
+} <table_element_array_t>
 
-%destructor { } <table_name_t>
+%destructor {
+    fprintf(stderr, "destroy statement array\n");
+    if (($$) != nullptr) {
+        for (auto ptr : *($$)) {
+            delete ptr;
+        }
+        delete ($$);
+    }
+} <stmt_array>
+
+%destructor {
+    fprintf(stderr, "destroy table name\n");
+    if (($$) != nullptr) {
+        free($$->schema_name_ptr_);
+        free($$->table_name_ptr_);
+        delete ($$);
+    }
+} <table_name_t>
+
+%destructor {
+    fprintf(stderr, "destroy constraints\n");
+    if (($$) != nullptr) {
+        delete ($$);
+    }
+} <column_constraints_t>
 
 %token <str_value>      IDENTIFIER STRING
 %token <double_value>   DOUBLE_VALUE
@@ -174,10 +198,7 @@ struct SQL_LTYPE {
 %%
 
 input_pattern : statement_list semicolon {
-    for (BaseStatement* stmt : *$1) {
-        result->statements_.emplace_back(stmt);
-    }
-    delete $1;
+    result->statements_ptr_ = $1;
 };
 
 statement_list : statement {
@@ -230,6 +251,7 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 /* CREATE TABLE table_name ( column list ); */
 | CREATE TABLE if_not_exists table_name '(' table_element_array ')' {
     if(result->IsError()) {
+        printf("Error happened, release memory\n");
         if($4->schema_name_ptr_ != nullptr) {
             free($4->schema_name_ptr_);
         }
@@ -257,15 +279,10 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
             create_table_info->constraints_.emplace_back((TableConstraint*)element);
         }
     }
+    delete $6;
 
     $$->create_info_ = std::move(create_table_info);
     $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
-    delete $6;
-
-    if (result->IsError()) {
-        delete $$;
-        YYERROR;
-    }
 };
 
 table_element_array : table_element {
@@ -288,7 +305,11 @@ table_element : table_column {
 
 table_column :
 IDENTIFIER column_type {
+    if(result->IsError()) {
+        free($1);
+    }
     $$ = new ColumnDef($2.logical_type_, nullptr);
+    $$->name_ = $1;
     free($1);
     /*
     if (!$$->trySetNullableExplicit()) {
@@ -297,7 +318,13 @@ IDENTIFIER column_type {
     */
 };
 | IDENTIFIER column_type column_constraints {
+    if(result->IsError()) {
+        free($1);
+        delete($3);
+    }
     $$ = new ColumnDef($2.logical_type_, nullptr);
+    $$->name_ = $1;
+    $$->constraints_ = $3;
     free($1);
     /*
     if (!$$->trySetNullableExplicit()) {
@@ -358,10 +385,14 @@ opt_decimal_specification : '(' INTVAL ',' INTVAL ')' { $$ = new std::pair<int64
 */
 
 column_constraints : column_constraint {
-    $$ = new std::unordered_set<ConstraintType>();
+    $$ = new HashSet<ConstraintType>();
     $$->insert($1);
 }
 | column_constraints column_constraint {
+    if($1->contains($2)) {
+        yyerror(&yyloc, scanner, result, "Duplicate column constraint.");
+        delete $1;
+    }
     $1->insert($2);
     $$ = $1;
 }
