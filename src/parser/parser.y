@@ -112,14 +112,14 @@ struct SQL_LTYPE {
 }
 
 %destructor {
-    fprintf(stderr, "destructor statement array\n");
+    fprintf(stderr, "destructor array\n");
     if (($$) != nullptr) {
         for (auto ptr : *($$)) {
             delete ptr;
         }
         delete ($$);
     }
-} <stmt_array>
+} <stmt_array> <table_element_array_t>
 
 %destructor { } <table_name_t>
 
@@ -133,7 +133,8 @@ struct SQL_LTYPE {
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE
 %token SCHEMA TABLE COLLECTION TABLES
 %token IF NOT EXISTS FROM TO WITH DELIMITER FORMAT HEADER
-%token INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL
+%token BOOLEAN INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
+%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE
 %token PRIMARY KEY UNIQUE NULLABLE
 
 %token NUMBER
@@ -204,8 +205,9 @@ statement : create_statement { $$ = $1; }
 /* CREATE SCHEMA schema_name; */
 create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     $$ = new CreateStatement();
-    std::unique_ptr<CreateSchemaInfo> create_schema_info = std::make_unique<CreateSchemaInfo>();
+    UniquePtr<CreateSchemaInfo> create_schema_info = MakeUnique<CreateSchemaInfo>();
     create_schema_info->schema_name_ = $4;
+    free($4);
     $$->create_info_ = std::move(create_schema_info);
     $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 }
@@ -216,8 +218,10 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     UniquePtr<CreateCollectionInfo> create_collection_info = std::make_unique<CreateCollectionInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         create_collection_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
     }
     create_collection_info->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
     $$->create_info_ = std::move(create_collection_info);
     $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
     delete $4;
@@ -225,25 +229,43 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 
 /* CREATE TABLE table_name ( column list ); */
 | CREATE TABLE if_not_exists table_name '(' table_element_array ')' {
-      if(result->IsError()) {
-          delete($4);
-          YYERROR;
-      }
+    if(result->IsError()) {
+        if($4->schema_name_ptr_ != nullptr) {
+            free($4->schema_name_ptr_);
+        }
+        free($4->table_name_ptr_);
+        delete($4);
+        delete($6);
+        YYERROR;
+    }
 
-      $$ = new CreateStatement();
-      UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
-      if($4->schema_name_ptr_ != nullptr) {
-          create_table_info->schema_name_ = $4->schema_name_ptr_;
-      }
-      create_table_info->table_name_ = $4->table_name_ptr_;
-      $$->create_info_ = std::move(create_table_info);
-      $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
-      delete $4;
+    $$ = new CreateStatement();
+    UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
+    if($4->schema_name_ptr_ != nullptr) {
+        create_table_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    create_table_info->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    delete $4;
 
-      if (result->IsError()) {
+    for (TableElement*& element : *$6) {
+        if(element->type_ == TableElementType::kColumn) {
+            /* SharedPtr<ColumnDef> column_def_ptr = SharedPtr<ColumnDef>((ColumnDef*)element);*/
+            create_table_info->column_defs_.emplace_back((ColumnDef*)element);
+        } else {
+            create_table_info->constraints_.emplace_back((TableConstraint*)element);
+        }
+    }
+
+    $$->create_info_ = std::move(create_table_info);
+    $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    delete $6;
+
+    if (result->IsError()) {
         delete $$;
         YYERROR;
-      }
+    }
 };
 
 table_element_array : table_element {
@@ -264,8 +286,19 @@ table_element : table_column {
 };
 
 
-table_column : IDENTIFIER column_type column_constraints {
+table_column :
+IDENTIFIER column_type {
     $$ = new ColumnDef($2.logical_type_, nullptr);
+    free($1);
+    /*
+    if (!$$->trySetNullableExplicit()) {
+        yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
+    }
+    */
+};
+| IDENTIFIER column_type column_constraints {
+    $$ = new ColumnDef($2.logical_type_, nullptr);
+    free($1);
     /*
     if (!$$->trySetNullableExplicit()) {
         yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
@@ -273,9 +306,29 @@ table_column : IDENTIFIER column_type column_constraints {
     */
 };
 
-column_type : BIGINT { $$ = ColumnType{LogicalType::kBigInt}; }
+column_type :
+BOOLEAN { $$ = ColumnType{LogicalType::kBoolean}; }
+| TINYINT { $$ = ColumnType{LogicalType::kTinyInt}; }
+| SMALLINT { $$ = ColumnType{LogicalType::kSmallInt}; }
+| INTEGER { $$ = ColumnType{LogicalType::kInteger}; }
+| BIGINT { $$ = ColumnType{LogicalType::kBigInt}; }
+| HUGEINT { $$ = ColumnType{LogicalType::kHugeInt}; }
+| FLOAT { $$ = ColumnType{LogicalType::kFloat}; }
+| REAL  { $$ = ColumnType{LogicalType::kFloat}; }
+| DOUBLE { $$ = ColumnType{LogicalType::kDouble}; }
+| DATE { $$ = ColumnType{LogicalType::kDate}; }
+| TIME { $$ = ColumnType{LogicalType::kTime}; }
+| DATETIME { $$ = ColumnType{LogicalType::kDateTime}; }
+| TIMESTAMP { $$ = ColumnType{LogicalType::kTimestamp}; }
+| UUID { $$ = ColumnType{LogicalType::kUuid}; }
+| POINT { $$ = ColumnType{LogicalType::kPoint}; }
+| LINE { $$ = ColumnType{LogicalType::kLine}; }
+| LSEG { $$ = ColumnType{LogicalType::kLineSeg}; }
+| BOX { $$ = ColumnType{LogicalType::kBox}; }
+| PATH { $$ = ColumnType{LogicalType::kPath}; }
+| POLYGON { $$ = ColumnType{LogicalType::kPolygon}; }
+| CIRCLE { $$ = ColumnType{LogicalType::kCircle}; }
 /*
-| BOOLEAN { $$ = ColumnType{DataType::BOOLEAN}; }
 | CHAR '(' INTVAL ')' { $$ = ColumnType{DataType::CHAR, $3}; }
 | CHARACTER_VARYING '(' INTVAL ')' { $$ = ColumnType{DataType::VARCHAR, $3}; }
 | DATE { $$ = ColumnType{DataType::DATE}; };
@@ -337,9 +390,11 @@ table_constraint : PRIMARY KEY '(' identifier_array ')' {
 identifier_array : IDENTIFIER {
     $$ = new Vector<String>();
     $$->emplace_back($1);
+    free($1);
 }
 | identifier_array ',' IDENTIFIER {
     $1->emplace_back($3);
+    free($3);
     $$ = $1;
 };
 
@@ -350,8 +405,9 @@ identifier_array : IDENTIFIER {
 /* DROP SCHEMA schema_name; */
 drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     $$ = new DropStatement();
-    std::unique_ptr<DropSchemaInfo> drop_schema_info = std::make_unique<DropSchemaInfo>();
+    UniquePtr<DropSchemaInfo> drop_schema_info = MakeUnique<DropSchemaInfo>();
     drop_schema_info->schema_name_ = $4;
+    free($4);
     $$->drop_info_ = std::move(drop_schema_info);
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 };
@@ -362,8 +418,10 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     std::unique_ptr<DropCollectionInfo> drop_collection_info = std::make_unique<DropCollectionInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         drop_collection_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
     }
     drop_collection_info->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
     $$->drop_info_ = std::move(drop_collection_info);
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
     delete $4;
@@ -375,6 +433,10 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
 // COPY schema.table TO file_path WITH (FORMAT csv, DELIMITER ',', HEADER TRUE)
 copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     if(result->IsError()) {
+        if($2->schema_name_ptr_ != nullptr) {
+            free($2->schema_name_ptr_);
+        }
+        free($2->table_name_ptr_);
         delete($2);
         free($4);
         delete $7;
@@ -389,8 +451,10 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     // table_name
     if($2->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $2->schema_name_ptr_;
+        free($2->schema_name_ptr_);
     }
     $$->table_name_ = $2->table_name_ptr_;
+    free($2->table_name_ptr_);
     delete $2;
 
     // file path
@@ -421,6 +485,10 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
 }
 | COPY table_name FROM file_path WITH '(' copy_option_list ')' {
     if(result->IsError()) {
+        if($2->schema_name_ptr_ != nullptr) {
+            free($2->schema_name_ptr_);
+        }
+        free($2->table_name_ptr_);
         delete($2);
         free($4);
         delete $7;
@@ -435,8 +503,10 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     // table_name
     if($2->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $2->schema_name_ptr_;
+        free($2->schema_name_ptr_);
     }
     $$->table_name_ = $2->table_name_ptr_;
+    free($2->table_name_ptr_);
     delete $2;
 
     // file path
@@ -478,8 +548,10 @@ show_statement: SHOW TABLES {
     $$->show_type_ = ShowStmtType::kColumns;
     if($2->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $2->schema_name_ptr_;
+        free($2->schema_name_ptr_);
     }
     $$->table_name_ = $2->table_name_ptr_;
+    free($2->table_name_ptr_);
     delete $2;
 }
 
@@ -515,7 +587,9 @@ copy_option : FORMAT IDENTIFIER {
     $$->option_type_ = CopyOptionType::kFormat;
     if (strcasecmp($2, "csv") == 0) {
         $$->file_type_ = CopyFileType::kCSV;
+        free($2);
     } else {
+        free($2);
         delete $$;
         yyerror(&yyloc, scanner, result, "Unknown file type");
     }

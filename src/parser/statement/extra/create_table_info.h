@@ -63,14 +63,16 @@ public:
     explicit
     CreateTableInfo() : ExtraDDLInfo(DDLType::kTable) {}
 
+    ~CreateTableInfo() override;
+
     [[nodiscard]] String
     ToString() const final;
 
     String schema_name_{"Default"};
     String table_name_{};
 
-    Vector<ColumnDef> column_defs_;
-    Vector<TableConstraint> contraints_;
+    Vector<ColumnDef *> column_defs_;
+    Vector<TableConstraint *> constraints_;
 };
 
 }

@@ -54,5 +54,30 @@ TEST_F(SQLParserTest, test1) {
         std::cout << result->ToString() << std::endl;
         result->Reset();
     }
+}
 
+TEST_F(SQLParserTest, test2) {
+    using namespace infinity;
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+    {
+        String input_sql = "create table t1 (a boolean);";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        for(auto& statement: result->statements_) {
+            EXPECT_EQ(statement->type_, StatementType::kCreate);
+            SharedPtr<CreateStatement> create_statement = std::static_pointer_cast<CreateStatement>(statement);
+            EXPECT_EQ(create_statement->create_info_->type_, DDLType::kTable);
+            EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kError);
+
+            CreateTableInfo* create_table_info = (CreateTableInfo*)(create_statement->create_info_.get());
+            EXPECT_EQ(create_table_info->schema_name_, String("Default"));
+            EXPECT_EQ(create_table_info->table_name_, String("t1"));
+            EXPECT_EQ(create_table_info->column_defs_.size(), 1);
+        }
+
+        result->Reset();
+    }
 }

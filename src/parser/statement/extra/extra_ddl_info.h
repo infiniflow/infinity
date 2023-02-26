@@ -29,6 +29,9 @@ public:
     explicit
     ExtraDDLInfo(DDLType type) : type_(type) {}
 
+    virtual
+    ~ExtraDDLInfo() = default;
+
     [[nodiscard]] virtual String
     ToString() const = 0;
 

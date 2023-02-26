@@ -6,6 +6,16 @@
 
 namespace infinity {
 
+CreateTableInfo::~CreateTableInfo() {
+    for(auto* column_def: column_defs_) {
+        delete column_def;
+    }
+
+    for(auto* table_constraint: constraints_) {
+        delete table_constraint;
+    }
+}
+
 String
 CreateTableInfo::ToString() const {
     std::stringstream ss;

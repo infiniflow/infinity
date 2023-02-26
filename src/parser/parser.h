@@ -139,22 +139,35 @@ struct SQL_LTYPE {
     DELIMITER = 287,               /* DELIMITER  */
     FORMAT = 288,                  /* FORMAT  */
     HEADER = 289,                  /* HEADER  */
-    INTEGER = 290,                 /* INTEGER  */
-    TINYINT = 291,                 /* TINYINT  */
-    SMALLINT = 292,                /* SMALLINT  */
-    BIGINT = 293,                  /* BIGINT  */
-    HUGEINT = 294,                 /* HUGEINT  */
-    CHAR = 295,                    /* CHAR  */
-    VARCHAR = 296,                 /* VARCHAR  */
-    FLOAT = 297,                   /* FLOAT  */
-    DOUBLE = 298,                  /* DOUBLE  */
-    REAL = 299,                    /* REAL  */
-    DECIMAL = 300,                 /* DECIMAL  */
-    PRIMARY = 301,                 /* PRIMARY  */
-    KEY = 302,                     /* KEY  */
-    UNIQUE = 303,                  /* UNIQUE  */
-    NULLABLE = 304,                /* NULLABLE  */
-    NUMBER = 305                   /* NUMBER  */
+    BOOLEAN = 290,                 /* BOOLEAN  */
+    INTEGER = 291,                 /* INTEGER  */
+    TINYINT = 292,                 /* TINYINT  */
+    SMALLINT = 293,                /* SMALLINT  */
+    BIGINT = 294,                  /* BIGINT  */
+    HUGEINT = 295,                 /* HUGEINT  */
+    CHAR = 296,                    /* CHAR  */
+    VARCHAR = 297,                 /* VARCHAR  */
+    FLOAT = 298,                   /* FLOAT  */
+    DOUBLE = 299,                  /* DOUBLE  */
+    REAL = 300,                    /* REAL  */
+    DECIMAL = 301,                 /* DECIMAL  */
+    DATE = 302,                    /* DATE  */
+    TIME = 303,                    /* TIME  */
+    DATETIME = 304,                /* DATETIME  */
+    TIMESTAMP = 305,               /* TIMESTAMP  */
+    UUID = 306,                    /* UUID  */
+    POINT = 307,                   /* POINT  */
+    LINE = 308,                    /* LINE  */
+    LSEG = 309,                    /* LSEG  */
+    BOX = 310,                     /* BOX  */
+    PATH = 311,                    /* PATH  */
+    POLYGON = 312,                 /* POLYGON  */
+    CIRCLE = 313,                  /* CIRCLE  */
+    PRIMARY = 314,                 /* PRIMARY  */
+    KEY = 315,                     /* KEY  */
+    UNIQUE = 316,                  /* UNIQUE  */
+    NULLABLE = 317,                /* NULLABLE  */
+    NUMBER = 318                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -200,7 +213,7 @@ union SQLSTYPE
     CopyOption* copy_option_t;
     Vector<CopyOption*>* copy_option_array;
 
-#line 204 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 217 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

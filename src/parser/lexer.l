@@ -30,10 +30,15 @@ static thread_local std::stringstream string_buffer;
 
 ALTER           { return ALTER; }
 BIGINT          { return BIGINT; }
+BOOLEAN         { return BOOLEAN; }
+BOX             { return BOX; }
 CHAR            { return CHAR; }
+CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
 COPY            { return COPY; }
 CREATE          { return CREATE; }
+DATE            { return DATE; }
+DATETIME        { return DATETIME; }
 DOUBLE          { return DOUBLE; }
 DECIMAL         { return DECIMAL; }
 DELETE          { return DELETE; }
@@ -52,8 +57,13 @@ IF              { return IF; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }
 KEY             { return KEY; }
+LINE            { return LINE; }
+LSEG            { return LSEG; }
 NULL            { return NULLABLE; }
 NOT             { return NOT; }
+PATH            { return PATH; }
+POINT           { return POINT; }
+POLYGON         { return POLYGON; }
 PREPARE         { return PREPARE; }
 PRIMARY         { return PRIMARY; }
 REAL            { return REAL; }
@@ -62,12 +72,15 @@ SELECT          { return SELECT; }
 SET             { return SET; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
+TIME            { return TIME; }
+TIMESTAMP       { return TIMESTAMP; }
 TO              { return TO; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
 TINYINT         { return TINYINT; }
 UNIQUE          { return UNIQUE; }
 UPDATE          { return UPDATE; }
+UUID            { return UUID; }
 VARCHAR         { return VARCHAR; }
 WITH            { return WITH; }
 
@@ -90,7 +103,7 @@ WITH            { return WITH; }
 }
 
 [A-Za-z][A-Za-z0-9_]* {
-    yylval->str_value = yytext;
+    yylval->str_value = strdup(yytext);
     return IDENTIFIER;
 }
 
