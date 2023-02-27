@@ -30,8 +30,11 @@ static thread_local std::stringstream string_buffer;
 
 ALTER           { return ALTER; }
 BIGINT          { return BIGINT; }
+BIT             { return BIT; }
 BOOLEAN         { return BOOLEAN; }
 BOX             { return BOX; }
+BLOB            { return BLOB; }
+BITMAP          { return BITMAP; }
 CHAR            { return CHAR; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
@@ -45,6 +48,7 @@ DELETE          { return DELETE; }
 DELIMITER       { return DELIMITER; }
 DESCRIBE        { return DESCRIBE; }
 DROP            { return DROP; }
+EMBEDDING       { return EMBEDDING; }
 EXECUTE         { return EXECUTE; }
 EXISTS          { return EXISTS; }
 EXPLAIN         { return EXPLAIN; }
@@ -82,6 +86,7 @@ UNIQUE          { return UNIQUE; }
 UPDATE          { return UPDATE; }
 UUID            { return UUID; }
 VARCHAR         { return VARCHAR; }
+VECTOR          { return VECTOR; }
 WITH            { return WITH; }
 
 [-+*/(){},.;<>=^%:?[\]|]    { return yytext[0]; }

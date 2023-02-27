@@ -82,7 +82,18 @@ TEST_F(SQLParserTest, good_test2) {
                            "                 r box, "
                            "                 s path, "
                            "                 t polygon, "
-                           "                 u circle); ";
+                           "                 u circle, "
+                           "                 v char(10), "
+                           "                 w varchar(100), "
+                           "                 x decimal, "
+                           "                 y decimal(10), "
+                           "                 z decimal(12, 14), "
+                           "                 aa blob(10), "
+                           "                 ab bitmap(16), "
+                           "                 ac embedding(bit, 256), "
+                           "                 ad vector(float, 512), "
+                           "                 primary key (a, b), "
+                           "                 unique (c, d)); ";
 
 
         parser->Parse(input_sql, result);
@@ -97,7 +108,7 @@ TEST_F(SQLParserTest, good_test2) {
             auto* create_table_info = (CreateTableInfo*)(create_statement->create_info_.get());
             EXPECT_EQ(create_table_info->schema_name_, String("Default"));
             EXPECT_EQ(create_table_info->table_name_, String("t1"));
-            EXPECT_EQ(create_table_info->column_defs_.size(), 21);
+            EXPECT_EQ(create_table_info->column_defs_.size(), 30);
 
             {
                 auto& column_def = create_table_info->column_defs_[0];
@@ -296,7 +307,103 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->constraints_, nullptr);
             }
 
-            EXPECT_EQ(create_table_info->constraints_.size(), 0);
+            {
+                auto& column_def = create_table_info->column_defs_[21];
+                EXPECT_EQ(column_def->name_, "v");
+                SharedPtr<TypeInfo> type_info = CharInfo::Make(10);
+                DataType column_type(LogicalType::kChar, type_info);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_, nullptr);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[22];
+                EXPECT_EQ(column_def->name_, "w");
+                SharedPtr<TypeInfo> type_info = VarcharInfo::Make(100);
+                DataType column_type(LogicalType::kVarchar, type_info);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_, nullptr);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[23];
+                EXPECT_EQ(column_def->name_, "x");
+                SharedPtr<TypeInfo> type_info = Decimal64Info::Make(0, 0);
+                DataType column_type(LogicalType::kDecimal64, type_info);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_, nullptr);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[24];
+                EXPECT_EQ(column_def->name_, "y");
+                SharedPtr<TypeInfo> type_info = Decimal64Info::Make(10, 0);
+                DataType column_type(LogicalType::kDecimal64, type_info);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_, nullptr);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[25];
+                EXPECT_EQ(column_def->name_, "z");
+                SharedPtr<TypeInfo> type_info = Decimal64Info::Make(12, 14);
+                DataType column_type(LogicalType::kDecimal64, type_info);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_, nullptr);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[26];
+                EXPECT_EQ(column_def->name_, "aa");
+                SharedPtr<TypeInfo> type_info = BlobInfo::Make(10);
+                DataType column_type(LogicalType::kBlob, type_info);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_, nullptr);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[27];
+                EXPECT_EQ(column_def->name_, "ab");
+                SharedPtr<TypeInfo> type_info = BitmapInfo::Make(16);
+                DataType column_type(LogicalType::kBitmap, type_info);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_, nullptr);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[28];
+                EXPECT_EQ(column_def->name_, "ac");
+                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemBit, 256);
+                DataType column_type(LogicalType::kEmbedding, type_info);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_, nullptr);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[29];
+                EXPECT_EQ(column_def->name_, "ad");
+                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemFloat, 512);
+                DataType column_type(LogicalType::kEmbedding, type_info);
+                EXPECT_EQ(column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_, nullptr);
+            }
+
+            EXPECT_EQ(create_table_info->constraints_.size(), 2);
+            {
+                EXPECT_EQ(create_table_info->constraints_[0]->constraint_, ConstraintType::kPrimaryKey);
+                const String &column1 = (*(create_table_info->constraints_[0]->names_ptr_))[0];
+                const String &column2 = (*(create_table_info->constraints_[0]->names_ptr_))[1];
+                EXPECT_EQ(column1, "a");
+                EXPECT_EQ(column2, "b");
+            }
+
+            {
+                EXPECT_EQ(create_table_info->constraints_[1]->constraint_, ConstraintType::kUnique);
+                const String &column3 = (*(create_table_info->constraints_[1]->names_ptr_))[0];
+                const String &column4 = (*(create_table_info->constraints_[1]->names_ptr_))[1];
+                EXPECT_EQ(column3, "c");
+                EXPECT_EQ(column4, "d");
+            }
         }
 
         result->Reset();

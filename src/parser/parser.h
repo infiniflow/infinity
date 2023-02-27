@@ -163,11 +163,16 @@ struct SQL_LTYPE {
     PATH = 311,                    /* PATH  */
     POLYGON = 312,                 /* POLYGON  */
     CIRCLE = 313,                  /* CIRCLE  */
-    PRIMARY = 314,                 /* PRIMARY  */
-    KEY = 315,                     /* KEY  */
-    UNIQUE = 316,                  /* UNIQUE  */
-    NULLABLE = 317,                /* NULLABLE  */
-    NUMBER = 318                   /* NUMBER  */
+    BLOB = 314,                    /* BLOB  */
+    BITMAP = 315,                  /* BITMAP  */
+    EMBEDDING = 316,               /* EMBEDDING  */
+    VECTOR = 317,                  /* VECTOR  */
+    BIT = 318,                     /* BIT  */
+    PRIMARY = 319,                 /* PRIMARY  */
+    KEY = 320,                     /* KEY  */
+    UNIQUE = 321,                  /* UNIQUE  */
+    NULLABLE = 322,                /* NULLABLE  */
+    NUMBER = 323                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -213,7 +218,7 @@ union SQLSTYPE
     CopyOption* copy_option_t;
     Vector<CopyOption*>* copy_option_array;
 
-#line 217 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 222 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

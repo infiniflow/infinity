@@ -7,6 +7,12 @@
 #include "extra_ddl_info.h"
 #include "parser/statement/statement_common.h"
 #include "common/types/data_type.h"
+#include "common/types/info/char_info.h"
+#include "common/types/info/varchar_info.h"
+#include "common/types/info/decimal64_info.h"
+#include "common/types/info/blob_info.h"
+#include "common/types/info/bitmap_info.h"
+#include "common/types/info/embedding_info.h"
 
 namespace infinity {
 
@@ -60,6 +66,7 @@ struct ColumnType {
     i64 width;
     i64 precision;
     i64 scale;
+    EmbeddingDataType embedding_type_;
 };
 
 class TableConstraint : public TableElement {
@@ -67,9 +74,12 @@ public:
     TableConstraint() : TableElement(TableElementType::kConstraint) {}
 
     inline
-    ~TableConstraint() override = default;
+    ~TableConstraint() override {
+        delete names_ptr_;
+        names_ptr_ = nullptr;
+    }
 
-    Vector<String> names_{};
+    Vector<String>* names_ptr_{nullptr};
     ConstraintType constraint_{ConstraintType::kNotNull};
 };
 

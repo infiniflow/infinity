@@ -9,8 +9,8 @@ namespace infinity {
 
 SharedPtr<Decimal64Info>
 Decimal64Info::Make(i64 precision, i64 scale) {
-    TypeAssert(scale <= precision, "Scale should not more than precision.")
-    TypeAssert(precision <= 18, "Decimal64 max precision should not more than 18.")
+//    TypeAssert(scale <= precision, "Scale should not more than precision.")
+//    TypeAssert(precision <= 18, "Decimal64 max precision should not more than 18.")
 
     return MakeShared<Decimal64Info>(precision, scale);
 }

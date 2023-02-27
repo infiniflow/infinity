@@ -8,6 +8,15 @@
 
 namespace infinity {
 
+ParserResult::~ParserResult() {
+    if(statements_ptr_ == nullptr) return ;
+    for(auto& statement: *statements_ptr_) {
+        delete statement;
+    }
+    delete statements_ptr_;
+}
+
+
 void
 ParserResult::SetErrorMessage(const char *msg, SizeT error_line, SizeT error_position) {
     this->error_message_ = String(msg);

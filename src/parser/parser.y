@@ -151,6 +151,11 @@ struct SQL_LTYPE {
     free($$);
 } <str_value>
 
+%destructor {
+    fprintf(stderr, "destroy identifier array\n");
+    delete ($$);
+} <identifier_array_t>
+
 %token <str_value>      IDENTIFIER STRING
 %token <double_value>   DOUBLE_VALUE
 %token <long_value>     LONG_VALUE
@@ -162,7 +167,7 @@ struct SQL_LTYPE {
 %token SCHEMA TABLE COLLECTION TABLES
 %token IF NOT EXISTS FROM TO WITH DELIMITER FORMAT HEADER
 %token BOOLEAN INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
-%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE
+%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
 %token PRIMARY KEY UNIQUE NULLABLE
 
 %token NUMBER
@@ -277,7 +282,6 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 
     for (TableElement*& element : *$6) {
         if(element->type_ == TableElementType::kColumn) {
-            /* SharedPtr<ColumnDef> column_def_ptr = SharedPtr<ColumnDef>((ColumnDef*)element);*/
             create_table_info->column_defs_.emplace_back((ColumnDef*)element);
         } else {
             create_table_info->constraints_.emplace_back((TableConstraint*)element);
@@ -312,7 +316,36 @@ IDENTIFIER column_type {
     if(result->IsError()) {
         free($1);
     }
-    $$ = new ColumnDef($2.logical_type_, nullptr);
+
+    SharedPtr<TypeInfo> type_info_ptr{nullptr};
+    switch($2.logical_type_) {
+        case LogicalType::kChar: {
+            type_info_ptr = CharInfo::Make($2.width);
+            break;
+        }
+        case LogicalType::kVarchar: {
+            type_info_ptr = VarcharInfo::Make($2.width);
+            break;
+        }
+        case LogicalType::kDecimal64: {
+            type_info_ptr = Decimal64Info::Make($2.precision, $2.scale);
+            break;
+        }
+        case LogicalType::kBlob: {
+            type_info_ptr = BlobInfo::Make($2.width);
+            break;
+        }
+        case LogicalType::kBitmap: {
+            type_info_ptr = BitmapInfo::Make($2.width);
+            break;
+        }
+        case LogicalType::kEmbedding: {
+            type_info_ptr = EmbeddingInfo::Make($2.embedding_type_, $2.width);
+            break;
+        }
+    }
+    $$ = new ColumnDef($2.logical_type_, type_info_ptr);
+
     $$->name_ = $1;
     free($1);
     /*
@@ -326,7 +359,36 @@ IDENTIFIER column_type {
         free($1);
         delete($3);
     }
-    $$ = new ColumnDef($2.logical_type_, nullptr);
+
+    SharedPtr<TypeInfo> type_info_ptr{nullptr};
+    switch($2.logical_type_) {
+        case LogicalType::kChar: {
+            type_info_ptr = CharInfo::Make($2.width);
+            break;
+        }
+        case LogicalType::kVarchar: {
+            type_info_ptr = VarcharInfo::Make($2.width);
+            break;
+        }
+        case LogicalType::kDecimal64: {
+            type_info_ptr = Decimal64Info::Make($2.precision, $2.scale);
+            break;
+        }
+        case LogicalType::kBlob: {
+            type_info_ptr = BlobInfo::Make($2.width);
+            break;
+        }
+        case LogicalType::kBitmap: {
+            type_info_ptr = BitmapInfo::Make($2.width);
+            break;
+        }
+        case LogicalType::kEmbedding: {
+            type_info_ptr = EmbeddingInfo::Make($2.embedding_type_, $2.width);
+            break;
+        }
+    }
+    $$ = new ColumnDef($2.logical_type_, type_info_ptr);
+
     $$->name_ = $1;
     $$->constraints_ = $3;
     free($1);
@@ -359,22 +421,33 @@ BOOLEAN { $$ = ColumnType{LogicalType::kBoolean}; }
 | PATH { $$ = ColumnType{LogicalType::kPath}; }
 | POLYGON { $$ = ColumnType{LogicalType::kPolygon}; }
 | CIRCLE { $$ = ColumnType{LogicalType::kCircle}; }
+// Variable types
+| CHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kChar, $3}; }
+| VARCHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kVarchar, $3}; }
+| DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kDecimal64, 0, $3, $5}; }
+| DECIMAL '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kDecimal64, 0, $3, 0}; }
+| DECIMAL { $$ = ColumnType{LogicalType::kDecimal64, 0, 0, 0}; }
+| BLOB '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kBlob, $3}; }
+| BITMAP '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kBitmap, $3}; }
+| EMBEDDING '(' BIT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemBit}; }
+| EMBEDDING '(' TINYINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt8}; }
+| EMBEDDING '(' SMALLINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt16}; }
+| EMBEDDING '(' INTEGER ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt32}; }
+| EMBEDDING '(' BIGINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt64}; }
+| EMBEDDING '(' FLOAT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemFloat}; }
+| EMBEDDING '(' DOUBLE ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemDouble}; }
+| VECTOR '(' BIT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemBit}; }
+| VECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt8}; }
+| VECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt16}; }
+| VECTOR '(' INTEGER ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt32}; }
+| VECTOR '(' BIGINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt64}; }
+| VECTOR '(' FLOAT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemFloat}; }
+| VECTOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemDouble}; }
 /*
-| CHAR '(' INTVAL ')' { $$ = ColumnType{DataType::CHAR, $3}; }
-| CHARACTER_VARYING '(' INTVAL ')' { $$ = ColumnType{DataType::VARCHAR, $3}; }
-| DATE { $$ = ColumnType{DataType::DATE}; };
-| DATETIME { $$ = ColumnType{DataType::DATETIME}; }
 | DECIMAL opt_decimal_specification {
   $$ = ColumnType{DataType::DECIMAL, 0, $2->first, $2->second};
   delete $2;
 }
-| DOUBLE { $$ = ColumnType{DataType::DOUBLE}; }
-| FLOAT { $$ = ColumnType{DataType::FLOAT}; }
-| INT { $$ = ColumnType{DataType::INT}; }
-| INTEGER { $$ = ColumnType{DataType::INT}; }
-| LONG { $$ = ColumnType{DataType::LONG}; }
-| REAL { $$ = ColumnType{DataType::REAL}; }
-| SMALLINT { $$ = ColumnType{DataType::SMALLINT}; }
 | TEXT { $$ = ColumnType{DataType::TEXT}; }
 | TIME opt_time_precision { $$ = ColumnType{DataType::TIME, 0, $2}; }
 | TIMESTAMP { $$ = ColumnType{DataType::DATETIME}; }
@@ -416,9 +489,13 @@ column_constraint : PRIMARY KEY {
 
 table_constraint : PRIMARY KEY '(' identifier_array ')' {
     $$ = new TableConstraint();
+    $$->names_ptr_ = $4;
+    $$->constraint_ = ConstraintType::kPrimaryKey;
 }
 | UNIQUE '(' identifier_array ')' {
     $$ = new TableConstraint();
+    $$->names_ptr_ = $3;
+    $$->constraint_ = ConstraintType::kUnique;
 };
 
 

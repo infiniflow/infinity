@@ -11,6 +11,8 @@ namespace infinity {
 class ParserResult {
 public:
 
+    ~ParserResult();
+
     void
     SetErrorMessage(const char *msg, SizeT error_line, SizeT error_position);
 
