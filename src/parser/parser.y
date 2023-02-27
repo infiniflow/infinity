@@ -147,6 +147,10 @@ struct SQL_LTYPE {
     }
 } <column_constraints_t>
 
+%destructor {
+    free($$);
+} <str_value>
+
 %token <str_value>      IDENTIFIER STRING
 %token <double_value>   DOUBLE_VALUE
 %token <long_value>     LONG_VALUE
