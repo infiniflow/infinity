@@ -165,6 +165,7 @@ struct SQL_LTYPE {
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE
 %token SCHEMA TABLE COLLECTION TABLES
+%token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE
 %token IF NOT EXISTS FROM TO WITH DELIMITER FORMAT HEADER
 %token BOOLEAN INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
@@ -649,6 +650,154 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
 };
 
 /*
+ * SET STATEMENT
+ */
+
+/*
+set_statement: select_statement set_operator select_statement {
+}
+| set_statement set_operator select_statement {
+}
+
+set_operator : UNION {
+}
+| UNION ALL {
+}
+| INTERSECT {
+}
+| EXCEPT {
+}
+*/
+
+/*
+ * SELECT STATEMENT
+ */
+
+/*
+select_statement: select_statement_with_paren {
+}
+| '(' select_statement_with_paren ')' {
+}
+
+select_statement_with_paren: '(' select_statement_without_paren ')' {
+}
+
+select_statement_without_paren: with_clause select_clause order_clause limit_clause {
+}
+
+select_clause : select_clause_with_paren {
+
+}
+| '(' select_clause_with_paren ')' {
+
+}
+
+select_clause_with_paren: '(' select_clause_without_paren ')' {
+}
+*/
+
+select_clause_without_paren: SELECT select_list from_clause where_clause group_by_clause {
+}
+
+select_list : DISTINCT expr_array {
+}
+
+from_clause: FROM table_reference {
+}
+| /* no from clause */ {
+}
+
+where_clause: WHERE expr {
+}
+| /* no where clause */ {
+}
+
+group_by_clause: GROUP BY expr_array HAVING expr {
+}
+| GROUP BY expr_array {
+}
+| /* No group by clause */ {
+}
+
+/*
+ * TABLE REFERENCE
+ */
+
+table_reference : table_reference_unit {
+}
+| table_reference ',' table_reference_unit {
+};
+
+
+table_reference_unit : table_reference_name | join_clause;
+
+table_reference_name : table_name table_alias {
+}
+/* FROM (select * from t1) AS t2 */
+/*
+| '(' select_statement ')' table_alias {
+}
+*/
+
+/* 'table_name' or 'schema_name.table_name' */
+table_name : IDENTIFIER {
+    if(!result->IsError()) {
+        $$ = new TableName();
+        $$->table_name_ptr_ = $1;
+    }
+}
+| IDENTIFIER '.' IDENTIFIER {
+    if(!result->IsError()) {
+        $$ = new TableName();
+        $$->schema_name_ptr_ = $1;
+        $$->table_name_ptr_ = $3;
+    }
+};
+
+/* AS 'table_alias' or AS 'table_alias(col1_alias, col2_alias ... )' */
+table_alias : AS IDENTIFIER {
+}
+| AS IDENTIFIER '(' identifier_array ')' {
+}
+/* no table alias */
+|{
+}
+
+/*
+ * JOIN CLAUSE
+ */
+
+join_clause: table_reference_unit NATURAL JOIN table_reference_name {
+}
+| table_reference_unit join_type JOIN table_reference_name ON expr {
+}
+/* Using column name to JOIN
+table_reference_unit join_type JOIN table_reference_name USING '(' column_name ')' {
+}
+*/
+
+join_type : INNER {
+}
+| LEFT OUTER {
+}
+| LEFT {
+}
+| RIGHT OUTER {
+}
+| RIGHT {
+}
+| FULL OUTER {
+}
+| OUTER {
+}
+| FULL {
+}
+| CROSS {
+}
+| /* default */ {
+};
+
+/*
  * SHOW STATEMENT
  */
 show_statement: SHOW TABLES {
@@ -668,22 +817,25 @@ show_statement: SHOW TABLES {
 }
 
 /*
- * Misc.
+ * EXPRESSION
  */
 
-table_name : IDENTIFIER {
-    if(!result->IsError()) {
-        $$ = new TableName();
-        $$->table_name_ptr_ = $1;
-    }
+expr_array : expr_alias {
 }
-| IDENTIFIER '.' IDENTIFIER {
-    if(!result->IsError()) {
-        $$ = new TableName();
-        $$->schema_name_ptr_ = $1;
-        $$->table_name_ptr_ = $3;
-    }
-};
+| expr_array ',' expr_alias {
+}
+
+expr_alias : expr IDENTIFIER {
+}
+| expr {
+}
+
+expr : {
+}
+
+/*
+ * Misc.
+ */
 
 copy_option_list : copy_option {
     $$ = new Vector<CopyOption*>();

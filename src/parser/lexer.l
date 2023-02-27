@@ -29,19 +29,23 @@ static thread_local std::stringstream string_buffer;
 [ \t\n]+        /* ignore \t\n and space */;
 
 ALTER           { return ALTER; }
+AS              { return AS; }
 BIGINT          { return BIGINT; }
 BIT             { return BIT; }
+BITMAP          { return BITMAP; }
 BOOLEAN         { return BOOLEAN; }
 BOX             { return BOX; }
 BLOB            { return BLOB; }
-BITMAP          { return BITMAP; }
+BY              { return BY; }
 CHAR            { return CHAR; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
 COPY            { return COPY; }
 CREATE          { return CREATE; }
+CROSS           { return CROSS; }
 DATE            { return DATE; }
 DATETIME        { return DATETIME; }
+DISTINCT        { return DISTINCT; }
 DOUBLE          { return DOUBLE; }
 DECIMAL         { return DECIMAL; }
 DELETE          { return DELETE; }
@@ -55,22 +59,32 @@ EXPLAIN         { return EXPLAIN; }
 FLOAT           { return FLOAT; }
 FORMAT          { return FORMAT; }
 FROM            { return FROM; }
+FULL            { return FULL; }
+GROUP           { return GROUP; }
+HAVING          { return HAVING; }
 HEADER          { return HEADER; }
 HUGEINT         { return HUGEINT; }
 IF              { return IF; }
+INNER           { return INNER; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }
+JOIN            { return JOIN; }
 KEY             { return KEY; }
+LEFT            { return LEFT; }
 LINE            { return LINE; }
 LSEG            { return LSEG; }
+NATURAL         { return NATURAL; }
 NULL            { return NULLABLE; }
 NOT             { return NOT; }
+ON              { return ON; }
+OUTER           { return OUTER; }
 PATH            { return PATH; }
 POINT           { return POINT; }
 POLYGON         { return POLYGON; }
 PREPARE         { return PREPARE; }
 PRIMARY         { return PRIMARY; }
 REAL            { return REAL; }
+RIGHT           { return RIGHT; }
 SCHEMA          { return SCHEMA; }
 SELECT          { return SELECT; }
 SET             { return SET; }
@@ -87,6 +101,7 @@ UPDATE          { return UPDATE; }
 UUID            { return UUID; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
+WHERE           { return WHERE; }
 WITH            { return WITH; }
 
 [-+*/(){},.;<>=^%:?[\]|]    { return yytext[0]; }
