@@ -5,11 +5,13 @@
 #pragma once
 
 #include "common/types/internal_types.h"
+#include "main/logger.h"
+#include "common/utility/infinity_assert.h"
+
 namespace infinity {
 
 enum class ParsedExprType {
     kConstant,
-    kExprStar,
     kExprParameter,
     kExprColumn,
     kExprFunction,
@@ -26,6 +28,9 @@ public:
 
     virtual
     ~ParsedExpr() = default;
+
+    [[nodiscard]] virtual String
+    ToString() const = 0;
 
     ParsedExprType type_;
     char* alias_{nullptr};

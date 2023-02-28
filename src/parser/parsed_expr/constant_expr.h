@@ -12,13 +12,13 @@ enum class LiteralType {
     kBoolean,
     kFloat,
     kString,
-    kInt,
+    kInteger,
     kNull,
     kDate,
     kInterval,
 };
 
-enum class IntervalType {
+enum class IntervalExprType {
     kSecond,
     kMinute,
     kHour,
@@ -32,13 +32,19 @@ public:
     explicit
     ConstantExpr(LiteralType literal_type) : ParsedExpr(ParsedExprType::kConstant), literal_type_(literal_type) {}
 
+    ~ConstantExpr() override;
+
+    [[nodiscard]] String
+    ToString() const override;
+
+public:
     LiteralType literal_type_;
 
     bool bool_value_{false};
     i64 integer_value_{0};
     double float_value_{0};
     char* str_value_{nullptr};
-    IntervalType interval_type_{IntervalType::kSecond};
+    IntervalExprType interval_type_{IntervalExprType::kSecond};
     char* date_value_{nullptr};
 };
 

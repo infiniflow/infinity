@@ -13,6 +13,7 @@ void yyerror(YYLTYPE * llocp, void* lexer, ParserResult* result, const char* msg
 #include "statement.h"
 #include "parser_result.h"
 #include "defer_operation.h"
+#include "parser/table_reference/join_reference.h"
 #include <vector>
 
 using namespace infinity;
@@ -106,6 +107,13 @@ struct SQL_LTYPE {
     Vector<String>*         identifier_array_t;
     TableConstraint*        table_constraint_t;
 
+    BaseTableReference*     table_reference_t;
+    TableAlias*             table_alias_t;
+    JoinType                join_type_t;
+
+    ParsedExpr*             parsed_expr_t;
+    Vector<ParsedExpr*>*    expr_array_t;
+
     TableName* table_name_t;
     CopyOption* copy_option_t;
     Vector<CopyOption*>* copy_option_array;
@@ -132,6 +140,16 @@ struct SQL_LTYPE {
 } <stmt_array>
 
 %destructor {
+    fprintf(stderr, "destroy expression array\n");
+    if (($$) != nullptr) {
+        for (auto ptr : *($$)) {
+            delete ptr;
+        }
+        delete ($$);
+    }
+} <expr_array_t>
+
+%destructor {
     fprintf(stderr, "destroy table name\n");
     if (($$) != nullptr) {
         free($$->schema_name_ptr_);
@@ -156,10 +174,23 @@ struct SQL_LTYPE {
     delete ($$);
 } <identifier_array_t>
 
+%destructor {
+    delete ($$);
+} <parsed_expr_t>
+
+%destructor {
+    fprintf(stderr, "destroy table alias\n");
+    delete ($$);
+} <table_alias_t>
+
+%destructor {
+    fprintf(stderr, "destroy table reference\n");
+    delete ($$);
+} <table_reference_t>
+
 %token <str_value>      IDENTIFIER STRING
 %token <double_value>   DOUBLE_VALUE
 %token <long_value>     LONG_VALUE
-%token <bool_value>     BOOL_VALUE
 
 /* SQL keywords */
 
@@ -169,7 +200,8 @@ struct SQL_LTYPE {
 %token IF NOT EXISTS FROM TO WITH DELIMITER FORMAT HEADER
 %token BOOLEAN INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
-%token PRIMARY KEY UNIQUE NULLABLE
+%token PRIMARY KEY UNIQUE NULLABLE IS
+%token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 
 %token NUMBER
 
@@ -192,6 +224,12 @@ struct SQL_LTYPE {
 %type <column_constraint_t>     column_constraint
 %type <column_constraints_t>    column_constraints
 
+%type <table_reference_t>       table_reference table_reference_unit table_reference_name
+%type <table_alias_t>           table_alias
+%type <join_type_t>             join_type
+
+%type <parsed_expr_t>           expr constant_expr interval_expr column_expr function_expr
+%type <expr_array_t>            expr_array
 
 %type <table_element_array_t>   table_element_array
 
@@ -724,6 +762,7 @@ group_by_clause: GROUP BY expr_array HAVING expr {
  */
 
 table_reference : table_reference_unit {
+    $$ = $1;
 }
 | table_reference ',' table_reference_unit {
 };
@@ -732,6 +771,16 @@ table_reference : table_reference_unit {
 table_reference_unit : table_reference_name | join_clause;
 
 table_reference_name : table_name table_alias {
+    $$ = new TableReference();
+    if($1->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $1->schema_name_ptr_;
+        free($1->schema_name_ptr_);
+    }
+    $$->table_name_ = $1->table_name_ptr_;
+    free($1->table_name_ptr_);
+    delete $1;
+
+    $$->alias_ = $2;
 }
 /* FROM (select * from t1) AS t2 */
 /*
@@ -756,11 +805,18 @@ table_name : IDENTIFIER {
 
 /* AS 'table_alias' or AS 'table_alias(col1_alias, col2_alias ... )' */
 table_alias : AS IDENTIFIER {
+    $$ = new TableAlias();
+    $$->alias_ = $2;
 }
 | AS IDENTIFIER '(' identifier_array ')' {
+    $$ = new TableAlias();
+    $$->alias_ = $2;
+    $$->column_alias_array_ = identifier_array;
 }
 /* no table alias */
-|{
+| IDENTIFIER {
+    $$ = new TableAlias();
+    $$->alias_ = $1;
 }
 
 /*
@@ -777,22 +833,22 @@ table_reference_unit join_type JOIN table_reference_name USING '(' column_name '
 */
 
 join_type : INNER {
-}
-| LEFT OUTER {
+    $$ = JoinType::kInner;
 }
 | LEFT {
-}
-| RIGHT OUTER {
+    $$ = JoinType::kLeft;
 }
 | RIGHT {
-}
-| FULL OUTER {
+    $$ = JoinType::kRight;
 }
 | OUTER {
+    $$ = JoinType::kFull;
 }
 | FULL {
+    $$ = JoinType::kFull;
 }
 | CROSS {
+    $$ = JoinType::kCross;
 }
 | /* default */ {
 };
@@ -830,7 +886,204 @@ expr_alias : expr IDENTIFIER {
 | expr {
 }
 
-expr : {
+expr :
+| '(' expr ')' {
+      $$ = $2;
+}
+| constant_expr
+| column_expr
+| function_expr
+
+function_expr : IDENTIFIER '(' ')' {
+    $$ = new FunctionExpr();
+    $$->func_name_ = $1;
+    $$->arguments_ = nullptr;
+}
+| IDENTIFIER '(' expr_array ')' {
+    $$ = new FunctionExpr();
+    $$->func_name_ = $1;
+    $$->arguments_ = $3;
+}
+| IDENTIFIER '(' DISTINCT expr_array ')' {
+    $$ = new FunctionExpr();
+    $$->func_name_ = $1;
+    $$->arguments_ = $4;
+    $$->distinct_ = true;
+}
+| '-' expr {
+    $$ = new FunctionExpr();
+    $$->func_name_ = strdup("-");
+    $$->arguments_ = new Vector<ParsedExpr*>();
+    $$->arguments_->emplace_back($2);
+}
+| '+' expr {
+    $$ = new FunctionExpr();
+    $$->func_name_ = strdup("+");
+    $$->arguments_ = new Vector<ParsedExpr*>();
+    $$->arguments_->emplace_back($2);
+}
+| NOT expr {
+    $$ = new FunctionExpr();
+    $$->func_name_ = strdup("not");
+    $$->arguments_ = new Vector<ParsedExpr*>();
+    $$->arguments_->emplace_back($2);
+}
+| expr IS NULLABLE {
+    $$ = new FunctionExpr();
+    $$->func_name_ = strdup("is_null");
+    $$->arguments_ = new Vector<ParsedExpr*>();
+    $$->arguments_->emplace_back($1);
+}
+| expr IS NOT NULLABLE {
+    $$ = new FunctionExpr();
+    $$->func_name_ = strdup("is_not_null");
+    $$->arguments_ = new Vector<ParsedExpr*>();
+    $$->arguments_->emplace_back($1);
+}
+| expr '-' expr {
+    $$ = new FunctionExpr();
+    $$->func_name_ = strdup("-");
+    $$->arguments_ = new Vector<ParsedExpr*>();
+    $$->arguments_->emplace_back($1);
+    $$->arguments_->emplace_back($3);
+}
+| expr '+' expr {
+    $$ = new FunctionExpr();
+    $$->func_name_ = strdup("-");
+    $$->arguments_ = new Vector<ParsedExpr*>();
+    $$->arguments_->emplace_back($1);
+    $$->arguments_->emplace_back($3);
+}
+| expr '*' expr {
+    $$ = new FunctionExpr();
+    $$->func_name_ = strdup("*");
+    $$->arguments_ = new Vector<ParsedExpr*>();
+    $$->arguments_->emplace_back($1);
+    $$->arguments_->emplace_back($3);
+}
+| expr '/' expr {
+    $$ = new FunctionExpr();
+    $$->func_name_ = strdup("/");
+    $$->arguments_ = new Vector<ParsedExpr*>();
+    $$->arguments_->emplace_back($1);
+    $$->arguments_->emplace_back($3);
+}
+| expr '%' expr {
+    $$ = new FunctionExpr();
+    $$->func_name_ = strdup("%");
+    $$->arguments_ = new Vector<ParsedExpr*>();
+    $$->arguments_->emplace_back($1);
+    $$->arguments_->emplace_back($3);
+}
+
+
+column_expr : IDENTIFIER {
+    $$ = new ColumnExpr()
+    $$->names_.emplace_back($1);
+}
+| column_expr '.' IDENTIFIER {
+    $1->names_.emplace_back($3);
+    $$ = $1;
+}
+| '*' {
+    $$ = new ColumnExpr();
+    $$->star_ = true;
+}
+| column_expr '.' '*' {
+    if($$->star_) {
+        yyerror(&yyloc, scanner, result, "Invalid column expression format");
+        YYERROR;
+    }
+    $$->star_ = true;
+}
+
+constant_expr: STRING {
+    $$ = new ConstantExpr(LiteralType::kString);
+    $$->str_value_ = $1;
+}
+| TRUE {
+    $$ = new ConstantExpr(LiteralType::kBoolean);
+    $$->bool_value_ = true;
+}
+| FALSE {
+    $$ = new ConstantExpr(LiteralType::kBoolean);
+    $$->bool_value_ = false;
+}
+| DOUBLE_VALUE {
+    $$ = new ConstantExpr(LiteralType::kFloat);
+    $$->float_value_ = $1;
+}
+| LONG_VALUE {
+    $$ = new ConstantExpr(LiteralType::kInteger);
+    $$->integer_value_ = $1;
+}
+| DATE STRING {
+    $$ = new ConstantExpr(LiteralType::kDate);
+    $$->date_value_ = $2;
+}
+| INTERVAL interval_expr {
+    $$ = $2
+}
+
+interval_expr: LONG_VALUE SECONDS {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kSecond;
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE SECOND {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kSecond;
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE MINUTES {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kMinute;
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE MINUTE {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kMinute;
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE HOURS {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kHour
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE HOUR {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kHour;
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE DAYS {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kDay;
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE DAY {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kDay;
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE MONTHS {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kMonth;
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE MONTH {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kMonth;
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE YEARS {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kYear;
+    $$->integer_value_ = $1;
+}
+| LONG_VALUE YEAR {
+    $$ = new ConstantExpr(LiteralType::kInterval);
+    $$->interval_type_ = IntervalExprType::kYear;
+    $$->integer_value_ = $1;
 }
 
 /*

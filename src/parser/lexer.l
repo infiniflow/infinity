@@ -45,6 +45,8 @@ CREATE          { return CREATE; }
 CROSS           { return CROSS; }
 DATE            { return DATE; }
 DATETIME        { return DATETIME; }
+DAY             { return DAY; }
+DAYS            { return DAYS; }
 DISTINCT        { return DISTINCT; }
 DOUBLE          { return DOUBLE; }
 DECIMAL         { return DECIMAL; }
@@ -56,6 +58,7 @@ EMBEDDING       { return EMBEDDING; }
 EXECUTE         { return EXECUTE; }
 EXISTS          { return EXISTS; }
 EXPLAIN         { return EXPLAIN; }
+FALSE           { return FALSE; }
 FLOAT           { return FLOAT; }
 FORMAT          { return FORMAT; }
 FROM            { return FROM; }
@@ -63,8 +66,11 @@ FULL            { return FULL; }
 GROUP           { return GROUP; }
 HAVING          { return HAVING; }
 HEADER          { return HEADER; }
+HOUR            { return HOUR; }
+HOURS           { return HOURS; }
 HUGEINT         { return HUGEINT; }
 IF              { return IF; }
+IS              { return IS; }
 INNER           { return INNER; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }
@@ -73,6 +79,10 @@ KEY             { return KEY; }
 LEFT            { return LEFT; }
 LINE            { return LINE; }
 LSEG            { return LSEG; }
+MINUTE          { return MINUTE; }
+MINUTES         { return MINUTES; }
+MONTH           { return MONTH; }
+MONTHS          { return MONTHS; }
 NATURAL         { return NATURAL; }
 NULL            { return NULLABLE; }
 NOT             { return NOT; }
@@ -86,6 +96,8 @@ PRIMARY         { return PRIMARY; }
 REAL            { return REAL; }
 RIGHT           { return RIGHT; }
 SCHEMA          { return SCHEMA; }
+SECOND          { return SECOND; }
+SECONDS         { return SECONDS; }
 SELECT          { return SELECT; }
 SET             { return SET; }
 SHOW            { return SHOW; }
@@ -95,6 +107,7 @@ TIMESTAMP       { return TIMESTAMP; }
 TO              { return TO; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
+TRUE            { return TRUE; }
 TINYINT         { return TINYINT; }
 UNIQUE          { return UNIQUE; }
 UPDATE          { return UPDATE; }
@@ -103,6 +116,8 @@ VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
 WHERE           { return WHERE; }
 WITH            { return WITH; }
+YEAR            { return YEAR; }
+YEARS           { return YEARS; }
 
 [-+*/(){},.;<>=^%:?[\]|]    { return yytext[0]; }
 
