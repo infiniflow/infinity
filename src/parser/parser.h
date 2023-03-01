@@ -203,7 +203,9 @@ struct SQL_LTYPE {
     MONTHS = 350,                  /* MONTHS  */
     YEAR = 351,                    /* YEAR  */
     YEARS = 352,                   /* YEARS  */
-    NUMBER = 353                   /* NUMBER  */
+    NUMBER = 353,                  /* NUMBER  */
+    OR = 354,                      /* OR  */
+    AND = 355                      /* AND  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -256,7 +258,7 @@ union SQLSTYPE
     CopyOption* copy_option_t;
     Vector<CopyOption*>* copy_option_array;
 
-#line 260 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 262 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

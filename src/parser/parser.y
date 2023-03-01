@@ -243,6 +243,23 @@ struct SQL_LTYPE {
 
 %type <bool_value>        if_not_exists if_exists distinct
 
+/*
+ * Operator precedence, low to high
+ */
+
+%left       OR
+%left       AND
+%right      NOT
+
+%nonassoc   IS
+%left       '+' '-'
+%left       '*' '/' '%'
+
+%left       '[' ']'
+%left       '(' ')'
+%left       '.'
+%left       JOIN
+
 %%
 
 input_pattern : statement_list semicolon {
@@ -965,18 +982,11 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->distinct_ = true;
     $$ = func_expr;
 }
-| '-' expr {
+| expr IS NOT NULLABLE {
     FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = strdup("-");
+    func_expr->func_name_ = strdup("is_not_null");
     func_expr->arguments_ = new Vector<ParsedExpr*>();
-    func_expr->arguments_->emplace_back($2);
-    $$ = func_expr;
-}
-| '+' expr {
-    FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = strdup("+");
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
-    func_expr->arguments_->emplace_back($2);
+    func_expr->arguments_->emplace_back($1);
     $$ = func_expr;
 }
 | expr IS NULLABLE {
@@ -986,12 +996,19 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($1);
     $$ = func_expr;
 }
-| expr IS NOT NULLABLE {
-    FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = strdup("is_not_null");
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
-    func_expr->arguments_->emplace_back($1);
-    $$ = func_expr;
+| '-' expr {
+  FunctionExpr* func_expr = new FunctionExpr();
+  func_expr->func_name_ = strdup("-");
+  func_expr->arguments_ = new Vector<ParsedExpr*>();
+  func_expr->arguments_->emplace_back($2);
+  $$ = func_expr;
+}
+| '+' expr {
+  FunctionExpr* func_expr = new FunctionExpr();
+  func_expr->func_name_ = strdup("+");
+  func_expr->arguments_ = new Vector<ParsedExpr*>();
+  func_expr->arguments_->emplace_back($2);
+  $$ = func_expr;
 }
 | expr '-' expr {
     FunctionExpr* func_expr = new FunctionExpr();
