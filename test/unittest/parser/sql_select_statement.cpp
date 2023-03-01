@@ -270,8 +270,6 @@ TEST_F(SelectStatementParsingTest, good_test2) {
         }
         result->Reset();
     }
-#endif
-#if 1
     {
         String input_sql = "SELECT a, AVG(b) AS c FROM t1 GROUP BY a HAVING AVG(b) < 3.2";
         parser->Parse(input_sql, result);
@@ -343,6 +341,69 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             auto* func_arg_col_expr =  (ColumnExpr *)func_arg_expr;
             EXPECT_EQ(func_arg_col_expr->names_.size(), 1);
             EXPECT_STREQ(func_arg_col_expr->names_[0], "b");
+        }
+    }
+
+    {
+        String input_sql = "SELECT a AS c FROM s1.t1;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_EQ(select_statement->where_expr_, nullptr);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->schema_name_, "s1");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t1");
+            }
+        }
+    }
+
+    {
+        String input_sql = "SELECT count(distinct a), count(b) AS c FROM s3.t2;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_EQ(select_statement->where_expr_, nullptr);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t2");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 2);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kFunction);
+                auto *func_expr = (FunctionExpr *) (*select_statement->select_list_)[0];
+                EXPECT_EQ(func_expr->func_name_, "count");
+                EXPECT_EQ(func_expr->distinct_, true);
+            }
+
+            {
+                EXPECT_EQ((*select_statement->select_list_)[1]->type_, ParsedExprType::kFunction);
+                auto *func_expr = (FunctionExpr *) (*select_statement->select_list_)[1];
+                EXPECT_EQ(func_expr->func_name_, "count");
+                EXPECT_EQ(func_expr->distinct_, false);
+            }
         }
     }
 #endif

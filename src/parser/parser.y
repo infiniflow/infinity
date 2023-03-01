@@ -756,6 +756,9 @@ select_clause_with_paren: '(' select_clause_without_paren ')' {
 }
 */
 
+/*
+select_without_paren:
+*/
 select_clause_without_paren: SELECT distinct expr_array from_clause where_clause group_by_clause having_clause {
     $$ = new SelectStatement();
     $$->select_list_ = $3;
@@ -769,7 +772,19 @@ select_clause_without_paren: SELECT distinct expr_array from_clause where_clause
         YYERROR;
     }
 }
+/*
+order_by : ORDER BY order_list {
+    $$ = $3;
+}
+| {
+    $$ = nullptr;
+}
 
+order_by_type: ASC {
+}
+| DESC {
+}
+*/
 distinct : DISTINCT {
     $$ = true;
 }
