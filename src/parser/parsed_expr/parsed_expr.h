@@ -12,13 +12,13 @@ namespace infinity {
 
 enum class ParsedExprType {
     kConstant,
-    kExprParameter,
-    kExprColumn,
-    kExprFunction,
-    kExprOperator,
-    kExprSubquery,
-    kExprCase,
-    kExprCast
+    kParameter,
+    kColumn,
+    kFunction,
+    kOperator,
+    kSubquery,
+    kCase,
+    kCast
 };
 
 class ParsedExpr {

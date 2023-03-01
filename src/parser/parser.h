@@ -203,9 +203,13 @@ struct SQL_LTYPE {
     MONTHS = 350,                  /* MONTHS  */
     YEAR = 351,                    /* YEAR  */
     YEARS = 352,                   /* YEARS  */
-    NUMBER = 353,                  /* NUMBER  */
-    OR = 354,                      /* OR  */
-    AND = 355                      /* AND  */
+    EQUAL = 353,                   /* EQUAL  */
+    NOT_EQ = 354,                  /* NOT_EQ  */
+    LESS_EQ = 355,                 /* LESS_EQ  */
+    GREATER_EQ = 356,              /* GREATER_EQ  */
+    NUMBER = 357,                  /* NUMBER  */
+    OR = 358,                      /* OR  */
+    AND = 359                      /* AND  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -248,7 +252,7 @@ union SQLSTYPE
     TableConstraint*        table_constraint_t;
 
     BaseTableReference*     table_reference_t;
-    TableAlias*             table_alias_t;
+    TableAlias *            table_alias_t;
     JoinType                join_type_t;
 
     ParsedExpr*             expr_t;
@@ -258,7 +262,7 @@ union SQLSTYPE
     CopyOption* copy_option_t;
     Vector<CopyOption*>* copy_option_array;
 
-#line 262 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 266 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

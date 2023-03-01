@@ -7,28 +7,25 @@
 namespace infinity {
 
 FunctionExpr::~FunctionExpr() {
-    if(func_name_ != nullptr) {
-        free(func_name_);
-    }
     if(arguments_ != nullptr) {
-        for (ParsedExpr *expr_ptr: *arguments_) {
-            free(expr_ptr);
+        for (auto& expr_ptr: *arguments_) {
+            delete expr_ptr;
         }
+        delete arguments_;
+        arguments_ = nullptr;
     }
 }
 
 String FunctionExpr::ToString() const {
     std::stringstream ss;
-    if(func_name_ != nullptr) {
-        ss << func_name_ << '(';
-        if(arguments_ != nullptr) {
-            for (ParsedExpr *expr_ptr: *arguments_) {
-                ss << expr_ptr->ToString();
-            }
+    ss << func_name_ << '(';
+    if(arguments_ != nullptr) {
+        for (ParsedExpr *expr_ptr: *arguments_) {
+            ss << expr_ptr->ToString();
         }
-        ss << ')';
-        return ss.str();
     }
+    ss << ')';
+    return ss.str();
     PlannerError("Not reachable.")
 }
 

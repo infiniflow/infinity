@@ -11,7 +11,7 @@ namespace infinity {
 class ColumnExpr : public ParsedExpr {
 public:
     explicit
-    ColumnExpr() : ParsedExpr(ParsedExprType::kExprColumn) {}
+    ColumnExpr() : ParsedExpr(ParsedExprType::kColumn) {}
 
     ~ColumnExpr() override;
 

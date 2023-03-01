@@ -107,7 +107,7 @@ struct SQL_LTYPE {
     TableConstraint*        table_constraint_t;
 
     BaseTableReference*     table_reference_t;
-    TableAlias*             table_alias_t;
+    TableAlias *            table_alias_t;
     JoinType                join_type_t;
 
     ParsedExpr*             expr_t;
@@ -201,6 +201,7 @@ struct SQL_LTYPE {
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
 %token PRIMARY KEY UNIQUE NULLABLE IS
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
+%token EQUAL NOT_EQ LESS_EQ GREATER_EQ
 
 %token NUMBER
 
@@ -250,6 +251,9 @@ struct SQL_LTYPE {
 %left       OR
 %left       AND
 %right      NOT
+
+%nonassoc   '=' EQUAL NOT_EQ
+%nonassoc   '<' '>' LESS_EQ GREATER_EQ
 
 %nonassoc   IS
 %left       '+' '-'
@@ -863,10 +867,8 @@ table_alias : AS IDENTIFIER {
     $$->alias_ = $2;
     $$->column_alias_array_ = $4;
 }
-/* no table alias */
-| IDENTIFIER {
-    $$ = new TableAlias();
-    $$->alias_ = $1;
+| {
+    $$ = nullptr;
 }
 
 /*
@@ -947,10 +949,10 @@ expr_array : expr_alias {
     $$ = $1;
 };
 
-expr_alias : expr IDENTIFIER {
+expr_alias : expr AS IDENTIFIER {
     $$ = $1;
-    $$->alias_ = $2;
-    free($2);
+    $$->alias_ = $3;
+    free($3);
 }
 | expr {
     $$ = $1;
@@ -966,53 +968,56 @@ expr : '(' expr ')' {
 function_expr : IDENTIFIER '(' ')' {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = $1;
+    free($1);
     func_expr->arguments_ = nullptr;
     $$ = func_expr;
 }
 | IDENTIFIER '(' expr_array ')' {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = $1;
+    free($1);
     func_expr->arguments_ = $3;
     $$ = func_expr;
 }
 | IDENTIFIER '(' DISTINCT expr_array ')' {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = $1;
+    free($1);
     func_expr->arguments_ = $4;
     func_expr->distinct_ = true;
     $$ = func_expr;
 }
 | expr IS NOT NULLABLE {
     FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = strdup("is_not_null");
+    func_expr->func_name_ = "is_not_null";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     $$ = func_expr;
 }
 | expr IS NULLABLE {
     FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = strdup("is_null");
+    func_expr->func_name_ = "is_null";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     $$ = func_expr;
 }
 | '-' expr {
   FunctionExpr* func_expr = new FunctionExpr();
-  func_expr->func_name_ = strdup("-");
+  func_expr->func_name_ = "-";
   func_expr->arguments_ = new Vector<ParsedExpr*>();
   func_expr->arguments_->emplace_back($2);
   $$ = func_expr;
 }
 | '+' expr {
   FunctionExpr* func_expr = new FunctionExpr();
-  func_expr->func_name_ = strdup("+");
+  func_expr->func_name_ = "+";
   func_expr->arguments_ = new Vector<ParsedExpr*>();
   func_expr->arguments_->emplace_back($2);
   $$ = func_expr;
 }
 | expr '-' expr {
     FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = strdup("-");
+    func_expr->func_name_ = "-";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
@@ -1020,7 +1025,7 @@ function_expr : IDENTIFIER '(' ')' {
 }
 | expr '+' expr {
     FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = strdup("+");
+    func_expr->func_name_ = "+";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
@@ -1028,7 +1033,7 @@ function_expr : IDENTIFIER '(' ')' {
 }
 | expr '*' expr {
     FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = strdup("*");
+    func_expr->func_name_ = "*";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
@@ -1036,7 +1041,7 @@ function_expr : IDENTIFIER '(' ')' {
 }
 | expr '/' expr {
     FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = strdup("/");
+    func_expr->func_name_ = "/";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
@@ -1044,7 +1049,63 @@ function_expr : IDENTIFIER '(' ')' {
 }
 | expr '%' expr {
     FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = strdup("%");
+    func_expr->func_name_ = "%";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| expr '=' expr {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "=";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| expr EQUAL expr {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "=";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| expr NOT_EQ expr {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "<>";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| expr '<' expr {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "<";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| expr '>' expr {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = ">";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| expr LESS_EQ expr {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "<=";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| expr GREATER_EQ expr {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = ">=";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);

@@ -119,7 +119,7 @@
   hsql::TransactionStatement* transaction_stmt;
   hsql::UpdateStatement* update_stmt;
 
-  hsql::Alias* alias_t;
+  hsql::TableAlias* alias_t;
   hsql::AlterAction* alter_action_t;
   hsql::ColumnDefinition* column_t;
   hsql::ColumnType column_type_t;
@@ -1129,12 +1129,12 @@ table_name : IDENTIFIER {
 opt_index_name : IDENTIFIER { $$ = $1; }
 | /* empty */ { $$ = nullptr; };
 
-table_alias : alias | AS IDENTIFIER '(' ident_commalist ')' { $$ = new Alias($2, $4); };
+table_alias : alias | AS IDENTIFIER '(' ident_commalist ')' { $$ = new TableAlias($2, $4); };
 
 opt_table_alias : table_alias | /* empty */ { $$ = nullptr; };
 
-alias : AS IDENTIFIER { $$ = new Alias($2); }
-| IDENTIFIER { $$ = new Alias($1); };
+alias : AS IDENTIFIER { $$ = new TableAlias($2); }
+| IDENTIFIER { $$ = new TableAlias($1); };
 
 opt_alias : alias | /* empty */ { $$ = nullptr; };
 

@@ -119,6 +119,12 @@ WITH            { return WITH; }
 YEAR            { return YEAR; }
 YEARS           { return YEARS; }
 
+"=="            { return EQUAL; }
+"!="            { return NOT_EQ; }
+"<>"            { return NOT_EQ; }
+"<="            { return LESS_EQ; }
+">="            { return GREATER_EQ; }
+
 [-+*/(){},.;<>=^%:?[\]|]    { return yytext[0]; }
 
 [0-9]+"."[0-9]* |
@@ -134,6 +140,11 @@ YEARS           { return YEARS; }
         return fprintf(stderr, "[SQL-Lexer-Error] Integer cannot be parsed - is it out of range?");
         return 0;
     }
+    return LONG_VALUE;
+}
+
+-9223372036854775808 {
+    yylval->long_value = LONG_MIN;
     return LONG_VALUE;
 }
 

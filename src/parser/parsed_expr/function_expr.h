@@ -11,7 +11,7 @@ namespace infinity {
 class FunctionExpr : public ParsedExpr {
 public:
     explicit
-    FunctionExpr() : ParsedExpr(ParsedExprType::kExprFunction) {}
+    FunctionExpr() : ParsedExpr(ParsedExprType::kFunction) {}
 
     ~FunctionExpr() override;
 
@@ -19,7 +19,7 @@ public:
     ToString() const override;
 
 public:
-    char* func_name_{nullptr};
+    String func_name_{};
     Vector<ParsedExpr*> *arguments_{nullptr};
     bool distinct_{false};
 };
