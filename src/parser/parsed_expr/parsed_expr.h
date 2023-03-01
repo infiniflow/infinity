@@ -33,7 +33,7 @@ public:
     ToString() const = 0;
 
     ParsedExprType type_;
-    char* alias_{nullptr};
+    String alias_{};
 };
 
 }

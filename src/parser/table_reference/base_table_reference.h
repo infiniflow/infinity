@@ -16,7 +16,7 @@ public:
     ~TableAlias();
 
     char *alias_{};
-    Vector<char*>* column_alias_array_{nullptr};
+    Vector<String>* column_alias_array_{nullptr};
 };
 
 enum class TableRefType {

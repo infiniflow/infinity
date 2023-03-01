@@ -11,6 +11,7 @@ void yyerror(YYLTYPE * llocp, void* lexer, ParserResult* result, const char* msg
 %code requires {
 
 #include "statement.h"
+#include "expression.h"
 #include "parser_result.h"
 #include "defer_operation.h"
 #include "parser/table_reference/join_reference.h"
@@ -49,7 +50,6 @@ struct SQL_LTYPE {
             yylloc->last_column++;                  \
         }                                         \
     }
-
 }
 
 
@@ -73,7 +73,6 @@ struct SQL_LTYPE {
   @$.total_column = 0;
   @$.string_length = 0;
 };
-
 
 %union {
     bool    bool_value;
@@ -111,7 +110,7 @@ struct SQL_LTYPE {
     TableAlias*             table_alias_t;
     JoinType                join_type_t;
 
-    ParsedExpr*             parsed_expr_t;
+    ParsedExpr*             expr_t;
     Vector<ParsedExpr*>*    expr_array_t;
 
     TableName* table_name_t;
@@ -176,7 +175,7 @@ struct SQL_LTYPE {
 
 %destructor {
     delete ($$);
-} <parsed_expr_t>
+} <expr_t>
 
 %destructor {
     fprintf(stderr, "destroy table alias\n");
@@ -213,6 +212,7 @@ struct SQL_LTYPE {
 %type <drop_stmt>         drop_statement
 %type <copy_stmt>         copy_statement
 %type <show_stmt>         show_statement
+%type <select_stmt>       select_clause_without_paren
 
 %type <stmt_array>        statement_list
 
@@ -224,12 +224,13 @@ struct SQL_LTYPE {
 %type <column_constraint_t>     column_constraint
 %type <column_constraints_t>    column_constraints
 
-%type <table_reference_t>       table_reference table_reference_unit table_reference_name
+%type <table_reference_t>       table_reference table_reference_unit table_reference_name from_clause join_clause
 %type <table_alias_t>           table_alias
 %type <join_type_t>             join_type
 
-%type <parsed_expr_t>           expr constant_expr interval_expr column_expr function_expr
-%type <expr_array_t>            expr_array
+%type <expr_t>                  expr expr_alias constant_expr interval_expr column_expr function_expr
+%type <expr_t>                  having_clause where_clause
+%type <expr_array_t>            expr_array group_by_clause
 
 %type <table_element_array_t>   table_element_array
 
@@ -240,8 +241,7 @@ struct SQL_LTYPE {
 %type <str_value>         file_path
 
 
-%type <bool_value>        if_not_exists
-%type <bool_value>        if_exists
+%type <bool_value>        if_not_exists if_exists distinct
 
 %%
 
@@ -265,7 +265,8 @@ statement_list : statement {
 statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
 | copy_statement { $$ = $1; }
-| show_statement { $$ = $1; };
+| show_statement { $$ = $1; }
+| select_clause_without_paren { $$ = $1; };
 
 /*
  * CREATE STATEMENT
@@ -734,27 +735,53 @@ select_clause_with_paren: '(' select_clause_without_paren ')' {
 }
 */
 
-select_clause_without_paren: SELECT select_list from_clause where_clause group_by_clause {
+select_clause_without_paren: SELECT distinct expr_array from_clause where_clause group_by_clause having_clause {
+    $$ = new SelectStatement();
+    $$->select_list_ = $3;
+    $$->select_distinct_ = $2;
+    $$->table_ref_ = $4;
+    $$->where_expr_ = $5;
+    $$->group_by_list_ = $6;
+    $$->having_expr_ = $7;
+    if($$->group_by_list_ == nullptr && $$->having_expr_ != nullptr) {
+        yyerror(&yyloc, scanner, result, "HAVING clause should follow after GROUP BY clause");
+        YYERROR;
+    }
 }
 
-select_list : DISTINCT expr_array {
+distinct : DISTINCT {
+    $$ = true;
+}
+| {
+    $$ = false;
 }
 
 from_clause: FROM table_reference {
+    $$ = $2;
 }
 | /* no from clause */ {
+    $$ = nullptr;
 }
 
 where_clause: WHERE expr {
+    $$ = $2;
 }
 | /* no where clause */ {
+    $$ = nullptr;
 }
 
-group_by_clause: GROUP BY expr_array HAVING expr {
+having_clause: HAVING expr {
+    $$ = $2;
 }
-| GROUP BY expr_array {
+| /* no where clause */ {
+    $$ = nullptr;
 }
-| /* No group by clause */ {
+
+group_by_clause: GROUP BY expr_array {
+    $$ = $3;
+}
+| {
+    $$ = nullptr;
 }
 
 /*
@@ -765,22 +792,28 @@ table_reference : table_reference_unit {
     $$ = $1;
 }
 | table_reference ',' table_reference_unit {
+    CrossProductReference* cross_product_ref = new CrossProductReference();
+    cross_product_ref->left_ = $1;
+    cross_product_ref->right_ = $3;
+
+    $$ = cross_product_ref;
 };
 
 
 table_reference_unit : table_reference_name | join_clause;
 
 table_reference_name : table_name table_alias {
-    $$ = new TableReference();
+    TableReference* table_ref = new TableReference();
     if($1->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $1->schema_name_ptr_;
+        table_ref->schema_name_ = $1->schema_name_ptr_;
         free($1->schema_name_ptr_);
     }
-    $$->table_name_ = $1->table_name_ptr_;
+    table_ref->table_name_ = $1->table_name_ptr_;
     free($1->table_name_ptr_);
     delete $1;
 
-    $$->alias_ = $2;
+    table_ref->alias_ = $2;
+    $$ = table_ref;
 }
 /* FROM (select * from t1) AS t2 */
 /*
@@ -811,7 +844,7 @@ table_alias : AS IDENTIFIER {
 | AS IDENTIFIER '(' identifier_array ')' {
     $$ = new TableAlias();
     $$->alias_ = $2;
-    $$->column_alias_array_ = identifier_array;
+    $$->column_alias_array_ = $4;
 }
 /* no table alias */
 | IDENTIFIER {
@@ -824,13 +857,25 @@ table_alias : AS IDENTIFIER {
  */
 
 join_clause: table_reference_unit NATURAL JOIN table_reference_name {
+    JoinReference* join_reference = new JoinReference();
+    join_reference->left_ = $1;
+    join_reference->right_ = $4;
+    join_reference->join_type_ = JoinType::kNatural;
+    $$ = join_reference;
 }
 | table_reference_unit join_type JOIN table_reference_name ON expr {
-}
+    JoinReference* join_reference = new JoinReference();
+    join_reference->left_ = $1;
+    join_reference->right_ = $4;
+    join_reference->join_type_ = $2;
+    join_reference->condition_ = $6;
+    $$ = join_reference;
+};
 /* Using column name to JOIN
-table_reference_unit join_type JOIN table_reference_name USING '(' column_name ')' {
+| table_reference_unit join_type JOIN table_reference_name USING '(' column_name ')' {
 }
 */
+
 
 join_type : INNER {
     $$ = JoinType::kInner;
@@ -870,221 +915,256 @@ show_statement: SHOW TABLES {
     $$->table_name_ = $2->table_name_ptr_;
     free($2->table_name_ptr_);
     delete $2;
-}
+};
 
 /*
  * EXPRESSION
  */
 
 expr_array : expr_alias {
+    $$ = new Vector<ParsedExpr*>();
+    $$->emplace_back($1);
 }
 | expr_array ',' expr_alias {
-}
+    $1->emplace_back($3);
+    $$ = $1;
+};
 
 expr_alias : expr IDENTIFIER {
+    $$ = $1;
+    $$->alias_ = $2;
+    free($2);
 }
 | expr {
-}
+    $$ = $1;
+};
 
-expr :
-| '(' expr ')' {
+expr : '(' expr ')' {
       $$ = $2;
 }
 | constant_expr
 | column_expr
-| function_expr
+| function_expr;
 
 function_expr : IDENTIFIER '(' ')' {
-    $$ = new FunctionExpr();
-    $$->func_name_ = $1;
-    $$->arguments_ = nullptr;
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = $1;
+    func_expr->arguments_ = nullptr;
+    $$ = func_expr;
 }
 | IDENTIFIER '(' expr_array ')' {
-    $$ = new FunctionExpr();
-    $$->func_name_ = $1;
-    $$->arguments_ = $3;
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = $1;
+    func_expr->arguments_ = $3;
+    $$ = func_expr;
 }
 | IDENTIFIER '(' DISTINCT expr_array ')' {
-    $$ = new FunctionExpr();
-    $$->func_name_ = $1;
-    $$->arguments_ = $4;
-    $$->distinct_ = true;
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = $1;
+    func_expr->arguments_ = $4;
+    func_expr->distinct_ = true;
+    $$ = func_expr;
 }
 | '-' expr {
-    $$ = new FunctionExpr();
-    $$->func_name_ = strdup("-");
-    $$->arguments_ = new Vector<ParsedExpr*>();
-    $$->arguments_->emplace_back($2);
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = strdup("-");
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($2);
+    $$ = func_expr;
 }
 | '+' expr {
-    $$ = new FunctionExpr();
-    $$->func_name_ = strdup("+");
-    $$->arguments_ = new Vector<ParsedExpr*>();
-    $$->arguments_->emplace_back($2);
-}
-| NOT expr {
-    $$ = new FunctionExpr();
-    $$->func_name_ = strdup("not");
-    $$->arguments_ = new Vector<ParsedExpr*>();
-    $$->arguments_->emplace_back($2);
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = strdup("+");
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($2);
+    $$ = func_expr;
 }
 | expr IS NULLABLE {
-    $$ = new FunctionExpr();
-    $$->func_name_ = strdup("is_null");
-    $$->arguments_ = new Vector<ParsedExpr*>();
-    $$->arguments_->emplace_back($1);
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = strdup("is_null");
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    $$ = func_expr;
 }
 | expr IS NOT NULLABLE {
-    $$ = new FunctionExpr();
-    $$->func_name_ = strdup("is_not_null");
-    $$->arguments_ = new Vector<ParsedExpr*>();
-    $$->arguments_->emplace_back($1);
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = strdup("is_not_null");
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    $$ = func_expr;
 }
 | expr '-' expr {
-    $$ = new FunctionExpr();
-    $$->func_name_ = strdup("-");
-    $$->arguments_ = new Vector<ParsedExpr*>();
-    $$->arguments_->emplace_back($1);
-    $$->arguments_->emplace_back($3);
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = strdup("-");
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
 }
 | expr '+' expr {
-    $$ = new FunctionExpr();
-    $$->func_name_ = strdup("-");
-    $$->arguments_ = new Vector<ParsedExpr*>();
-    $$->arguments_->emplace_back($1);
-    $$->arguments_->emplace_back($3);
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = strdup("+");
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
 }
 | expr '*' expr {
-    $$ = new FunctionExpr();
-    $$->func_name_ = strdup("*");
-    $$->arguments_ = new Vector<ParsedExpr*>();
-    $$->arguments_->emplace_back($1);
-    $$->arguments_->emplace_back($3);
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = strdup("*");
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
 }
 | expr '/' expr {
-    $$ = new FunctionExpr();
-    $$->func_name_ = strdup("/");
-    $$->arguments_ = new Vector<ParsedExpr*>();
-    $$->arguments_->emplace_back($1);
-    $$->arguments_->emplace_back($3);
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = strdup("/");
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
 }
 | expr '%' expr {
-    $$ = new FunctionExpr();
-    $$->func_name_ = strdup("%");
-    $$->arguments_ = new Vector<ParsedExpr*>();
-    $$->arguments_->emplace_back($1);
-    $$->arguments_->emplace_back($3);
-}
-
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = strdup("%");
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+};
 
 column_expr : IDENTIFIER {
-    $$ = new ColumnExpr()
-    $$->names_.emplace_back($1);
+    ColumnExpr* column_expr = new ColumnExpr();
+    column_expr->names_.emplace_back($1);
+    $$ = column_expr;
 }
 | column_expr '.' IDENTIFIER {
-    $1->names_.emplace_back($3);
-    $$ = $1;
+    ColumnExpr* column_expr = (ColumnExpr*)$1;
+    column_expr->names_.emplace_back($3);
+    $$ = column_expr;
 }
 | '*' {
-    $$ = new ColumnExpr();
-    $$->star_ = true;
+    ColumnExpr* column_expr = new ColumnExpr();
+    column_expr->star_ = true;
+    $$ = column_expr;
 }
 | column_expr '.' '*' {
-    if($$->star_) {
+    ColumnExpr* column_expr = (ColumnExpr*)$1;
+    if(column_expr->star_) {
         yyerror(&yyloc, scanner, result, "Invalid column expression format");
         YYERROR;
     }
-    $$->star_ = true;
-}
+    column_expr->star_ = true;
+    $$ = column_expr;
+};
 
 constant_expr: STRING {
-    $$ = new ConstantExpr(LiteralType::kString);
-    $$->str_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kString);
+    const_expr->str_value_ = $1;
+    $$ = const_expr;
 }
 | TRUE {
-    $$ = new ConstantExpr(LiteralType::kBoolean);
-    $$->bool_value_ = true;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kBoolean);
+    const_expr->bool_value_ = true;
+    $$ = const_expr;
 }
 | FALSE {
-    $$ = new ConstantExpr(LiteralType::kBoolean);
-    $$->bool_value_ = false;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kBoolean);
+    const_expr->bool_value_ = false;
+    $$ = const_expr;
 }
 | DOUBLE_VALUE {
-    $$ = new ConstantExpr(LiteralType::kFloat);
-    $$->float_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kFloat);
+    const_expr->float_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE {
-    $$ = new ConstantExpr(LiteralType::kInteger);
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInteger);
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | DATE STRING {
-    $$ = new ConstantExpr(LiteralType::kDate);
-    $$->date_value_ = $2;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kDate);
+    const_expr->date_value_ = $2;
+    $$ = const_expr;
 }
 | INTERVAL interval_expr {
-    $$ = $2
-}
+    $$ = $2;
+};
 
 interval_expr: LONG_VALUE SECONDS {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kSecond;
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kSecond;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE SECOND {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kSecond;
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kSecond;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE MINUTES {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kMinute;
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kMinute;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE MINUTE {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kMinute;
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kMinute;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE HOURS {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kHour
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kHour;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE HOUR {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kHour;
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kHour;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE DAYS {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kDay;
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kDay;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE DAY {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kDay;
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kDay;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE MONTHS {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kMonth;
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kMonth;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE MONTH {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kMonth;
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kMonth;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE YEARS {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kYear;
-    $$->integer_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kYear;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
 }
 | LONG_VALUE YEAR {
-    $$ = new ConstantExpr(LiteralType::kInterval);
-    $$->interval_type_ = IntervalExprType::kYear;
-    $$->integer_value_ = $1;
-}
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
+    const_expr->interval_type_ = IntervalExprType::kYear;
+    const_expr->integer_value_ = $1;
+    $$ = const_expr;
+};
 
 /*
  * Misc.

@@ -13,9 +13,6 @@ TableAlias::~TableAlias() {
         alias_ = nullptr;
     }
     if(column_alias_array_ != nullptr) {
-        for(auto column_alias_ptr: *column_alias_array_) {
-            free(column_alias_ptr);
-        }
         delete column_alias_array_;
     }
 }

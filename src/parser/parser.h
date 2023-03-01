@@ -57,6 +57,7 @@ extern int sqldebug;
 
 
 #include "statement.h"
+#include "expression.h"
 #include "parser_result.h"
 #include "defer_operation.h"
 #include "parser/table_reference/join_reference.h"
@@ -95,7 +96,6 @@ struct SQL_LTYPE {
             yylloc->last_column++;                  \
         }                                         \
     }
-
 
 #line 101 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
@@ -212,7 +212,7 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 78 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 77 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -249,7 +249,7 @@ union SQLSTYPE
     TableAlias*             table_alias_t;
     JoinType                join_type_t;
 
-    ParsedExpr*             parsed_expr_t;
+    ParsedExpr*             expr_t;
     Vector<ParsedExpr*>*    expr_array_t;
 
     TableName* table_name_t;
