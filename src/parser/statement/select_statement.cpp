@@ -38,6 +38,32 @@ SelectStatement::~SelectStatement() {
         delete having_expr_;
         having_expr_ = nullptr;
     }
+
+    if(order_by_list != nullptr) {
+        for(auto& expr_ptr: *order_by_list) {
+            delete expr_ptr;
+        }
+        delete order_by_list;
+        order_by_list = nullptr;
+    }
+
+    if(limit_expr_ != nullptr) {
+        delete limit_expr_;
+        limit_expr_ = nullptr;
+    }
+
+    if(offset_expr_ != nullptr) {
+        delete offset_expr_;
+        offset_expr_ = nullptr;
+    }
+
+    if(with_exprs_ != nullptr) {
+        for(auto& with_expr_ptr: *with_exprs_) {
+            delete with_expr_ptr;
+        }
+        delete with_exprs_;
+        with_exprs_ = nullptr;
+    }
 }
 
 String

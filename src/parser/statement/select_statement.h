@@ -13,6 +13,31 @@
 
 namespace infinity {
 
+class SelectStatement;
+
+struct WithExpr {
+    ~WithExpr() {
+        if(statement_ != nullptr) {
+            delete statement_;
+        }
+    }
+    String alias_{};
+    BaseStatement* statement_{};
+};
+
+enum OrderType {
+    kAsc,
+    kDesc
+};
+
+struct OrderByExpr {
+    ~OrderByExpr() {
+        delete expr_;
+    }
+    ParsedExpr* expr_{};
+    OrderType type_{OrderType::kAsc};
+};
+
 class SelectStatement : public BaseStatement {
 public:
     SelectStatement() : BaseStatement(StatementType::kSelect) {}
@@ -28,6 +53,10 @@ public:
     ParsedExpr* where_expr_{nullptr};
     Vector<ParsedExpr*>* group_by_list_{nullptr};
     ParsedExpr* having_expr_{nullptr};
+    Vector<OrderByExpr*>* order_by_list{nullptr};
+    ParsedExpr*         limit_expr_{nullptr};
+    ParsedExpr*         offset_expr_{nullptr};
+    Vector<WithExpr*>*  with_exprs_{nullptr};
 };
 
 }

@@ -110,6 +110,13 @@ struct SQL_LTYPE {
     TableAlias *            table_alias_t;
     JoinType                join_type_t;
 
+    OrderByExpr*            order_by_expr_t;
+    Vector<OrderByExpr*>*   order_by_expr_list_t;
+    OrderType               order_by_type_t;
+
+    WithExpr*               with_expr_t;
+    Vector<WithExpr*>*      with_expr_list_t;
+
     ParsedExpr*             expr_t;
     Vector<ParsedExpr*>*    expr_array_t;
 
@@ -147,6 +154,26 @@ struct SQL_LTYPE {
         delete ($$);
     }
 } <expr_array_t>
+
+%destructor {
+    fprintf(stderr, "destroy order by expr list\n");
+    if (($$) != nullptr) {
+        for (auto ptr : *($$)) {
+            delete ptr;
+        }
+        delete ($$);
+    }
+} <order_by_expr_list_t>
+
+%destructor {
+    fprintf(stderr, "destroy with expr list\n");
+    if (($$) != nullptr) {
+        for (auto ptr : *($$)) {
+            delete ptr;
+        }
+        delete ($$);
+    }
+} <with_expr_list_t>
 
 %destructor {
     fprintf(stderr, "destroy table name\n");
@@ -187,6 +214,18 @@ struct SQL_LTYPE {
     delete ($$);
 } <table_reference_t>
 
+%destructor {
+    fprintf(stderr, "destroy order by expr\n");
+    delete $$->expr_;
+    delete $$;
+} <order_by_expr_t>
+
+%destructor {
+    fprintf(stderr, "destroy with expr\n");
+    delete $$->statement_;
+    delete $$;
+} <with_expr_t>
+
 %token <str_value>      IDENTIFIER STRING
 %token <double_value>   DOUBLE_VALUE
 %token <long_value>     LONG_VALUE
@@ -195,7 +234,7 @@ struct SQL_LTYPE {
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE
 %token SCHEMA TABLE COLLECTION TABLES
-%token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE
+%token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS FROM TO WITH DELIMITER FORMAT HEADER
 %token BOOLEAN INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
@@ -207,13 +246,12 @@ struct SQL_LTYPE {
 
 /* nonterminal symbol */
 
-
 %type <base_stmt>         statement
 %type <create_stmt>       create_statement
 %type <drop_stmt>         drop_statement
 %type <copy_stmt>         copy_statement
 %type <show_stmt>         show_statement
-%type <select_stmt>       select_clause_without_paren
+%type <select_stmt>       select_clause select_without_paren select_with_paren select_statement
 
 %type <stmt_array>        statement_list
 
@@ -228,9 +266,14 @@ struct SQL_LTYPE {
 %type <table_reference_t>       table_reference table_reference_unit table_reference_name from_clause join_clause
 %type <table_alias_t>           table_alias
 %type <join_type_t>             join_type
+%type <order_by_type_t>         order_by_type
+%type <order_by_expr_t>         order_by_expr
+%type <order_by_expr_list_t>    order_by_expr_list order_by_clause
+%type <with_expr_t>             with_expr
+%type <with_expr_list_t>        with_expr_list with_clause
 
 %type <expr_t>                  expr expr_alias constant_expr interval_expr column_expr function_expr
-%type <expr_t>                  having_clause where_clause
+%type <expr_t>                  having_clause where_clause limit_expr offset_expr
 %type <expr_array_t>            expr_array group_by_clause
 
 %type <table_element_array_t>   table_element_array
@@ -287,7 +330,8 @@ statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
 | copy_statement { $$ = $1; }
 | show_statement { $$ = $1; }
-| select_clause_without_paren { $$ = $1; };
+/* | select_clause { $$ = $1; } */
+| select_statement { $$ = $1; };
 
 /*
  * CREATE STATEMENT
@@ -732,34 +776,28 @@ set_operator : UNION {
 /*
  * SELECT STATEMENT
  */
-
-/*
-select_statement: select_statement_with_paren {
+select_statement : select_without_paren {
+    $$ = $1;
 }
-| '(' select_statement_with_paren ')' {
+| select_with_paren {
+    $$ = $1;
+};
+
+select_with_paren : '(' select_without_paren ')' {
+    $$ = $2;
 }
+| '(' select_with_paren ')' {
+    $$ = $2;
+};
 
-select_statement_with_paren: '(' select_statement_without_paren ')' {
-}
+select_without_paren: with_clause select_clause  {
+    $2->with_exprs_ = $1;
 
-select_statement_without_paren: with_clause select_clause order_clause limit_clause {
-}
+    $$ = $2;
+};
 
-select_clause : select_clause_with_paren {
-
-}
-| '(' select_clause_with_paren ')' {
-
-}
-
-select_clause_with_paren: '(' select_clause_without_paren ')' {
-}
-*/
-
-/*
-select_without_paren:
-*/
-select_clause_without_paren: SELECT distinct expr_array from_clause where_clause group_by_clause having_clause {
+select_clause:
+SELECT distinct expr_array from_clause where_clause group_by_clause having_clause order_by_clause limit_expr offset_expr {
     $$ = new SelectStatement();
     $$->select_list_ = $3;
     $$->select_distinct_ = $2;
@@ -767,24 +805,56 @@ select_clause_without_paren: SELECT distinct expr_array from_clause where_clause
     $$->where_expr_ = $5;
     $$->group_by_list_ = $6;
     $$->having_expr_ = $7;
+    $$->order_by_list = $8;
+    $$->limit_expr_ = $9;
+    $$->offset_expr_ = $10;
     if($$->group_by_list_ == nullptr && $$->having_expr_ != nullptr) {
         yyerror(&yyloc, scanner, result, "HAVING clause should follow after GROUP BY clause");
         YYERROR;
     }
-}
-/*
-order_by : ORDER BY order_list {
+};
+
+order_by_clause : ORDER BY order_by_expr_list {
     $$ = $3;
 }
-| {
+| /* empty order by */ {
     $$ = nullptr;
+};
+
+order_by_expr_list: order_by_expr {
+    $$ = new Vector<OrderByExpr*>();
+    $$->emplace_back($1);
+}
+| order_by_expr_list ',' order_by_expr {
+    $1->emplace_back($3);
+    $$ = $1;
 }
 
+order_by_expr : expr order_by_type {
+    $$ = new OrderByExpr();
+    $$->expr_ = $1;
+    $$->type_ = $2;
+};
+
 order_by_type: ASC {
+    $$ = kAsc;
 }
 | DESC {
+    $$ = kDesc;
+};
+
+limit_expr: LIMIT expr {
+    $$ = $2;
 }
-*/
+| /* empty limit expression */
+{   $$ = nullptr; };
+
+offset_expr: OFFSET expr {
+    $$ = $2;
+}
+| /* empty offset expression */
+{   $$ = nullptr; };
+
 distinct : DISTINCT {
     $$ = true;
 }
@@ -885,6 +955,38 @@ table_alias : AS IDENTIFIER {
 | {
     $$ = nullptr;
 }
+
+/*
+ * WITH CLAUSE
+ */
+with_clause : WITH with_expr_list {
+    $$ = $2;
+}
+| /* empty with clause */ {
+    $$ = nullptr;
+}
+
+with_expr_list: with_expr {
+    $$ = new Vector<WithExpr*>();
+    $$->emplace_back($1);
+} | with_expr_list ',' with_expr {
+    $1->emplace_back($3);
+    $$ = $1;
+}
+
+with_expr: IDENTIFIER AS '(' select_clause ')' {
+    $$ = new WithExpr();
+    $$->alias_ = $1;
+    free($1);
+    $$->statement_ = $4;
+}
+/*
+| IDENTIFIER AS set_statement {
+    $$ = new WithExpr();
+    $$->alias_ = $1;
+    $$->statement_ = $3;
+}
+*/
 
 /*
  * JOIN CLAUSE

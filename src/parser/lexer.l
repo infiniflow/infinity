@@ -30,6 +30,7 @@ static thread_local std::stringstream string_buffer;
 
 ALTER           { return ALTER; }
 AS              { return AS; }
+ASC             { return ASC; }
 BIGINT          { return BIGINT; }
 BIT             { return BIT; }
 BITMAP          { return BITMAP; }
@@ -53,6 +54,7 @@ DECIMAL         { return DECIMAL; }
 DELETE          { return DELETE; }
 DELIMITER       { return DELIMITER; }
 DESCRIBE        { return DESCRIBE; }
+DESC            { return DESC; }
 DROP            { return DROP; }
 EMBEDDING       { return EMBEDDING; }
 EXECUTE         { return EXECUTE; }
@@ -77,6 +79,7 @@ INTEGER         { return INTEGER; }
 JOIN            { return JOIN; }
 KEY             { return KEY; }
 LEFT            { return LEFT; }
+LIMIT           { return LIMIT; }
 LINE            { return LINE; }
 LSEG            { return LSEG; }
 MINUTE          { return MINUTE; }
@@ -86,7 +89,9 @@ MONTHS          { return MONTHS; }
 NATURAL         { return NATURAL; }
 NULL            { return NULLABLE; }
 NOT             { return NOT; }
+OFFSET          { return OFFSET; }
 ON              { return ON; }
+ORDER           { return ORDER; }
 OUTER           { return OUTER; }
 PATH            { return PATH; }
 POINT           { return POINT; }
