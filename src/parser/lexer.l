@@ -31,6 +31,7 @@ static thread_local std::stringstream string_buffer;
 ALL             { return ALL; }
 ALTER           { return ALTER; }
 AS              { return AS; }
+AST             { return AST; }
 ASC             { return ASC; }
 BIGINT          { return BIGINT; }
 BIT             { return BIT; }
@@ -79,11 +80,13 @@ INNER           { return INNER; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }
 INTERSECT       { return INTERSECT; }
+INTO            { return INTO; }
 JOIN            { return JOIN; }
 KEY             { return KEY; }
 LEFT            { return LEFT; }
 LIMIT           { return LIMIT; }
 LINE            { return LINE; }
+LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
 MINUTE          { return MINUTE; }
 MINUTES         { return MINUTES; }
@@ -94,9 +97,12 @@ NULL            { return NULLABLE; }
 NOT             { return NOT; }
 OFFSET          { return OFFSET; }
 ON              { return ON; }
+OPT             { return OPT; }
 ORDER           { return ORDER; }
 OUTER           { return OUTER; }
 PATH            { return PATH; }
+PHYSICAL        { return PHYSICAL; }
+PIPELINE        { return PIPELINE; }
 POINT           { return POINT; }
 POLYGON         { return POLYGON; }
 PREPARE         { return PREPARE; }
@@ -119,8 +125,10 @@ TRUE            { return TRUE; }
 TINYINT         { return TINYINT; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
+UNOPT           { return UNOPT; }
 UPDATE          { return UPDATE; }
 UUID            { return UUID; }
+VALUES          { return VALUES; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
 WHERE           { return WHERE; }

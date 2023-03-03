@@ -5,11 +5,26 @@
 #pragma once
 
 #include "parser/base_statement.h"
+#include "parser/statement/select_statement.h"
 
 namespace infinity {
 
-class InsertStatement : public BaseStatement {
+class InsertStatement final : public BaseStatement {
+public:
+    InsertStatement() : BaseStatement(StatementType::kInsert) {}
 
+    ~InsertStatement() final;
+
+    [[nodiscard]] String
+    ToString() const final;
+
+    String schema_name_{};
+    String table_name_{};
+
+    Vector<String>*      columns_{nullptr};
+    Vector<ParsedExpr*>* values_{nullptr};
+
+    SelectStatement* select_{nullptr};
 };
 
 }

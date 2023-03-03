@@ -122,8 +122,13 @@ struct SQL_LTYPE {
 
     SetOperatorType         set_operator_t;
 
+    ExplainType             explain_type_t;
+
     ParsedExpr*             expr_t;
     Vector<ParsedExpr*>*    expr_array_t;
+
+    UpdateExpr*             update_expr_t;
+    Vector<UpdateExpr*>*    update_expr_array_t;
 
     TableName* table_name_t;
     CopyOption* copy_option_t;
@@ -169,6 +174,16 @@ struct SQL_LTYPE {
         delete ($$);
     }
 } <order_by_expr_list_t>
+
+%destructor {
+    fprintf(stderr, "destroy update expr array\n");
+    if (($$) != nullptr) {
+        for (auto ptr : *($$)) {
+            delete ptr;
+        }
+        delete ($$);
+    }
+} <update_expr_array_t>
 
 %destructor {
     fprintf(stderr, "destroy with expr list\n");
@@ -239,7 +254,7 @@ struct SQL_LTYPE {
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT
 %token EXCEPT
-%token SCHEMA TABLE COLLECTION TABLES
+%token SCHEMA TABLE COLLECTION TABLES INTO VALUES AST PIPELINE UNOPT OPT LOGICAL PHYSICAL
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS FROM TO WITH DELIMITER FORMAT HEADER
 %token BOOLEAN INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
@@ -252,7 +267,7 @@ struct SQL_LTYPE {
 
 /* nonterminal symbol */
 
-%type <base_stmt>         statement
+%type <base_stmt>         statement explainable_statement
 %type <create_stmt>       create_statement
 %type <drop_stmt>         drop_statement
 %type <copy_stmt>         copy_statement
@@ -260,13 +275,16 @@ struct SQL_LTYPE {
 %type <select_stmt>       select_clause_without_modifier select_without_paren select_with_paren select_statement
 %type <select_stmt>       select_clause_without_modifier_paren select_clause_with_modifier
 %type <delete_stmt>       delete_statement
+%type <update_stmt>       update_statement
+%type <insert_stmt>       insert_statement
+%type <explain_stmt>      explain_statement
 
 %type <stmt_array>        statement_list
 
 %type <table_element_t>         table_element
 %type <table_column_t>          table_column
 %type <column_type_t>           column_type
-%type <identifier_array_t>      identifier_array
+%type <identifier_array_t>      identifier_array optional_identifier_array
 %type <table_constraint_t>      table_constraint
 %type <column_constraint_t>     column_constraint
 %type <column_constraints_t>    column_constraints
@@ -280,10 +298,13 @@ struct SQL_LTYPE {
 %type <with_expr_t>             with_expr
 %type <with_expr_list_t>        with_expr_list with_clause
 %type <set_operator_t>          set_operator
+%type <explain_type_t>          explain_type
 
 %type <expr_t>                  expr expr_alias constant_expr interval_expr column_expr function_expr
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr
-%type <expr_array_t>            expr_array group_by_clause
+%type <expr_array_t>            expr_array group_by_clause constant_expr_array
+%type <update_expr_t>           update_expr;
+%type <update_expr_array_t>     update_expr_array;
 
 %type <table_element_array_t>   table_element_array
 
@@ -292,7 +313,6 @@ struct SQL_LTYPE {
 %type <copy_option_t>     copy_option
 
 %type <str_value>         file_path
-
 
 %type <bool_value>        if_not_exists if_exists distinct
 
@@ -341,6 +361,18 @@ statement : create_statement { $$ = $1; }
 | show_statement { $$ = $1; }
 | select_statement { $$ = $1; }
 | delete_statement { $$ = $1; }
+| update_statement { $$ = $1; }
+| insert_statement { $$ = $1; }
+| explain_statement { $$ = $1; }
+
+explainable_statement : create_statement { $$ = $1; }
+| drop_statement { $$ = $1; }
+| copy_statement { $$ = $1; }
+| show_statement { $$ = $1; }
+| select_statement { $$ = $1; }
+| delete_statement { $$ = $1; }
+| update_statement { $$ = $1; }
+| insert_statement { $$ = $1; }
 
 /*
  * CREATE STATEMENT
@@ -636,6 +668,95 @@ delete_statement : DELETE FROM table_name where_clause {
     }
     $$->table_name_ = $3->table_name_ptr_;
     $$->where_expr_ = $4;
+};
+
+/*
+ * INSERT STATEMENT
+ */
+insert_statement: INSERT INTO table_name optional_identifier_array VALUES '(' constant_expr_array ')' {
+    $$ = new InsertStatement();
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+
+    $$->columns_ = $4;
+    $$->values_ = $7;
+}
+| INSERT INTO table_name optional_identifier_array select_without_paren {
+    $$ = new InsertStatement();
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    $$->columns_ = $4;
+    $$->select_ = $5;
+}
+
+optional_identifier_array: '(' identifier_array ')' {
+    $$ = $2;
+}
+| {
+    $$ = nullptr;
+}
+
+/*
+ * EXPLAIN STATEMENT
+ */
+explain_statement : EXPLAIN explain_type explainable_statement {
+    $$ = new ExplainStatement();
+    $$->type_ = $2;
+    $$->statement_ = $3;
+}
+
+explain_type: AST {
+    $$ = ExplainType::kAst;
+}
+| UNOPT LOGICAL {
+    $$ = ExplainType::kUnOpt;
+}
+| OPT LOGICAL {
+    $$ = ExplainType::kOpt;
+}
+| PHYSICAL {
+    $$ = ExplainType::kPhysical;
+}
+| PIPELINE {
+    $$ = ExplainType::kPipeline;
+}
+
+/*
+ * UPDATE STATEMENT
+ */
+update_statement: UPDATE table_name SET update_expr_array where_clause {
+    $$ = new UpdateStatement();
+    if($2->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $2->schema_name_ptr_;
+        free($2->schema_name_ptr_);
+    }
+    $$->table_name_ = $2->table_name_ptr_;
+    free($2->table_name_ptr_);
+    $$->where_expr_ = $5;
+    $$->update_expr_array_ = $4;
+}
+
+update_expr_array: update_expr {
+    $$ = new Vector<UpdateExpr*>();
+    $$->emplace_back($1);
+}
+| update_expr_array ',' update_expr {
+    $1->emplace_back($3);
+    $$ = $1;
+}
+
+update_expr : IDENTIFIER '=' expr {
+    $$ = new UpdateExpr();
+    $$->column_name = $1;
+    $$->value = $3;
 };
 
 /*
@@ -1104,6 +1225,15 @@ expr_array : expr_alias {
     $1->emplace_back($3);
     $$ = $1;
 };
+
+constant_expr_array: constant_expr {
+    $$ = new Vector<ParsedExpr*>();
+    $$->emplace_back($1);
+}
+| constant_expr_array ',' constant_expr {
+    $1->emplace_back($3);
+    $$ = $1;
+}
 
 expr_alias : expr AS IDENTIFIER {
     $$ = $1;

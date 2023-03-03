@@ -4,12 +4,36 @@
 
 #pragma once
 
+#include "parser/parsed_expr/parsed_expr.h"
 #include "parser/base_statement.h"
 
 namespace infinity {
 
-class UpdateStatement : public BaseStatement {
+struct UpdateExpr {
+    ~UpdateExpr() {
+        delete value;
+        value = nullptr;
+    }
 
+    String column_name;
+    ParsedExpr* value;
+};
+
+class UpdateStatement final : public BaseStatement {
+public:
+    UpdateStatement() : BaseStatement(StatementType::kUpdate) {}
+
+    ~UpdateStatement() final;
+
+    [[nodiscard]] String
+    ToString() const final;
+
+    String schema_name_{};
+    String table_name_{};
+
+    ParsedExpr* where_expr_{nullptr};
+
+    Vector<UpdateExpr*>* update_expr_array_{nullptr};
 };
 
 }

@@ -43,7 +43,7 @@ struct OrderByExpr {
     OrderType type_{OrderType::kAsc};
 };
 
-class SelectStatement : public BaseStatement {
+class SelectStatement final : public BaseStatement {
 public:
     SelectStatement() : BaseStatement(StatementType::kSelect) {}
 
