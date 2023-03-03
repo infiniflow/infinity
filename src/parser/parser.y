@@ -15,6 +15,10 @@ void yyerror(YYLTYPE * llocp, void* lexer, ParserResult* result, const char* msg
 #include "parser_result.h"
 #include "defer_operation.h"
 #include "parser/table_reference/join_reference.h"
+#include "parser/table_reference/cross_product_reference.h"
+#include "parser/table_reference/table_reference.h"
+#include "parser/table_reference/subquery_reference.h"
+
 #include <vector>
 
 using namespace infinity;
@@ -255,6 +259,7 @@ struct SQL_LTYPE {
 %type <show_stmt>         show_statement
 %type <select_stmt>       select_clause_without_modifier select_without_paren select_with_paren select_statement
 %type <select_stmt>       select_clause_without_modifier_paren select_clause_with_modifier
+%type <delete_stmt>       delete_statement
 
 %type <stmt_array>        statement_list
 
@@ -335,6 +340,7 @@ statement : create_statement { $$ = $1; }
 | copy_statement { $$ = $1; }
 | show_statement { $$ = $1; }
 | select_statement { $$ = $1; }
+| delete_statement { $$ = $1; }
 
 /*
  * CREATE STATEMENT
@@ -619,6 +625,20 @@ identifier_array : IDENTIFIER {
 };
 
 /*
+ * DELETE STATEMENT
+ */
+delete_statement : DELETE FROM table_name where_clause {
+    $$ = new DeleteStatement();
+
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    $$->where_expr_ = $4;
+};
+
+/*
  * DROP STATEMENT
  */
 
@@ -755,25 +775,6 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     }
     delete $7;
 };
-
-/*
- * SET STATEMENT
- */
-
-
-set_operator : UNION {
-    $$ = SetOperatorType::kUnion;
-}
-| UNION ALL {
-    $$ = SetOperatorType::kUnionAll;
-}
-| INTERSECT {
-    $$ = SetOperatorType::kIntersect;
-}
-| EXCEPT {
-    $$ = SetOperatorType::kExcept;
-}
-
 
 /*
  * SELECT STATEMENT
@@ -919,6 +920,19 @@ group_by_clause: GROUP BY expr_array {
     $$ = nullptr;
 }
 
+set_operator : UNION {
+    $$ = SetOperatorType::kUnion;
+}
+| UNION ALL {
+    $$ = SetOperatorType::kUnionAll;
+}
+| INTERSECT {
+    $$ = SetOperatorType::kIntersect;
+}
+| EXCEPT {
+    $$ = SetOperatorType::kExcept;
+}
+
 /*
  * TABLE REFERENCE
  */
@@ -951,10 +965,13 @@ table_reference_name : table_name table_alias {
     $$ = table_ref;
 }
 /* FROM (select * from t1) AS t2 */
-/*
 | '(' select_statement ')' table_alias {
+    SubqueryReference* subquery_reference = new SubqueryReference();
+    subquery_reference->select_statement_ = $2;
+    subquery_reference->alias_ = $4;
+    $$ = subquery_reference;
 }
-*/
+
 
 /* 'table_name' or 'schema_name.table_name' */
 table_name : IDENTIFIER {

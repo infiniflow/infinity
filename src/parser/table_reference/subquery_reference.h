@@ -7,6 +7,8 @@
 
 namespace infinity {
 
+class SelectStatement;
+
 class SubqueryReference: public BaseTableReference {
 
 public:
@@ -17,8 +19,7 @@ public:
     String
     ToString() override;
 
-    UniquePtr<SelectStatement> select_statement_{nullptr};
-    Vector<char*>* column_alias_array_{nullptr};
+    SelectStatement* select_statement_{nullptr};
 };
 
 }

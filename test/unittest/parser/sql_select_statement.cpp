@@ -29,8 +29,30 @@ TEST_F(SelectStatementParsingTest, good_test1) {
         String input_sql = "select a from t1;";
         parser->Parse(input_sql, result);
 
-        EXPECT_FALSE(result->error_message_.empty());
-        EXPECT_TRUE(result->statements_ptr_ == nullptr);
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto* select_statement = (SelectStatement*)(statement);
+            EXPECT_EQ(select_statement->where_expr_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            auto* table_ref = (TableReference*)(select_statement->table_ref_);
+            EXPECT_EQ(table_ref->schema_name_, "");
+            EXPECT_EQ(table_ref->table_name_, "t1");
+            EXPECT_EQ(table_ref->alias_, nullptr);
+
+            EXPECT_EQ(select_statement->group_by_list_, nullptr);
+            EXPECT_EQ(select_statement->having_expr_, nullptr);
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
+            auto* col_expr = (ColumnExpr*)(*select_statement->select_list_)[0];
+            EXPECT_STREQ(col_expr->names_[0], "a");
+            EXPECT_EQ(col_expr->star_, false);
+            EXPECT_EQ(col_expr->alias_.empty(), true);
+        }
 
         result->Reset();
     }

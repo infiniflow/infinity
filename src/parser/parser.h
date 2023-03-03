@@ -61,6 +61,10 @@ extern int sqldebug;
 #include "parser_result.h"
 #include "defer_operation.h"
 #include "parser/table_reference/join_reference.h"
+#include "parser/table_reference/cross_product_reference.h"
+#include "parser/table_reference/table_reference.h"
+#include "parser/table_reference/subquery_reference.h"
+
 #include <vector>
 
 using namespace infinity;
@@ -97,7 +101,7 @@ struct SQL_LTYPE {
         }                                         \
     }
 
-#line 101 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 105 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 /* Token kinds.  */
 #ifndef SQLTOKENTYPE
@@ -227,7 +231,7 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 77 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 81 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -279,7 +283,7 @@ union SQLSTYPE
     CopyOption* copy_option_t;
     Vector<CopyOption*>* copy_option_array;
 
-#line 283 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 287 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

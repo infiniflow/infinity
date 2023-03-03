@@ -7,9 +7,7 @@
 #include "parser/parsed_expr/constant_expr.h"
 #include "parser/parsed_expr/column_expr.h"
 #include "parser/base_statement.h"
-#include "parser/table_reference/table_reference.h"
-#include "parser/table_reference/cross_product_reference.h"
-#include "parser/table_reference/join_reference.h"
+#include "parser/table_reference/base_table_reference.h"
 
 namespace infinity {
 
