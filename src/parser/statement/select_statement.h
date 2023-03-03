@@ -15,6 +15,13 @@ namespace infinity {
 
 class SelectStatement;
 
+enum class SetOperatorType {
+    kUnion,
+    kUnionAll,
+    kIntersect,
+    kExcept
+};
+
 struct WithExpr {
     ~WithExpr() {
         if(statement_ != nullptr) {
@@ -57,6 +64,9 @@ public:
     ParsedExpr*         limit_expr_{nullptr};
     ParsedExpr*         offset_expr_{nullptr};
     Vector<WithExpr*>*  with_exprs_{nullptr};
+
+    SetOperatorType set_op_{SetOperatorType::kUnion};
+    SelectStatement* nested_select_{nullptr};
 };
 
 }

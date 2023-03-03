@@ -28,6 +28,7 @@ static thread_local std::stringstream string_buffer;
 
 [ \t\n]+        /* ignore \t\n and space */;
 
+ALL             { return ALL; }
 ALTER           { return ALTER; }
 AS              { return AS; }
 ASC             { return ASC; }
@@ -57,6 +58,7 @@ DESCRIBE        { return DESCRIBE; }
 DESC            { return DESC; }
 DROP            { return DROP; }
 EMBEDDING       { return EMBEDDING; }
+EXCEPT          { return EXCEPT; }
 EXECUTE         { return EXECUTE; }
 EXISTS          { return EXISTS; }
 EXPLAIN         { return EXPLAIN; }
@@ -76,6 +78,7 @@ IS              { return IS; }
 INNER           { return INNER; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }
+INTERSECT       { return INTERSECT; }
 JOIN            { return JOIN; }
 KEY             { return KEY; }
 LEFT            { return LEFT; }
@@ -114,6 +117,7 @@ TABLE           { return TABLE; }
 TABLES          { return TABLES; }
 TRUE            { return TRUE; }
 TINYINT         { return TINYINT; }
+UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
 UPDATE          { return UPDATE; }
 UUID            { return UUID; }

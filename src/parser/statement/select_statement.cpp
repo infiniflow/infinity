@@ -64,6 +64,11 @@ SelectStatement::~SelectStatement() {
         delete with_exprs_;
         with_exprs_ = nullptr;
     }
+
+    if(nested_select_ != nullptr) {
+        delete nested_select_;
+        nested_select_ = nullptr;
+    }
 }
 
 String

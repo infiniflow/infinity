@@ -16,4 +16,3 @@
 #include "parser/statement/alter_statement.h"
 #include "parser/statement/show_statement.h"
 #include "parser/statement/explain_statement.h"
-#include "parser/statement/set_statement.h"

@@ -93,7 +93,6 @@ struct SQL_LTYPE {
     AlterStatement*   alter_stmt;
     ShowStatement*    show_stmt;
     ExplainStatement* explain_stmt;
-    SetStatement*     set_stmt;
 
     Vector<BaseStatement*>* stmt_array;
 
@@ -116,6 +115,8 @@ struct SQL_LTYPE {
 
     WithExpr*               with_expr_t;
     Vector<WithExpr*>*      with_expr_list_t;
+
+    SetOperatorType         set_operator_t;
 
     ParsedExpr*             expr_t;
     Vector<ParsedExpr*>*    expr_array_t;
@@ -232,7 +233,8 @@ struct SQL_LTYPE {
 
 /* SQL keywords */
 
-%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE
+%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT
+%token EXCEPT
 %token SCHEMA TABLE COLLECTION TABLES
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS FROM TO WITH DELIMITER FORMAT HEADER
@@ -251,7 +253,8 @@ struct SQL_LTYPE {
 %type <drop_stmt>         drop_statement
 %type <copy_stmt>         copy_statement
 %type <show_stmt>         show_statement
-%type <select_stmt>       select_clause select_without_paren select_with_paren select_statement
+%type <select_stmt>       select_clause_without_modifier select_without_paren select_with_paren select_statement
+%type <select_stmt>       select_clause_without_modifier_paren select_clause_with_modifier
 
 %type <stmt_array>        statement_list
 
@@ -271,6 +274,7 @@ struct SQL_LTYPE {
 %type <order_by_expr_list_t>    order_by_expr_list order_by_clause
 %type <with_expr_t>             with_expr
 %type <with_expr_list_t>        with_expr_list with_clause
+%type <set_operator_t>          set_operator
 
 %type <expr_t>                  expr expr_alias constant_expr interval_expr column_expr function_expr
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr
@@ -330,8 +334,7 @@ statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
 | copy_statement { $$ = $1; }
 | show_statement { $$ = $1; }
-/* | select_clause { $$ = $1; } */
-| select_statement { $$ = $1; };
+| select_statement { $$ = $1; }
 
 /*
  * CREATE STATEMENT
@@ -757,21 +760,20 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
  * SET STATEMENT
  */
 
-/*
-set_statement: select_statement set_operator select_statement {
-}
-| set_statement set_operator select_statement {
-}
 
 set_operator : UNION {
+    $$ = SetOperatorType::kUnion;
 }
 | UNION ALL {
+    $$ = SetOperatorType::kUnionAll;
 }
 | INTERSECT {
+    $$ = SetOperatorType::kIntersect;
 }
 | EXCEPT {
+    $$ = SetOperatorType::kExcept;
 }
-*/
+
 
 /*
  * SELECT STATEMENT
@@ -781,7 +783,23 @@ select_statement : select_without_paren {
 }
 | select_with_paren {
     $$ = $1;
-};
+}
+| select_statement set_operator select_clause_without_modifier_paren {
+    $1->set_op_ = $2;
+    SelectStatement* node = $1;
+    while(node->nested_select_ != nullptr) {
+        node = node->nested_select_;
+    }
+    node->nested_select_ = $3;
+}
+| select_statement set_operator select_clause_without_modifier {
+    $1->set_op_ = $2;
+    SelectStatement* node = $1;
+    while(node->nested_select_ != nullptr) {
+        node = node->nested_select_;
+    }
+    node->nested_select_ = $3;
+}
 
 select_with_paren : '(' select_without_paren ')' {
     $$ = $2;
@@ -790,14 +808,27 @@ select_with_paren : '(' select_without_paren ')' {
     $$ = $2;
 };
 
-select_without_paren: with_clause select_clause  {
+select_without_paren: with_clause select_clause_with_modifier {
     $2->with_exprs_ = $1;
-
     $$ = $2;
 };
 
-select_clause:
-SELECT distinct expr_array from_clause where_clause group_by_clause having_clause order_by_clause limit_expr offset_expr {
+select_clause_with_modifier: select_clause_without_modifier order_by_clause limit_expr offset_expr {
+    $1->order_by_list = $2;
+    $1->limit_expr_ = $3;
+    $1->offset_expr_ = $4;
+    $$ = $1;
+}
+
+select_clause_without_modifier_paren: '(' select_clause_without_modifier ')' {
+  $$ = $2;
+}
+| '(' select_clause_without_modifier_paren ')' {
+    $$ = $2;
+};
+
+select_clause_without_modifier:
+SELECT distinct expr_array from_clause where_clause group_by_clause having_clause {
     $$ = new SelectStatement();
     $$->select_list_ = $3;
     $$->select_distinct_ = $2;
@@ -805,9 +836,7 @@ SELECT distinct expr_array from_clause where_clause group_by_clause having_claus
     $$->where_expr_ = $5;
     $$->group_by_list_ = $6;
     $$->having_expr_ = $7;
-    $$->order_by_list = $8;
-    $$->limit_expr_ = $9;
-    $$->offset_expr_ = $10;
+
     if($$->group_by_list_ == nullptr && $$->having_expr_ != nullptr) {
         yyerror(&yyloc, scanner, result, "HAVING clause should follow after GROUP BY clause");
         YYERROR;
@@ -974,19 +1003,12 @@ with_expr_list: with_expr {
     $$ = $1;
 }
 
-with_expr: IDENTIFIER AS '(' select_clause ')' {
+with_expr: IDENTIFIER AS '(' select_clause_with_modifier ')' {
     $$ = new WithExpr();
     $$->alias_ = $1;
     free($1);
     $$->statement_ = $4;
 }
-/*
-| IDENTIFIER AS set_statement {
-    $$ = new WithExpr();
-    $$->alias_ = $1;
-    $$->statement_ = $3;
-}
-*/
 
 /*
  * JOIN CLAUSE
