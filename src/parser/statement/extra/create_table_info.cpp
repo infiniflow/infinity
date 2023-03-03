@@ -14,6 +14,10 @@ CreateTableInfo::~CreateTableInfo() {
     for(auto* table_constraint: constraints_) {
         delete table_constraint;
     }
+
+    if(select_ != nullptr) {
+        delete select_;
+    }
 }
 
 String

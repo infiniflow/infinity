@@ -254,7 +254,7 @@ struct SQL_LTYPE {
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT
 %token EXCEPT
-%token SCHEMA TABLE COLLECTION TABLES INTO VALUES AST PIPELINE UNOPT OPT LOGICAL PHYSICAL
+%token SCHEMA TABLE COLLECTION TABLES INTO VALUES AST PIPELINE UNOPT OPT LOGICAL PHYSICAL VIEW INDEX
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS FROM TO WITH DELIMITER FORMAT HEADER
 %token BOOLEAN INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
@@ -437,6 +437,56 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 
     $$->create_info_ = std::move(create_table_info);
     $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+}
+/* CREATE TABLE table_name AS SELECT .... ; */
+| CREATE TABLE if_not_exists table_name AS select_statement {
+    $$ = new CreateStatement();
+    UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
+    if($4->schema_name_ptr_ != nullptr) {
+        create_table_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    create_table_info->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    delete $4;
+
+    create_table_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    create_table_info->select_ = $6;
+    $$->create_info_ = std::move(create_table_info);
+}
+/* CREATE VIEW table_name AS SELECT .... ; */
+| CREATE VIEW if_not_exists table_name optional_identifier_array AS select_statement {
+    $$ = new CreateStatement();
+    UniquePtr<CreateViewInfo> create_view_info = MakeUnique<CreateViewInfo>();
+    if($4->schema_name_ptr_ != nullptr) {
+        create_view_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    create_view_info->view_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    delete $4;
+
+    create_view_info->view_columns_ = $5;
+    create_view_info->select_ = $7;
+    create_view_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+}
+/* CREATE INDEX index_name ON table_name (column1) ; */
+| CREATE INDEX if_not_exists IDENTIFIER ON table_name '(' identifier_array ')' {
+    $$ = new CreateStatement();
+    UniquePtr<CreateIndexInfo> create_index_info = MakeUnique<CreateIndexInfo>();
+    if($6->schema_name_ptr_ != nullptr) {
+        create_index_info->schema_name_ = $6->schema_name_ptr_;
+        free($6->schema_name_ptr_);
+    }
+    create_index_info->table_name_ = $6->table_name_ptr_;
+    free($6->table_name_ptr_);
+    delete $6;
+
+    create_index_info->index_name_ = $4;
+    free($4);
+
+    create_index_info->column_names_ = $8;
+    create_index_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 };
 
 table_element_array : table_element {

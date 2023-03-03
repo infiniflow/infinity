@@ -75,12 +75,13 @@ HOUR            { return HOUR; }
 HOURS           { return HOURS; }
 HUGEINT         { return HUGEINT; }
 IF              { return IF; }
-IS              { return IS; }
+INDEX           { return INDEX; }
 INNER           { return INNER; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }
 INTERSECT       { return INTERSECT; }
 INTO            { return INTO; }
+IS              { return IS; }
 JOIN            { return JOIN; }
 KEY             { return KEY; }
 LEFT            { return LEFT; }
@@ -131,6 +132,7 @@ UUID            { return UUID; }
 VALUES          { return VALUES; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
+VIEW            { return VIEW; }
 WHERE           { return WHERE; }
 WITH            { return WITH; }
 YEAR            { return YEAR; }

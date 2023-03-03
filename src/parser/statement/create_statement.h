@@ -8,6 +8,8 @@
 #include "parser/statement/extra/create_schema_info.h"
 #include "parser/statement/extra/create_collection_info.h"
 #include "parser/statement/extra/create_table_info.h"
+#include "parser/statement/extra/create_view_info.h"
+#include "parser/statement/extra/create_index_info.h"
 
 
 namespace infinity {

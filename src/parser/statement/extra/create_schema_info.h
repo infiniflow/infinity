@@ -8,12 +8,12 @@
 
 namespace infinity {
 
-class CreateSchemaInfo : public ExtraDDLInfo {
+class CreateSchemaInfo final : public ExtraDDLInfo {
 public:
     explicit
     CreateSchemaInfo() : ExtraDDLInfo(DDLType::kSchema) {}
 
-    [[nodiscard]] virtual String
+    [[nodiscard]] String
     ToString() const final;
 
     String schema_name_;

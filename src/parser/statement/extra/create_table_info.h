@@ -6,6 +6,7 @@
 
 #include "extra_ddl_info.h"
 #include "parser/statement/statement_common.h"
+#include "parser/statement/select_statement.h"
 #include "common/types/data_type.h"
 #include "common/types/info/char_info.h"
 #include "common/types/info/varchar_info.h"
@@ -83,12 +84,12 @@ public:
     ConstraintType constraint_{ConstraintType::kNotNull};
 };
 
-class CreateTableInfo : public ExtraDDLInfo {
+class CreateTableInfo final : public ExtraDDLInfo {
 public:
     explicit
     CreateTableInfo() : ExtraDDLInfo(DDLType::kTable) {}
 
-    ~CreateTableInfo() override;
+    ~CreateTableInfo() final;
 
     [[nodiscard]] String
     ToString() const final;
@@ -96,8 +97,10 @@ public:
     String schema_name_{"Default"};
     String table_name_{};
 
-    Vector<ColumnDef *> column_defs_;
-    Vector<TableConstraint *> constraints_;
+    Vector<ColumnDef *> column_defs_{};
+    Vector<TableConstraint *> constraints_{};
+
+    SelectStatement* select_{nullptr};
 };
 
 }
