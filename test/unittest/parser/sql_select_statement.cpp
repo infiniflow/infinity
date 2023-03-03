@@ -62,7 +62,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     using namespace infinity;
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
-#if 0
+
     {
         String input_sql = "select 1;";
         parser->Parse(input_sql, result);
@@ -130,7 +130,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 EXPECT_EQ((*select_statement->select_list_)[1]->type_, ParsedExprType::kFunction);
                 auto *col1_expr = (FunctionExpr *) (*select_statement->select_list_)[1];
-                EXPECT_STREQ(col1_expr->func_name_, "sum");
+                EXPECT_EQ(col1_expr->func_name_, "sum");
                 auto& args = *col1_expr->arguments_;
                 EXPECT_EQ(args.size(), 1);
                 EXPECT_EQ(args[0]->type_, ParsedExprType::kColumn);
@@ -141,7 +141,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 EXPECT_EQ((*select_statement->select_list_)[2]->type_, ParsedExprType::kFunction);
                 auto *col1_expr = (FunctionExpr *) (*select_statement->select_list_)[2];
-                EXPECT_STREQ(col1_expr->func_name_, "function");
+                EXPECT_EQ(col1_expr->func_name_, "function");
                 auto& args = *col1_expr->arguments_;
                 EXPECT_EQ(args.size(), 2);
                 EXPECT_EQ(args[0]->type_, ParsedExprType::kColumn);
@@ -154,7 +154,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 EXPECT_EQ(args[1]->type_, ParsedExprType::kFunction);
                 {
                     auto *arg_expr = (FunctionExpr *) args[1];
-                    EXPECT_STREQ(arg_expr->func_name_, "nested");
+                    EXPECT_EQ(arg_expr->func_name_, "nested");
                     EXPECT_EQ(arg_expr->arguments_->size(), 1);
 
                     auto& func_args = *arg_expr->arguments_;
@@ -226,7 +226,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kFunction);
                 auto *col0_expr = (FunctionExpr *) (*select_statement->select_list_)[0];
-                EXPECT_STREQ(col0_expr->func_name_, "-");
+                EXPECT_EQ(col0_expr->func_name_, "-");
                 auto& args = *col0_expr->arguments_;
                 EXPECT_EQ(args.size(), 2);
                 EXPECT_EQ(args[0]->type_, ParsedExprType::kConstant);
@@ -241,7 +241,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 EXPECT_EQ((*select_statement->select_list_)[1]->type_, ParsedExprType::kFunction);
                 auto *col0_expr = (FunctionExpr *) (*select_statement->select_list_)[1];
-                EXPECT_STREQ(col0_expr->func_name_, "+");
+                EXPECT_EQ(col0_expr->func_name_, "+");
                 auto& args = *col0_expr->arguments_;
                 EXPECT_EQ(args.size(), 2);
                 EXPECT_EQ(args[0]->type_, ParsedExprType::kConstant);
@@ -250,7 +250,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
                 EXPECT_EQ(args[1]->type_, ParsedExprType::kFunction);
                 auto* arg1_expr =  (FunctionExpr *)args[1];
-                EXPECT_STREQ(arg1_expr->func_name_, "-");
+                EXPECT_EQ(arg1_expr->func_name_, "-");
                 EXPECT_EQ(arg1_expr->arguments_->size(), 1);
                 auto child_args = *arg1_expr->arguments_;
                 EXPECT_EQ(child_args[0]->type_, ParsedExprType::kConstant);
@@ -261,7 +261,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 EXPECT_EQ((*select_statement->select_list_)[2]->type_, ParsedExprType::kFunction);
                 auto *col0_expr = (FunctionExpr *) (*select_statement->select_list_)[2];
-                EXPECT_STREQ(col0_expr->func_name_, "+");
+                EXPECT_EQ(col0_expr->func_name_, "+");
                 auto& args = *col0_expr->arguments_;
                 EXPECT_EQ(args.size(), 2);
                 EXPECT_EQ(args[0]->type_, ParsedExprType::kConstant);
@@ -270,7 +270,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
                 EXPECT_EQ(args[1]->type_, ParsedExprType::kFunction);
                 auto* arg1_expr =  (FunctionExpr *)args[1];
-                EXPECT_STREQ(arg1_expr->func_name_, "-");
+                EXPECT_EQ(arg1_expr->func_name_, "-");
                 EXPECT_EQ(arg1_expr->arguments_->size(), 1);
                 auto child_args = *arg1_expr->arguments_;
                 EXPECT_EQ(child_args[0]->type_, ParsedExprType::kConstant);
@@ -364,6 +364,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             EXPECT_EQ(func_arg_col_expr->names_.size(), 1);
             EXPECT_STREQ(func_arg_col_expr->names_[0], "b");
         }
+        result->Reset();
     }
 
     {
@@ -387,6 +388,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 EXPECT_EQ(table_ref_ptr->table_name_, "t1");
             }
         }
+        result->Reset();
     }
 
     {
@@ -427,6 +429,6 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 EXPECT_EQ(func_expr->distinct_, false);
             }
         }
+        result->Reset();
     }
-#endif
 }
