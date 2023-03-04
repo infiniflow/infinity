@@ -731,29 +731,29 @@ static const yytype_int16 yyrline[] =
 {
        0,   349,   349,   353,   359,   366,   367,   368,   369,   370,
      371,   372,   373,   374,   376,   377,   378,   379,   380,   381,
-     382,   383,   390,   400,   415,   450,   466,   482,   500,   504,
-     510,   513,   519,   561,   607,   608,   609,   610,   611,   612,
-     613,   614,   615,   616,   617,   618,   619,   620,   621,   622,
-     623,   624,   625,   626,   627,   629,   630,   631,   632,   633,
-     634,   635,   636,   637,   638,   639,   640,   641,   642,   643,
-     644,   645,   646,   647,   648,   649,   668,   672,   681,   684,
-     687,   690,   694,   699,   706,   711,   720,   734,   746,   758,
-     761,   768,   774,   777,   780,   783,   786,   793,   805,   809,
-     814,   825,   835,   853,   905,   961,   964,   967,   976,   986,
-     989,   993,   998,  1005,  1008,  1013,  1028,  1031,  1035,  1039,
-    1044,  1050,  1053,  1056,  1060,  1064,  1066,  1070,  1072,  1075,
-    1079,  1082,  1086,  1089,  1093,  1096,  1100,  1103,  1107,  1110,
-    1113,  1116,  1124,  1127,  1136,  1136,  1138,  1152,  1161,  1167,
-    1176,  1180,  1185,  1192,  1195,  1199,  1202,  1207,  1218,  1225,
-    1239,  1242,  1245,  1248,  1251,  1254,  1257,  1263,  1267,  1283,
-    1287,  1292,  1296,  1301,  1306,  1310,  1311,  1312,  1313,  1314,
-    1316,  1319,  1325,  1326,  1327,  1329,  1336,  1343,  1351,  1358,
-    1365,  1372,  1379,  1387,  1395,  1403,  1411,  1419,  1427,  1435,
-    1443,  1451,  1459,  1467,  1476,  1484,  1493,  1503,  1510,  1518,
-    1524,  1530,  1537,  1545,  1550,  1555,  1560,  1570,  1575,  1580,
-    1585,  1590,  1595,  1600,  1604,  1610,  1616,  1622,  1628,  1634,
-    1640,  1646,  1652,  1658,  1664,  1670,  1681,  1685,  1690,  1702,
-    1708,  1714,  1718,  1719,  1721,  1722,  1724,  1725
+     382,   383,   390,   400,   415,   439,   455,   471,   489,   493,
+     499,   502,   508,   546,   587,   588,   589,   590,   591,   592,
+     593,   594,   595,   596,   597,   598,   599,   600,   601,   602,
+     603,   604,   605,   606,   607,   609,   610,   611,   612,   613,
+     614,   615,   616,   617,   618,   619,   620,   621,   622,   623,
+     624,   625,   626,   627,   628,   629,   648,   652,   662,   665,
+     668,   671,   675,   680,   687,   692,   701,   715,   727,   739,
+     742,   749,   755,   758,   761,   764,   767,   774,   786,   790,
+     795,   806,   816,   834,   875,   920,   923,   926,   935,   945,
+     948,   952,   957,   964,   967,   972,   987,   990,   994,   998,
+    1003,  1009,  1012,  1015,  1019,  1023,  1025,  1029,  1031,  1034,
+    1038,  1041,  1045,  1048,  1052,  1055,  1059,  1062,  1066,  1069,
+    1072,  1075,  1083,  1086,  1095,  1095,  1097,  1111,  1120,  1126,
+    1135,  1139,  1144,  1151,  1154,  1158,  1161,  1166,  1177,  1184,
+    1198,  1201,  1204,  1207,  1210,  1213,  1216,  1222,  1226,  1242,
+    1246,  1251,  1255,  1260,  1265,  1269,  1270,  1271,  1272,  1273,
+    1275,  1278,  1284,  1285,  1286,  1288,  1295,  1302,  1310,  1317,
+    1324,  1331,  1338,  1346,  1354,  1362,  1370,  1378,  1386,  1394,
+    1402,  1410,  1418,  1426,  1435,  1443,  1452,  1462,  1469,  1477,
+    1483,  1489,  1496,  1504,  1509,  1514,  1519,  1529,  1534,  1539,
+    1544,  1549,  1554,  1559,  1563,  1569,  1575,  1581,  1587,  1593,
+    1599,  1605,  1611,  1617,  1623,  1629,  1640,  1644,  1649,  1662,
+    1668,  1674,  1678,  1679,  1681,  1682,  1684,  1685
 };
 #endif
 
@@ -2702,17 +2702,6 @@ yyreduce:
   case 24: /* create_statement: CREATE TABLE if_not_exists table_name '(' table_element_array ')'  */
 #line 415 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                     {
-    if(result->IsError()) {
-        printf("Error happened, release memory\n");
-        if((yyvsp[-3].table_name_t)->schema_name_ptr_ != nullptr) {
-            free((yyvsp[-3].table_name_t)->schema_name_ptr_);
-        }
-        free((yyvsp[-3].table_name_t)->table_name_ptr_);
-        delete((yyvsp[-3].table_name_t));
-        delete((yyvsp[-1].table_element_array_t));
-        YYERROR;
-    }
-
     (yyval.create_stmt) = new CreateStatement();
     UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
     if((yyvsp[-3].table_name_t)->schema_name_ptr_ != nullptr) {
@@ -2735,11 +2724,11 @@ yyreduce:
     (yyval.create_stmt)->create_info_ = std::move(create_table_info);
     (yyval.create_stmt)->create_info_->conflict_type_ = (yyvsp[-4].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
 }
-#line 2739 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2728 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 25: /* create_statement: CREATE TABLE if_not_exists table_name AS select_statement  */
-#line 450 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 439 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                             {
     (yyval.create_stmt) = new CreateStatement();
     UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
@@ -2755,11 +2744,11 @@ yyreduce:
     create_table_info->select_ = (yyvsp[0].select_stmt);
     (yyval.create_stmt)->create_info_ = std::move(create_table_info);
 }
-#line 2759 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2748 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 26: /* create_statement: CREATE VIEW if_not_exists table_name optional_identifier_array AS select_statement  */
-#line 466 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 455 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                                      {
     (yyval.create_stmt) = new CreateStatement();
     UniquePtr<CreateViewInfo> create_view_info = MakeUnique<CreateViewInfo>();
@@ -2775,11 +2764,11 @@ yyreduce:
     create_view_info->select_ = (yyvsp[0].select_stmt);
     create_view_info->conflict_type_ = (yyvsp[-4].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
 }
-#line 2779 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2768 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 27: /* create_statement: CREATE INDEX if_not_exists IDENTIFIER ON table_name '(' identifier_array ')'  */
-#line 482 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 471 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                                {
     (yyval.create_stmt) = new CreateStatement();
     UniquePtr<CreateIndexInfo> create_index_info = MakeUnique<CreateIndexInfo>();
@@ -2797,50 +2786,46 @@ yyreduce:
     create_index_info->column_names_ = (yyvsp[-1].identifier_array_t);
     create_index_info->conflict_type_ = (yyvsp[-6].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
 }
-#line 2801 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2790 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 28: /* table_element_array: table_element  */
-#line 500 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 489 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                     {
     (yyval.table_element_array_t) = new Vector<TableElement*>();
     (yyval.table_element_array_t)->push_back((yyvsp[0].table_element_t));
 }
-#line 2810 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2799 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 29: /* table_element_array: table_element_array ',' table_element  */
-#line 504 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 493 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                         {
     (yyvsp[-2].table_element_array_t)->push_back((yyvsp[0].table_element_t));
     (yyval.table_element_array_t) = (yyvsp[-2].table_element_array_t);
 }
-#line 2819 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2808 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 30: /* table_element: table_column  */
-#line 510 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 499 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                              {
     (yyval.table_element_t) = (yyvsp[0].table_column_t);
 }
-#line 2827 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2816 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 31: /* table_element: table_constraint  */
-#line 513 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 502 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     (yyval.table_element_t) = (yyvsp[0].table_constraint_t);
 }
-#line 2835 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2824 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 32: /* table_column: IDENTIFIER column_type  */
-#line 519 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 508 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                        {
-    if(result->IsError()) {
-        free((yyvsp[-1].str_value));
-    }
-
     SharedPtr<TypeInfo> type_info_ptr{nullptr};
     switch((yyvsp[0].column_type_t).logical_type_) {
         case LogicalType::kChar: {
@@ -2878,17 +2863,12 @@ yyreduce:
     }
     */
 }
-#line 2882 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2867 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 33: /* table_column: IDENTIFIER column_type column_constraints  */
-#line 561 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 546 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                             {
-    if(result->IsError()) {
-        free((yyvsp[-2].str_value));
-        delete((yyvsp[0].column_constraints_t));
-    }
-
     SharedPtr<TypeInfo> type_info_ptr{nullptr};
     switch((yyvsp[-1].column_type_t).logical_type_) {
         case LogicalType::kChar: {
@@ -2927,357 +2907,358 @@ yyreduce:
     }
     */
 }
-#line 2931 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2911 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 34: /* column_type: BOOLEAN  */
-#line 607 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 587 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
         { (yyval.column_type_t) = ColumnType{LogicalType::kBoolean}; }
-#line 2937 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2917 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 35: /* column_type: TINYINT  */
-#line 608 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 588 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
           { (yyval.column_type_t) = ColumnType{LogicalType::kTinyInt}; }
-#line 2943 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2923 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 36: /* column_type: SMALLINT  */
-#line 609 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 589 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
            { (yyval.column_type_t) = ColumnType{LogicalType::kSmallInt}; }
-#line 2949 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2929 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 37: /* column_type: INTEGER  */
-#line 610 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 590 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
           { (yyval.column_type_t) = ColumnType{LogicalType::kInteger}; }
-#line 2955 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2935 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 38: /* column_type: BIGINT  */
-#line 611 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 591 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
          { (yyval.column_type_t) = ColumnType{LogicalType::kBigInt}; }
-#line 2961 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2941 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 39: /* column_type: HUGEINT  */
-#line 612 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 592 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
           { (yyval.column_type_t) = ColumnType{LogicalType::kHugeInt}; }
-#line 2967 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2947 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 40: /* column_type: FLOAT  */
-#line 613 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 593 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
         { (yyval.column_type_t) = ColumnType{LogicalType::kFloat}; }
-#line 2973 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2953 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 41: /* column_type: REAL  */
-#line 614 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 594 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
         { (yyval.column_type_t) = ColumnType{LogicalType::kFloat}; }
-#line 2979 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2959 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 42: /* column_type: DOUBLE  */
-#line 615 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 595 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
          { (yyval.column_type_t) = ColumnType{LogicalType::kDouble}; }
-#line 2985 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2965 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 43: /* column_type: DATE  */
-#line 616 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 596 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        { (yyval.column_type_t) = ColumnType{LogicalType::kDate}; }
-#line 2991 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2971 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 44: /* column_type: TIME  */
-#line 617 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 597 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        { (yyval.column_type_t) = ColumnType{LogicalType::kTime}; }
-#line 2997 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2977 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 45: /* column_type: DATETIME  */
-#line 618 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 598 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
            { (yyval.column_type_t) = ColumnType{LogicalType::kDateTime}; }
-#line 3003 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2983 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 46: /* column_type: TIMESTAMP  */
-#line 619 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 599 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
             { (yyval.column_type_t) = ColumnType{LogicalType::kTimestamp}; }
-#line 3009 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2989 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 47: /* column_type: UUID  */
-#line 620 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 600 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        { (yyval.column_type_t) = ColumnType{LogicalType::kUuid}; }
-#line 3015 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 2995 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 48: /* column_type: POINT  */
-#line 621 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 601 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
         { (yyval.column_type_t) = ColumnType{LogicalType::kPoint}; }
-#line 3021 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3001 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 49: /* column_type: LINE  */
-#line 622 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 602 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        { (yyval.column_type_t) = ColumnType{LogicalType::kLine}; }
-#line 3027 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3007 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 50: /* column_type: LSEG  */
-#line 623 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 603 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        { (yyval.column_type_t) = ColumnType{LogicalType::kLineSeg}; }
-#line 3033 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3013 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 51: /* column_type: BOX  */
-#line 624 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 604 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
       { (yyval.column_type_t) = ColumnType{LogicalType::kBox}; }
-#line 3039 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3019 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 52: /* column_type: PATH  */
-#line 625 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 605 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        { (yyval.column_type_t) = ColumnType{LogicalType::kPath}; }
-#line 3045 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3025 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 53: /* column_type: POLYGON  */
-#line 626 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 606 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
           { (yyval.column_type_t) = ColumnType{LogicalType::kPolygon}; }
-#line 3051 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3031 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 54: /* column_type: CIRCLE  */
-#line 627 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 607 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
          { (yyval.column_type_t) = ColumnType{LogicalType::kCircle}; }
-#line 3057 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3037 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 55: /* column_type: CHAR '(' LONG_VALUE ')'  */
-#line 629 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 609 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                           { (yyval.column_type_t) = ColumnType{LogicalType::kChar, (yyvsp[-1].long_value)}; }
-#line 3063 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3043 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 56: /* column_type: VARCHAR '(' LONG_VALUE ')'  */
-#line 630 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 610 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                              { (yyval.column_type_t) = ColumnType{LogicalType::kVarchar, (yyvsp[-1].long_value)}; }
-#line 3069 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3049 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 57: /* column_type: DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')'  */
-#line 631 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 611 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                             { (yyval.column_type_t) = ColumnType{LogicalType::kDecimal64, 0, (yyvsp[-3].long_value), (yyvsp[-1].long_value)}; }
-#line 3075 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3055 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 58: /* column_type: DECIMAL '(' LONG_VALUE ')'  */
-#line 632 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 612 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                              { (yyval.column_type_t) = ColumnType{LogicalType::kDecimal64, 0, (yyvsp[-1].long_value), 0}; }
-#line 3081 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3061 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 59: /* column_type: DECIMAL  */
-#line 633 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 613 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
           { (yyval.column_type_t) = ColumnType{LogicalType::kDecimal64, 0, 0, 0}; }
-#line 3087 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3067 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 60: /* column_type: BLOB '(' LONG_VALUE ')'  */
-#line 634 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 614 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                           { (yyval.column_type_t) = ColumnType{LogicalType::kBlob, (yyvsp[-1].long_value)}; }
-#line 3093 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3073 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 61: /* column_type: BITMAP '(' LONG_VALUE ')'  */
-#line 635 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 615 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                             { (yyval.column_type_t) = ColumnType{LogicalType::kBitmap, (yyvsp[-1].long_value)}; }
-#line 3099 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3079 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 62: /* column_type: EMBEDDING '(' BIT ',' LONG_VALUE ')'  */
-#line 636 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 616 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemBit}; }
-#line 3105 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3085 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 63: /* column_type: EMBEDDING '(' TINYINT ',' LONG_VALUE ')'  */
-#line 637 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 617 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                            { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemInt8}; }
-#line 3111 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3091 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 64: /* column_type: EMBEDDING '(' SMALLINT ',' LONG_VALUE ')'  */
-#line 638 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 618 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                             { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemInt16}; }
-#line 3117 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3097 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 65: /* column_type: EMBEDDING '(' INTEGER ',' LONG_VALUE ')'  */
-#line 639 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 619 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                            { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemInt32}; }
-#line 3123 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3103 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 66: /* column_type: EMBEDDING '(' BIGINT ',' LONG_VALUE ')'  */
-#line 640 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 620 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                           { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemInt64}; }
-#line 3129 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3109 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 67: /* column_type: EMBEDDING '(' FLOAT ',' LONG_VALUE ')'  */
-#line 641 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 621 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                          { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemFloat}; }
-#line 3135 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3115 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 68: /* column_type: EMBEDDING '(' DOUBLE ',' LONG_VALUE ')'  */
-#line 642 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 622 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                           { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemDouble}; }
-#line 3141 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3121 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 69: /* column_type: VECTOR '(' BIT ',' LONG_VALUE ')'  */
-#line 643 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 623 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                     { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemBit}; }
-#line 3147 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3127 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 70: /* column_type: VECTOR '(' TINYINT ',' LONG_VALUE ')'  */
-#line 644 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 624 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                         { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemInt8}; }
-#line 3153 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3133 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 71: /* column_type: VECTOR '(' SMALLINT ',' LONG_VALUE ')'  */
-#line 645 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 625 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                          { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemInt16}; }
-#line 3159 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3139 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 72: /* column_type: VECTOR '(' INTEGER ',' LONG_VALUE ')'  */
-#line 646 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 626 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                         { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemInt32}; }
-#line 3165 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3145 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 73: /* column_type: VECTOR '(' BIGINT ',' LONG_VALUE ')'  */
-#line 647 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 627 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemInt64}; }
-#line 3171 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3151 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 74: /* column_type: VECTOR '(' FLOAT ',' LONG_VALUE ')'  */
-#line 648 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 628 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                       { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemFloat}; }
-#line 3177 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3157 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 75: /* column_type: VECTOR '(' DOUBLE ',' LONG_VALUE ')'  */
-#line 649 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 629 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        { (yyval.column_type_t) = ColumnType{LogicalType::kEmbedding, (yyvsp[-1].long_value), 0, 0, kElemDouble}; }
-#line 3183 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3163 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 76: /* column_constraints: column_constraint  */
-#line 668 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 648 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        {
     (yyval.column_constraints_t) = new HashSet<ConstraintType>();
     (yyval.column_constraints_t)->insert((yyvsp[0].column_constraint_t));
 }
-#line 3192 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3172 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 77: /* column_constraints: column_constraints column_constraint  */
-#line 672 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 652 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        {
     if((yyvsp[-1].column_constraints_t)->contains((yyvsp[0].column_constraint_t))) {
         yyerror(&yyloc, scanner, result, "Duplicate column constraint.");
         delete (yyvsp[-1].column_constraints_t);
+        YYERROR;
     }
     (yyvsp[-1].column_constraints_t)->insert((yyvsp[0].column_constraint_t));
     (yyval.column_constraints_t) = (yyvsp[-1].column_constraints_t);
 }
-#line 3205 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3186 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 78: /* column_constraint: PRIMARY KEY  */
-#line 681 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 662 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                 {
     (yyval.column_constraint_t) = ConstraintType::kPrimaryKey;
 }
-#line 3213 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3194 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 79: /* column_constraint: UNIQUE  */
-#line 684 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 665 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
          {
     (yyval.column_constraint_t) = ConstraintType::kUnique;
 }
-#line 3221 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3202 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 80: /* column_constraint: NULLABLE  */
-#line 687 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 668 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
            {
     (yyval.column_constraint_t) = ConstraintType::kNull;
 }
-#line 3229 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3210 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 81: /* column_constraint: NOT NULLABLE  */
-#line 690 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 671 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                {
     (yyval.column_constraint_t) = ConstraintType::kNotNull;
 }
-#line 3237 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3218 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 82: /* table_constraint: PRIMARY KEY '(' identifier_array ')'  */
-#line 694 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 675 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                         {
     (yyval.table_constraint_t) = new TableConstraint();
     (yyval.table_constraint_t)->names_ptr_ = (yyvsp[-1].identifier_array_t);
     (yyval.table_constraint_t)->constraint_ = ConstraintType::kPrimaryKey;
 }
-#line 3247 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3228 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 83: /* table_constraint: UNIQUE '(' identifier_array ')'  */
-#line 699 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 680 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                   {
     (yyval.table_constraint_t) = new TableConstraint();
     (yyval.table_constraint_t)->names_ptr_ = (yyvsp[-1].identifier_array_t);
     (yyval.table_constraint_t)->constraint_ = ConstraintType::kUnique;
 }
-#line 3257 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3238 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 84: /* identifier_array: IDENTIFIER  */
-#line 706 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 687 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                               {
     (yyval.identifier_array_t) = new Vector<String>();
     (yyval.identifier_array_t)->emplace_back((yyvsp[0].str_value));
     free((yyvsp[0].str_value));
 }
-#line 3267 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3248 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 85: /* identifier_array: identifier_array ',' IDENTIFIER  */
-#line 711 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 692 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                   {
     (yyvsp[-2].identifier_array_t)->emplace_back((yyvsp[0].str_value));
     free((yyvsp[0].str_value));
     (yyval.identifier_array_t) = (yyvsp[-2].identifier_array_t);
 }
-#line 3277 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3258 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 86: /* delete_statement: DELETE FROM table_name where_clause  */
-#line 720 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 701 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                        {
     (yyval.delete_stmt) = new DeleteStatement();
 
@@ -3288,11 +3269,11 @@ yyreduce:
     (yyval.delete_stmt)->table_name_ = (yyvsp[-1].table_name_t)->table_name_ptr_;
     (yyval.delete_stmt)->where_expr_ = (yyvsp[0].expr_t);
 }
-#line 3292 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3273 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 87: /* insert_statement: INSERT INTO table_name optional_identifier_array VALUES '(' constant_expr_array ')'  */
-#line 734 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 715 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                                                       {
     (yyval.insert_stmt) = new InsertStatement();
     if((yyvsp[-5].table_name_t)->schema_name_ptr_ != nullptr) {
@@ -3305,11 +3286,11 @@ yyreduce:
     (yyval.insert_stmt)->columns_ = (yyvsp[-4].identifier_array_t);
     (yyval.insert_stmt)->values_ = (yyvsp[-1].expr_array_t);
 }
-#line 3309 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3290 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 88: /* insert_statement: INSERT INTO table_name optional_identifier_array select_without_paren  */
-#line 746 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 727 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                         {
     (yyval.insert_stmt) = new InsertStatement();
     if((yyvsp[-2].table_name_t)->schema_name_ptr_ != nullptr) {
@@ -3321,77 +3302,77 @@ yyreduce:
     (yyval.insert_stmt)->columns_ = (yyvsp[-1].identifier_array_t);
     (yyval.insert_stmt)->select_ = (yyvsp[0].select_stmt);
 }
-#line 3325 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3306 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 89: /* optional_identifier_array: '(' identifier_array ')'  */
-#line 758 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 739 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                     {
     (yyval.identifier_array_t) = (yyvsp[-1].identifier_array_t);
 }
-#line 3333 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3314 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 90: /* optional_identifier_array: %empty  */
-#line 761 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 742 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
   {
     (yyval.identifier_array_t) = nullptr;
 }
-#line 3341 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3322 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 91: /* explain_statement: EXPLAIN explain_type explainable_statement  */
-#line 768 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 749 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                {
     (yyval.explain_stmt) = new ExplainStatement();
     (yyval.explain_stmt)->type_ = (yyvsp[-1].explain_type_t);
     (yyval.explain_stmt)->statement_ = (yyvsp[0].base_stmt);
 }
-#line 3351 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3332 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 92: /* explain_type: AST  */
-#line 774 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 755 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                   {
     (yyval.explain_type_t) = ExplainType::kAst;
 }
-#line 3359 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3340 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 93: /* explain_type: UNOPT LOGICAL  */
-#line 777 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 758 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                 {
     (yyval.explain_type_t) = ExplainType::kUnOpt;
 }
-#line 3367 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3348 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 94: /* explain_type: OPT LOGICAL  */
-#line 780 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 761 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
               {
     (yyval.explain_type_t) = ExplainType::kOpt;
 }
-#line 3375 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3356 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 95: /* explain_type: PHYSICAL  */
-#line 783 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 764 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
            {
     (yyval.explain_type_t) = ExplainType::kPhysical;
 }
-#line 3383 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3364 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 96: /* explain_type: PIPELINE  */
-#line 786 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 767 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
            {
     (yyval.explain_type_t) = ExplainType::kPipeline;
 }
-#line 3391 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3372 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 97: /* update_statement: UPDATE table_name SET update_expr_array where_clause  */
-#line 793 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 774 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                        {
     (yyval.update_stmt) = new UpdateStatement();
     if((yyvsp[-3].table_name_t)->schema_name_ptr_ != nullptr) {
@@ -3403,39 +3384,39 @@ yyreduce:
     (yyval.update_stmt)->where_expr_ = (yyvsp[0].expr_t);
     (yyval.update_stmt)->update_expr_array_ = (yyvsp[-1].update_expr_array_t);
 }
-#line 3407 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3388 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 98: /* update_expr_array: update_expr  */
-#line 805 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 786 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                {
     (yyval.update_expr_array_t) = new Vector<UpdateExpr*>();
     (yyval.update_expr_array_t)->emplace_back((yyvsp[0].update_expr_t));
 }
-#line 3416 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3397 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 99: /* update_expr_array: update_expr_array ',' update_expr  */
-#line 809 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 790 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                     {
     (yyvsp[-2].update_expr_array_t)->emplace_back((yyvsp[0].update_expr_t));
     (yyval.update_expr_array_t) = (yyvsp[-2].update_expr_array_t);
 }
-#line 3425 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3406 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 100: /* update_expr: IDENTIFIER '=' expr  */
-#line 814 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 795 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                   {
     (yyval.update_expr_t) = new UpdateExpr();
     (yyval.update_expr_t)->column_name = (yyvsp[-2].str_value);
     (yyval.update_expr_t)->value = (yyvsp[0].expr_t);
 }
-#line 3435 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3416 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 101: /* drop_statement: DROP SCHEMA if_exists IDENTIFIER  */
-#line 825 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 806 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                  {
     (yyval.drop_stmt) = new DropStatement();
     UniquePtr<DropSchemaInfo> drop_schema_info = MakeUnique<DropSchemaInfo>();
@@ -3444,11 +3425,11 @@ yyreduce:
     (yyval.drop_stmt)->drop_info_ = std::move(drop_schema_info);
     (yyval.drop_stmt)->drop_info_->conflict_type_ = (yyvsp[-1].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
 }
-#line 3448 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3429 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 102: /* drop_statement: DROP COLLECTION if_exists table_name  */
-#line 835 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 816 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        {
     (yyval.drop_stmt) = new DropStatement();
     std::unique_ptr<DropCollectionInfo> drop_collection_info = std::make_unique<DropCollectionInfo>();
@@ -3462,23 +3443,12 @@ yyreduce:
     (yyval.drop_stmt)->drop_info_->conflict_type_ = (yyvsp[-1].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
     delete (yyvsp[0].table_name_t);
 }
-#line 3466 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3447 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 103: /* copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')'  */
-#line 853 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 834 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                            {
-    if(result->IsError()) {
-        if((yyvsp[-6].table_name_t)->schema_name_ptr_ != nullptr) {
-            free((yyvsp[-6].table_name_t)->schema_name_ptr_);
-        }
-        free((yyvsp[-6].table_name_t)->table_name_ptr_);
-        delete((yyvsp[-6].table_name_t));
-        free((yyvsp[-4].str_value));
-        delete (yyvsp[-1].copy_option_array);
-        YYERROR;
-    }
-
     (yyval.copy_stmt) = new CopyStatement();
 
     // Copy To
@@ -3519,23 +3489,12 @@ yyreduce:
     }
     delete (yyvsp[-1].copy_option_array);
 }
-#line 3523 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3493 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 104: /* copy_statement: COPY table_name FROM file_path WITH '(' copy_option_list ')'  */
-#line 905 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 875 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                {
-    if(result->IsError()) {
-        if((yyvsp[-6].table_name_t)->schema_name_ptr_ != nullptr) {
-            free((yyvsp[-6].table_name_t)->schema_name_ptr_);
-        }
-        free((yyvsp[-6].table_name_t)->table_name_ptr_);
-        delete((yyvsp[-6].table_name_t));
-        free((yyvsp[-4].str_value));
-        delete (yyvsp[-1].copy_option_array);
-        YYERROR;
-    }
-
     (yyval.copy_stmt) = new CopyStatement();
 
     // Copy From
@@ -3576,27 +3535,27 @@ yyreduce:
     }
     delete (yyvsp[-1].copy_option_array);
 }
-#line 3580 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3539 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 105: /* select_statement: select_without_paren  */
-#line 961 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 920 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                         {
     (yyval.select_stmt) = (yyvsp[0].select_stmt);
 }
-#line 3588 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3547 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 106: /* select_statement: select_with_paren  */
-#line 964 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 923 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                     {
     (yyval.select_stmt) = (yyvsp[0].select_stmt);
 }
-#line 3596 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3555 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 107: /* select_statement: select_statement set_operator select_clause_without_modifier_paren  */
-#line 967 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 926 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                      {
     (yyvsp[-2].select_stmt)->set_op_ = (yyvsp[-1].set_operator_t);
     SelectStatement* node = (yyvsp[-2].select_stmt);
@@ -3606,11 +3565,11 @@ yyreduce:
     node->nested_select_ = (yyvsp[0].select_stmt);
     (yyval.select_stmt) = (yyvsp[-2].select_stmt);
 }
-#line 3610 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3569 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 108: /* select_statement: select_statement set_operator select_clause_without_modifier  */
-#line 976 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 935 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                {
     (yyvsp[-2].select_stmt)->set_op_ = (yyvsp[-1].set_operator_t);
     SelectStatement* node = (yyvsp[-2].select_stmt);
@@ -3620,63 +3579,63 @@ yyreduce:
     node->nested_select_ = (yyvsp[0].select_stmt);
     (yyval.select_stmt) = (yyvsp[-2].select_stmt);
 }
-#line 3624 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3583 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 109: /* select_with_paren: '(' select_without_paren ')'  */
-#line 986 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 945 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                  {
     (yyval.select_stmt) = (yyvsp[-1].select_stmt);
 }
-#line 3632 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3591 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 110: /* select_with_paren: '(' select_with_paren ')'  */
-#line 989 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 948 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                             {
     (yyval.select_stmt) = (yyvsp[-1].select_stmt);
 }
-#line 3640 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3599 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 111: /* select_without_paren: with_clause select_clause_with_modifier  */
-#line 993 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 952 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                               {
     (yyvsp[0].select_stmt)->with_exprs_ = (yyvsp[-1].with_expr_list_t);
     (yyval.select_stmt) = (yyvsp[0].select_stmt);
 }
-#line 3649 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3608 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 112: /* select_clause_with_modifier: select_clause_without_modifier order_by_clause limit_expr offset_expr  */
-#line 998 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 957 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                                                    {
     (yyvsp[-3].select_stmt)->order_by_list = (yyvsp[-2].order_by_expr_list_t);
     (yyvsp[-3].select_stmt)->limit_expr_ = (yyvsp[-1].expr_t);
     (yyvsp[-3].select_stmt)->offset_expr_ = (yyvsp[0].expr_t);
     (yyval.select_stmt) = (yyvsp[-3].select_stmt);
 }
-#line 3660 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3619 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 113: /* select_clause_without_modifier_paren: '(' select_clause_without_modifier ')'  */
-#line 1005 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 964 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                              {
   (yyval.select_stmt) = (yyvsp[-1].select_stmt);
 }
-#line 3668 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3627 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 114: /* select_clause_without_modifier_paren: '(' select_clause_without_modifier_paren ')'  */
-#line 1008 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 967 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                {
     (yyval.select_stmt) = (yyvsp[-1].select_stmt);
 }
-#line 3676 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3635 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 115: /* select_clause_without_modifier: SELECT distinct expr_array from_clause where_clause group_by_clause having_clause  */
-#line 1013 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 972 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                                   {
     (yyval.select_stmt) = new SelectStatement();
     (yyval.select_stmt)->select_list_ = (yyvsp[-4].expr_array_t);
@@ -3691,227 +3650,227 @@ yyreduce:
         YYERROR;
     }
 }
-#line 3695 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3654 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 116: /* order_by_clause: ORDER BY order_by_expr_list  */
-#line 1028 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 987 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                               {
     (yyval.order_by_expr_list_t) = (yyvsp[0].order_by_expr_list_t);
 }
-#line 3703 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3662 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 117: /* order_by_clause: %empty  */
-#line 1031 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 990 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                        {
     (yyval.order_by_expr_list_t) = nullptr;
 }
-#line 3711 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3670 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 118: /* order_by_expr_list: order_by_expr  */
-#line 1035 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 994 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                   {
     (yyval.order_by_expr_list_t) = new Vector<OrderByExpr*>();
     (yyval.order_by_expr_list_t)->emplace_back((yyvsp[0].order_by_expr_t));
 }
-#line 3720 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3679 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 119: /* order_by_expr_list: order_by_expr_list ',' order_by_expr  */
-#line 1039 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 998 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        {
     (yyvsp[-2].order_by_expr_list_t)->emplace_back((yyvsp[0].order_by_expr_t));
     (yyval.order_by_expr_list_t) = (yyvsp[-2].order_by_expr_list_t);
 }
-#line 3729 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3688 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 120: /* order_by_expr: expr order_by_type  */
-#line 1044 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1003 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                    {
     (yyval.order_by_expr_t) = new OrderByExpr();
     (yyval.order_by_expr_t)->expr_ = (yyvsp[-1].expr_t);
     (yyval.order_by_expr_t)->type_ = (yyvsp[0].order_by_type_t);
 }
-#line 3739 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3698 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 121: /* order_by_type: ASC  */
-#line 1050 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1009 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     (yyval.order_by_type_t) = kAsc;
 }
-#line 3747 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3706 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 122: /* order_by_type: DESC  */
-#line 1053 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1012 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        {
     (yyval.order_by_type_t) = kDesc;
 }
-#line 3755 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3714 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 123: /* order_by_type: %empty  */
-#line 1056 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1015 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
   {
     (yyval.order_by_type_t) = kAsc;
 }
-#line 3763 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3722 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 124: /* limit_expr: LIMIT expr  */
-#line 1060 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1019 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                        {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 3771 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3730 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 125: /* limit_expr: %empty  */
-#line 1064 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1023 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
 {   (yyval.expr_t) = nullptr; }
-#line 3777 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3736 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 126: /* offset_expr: OFFSET expr  */
-#line 1066 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1025 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                          {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 3785 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3744 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 127: /* offset_expr: %empty  */
-#line 1070 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1029 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
 {   (yyval.expr_t) = nullptr; }
-#line 3791 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3750 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 128: /* distinct: DISTINCT  */
-#line 1072 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1031 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                     {
     (yyval.bool_value) = true;
 }
-#line 3799 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3758 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 129: /* distinct: %empty  */
-#line 1075 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1034 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
   {
     (yyval.bool_value) = false;
 }
-#line 3807 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3766 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 130: /* from_clause: FROM table_reference  */
-#line 1079 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1038 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                   {
     (yyval.table_reference_t) = (yyvsp[0].table_reference_t);
 }
-#line 3815 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3774 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 131: /* from_clause: %empty  */
-#line 1082 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1041 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                        {
     (yyval.table_reference_t) = nullptr;
 }
-#line 3823 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3782 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 132: /* where_clause: WHERE expr  */
-#line 1086 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1045 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                          {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 3831 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3790 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 133: /* where_clause: %empty  */
-#line 1089 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1048 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                         {
     (yyval.expr_t) = nullptr;
 }
-#line 3839 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3798 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 134: /* having_clause: HAVING expr  */
-#line 1093 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1052 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                            {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 3847 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3806 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 135: /* having_clause: %empty  */
-#line 1096 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1055 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                         {
     (yyval.expr_t) = nullptr;
 }
-#line 3855 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3814 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 136: /* group_by_clause: GROUP BY expr_array  */
-#line 1100 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1059 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                      {
     (yyval.expr_array_t) = (yyvsp[0].expr_array_t);
 }
-#line 3863 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3822 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 137: /* group_by_clause: %empty  */
-#line 1103 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1062 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
   {
     (yyval.expr_array_t) = nullptr;
 }
-#line 3871 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3830 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 138: /* set_operator: UNION  */
-#line 1107 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1066 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                      {
     (yyval.set_operator_t) = SetOperatorType::kUnion;
 }
-#line 3879 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3838 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 139: /* set_operator: UNION ALL  */
-#line 1110 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1069 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
             {
     (yyval.set_operator_t) = SetOperatorType::kUnionAll;
 }
-#line 3887 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3846 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 140: /* set_operator: INTERSECT  */
-#line 1113 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1072 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
             {
     (yyval.set_operator_t) = SetOperatorType::kIntersect;
 }
-#line 3895 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3854 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 141: /* set_operator: EXCEPT  */
-#line 1116 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1075 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
          {
     (yyval.set_operator_t) = SetOperatorType::kExcept;
 }
-#line 3903 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3862 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 142: /* table_reference: table_reference_unit  */
-#line 1124 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1083 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        {
     (yyval.table_reference_t) = (yyvsp[0].table_reference_t);
 }
-#line 3911 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3870 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 143: /* table_reference: table_reference ',' table_reference_unit  */
-#line 1127 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1086 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                            {
     CrossProductReference* cross_product_ref = new CrossProductReference();
     cross_product_ref->left_ = (yyvsp[-2].table_reference_t);
@@ -3919,11 +3878,11 @@ yyreduce:
 
     (yyval.table_reference_t) = cross_product_ref;
 }
-#line 3923 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3882 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 146: /* table_reference_name: table_name table_alias  */
-#line 1138 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1097 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                               {
     TableReference* table_ref = new TableReference();
     if((yyvsp[-1].table_name_t)->schema_name_ptr_ != nullptr) {
@@ -3937,33 +3896,33 @@ yyreduce:
     table_ref->alias_ = (yyvsp[0].table_alias_t);
     (yyval.table_reference_t) = table_ref;
 }
-#line 3941 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3900 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 147: /* table_reference_name: '(' select_statement ')' table_alias  */
-#line 1152 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1111 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        {
     SubqueryReference* subquery_reference = new SubqueryReference();
     subquery_reference->select_statement_ = (yyvsp[-2].select_stmt);
     subquery_reference->alias_ = (yyvsp[0].table_alias_t);
     (yyval.table_reference_t) = subquery_reference;
 }
-#line 3952 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3911 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 148: /* table_name: IDENTIFIER  */
-#line 1161 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1120 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                         {
     if(!result->IsError()) {
         (yyval.table_name_t) = new TableName();
         (yyval.table_name_t)->table_name_ptr_ = (yyvsp[0].str_value);
     }
 }
-#line 3963 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3922 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 149: /* table_name: IDENTIFIER '.' IDENTIFIER  */
-#line 1167 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1126 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                             {
     if(!result->IsError()) {
         (yyval.table_name_t) = new TableName();
@@ -3971,83 +3930,83 @@ yyreduce:
         (yyval.table_name_t)->table_name_ptr_ = (yyvsp[0].str_value);
     }
 }
-#line 3975 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3934 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 150: /* table_alias: AS IDENTIFIER  */
-#line 1176 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1135 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                             {
     (yyval.table_alias_t) = new TableAlias();
     (yyval.table_alias_t)->alias_ = (yyvsp[0].str_value);
 }
-#line 3984 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3943 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 151: /* table_alias: AS IDENTIFIER '(' identifier_array ')'  */
-#line 1180 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1139 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                          {
     (yyval.table_alias_t) = new TableAlias();
     (yyval.table_alias_t)->alias_ = (yyvsp[-3].str_value);
     (yyval.table_alias_t)->column_alias_array_ = (yyvsp[-1].identifier_array_t);
 }
-#line 3994 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3953 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 152: /* table_alias: %empty  */
-#line 1185 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1144 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
   {
     (yyval.table_alias_t) = nullptr;
 }
-#line 4002 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3961 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 153: /* with_clause: WITH with_expr_list  */
-#line 1192 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1151 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                   {
     (yyval.with_expr_list_t) = (yyvsp[0].with_expr_list_t);
 }
-#line 4010 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3969 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 154: /* with_clause: %empty  */
-#line 1195 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1154 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                           {
     (yyval.with_expr_list_t) = nullptr;
 }
-#line 4018 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3977 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 155: /* with_expr_list: with_expr  */
-#line 1199 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1158 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                           {
     (yyval.with_expr_list_t) = new Vector<WithExpr*>();
     (yyval.with_expr_list_t)->emplace_back((yyvsp[0].with_expr_t));
 }
-#line 4027 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3986 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 156: /* with_expr_list: with_expr_list ',' with_expr  */
-#line 1202 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1161 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                  {
     (yyvsp[-2].with_expr_list_t)->emplace_back((yyvsp[0].with_expr_t));
     (yyval.with_expr_list_t) = (yyvsp[-2].with_expr_list_t);
 }
-#line 4036 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 3995 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 157: /* with_expr: IDENTIFIER AS '(' select_clause_with_modifier ')'  */
-#line 1207 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1166 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                              {
     (yyval.with_expr_t) = new WithExpr();
     (yyval.with_expr_t)->alias_ = (yyvsp[-4].str_value);
     free((yyvsp[-4].str_value));
     (yyval.with_expr_t)->statement_ = (yyvsp[-1].select_stmt);
 }
-#line 4047 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4006 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 158: /* join_clause: table_reference_unit NATURAL JOIN table_reference_name  */
-#line 1218 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1177 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                     {
     JoinReference* join_reference = new JoinReference();
     join_reference->left_ = (yyvsp[-3].table_reference_t);
@@ -4055,11 +4014,11 @@ yyreduce:
     join_reference->join_type_ = JoinType::kNatural;
     (yyval.table_reference_t) = join_reference;
 }
-#line 4059 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4018 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 159: /* join_clause: table_reference_unit join_type JOIN table_reference_name ON expr  */
-#line 1225 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1184 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                    {
     JoinReference* join_reference = new JoinReference();
     join_reference->left_ = (yyvsp[-5].table_reference_t);
@@ -4068,75 +4027,75 @@ yyreduce:
     join_reference->condition_ = (yyvsp[0].expr_t);
     (yyval.table_reference_t) = join_reference;
 }
-#line 4072 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4031 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 160: /* join_type: INNER  */
-#line 1239 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1198 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                   {
     (yyval.join_type_t) = JoinType::kInner;
 }
-#line 4080 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4039 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 161: /* join_type: LEFT  */
-#line 1242 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1201 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        {
     (yyval.join_type_t) = JoinType::kLeft;
 }
-#line 4088 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4047 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 162: /* join_type: RIGHT  */
-#line 1245 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1204 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
         {
     (yyval.join_type_t) = JoinType::kRight;
 }
-#line 4096 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4055 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 163: /* join_type: OUTER  */
-#line 1248 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1207 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
         {
     (yyval.join_type_t) = JoinType::kFull;
 }
-#line 4104 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4063 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 164: /* join_type: FULL  */
-#line 1251 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1210 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        {
     (yyval.join_type_t) = JoinType::kFull;
 }
-#line 4112 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4071 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 165: /* join_type: CROSS  */
-#line 1254 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1213 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
         {
     (yyval.join_type_t) = JoinType::kCross;
 }
-#line 4120 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4079 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 166: /* join_type: %empty  */
-#line 1257 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1216 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                 {
 }
-#line 4127 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4086 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 167: /* show_statement: SHOW TABLES  */
-#line 1263 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1222 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                             {
     (yyval.show_stmt) = new ShowStatement();
     (yyval.show_stmt)->show_type_ = ShowStmtType::kTables;
 }
-#line 4136 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4095 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 168: /* show_statement: DESCRIBE table_name  */
-#line 1267 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1226 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     (yyval.show_stmt) = new ShowStatement();
     (yyval.show_stmt)->show_type_ = ShowStmtType::kColumns;
@@ -4148,84 +4107,84 @@ yyreduce:
     free((yyvsp[0].table_name_t)->table_name_ptr_);
     delete (yyvsp[0].table_name_t);
 }
-#line 4152 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4111 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 169: /* expr_array: expr_alias  */
-#line 1283 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1242 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                         {
     (yyval.expr_array_t) = new Vector<ParsedExpr*>();
     (yyval.expr_array_t)->emplace_back((yyvsp[0].expr_t));
 }
-#line 4161 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4120 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 170: /* expr_array: expr_array ',' expr_alias  */
-#line 1287 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1246 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                             {
     (yyvsp[-2].expr_array_t)->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_array_t) = (yyvsp[-2].expr_array_t);
 }
-#line 4170 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4129 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 171: /* constant_expr_array: constant_expr  */
-#line 1292 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1251 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                    {
     (yyval.expr_array_t) = new Vector<ParsedExpr*>();
     (yyval.expr_array_t)->emplace_back((yyvsp[0].expr_t));
 }
-#line 4179 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4138 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 172: /* constant_expr_array: constant_expr_array ',' constant_expr  */
-#line 1296 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1255 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                         {
     (yyvsp[-2].expr_array_t)->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_array_t) = (yyvsp[-2].expr_array_t);
 }
-#line 4188 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4147 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 173: /* expr_alias: expr AS IDENTIFIER  */
-#line 1301 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1260 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                 {
     (yyval.expr_t) = (yyvsp[-2].expr_t);
     (yyval.expr_t)->alias_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
-#line 4198 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4157 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 174: /* expr_alias: expr  */
-#line 1306 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1265 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 4206 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4165 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 180: /* operand: '(' expr ')'  */
-#line 1316 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1275 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
    (yyval.expr_t) = (yyvsp[-1].expr_t);
 }
-#line 4214 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4173 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 181: /* operand: '(' select_without_paren ')'  */
-#line 1319 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1278 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                {
     SubqueryExpr* subquery_expr = new SubqueryExpr();
     subquery_expr->subquery_type_ = SubqueryType::kScalar;
     subquery_expr->select_ = (yyvsp[-1].select_stmt);
     (yyval.expr_t) = subquery_expr;
 }
-#line 4225 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4184 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 185: /* function_expr: IDENTIFIER '(' ')'  */
-#line 1329 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1288 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                    {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = (yyvsp[-2].str_value);
@@ -4233,11 +4192,11 @@ yyreduce:
     func_expr->arguments_ = nullptr;
     (yyval.expr_t) = func_expr;
 }
-#line 4237 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4196 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 186: /* function_expr: IDENTIFIER '(' expr_array ')'  */
-#line 1336 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1295 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                 {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = (yyvsp[-3].str_value);
@@ -4245,11 +4204,11 @@ yyreduce:
     func_expr->arguments_ = (yyvsp[-1].expr_array_t);
     (yyval.expr_t) = func_expr;
 }
-#line 4249 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4208 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 187: /* function_expr: IDENTIFIER '(' DISTINCT expr_array ')'  */
-#line 1343 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1302 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                          {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = (yyvsp[-4].str_value);
@@ -4258,11 +4217,11 @@ yyreduce:
     func_expr->distinct_ = true;
     (yyval.expr_t) = func_expr;
 }
-#line 4262 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4221 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 188: /* function_expr: operand IS NOT NULLABLE  */
-#line 1351 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1310 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                           {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "is_not_null";
@@ -4270,11 +4229,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[-3].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4274 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4233 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 189: /* function_expr: operand IS NULLABLE  */
-#line 1358 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1317 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "is_null";
@@ -4282,11 +4241,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[-2].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4286 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4245 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 190: /* function_expr: '-' operand  */
-#line 1365 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1324 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
               {
   FunctionExpr* func_expr = new FunctionExpr();
   func_expr->func_name_ = "-";
@@ -4294,11 +4253,11 @@ yyreduce:
   func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
   (yyval.expr_t) = func_expr;
 }
-#line 4298 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4257 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 191: /* function_expr: '+' operand  */
-#line 1372 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1331 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
               {
   FunctionExpr* func_expr = new FunctionExpr();
   func_expr->func_name_ = "+";
@@ -4306,11 +4265,11 @@ yyreduce:
   func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
   (yyval.expr_t) = func_expr;
 }
-#line 4310 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4269 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 192: /* function_expr: operand '-' operand  */
-#line 1379 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1338 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "-";
@@ -4319,11 +4278,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4323 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4282 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 193: /* function_expr: operand '+' operand  */
-#line 1387 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1346 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "+";
@@ -4332,11 +4291,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4336 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4295 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 194: /* function_expr: operand '*' operand  */
-#line 1395 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1354 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "*";
@@ -4345,11 +4304,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4349 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4308 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 195: /* function_expr: operand '/' operand  */
-#line 1403 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1362 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "/";
@@ -4358,11 +4317,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4362 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4321 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 196: /* function_expr: operand '%' operand  */
-#line 1411 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1370 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "%";
@@ -4371,11 +4330,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4375 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4334 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 197: /* function_expr: operand '=' operand  */
-#line 1419 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1378 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "=";
@@ -4384,11 +4343,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4388 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4347 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 198: /* function_expr: operand EQUAL operand  */
-#line 1427 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1386 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                         {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "=";
@@ -4397,11 +4356,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4401 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4360 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 199: /* function_expr: operand NOT_EQ operand  */
-#line 1435 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1394 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                          {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "<>";
@@ -4410,11 +4369,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4414 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4373 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 200: /* function_expr: operand '<' operand  */
-#line 1443 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1402 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "<";
@@ -4423,11 +4382,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4427 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4386 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 201: /* function_expr: operand '>' operand  */
-#line 1451 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1410 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = ">";
@@ -4436,11 +4395,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4440 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4399 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 202: /* function_expr: operand LESS_EQ operand  */
-#line 1459 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1418 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                           {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "<=";
@@ -4449,11 +4408,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4453 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4412 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 203: /* function_expr: operand GREATER_EQ operand  */
-#line 1467 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1426 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                              {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = ">=";
@@ -4462,11 +4421,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4466 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4425 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 204: /* conjunction_expr: expr AND expr  */
-#line 1476 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1435 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                 {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "and";
@@ -4475,11 +4434,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4479 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4438 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 205: /* conjunction_expr: expr OR expr  */
-#line 1484 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1443 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "or";
@@ -4488,11 +4447,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4492 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4451 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 206: /* between_expr: operand BETWEEN operand AND operand  */
-#line 1493 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1452 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                   {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "between_and";
@@ -4502,11 +4461,11 @@ yyreduce:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 4506 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4465 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 207: /* in_expr: operand IN '(' expr_array ')'  */
-#line 1503 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1462 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        {
      FunctionExpr* func_expr = new FunctionExpr();
      func_expr->func_name_ = "in";
@@ -4514,11 +4473,11 @@ yyreduce:
      func_expr->arguments_->emplace_back((yyvsp[-4].expr_t));
      (yyval.expr_t) = func_expr;
  }
-#line 4518 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4477 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 208: /* in_expr: operand NOT IN '(' expr_array ')'  */
-#line 1510 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1469 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                      {
      FunctionExpr* func_expr = new FunctionExpr();
      func_expr->func_name_ = "not_in";
@@ -4526,33 +4485,33 @@ yyreduce:
      func_expr->arguments_->emplace_back((yyvsp[-5].expr_t));
      (yyval.expr_t) = func_expr;
  }
-#line 4530 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4489 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 209: /* subquery_expr: EXISTS '(' select_without_paren ')'  */
-#line 1518 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1477 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                    {
     SubqueryExpr* subquery_expr = new SubqueryExpr();
     subquery_expr->subquery_type_ = SubqueryType::kExists;
     subquery_expr->select_ = (yyvsp[-1].select_stmt);
     (yyval.expr_t) = subquery_expr;
 }
-#line 4541 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4500 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 210: /* subquery_expr: NOT EXISTS '(' select_without_paren ')'  */
-#line 1524 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1483 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                           {
     SubqueryExpr* subquery_expr = new SubqueryExpr();
     subquery_expr->subquery_type_ = SubqueryType::kNotExists;
     subquery_expr->select_ = (yyvsp[-1].select_stmt);
     (yyval.expr_t) = subquery_expr;
 }
-#line 4552 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4511 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 211: /* subquery_expr: operand IN '(' select_without_paren ')'  */
-#line 1530 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1489 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                           {
     SubqueryExpr* subquery_expr = new SubqueryExpr();
     subquery_expr->subquery_type_ = SubqueryType::kIn;
@@ -4560,11 +4519,11 @@ yyreduce:
     subquery_expr->select_ = (yyvsp[-1].select_stmt);
     (yyval.expr_t) = subquery_expr;
 }
-#line 4564 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4523 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 212: /* subquery_expr: operand NOT IN '(' select_without_paren ')'  */
-#line 1537 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1496 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                               {
     SubqueryExpr* subquery_expr = new SubqueryExpr();
     subquery_expr->subquery_type_ = SubqueryType::kNotIn;
@@ -4572,41 +4531,41 @@ yyreduce:
     subquery_expr->select_ = (yyvsp[-1].select_stmt);
     (yyval.expr_t) = subquery_expr;
 }
-#line 4576 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4535 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 213: /* column_expr: IDENTIFIER  */
-#line 1545 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1504 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                          {
     ColumnExpr* column_expr = new ColumnExpr();
     column_expr->names_.emplace_back((yyvsp[0].str_value));
     (yyval.expr_t) = column_expr;
 }
-#line 4586 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4545 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 214: /* column_expr: column_expr '.' IDENTIFIER  */
-#line 1550 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1509 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                              {
     ColumnExpr* column_expr = (ColumnExpr*)(yyvsp[-2].expr_t);
     column_expr->names_.emplace_back((yyvsp[0].str_value));
     (yyval.expr_t) = column_expr;
 }
-#line 4596 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4555 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 215: /* column_expr: '*'  */
-#line 1555 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1514 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
       {
     ColumnExpr* column_expr = new ColumnExpr();
     column_expr->star_ = true;
     (yyval.expr_t) = column_expr;
 }
-#line 4606 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4565 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 216: /* column_expr: column_expr '.' '*'  */
-#line 1560 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1519 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     ColumnExpr* column_expr = (ColumnExpr*)(yyvsp[-2].expr_t);
     if(column_expr->star_) {
@@ -4616,229 +4575,229 @@ yyreduce:
     column_expr->star_ = true;
     (yyval.expr_t) = column_expr;
 }
-#line 4620 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4579 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 217: /* constant_expr: STRING  */
-#line 1570 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1529 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                       {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kString);
     const_expr->str_value_ = (yyvsp[0].str_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4630 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4589 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 218: /* constant_expr: TRUE  */
-#line 1575 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1534 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
        {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kBoolean);
     const_expr->bool_value_ = true;
     (yyval.expr_t) = const_expr;
 }
-#line 4640 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4599 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 219: /* constant_expr: FALSE  */
-#line 1580 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1539 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
         {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kBoolean);
     const_expr->bool_value_ = false;
     (yyval.expr_t) = const_expr;
 }
-#line 4650 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4609 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 220: /* constant_expr: DOUBLE_VALUE  */
-#line 1585 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1544 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kFloat);
     const_expr->float_value_ = (yyvsp[0].double_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4660 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4619 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 221: /* constant_expr: LONG_VALUE  */
-#line 1590 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1549 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
              {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInteger);
     const_expr->integer_value_ = (yyvsp[0].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4670 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4629 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 222: /* constant_expr: DATE STRING  */
-#line 1595 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1554 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
               {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kDate);
     const_expr->date_value_ = (yyvsp[0].str_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4680 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4639 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 223: /* constant_expr: INTERVAL interval_expr  */
-#line 1600 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1559 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                          {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 4688 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4647 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 224: /* interval_expr: LONG_VALUE SECONDS  */
-#line 1604 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1563 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                   {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kSecond;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4699 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4658 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 225: /* interval_expr: LONG_VALUE SECOND  */
-#line 1610 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1569 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                     {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kSecond;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4710 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4669 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 226: /* interval_expr: LONG_VALUE MINUTES  */
-#line 1616 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1575 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                      {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kMinute;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4721 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4680 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 227: /* interval_expr: LONG_VALUE MINUTE  */
-#line 1622 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1581 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                     {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kMinute;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4732 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4691 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 228: /* interval_expr: LONG_VALUE HOURS  */
-#line 1628 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1587 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kHour;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4743 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4702 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 229: /* interval_expr: LONG_VALUE HOUR  */
-#line 1634 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1593 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                   {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kHour;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4754 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4713 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 230: /* interval_expr: LONG_VALUE DAYS  */
-#line 1640 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1599 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                   {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kDay;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4765 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4724 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 231: /* interval_expr: LONG_VALUE DAY  */
-#line 1646 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1605 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                  {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kDay;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4776 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4735 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 232: /* interval_expr: LONG_VALUE MONTHS  */
-#line 1652 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1611 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                     {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kMonth;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4787 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4746 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 233: /* interval_expr: LONG_VALUE MONTH  */
-#line 1658 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1617 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kMonth;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4798 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4757 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 234: /* interval_expr: LONG_VALUE YEARS  */
-#line 1664 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1623 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kYear;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4809 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4768 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 235: /* interval_expr: LONG_VALUE YEAR  */
-#line 1670 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1629 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                   {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
     const_expr->interval_type_ = IntervalExprType::kYear;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
-#line 4820 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4779 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 236: /* copy_option_list: copy_option  */
-#line 1681 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1640 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                {
     (yyval.copy_option_array) = new Vector<CopyOption*>();
     (yyval.copy_option_array)->push_back((yyvsp[0].copy_option_t));
 }
-#line 4829 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4788 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 237: /* copy_option_list: copy_option_list ',' copy_option  */
-#line 1685 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1644 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                    {
     (yyvsp[-2].copy_option_array)->push_back((yyvsp[0].copy_option_t));
     (yyval.copy_option_array) = (yyvsp[-2].copy_option_array);
 }
-#line 4838 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4797 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 238: /* copy_option: FORMAT IDENTIFIER  */
-#line 1690 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1649 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                 {
     (yyval.copy_option_t) = new CopyOption();
     (yyval.copy_option_t)->option_type_ = CopyOptionType::kFormat;
@@ -4849,66 +4808,67 @@ yyreduce:
         free((yyvsp[0].str_value));
         delete (yyval.copy_option_t);
         yyerror(&yyloc, scanner, result, "Unknown file type");
+        YYERROR;
     }
 }
-#line 4855 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4815 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 239: /* copy_option: DELIMITER STRING  */
-#line 1702 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1662 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     (yyval.copy_option_t) = new CopyOption();
     (yyval.copy_option_t)->option_type_ = CopyOptionType::kDelimiter;
     (yyval.copy_option_t)->delimiter_ = (yyvsp[0].str_value)[0];
     free((yyvsp[0].str_value));
 }
-#line 4866 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4826 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 240: /* copy_option: HEADER  */
-#line 1708 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1668 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
          {
     (yyval.copy_option_t) = new CopyOption();
     (yyval.copy_option_t)->option_type_ = CopyOptionType::kHeader;
     (yyval.copy_option_t)->header_ = true;
 }
-#line 4876 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4836 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 241: /* file_path: STRING  */
-#line 1714 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1674 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     (yyval.str_value) = (yyvsp[0].str_value);
 }
-#line 4884 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4844 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 242: /* if_exists: IF EXISTS  */
-#line 1718 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1678 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                      { (yyval.bool_value) = true; }
-#line 4890 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4850 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 243: /* if_exists: %empty  */
-#line 1719 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1679 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
   { (yyval.bool_value) = false; }
-#line 4896 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4856 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 244: /* if_not_exists: IF NOT EXISTS  */
-#line 1721 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1681 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                               { (yyval.bool_value) = true; }
-#line 4902 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4862 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
   case 245: /* if_not_exists: %empty  */
-#line 1722 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1682 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
   { (yyval.bool_value) = false; }
-#line 4908 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4868 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
 
 
-#line 4912 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
+#line 4872 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
 
       default: break;
     }
@@ -5137,7 +5097,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 1728 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 1688 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
 
 
 void

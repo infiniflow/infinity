@@ -413,17 +413,6 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 
 /* CREATE TABLE table_name ( column list ); */
 | CREATE TABLE if_not_exists table_name '(' table_element_array ')' {
-    if(result->IsError()) {
-        printf("Error happened, release memory\n");
-        if($4->schema_name_ptr_ != nullptr) {
-            free($4->schema_name_ptr_);
-        }
-        free($4->table_name_ptr_);
-        delete($4);
-        delete($6);
-        YYERROR;
-    }
-
     $$ = new CreateStatement();
     UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
     if($4->schema_name_ptr_ != nullptr) {
@@ -517,10 +506,6 @@ table_element : table_column {
 
 table_column :
 IDENTIFIER column_type {
-    if(result->IsError()) {
-        free($1);
-    }
-
     SharedPtr<TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
         case LogicalType::kChar: {
@@ -559,11 +544,6 @@ IDENTIFIER column_type {
     */
 };
 | IDENTIFIER column_type column_constraints {
-    if(result->IsError()) {
-        free($1);
-        delete($3);
-    }
-
     SharedPtr<TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
         case LogicalType::kChar: {
@@ -673,6 +653,7 @@ column_constraints : column_constraint {
     if($1->contains($2)) {
         yyerror(&yyloc, scanner, result, "Duplicate column constraint.");
         delete $1;
+        YYERROR;
     }
     $1->insert($2);
     $$ = $1;
@@ -851,17 +832,6 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
  */
 // COPY schema.table TO file_path WITH (FORMAT csv, DELIMITER ',', HEADER TRUE)
 copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
-    if(result->IsError()) {
-        if($2->schema_name_ptr_ != nullptr) {
-            free($2->schema_name_ptr_);
-        }
-        free($2->table_name_ptr_);
-        delete($2);
-        free($4);
-        delete $7;
-        YYERROR;
-    }
-
     $$ = new CopyStatement();
 
     // Copy To
@@ -903,17 +873,6 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     delete $7;
 }
 | COPY table_name FROM file_path WITH '(' copy_option_list ')' {
-    if(result->IsError()) {
-        if($2->schema_name_ptr_ != nullptr) {
-            free($2->schema_name_ptr_);
-        }
-        free($2->table_name_ptr_);
-        delete($2);
-        free($4);
-        delete $7;
-        YYERROR;
-    }
-
     $$ = new CopyStatement();
 
     // Copy From
@@ -1697,6 +1656,7 @@ copy_option : FORMAT IDENTIFIER {
         free($2);
         delete $$;
         yyerror(&yyloc, scanner, result, "Unknown file type");
+        YYERROR;
     }
 }
 | DELIMITER STRING {
