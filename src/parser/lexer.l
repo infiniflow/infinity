@@ -42,6 +42,7 @@ BOOLEAN         { return BOOLEAN; }
 BOX             { return BOX; }
 BLOB            { return BLOB; }
 BY              { return BY; }
+CAST            { return CAST; }
 CHAR            { return CHAR; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
@@ -61,6 +62,7 @@ DESCRIBE        { return DESCRIBE; }
 DESC            { return DESC; }
 DROP            { return DROP; }
 EMBEDDING       { return EMBEDDING; }
+END             { return END; }
 EXCEPT          { return EXCEPT; }
 EXECUTE         { return EXECUTE; }
 EXISTS          { return EXISTS; }

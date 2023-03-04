@@ -127,6 +127,8 @@ struct SQL_LTYPE {
     ParsedExpr*             expr_t;
     Vector<ParsedExpr*>*    expr_array_t;
 
+    Vector<CaseCheck*>*     case_check_array_t;
+
     UpdateExpr*             update_expr_t;
     Vector<UpdateExpr*>*    update_expr_array_t;
 
@@ -252,6 +254,15 @@ struct SQL_LTYPE {
     }
 } <select_stmt>
 
+%destructor {
+    fprintf(stderr, "destroy case check array\n");
+    if($$ != nullptr) {
+        for(auto ptr: *($$)) {
+            delete ptr;
+        }
+    }
+} <case_check_array_t>
+
 %token <str_value>      IDENTIFIER STRING
 %token <double_value>   DOUBLE_VALUE
 %token <long_value>     LONG_VALUE
@@ -262,7 +273,7 @@ struct SQL_LTYPE {
 %token EXCEPT
 %token SCHEMA TABLE COLLECTION TABLES INTO VALUES AST PIPELINE UNOPT OPT LOGICAL PHYSICAL VIEW INDEX
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
-%token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER
+%token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END
 %token BOOLEAN INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
 %token PRIMARY KEY UNIQUE NULLABLE IS
@@ -308,10 +319,11 @@ struct SQL_LTYPE {
 
 %type <expr_t>                  expr expr_alias constant_expr interval_expr column_expr function_expr subquery_expr
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
-%type <expr_t>                  conjunction_expr
+%type <expr_t>                  conjunction_expr cast_expr case_expr
 %type <expr_array_t>            expr_array group_by_clause constant_expr_array
 %type <update_expr_t>           update_expr;
 %type <update_expr_array_t>     update_expr_array;
+%type <case_check_array_t>      case_check_array;
 
 %type <table_element_array_t>   table_element_array
 
@@ -1283,7 +1295,9 @@ operand: '(' expr ')' {
 }
 | constant_expr
 | column_expr
-| function_expr;
+| function_expr
+| case_expr
+| cast_expr
 
 function_expr : IDENTIFIER '(' ')' {
     FunctionExpr* func_expr = new FunctionExpr();
@@ -1460,19 +1474,92 @@ between_expr: operand BETWEEN operand AND operand {
 }
 
 in_expr: operand IN '(' expr_array ')' {
-     FunctionExpr* func_expr = new FunctionExpr();
-     func_expr->func_name_ = "in";
-     func_expr->arguments_ = $4;
-     func_expr->arguments_->emplace_back($1);
-     $$ = func_expr;
- }
- | operand NOT IN '(' expr_array ')' {
-     FunctionExpr* func_expr = new FunctionExpr();
-     func_expr->func_name_ = "not_in";
-     func_expr->arguments_ = $5;
-     func_expr->arguments_->emplace_back($1);
-     $$ = func_expr;
- };
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "in";
+    func_expr->arguments_ = $4;
+    func_expr->arguments_->emplace_back($1);
+    $$ = func_expr;
+}
+| operand NOT IN '(' expr_array ')' {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "not_in";
+    func_expr->arguments_ = $5;
+    func_expr->arguments_->emplace_back($1);
+    $$ = func_expr;
+};
+
+case_expr: CASE expr case_check_array END {
+    CaseExpr* case_expr = new CaseExpr();
+    case_expr->expr_ = $2;
+    case_expr->case_check_array_ = $3;
+    $$ = case_expr;
+}
+| CASE expr case_check_array ELSE expr END {
+    CaseExpr* case_expr = new CaseExpr();
+    case_expr->expr_ = $2;
+    case_expr->case_check_array_ = $3;
+    case_expr->else_expr_ = $5;
+    $$ = case_expr;
+}
+| CASE case_check_array END {
+    CaseExpr* case_expr = new CaseExpr();
+    case_expr->case_check_array_ = $2;
+    $$ = case_expr;
+}
+| CASE case_check_array ELSE expr END {
+    CaseExpr* case_expr = new CaseExpr();
+    case_expr->case_check_array_ = $2;
+    case_expr->else_expr_ = $4;
+    $$ = case_expr;
+};
+
+case_check_array: WHEN expr THEN expr {
+    $$ = new Vector<CaseCheck*>();
+    CaseCheck* case_check_ptr = new CaseCheck();
+    case_check_ptr->when_ = $2;
+    case_check_ptr->then_ = $4;
+    $$->emplace_back(case_check_ptr);
+}
+| case_check_array WHEN expr THEN expr {
+    CaseCheck* case_check_ptr = new CaseCheck();
+    case_check_ptr->when_ = $3;
+    case_check_ptr->then_ = $5;
+    $1->emplace_back(case_check_ptr);
+    $$ = $1;
+};
+
+cast_expr: CAST '(' expr AS column_type ')' {
+    SharedPtr<TypeInfo> type_info_ptr{nullptr};
+    switch($5.logical_type_) {
+        case LogicalType::kChar: {
+            type_info_ptr = CharInfo::Make($5.width);
+            break;
+        }
+        case LogicalType::kVarchar: {
+            type_info_ptr = VarcharInfo::Make($5.width);
+            break;
+        }
+        case LogicalType::kDecimal64: {
+            type_info_ptr = Decimal64Info::Make($5.precision, $5.scale);
+            break;
+        }
+        case LogicalType::kBlob: {
+            type_info_ptr = BlobInfo::Make($5.width);
+            break;
+        }
+        case LogicalType::kBitmap: {
+            type_info_ptr = BitmapInfo::Make($5.width);
+            break;
+        }
+        case LogicalType::kEmbedding: {
+            type_info_ptr = EmbeddingInfo::Make($5.embedding_type_, $5.width);
+            break;
+        }
+    }
+    CastExpr* cast_expr = new CastExpr($5.logical_type_, type_info_ptr);
+    cast_expr->expr_ = $3;
+    $$ = cast_expr;
+};
 
 subquery_expr: EXISTS '(' select_without_paren ')' {
     SubqueryExpr* subquery_expr = new SubqueryExpr();
