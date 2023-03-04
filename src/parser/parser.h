@@ -230,9 +230,14 @@ struct SQL_LTYPE {
     NOT_EQ = 373,                  /* NOT_EQ  */
     LESS_EQ = 374,                 /* LESS_EQ  */
     GREATER_EQ = 375,              /* GREATER_EQ  */
-    NUMBER = 376,                  /* NUMBER  */
-    OR = 377,                      /* OR  */
-    AND = 378                      /* AND  */
+    BETWEEN = 376,                 /* BETWEEN  */
+    AND = 377,                     /* AND  */
+    OR = 378,                      /* OR  */
+    NUMBER = 379,                  /* NUMBER  */
+    CASE = 380,                    /* CASE  */
+    WHEN = 381,                    /* WHEN  */
+    THEN = 382,                    /* THEN  */
+    ELSE = 383                     /* ELSE  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -298,7 +303,7 @@ union SQLSTYPE
     CopyOption* copy_option_t;
     Vector<CopyOption*>* copy_option_array;
 
-#line 302 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 307 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

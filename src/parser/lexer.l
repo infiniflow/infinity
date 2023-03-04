@@ -30,9 +30,11 @@ static thread_local std::stringstream string_buffer;
 
 ALL             { return ALL; }
 ALTER           { return ALTER; }
+AND             { return AND; }
 AS              { return AS; }
 AST             { return AST; }
 ASC             { return ASC; }
+BETWEEN         { return BETWEEN; }
 BIGINT          { return BIGINT; }
 BIT             { return BIT; }
 BITMAP          { return BITMAP; }
@@ -98,6 +100,7 @@ NULL            { return NULLABLE; }
 NOT             { return NOT; }
 OFFSET          { return OFFSET; }
 ON              { return ON; }
+OR              { return OR; }
 OPT             { return OPT; }
 ORDER           { return ORDER; }
 OUTER           { return OUTER; }

@@ -246,6 +246,12 @@ struct SQL_LTYPE {
     delete $$;
 } <with_expr_t>
 
+%destructor {
+    if($$ != nullptr) {
+        delete $$;
+    }
+} <select_stmt>
+
 %token <str_value>      IDENTIFIER STRING
 %token <double_value>   DOUBLE_VALUE
 %token <long_value>     LONG_VALUE
@@ -261,7 +267,7 @@ struct SQL_LTYPE {
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
 %token PRIMARY KEY UNIQUE NULLABLE IS
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
-%token EQUAL NOT_EQ LESS_EQ GREATER_EQ
+%token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR
 
 %token NUMBER
 
@@ -322,6 +328,7 @@ struct SQL_LTYPE {
 
 %left       OR
 %left       AND
+%left       BETWEEN CASE WHEN THEN ELSE
 %right      NOT
 
 %nonassoc   '=' EQUAL NOT_EQ
@@ -963,6 +970,7 @@ select_statement : select_without_paren {
         node = node->nested_select_;
     }
     node->nested_select_ = $3;
+    $$ = $1;
 }
 | select_statement set_operator select_clause_without_modifier {
     $1->set_op_ = $2;
@@ -971,6 +979,7 @@ select_statement : select_without_paren {
         node = node->nested_select_;
     }
     node->nested_select_ = $3;
+    $$ = $1;
 }
 
 select_with_paren : '(' select_without_paren ')' {
@@ -1042,7 +1051,10 @@ order_by_type: ASC {
 }
 | DESC {
     $$ = kDesc;
-};
+}
+| {
+    $$ = kAsc;
+}
 
 limit_expr: LIMIT expr {
     $$ = $2;
@@ -1445,6 +1457,15 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| expr BETWEEN expr AND expr {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "between_and";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    func_expr->arguments_->emplace_back($5);
     $$ = func_expr;
 };
 

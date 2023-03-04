@@ -431,4 +431,97 @@ TEST_F(SelectStatementParsingTest, good_test2) {
         }
         result->Reset();
     }
+
+    {
+        String input_sql = "SELECT a, b FROM s3.t2 ORDER BY a, b DESC;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_EQ(select_statement->where_expr_, nullptr);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t2");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 2);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *) (*select_statement->select_list_)[0];
+                EXPECT_STREQ(col_expr->names_[0], "a");
+            }
+
+            {
+                EXPECT_EQ((*select_statement->select_list_)[1]->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *) (*select_statement->select_list_)[1];
+                EXPECT_STREQ(col_expr->names_[0], "b");
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT a, b FROM s3.t2 ORDER BY a, b DESC;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_EQ(select_statement->where_expr_, nullptr);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t2");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 2);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *) (*select_statement->select_list_)[0];
+                EXPECT_STREQ(col_expr->names_[0], "a");
+            }
+
+            {
+                EXPECT_EQ((*select_statement->select_list_)[1]->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *) (*select_statement->select_list_)[1];
+                EXPECT_STREQ(col_expr->names_[0], "b");
+            }
+
+            EXPECT_NE(select_statement->order_by_list, nullptr);
+            EXPECT_EQ(select_statement->order_by_list->size(), 2);
+            {
+                EXPECT_EQ((*select_statement->order_by_list)[0]->type_, OrderType::kAsc);
+                EXPECT_EQ((*select_statement->order_by_list)[0]->expr_->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *) ((*select_statement->order_by_list)[0]->expr_);
+                EXPECT_STREQ(col_expr->names_[0], "a");
+            }
+            {
+                EXPECT_EQ((*select_statement->order_by_list)[1]->type_, OrderType::kDesc);
+                EXPECT_EQ((*select_statement->order_by_list)[1]->expr_->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *) ((*select_statement->order_by_list)[1]->expr_);
+                EXPECT_STREQ(col_expr->names_[0], "b");
+            }
+        }
+        result->Reset();
+    }
 }
