@@ -467,12 +467,27 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto *col_expr = (ColumnExpr *) (*select_statement->select_list_)[1];
                 EXPECT_STREQ(col_expr->names_[0], "b");
             }
+
+            EXPECT_NE(select_statement->order_by_list, nullptr);
+            EXPECT_EQ(select_statement->order_by_list->size(), 2);
+            {
+                EXPECT_EQ((*select_statement->order_by_list)[0]->type_, OrderType::kAsc);
+                EXPECT_EQ((*select_statement->order_by_list)[0]->expr_->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *) ((*select_statement->order_by_list)[0]->expr_);
+                EXPECT_STREQ(col_expr->names_[0], "a");
+            }
+            {
+                EXPECT_EQ((*select_statement->order_by_list)[1]->type_, OrderType::kDesc);
+                EXPECT_EQ((*select_statement->order_by_list)[1]->expr_->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *) ((*select_statement->order_by_list)[1]->expr_);
+                EXPECT_STREQ(col_expr->names_[0], "b");
+            }
         }
         result->Reset();
     }
 
     {
-        String input_sql = "SELECT a, b FROM s3.t2 ORDER BY a, b DESC;";
+        String input_sql = "SELECT a, b FROM s3.t2 WHERE a BETWEEN 1 AND 4;";
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -481,7 +496,6 @@ TEST_F(SelectStatementParsingTest, good_test2) {
         for (auto &statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kSelect);
             auto *select_statement = (SelectStatement *) (statement);
-            EXPECT_EQ(select_statement->where_expr_, nullptr);
 
             EXPECT_NE(select_statement->table_ref_, nullptr);
             EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
@@ -507,19 +521,119 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 EXPECT_STREQ(col_expr->names_[0], "b");
             }
 
-            EXPECT_NE(select_statement->order_by_list, nullptr);
-            EXPECT_EQ(select_statement->order_by_list->size(), 2);
+            EXPECT_NE(select_statement->where_expr_, nullptr);
             {
-                EXPECT_EQ((*select_statement->order_by_list)[0]->type_, OrderType::kAsc);
-                EXPECT_EQ((*select_statement->order_by_list)[0]->expr_->type_, ParsedExprType::kColumn);
-                auto *col_expr = (ColumnExpr *) ((*select_statement->order_by_list)[0]->expr_);
-                EXPECT_STREQ(col_expr->names_[0], "a");
+                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
+                auto *func_expr = (FunctionExpr *) (select_statement->where_expr_);
+                EXPECT_EQ(func_expr->func_name_, "between_and");
+                {
+                    auto *arg0_expr = (*func_expr->arguments_)[0];
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kColumn);
+                    auto *arg0_col_expr = (ColumnExpr *) (arg0_expr);
+                    EXPECT_STREQ(arg0_col_expr->names_[0], "a");
+                }
+                {
+                    auto *arg1_expr = (*func_expr->arguments_)[1];
+                    EXPECT_EQ(arg1_expr->type_, ParsedExprType::kConstant);
+                    auto *arg1_constant_expr = (ConstantExpr *) (arg1_expr);
+                    EXPECT_EQ(arg1_constant_expr->literal_type_, LiteralType::kInteger);
+                    EXPECT_EQ(arg1_constant_expr->integer_value_, 1);
+                }
+                {
+                    auto *arg3_expr = (*func_expr->arguments_)[2];
+                    EXPECT_EQ(arg3_expr->type_, ParsedExprType::kConstant);
+                    auto *arg3_constant_expr = (ConstantExpr *) (arg3_expr);
+                    EXPECT_EQ(arg3_constant_expr->literal_type_, LiteralType::kInteger);
+                    EXPECT_EQ(arg3_constant_expr->integer_value_, 4);
+                }
             }
+        }
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT * FROM s3.t2 WHERE a = (SELECT MIN(c) FROM t1) AND EXISTS (SELECT * FROM test WHERE x < y);";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
             {
-                EXPECT_EQ((*select_statement->order_by_list)[1]->type_, OrderType::kDesc);
-                EXPECT_EQ((*select_statement->order_by_list)[1]->expr_->type_, ParsedExprType::kColumn);
-                auto *col_expr = (ColumnExpr *) ((*select_statement->order_by_list)[1]->expr_);
-                EXPECT_STREQ(col_expr->names_[0], "b");
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t2");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *) (*select_statement->select_list_)[0];
+                EXPECT_EQ(col_expr->names_.size(), 0);
+                EXPECT_EQ(col_expr->star_, true);
+            }
+
+            EXPECT_NE(select_statement->where_expr_, nullptr);
+            {
+                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
+                auto *func_expr = (FunctionExpr *) (select_statement->where_expr_);
+                EXPECT_EQ(func_expr->func_name_, "and");
+                {
+                    auto *arg0_expr = (*func_expr->arguments_)[0];
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kFunction);
+                    auto *arg0_func_expr = (FunctionExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_func_expr->func_name_, "=");
+                    {
+                        auto *arg01_expr = (SubqueryExpr*)(*arg0_func_expr->arguments_)[1];
+                        EXPECT_EQ(arg01_expr->subquery_type_, SubqueryType::kScalar);
+                        EXPECT_EQ(arg01_expr->left_, nullptr);
+                        auto* subquery_select = arg01_expr->select_;
+                        {
+                            EXPECT_EQ((*subquery_select->select_list_)[0]->type_, ParsedExprType::kFunction);
+                            auto *subquery_func_expr = (FunctionExpr *) (*subquery_select->select_list_)[0];
+                            EXPECT_EQ(subquery_func_expr->func_name_, "MIN");
+                            EXPECT_EQ((*subquery_func_expr->arguments_)[0]->type_, ParsedExprType::kColumn);
+                            auto* subquery_func_arg_col_expr = (ColumnExpr*)(*subquery_func_expr->arguments_)[0];
+                            EXPECT_STREQ(subquery_func_arg_col_expr->names_[0], "c");
+                        }
+                        {
+                            auto *table_ref_ptr = (TableReference *) (subquery_select->table_ref_);
+                            EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                            EXPECT_EQ(table_ref_ptr->table_name_, "t1");
+                        }
+                    }
+                }
+                {
+                    auto *arg1_expr = (*func_expr->arguments_)[1];
+                    EXPECT_EQ(arg1_expr->type_, ParsedExprType::kSubquery);
+                    auto *arg1_expr_expr = (SubqueryExpr *) (arg1_expr);
+                    EXPECT_EQ(arg1_expr_expr->subquery_type_, SubqueryType::kExists);
+                    auto* subquery_select = arg1_expr_expr->select_;
+                    {
+                        EXPECT_EQ((*subquery_select->select_list_)[0]->type_, ParsedExprType::kColumn);
+                        auto *subquery_col_expr = (ColumnExpr *) (*subquery_select->select_list_)[0];
+                        EXPECT_EQ(subquery_col_expr->star_, true);
+                        EXPECT_EQ(subquery_col_expr->names_.size(), 0);
+                    }
+                    {
+                        auto *table_ref_ptr = (TableReference *) (subquery_select->table_ref_);
+                        EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                        EXPECT_EQ(table_ref_ptr->table_name_, "test");
+                    }
+                    {
+                        EXPECT_EQ(subquery_select->where_expr_->type_, ParsedExprType::kFunction);
+                        auto *sub_where_func_expr = (FunctionExpr *) (subquery_select->where_expr_);
+                        EXPECT_EQ(sub_where_func_expr->func_name_, "<");
+                    }
+                }
             }
         }
         result->Reset();

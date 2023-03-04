@@ -77,6 +77,7 @@ HOUR            { return HOUR; }
 HOURS           { return HOURS; }
 HUGEINT         { return HUGEINT; }
 IF              { return IF; }
+IN              { return IN; }
 INDEX           { return INDEX; }
 INNER           { return INNER; }
 INSERT          { return INSERT; }

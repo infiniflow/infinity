@@ -262,7 +262,7 @@ struct SQL_LTYPE {
 %token EXCEPT
 %token SCHEMA TABLE COLLECTION TABLES INTO VALUES AST PIPELINE UNOPT OPT LOGICAL PHYSICAL VIEW INDEX
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
-%token IF NOT EXISTS FROM TO WITH DELIMITER FORMAT HEADER
+%token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER
 %token BOOLEAN INTEGER TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
 %token PRIMARY KEY UNIQUE NULLABLE IS
@@ -306,8 +306,9 @@ struct SQL_LTYPE {
 %type <set_operator_t>          set_operator
 %type <explain_type_t>          explain_type
 
-%type <expr_t>                  expr expr_alias constant_expr interval_expr column_expr function_expr
-%type <expr_t>                  having_clause where_clause limit_expr offset_expr
+%type <expr_t>                  expr expr_alias constant_expr interval_expr column_expr function_expr subquery_expr
+%type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
+%type <expr_t>                  conjunction_expr
 %type <expr_array_t>            expr_array group_by_clause constant_expr_array
 %type <update_expr_t>           update_expr;
 %type <update_expr_array_t>     update_expr_array;
@@ -1306,8 +1307,20 @@ expr_alias : expr AS IDENTIFIER {
     $$ = $1;
 };
 
-expr : '(' expr ')' {
-      $$ = $2;
+expr : operand
+| subquery_expr
+| in_expr
+| between_expr
+| conjunction_expr;
+
+operand: '(' expr ')' {
+   $$ = $2;
+}
+| '(' select_without_paren ')' {
+    SubqueryExpr* subquery_expr = new SubqueryExpr();
+    subquery_expr->subquery_type_ = SubqueryType::kScalar;
+    subquery_expr->select_ = $2;
+    $$ = subquery_expr;
 }
 | constant_expr
 | column_expr
@@ -1335,35 +1348,35 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->distinct_ = true;
     $$ = func_expr;
 }
-| expr IS NOT NULLABLE {
+| operand IS NOT NULLABLE {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "is_not_null";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     $$ = func_expr;
 }
-| expr IS NULLABLE {
+| operand IS NULLABLE {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "is_null";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     $$ = func_expr;
 }
-| '-' expr {
+| '-' operand {
   FunctionExpr* func_expr = new FunctionExpr();
   func_expr->func_name_ = "-";
   func_expr->arguments_ = new Vector<ParsedExpr*>();
   func_expr->arguments_->emplace_back($2);
   $$ = func_expr;
 }
-| '+' expr {
+| '+' operand {
   FunctionExpr* func_expr = new FunctionExpr();
   func_expr->func_name_ = "+";
   func_expr->arguments_ = new Vector<ParsedExpr*>();
   func_expr->arguments_->emplace_back($2);
   $$ = func_expr;
 }
-| expr '-' expr {
+| operand '-' operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "-";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1371,7 +1384,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr '+' expr {
+| operand '+' operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "+";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1379,7 +1392,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr '*' expr {
+| operand '*' operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "*";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1387,7 +1400,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr '/' expr {
+| operand '/' operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "/";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1395,7 +1408,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr '%' expr {
+| operand '%' operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "%";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1403,7 +1416,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr '=' expr {
+| operand '=' operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "=";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1411,7 +1424,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr EQUAL expr {
+| operand EQUAL operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "=";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1419,7 +1432,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr NOT_EQ expr {
+| operand NOT_EQ operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "<>";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1427,7 +1440,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr '<' expr {
+| operand '<' operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "<";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1435,7 +1448,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr '>' expr {
+| operand '>' operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = ">";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1443,7 +1456,7 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr LESS_EQ expr {
+| operand LESS_EQ operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "<=";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1451,15 +1464,33 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| expr GREATER_EQ expr {
+| operand GREATER_EQ operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = ">=";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
+};
+
+conjunction_expr: expr AND expr {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "and";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
 }
-| expr BETWEEN expr AND expr {
+| expr OR expr {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "or";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+};
+
+between_expr: operand BETWEEN operand AND operand {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "between_and";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
@@ -1467,6 +1498,48 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     func_expr->arguments_->emplace_back($5);
     $$ = func_expr;
+}
+
+in_expr: operand IN '(' expr_array ')' {
+     FunctionExpr* func_expr = new FunctionExpr();
+     func_expr->func_name_ = "in";
+     func_expr->arguments_ = $4;
+     func_expr->arguments_->emplace_back($1);
+     $$ = func_expr;
+ }
+ | operand NOT IN '(' expr_array ')' {
+     FunctionExpr* func_expr = new FunctionExpr();
+     func_expr->func_name_ = "not_in";
+     func_expr->arguments_ = $5;
+     func_expr->arguments_->emplace_back($1);
+     $$ = func_expr;
+ };
+
+subquery_expr: EXISTS '(' select_without_paren ')' {
+    SubqueryExpr* subquery_expr = new SubqueryExpr();
+    subquery_expr->subquery_type_ = SubqueryType::kExists;
+    subquery_expr->select_ = $3;
+    $$ = subquery_expr;
+}
+| NOT EXISTS '(' select_without_paren ')' {
+    SubqueryExpr* subquery_expr = new SubqueryExpr();
+    subquery_expr->subquery_type_ = SubqueryType::kNotExists;
+    subquery_expr->select_ = $4;
+    $$ = subquery_expr;
+}
+| operand IN '(' select_without_paren ')' {
+    SubqueryExpr* subquery_expr = new SubqueryExpr();
+    subquery_expr->subquery_type_ = SubqueryType::kIn;
+    subquery_expr->left_ = $1;
+    subquery_expr->select_ = $4;
+    $$ = subquery_expr;
+}
+| operand NOT IN '(' select_without_paren ')' {
+    SubqueryExpr* subquery_expr = new SubqueryExpr();
+    subquery_expr->subquery_type_ = SubqueryType::kNotIn;
+    subquery_expr->left_ = $1;
+    subquery_expr->select_ = $5;
+    $$ = subquery_expr;
 };
 
 column_expr : IDENTIFIER {
