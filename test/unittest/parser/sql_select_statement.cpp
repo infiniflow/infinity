@@ -638,4 +638,61 @@ TEST_F(SelectStatementParsingTest, good_test2) {
         }
         result->Reset();
     }
+
+    {
+        String input_sql = "SELECT MIN(CASE WHEN c = 'xxx' THEN d ELSE 1 END) FROM s3.tx;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->table_name_, "tx");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kFunction);
+                auto *func_expr = (FunctionExpr *) (*select_statement->select_list_)[0];
+                EXPECT_EQ(func_expr->func_name_, "MIN");
+                EXPECT_EQ((*func_expr->arguments_)[0]->type_, ParsedExprType::kCase);
+                CaseExpr* case_expr = (CaseExpr*)(*func_expr->arguments_)[0];
+                EXPECT_EQ(case_expr->expr_, nullptr);
+                CaseCheck* case_check = (*case_expr->case_check_array_)[0];
+                EXPECT_EQ(case_check->when_->type_, ParsedExprType::kFunction);
+                {
+                    auto* f_expr = (FunctionExpr*)(case_check->when_);
+                    EXPECT_EQ((*f_expr->arguments_)[0]->type_, ParsedExprType::kColumn);
+                    auto* col_expr = (ColumnExpr*)((*f_expr->arguments_)[0]);
+                    EXPECT_STREQ(col_expr->names_[0], "c");
+                    EXPECT_EQ((*f_expr->arguments_)[1]->type_, ParsedExprType::kConstant);
+                    auto* const_expr = (ConstantExpr*)((*f_expr->arguments_)[1]);
+                    EXPECT_STREQ(const_expr->str_value_, "xxx");
+                }
+                EXPECT_EQ(case_check->then_->type_, ParsedExprType::kColumn);
+                {
+                    auto* col_expr = (ColumnExpr*)(case_check->then_);
+                    EXPECT_STREQ(col_expr->names_[0], "d");
+                }
+                EXPECT_EQ(case_expr->else_expr_->type_, ParsedExprType::kConstant);
+                {
+                    auto* const_expr = (ConstantExpr*)(case_expr->else_expr_);
+                    EXPECT_EQ(const_expr->integer_value_, 1);
+                }
+            }
+            EXPECT_EQ(select_statement->where_expr_, nullptr);
+        }
+        result->Reset();
+    }
 }

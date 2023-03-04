@@ -42,6 +42,7 @@ BOOLEAN         { return BOOLEAN; }
 BOX             { return BOX; }
 BLOB            { return BLOB; }
 BY              { return BY; }
+CASE            { return CASE; }
 CAST            { return CAST; }
 CHAR            { return CHAR; }
 CIRCLE          { return CIRCLE; }
@@ -61,6 +62,7 @@ DELIMITER       { return DELIMITER; }
 DESCRIBE        { return DESCRIBE; }
 DESC            { return DESC; }
 DROP            { return DROP; }
+ELSE            { return ELSE; }
 EMBEDDING       { return EMBEDDING; }
 END             { return END; }
 EXCEPT          { return EXCEPT; }
@@ -123,6 +125,7 @@ SELECT          { return SELECT; }
 SET             { return SET; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
+THEN            { return THEN; }
 TIME            { return TIME; }
 TIMESTAMP       { return TIMESTAMP; }
 TO              { return TO; }
@@ -139,6 +142,7 @@ VALUES          { return VALUES; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
 VIEW            { return VIEW; }
+WHEN            { return WHEN; }
 WHERE           { return WHERE; }
 WITH            { return WITH; }
 YEAR            { return YEAR; }
