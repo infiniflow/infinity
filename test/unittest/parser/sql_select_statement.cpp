@@ -695,4 +695,434 @@ TEST_F(SelectStatementParsingTest, good_test2) {
         }
         result->Reset();
     }
+
+    {
+        String input_sql = "SELECT CASE WHEN a = 0 THEN 1 WHEN b > 3.5 THEN 2 END FROM s3.tx;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->table_name_, "tx");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kCase);
+
+
+                CaseExpr* case_expr = (CaseExpr*)(*select_statement->select_list_)[0];
+                EXPECT_EQ(case_expr->expr_, nullptr);
+                {
+                    CaseCheck *case_check = (*case_expr->case_check_array_)[0];
+                    EXPECT_EQ(case_check->when_->type_, ParsedExprType::kFunction);
+                    {
+                        auto *f_expr = (FunctionExpr *) (case_check->when_);
+                        EXPECT_EQ(f_expr->func_name_, "=");
+                        EXPECT_EQ((*f_expr->arguments_)[0]->type_, ParsedExprType::kColumn);
+                        auto *col_expr = (ColumnExpr *) ((*f_expr->arguments_)[0]);
+                        EXPECT_STREQ(col_expr->names_[0], "a");
+                        EXPECT_EQ((*f_expr->arguments_)[1]->type_, ParsedExprType::kConstant);
+                        auto *const_expr = (ConstantExpr *) ((*f_expr->arguments_)[1]);
+                        EXPECT_EQ(const_expr->integer_value_, 0);
+                    }
+                    EXPECT_EQ(case_check->then_->type_, ParsedExprType::kConstant);
+                    {
+                        auto *c_expr = (ConstantExpr *) (case_check->then_);
+                        EXPECT_EQ(c_expr->integer_value_, 1);
+                    }
+                    case_check = (*case_expr->case_check_array_)[1];
+                    EXPECT_EQ(case_check->when_->type_, ParsedExprType::kFunction);
+                    {
+                        auto *f_expr = (FunctionExpr *) (case_check->when_);
+                        EXPECT_EQ(f_expr->func_name_, ">");
+                        EXPECT_EQ((*f_expr->arguments_)[0]->type_, ParsedExprType::kColumn);
+                        auto *col_expr = (ColumnExpr *) ((*f_expr->arguments_)[0]);
+                        EXPECT_STREQ(col_expr->names_[0], "b");
+                        EXPECT_EQ((*f_expr->arguments_)[1]->type_, ParsedExprType::kConstant);
+                        auto *const_expr = (ConstantExpr *) ((*f_expr->arguments_)[1]);
+                        EXPECT_FLOAT_EQ(const_expr->float_value_, 3.5);
+                    }
+                    EXPECT_EQ(case_check->then_->type_, ParsedExprType::kConstant);
+                    {
+                        auto *c_expr = (ConstantExpr *) (case_check->then_);
+                        EXPECT_EQ(c_expr->integer_value_, 2);
+                    }
+                }
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT CASE b WHEN 1 THEN 10 WHEN 2 THEN 20 END FROM s3.tx;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->table_name_, "tx");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kCase);
+
+
+                CaseExpr* case_expr = (CaseExpr*)(*select_statement->select_list_)[0];
+                EXPECT_EQ(case_expr->expr_->type_, ParsedExprType::kColumn);
+                auto* case_col_expr = (ColumnExpr*)(case_expr->expr_);
+                EXPECT_STREQ(case_col_expr->names_[0], "b");
+                {
+                    CaseCheck *case_check = (*case_expr->case_check_array_)[0];
+                    EXPECT_EQ(case_check->when_->type_, ParsedExprType::kConstant);
+                    {
+                        auto *c_expr = (ConstantExpr *) (case_check->when_);
+                        EXPECT_EQ(c_expr->integer_value_, 1);
+                    }
+                    EXPECT_EQ(case_check->then_->type_, ParsedExprType::kConstant);
+                    {
+                        auto *c_expr = (ConstantExpr *) (case_check->then_);
+                        EXPECT_EQ(c_expr->integer_value_, 10);
+                    }
+                    case_check = (*case_expr->case_check_array_)[1];
+                    EXPECT_EQ(case_check->when_->type_, ParsedExprType::kConstant);
+                    {
+                        auto *c_expr = (ConstantExpr *) (case_check->when_);
+                        EXPECT_EQ(c_expr->integer_value_, 2);
+                    }
+                    EXPECT_EQ(case_check->then_->type_, ParsedExprType::kConstant);
+                    {
+                        auto *c_expr = (ConstantExpr *) (case_check->then_);
+                        EXPECT_EQ(c_expr->integer_value_, 20);
+                    }
+                }
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT t1.a, t2.b, SUM(t2.price) FROM t3 INNER JOIN t1 ON t3.c = t1.c \
+                           OUTER JOIN t2 ON t1.d = t2.d GROUP BY t1.a, t2.b;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kJoin);
+            {
+                auto *join_ref_ptr = (JoinReference *) (select_statement->table_ref_);
+                {
+                    EXPECT_EQ(join_ref_ptr->alias_, nullptr);
+                    EXPECT_EQ(join_ref_ptr->condition_->type_, ParsedExprType::kFunction);
+                    auto *func_expr = (FunctionExpr *) (join_ref_ptr->condition_);
+                    EXPECT_EQ(func_expr->func_name_, "=");
+                    ColumnExpr* col_left = (ColumnExpr*)(*func_expr->arguments_)[0];
+                    ColumnExpr* col_right = (ColumnExpr*)(*func_expr->arguments_)[1];
+                    EXPECT_STREQ(col_left->names_[0], "t1");
+                    EXPECT_STREQ(col_left->names_[1], "d");
+                    EXPECT_STREQ(col_right->names_[0], "t2");
+                    EXPECT_STREQ(col_right->names_[1], "d");
+                    EXPECT_EQ(join_ref_ptr->join_type_, JoinType::kFull);
+                    EXPECT_EQ(join_ref_ptr->right_->type_, TableRefType::kTable);
+                    {
+                        auto *right_ref_ptr = (TableReference *) (join_ref_ptr->right_);
+                        EXPECT_EQ(right_ref_ptr->alias_, nullptr);
+                        EXPECT_EQ(right_ref_ptr->table_name_, "t2");
+                    }
+                    EXPECT_EQ(join_ref_ptr->left_->type_, TableRefType::kJoin);
+                    auto *nested_join_ref = (JoinReference *) (join_ref_ptr->left_);
+                    {
+                        EXPECT_EQ(nested_join_ref->alias_, nullptr);
+                        EXPECT_EQ(nested_join_ref->condition_->type_, ParsedExprType::kFunction);
+                        auto *func1_expr = (FunctionExpr *) (nested_join_ref->condition_);
+                        EXPECT_EQ(func_expr->func_name_, "=");
+                        ColumnExpr *col1_left = (ColumnExpr *) (*func1_expr->arguments_)[0];
+                        ColumnExpr *col1_right = (ColumnExpr *) (*func1_expr->arguments_)[1];
+                        EXPECT_STREQ(col1_left->names_[0], "t3");
+                        EXPECT_STREQ(col1_left->names_[1], "c");
+                        EXPECT_STREQ(col1_right->names_[0], "t1");
+                        EXPECT_STREQ(col1_right->names_[1], "c");
+                        EXPECT_EQ(nested_join_ref->join_type_, JoinType::kInner);
+                        EXPECT_EQ(nested_join_ref->right_->type_, TableRefType::kTable);
+                        {
+                            auto *right_ref_ptr = (TableReference *) (nested_join_ref->right_);
+                            EXPECT_EQ(right_ref_ptr->alias_, nullptr);
+                            EXPECT_EQ(right_ref_ptr->table_name_, "t1");
+                        }
+                        EXPECT_EQ(nested_join_ref->left_->type_, TableRefType::kTable);
+                        {
+                            auto *left_ref_ptr = (TableReference *) (nested_join_ref->left_);
+                            EXPECT_EQ(left_ref_ptr->alias_, nullptr);
+                            EXPECT_EQ(left_ref_ptr->table_name_, "t3");
+                        }
+                    }
+                }
+            }
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT * FROM t1, (SELECT a AS aa FROM aaa) AS t2, (SELECT b AS bb FROM bbb) AS t3";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kCrossProduct);
+
+            CrossProductReference* cross1 = (CrossProductReference*)(select_statement->table_ref_);
+            {
+                EXPECT_EQ(cross1->left_->type_, TableRefType::kCrossProduct);
+                CrossProductReference* cross2 = (CrossProductReference*)(cross1->left_);
+                {
+                    EXPECT_EQ(cross2->left_->type_, TableRefType::kTable);
+                    TableReference* t1 = (TableReference*)(cross2->left_);
+                    EXPECT_EQ(t1->table_name_, "t1");
+                    EXPECT_EQ(cross2->right_->type_, TableRefType::kSubquery);
+                    SubqueryReference* t2 = (SubqueryReference*)(cross2->right_);
+                    EXPECT_STREQ(t2->alias_->alias_, "t2");
+                    SelectStatement* t2_select = (SelectStatement*) (t2->select_statement_);
+                    EXPECT_EQ(t2_select->select_list_->size(), 1);
+                    {
+                        EXPECT_EQ((*t2_select->select_list_)[0]->type_, ParsedExprType::kColumn);
+                        auto *col_expr = (ColumnExpr *) (*t2_select->select_list_)[0];
+                        EXPECT_STREQ(col_expr->names_[0], "a");
+                        EXPECT_EQ(col_expr->alias_, "aa");
+                        auto* t2_table = (TableReference*)(t2_select->table_ref_);
+                        EXPECT_EQ(t2_table->table_name_, "aaa");
+                    }
+                }
+
+                EXPECT_EQ(cross1->right_->type_, TableRefType::kSubquery);
+                SubqueryReference* t3 = (SubqueryReference*)(cross1->right_);
+                EXPECT_STREQ(t3->alias_->alias_, "t3");
+                SelectStatement* t3_select = (SelectStatement*) (t3->select_statement_);
+                EXPECT_EQ(t3_select->select_list_->size(), 1);
+                {
+                    EXPECT_EQ((*t3_select->select_list_)[0]->type_, ParsedExprType::kColumn);
+                    auto *col_expr = (ColumnExpr *) (*t3_select->select_list_)[0];
+                    EXPECT_STREQ(col_expr->names_[0], "b");
+                    EXPECT_EQ(col_expr->alias_, "bb");
+                    auto* t3_table = (TableReference*)(t3_select->table_ref_);
+                    EXPECT_EQ(t3_table->table_name_, "bbb");
+                }
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT * FROM t1, (SELECT a AS aa FROM aaa) AS t2, (SELECT b AS bb FROM bbb) AS t3";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kCrossProduct);
+
+            CrossProductReference* cross1 = (CrossProductReference*)(select_statement->table_ref_);
+            {
+                EXPECT_EQ(cross1->left_->type_, TableRefType::kCrossProduct);
+                CrossProductReference* cross2 = (CrossProductReference*)(cross1->left_);
+                {
+                    EXPECT_EQ(cross2->left_->type_, TableRefType::kTable);
+                    TableReference* t1 = (TableReference*)(cross2->left_);
+                    EXPECT_EQ(t1->table_name_, "t1");
+                    EXPECT_EQ(cross2->right_->type_, TableRefType::kSubquery);
+                    SubqueryReference* t2 = (SubqueryReference*)(cross2->right_);
+                    EXPECT_STREQ(t2->alias_->alias_, "t2");
+                    SelectStatement* t2_select = (SelectStatement*) (t2->select_statement_);
+                    EXPECT_EQ(t2_select->select_list_->size(), 1);
+                    {
+                        EXPECT_EQ((*t2_select->select_list_)[0]->type_, ParsedExprType::kColumn);
+                        auto *col_expr = (ColumnExpr *) (*t2_select->select_list_)[0];
+                        EXPECT_STREQ(col_expr->names_[0], "a");
+                        EXPECT_EQ(col_expr->alias_, "aa");
+                        auto* t2_table = (TableReference*)(t2_select->table_ref_);
+                        EXPECT_EQ(t2_table->table_name_, "aaa");
+                    }
+                }
+
+                EXPECT_EQ(cross1->right_->type_, TableRefType::kSubquery);
+                SubqueryReference* t3 = (SubqueryReference*)(cross1->right_);
+                EXPECT_STREQ(t3->alias_->alias_, "t3");
+                SelectStatement* t3_select = (SelectStatement*) (t3->select_statement_);
+                EXPECT_EQ(t3_select->select_list_->size(), 1);
+                {
+                    EXPECT_EQ((*t3_select->select_list_)[0]->type_, ParsedExprType::kColumn);
+                    auto *col_expr = (ColumnExpr *) (*t3_select->select_list_)[0];
+                    EXPECT_STREQ(col_expr->names_[0], "b");
+                    EXPECT_EQ(col_expr->alias_, "bb");
+                    auto* t3_table = (TableReference*)(t3_select->table_ref_);
+                    EXPECT_EQ(t3_table->table_name_, "bbb");
+                }
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT * FROM t1 AS xxx(a, b)";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+
+            TableReference *t1 = (TableReference *) (select_statement->table_ref_);
+            EXPECT_EQ(t1->table_name_, "t1");
+            EXPECT_STREQ(t1->alias_->alias_, "xxx");
+            EXPECT_EQ((*t1->alias_->column_alias_array_)[0], "a");
+            EXPECT_EQ((*t1->alias_->column_alias_array_)[1], "b");
+        }
+        result->Reset();
+    }
+}
+
+TEST_F(SelectStatementParsingTest, good_test3) {
+    using namespace infinity;
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+    {
+        String input_sql = "SELECT * FROM t1; \
+                            SELECt * FROM t2; ";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        SelectStatement *select1 = (SelectStatement *) ((*result->statements_ptr_)[0]);
+        EXPECT_NE(select1->table_ref_, nullptr);
+        EXPECT_EQ(select1->table_ref_->type_, TableRefType::kTable);
+        TableReference *t1 = (TableReference *) (select1->table_ref_);
+        EXPECT_EQ(t1->table_name_, "t1");
+
+        SelectStatement *select2 = (SelectStatement *) ((*result->statements_ptr_)[1]);
+        EXPECT_NE(select2->table_ref_, nullptr);
+        EXPECT_EQ(select2->table_ref_->type_, TableRefType::kTable);
+        TableReference *t2 = (TableReference *) (select2->table_ref_);
+        EXPECT_EQ(t2->table_name_, "t2");
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT * FROM t1 join t2 on x = y; \
+		                    SELECT * FROM t1 inner join t2 on x = y; \
+		                    SELECT * FROM t1 left join t2 on x = y; \
+		                    SELECT * FROM t1 right join t2 on x = y; \
+		                    SELECT * FROM t1 full join t2 on x = y; \
+                            SELECT * FROM t1 outer join t2 on x = y; \
+		                    SELECT * FROM t1 natural join t2; \
+		                    SELECT * FROM t1 cross join t2 on x = y; \
+		                    SELECT * FROM t1, t2 where x = y;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[0]);
+            EXPECT_EQ(select->table_ref_->type_, TableRefType::kJoin);
+            JoinReference *join = (JoinReference *) (select->table_ref_);
+            EXPECT_EQ(join->join_type_, JoinType::kInner);
+        }
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[1]);
+            EXPECT_EQ(select->table_ref_->type_, TableRefType::kJoin);
+            JoinReference *join = (JoinReference *) (select->table_ref_);
+            EXPECT_EQ(join->join_type_, JoinType::kInner);
+        }
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[2]);
+            EXPECT_EQ(select->table_ref_->type_, TableRefType::kJoin);
+            JoinReference *join = (JoinReference *) (select->table_ref_);
+            EXPECT_EQ(join->join_type_, JoinType::kLeft);
+        }
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[3]);
+            EXPECT_EQ(select->table_ref_->type_, TableRefType::kJoin);
+            JoinReference *join = (JoinReference *) (select->table_ref_);
+            EXPECT_EQ(join->join_type_, JoinType::kRight);
+        }
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[4]);
+            EXPECT_EQ(select->table_ref_->type_, TableRefType::kJoin);
+            JoinReference *join = (JoinReference *) (select->table_ref_);
+            EXPECT_EQ(join->join_type_, JoinType::kFull);
+        }
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[5]);
+            EXPECT_EQ(select->table_ref_->type_, TableRefType::kJoin);
+            JoinReference *join = (JoinReference *) (select->table_ref_);
+            EXPECT_EQ(join->join_type_, JoinType::kFull);
+        }
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[6]);
+            EXPECT_EQ(select->table_ref_->type_, TableRefType::kJoin);
+            JoinReference *join = (JoinReference *) (select->table_ref_);
+            EXPECT_EQ(join->join_type_, JoinType::kNatural);
+        }
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[7]);
+            EXPECT_EQ(select->table_ref_->type_, TableRefType::kJoin);
+            JoinReference *join = (JoinReference *) (select->table_ref_);
+            EXPECT_EQ(join->join_type_, JoinType::kCross);
+        }
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[8]);
+            EXPECT_EQ(select->table_ref_->type_, TableRefType::kCrossProduct);
+        }
+        result->Reset();
+    }
 }
