@@ -7,6 +7,8 @@
 #include "parser/base_statement.h"
 #include "parser/statement/extra/drop_schema_info.h"
 #include "parser/statement/extra/drop_collection_info.h"
+#include "parser/statement/extra/drop_table_info.h"
+#include "parser/statement/extra/drop_index_info.h"
 
 namespace infinity {
 

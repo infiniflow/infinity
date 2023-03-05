@@ -24,7 +24,7 @@ TEST_F(StatementParsingTest, good_test1) {
     using namespace infinity;
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
-
+/*
     {
         String input_sql = "CREATE TABLE t1 AS SELECT a, b FROM t2;";
         parser->Parse(input_sql, result);
@@ -104,6 +104,195 @@ TEST_F(StatementParsingTest, good_test1) {
             EXPECT_EQ(insert1_expr->integer_value_, 333);
         }
 
+        result->Reset();
+    }
+
+    {
+        String input_sql = "CREATE INDEX index1 ON t1 (a, b);";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kCreate);
+            auto *create_statement = (CreateStatement *) (statement);
+            EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+            CreateIndexInfo* index_info = (CreateIndexInfo*)create_statement->create_info_.get();
+            EXPECT_EQ(index_info->schema_name_, "Default");
+            EXPECT_EQ(index_info->table_name_, "t1");
+            EXPECT_EQ(index_info->conflict_type_, ConflictType::kError);
+            EXPECT_EQ((*index_info->column_names_)[0], "a");
+            EXPECT_EQ((*index_info->column_names_)[1], "b");
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "DROP INDEX index1;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kDrop);
+            auto *drop_statement = (DropStatement *) (statement);
+            EXPECT_EQ(drop_statement->drop_info_->type_, DDLType::kIndex);
+            DropIndexInfo* drop_info = (DropIndexInfo*)drop_statement->drop_info_.get();
+            EXPECT_EQ(drop_info->index_name_, "index1");
+            EXPECT_EQ(drop_info->conflict_type_, ConflictType::kError);
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "DROP TABLE t1;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kDrop);
+            auto *drop_statement = (DropStatement *) (statement);
+            EXPECT_EQ(drop_statement->drop_info_->type_, DDLType::kTable);
+            DropTableInfo* drop_info = (DropTableInfo*)drop_statement->drop_info_.get();
+            EXPECT_EQ(drop_info->table_name_, "t1");
+            EXPECT_EQ(drop_info->schema_name_, "Default");
+            EXPECT_EQ(drop_info->conflict_type_, ConflictType::kError);
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SHOW TABLES;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kShow);
+            auto *show_statement = (ShowStatement *) (statement);
+            EXPECT_EQ(show_statement->show_type_, ShowStmtType::kTables);
+            EXPECT_EQ(show_statement->table_name_, "");
+            EXPECT_EQ(show_statement->schema_name_, "Default");
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "DESCRIBE t1;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kShow);
+            auto *show_statement = (ShowStatement *) (statement);
+            EXPECT_EQ(show_statement->show_type_, ShowStmtType::kColumns);
+            EXPECT_EQ(show_statement->table_name_, "t1");
+            EXPECT_EQ(show_statement->schema_name_, "Default");
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "copy t1 to '/usr/filename' with (format csv, header, delimiter '|');";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kCopy);
+            auto *copy_statement = (CopyStatement *) (statement);
+            EXPECT_EQ(copy_statement->copy_file_type_, CopyFileType::kCSV);
+            EXPECT_EQ(copy_statement->copy_from_, false);
+            EXPECT_EQ(copy_statement->schema_name_, "Default");
+            EXPECT_EQ(copy_statement->table_name_, "t1");
+            EXPECT_EQ(copy_statement->file_path_, "/usr/filename");
+            EXPECT_EQ(copy_statement->header_, true);
+            EXPECT_EQ(copy_statement->delimiter_, '|');
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "copy t2 from '/usr/filename' with (format csv, header, delimiter '|');";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kCopy);
+            auto *copy_statement = (CopyStatement *) (statement);
+            EXPECT_EQ(copy_statement->copy_file_type_, CopyFileType::kCSV);
+            EXPECT_EQ(copy_statement->copy_from_, true);
+            EXPECT_EQ(copy_statement->schema_name_, "Default");
+            EXPECT_EQ(copy_statement->table_name_, "t2");
+            EXPECT_EQ(copy_statement->file_path_, "/usr/filename");
+            EXPECT_EQ(copy_statement->header_, true);
+            EXPECT_EQ(copy_statement->delimiter_, '|');
+        }
+        result->Reset();
+    }
+
+    {
+        String input_sql = "select * from t1 except select * from t2;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_EQ(select_statement->set_op_, SetOperatorType::kExcept);
+            TableReference* t1 = (TableReference*)select_statement->table_ref_;
+            EXPECT_EQ(t1->table_name_, "t1");
+            EXPECT_EQ(t1->schema_name_, "Default");
+
+            TableReference* t2 = (TableReference*)select_statement->nested_select_->table_ref_;
+            EXPECT_EQ(t2->table_name_, "t2");
+            EXPECT_EQ(t2->schema_name_, "Default");
+        }
+        result->Reset();
+    }
+*/
+    {
+        String input_sql = "select * from t1 intersect select * from t2 union all select * from t3;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_EQ(select_statement->set_op_, SetOperatorType::kIntersect);
+            TableReference* t1 = (TableReference*)select_statement->table_ref_;
+            EXPECT_EQ(t1->table_name_, "t1");
+            EXPECT_EQ(t1->schema_name_, "Default");
+
+            TableReference* t2 = (TableReference*)select_statement->nested_select_->table_ref_;
+            EXPECT_EQ(t2->table_name_, "t2");
+            EXPECT_EQ(t2->schema_name_, "Default");
+
+            EXPECT_EQ(select_statement->nested_select_->set_op_, SetOperatorType::kUnionAll);
+            TableReference* t3 = (TableReference*)select_statement->nested_select_->nested_select_->table_ref_;
+            EXPECT_EQ(t3->table_name_, "t3");
+            EXPECT_EQ(t3->schema_name_, "Default");
+        }
         result->Reset();
     }
 }

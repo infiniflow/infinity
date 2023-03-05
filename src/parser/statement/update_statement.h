@@ -10,9 +10,12 @@
 namespace infinity {
 
 struct UpdateExpr {
+    inline
     ~UpdateExpr() {
-        delete value;
-        value = nullptr;
+        if(value != nullptr) {
+            delete value;
+            value = nullptr;
+        }
     }
 
     String column_name;

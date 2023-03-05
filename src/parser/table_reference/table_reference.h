@@ -18,7 +18,7 @@ public:
     String
     ToString() override;
 
-    String schema_name_{};
+    String schema_name_{"Default"};
     String table_name_{};
 };
 

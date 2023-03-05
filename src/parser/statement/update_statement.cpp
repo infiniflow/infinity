@@ -13,10 +13,10 @@ UpdateStatement::~UpdateStatement() {
     }
 
     if(update_expr_array_ != nullptr) {
-        for(auto& update_expr: *update_expr_array_) {
+        for(auto update_expr: *update_expr_array_) {
             delete update_expr;
-            update_expr = nullptr;
         }
+        delete update_expr_array_;
     }
 }
 

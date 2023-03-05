@@ -178,6 +178,13 @@ struct SQL_LTYPE {
 } <order_by_expr_list_t>
 
 %destructor {
+    fprintf(stderr, "destroy update expr\n");
+    if($$ != nullptr) {
+        delete $$;
+    }
+} <update_expr_t>
+
+%destructor {
     fprintf(stderr, "destroy update expr array\n");
     if (($$) != nullptr) {
         for (auto ptr : *($$)) {
@@ -478,6 +485,7 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     create_view_info->view_columns_ = $5;
     create_view_info->select_ = $7;
     create_view_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    $$->create_info_ = std::move(create_view_info);
 }
 /* CREATE INDEX index_name ON table_name (column1) ; */
 | CREATE INDEX if_not_exists IDENTIFIER ON table_name '(' identifier_array ')' {
@@ -496,6 +504,7 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 
     create_index_info->column_names_ = $8;
     create_index_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    $$->create_info_ = std::move(create_index_info);
 };
 
 table_element_array : table_element {
@@ -732,7 +741,7 @@ insert_statement: INSERT INTO table_name optional_identifier_array VALUES '(' co
     }
     $$->table_name_ = $3->table_name_ptr_;
     free($3->table_name_ptr_);
-
+    delete $3;
     $$->columns_ = $4;
     $$->values_ = $7;
 }
@@ -791,6 +800,7 @@ update_statement: UPDATE table_name SET update_expr_array where_clause {
     }
     $$->table_name_ = $2->table_name_ptr_;
     free($2->table_name_ptr_);
+    delete $2;
     $$->where_expr_ = $5;
     $$->update_expr_array_ = $4;
 }
@@ -807,6 +817,7 @@ update_expr_array: update_expr {
 update_expr : IDENTIFIER '=' expr {
     $$ = new UpdateExpr();
     $$->column_name = $1;
+    free($1);
     $$->value = $3;
 };
 
@@ -837,6 +848,31 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     $$->drop_info_ = std::move(drop_collection_info);
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
     delete $4;
+}
+
+/* DROP TABLE table_name; */
+| DROP TABLE if_exists table_name {
+    $$ = new DropStatement();
+    std::unique_ptr<DropTableInfo> drop_table_info = std::make_unique<DropTableInfo>();
+    if($4->schema_name_ptr_ != nullptr) {
+        drop_table_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    drop_table_info->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    $$->drop_info_ = std::move(drop_table_info);
+    $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    delete $4;
+}
+
+/* DROP INDEX index_name; */
+| DROP INDEX if_exists IDENTIFIER {
+    $$ = new DropStatement();
+    std::unique_ptr<DropIndexInfo> drop_index_info = std::make_unique<DropIndexInfo>();
+    drop_index_info->index_name_ = $4;
+    free($4);
+    $$->drop_info_ = std::move(drop_index_info);
+    $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 };
 
 /*
@@ -936,20 +972,20 @@ select_statement : select_without_paren {
     $$ = $1;
 }
 | select_statement set_operator select_clause_without_modifier_paren {
-    $1->set_op_ = $2;
     SelectStatement* node = $1;
     while(node->nested_select_ != nullptr) {
         node = node->nested_select_;
     }
+    node->set_op_ = $2;
     node->nested_select_ = $3;
     $$ = $1;
 }
 | select_statement set_operator select_clause_without_modifier {
-    $1->set_op_ = $2;
     SelectStatement* node = $1;
     while(node->nested_select_ != nullptr) {
         node = node->nested_select_;
     }
+    node->set_op_ = $2;
     node->nested_select_ = $3;
     $$ = $1;
 }
@@ -1086,7 +1122,7 @@ set_operator : UNION {
 }
 | EXCEPT {
     $$ = SetOperatorType::kExcept;
-}
+};
 
 /*
  * TABLE REFERENCE
