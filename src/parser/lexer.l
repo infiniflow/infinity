@@ -94,6 +94,7 @@ IS              { return IS; }
 JOIN            { return JOIN; }
 KEY             { return KEY; }
 LEFT            { return LEFT; }
+LIKE            { return LIKE; }
 LIMIT           { return LIMIT; }
 LINE            { return LINE; }
 LOGICAL         { return LOGICAL; }

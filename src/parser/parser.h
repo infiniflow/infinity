@@ -241,7 +241,8 @@ struct SQL_LTYPE {
     AND = 384,                     /* AND  */
     OR = 385,                      /* OR  */
     EXTRACT = 386,                 /* EXTRACT  */
-    NUMBER = 387                   /* NUMBER  */
+    LIKE = 387,                    /* LIKE  */
+    NUMBER = 388                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -309,7 +310,7 @@ union SQLSTYPE
     CopyOption* copy_option_t;
     Vector<CopyOption*>* copy_option_array;
 
-#line 313 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 314 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

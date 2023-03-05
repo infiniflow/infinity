@@ -9,6 +9,7 @@
 #include "parser/statement/extra/drop_collection_info.h"
 #include "parser/statement/extra/drop_table_info.h"
 #include "parser/statement/extra/drop_index_info.h"
+#include "parser/statement/extra/drop_view_info.h"
 
 namespace infinity {
 

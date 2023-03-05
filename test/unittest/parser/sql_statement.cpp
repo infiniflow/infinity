@@ -9,7 +9,6 @@
 #include "parser/parser_result.h"
 #include "parser/sql_parser.h"
 
-
 class StatementParsingTest : public BaseTest {
     void
     SetUp() override {
@@ -24,7 +23,7 @@ TEST_F(StatementParsingTest, good_test1) {
     using namespace infinity;
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
-/*
+
     {
         String input_sql = "CREATE TABLE t1 AS SELECT a, b FROM t2;";
         parser->Parse(input_sql, result);
@@ -268,7 +267,7 @@ TEST_F(StatementParsingTest, good_test1) {
         }
         result->Reset();
     }
-*/
+
     {
         String input_sql = "select * from t1 intersect select * from t2 union all select * from t3;";
         parser->Parse(input_sql, result);

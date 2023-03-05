@@ -285,7 +285,7 @@ struct SQL_LTYPE {
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
 %token PRIMARY KEY UNIQUE NULLABLE IS
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
-%token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT
+%token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 
 %token NUMBER
 
@@ -351,7 +351,7 @@ struct SQL_LTYPE {
 %left       BETWEEN CASE WHEN THEN ELSE
 %right      NOT
 
-%nonassoc   '=' EQUAL NOT_EQ
+%nonassoc   '=' EQUAL NOT_EQ LIKE
 %nonassoc   '<' '>' LESS_EQ GREATER_EQ
 
 %nonassoc   IS
@@ -727,6 +727,8 @@ delete_statement : DELETE FROM table_name where_clause {
         free($3->schema_name_ptr_);
     }
     $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
     $$->where_expr_ = $4;
 };
 
@@ -753,6 +755,7 @@ insert_statement: INSERT INTO table_name optional_identifier_array VALUES '(' co
     }
     $$->table_name_ = $3->table_name_ptr_;
     free($3->table_name_ptr_);
+    delete $3;
     $$->columns_ = $4;
     $$->select_ = $5;
 }
@@ -861,6 +864,21 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     drop_table_info->table_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
     $$->drop_info_ = std::move(drop_table_info);
+    $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    delete $4;
+}
+
+/* DROP VIEW view_name; */
+| DROP VIEW if_exists table_name {
+    $$ = new DropStatement();
+    std::unique_ptr<DropViewInfo> drop_view_info = std::make_unique<DropViewInfo>();
+    if($4->schema_name_ptr_ != nullptr) {
+        drop_view_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    drop_view_info->view_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    $$->drop_info_ = std::move(drop_view_info);
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
     delete $4;
 }
@@ -1184,6 +1202,10 @@ table_alias : AS IDENTIFIER {
     $$ = new TableAlias();
     $$->alias_ = $2;
 }
+| IDENTIFIER {
+    $$ = new TableAlias();
+    $$->alias_ = $1;
+}
 | AS IDENTIFIER '(' identifier_array ')' {
     $$ = new TableAlias();
     $$->alias_ = $2;
@@ -1371,6 +1393,13 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($1);
     $$ = func_expr;
 }
+| NOT operand {
+  FunctionExpr* func_expr = new FunctionExpr();
+  func_expr->func_name_ = "not";
+  func_expr->arguments_ = new Vector<ParsedExpr*>();
+  func_expr->arguments_->emplace_back($2);
+  $$ = func_expr;
+}
 | '-' operand {
   FunctionExpr* func_expr = new FunctionExpr();
   func_expr->func_name_ = "-";
@@ -1487,6 +1516,22 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_ = new Vector<ParsedExpr*>();
     func_expr->arguments_->emplace_back($3);
     func_expr->arguments_->emplace_back($5);
+    $$ = func_expr;
+}
+| operand LIKE operand {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "like";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| operand NOT LIKE operand {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "not_like";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($4);
     $$ = func_expr;
 };
 
@@ -1826,5 +1871,5 @@ yyerror(YYLTYPE * llocp, void* lexer, ParserResult* result, const char* msg) {
     if(result->IsError()) return ;
 
     result->error_message_ = String(msg) + ", " + std::to_string(llocp->first_column);
-	fprintf(stderr, "Error: %s, %d\n", msg, llocp->first_column);
+	fprintf(stderr, "Error: %s, %d:%d\n", msg, llocp->first_line, llocp->first_column);
 }
