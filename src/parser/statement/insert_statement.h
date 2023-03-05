@@ -18,7 +18,7 @@ public:
     [[nodiscard]] String
     ToString() const final;
 
-    String schema_name_{};
+    String schema_name_{"Default"};
     String table_name_{};
 
     Vector<String>*      columns_{nullptr};

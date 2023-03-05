@@ -28,7 +28,7 @@ public:
     [[nodiscard]] String
     ToString() const final;
 
-    String schema_name_{};
+    String schema_name_{"Default"};
     String table_name_{};
 
     ParsedExpr* where_expr_{nullptr};
