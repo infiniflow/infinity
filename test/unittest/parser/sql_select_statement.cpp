@@ -1125,4 +1125,219 @@ TEST_F(SelectStatementParsingTest, good_test3) {
         }
         result->Reset();
     }
+
+    {
+        String input_sql = "SELECT * FROM t1 limit 1 + 1 offset 2 + 2; \
+		                    SELECT * FROM t1 limit (SELECT MIN(x) FROM t2) offset (SELECT MAX(y) FROM t2); ";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[0]);
+            {
+                EXPECT_EQ(select->limit_expr_->type_, ParsedExprType::kFunction);
+                auto *limit_func_expr = (FunctionExpr *) (select->limit_expr_);
+                EXPECT_EQ(limit_func_expr->func_name_, "+");
+                auto *left_func_arg = (ConstantExpr *) ((*limit_func_expr->arguments_)[0]);
+                auto *right_func_arg = (ConstantExpr *) ((*limit_func_expr->arguments_)[1]);
+                EXPECT_EQ(left_func_arg->integer_value_, 1);
+                EXPECT_EQ(right_func_arg->integer_value_, 1);
+            }
+
+            {
+                EXPECT_EQ(select->offset_expr_->type_, ParsedExprType::kFunction);
+                auto *offset_func_expr = (FunctionExpr *) (select->offset_expr_);
+                EXPECT_EQ(offset_func_expr->func_name_, "+");
+                auto *left_func_arg = (ConstantExpr *) ((*offset_func_expr->arguments_)[0]);
+                auto *right_func_arg = (ConstantExpr *) ((*offset_func_expr->arguments_)[1]);
+                EXPECT_EQ(left_func_arg->integer_value_, 2);
+                EXPECT_EQ(right_func_arg->integer_value_, 2);
+            }
+        }
+
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[1]);
+            {
+                EXPECT_EQ(select->limit_expr_->type_, ParsedExprType::kSubquery);
+            }
+
+            {
+                EXPECT_EQ(select->offset_expr_->type_, ParsedExprType::kSubquery);
+            }
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT extract('year' from date '2025-03-04'); \
+		                    SELECT * FROM t1 WHERE extract('year' from a) < 2023";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[0]);
+            auto* func_expr = (FunctionExpr*)(*(select->select_list_))[0];
+            EXPECT_EQ(func_expr->func_name_, "extract");
+            auto* arg1_expr = (ConstantExpr*)(*(func_expr->arguments_))[0];
+            auto* arg2_expr = (ConstantExpr*)(*(func_expr->arguments_))[1];
+            EXPECT_STREQ(arg1_expr->str_value_, "year");
+            EXPECT_STREQ(arg2_expr->date_value_, "2025-03-04");
+        }
+
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[1]);
+            auto* func_expr = (FunctionExpr*)(select->where_expr_);
+            EXPECT_EQ(func_expr->func_name_, "<");
+            auto* arg1_expr = (FunctionExpr*)(*(func_expr->arguments_))[0];
+            auto* arg2_expr = (ConstantExpr*)(*(func_expr->arguments_))[1];
+            EXPECT_EQ(arg1_expr->func_name_, "extract");
+            {
+                auto* arg11_expr = (ConstantExpr*)(*(arg1_expr->arguments_))[0];
+                auto* arg12_expr = (ColumnExpr*)(*(arg1_expr->arguments_))[1];
+                EXPECT_STREQ(arg11_expr->str_value_, "year");
+                EXPECT_STREQ(arg12_expr->names_[0], "a");
+            }
+            EXPECT_EQ(arg2_expr->integer_value_, 2023);
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT CAST(5.3 AS BIGINT);";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[0]);
+            auto* cast_expr = (CastExpr*)(*(select->select_list_))[0];
+            auto* arg1_expr = (ConstantExpr*)(cast_expr->expr_);
+            EXPECT_FLOAT_EQ(arg1_expr->float_value_, 5.3);
+            EXPECT_EQ(cast_expr->data_type_.type(), LogicalType::kBigInt);
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "WITH t1 AS (SELECT a FROM x), t2 AS (SELECT b FROM y) SELECT * FROM t1, t2;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[0]);
+            WithExpr* with0 = (*select->with_exprs_)[0];
+            WithExpr* with1 = (*select->with_exprs_)[1];
+
+            EXPECT_EQ(with0->alias_, "t1");
+            ColumnExpr* with0_select_expr = (ColumnExpr*)((*((SelectStatement*)with0->select_)->select_list_)[0]);
+            EXPECT_STREQ(with0_select_expr->names_[0], "a");
+            TableReference* with0_table_ref = (TableReference*)(((SelectStatement*)with0->select_)->table_ref_);
+            EXPECT_EQ(with0_table_ref->table_name_, "x");
+
+            EXPECT_EQ(with1->alias_, "t2");
+            ColumnExpr* with1_select_expr = (ColumnExpr*)((*((SelectStatement*)with1->select_)->select_list_)[0]);
+            EXPECT_STREQ(with1_select_expr->names_[0], "b");
+            TableReference* with1_table_ref = (TableReference*)(((SelectStatement*)with1->select_)->table_ref_);
+            EXPECT_EQ(with1_table_ref->table_name_, "y");
+
+            EXPECT_EQ(select->table_ref_->type_, TableRefType::kCrossProduct);
+            CrossProductReference* cross = (CrossProductReference*)(select->table_ref_);
+            TableReference* cross_left = (TableReference*)(cross->left_);
+            TableReference* cross_right = (TableReference*)(cross->right_);
+            EXPECT_EQ(cross_left->table_name_, "t1");
+            EXPECT_EQ(cross_right->table_name_, "t2");
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "select a + 3 day from t1;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[0]);
+            FunctionExpr* func_expr = (FunctionExpr*)(*select->select_list_)[0];
+            EXPECT_EQ(func_expr->func_name_, "+");
+            ColumnExpr* arg0 = (ColumnExpr*)(*func_expr->arguments_)[0];
+            EXPECT_STREQ(arg0->names_[0], "a");
+
+            ConstantExpr* arg1 = (ConstantExpr*)(*func_expr->arguments_)[1];
+            EXPECT_EQ(arg1->interval_type_, IntervalExprType::kDay);
+            EXPECT_EQ(arg1->integer_value_, 3);
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 days;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[0]);
+            FunctionExpr* func_expr = (FunctionExpr*)select->where_expr_;
+            EXPECT_EQ(func_expr->func_name_, "=");
+            ColumnExpr* arg0 = (ColumnExpr*)(*func_expr->arguments_)[0];
+            EXPECT_STREQ(arg0->names_[0], "a");
+
+            FunctionExpr* arg1 = (FunctionExpr*)(*func_expr->arguments_)[1];
+            EXPECT_EQ(arg1->func_name_, "-");
+            FunctionExpr* arg10 = (FunctionExpr*)(*arg1->arguments_)[0];
+            EXPECT_EQ(arg10->func_name_, "cast");
+            ConstantExpr* arg11 = (ConstantExpr*)(*arg1->arguments_)[0];
+            EXPECT_EQ(arg11->interval_type_, IntervalExprType::kDay);
+            EXPECT_EQ(arg11->integer_value_, 15);
+        }
+
+        result->Reset();
+    }
+}
+
+TEST_F(SelectStatementParsingTest, good_test4) {
+    using namespace infinity;
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+    {
+        String input_sql = "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 DAYS;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        {
+            SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[0]);
+            FunctionExpr* func_expr = (FunctionExpr*)select->where_expr_;
+            EXPECT_EQ(func_expr->func_name_, "=");
+            ColumnExpr* arg0 = (ColumnExpr*)(*func_expr->arguments_)[0];
+            EXPECT_STREQ(arg0->names_[0], "a");
+
+            FunctionExpr* arg1 = (FunctionExpr*)(*func_expr->arguments_)[1];
+            EXPECT_EQ(arg1->func_name_, "-");
+            CastExpr* arg10 = (CastExpr*)(*arg1->arguments_)[0];
+            EXPECT_EQ(arg10->data_type_.type(), LogicalType::kDate);
+            ConstantExpr* arg11 = (ConstantExpr*)(*arg1->arguments_)[1];
+            EXPECT_EQ(arg11->interval_type_, IntervalExprType::kDay);
+            EXPECT_EQ(arg11->integer_value_, 15);
+        }
+
+        result->Reset();
+    }
 }

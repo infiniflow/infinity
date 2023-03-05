@@ -22,12 +22,12 @@ enum class SetOperatorType {
 
 struct WithExpr {
     ~WithExpr() {
-        if(statement_ != nullptr) {
-            delete statement_;
+        if(select_ != nullptr) {
+            delete select_;
         }
     }
     String alias_{};
-    BaseStatement* statement_{};
+    BaseStatement* select_{};
 };
 
 enum OrderType {

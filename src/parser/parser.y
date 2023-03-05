@@ -244,7 +244,7 @@ struct SQL_LTYPE {
 
 %destructor {
     fprintf(stderr, "destroy with expr\n");
-    delete $$->statement_;
+    delete $$->select_;
     delete $$;
 } <with_expr_t>
 
@@ -278,7 +278,7 @@ struct SQL_LTYPE {
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
 %token PRIMARY KEY UNIQUE NULLABLE IS
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
-%token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR
+%token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT
 
 %token NUMBER
 
@@ -1179,7 +1179,7 @@ with_expr: IDENTIFIER AS '(' select_clause_with_modifier ')' {
     $$ = new WithExpr();
     $$->alias_ = $1;
     free($1);
-    $$->statement_ = $4;
+    $$->select_ = $4;
 }
 
 /*
@@ -1444,6 +1444,14 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
+}
+| EXTRACT '(' constant_expr FROM operand ')' {
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "extract";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($3);
+    func_expr->arguments_->emplace_back($5);
+    $$ = func_expr;
 };
 
 conjunction_expr: expr AND expr {
@@ -1645,6 +1653,9 @@ constant_expr: STRING {
 }
 | INTERVAL interval_expr {
     $$ = $2;
+}
+| interval_expr {
+    $$ = $1;
 };
 
 interval_expr: LONG_VALUE SECONDS {

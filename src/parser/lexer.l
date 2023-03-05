@@ -66,6 +66,7 @@ ELSE            { return ELSE; }
 EMBEDDING       { return EMBEDDING; }
 END             { return END; }
 EXCEPT          { return EXCEPT; }
+EXTRACT         { return EXTRACT; }
 EXECUTE         { return EXECUTE; }
 EXISTS          { return EXISTS; }
 EXPLAIN         { return EXPLAIN; }
@@ -87,6 +88,7 @@ INNER           { return INNER; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }
 INTERSECT       { return INTERSECT; }
+INTERVAL        { return INTERVAL; }
 INTO            { return INTO; }
 IS              { return IS; }
 JOIN            { return JOIN; }
