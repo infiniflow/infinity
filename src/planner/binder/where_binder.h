@@ -10,7 +10,7 @@
 
 namespace infinity {
 
-class WhereBinder : public ExpressionBinder {
+class WhereBinder final : public ExpressionBinder {
 public:
     explicit
     WhereBinder(SharedPtr<QueryContext>& query_context,
@@ -20,16 +20,16 @@ public:
 
     // Bind expression entry
     SharedPtr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr,
+    BuildExpression(const ParsedExpr& expr,
                     const SharedPtr<BindContext>& bind_context_ptr,
                     i64 depth,
-                    bool root) override;
+                    bool root) final;
 
     SharedPtr<BaseExpression>
-    BuildColExpr(const hsql::Expr &expr,
+    BuildColExpr(const ColumnExpr& expr,
                  const SharedPtr<BindContext>& bind_context_ptr,
                  i64 depth,
-                 bool root) override;
+                 bool root) final;
 
     void
     CheckFuncType(FunctionType func_type) const override;

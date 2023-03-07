@@ -24,14 +24,15 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
         case ChunkScanType::kShowTables: {
             // Define output table schema
             Vector<SharedPtr<ColumnDef>> column_defs = {
-                    ColumnDef::Make("table_name", 0, DataType(LogicalType::kVarchar), Set<ConstrainType>()),
-                    ColumnDef::Make("column_count", 1, DataType(LogicalType::kBigInt), Set<ConstrainType>()),
-                    ColumnDef::Make("row_count", 2, DataType(LogicalType::kBigInt), Set<ConstrainType>()),
-                    ColumnDef::Make("block_count", 3, DataType(LogicalType::kBigInt), Set<ConstrainType>()),
-                    ColumnDef::Make("block_size", 4, DataType(LogicalType::kBigInt), Set<ConstrainType>()),
+                    MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "table_name", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(1, DataType(LogicalType::kBigInt), "column_count", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(2, DataType(LogicalType::kBigInt), "row_count", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(3, DataType(LogicalType::kBigInt), "block_count", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(4, DataType(LogicalType::kBigInt), "block_size", HashSet<ConstraintType>()),
             };
 
-            output_ = MakeShared<Table>(MakeShared<TableDef>("Tables", column_defs, false), TableType::kResult);
+            SharedPtr<TableDef> table_def = MakeShared<TableDef>("Tables", column_defs);
+            output_ = MakeShared<Table>(table_def, TableType::kResult);
 
             // Get tables from catalog
             // TODO: Use context to carry runtime information, such as current schema

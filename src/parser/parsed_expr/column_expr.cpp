@@ -6,11 +6,7 @@
 
 namespace infinity {
 
-ColumnExpr::~ColumnExpr() {
-    for(auto& name_ptr: names_) {
-        free(name_ptr);
-    }
-}
+ColumnExpr::~ColumnExpr() = default;
 
 String
 ColumnExpr::ToString() const {

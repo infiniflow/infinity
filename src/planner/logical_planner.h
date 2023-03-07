@@ -7,22 +7,21 @@
 #include <utility>
 
 #include "bound_statement.h"
-#include "SQLParserResult.h"
-#include "sql/CreateStatement.h"
-#include "sql/DropStatement.h"
-#include "sql/InsertStatement.h"
-#include "sql/DeleteStatement.h"
-#include "sql/UpdateStatement.h"
-#include "sql/SelectStatement.h"
-#include "sql/ShowStatement.h"
-#include "sql/ImportStatement.h"
-#include "sql/ExportStatement.h"
-#include "sql/TransactionStatement.h"
-#include "sql/AlterStatement.h"
-#include "sql/PrepareStatement.h"
-#include "sql/ExecuteStatement.h"
 
 #include "planner/bind_context.h"
+#include "parser/base_statement.h"
+#include "parser/statement/select_statement.h"
+#include "parser/statement/insert_statement.h"
+#include "parser/statement/update_statement.h"
+#include "parser/statement/delete_statement.h"
+#include "parser/statement/create_statement.h"
+#include "parser/statement/drop_statement.h"
+#include "parser/statement/prepare_statement.h"
+#include "parser/statement/execute_statement.h"
+#include "parser/statement/alter_statement.h"
+#include "parser/statement/show_statement.h"
+#include "parser/statement/explain_statement.h"
+#include "parser/statement/copy_statement.h"
 
 namespace infinity {
 
@@ -35,132 +34,108 @@ public:
     }
 
     void
-    Build(const hsql::SQLStatement &statement);
+    Build(const BaseStatement* statement);
 
     void
-    BuildSelect(const hsql::SelectStatement &statement);
-
-    // Import operator
-    void
-    BuildImport(const hsql::ImportStatement &statement);
+    BuildSelect(const SelectStatement* statement);
 
     void
-    BuildImportCsv(const hsql::ImportStatement &statement);
+    BuildInsert(const InsertStatement* statement);
 
     void
-    BuildImportTbl(const hsql::ImportStatement &statement);
+    BuildInsertValue(const InsertStatement* statement);
 
     void
-    BuildImportBinary(const hsql::ImportStatement &statement);
-
-    void
-    BuildImportAuto(const hsql::ImportStatement &statement);
-
-    void
-    BuildInsert(const hsql::InsertStatement &statement);
-
-    void
-    BuildInsertValue(const hsql::InsertStatement &statement);
-
-    void
-    BuildInsertSelect(const hsql::InsertStatement &statement);
+    BuildInsertSelect(const InsertStatement* statement);
 
     // Update operator
     void
-    BuildUpdate(const hsql::UpdateStatement &statement);
+    BuildUpdate(const UpdateStatement* statement);
 
     // Delete operator
     void
-    BuildDelete(const hsql::DeleteStatement &statement);
+    BuildDelete(const DeleteStatement* statement);
 
     // Create operator
     void
-    BuildCreate(const hsql::CreateStatement &statement);
+    BuildCreate(const CreateStatement* statement);
 
     void
-    BuildCreateTable(const hsql::CreateStatement &statement);
+    BuildCreateSchema(const CreateStatement* statement);
 
     void
-    BuildCreateView(const hsql::CreateStatement &statement);
+    BuildCreateTable(const CreateStatement* statement);
 
     void
-    BuildCreateTableFromTable(const hsql::CreateStatement &statement);
+    BuildCreateCollection(const CreateStatement* statement);
 
     void
-    BuildCreateIndex(const hsql::CreateStatement &statement);
+    BuildCreateView(const CreateStatement* statement);
+
+    void
+    BuildCreateIndex(const CreateStatement* statement);
 
     // Drop operator
     void
-    BuildDrop(const hsql::DropStatement &statement);
+    BuildDrop(const DropStatement* statement);
 
     void
-    BuildDropTable(const hsql::DropStatement &statement);
+    BuildDropTable(const DropStatement* statement);
 
     void
-    BuildDropSchema(const hsql::DropStatement &statement);
+    BuildDropCollection(const DropStatement* statement);
 
     void
-    BuildDropIndex(const hsql::DropStatement &statement);
+    BuildDropSchema(const DropStatement* statement);
 
     void
-    BuildDropView(const hsql::DropStatement &statement);
+    BuildDropIndex(const DropStatement* statement);
 
     void
-    BuildDropPreparedStatement(const hsql::DropStatement &statement);
+    BuildDropView(const DropStatement* statement);
 
     // Prepare operator
     void
-    BuildPrepare(const hsql::PrepareStatement &statement);
+    BuildPrepare(const PrepareStatement* statement);
 
     // Execute operator
     void
-    BuildExecute(const hsql::ExecuteStatement &statement);
+    BuildExecute(const ExecuteStatement* statement);
 
+
+    void
+    BuildCopy(const CopyStatement* statement);
     // Export operator
     void
-    BuildExport(const hsql::ExportStatement &statement);
+    BuildExport(const CopyStatement* statement);
 
     void
-    BuildExportCsv(const hsql::ExportStatement &statement);
+    BuildExportCsv(const CopyStatement* statement);
+
+    // Import operator
+    void
+    BuildImport(const CopyStatement* statement);
 
     void
-    BuildExportTbl(const hsql::ExportStatement &statement);
-
-    void
-    BuildExportBinary(const hsql::ExportStatement &statement);
-
-    void
-    BuildExportAuto(const hsql::ExportStatement &statement);
+    BuildImportCsv(const CopyStatement* statement);
 
     // Alter operator
     void
-    BuildAlter(const hsql::AlterStatement& statement);
-
-    void
-    BuildAlterDropColumn(const hsql::AlterStatement& statement);
+    BuildAlter(const AlterStatement* statement);
 
     // Show operator
     void
-    BuildShow(const hsql::ShowStatement& statement);
+    BuildShow(const ShowStatement* statement);
 
     void
-    BuildShowColumns(const hsql::ShowStatement& statement);
+    BuildShowColumns(const ShowStatement* statement);
 
     void
-    BuildShowTables(const hsql::ShowStatement& statement);
+    BuildShowTables(const ShowStatement* statement);
 
     // Transaction operator
     void
-    BuildTransaction(const hsql::TransactionStatement &statement);
-
-    void
-    BuildTransactionBegin(const hsql::TransactionStatement &statement);
-
-    void
-    BuildTransactionCommit(const hsql::TransactionStatement &statement);
-
-    void
-    BuildTransactionRollback(const hsql::TransactionStatement &statement);
+    BuildExplain(const ExplainStatement* statement);
 
     [[nodiscard]] SharedPtr<LogicalNode>
     LogicalPlan() const {

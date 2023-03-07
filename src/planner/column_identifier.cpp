@@ -8,41 +8,35 @@ namespace infinity {
 
 ColumnIdentifier
 ColumnIdentifier::MakeColumnIdentifier(SharedPtr<QueryContext>& query_context,
-                                       const hsql::Expr& expr) {
+                                       const ColumnExpr& expr) {
+    PlannerAssert(expr.star_ == false, "Star expression should be unfolded before.")
+
     SharedPtr<String> db_name_ptr = nullptr;
     SharedPtr<String> schema_name_ptr = nullptr;
     SharedPtr<String> table_name_ptr = nullptr;
-    SharedPtr<String> column_name_ptr = MakeShared<String>(expr.name);
+    SharedPtr<String> column_name_ptr = nullptr;
+
+    i64 name_count = expr.names_.size();
+    PlannerAssert(name_count <= 4 && name_count > 0, "Invalid field count of the column name.");
+    -- name_count;
+    column_name_ptr = MakeShared<String>(expr.names_[name_count]);
+    -- name_count;
+    if(name_count >= 0) {
+        table_name_ptr = MakeShared<String>(expr.names_[name_count]);
+        -- name_count;
+        if(name_count >= 0) {
+            schema_name_ptr = MakeShared<String>(expr.names_[name_count]);
+            -- name_count;
+            if(name_count >= 0) {
+                db_name_ptr = MakeShared<String>(expr.names_[name_count]);
+            }
+        }
+    }
 
     SharedPtr<String> alias_name_ptr = nullptr;
-
-    // TODO: db name
-    db_name_ptr = MakeShared<String>();
-
-    // Check schema name;
-    // TODO: currently parser don't support schema name in expression
-    schema_name_ptr = MakeShared<String>(query_context->schema_name());
-
-    if(expr.table != nullptr) {
-        table_name_ptr = MakeShared<String>(expr.table);
+    if(!expr.alias_.empty()) {
+        alias_name_ptr = MakeShared<String>(expr.alias_);
     }
-    if(expr.alias != nullptr) {
-        alias_name_ptr = MakeShared<String>(expr.alias);
-    }
-    return ColumnIdentifier(db_name_ptr, schema_name_ptr, table_name_ptr, column_name_ptr, alias_name_ptr);
-}
-
-ColumnIdentifier
-ColumnIdentifier::MakeColumnIdentifier(SharedPtr<QueryContext>& query_context,
-                                       const SharedPtr<ParsedColumnExpression>& parsed_expr) {
-    SharedPtr<String> db_name_ptr = MakeShared<String>(parsed_expr->db_name_);
-    SharedPtr<String> schema_name_ptr = MakeShared<String>(parsed_expr->schema_name_);
-    SharedPtr<String> table_name_ptr = MakeShared<String>(parsed_expr->table_name_);
-    SharedPtr<String> column_name_ptr = MakeShared<String>(parsed_expr->column_name_);
-    SharedPtr<String> alias_ptr = MakeShared<String>(parsed_expr->alias_);
-
-    SharedPtr<String> alias_name_ptr = nullptr;
-
     return ColumnIdentifier(db_name_ptr, schema_name_ptr, table_name_ptr, column_name_ptr, alias_name_ptr);
 }
 

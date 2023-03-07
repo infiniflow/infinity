@@ -19,7 +19,7 @@ public:
                           u64 table_index,
                           const Vector<String>& column_names,
                           const Vector<DataType>& column_types)
-        : TableRef(TableRefType::kBaseTable, table_index, alias),
+        : TableRef(TableRefType::kTable, table_index, alias),
           table_scan_func_(std::move(table_func)),
           table_scan_function_data_(std::move(table_func_data)),
           column_names_(column_names),

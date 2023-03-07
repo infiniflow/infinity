@@ -73,8 +73,11 @@ TEST_F(ExpressionExecutorTest, add_bigint_constant_1) {
     ExpressionExecutor expr_executor;
     expr_executor.Init({func_expr});
 
-    SharedPtr<ColumnDef> col_def = ColumnDef::Make("c1", 0, DataType(LogicalType::kBigInt), Set<ConstrainType>());
-    SharedPtr<TableDef> table_def = TableDef::Make("t1", {col_def}, false);
+    SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0,
+                                                         DataType(LogicalType::kBigInt),
+                                                         "c1",
+                                                         HashSet<ConstraintType>());
+    SharedPtr<TableDef> table_def = TableDef::Make("t1", {col_def});
     SharedPtr<Table> input_table = Table::Make(table_def, TableType::kDataTable);
 
     {
@@ -200,8 +203,11 @@ TEST_F(ExpressionExecutorTest, subtract_constant_8192_bigint) {
     ExpressionExecutor expr_executor;
     expr_executor.Init({func_expr});
 
-    SharedPtr<ColumnDef> col_def = ColumnDef::Make("c1", 0, DataType(LogicalType::kBigInt), Set<ConstrainType>());
-    SharedPtr<TableDef> table_def = TableDef::Make("t1", {col_def}, false);
+    SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0,
+                                                         DataType(LogicalType::kBigInt),
+                                                         "c1",
+                                                         HashSet<ConstraintType>());
+    SharedPtr<TableDef> table_def = TableDef::Make("t1", {col_def});
     SharedPtr<Table> input_table = Table::Make(table_def, TableType::kDataTable);
 
     {

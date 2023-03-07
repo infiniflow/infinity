@@ -5,18 +5,17 @@
 #include "common/utility/infinity_assert.h"
 #include "function/function_set.h"
 #include "having_binder.h"
-#include "legacy_parser/statement.h"
 #include "expression/column_expression.h"
 
 namespace infinity {
 
 SharedPtr<BaseExpression>
-HavingBinder::BuildExpression(const hsql::Expr &expr,
+HavingBinder::BuildExpression(const ParsedExpr& expr,
                               const SharedPtr<BindContext>& bind_context_ptr,
                               i64 depth,
                               bool root) {
 
-    String expr_name = expr.getName() == nullptr ? Statement::ExprAsColumnName(&expr) : expr.getName();
+    String expr_name = expr.GetName();
 
     // Trying to bind in group by
     if(!this->binding_agg_func_) {
@@ -62,7 +61,7 @@ HavingBinder::BuildExpression(const hsql::Expr &expr,
 }
 
 SharedPtr<BaseExpression>
-HavingBinder::BuildColExpr(const hsql::Expr &expr,
+HavingBinder::BuildColExpr(const ColumnExpr& expr,
                            const SharedPtr<BindContext>& bind_context_ptr,
                            i64 depth,
                            bool root) {
@@ -80,12 +79,12 @@ HavingBinder::BuildColExpr(const hsql::Expr &expr,
         return result;
 
     } else {
-        PlannerError("Column " + String(expr.getName()) + " must appear in the GROUP BY clause or be used in an aggregate function");
+        PlannerError("Column " + String(expr.GetName()) + " must appear in the GROUP BY clause or be used in an aggregate function");
     }
 }
 
 SharedPtr<BaseExpression>
-HavingBinder::BuildFuncExpr(const hsql::Expr &expr,
+HavingBinder::BuildFuncExpr(const FunctionExpr& expr,
                             const SharedPtr<BindContext>& bind_context_ptr,
                             i64 depth,
                             bool root) {
@@ -101,7 +100,7 @@ HavingBinder::BuildFuncExpr(const hsql::Expr &expr,
     auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
-        String expr_name = expr.getName();
+        String expr_name = expr.GetName();
         i64 aggregate_index = bind_context_ptr->aggregate_exprs_.size();
         bind_context_ptr->aggregate_exprs_.emplace_back(func_expr_ptr);
         bind_context_ptr->aggregate_index_by_name_[expr_name] = aggregate_index;

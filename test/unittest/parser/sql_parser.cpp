@@ -115,11 +115,11 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "a");
                 DataType column_type(LogicalType::kBoolean, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 4);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kPrimaryKey), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNull), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kUnique), true);
+                EXPECT_EQ(column_def->constraints_.size(), 4);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kPrimaryKey), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNull), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kUnique), true);
             }
 
             {
@@ -127,10 +127,10 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "b");
                 DataType column_type(LogicalType::kTinyInt, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 3);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNull), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kUnique), true);
+                EXPECT_EQ(column_def->constraints_.size(), 3);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNull), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kUnique), true);
             }
 
             {
@@ -138,9 +138,9 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "c");
                 DataType column_type(LogicalType::kSmallInt, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 2);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNull), true);
+                EXPECT_EQ(column_def->constraints_.size(), 2);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNull), true);
             }
 
             {
@@ -148,8 +148,8 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "d");
                 DataType column_type(LogicalType::kInteger, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 1);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_.size(), 1);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNotNull), true);
             }
 
             {
@@ -157,8 +157,8 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "e");
                 DataType column_type(LogicalType::kBigInt, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 1);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNull), true);
+                EXPECT_EQ(column_def->constraints_.size(), 1);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNull), true);
             }
 
             {
@@ -166,8 +166,8 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "f");
                 DataType column_type(LogicalType::kHugeInt, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 1);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kUnique), true);
+                EXPECT_EQ(column_def->constraints_.size(), 1);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kUnique), true);
             }
 
             {
@@ -175,8 +175,8 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "g");
                 DataType column_type(LogicalType::kFloat, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 1);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kPrimaryKey), true);
+                EXPECT_EQ(column_def->constraints_.size(), 1);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kPrimaryKey), true);
             }
 
             {
@@ -184,9 +184,9 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "h");
                 DataType column_type(LogicalType::kDouble, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 2);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kPrimaryKey), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_.size(), 2);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kPrimaryKey), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNotNull), true);
             }
 
             {
@@ -194,9 +194,9 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "i");
                 DataType column_type(LogicalType::kFloat, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 2);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kPrimaryKey), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNull), true);
+                EXPECT_EQ(column_def->constraints_.size(), 2);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kPrimaryKey), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNull), true);
             }
 
             {
@@ -204,9 +204,9 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "j");
                 DataType column_type(LogicalType::kDate, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 2);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kPrimaryKey), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kUnique), true);
+                EXPECT_EQ(column_def->constraints_.size(), 2);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kPrimaryKey), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kUnique), true);
             }
 
             {
@@ -214,10 +214,10 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "k");
                 DataType column_type(LogicalType::kTime, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 3);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kPrimaryKey), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNull), true);
+                EXPECT_EQ(column_def->constraints_.size(), 3);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kPrimaryKey), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNull), true);
             }
 
             {
@@ -225,10 +225,10 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "l");
                 DataType column_type(LogicalType::kDateTime, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 3);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kPrimaryKey), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kUnique), true);
+                EXPECT_EQ(column_def->constraints_.size(), 3);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kPrimaryKey), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kUnique), true);
             }
 
             {
@@ -236,9 +236,9 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "m");
                 DataType column_type(LogicalType::kTimestamp, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 2);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNotNull), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kUnique), true);
+                EXPECT_EQ(column_def->constraints_.size(), 2);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNotNull), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kUnique), true);
             }
 
             {
@@ -246,9 +246,9 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "n");
                 DataType column_type(LogicalType::kUuid, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_->size(), 2);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kNull), true);
-                EXPECT_EQ(column_def->constraints_->contains(ConstraintType::kUnique), true);
+                EXPECT_EQ(column_def->constraints_.size(), 2);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNull), true);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kUnique), true);
             }
 
             {
@@ -256,7 +256,7 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "o");
                 DataType column_type(LogicalType::kPoint, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -264,7 +264,7 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "p");
                 DataType column_type(LogicalType::kLine, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -272,7 +272,7 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "q");
                 DataType column_type(LogicalType::kLineSeg, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -280,7 +280,7 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "r");
                 DataType column_type(LogicalType::kBox, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -288,7 +288,7 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "s");
                 DataType column_type(LogicalType::kPath, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -296,7 +296,7 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "t");
                 DataType column_type(LogicalType::kPolygon, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -304,7 +304,7 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->name_, "u");
                 DataType column_type(LogicalType::kCircle, nullptr);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -313,7 +313,7 @@ TEST_F(SQLParserTest, good_test2) {
                 SharedPtr<TypeInfo> type_info = CharInfo::Make(10);
                 DataType column_type(LogicalType::kChar, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -322,7 +322,7 @@ TEST_F(SQLParserTest, good_test2) {
                 SharedPtr<TypeInfo> type_info = VarcharInfo::Make(100);
                 DataType column_type(LogicalType::kVarchar, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -331,7 +331,7 @@ TEST_F(SQLParserTest, good_test2) {
                 SharedPtr<TypeInfo> type_info = Decimal64Info::Make(0, 0);
                 DataType column_type(LogicalType::kDecimal64, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -340,7 +340,7 @@ TEST_F(SQLParserTest, good_test2) {
                 SharedPtr<TypeInfo> type_info = Decimal64Info::Make(10, 0);
                 DataType column_type(LogicalType::kDecimal64, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -349,7 +349,7 @@ TEST_F(SQLParserTest, good_test2) {
                 SharedPtr<TypeInfo> type_info = Decimal64Info::Make(12, 14);
                 DataType column_type(LogicalType::kDecimal64, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -358,7 +358,7 @@ TEST_F(SQLParserTest, good_test2) {
                 SharedPtr<TypeInfo> type_info = BlobInfo::Make(10);
                 DataType column_type(LogicalType::kBlob, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -367,7 +367,7 @@ TEST_F(SQLParserTest, good_test2) {
                 SharedPtr<TypeInfo> type_info = BitmapInfo::Make(16);
                 DataType column_type(LogicalType::kBitmap, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -376,7 +376,7 @@ TEST_F(SQLParserTest, good_test2) {
                 SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemBit, 256);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             {
@@ -385,7 +385,7 @@ TEST_F(SQLParserTest, good_test2) {
                 SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemFloat, 512);
                 DataType column_type(LogicalType::kEmbedding, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_, nullptr);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
             EXPECT_EQ(create_table_info->constraints_.size(), 2);

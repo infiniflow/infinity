@@ -2,6 +2,8 @@
 // Created by jinhai on 23-2-27.
 //
 
+#pragma once
+
 #include "common/default_values.h"
 #include "common/types/type_info.h"
 #include "common/utility/infinity_assert.h"

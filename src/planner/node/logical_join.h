@@ -35,7 +35,7 @@ public:
     u64 table_index_{};
 
 public:
-    JoinType join_type_{JoinType::kInvalid};
+    JoinType join_type_{JoinType::kInner};
     Vector<SharedPtr<BaseExpression>> conditions_{};
 };
 

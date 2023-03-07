@@ -8,32 +8,24 @@
 namespace infinity {
 
 SharedPtr<BaseExpression>
-LimitBinder::BuildExpression(const hsql::Expr &expr,
+LimitBinder::BuildExpression(const ParsedExpr& expr,
                              const SharedPtr<BindContext>& bind_context_ptr,
                              i64 depth,
                              bool root) {
-    switch(expr.type) {
-        case hsql::kExprStar:
-            PlannerError("Star expression isn't allowed in limit expression.");
-        case hsql::kExprParameter:
+    switch(expr.type_) {
+        case ParsedExprType::kParameter: {
             PlannerError("Parameter expression isn't allowed in limit expression.");
-        case hsql::kExprColumnRef:
-            PlannerError("Column expression isn't allowed in limit expression.");
-        case hsql::kExprSelect:
-            PlannerError("Subquery isn't allowed in limit expression.");
-        case hsql::kExprHint:
-            PlannerError("Hint expression isn't allowed in limit expression.");
-        case hsql::kExprArray:
-            PlannerError("Array expression isn't allowed in limit expression.");
-        case hsql::kExprArrayIndex:
-            PlannerError("Array Index expression isn't allowed in limit expression.");
+        }
+        case ParsedExprType::kSubquery: {
+            PlannerError("Subquery expression isn't allowed in limit expression.");
+        }
         default:
             return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
     }
 }
 
 SharedPtr<BaseExpression>
-LimitBinder::BuildFuncExpr(const hsql::Expr &expr,
+LimitBinder::BuildFuncExpr(const FunctionExpr& expr,
                            const SharedPtr<BindContext>& bind_context_ptr,
                            i64 depth,
                            bool root) {
@@ -42,6 +34,17 @@ LimitBinder::BuildFuncExpr(const hsql::Expr &expr,
         PlannerError("Only scalar function is supported in limit clause.");
     }
     return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
+}
+
+SharedPtr<BaseExpression>
+LimitBinder::BuildColExpr(const ColumnExpr& expr,
+                          const SharedPtr<BindContext>& bind_context_ptr,
+                          i64 depth,
+                          bool root) {
+    if(expr.star_) {
+        PlannerError("Star expression isn't allowed in limit clause.");
+    }
+    return ExpressionBinder::BuildColExpr(expr, bind_context_ptr, depth, root);
 }
 
 }

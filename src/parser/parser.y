@@ -127,7 +127,7 @@ struct SQL_LTYPE {
     ParsedExpr*             expr_t;
     Vector<ParsedExpr*>*    expr_array_t;
 
-    Vector<CaseCheck*>*     case_check_array_t;
+    Vector<WhenThen*>*     case_check_array_t;
 
     UpdateExpr*             update_expr_t;
     Vector<UpdateExpr*>*    update_expr_array_t;
@@ -423,7 +423,7 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
         create_collection_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
     }
-    create_collection_info->table_name_ = $4->table_name_ptr_;
+    create_collection_info->collection_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
     $$->create_info_ = std::move(create_collection_info);
     $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
@@ -595,7 +595,8 @@ IDENTIFIER column_type {
     $$ = new ColumnDef($2.logical_type_, type_info_ptr);
 
     $$->name_ = $1;
-    $$->constraints_ = $3;
+    $$->constraints_ = *$3;
+    delete $3;
     free($1);
     /*
     if (!$$->trySetNullableExplicit()) {
@@ -846,7 +847,7 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
         drop_collection_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
     }
-    drop_collection_info->table_name_ = $4->table_name_ptr_;
+    drop_collection_info->collection_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
     $$->drop_info_ = std::move(drop_collection_info);
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
@@ -884,11 +885,17 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
 }
 
 /* DROP INDEX index_name; */
-| DROP INDEX if_exists IDENTIFIER {
+| DROP INDEX if_exists table_name {
     $$ = new DropStatement();
-    std::unique_ptr<DropIndexInfo> drop_index_info = std::make_unique<DropIndexInfo>();
-    drop_index_info->index_name_ = $4;
-    free($4);
+    UniquePtr<DropIndexInfo> drop_index_info = MakeUnique<DropIndexInfo>();
+    if($4->schema_name_ptr_ != nullptr) {
+        drop_index_info->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    drop_index_info->index_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    delete $4;
+
     $$->drop_info_ = std::move(drop_index_info);
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 };
@@ -1150,9 +1157,15 @@ table_reference : table_reference_unit {
     $$ = $1;
 }
 | table_reference ',' table_reference_unit {
-    CrossProductReference* cross_product_ref = new CrossProductReference();
-    cross_product_ref->left_ = $1;
-    cross_product_ref->right_ = $3;
+    CrossProductReference* cross_product_ref = nullptr;
+    if($1->type_ == TableRefType::kCrossProduct) {
+        cross_product_ref = (CrossProductReference*)$1;
+        cross_product_ref->tables_.emplace_back($3);
+    } else {
+        cross_product_ref = new CrossProductReference();
+        cross_product_ref->tables_.emplace_back($1);
+        cross_product_ref->tables_.emplace_back($3);
+    }
 
     $$ = cross_product_ref;
 };
@@ -1603,17 +1616,17 @@ case_expr: CASE expr case_check_array END {
 };
 
 case_check_array: WHEN expr THEN expr {
-    $$ = new Vector<CaseCheck*>();
-    CaseCheck* case_check_ptr = new CaseCheck();
-    case_check_ptr->when_ = $2;
-    case_check_ptr->then_ = $4;
-    $$->emplace_back(case_check_ptr);
+    $$ = new Vector<WhenThen*>();
+    WhenThen* when_then_ptr = new WhenThen();
+    when_then_ptr->when_ = $2;
+    when_then_ptr->then_ = $4;
+    $$->emplace_back(when_then_ptr);
 }
 | case_check_array WHEN expr THEN expr {
-    CaseCheck* case_check_ptr = new CaseCheck();
-    case_check_ptr->when_ = $3;
-    case_check_ptr->then_ = $5;
-    $1->emplace_back(case_check_ptr);
+    WhenThen* when_then_ptr = new WhenThen();
+    when_then_ptr->when_ = $3;
+    when_then_ptr->then_ = $5;
+    $1->emplace_back(when_then_ptr);
     $$ = $1;
 };
 
@@ -1680,11 +1693,13 @@ subquery_expr: EXISTS '(' select_without_paren ')' {
 column_expr : IDENTIFIER {
     ColumnExpr* column_expr = new ColumnExpr();
     column_expr->names_.emplace_back($1);
+    free($1);
     $$ = column_expr;
 }
 | column_expr '.' IDENTIFIER {
     ColumnExpr* column_expr = (ColumnExpr*)$1;
     column_expr->names_.emplace_back($3);
+    free($3);
     $$ = column_expr;
 }
 | '*' {

@@ -301,7 +301,7 @@ union SQLSTYPE
     ParsedExpr*             expr_t;
     Vector<ParsedExpr*>*    expr_array_t;
 
-    Vector<CaseCheck*>*     case_check_array_t;
+    Vector<WhenThen*>*     case_check_array_t;
 
     UpdateExpr*             update_expr_t;
     Vector<UpdateExpr*>*    update_expr_array_t;

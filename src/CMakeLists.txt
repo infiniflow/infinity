@@ -115,7 +115,6 @@ add_library(infinity_parser STATIC
 
 target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(infinity_parser PUBLIC "/usr/local/include")
-#target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/sql-parser/src")
 #target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tlsf")
 target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 #target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
@@ -143,7 +142,6 @@ set(INFINITY_CORE_SOURCE
 add_library(infinity_core STATIC ${INFINITY_CORE_SOURCE})
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(infinity_core PUBLIC "/usr/local/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/sql-parser/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tlsf")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
@@ -163,7 +161,6 @@ target_link_libraries(
         infinity_main
         infinity_core
         infinity_parser
-        sql-parser
         tlsf
 )
 
@@ -171,7 +168,6 @@ target_link_libraries(
         infinity_console
         infinity_core
         infinity_parser
-        sql-parser
         tlsf
         linenoise
 )

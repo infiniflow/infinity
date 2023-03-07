@@ -4,9 +4,7 @@
 
 #pragma once
 
-#include "sql/Expr.h"
 #include "main/query_context.h"
-#include "legacy_parser/expression/parsed_column_expression.h"
 
 #include <string>
 
@@ -15,11 +13,7 @@ namespace infinity {
 struct ColumnIdentifier {
 public:
     static ColumnIdentifier
-    MakeColumnIdentifier(SharedPtr<QueryContext>& query_context, const hsql::Expr &expr);
-
-    static ColumnIdentifier
-    MakeColumnIdentifier(SharedPtr<QueryContext>& query_context,
-                         const SharedPtr<ParsedColumnExpression>& parsed_expr);
+    MakeColumnIdentifier(SharedPtr<QueryContext>& query_context, const ColumnExpr& expr);
 
 public:
     explicit

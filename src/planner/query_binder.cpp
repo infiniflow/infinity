@@ -15,8 +15,6 @@
 #include "planner/binder/join_binder.h"
 #include "planner/binder/bind_alias_proxy.h"
 #include "expression/expression_transformer.h"
-#include "legacy_parser/expression/parsed_raw_expression.h"
-#include "legacy_parser/expression/parsed_column_expression.h"
 #include "planner/binder/where_binder.h"
 #include "planner/binder/group_binder.h"
 #include "planner/binder/having_binder.h"
@@ -27,31 +25,35 @@
 namespace infinity {
 
 SharedPtr<BoundSelectStatement>
-QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
+QueryBinder::BindSelect(const SelectStatement& statement) {
     SharedPtr<BoundSelectStatement> bound_select_statement = BoundSelectStatement::Make();
-    PlannerAssert(statement.selectList != nullptr, "SELECT list is needed");
-    PlannerAssert(!statement.selectList->empty(), "SELECT list can't be empty");
+    PlannerAssert(statement.select_list_ != nullptr, "SELECT list is needed");
+    PlannerAssert(!statement.select_list_->empty(), "SELECT list can't be empty");
 
     // 1. WITH clause
-    if (statement.withDescriptions != nullptr) {
+    if (statement.with_exprs_ != nullptr) {
 
         // Prepare to store the with statement
-        SizeT with_stmt_count = statement.withDescriptions->size();
+        SizeT with_stmt_count = statement.with_exprs_->size();
         bind_context_ptr_->CTE_map_.reserve(with_stmt_count);
 
         // Hash set to restrict the with statement name visibility
         HashSet<String> masked_name_set;
 
         for(i64 i = with_stmt_count - 1; i >= 0; -- i) {
-            hsql::WithDescription* with_desc = (*statement.withDescriptions)[i];
-            String name = with_desc->alias;
+            WithExpr* with_expr = (*statement.with_exprs_)[i];
+            String name = with_expr->alias_;
             if(bind_context_ptr_->CTE_map_.contains(name)) {
                 PlannerError("WITH query name: " + name + " occurs more than once.");
             }
 
+            PlannerAssert(with_expr->select_->type_ == StatementType::kSelect, "Non-select statement in WITH clause.");
+
             masked_name_set.insert(name);
             SharedPtr<CommonTableExpressionInfo> cte_info_ptr
-                    = MakeShared<CommonTableExpressionInfo>(name, with_desc->select, masked_name_set);
+                    = MakeShared<CommonTableExpressionInfo>(name,
+                                                            (SelectStatement*)(with_expr->select_),
+                                                            masked_name_set);
 
             bind_context_ptr_->CTE_map_[name] = cte_info_ptr;
         }
@@ -60,9 +62,9 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     // 2. FROM clause (BaseTable, Join and Subquery)
     // 3. ON
     // 4. JOIN
-    if (statement.fromTable != nullptr) {
+    if (statement.table_ref_ != nullptr) {
         // Build table reference
-        bound_select_statement->table_ref_ptr_ = BuildFromClause(query_context_ptr_, statement.fromTable);
+        bound_select_statement->table_ref_ptr_ = BuildFromClause(query_context_ptr_, statement.table_ref_);
     } else {
         // No table reference, just evaluate the expr of the select list.
         bound_select_statement->table_ref_ptr_ = BuildDummyTable(query_context_ptr_);
@@ -71,11 +73,13 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     // 5. SELECT list (aliases)
     // Unfold the star expression in the select list.
     // Star expression will be unfolded and bound as column expressions.
-    bind_context_ptr_->select_expression_ = UnfoldStarExpression(query_context_ptr_, *statement.selectList);
+    UnfoldStarExpression(query_context_ptr_,
+                         *statement.select_list_,
+                         bind_context_ptr_->select_expression_);
 
     i64 select_column_count = bind_context_ptr_->select_expression_.size();
     for(i64 column_index = 0; column_index < select_column_count; ++ column_index) {
-        const SharedPtr<ParsedExpression>& select_expr = bind_context_ptr_->select_expression_[column_index];
+        const ParsedExpr* select_expr = bind_context_ptr_->select_expression_[column_index];
         // Bound column expression is bound due to the star expression, which won't be referenced in other place.
         // Only consider the Raw Expression case.
         if(!select_expr->alias_.empty()) {
@@ -87,7 +91,7 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
                 bind_context_ptr_->select_alias2index_[select_expr->alias_] = column_index;
             }
         } else {
-            const String select_expr_name = select_expr->GetName();
+            const String select_expr_name = select_expr->ToString();
             if(bind_context_ptr_->select_expr_name2index_.contains(select_expr_name)) {
                 LOG_TRACE("Same expression: {} had already been found in select list index: {}",
                           select_expr_name,
@@ -102,10 +106,10 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
 
     // 6. WHERE
-    if (statement.whereClause) {
+    if (statement.where_expr_) {
         auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr =
-                where_binder->Bind(*statement.whereClause, this->bind_context_ptr_, 0, true);
+                where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_, 0, true);
 
         bound_select_statement->where_conditions_ =
                 SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
@@ -118,10 +122,10 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     BuildHaving(query_context_ptr_, statement, bind_alias_proxy, bound_select_statement);
 
     // 10. DISTINCT
-    bound_select_statement->distinct_ = statement.selectDistinct;
+    bound_select_statement->distinct_ = statement.select_distinct_;
 
     // Push order by expression to projection
-    if(statement.order != nullptr) {
+    if(statement.order_by_list != nullptr) {
         PushOrderByToProject(query_context_ptr_, statement);
     }
 
@@ -130,12 +134,12 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
     bound_select_statement->aggregate_expressions_ = bind_context_ptr_->aggregate_exprs_;
 
     // 12. ORDER BY
-    if(statement.order != nullptr) {
+    if(statement.order_by_list != nullptr) {
         BuildOrderBy(query_context_ptr_, statement, bound_select_statement);
     }
 
     // 13. LIMIT
-    if(statement.limit !=nullptr) {
+    if(statement.limit_expr_ !=nullptr) {
         BuildLimit(query_context_ptr_, statement, bound_select_statement);
     }
 
@@ -164,33 +168,42 @@ QueryBinder::BindSelect(const hsql::SelectStatement& statement) {
 
 SharedPtr<TableRef>
 QueryBinder::BuildFromClause(SharedPtr<QueryContext>& query_context,
-                             const hsql::TableRef *from_table) {
+                             const BaseTableReference *table_ref) {
 
     SharedPtr<TableRef> result = nullptr;
-    switch(from_table->type) {
-        case hsql::kTableName: {
+    switch(table_ref->type_) {
+        case TableRefType::kTable: {
             // Only one table: select * from t1;
-            result = BuildTable(query_context, from_table);
+            result = BuildTable(query_context, (TableReference*)table_ref);
             break;
         }
-        case hsql::kTableSelect: {
+        case TableRefType::kSubquery: {
             // select t1.a from (select * from t2 as t1);
-            String table_alias = from_table->getName() != nullptr ? from_table->getName() : String();
-            result = BuildSubquery(query_context, table_alias, *(from_table->select));
+            auto* subquery_ref = (SubqueryReference*)table_ref;
+            String table_alias;
+            if(subquery_ref->alias_ != nullptr) {
+                // Todo: column alias isn't handling
+                table_alias = subquery_ref->alias_->alias_;
+            }
+            result = BuildSubquery(query_context, table_alias, subquery_ref);
             break;
         }
-        case hsql::kTableJoin: {
+        case TableRefType::kJoin: {
             // select t1.b, t2.c from t1 join t2 on t1.a = t2.a
-            result = BuildJoin(query_context, from_table);
+            result = BuildJoin(query_context, (JoinReference*)table_ref);
             break;
         }
-        case hsql::kTableCrossProduct: {
+        case TableRefType::kCrossProduct: {
             // select t1.b, t2.c from t1, t2;
-            result = BuildCrossProduct(query_context, from_table);
+            result = BuildCrossProduct(query_context, (CrossProductReference*)table_ref);
             break;
         }
 
-            // TODO: No case currently, since parser doesn't support it.
+        case TableRefType::kDummy: {
+            PlannerError("Unexpected table reference type.");
+        }
+
+        // TODO: No case currently, since parser doesn't support it.
 //        case hsql::kExpressionList: {
 //            break;
 //        }
@@ -206,7 +219,7 @@ QueryBinder::BuildDummyTable(SharedPtr<QueryContext>& query_context) {
 
 SharedPtr<TableRef>
 QueryBinder::BuildTable(SharedPtr<QueryContext>& query_context,
-                        const hsql::TableRef* from_table) {
+                        const TableReference* from_table) {
     // There are five cases here:
     // CTE*, which is subquery (may include correlated expression).
     // Recursive CTE (not supported by parser.)
@@ -217,43 +230,40 @@ QueryBinder::BuildTable(SharedPtr<QueryContext>& query_context,
     // In AST, name is the alias of CTE and name of table
     // In AST, alias is the alias of table
 
-    String name = from_table->name;
-    String schema_name{};
-
     // If schema is null, it may from CTE
     // else the table will be checked in catalog
-    if(from_table->schema == nullptr) {
+
+    String schema_name{};
+    if(from_table->schema_name_.empty()) {
         // Before find the table meta from catalog, Attempt to get CTE info from bind context which saved CTE info into before.
-        if(SharedPtr<TableRef> cte_ref = BuildCTE(query_context, name); cte_ref != nullptr) {
+        if(SharedPtr<TableRef> cte_ref = BuildCTE(query_context, from_table->table_name_); cte_ref != nullptr) {
             return cte_ref;
         }
-
-        schema_name = "Default";
     }
 
     // Base Table
-    if(SharedPtr<TableRef> base_table_ref = BuildBaseTable(query_context, from_table, schema_name); base_table_ref != nullptr) {
+    if(SharedPtr<TableRef> base_table_ref = BuildBaseTable(query_context, from_table); base_table_ref != nullptr) {
         return base_table_ref;
     }
 
     // View
-    if(SharedPtr<TableRef> view_ref = BuildView(query_context, from_table, schema_name); view_ref != nullptr) {
+    if(SharedPtr<TableRef> view_ref = BuildView(query_context, from_table); view_ref != nullptr) {
         return view_ref;
     }
 
-    PlannerError("Table or View: " + name +" is not found in catalog.");
+    PlannerError("Table or View: " + from_table->table_name_ +" is not found in catalog.");
 }
 
 SharedPtr<TableRef>
 QueryBinder::BuildSubquery(SharedPtr<QueryContext>& query_context,
                            const String &table_alias,
-                           const hsql::SelectStatement& select_stmt) {
+                           const SubqueryReference* subquery_ref) {
     // Create new bind context and add into context array;
     SharedPtr<BindContext> subquery_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
 
     // Create bound select node and subquery table reference
     QueryBinder subquery_binder(this->query_context_ptr_, subquery_bind_context_ptr);
-    SharedPtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(select_stmt);
+    SharedPtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*subquery_ref->select_statement_);
 
 //    auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, select_stmt, subquery_bind_context_ptr);
     this->bind_context_ptr_->AddSubQueryChild(subquery_bind_context_ptr);
@@ -324,10 +334,14 @@ QueryBinder::BuildCTE(SharedPtr<QueryContext>& query_context,
 
 SharedPtr<TableRef>
 QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
-                            const hsql::TableRef* from_table,
-                            const String &schema_name) {
-    String table_name = from_table->name;
-    auto table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, table_name);
+                            const TableReference* from_table) {
+    String schema_name;
+    if(from_table->schema_name_.empty()) {
+        schema_name = "Default";
+    } else {
+        schema_name = from_table->schema_name_;
+    }
+    auto table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, from_table->table_name_);
     if(table_ptr == nullptr) {
         // Not found in catalog
         return nullptr;
@@ -335,7 +349,8 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
 
     // TODO: Handle table and column alias
     u64 table_index = this->bind_context_ptr_->GenerateTableIndex();
-    String alias = from_table->getName() != nullptr ? from_table->getName() : String();
+
+    String alias = from_table->GetTableName();
     Vector<DataType> types;
     Vector<String> names;
     Vector<SizeT> columns;
@@ -368,9 +383,15 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
 
 SharedPtr<TableRef>
 QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
-                       const hsql::TableRef* from_table,
-                       const String &schema_name) {
-    String view_name = from_table->name;
+                       const TableReference* from_table) {
+    String schema_name;
+    if(from_table->schema_name_.empty()) {
+        schema_name = "Default";
+    } else {
+        schema_name = from_table->schema_name_;
+    }
+
+    String view_name = from_table->table_name_;
     SharedPtr<View> view_ptr = Infinity::instance().catalog()->GetViewByName(schema_name, view_name);
     if(view_ptr == nullptr) {
         // Not found in catalog
@@ -381,10 +402,7 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
     PlannerAssert(!(this->bind_context_ptr_->IsViewBound(view_name)), "View: " + view_name + " is bound before!");
     this->bind_context_ptr_->BoundView(view_name);
 
-    const hsql::SQLStatement* sql_statement = view_ptr->GetSQLStatement();
-    PlannerAssert(sql_statement->type() != hsql::StatementType::kStmtSelect, "View related statement isn't a select statement.");
-
-    auto* select_stmt_ptr = static_cast<const hsql::SelectStatement*>(sql_statement);
+    const SelectStatement* select_stmt_ptr = view_ptr->GetSQLStatement();
 
     // Create new bind context and add into context array;
     SharedPtr<BindContext> view_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
@@ -415,8 +433,8 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
 
 SharedPtr<TableRef>
 QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
-                            const hsql::TableRef *from_table) {
-    const Vector<hsql::TableRef*>& tables = *from_table->list;
+                               const CrossProductReference* from_table) {
+    const Vector<BaseTableReference*>& tables = from_table->tables_;
 
     Vector<SharedPtr<BindContext>> bind_contexts;
     {
@@ -487,30 +505,21 @@ QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
 
 SharedPtr<TableRef>
 QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
-                       const hsql::TableRef *from_table) {
+                       const JoinReference* from_table) {
 
-    String alias = from_table->getName() != nullptr ? from_table->getName() : String();
+    String alias = from_table->alias_->alias_ != nullptr ? from_table->alias_->alias_ : String();
     auto result = MakeShared<JoinTableRef>(bind_context_ptr_->GenerateTableIndex(), alias);
 
-    switch (from_table->join->type) {
-        case hsql::JoinType::kJoinCross: result->join_type_ = JoinType::kCross; break;
-        case hsql::JoinType::kJoinFull: result->join_type_ = JoinType::kFull; break;
-        case hsql::JoinType::kJoinInner: result->join_type_ = JoinType::kInner; break;
-        case hsql::JoinType::kJoinNatural: result->join_type_ = JoinType::kNatural; break;
-        case hsql::JoinType::kJoinLeft: result->join_type_ = JoinType::kLeft; break;
-        case hsql::JoinType::kJoinRight: result->join_type_ = JoinType::kRight; break;
-        default:
-            PlannerError("Unsupported join type.")
-    }
+    result->join_type_ = from_table->join_type_;
 
     // Build left child
     SharedPtr<QueryBinder> left_query_binder = MakeShared<QueryBinder>(query_context, this->bind_context_ptr_);
-    auto left_bound_table_ref = left_query_binder->BuildFromClause(query_context, from_table->join->left);
+    auto left_bound_table_ref = left_query_binder->BuildFromClause(query_context, from_table->left_);
     this->bind_context_ptr_->AddLeftChild(left_query_binder->bind_context_ptr_);
 
     // Build right child
     SharedPtr<QueryBinder> right_query_binder = MakeShared<QueryBinder>(query_context, this->bind_context_ptr_);
-    auto right_bound_table_ref = right_query_binder->BuildFromClause(query_context, from_table->join->right);
+    auto right_bound_table_ref = right_query_binder->BuildFromClause(query_context, from_table->right_);
     this->bind_context_ptr_->AddRightChild(right_query_binder->bind_context_ptr_);
 
     result->left_table_ref_ = left_bound_table_ref;
@@ -614,7 +623,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
     auto join_binder = MakeShared<JoinBinder>(query_context);
 
     // SharedPtr<BaseExpression> on_condition_ptr
-    auto on_condition_ptr = join_binder->BuildExpression(*from_table->join->condition,
+    auto on_condition_ptr = join_binder->BuildExpression(*from_table->condition_,
                                                          this->bind_context_ptr_,
                                                          0,
                                                          true);
@@ -624,16 +633,16 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
     return result;
 }
 
-Vector<SharedPtr<ParsedExpression>>
+void
 QueryBinder::UnfoldStarExpression(SharedPtr<QueryContext>& query_context,
-                                  const Vector<hsql::Expr *> &input_select_list) {
-    Vector<SharedPtr<ParsedExpression>> output_select_list;
+                                  const Vector<ParsedExpr *>& input_select_list,
+                                  Vector<ParsedExpr*>& output_select_list) {
     output_select_list.reserve(input_select_list.size());
-    for(const hsql::Expr* select_expr: input_select_list) {
-        switch (select_expr->type) {
-            case hsql::kExprStar: {
-
-                if (select_expr->table == nullptr) {
+    for(auto* select_expr: input_select_list) {
+        if(select_expr->type_ == ParsedExprType::kColumn) {
+            auto* column_expr = (ColumnExpr*) select_expr;
+            if(column_expr->star_) {
+                if(column_expr->names_.empty()) {
                     // select * from t1;
                     PlannerAssert(!this->bind_context_ptr_->table_names_.empty(), "No table was bound.");
 
@@ -644,28 +653,23 @@ QueryBinder::UnfoldStarExpression(SharedPtr<QueryContext>& query_context,
                         GenerateColumns(binding, table_name, output_select_list);
                     }
                 } else {
-                    // select t1.* from t1;
-
-                    String table_name = select_expr->table;
+                    String table_name = column_expr->names_[0];
                     SharedPtr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
                     PlannerAssert(binding != nullptr, fmt::format("Table: {} wasn't bound before.", table_name));
                     GenerateColumns(binding, table_name, output_select_list);
                 }
-                break;
-            }
-            default: {
-                SharedPtr<ParsedRawExpression> raw_expr = MakeShared<ParsedRawExpression>(select_expr);
-                output_select_list.emplace_back(raw_expr);
+
+                continue;
             }
         }
+        output_select_list.emplace_back(select_expr);
     }
-    return output_select_list;
 }
 
 void
 QueryBinder::GenerateColumns(const SharedPtr<Binding>& binding,
                              const String& table_name,
-                             Vector<SharedPtr<ParsedExpression>>& output_select_list) {
+                             Vector<ParsedExpr*>& output_select_list) {
     switch(binding->binding_type_) {
 
         case BindingType::kInvalid: {
@@ -681,9 +685,11 @@ QueryBinder::GenerateColumns(const SharedPtr<Binding>& binding,
             // Build select list
             for(SizeT idx = 0; idx < column_count; ++ idx) {
                 String column_name = binding->table_ptr_->GetColumnNameById(idx);
-                SharedPtr<ParsedColumnExpression> bound_column_expr
-                        = MakeShared<ParsedColumnExpression>(String(), String(), table_name, column_name);
-                output_select_list.emplace_back(bound_column_expr);
+                auto* column_expr = new ColumnExpr();
+                column_expr->names_.emplace_back(table_name);
+                column_expr->names_.emplace_back(column_name);
+                column_expr->generated_ = true;
+                output_select_list.emplace_back(column_expr);
             }
             break;
         }
@@ -697,9 +703,11 @@ QueryBinder::GenerateColumns(const SharedPtr<Binding>& binding,
             // Build select list
             for(SizeT idx = 0; idx < column_count; ++ idx) {
                 String column_name = binding->column_names_[idx];
-                SharedPtr<ParsedColumnExpression> bound_column_expr
-                        = MakeShared<ParsedColumnExpression>(String(), String(), table_name, column_name);
-                output_select_list.emplace_back(bound_column_expr);
+                auto* column_expr = new ColumnExpr();
+                column_expr->names_.emplace_back(table_name);
+                column_expr->names_.emplace_back(column_name);
+                output_select_list.emplace_back(column_expr);
+                column_expr->generated_ = true;
             }
             break;
         }
@@ -712,25 +720,25 @@ QueryBinder::GenerateColumns(const SharedPtr<Binding>& binding,
 
 void
 QueryBinder::BuildGroupBy(SharedPtr<QueryContext>& query_context,
-                          const hsql::SelectStatement& select,
+                          const SelectStatement& select,
                           const SharedPtr<BindAliasProxy>& bind_alias_proxy,
                           SharedPtr<BoundSelectStatement>& select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->group_by_table_index_ = table_index;
     bind_context_ptr_->group_by_table_name_ = "groupby" + std::to_string(table_index);
 
-    if(select.groupBy != nullptr) {
+    if(select.group_by_list_ != nullptr) {
         // Start to bind GROUP BY clause
         // Set group binder
         auto group_binder = MakeShared<GroupBinder>(query_context, bind_alias_proxy);
 
         // Reserve the group names used in GroupBinder::BuildExpression
-        SizeT group_count = select.groupBy->columns->size();
+        SizeT group_count = select.group_by_list_->size();
         bind_context_ptr_->group_exprs_.reserve(group_count);
         for(i64 idx = 0; idx < group_count; ++ idx) {
             // set group-by expression index
             group_binder->group_by_expr_index = idx;
-            const hsql::Expr& expr = *(*select.groupBy->columns)[idx];
+            const ParsedExpr& expr = *(*select.group_by_list_)[idx];
 
             // Call GroupBinder BuildExpression
             SharedPtr<BaseExpression> group_by_expr = group_binder->Bind(expr, this->bind_context_ptr_, 0, true);
@@ -742,7 +750,7 @@ QueryBinder::BuildGroupBy(SharedPtr<QueryContext>& query_context,
 
 void
 QueryBinder::BuildHaving(SharedPtr<QueryContext>& query_context,
-                         const hsql::SelectStatement& select,
+                         const SelectStatement& select,
                          const SharedPtr<BindAliasProxy>& bind_alias_proxy,
                          SharedPtr<BoundSelectStatement>& select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
@@ -750,11 +758,11 @@ QueryBinder::BuildHaving(SharedPtr<QueryContext>& query_context,
     bind_context_ptr_->aggregate_table_name_ = "aggregate" + std::to_string(table_index);
 
     // All having expr must appear in group by list or aggregate function list.
-    if(select.groupBy != nullptr && select.groupBy->having != nullptr) {
+    if(select.group_by_list_ != nullptr && select.having_expr_ != nullptr) {
         // Start to bind Having clause
         // Set having binder
         auto having_binder = MakeShared<HavingBinder>(query_context, bind_alias_proxy);
-        SharedPtr<BaseExpression> having_expr = having_binder->Bind(*(select.groupBy->having),
+        SharedPtr<BaseExpression> having_expr = having_binder->Bind(*(select.having_expr_),
                                                                     bind_context_ptr_,
                                                                     0,
                                                                     true);
@@ -764,9 +772,9 @@ QueryBinder::BuildHaving(SharedPtr<QueryContext>& query_context,
 
 void
 QueryBinder::PushOrderByToProject(SharedPtr<QueryContext>& query_context,
-                                  const hsql::SelectStatement& statement) {
-    for(const hsql::OrderDescription* order_desc: *statement.order) {
-        OrderBinder::PushExtraExprToSelectList(order_desc->expr, bind_context_ptr_);
+                                  const SelectStatement& statement) {
+    for(const OrderByExpr* order_by_expr: *statement.order_by_list) {
+        OrderBinder::PushExtraExprToSelectList(order_by_expr->expr_, bind_context_ptr_);
     }
 }
 
@@ -788,36 +796,12 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
     bind_context_ptr_->project_exprs_.reserve(column_count);
     bound_select_statement->projection_expressions_.reserve(column_count);
     for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
-        const SharedPtr<ParsedExpression>& select_expr = bind_context_ptr_->select_expression_[column_id];
-        SharedPtr<BaseExpression> bound_expr = nullptr;
-        String expr_name;
-        switch(select_expr->type_) {
-            case ExpressionType::kColumn: {
-                // This part is from unfold star expression, no alias
-                SharedPtr<ParsedColumnExpression> parsed_col_expr
-                        = std::static_pointer_cast<ParsedColumnExpression>(select_expr);
-                bound_expr = project_binder->ExpressionBinder::BuildColExpr(parsed_col_expr,
-                                                                            this->bind_context_ptr_,
-                                                                            0,
-                                                                            true);
-                expr_name = parsed_col_expr->ToString();
-                break;
-            }
-            case ExpressionType::kRaw: {
-                SharedPtr<ParsedRawExpression> parsed_raw_expr
-                        = std::static_pointer_cast<ParsedRawExpression>(select_expr);
-
-                bound_expr = project_binder->Bind(*parsed_raw_expr->raw_expr_,
-                                                  this->bind_context_ptr_,
-                                                  0,
-                                                  true);
-                expr_name = parsed_raw_expr->ToString();
-                break;
-            }
-            default: {
-                PlannerError("Invalid type in select list.")
-            }
-        }
+        const ParsedExpr* select_expr = bind_context_ptr_->select_expression_[column_id];
+        SharedPtr<BaseExpression> bound_expr = project_binder->Bind(*select_expr,
+                                                                    this->bind_context_ptr_,
+                                                                    0,
+                                                                    true);
+        String expr_name = bound_expr->ToString();
         if(!(bind_context_ptr_->project_index_by_name_.contains(expr_name))) {
             bind_context_ptr_->project_index_by_name_[expr_name] = column_id;
         }
@@ -830,7 +814,9 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
         bound_select_statement->types_ptr_->emplace_back(bound_expr->Type());
     }
 
-    if(!bound_select_statement->having_expressions_.empty() || !bound_select_statement->group_by_expressions_.empty()) {
+    if(!bound_select_statement->having_expressions_.empty() ||
+        !bound_select_statement->group_by_expressions_.empty() ||
+        !bind_context_ptr_->aggregate_exprs_.empty()) {
         if(!project_binder->BoundColumn().empty()) {
             PlannerError("Column: " + project_binder->BoundColumn()
                          + " must appear in the GROUP BY clause or be used in an aggregate function");
@@ -840,22 +826,15 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
 
 void
 QueryBinder::BuildOrderBy(SharedPtr<QueryContext>& query_context,
-                          const hsql::SelectStatement& statement,
+                          const SelectStatement& statement,
                           SharedPtr<BoundSelectStatement>& bound_statement) const {
     auto order_binder = MakeShared<OrderBinder>(query_context);
-    SizeT order_by_count = statement.order->size();
+    SizeT order_by_count = statement.order_by_list->size();
     bound_statement->order_by_expressions_.reserve(order_by_count);
     bound_statement->order_by_types_.reserve(order_by_count);
-    for(const hsql::OrderDescription* order_desc: *statement.order) {
-        switch (order_desc->type) {
-            case hsql::kOrderAsc:
-                bound_statement->order_by_types_.emplace_back(OrderByType::kAscending);
-                break;
-            case hsql::kOrderDesc:
-                bound_statement->order_by_types_.emplace_back(OrderByType::kDescending);
-                break;
-        }
-        auto bound_order_expr = order_binder->Bind(*order_desc->expr,
+    for(const OrderByExpr* order_expr: *statement.order_by_list) {
+        bound_statement->order_by_types_.emplace_back(order_expr->type_);
+        auto bound_order_expr = order_binder->Bind(*order_expr->expr_,
                                                    this->bind_context_ptr_,
                                                    0,
                                                    true);
@@ -865,15 +844,15 @@ QueryBinder::BuildOrderBy(SharedPtr<QueryContext>& query_context,
 
 void
 QueryBinder::BuildLimit(SharedPtr<QueryContext>& query_context,
-                        const hsql::SelectStatement& statement,
+                        const SelectStatement& statement,
                         SharedPtr<BoundSelectStatement>& bound_statement) const {
     auto limit_binder = MakeShared<LimitBinder>(query_context);
     bound_statement->limit_expression_
-            = limit_binder->Bind(*statement.limit->limit, this->bind_context_ptr_, 0, true);
+            = limit_binder->Bind(*statement.limit_expr_, this->bind_context_ptr_, 0, true);
 
-    if(statement.limit->offset != nullptr) {
+    if(statement.offset_expr_ != nullptr) {
         bound_statement->offset_expression_
-                = limit_binder->Bind(*statement.limit->offset, this->bind_context_ptr_, 0, true);
+                = limit_binder->Bind(*statement.offset_expr_, this->bind_context_ptr_, 0, true);
     }
 }
 

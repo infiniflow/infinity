@@ -19,8 +19,7 @@ public:
     String
     ToString() override;
 
-    BaseTableReference* left_{nullptr};
-    BaseTableReference* right_{nullptr};
+    Vector<BaseTableReference*> tables_;
 
 };
 

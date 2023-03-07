@@ -19,11 +19,11 @@ PhysicalDropTable::Execute(std::shared_ptr<QueryContext>& query_context) {
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            ColumnDef::Make("OK", 0, DataType(LogicalType::kInteger), Set<ConstrainType>()),
+            MakeShared<ColumnDef>(0, DataType(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
     };
 
     SharedPtr<TableDef> result_table_def_ptr
-            = MakeShared<TableDef>("Tables", column_defs, false);
+            = MakeShared<TableDef>("Tables", column_defs);
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 

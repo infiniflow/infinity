@@ -9,7 +9,7 @@ namespace infinity {
 String
 CreateCollectionInfo::ToString() const {
     std::stringstream ss;
-    ss << "CREATE COLLECTION: " << schema_name_ << "." << table_name_;
+    ss << "CREATE COLLECTION: " << schema_name_ << "." << collection_name_;
     if (this->conflict_type_ == ConflictType::kIgnore) {
         ss << " IgnoreIfNotExists";
     } else {

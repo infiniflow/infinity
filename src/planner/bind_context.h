@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "SQLParserResult.h"
 #include "expression/base_expression.h"
 #include "column_identifier.h"
 #include "binding.h"
@@ -22,11 +21,11 @@ class ExpressionBinder;
 class QueryContext;
 
 struct CommonTableExpressionInfo {
-    CommonTableExpressionInfo(String alias, hsql::SelectStatement* select_stmt, HashSet<String> masked_name_set)
+    CommonTableExpressionInfo(String alias, SelectStatement* select_stmt, HashSet<String> masked_name_set)
         : alias_(std::move(alias)), select_statement_(select_stmt), masked_name_set_(std::move(masked_name_set)) {}
 
     String alias_;
-    hsql::SelectStatement* select_statement_;
+    SelectStatement* select_statement_;
     HashSet<String> masked_name_set_;
 };
 
@@ -69,7 +68,7 @@ public:
     HashMap<u64, String> table_table_index2table_name_;
 
     // Select list
-    Vector<SharedPtr<ParsedExpression>> select_expression_;
+    Vector<ParsedExpr*> select_expression_;    // ParsedExpr won't be free here.
     HashMap<String, i64> select_alias2index_;  // Some select item has alias, alias_name -> index
     HashMap<String, i64> select_expr_name2index_; // Select expr name -> index
     HashMap<i64, i64> select_index_to_group_by_index_; // select index -> group by index

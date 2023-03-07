@@ -23,22 +23,25 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
     groupby_executor.Init(groups_);
 
     Vector<SharedPtr<ColumnDef>> groupby_columns;
-    Vector<SharedPtr<ColumnDef>> output_columns;
-    groupby_columns.reserve(groups_.size());
-    output_columns.reserve(groups_.size());
+    SizeT group_count = groups_.size();
+    ExecutorAssert(group_count > 0, "Aggregate without group by cases are not implemented now.");
+
+    groupby_columns.reserve(group_count);
 
     Vector<DataType> types;
-    types.reserve(groups_.size());
+    types.reserve(group_count);
 
     for(i64 idx = 0; auto& expr: groups_) {
-        SharedPtr<ColumnDef> col_def = ColumnDef::Make(expr->ToString(), idx, expr->Type(), Set<ConstrainType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
+                                                             expr->Type(),
+                                                             expr->ToString(),
+                                                             HashSet<ConstraintType>());
         groupby_columns.emplace_back(col_def);
-        output_columns.emplace_back(col_def);
         types.emplace_back(expr->Type());
         ++ idx;
     }
 
-    SharedPtr<TableDef> groupby_tabledef = TableDef::Make("groupby", groupby_columns, false);
+    SharedPtr<TableDef> groupby_tabledef = TableDef::Make("groupby", groupby_columns);
     SharedPtr<Table> groupby_table = Table::Make(groupby_tabledef, TableType::kIntermediate);
 
     groupby_executor.Execute(input_table_, groupby_table);
@@ -67,11 +70,11 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
             DataType col_type = input_table_->GetColumnTypeById(idx);
             String col_name = input_table_->GetColumnNameById(idx);
 
-            SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
+            SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
             columns.emplace_back(col_def);
         }
 
-        SharedPtr<TableDef> table_def = TableDef::Make("grouped_input", columns, false);
+        SharedPtr<TableDef> table_def = TableDef::Make("grouped_input", columns);
 
         grouped_input_table = Table::Make(table_def, TableType::kGroupBy);
     }
@@ -99,7 +102,10 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
             expr_states.emplace_back(ExpressionState::CreateState(expr));
 
             // column definition
-            SharedPtr<ColumnDef> col_def = ColumnDef::Make(expr->ToString(), idx, expr->Type(), Set<ConstrainType>());
+            SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
+                                                                 expr->Type(),
+                                                                 expr->ToString(),
+                                                                 HashSet<ConstraintType>());
             aggregate_columns.emplace_back(col_def);
 
             // for output block
@@ -109,7 +115,7 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
         }
 
         // output aggregate table definition
-        SharedPtr<TableDef> aggregate_tabledef = TableDef::Make("aggregate", groupby_columns, false);
+        SharedPtr<TableDef> aggregate_tabledef = TableDef::Make("aggregate", groupby_columns);
         output_aggregate_table = Table::Make(aggregate_tabledef, TableType::kAggregate);
 
         // Loop blocks

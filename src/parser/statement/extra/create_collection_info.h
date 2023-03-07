@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class CreateCollectionInfo : public ExtraDDLInfo {
+class CreateCollectionInfo final : public ExtraDDLInfo {
 public:
     explicit
     CreateCollectionInfo() : ExtraDDLInfo(DDLType::kCollection) {}
@@ -17,7 +17,7 @@ public:
     ToString() const final;
 
     String schema_name_{"Default"};
-    String table_name_{};
+    String collection_name_{};
 };
 
 }

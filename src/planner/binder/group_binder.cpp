@@ -5,31 +5,31 @@
 #include "common/utility/infinity_assert.h"
 #include "function/function_set.h"
 #include "group_binder.h"
-#include "legacy_parser/statement.h"
-#include "legacy_parser/expression/parsed_raw_expression.h"
 
 namespace infinity {
 
 SharedPtr<BaseExpression>
-GroupBinder::BuildExpression(const hsql::Expr &expr,
+GroupBinder::BuildExpression(const ParsedExpr& expr,
                              const SharedPtr<BindContext>& bind_context_ptr,
                              i64 depth,
                              bool root) {
     SharedPtr<BaseExpression> result = nullptr;
 
     if(depth == 0 && root) {
-        switch(expr.type) {
-            case hsql::kExprLiteralInt: {
-                // Group by the expression of the given index in select list;
-                // For example: select a, sum(a) from t1 group by 1; # group by a
-                result = BindConstantExpression(expr, bind_context_ptr);
+        switch(expr.type_) {
+            case ParsedExprType::kConstant: {
+                ConstantExpr& const_expr = (ConstantExpr&)expr;
+                if(const_expr.literal_type_ == LiteralType::kInteger) {
+                    // Group by the expression of the given index in select list;
+                    // For example: select a, sum(a) from t1 group by 1; # group by a
+                    result = BindConstantExpression(const_expr, bind_context_ptr);
+                }
                 break;
             }
-            case hsql::kExprColumnRef: {
+            case ParsedExprType::kColumn: {
                 // Group by the column expression.
                 // For example: select a as x from t1 group by x;
-                result = BindColumnReference(expr, bind_context_ptr);
-                break;
+                result = BindColumnReference((ColumnExpr&)expr, bind_context_ptr);
             }
         }
     }
@@ -43,7 +43,7 @@ GroupBinder::BuildExpression(const hsql::Expr &expr,
     }
 
     if(root) {
-        String expr_name = Statement::ExprAsColumnName(&expr);
+        String expr_name = expr.GetName();
 
         if(bind_context_ptr->group_index_by_name_.contains(expr_name)) {
             PlannerError("Duplicated group by expression: " + expr_name);
@@ -58,12 +58,10 @@ GroupBinder::BuildExpression(const hsql::Expr &expr,
 }
 
 SharedPtr<BaseExpression>
-GroupBinder::BindColumnReference(const hsql::Expr &expr,
+GroupBinder::BindColumnReference(const ColumnExpr& expr,
                                  const SharedPtr<BindContext>& bind_context_ptr) {
     // Either the expr is a column or a alias
-    const char* name_ptr = expr.getName();
-    PlannerAssert(name_ptr != nullptr, "Empty column name")
-    String column_name = name_ptr;
+    String column_name = expr.GetName();
 
     // Check if the column is from select list alias
     if(bind_context_ptr->select_alias2index_.contains(column_name)) {
@@ -85,12 +83,12 @@ GroupBinder::BindColumnReference(const hsql::Expr &expr,
 }
 
 SharedPtr<BaseExpression>
-GroupBinder::BindConstantExpression(const hsql::Expr &expr,
+GroupBinder::BindConstantExpression(const ConstantExpr& expr,
                                     const SharedPtr<BindContext>& bind_context_ptr) {
-    PlannerAssert(expr.isType(hsql::ExprType::kExprLiteralInt), "Not an integer.")
-    i64 select_idx = expr.ival;
+    PlannerAssert(expr.literal_type_ == LiteralType::kInteger, "Not an integer.")
+    i64 select_idx = expr.integer_value_;
 
-    Vector<SharedPtr<ParsedExpression>>&  expr_array = bind_context_ptr->select_expression_;
+    Vector<ParsedExpr*>& expr_array = bind_context_ptr->select_expression_;
     if(select_idx > expr_array.size() or select_idx < 1) {
         std::stringstream ss;
         ss << "GROUP BY clause out of range - should be from 1 to "
@@ -101,27 +99,17 @@ GroupBinder::BindConstantExpression(const hsql::Expr &expr,
 
     select_idx -= 1;
 
-    SharedPtr<BaseExpression> result = nullptr;
-    if(expr_array[select_idx]->type_ == ExpressionType::kRaw) {
-        SharedPtr<ParsedRawExpression> parsed_raw_expr
-                = std::static_pointer_cast<ParsedRawExpression>(expr_array[select_idx]);
-        result = ExpressionBinder::BuildColExpr(*parsed_raw_expr->raw_expr_,
-                                                bind_context_ptr,
-                                                0,
-                                                false);
-    } else {
-        SharedPtr<ParsedColumnExpression> parsed_col_expr
-                = std::static_pointer_cast<ParsedColumnExpression>(expr_array[select_idx]);
-        result = ExpressionBinder::BuildColExpr(parsed_col_expr,
-                                                bind_context_ptr,
-                                                0,
-                                                false);
-    }
+    ColumnExpr& col_expr = (ColumnExpr&)(*expr_array[select_idx]);
+
+    SharedPtr<BaseExpression> result = ExpressionBinder::BuildColExpr(col_expr,
+                                                                      bind_context_ptr,
+                                                                      0,
+                                                                      false);
     return result;
 }
 
 SharedPtr<BaseExpression>
-GroupBinder::BuildColExpr(const hsql::Expr &expr,
+GroupBinder::BuildColExpr(const ColumnExpr& expr,
                           const SharedPtr<BindContext>& bind_context_ptr,
                           i64 depth,
                           bool root) {
@@ -137,7 +125,7 @@ GroupBinder::BuildColExpr(const hsql::Expr &expr,
 }
 
 SharedPtr<BaseExpression>
-GroupBinder::BuildFuncExpr(const hsql::Expr &expr,
+GroupBinder::BuildFuncExpr(const FunctionExpr& expr,
                            const SharedPtr<BindContext>& bind_context_ptr,
                            i64 depth,
                            bool root) {
@@ -154,7 +142,7 @@ GroupBinder::CheckFuncType(FunctionType func_type) const {
 }
 
 SharedPtr<SubqueryExpression>
-GroupBinder::BuildSubquery(const hsql::SelectStatement& select,
+GroupBinder::BuildSubquery(const SubqueryExpr& select,
                            const SharedPtr<BindContext>& bind_context_ptr,
                            SubqueryType subquery_type,
                            i64 depth,

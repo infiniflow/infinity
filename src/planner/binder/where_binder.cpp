@@ -7,7 +7,7 @@
 namespace infinity {
 
 SharedPtr<BaseExpression>
-WhereBinder::BuildExpression(const hsql::Expr &expr,
+WhereBinder::BuildExpression(const ParsedExpr& expr,
                              const SharedPtr<BindContext>& bind_context_ptr,
                              i64 depth,
                              bool root) {
@@ -16,7 +16,7 @@ WhereBinder::BuildExpression(const hsql::Expr &expr,
 }
 
 SharedPtr<BaseExpression>
-WhereBinder::BuildColExpr(const hsql::Expr &expr,
+WhereBinder::BuildColExpr(const ColumnExpr& expr,
                           const SharedPtr<BindContext>& bind_context_ptr,
                           i64 depth,
                           bool root) {
@@ -35,7 +35,7 @@ WhereBinder::BuildColExpr(const hsql::Expr &expr,
         result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr, depth, root);
     }
 
-    PlannerAssert(result != nullptr, String("Can't bind the expr: ") + expr.getName());
+    PlannerAssert(result != nullptr, String("Can't bind the expr: ") + expr.GetName());
     return result;
 }
 

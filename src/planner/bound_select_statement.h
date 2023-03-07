@@ -63,7 +63,7 @@ public:
 
     // Order by expression list
     Vector<SharedPtr<BaseExpression>> order_by_expressions_{};
-    Vector<OrderByType> order_by_types_{};
+    Vector<OrderType> order_by_types_{};
 
     // limit expression
     SharedPtr<BaseExpression> limit_expression_{};

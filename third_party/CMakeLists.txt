@@ -15,31 +15,6 @@ add_subdirectory(magic_enum)
 # Build spdlog
 add_subdirectory(spdlog)
 
-# Build sql-parser
-set(PARSER_DIR sql-parser)
-
-add_library(
-        sql-parser
-
-        ${PARSER_DIR}/src/parser/bison_parser.cpp
-        ${PARSER_DIR}/src/parser/flex_lexer.cpp
-        ${PARSER_DIR}/src/sql/Expr.cpp
-        ${PARSER_DIR}/src/sql/PrepareStatement.cpp
-        ${PARSER_DIR}/src/sql/SQLStatement.cpp
-        ${PARSER_DIR}/src/sql/statements.cpp
-        ${PARSER_DIR}/src/SQLParser.cpp
-        ${PARSER_DIR}/src/SQLParserResult.cpp
-        ${PARSER_DIR}/src/util/sqlhelper.cpp
-)
-
-target_compile_options(
-        sql-parser
-        PRIVATE
-        -std=c++20
-        -O3 -Wno-sign-compare
-        -fPIC
-)
-
 set(TLSF_DIR tlsf)
 add_library(
         tlsf

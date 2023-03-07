@@ -15,10 +15,8 @@
 #include "scheduler/operator_pipeline.h"
 #include "main/infinity.h"
 
-#include "SQLParser.h"
-#include "SQLParserResult.h"
-#include "util/sqlhelper.h"
 #include "main/profiler/show_logical_plan.h"
+#include "parser/sql_parser.h"
 
 class LogicalPlannerTest : public BaseTest {
     void
@@ -43,11 +41,12 @@ RunSQL(const infinity::String& sql_text, bool print) {
         LOG_TRACE("{}", sql_text);
     }
 
-    hsql::SQLParserResult parse_result;
+    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
+    parser->Parse(sql_text, parsed_result);
 
-    hsql::SQLParser::parse(sql_text, &parse_result);
-    if(!parse_result.isValid()) {
-        ParserError(parse_result.errorMsg())
+    if(parsed_result->IsError()) {
+        ParserError(parsed_result->error_message_)
     }
 
     SharedPtr<Session> session_ptr = MakeShared<Session>();
@@ -58,9 +57,11 @@ RunSQL(const infinity::String& sql_text, bool print) {
     Optimizer optimizer(query_context_ptr);
     PhysicalPlanner physical_planner(query_context_ptr);
 
-    PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
-    hsql::SQLStatement *statement = parse_result.getStatements()[0];
-    logical_planner.Build(*statement);
+    PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
+
+    BaseStatement* statement = (*parsed_result->statements_ptr_)[0];
+    logical_planner.Build(statement);
+    parsed_result->Reset();
 
     SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 

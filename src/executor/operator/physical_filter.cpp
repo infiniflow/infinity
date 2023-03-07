@@ -41,10 +41,10 @@ PhysicalFilter::Execute(SharedPtr<QueryContext>& query_context) {
         DataType col_type(LogicalType::kBoolean);
         String col_name = "bool_col";
 
-        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type,col_name, HashSet<ConstraintType>());
         columns.emplace_back(col_def);
     }
-    SharedPtr<TableDef> table_def = TableDef::Make("selected", columns, false);
+    SharedPtr<TableDef> table_def = TableDef::Make("selected", columns);
     SharedPtr<Table> selected_table = Table::Make(table_def, TableType::kIntermediate);
 
     // Execute the expression on the input table

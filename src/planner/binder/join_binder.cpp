@@ -9,13 +9,13 @@
 namespace infinity {
 
 SharedPtr<BaseExpression>
-JoinBinder::BuildExpression(const hsql::Expr &expr,
+JoinBinder::BuildExpression(const ParsedExpr& expr,
                             const SharedPtr<BindContext>& bind_context_ptr,
                             i64 depth,
                             bool root) {
     SharedPtr<BaseExpression> result;
-    switch(expr.type) {
-        case hsql::ExprType::kExprSelect: {
+    switch(expr.type_) {
+        case ParsedExprType::kSubquery: {
             PlannerError("Subquery isn't allowed in JOIN condition.");
         }
         default: {

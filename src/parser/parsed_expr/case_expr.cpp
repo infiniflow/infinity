@@ -6,7 +6,7 @@
 
 namespace infinity {
 
-CaseCheck::~CaseCheck() {
+WhenThen::~WhenThen() {
     if(when_ != nullptr) {
         delete when_;
         when_ = nullptr;
@@ -27,7 +27,7 @@ CaseExpr::~CaseExpr() {
         else_expr_ = nullptr;
     }
     if(case_check_array_ != nullptr) {
-        for(CaseCheck* check_ptr: *case_check_array_) {
+        for(WhenThen* check_ptr: *case_check_array_) {
             delete check_ptr;
         }
         delete case_check_array_;
@@ -37,7 +37,22 @@ CaseExpr::~CaseExpr() {
 
 [[nodiscard]] String
 CaseExpr::ToString() const {
-    return "case expression";
+    std::stringstream ss;
+
+    ss << "CASE ";
+    if(expr_ != nullptr) {
+        ss << expr_->ToString();
+    }
+
+    if(case_check_array_ != nullptr) {
+        for(auto& when_then: *case_check_array_) {
+            ss << " WHEN " << when_then->when_->ToString() << " THEN " << when_then->then_->ToString();
+        }
+    }
+    if(else_expr_ != nullptr) {
+        ss << " ELSE " << else_expr_->ToString();
+    }
+    return ss.str();
 }
 
 }

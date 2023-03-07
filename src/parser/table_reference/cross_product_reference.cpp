@@ -7,13 +7,8 @@
 namespace infinity {
 
 CrossProductReference::~CrossProductReference() {
-    if(left_ != nullptr) {
-        delete(left_);
-        left_ = nullptr;
-    }
-    if(right_ != nullptr) {
-        delete(right_);
-        right_ = nullptr;
+    for(auto* table_ptr: tables_) {
+        delete(table_ptr);
     }
 }
 

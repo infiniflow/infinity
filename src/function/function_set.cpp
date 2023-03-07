@@ -9,8 +9,8 @@
 namespace infinity {
 
 SharedPtr<FunctionSet>
-FunctionSet::GetFunctionSet(const hsql::Expr &expr) {
-    String function_name = expr.name;
+FunctionSet::GetFunctionSet(const FunctionExpr &expr) {
+    String function_name = expr.func_name_;
 
     // UniquePtr<Catalog>& catalog
     auto& catalog = Infinity::instance().catalog();
@@ -36,13 +36,7 @@ FunctionSet::ToString(const String& name, const Vector<SharedPtr<BaseExpression>
         ss << arguments.back()->Type().ToString();
         ss << ")";
     }
-
     return ss.str();
 }
 
-
-
-
-
 }
-

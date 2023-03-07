@@ -8,29 +8,29 @@
 
 namespace infinity {
 
-class ProjectBinder : public ExpressionBinder {
+class ProjectBinder final: public ExpressionBinder {
 public:
     explicit
     ProjectBinder(SharedPtr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
     SharedPtr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr,
+    BuildExpression(const ParsedExpr& expr,
                     const SharedPtr<BindContext>& bind_context_ptr,
                     i64 depth,
-                    bool root) override;
+                    bool root) final;
 
     SharedPtr<BaseExpression>
-    BuildFuncExpr(const hsql::Expr &expr,
+    BuildFuncExpr(const FunctionExpr& expr,
                   const SharedPtr<BindContext>& bind_context_ptr,
                   i64 depth,
-                  bool root) override;
+                  bool root) final;
 
     SharedPtr<BaseExpression>
-    BuildColExpr(const hsql::Expr &expr,
+    BuildColExpr(const ColumnExpr& expr,
                  const SharedPtr<BindContext>& bind_context_ptr,
                  i64 depth,
-                 bool root) override;
+                 bool root) final;
 
     [[nodiscard]] const String&
     BoundColumn() const { return bound_column_name_; }

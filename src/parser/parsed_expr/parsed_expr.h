@@ -29,6 +29,11 @@ public:
     virtual
     ~ParsedExpr() = default;
 
+    inline String
+    GetName() const {
+        return ToString();
+    }
+
     [[nodiscard]] virtual String
     ToString() const = 0;
 

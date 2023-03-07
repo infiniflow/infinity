@@ -11,7 +11,7 @@ namespace infinity {
 class OrderBinder : public ExpressionBinder {
 public:
     static void
-    PushExtraExprToSelectList(const hsql::Expr *expr,
+    PushExtraExprToSelectList(ParsedExpr* expr,
                               const SharedPtr<BindContext>& bind_context_ptr);
 
 public:
@@ -19,7 +19,7 @@ public:
 
     // Bind expression entry
     SharedPtr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr,
+    BuildExpression(const ParsedExpr& expr,
                     const SharedPtr<BindContext>& bind_context_ptr,
                     i64 depth,
                     bool root) override;

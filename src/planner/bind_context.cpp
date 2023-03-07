@@ -20,6 +20,16 @@ BindContext::Destroy() {
         parent_->Destroy();
         parent_ = nullptr;
     }
+
+    // Release raw pointer
+    for(auto* expr: select_expression_) {
+        if(expr->type_ == ParsedExprType::kColumn) {
+            ColumnExpr* col_expr = (ColumnExpr*)expr;
+            if(col_expr->generated_) {
+                delete expr;
+            }
+        }
+    }
 }
 
 SharedPtr<CommonTableExpressionInfo>

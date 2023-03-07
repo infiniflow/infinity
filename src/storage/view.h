@@ -4,11 +4,8 @@
 
 #pragma once
 
-#include "SQLParserResult.h"
-
-#include <vector>
-#include <string>
-#include <memory>
+#include "common/types/internal_types.h"
+#include "parser/statement/select_statement.h"
 
 // A view means a logical plan
 namespace infinity {
@@ -17,24 +14,22 @@ class LogicalNode;
 
 class View {
 public:
-    View(std::string view_name,
-         std::string sql_text,
-         hsql::SQLParserResult sql_parser_result,
-         std::vector<std::string> column_names);
+    View(String view_name,
+         String sql_text,
+         SelectStatement* select_statement_,
+         Vector<String> column_names);
 
-    [[nodiscard]] const std::string& name() const { return name_; }
-    [[nodiscard]] const std::string& sql_text() const { return sql_text_; }
-    const hsql::SQLStatement* GetSQLStatement() { return sql_parser_result_.getStatement(0); }
-    [[nodiscard]] const std::vector<std::string>& column_names() const { return column_names_; }
-    void set_view_id(uint64_t view_id) { view_id_ = view_id; }
+    [[nodiscard]] const String& name() const { return name_; }
+    [[nodiscard]] const String& sql_text() const { return sql_text_; }
+    const SelectStatement* GetSQLStatement() { return select_statement_; }
+    [[nodiscard]] const Vector<String>& column_names() const { return column_names_; }
 
 private:
-    std::string name_;
-    std::string sql_text_;
-    std::shared_ptr<LogicalNode> logical_plan_;
-    hsql::SQLParserResult sql_parser_result_;
-    std::vector<std::string> column_names_;
-    uint64_t view_id_{0};
+    String name_;
+    String sql_text_;
+    SharedPtr<LogicalNode> logical_plan_;
+    SelectStatement* select_statement_;
+    Vector<String> column_names_;
 };
 }
 

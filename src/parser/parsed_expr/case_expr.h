@@ -8,8 +8,8 @@
 
 namespace infinity {
 
-struct CaseCheck {
-    ~CaseCheck();
+struct WhenThen {
+    ~WhenThen();
     ParsedExpr* when_{nullptr};
     ParsedExpr* then_{nullptr};
 };
@@ -27,7 +27,7 @@ public:
 public:
     ParsedExpr* expr_{nullptr};
     ParsedExpr* else_expr_{nullptr};
-    Vector<CaseCheck*>* case_check_array_{nullptr};
+    Vector<WhenThen*>* case_check_array_{nullptr};
 };
 
 }

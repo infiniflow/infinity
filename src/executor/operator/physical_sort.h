@@ -17,7 +17,7 @@ public:
     PhysicalSort(u64 id,
                  SharedPtr<PhysicalOperator> left,
                  Vector<SharedPtr<BaseExpression>> expressions,
-                 Vector<OrderByType> order_by_types)
+                 Vector<OrderType> order_by_types)
                  : PhysicalOperator(PhysicalOperatorType::kSort, std::move(left), nullptr, id),
                    expressions_(std::move(expressions)),
                    order_by_types_(std::move(order_by_types))
@@ -32,14 +32,14 @@ public:
 
     void
     Sort(const SharedPtr<Table>& order_by_table,
-         const Vector<OrderByType>& order_by_types_);
+         const Vector<OrderType>& order_by_types_);
 
     static SharedPtr<Table>
     GenerateOutput(const SharedPtr<Table>& input_table,
                    const SharedPtr<Vector<RowID>>& rowid_vector);
 
     Vector<SharedPtr<BaseExpression>> expressions_;
-    Vector<OrderByType> order_by_types_{};
+    Vector<OrderType> order_by_types_{};
 private:
 
     SharedPtr<Table>

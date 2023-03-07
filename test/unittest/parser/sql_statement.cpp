@@ -42,8 +42,8 @@ TEST_F(StatementParsingTest, good_test1) {
             {
                 ColumnExpr* col0 = (ColumnExpr* )(*select->select_list_)[0];
                 ColumnExpr* col1 = (ColumnExpr* )(*select->select_list_)[1];
-                EXPECT_STREQ(col0->names_[0], "a");
-                EXPECT_STREQ(col1->names_[0], "b");
+                EXPECT_EQ(col0->names_[0], "a");
+                EXPECT_EQ(col1->names_[0], "b");
 
                 EXPECT_EQ(select->table_ref_->type_, TableRefType::kTable);
                 auto* from_table = (TableReference*)select->table_ref_;
@@ -70,7 +70,7 @@ TEST_F(StatementParsingTest, good_test1) {
             EXPECT_EQ(where_func->func_name_, "=");
             ColumnExpr* where_left_expr = (ColumnExpr*)(*where_func->arguments_)[0];
             ConstantExpr* where_right_expr = (ConstantExpr*)(*where_func->arguments_)[1];
-            EXPECT_STREQ(where_left_expr->names_[0], "c");
+            EXPECT_EQ(where_left_expr->names_[0], "c");
             EXPECT_STREQ(where_right_expr->str_value_, "O'K");
 
             UpdateExpr* up0_expr = (*update_statement->update_expr_array_)[0];

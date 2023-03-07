@@ -193,7 +193,6 @@ PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) 
     return MakeShared<PhysicalDropTable>(
             logical_drop_table->schema_name(),
             logical_drop_table->table_name(),
-            logical_drop_table->table_index(),
             logical_drop_table->node_id());
 }
 

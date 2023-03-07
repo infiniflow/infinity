@@ -113,11 +113,11 @@ PhysicalLimit::GetLimitOutput(const SharedPtr<Table>& input_table, i64 limit, i6
 
         String col_name = input_table->GetColumnNameById(idx);
 
-        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type,col_name, HashSet<ConstraintType>());
         columns.emplace_back(col_def);
     }
 
-    SharedPtr<TableDef> table_def = TableDef::Make("limit", columns, false);
+    SharedPtr<TableDef> table_def = TableDef::Make("limit", columns);
     SharedPtr<Table> output_table = Table::Make(table_def, TableType::kIntermediate);
 
     const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;

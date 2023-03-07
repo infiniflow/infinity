@@ -23,27 +23,27 @@ public:
 
     // Bind expression entry
     SharedPtr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr,
+    BuildExpression(const ParsedExpr& expr,
                     const SharedPtr<BindContext>& bind_context_ptr,
                     i64 depth,
                     bool root) override;
 
     SharedPtr<BaseExpression>
-    BindColumnReference(const hsql::Expr &expr,
+    BindColumnReference(const ColumnExpr& expr,
                          const SharedPtr<BindContext>& bind_context_ptr);
 
     SharedPtr<BaseExpression>
-    BindConstantExpression(const hsql::Expr &expr,
+    BindConstantExpression(const ConstantExpr& expr,
                            const SharedPtr<BindContext>& bind_context_ptr);
 
     SharedPtr<BaseExpression>
-    BuildColExpr(const hsql::Expr &expr,
+    BuildColExpr(const ColumnExpr& expr,
                  const SharedPtr<BindContext>& bind_context_ptr,
                  i64 depth,
                  bool root) override;
 
     SharedPtr<BaseExpression>
-    BuildFuncExpr(const hsql::Expr &expr,
+    BuildFuncExpr(const FunctionExpr& expr,
                   const SharedPtr<BindContext>& bind_context_ptr,
                   i64 depth,
                   bool root) override;
@@ -52,10 +52,11 @@ public:
     CheckFuncType(FunctionType func_type) const override;
 
     SharedPtr<SubqueryExpression>
-    BuildSubquery(const hsql::SelectStatement& select,
-                  const SharedPtr<BindContext>& bind_context_ptr, SubqueryType subquery_type,
+    BuildSubquery(const SubqueryExpr& select,
+                  const SharedPtr<BindContext>& bind_context_ptr,
+                  SubqueryType subquery_type,
                   i64 depth,
-                  bool root) override;
+                  bool root) final;
 private:
 
     const SharedPtr<BindAliasProxy>& bind_alias_proxy_;

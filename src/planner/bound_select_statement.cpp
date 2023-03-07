@@ -92,7 +92,7 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef>& table_ref,
                                 const SharedPtr<BindContext>& bind_context) {
     if(table_ref) {
         switch(table_ref->type_) {
-            case TableRefType::kBaseTable: {
+            case TableRefType::kTable: {
                 return BuildBaseTable(table_ref, bind_context);
             }
             case TableRefType::kSubquery: {

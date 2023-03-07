@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "parser/statement/statement_common.h"
+#include "common/types/internal_types.h"
 
 namespace infinity {
 

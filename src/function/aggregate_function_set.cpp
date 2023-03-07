@@ -13,13 +13,13 @@ AggregateFunctionSet::AddFunction(const AggregateFunction& func) {
 
 AggregateFunction
 AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<BaseExpression> &input_argument) {
-    int64_t lowest_cost = std::numeric_limits<int64_t>::max();
-    size_t function_count = functions_.size();
-    Vector<int64_t> candidates_index;
+    i64 lowest_cost = std::numeric_limits<i64>::max();
+    SizeT function_count = functions_.size();
+    Vector<i64> candidates_index;
 
     for(auto i = 0; i < function_count; ++ i) {
         AggregateFunction& function = functions_[i];
-        int64_t cost = MatchFunctionCost(function, input_argument);
+        i64 cost = MatchFunctionCost(function, input_argument);
         if(cost >= 0 && cost <= lowest_cost) {
             // Have matched function and may be one of the candidate
             if(cost == lowest_cost) {
@@ -57,11 +57,11 @@ AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<BaseExpression> &inpu
     return functions_[candidates_index[0]];
 }
 
-int64_t
+i64
 AggregateFunctionSet::MatchFunctionCost(const AggregateFunction& func,  const SharedPtr<BaseExpression>& argument) {
     ExecutorAssert(argument != nullptr, "Argument is NULL");
 
-    int64_t cost = DataType::CastRule(argument->Type(), func.argument_type_);
+    i64 cost = DataType::CastRule(argument->Type(), func.argument_type_);
 
     return cost;
 }

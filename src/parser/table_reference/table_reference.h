@@ -20,6 +20,9 @@ public:
 
     String schema_name_{"Default"};
     String table_name_{};
+
+    [[nodiscard]] String
+    GetTableName() const;
 };
 
 }

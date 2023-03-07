@@ -9,7 +9,7 @@ namespace infinity {
 class Comparator {
 public:
     explicit
-    Comparator(const SharedPtr<Table>& order_by_table, const Vector<OrderByType>& order_by_types)
+    Comparator(const SharedPtr<Table>& order_by_table, const Vector<OrderType>& order_by_types)
             : order_by_table_(order_by_table), order_by_types_(order_by_types)
     {}
 
@@ -19,7 +19,7 @@ public:
         for(SizeT col_id = 0; col_id < column_count; ++ col_id) {
 
             DataType type = order_by_table_->GetColumnTypeById(col_id);
-            OrderByType order_type = order_by_types_[col_id];
+            OrderType order_type = order_by_types_[col_id];
 
             const SharedPtr<DataBlock>& left_block = order_by_table_->GetDataBlockById(left.block);
             const SharedPtr<ColumnVector>& left_column = left_block->column_vectors[col_id];
@@ -34,7 +34,7 @@ public:
                         continue;
                     }
 
-                    if(order_type == OrderByType::kAscending) {
+                    if(order_type == OrderType::kAsc) {
                         return left_value < right_value;
                     } else {
                         return left_value > right_value;
@@ -47,7 +47,7 @@ public:
                         continue;
                     }
 
-                    if(order_type == OrderByType::kAscending) {
+                    if(order_type == OrderType::kAsc) {
                         return left_value < right_value;
                     } else {
                         return left_value > right_value;
@@ -60,7 +60,7 @@ public:
                         continue;
                     }
 
-                    if(order_type == OrderByType::kAscending) {
+                    if(order_type == OrderType::kAsc) {
                         return left_value < right_value;
                     } else {
                         return left_value > right_value;
@@ -73,7 +73,7 @@ public:
                         continue;
                     }
 
-                    if(order_type == OrderByType::kAscending) {
+                    if(order_type == OrderType::kAsc) {
                         return left_value < right_value;
                     } else {
                         return left_value > right_value;
@@ -86,7 +86,7 @@ public:
                         continue;
                     }
 
-                    if(order_type == OrderByType::kAscending) {
+                    if(order_type == OrderType::kAsc) {
                         return left_value < right_value;
                     } else {
                         return left_value > right_value;
@@ -102,7 +102,7 @@ public:
                         continue;
                     }
 
-                    if(order_type == OrderByType::kAscending) {
+                    if(order_type == OrderType::kAsc) {
                         return left_value < right_value;
                     } else {
                         return left_value > right_value;
@@ -115,7 +115,7 @@ public:
                         continue;
                     }
 
-                    if(order_type == OrderByType::kAscending) {
+                    if(order_type == OrderType::kAsc) {
                         return left_value < right_value;
                     } else {
                         return left_value > right_value;
@@ -170,7 +170,7 @@ public:
 
 private:
     const SharedPtr<Table>& order_by_table_;
-    const Vector<OrderByType>& order_by_types_;
+    const Vector<OrderType>& order_by_types_;
 };
 
 void
@@ -195,11 +195,11 @@ PhysicalSort::Execute(SharedPtr<QueryContext>& query_context) {
         DataType col_type = input_table_->GetColumnTypeById(idx);
         String col_name = input_table_->GetColumnNameById(idx);
 
-        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
         columns.emplace_back(col_def);
     }
 
-    SharedPtr<TableDef> table_def = TableDef::Make("sort", columns, false);
+    SharedPtr<TableDef> table_def = TableDef::Make("sort", columns);
 
     output_ = Table::Make(table_def, TableType::kIntermediate);
 
@@ -221,7 +221,7 @@ PhysicalSort::GetOrderTable() const {
         DataType col_type = this->expressions_[idx]->Type();
         String col_name = this->expressions_[idx]->ToString();
 
-        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
         columns.emplace_back(col_def);
     }
 
@@ -233,14 +233,14 @@ PhysicalSort::GetOrderTable() const {
 //
 //    columns.emplace_back(offset_col);
 
-    SharedPtr<TableDef> table_def = TableDef::Make("order_by_key_table", columns, false);
+    SharedPtr<TableDef> table_def = TableDef::Make("order_by_key_table", columns);
 
     return Table::Make(table_def, TableType::kIntermediate);
 }
 
 void
 PhysicalSort::Sort(const SharedPtr<Table>& order_by_table,
-                   const Vector<OrderByType>& order_by_types) {
+                   const Vector<OrderType>& order_by_types) {
     // Generate row id vector
     SharedPtr<Vector<RowID>> rowid_vector = order_by_table->GetRowIDVector();
 
@@ -265,11 +265,11 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
 
         String col_name = input_table->GetColumnNameById(idx);
 
-        SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, idx, col_type, Set<ConstrainType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
         columns.emplace_back(col_def);
     }
 
-    SharedPtr<TableDef> table_def = TableDef::Make("sort", columns, false);
+    SharedPtr<TableDef> table_def = TableDef::Make("sort", columns);
     SharedPtr<Table> output_table = Table::Make(table_def, TableType::kIntermediate);
 
     const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;

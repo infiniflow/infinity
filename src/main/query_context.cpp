@@ -11,8 +11,8 @@
 #include "common/utility/infinity_assert.h"
 #include "scheduler/operator_pipeline.h"
 
-#include "SQLParser.h"
-#include "SQLParserResult.h"
+#include "parser/parser_result.h"
+#include "parser/sql_parser.h"
 
 #include <sstream>
 #include <utility>
@@ -70,12 +70,13 @@ QueryContext::QueryContext(SharedPtr<Session> session_ptr, UniquePtr<Transaction
 
 QueryResult
 QueryContext::Query(const String &query) {
-    hsql::SQLParserResult parse_result;
+    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
-    // Parse sql
-    hsql::SQLParser::parse(query, &parse_result);
-    if(!parse_result.isValid()) {
-        ParserError(parse_result.errorMsg())
+    parser->Parse(query, parsed_result);
+
+    if(parsed_result->IsError()) {
+        ParserError(parsed_result->error_message_)
     }
 
     SharedPtr<QueryContext> query_context = shared_from_this();
@@ -84,10 +85,12 @@ QueryContext::Query(const String &query) {
     Optimizer optimizer(query_context);
     PhysicalPlanner physical_planner(query_context);
 
-    PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
-    for (hsql::SQLStatement *statement : parse_result.getStatements()) {
+    PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
+    for (BaseStatement* statement : *parsed_result->statements_ptr_) {
         // Build unoptimized logical plan for each SQL statement.
-        logical_planner.Build(*statement);
+        logical_planner.Build(statement);
+        parsed_result->Reset();
+
         SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 
         // Apply optimized rule to the logical plan
@@ -111,7 +114,6 @@ QueryContext::Query(const String &query) {
     }
 
     NetworkError("Can't reach here.")
-//    return QueryResult();
 }
 
 }

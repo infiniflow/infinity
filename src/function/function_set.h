@@ -9,14 +9,14 @@
 #include "scalar_function.h"
 #include "table_function.h"
 
-#include "sql/Expr.h"
+#include "parser/parsed_expr/function_expr.h"
 
 namespace infinity {
 
 class FunctionSet {
 public:
     static SharedPtr<FunctionSet>
-    GetFunctionSet(const hsql::Expr &expr);
+    GetFunctionSet(const FunctionExpr &expr);
 
     static String
     ToString(const String& name, const Vector<SharedPtr<BaseExpression>>& arguments);
@@ -33,11 +33,5 @@ public:
     String name_;
     FunctionType type_;
 };
-
-
-
-
-
-
 
 }

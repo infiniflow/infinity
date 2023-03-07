@@ -32,14 +32,14 @@ class ColumnDefTest : public BaseTest {
 TEST_F(ColumnDefTest, test1) {
     using namespace infinity;
 
-    Set<ConstrainType> constraints;
-    constraints.insert(ConstrainType::kUnique);
-    constraints.insert(ConstrainType::kNotNull);
-    auto column_def_ptr = ColumnDef::Make("c1", 0, DataType(LogicalType::kTinyInt), constraints);
+    HashSet<ConstraintType> constraints;
+    constraints.insert(ConstraintType::kUnique);
+    constraints.insert(ConstraintType::kNotNull);
+    auto column_def_ptr = MakeShared<ColumnDef>(0, DataType(LogicalType::kTinyInt), "c1", constraints);
     EXPECT_EQ(column_def_ptr->type(), DataType(LogicalType::kTinyInt));
     EXPECT_EQ(column_def_ptr->id(), 0);
     EXPECT_STREQ(column_def_ptr->name().c_str(), "c1");
-    EXPECT_EQ(column_def_ptr->ToString(), "(c1 TinyInt Unique Not nullable)");
+    EXPECT_EQ(column_def_ptr->ToString(), "(c1 TinyInt Not nullable Unique)");
 }
 
 TEST_F(ColumnDefTest, test2) {
@@ -47,9 +47,9 @@ TEST_F(ColumnDefTest, test2) {
 
     auto type_info_ptr = VarcharInfo::Make(128);
 
-    Set<ConstrainType> constraints;
-    constraints.insert(ConstrainType::kPrimaryKey);
-    auto column_def_ptr = ColumnDef::Make("c2", 3, DataType(LogicalType::kVarchar, type_info_ptr), constraints);
+    HashSet<ConstraintType> constraints;
+    constraints.insert(ConstraintType::kPrimaryKey);
+    auto column_def_ptr = MakeShared<ColumnDef>(3, DataType(LogicalType::kVarchar, type_info_ptr), "c2", constraints);
     EXPECT_EQ(column_def_ptr->type(), DataType(LogicalType::kVarchar, type_info_ptr));
     EXPECT_EQ(column_def_ptr->id(), 3);
     EXPECT_EQ(column_def_ptr->name(), "c2");

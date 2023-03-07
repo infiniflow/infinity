@@ -10,7 +10,7 @@ Vector<ColumnBinding>
 LogicalAggregate::GetColumnBindings() const {
     Vector<ColumnBinding> result;
     SizeT groups_count = groups_.size();
-    SizeT aggregates_count = groups_.size();
+    SizeT aggregates_count = aggregates_.size();
     result.reserve(groups_count + aggregates_count);
     for(SizeT i = 0; i < groups_count; ++ i) {
         result.emplace_back(groupby_index_, i);

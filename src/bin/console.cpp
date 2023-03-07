@@ -11,19 +11,14 @@
 #include "main/session.h"
 #include "main/stats/global_resource_usage.h"
 
-// Parser header
-#include "SQLParser.h"
-#include "SQLParserResult.h"
-#include "util/sqlhelper.h"
-
 // SQL compile
-#include "legacy_parser/statement.h"
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
 #include "executor/physical_planner.h"
 #include "scheduler/operator_pipeline.h"
 #include "main/infinity.h"
 #include "main/query_context.h"
+#include "parser/sql_parser.h"
 
 #include <iostream>
 #include <algorithm>
@@ -104,7 +99,8 @@ Console::Exit(const String& command) {
 
 void
 Console::Explain(const String& arguments) {
-    hsql::SQLParserResult parse_result;
+    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
     SharedPtr<Session> session_ptr = std::make_shared<Session>();
     SharedPtr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
@@ -122,21 +118,23 @@ Console::Explain(const String& arguments) {
     String query = arguments.substr(parameter_pos + 1, arguments.size());
 
     // Parse sql
-    hsql::SQLParser::parse(query, &parse_result);
-    if(!parse_result.isValid()) {
-        ParserError(parse_result.errorMsg())
+    parser->Parse(query, parsed_result);
+    if(!parsed_result->IsError()) {
+        ParserError(parsed_result->error_message_)
     }
 
-    PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
+    PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
+
+    BaseStatement* statement = (*parsed_result->statements_ptr_)[0];
 
     if(parameter == "AST") {
         std::cout << "Explain AST: " << query << std::endl;
-        hsql::printStatementInfo(parse_result.getStatements()[0]);
+        NotImplementError("Not implement explain AST")
         return ;
     }
 
     // Build unoptimized logical plan for each SQL statement.
-    logical_planner.Build(*parse_result.getStatements()[0]);
+    logical_planner.Build(statement);
     SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 
     if(parameter == "LOGICAL") {
@@ -179,7 +177,8 @@ Console::Explain(const String& arguments) {
 
 void
 Console::Visualize(const String& arguments) {
-    hsql::SQLParserResult parse_result;
+    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
     SharedPtr<Session> session_ptr = std::make_shared<Session>();
     SharedPtr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
@@ -195,12 +194,12 @@ Console::Visualize(const String& arguments) {
     String query = arguments.substr(option_pos + 1, arguments.size());
 
     // Parse sql
-    hsql::SQLParser::parse(query, &parse_result);
-    if(!parse_result.isValid()) {
-        ParserError(parse_result.errorMsg())
+    parser->Parse(query, parsed_result);
+    if(!parsed_result->IsError()) {
+        ParserError(parsed_result->error_message_)
     }
 
-    PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
+    PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
 
     if(option == "AST") {
         std::cout << "Visualize AST: " << query << std::endl;
@@ -208,7 +207,7 @@ Console::Visualize(const String& arguments) {
     }
 
     // Build unoptimized logical plan for each SQL statement.
-    logical_planner.Build(*parse_result.getStatements()[0]);
+    logical_planner.Build((*parsed_result->statements_ptr_)[0]);
     SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 
     if(option == "LOGICAL") {
@@ -255,13 +254,16 @@ Console::RunScript(const String& arguments) {
 
 void
 Console::ExecuteSQL(const String& sql_text) {
-    hsql::SQLParserResult parse_result;
+    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
     // Parse sql
-    hsql::SQLParser::parse(sql_text, &parse_result);
-    if(!parse_result.isValid()) {
-        ParserError(parse_result.errorMsg())
+    parser->Parse(sql_text, parsed_result);
+    if(!parsed_result->IsError()) {
+        ParserError(parsed_result->error_message_)
     }
+
+    PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
 
     SharedPtr<Session> session_ptr = std::make_shared<Session>();
     SharedPtr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
@@ -272,10 +274,9 @@ Console::ExecuteSQL(const String& sql_text) {
     Optimizer optimizer(query_context_ptr);
     PhysicalPlanner physical_planner(query_context_ptr);
 
-    PlannerAssert(parse_result.getStatements().size() == 1, "Not support more statements");
-    for (hsql::SQLStatement *statement : parse_result.getStatements()) {
+    for (const BaseStatement *statement : *parsed_result->statements_ptr_) {
         // Build unoptimized logical plan for each SQL statement.
-        logical_planner.Build(*statement);
+        logical_planner.Build(statement);
         SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 
         // Apply optimized rule to the logical plan

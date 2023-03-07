@@ -37,23 +37,28 @@ TEST_F(TableDefTest, test1) {
 
     i64 column_id = 0;
     {
-        Set<ConstrainType> constraints;
-        constraints.insert(ConstrainType::kUnique);
-        constraints.insert(ConstrainType::kNotNull);
-        auto column_def_ptr = ColumnDef::Make("c1", column_id ++, DataType(LogicalType::kTinyInt), constraints);
-
+        HashSet<ConstraintType> constraints;
+        constraints.insert(ConstraintType::kUnique);
+        constraints.insert(ConstraintType::kNotNull);
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id ++,
+                                                    DataType(LogicalType::kTinyInt),
+                                                    "c1",
+                                                    constraints);
         columns.emplace_back(column_def_ptr);
 
     }
     {
         auto type_info_ptr = VarcharInfo::Make(128);
-        Set<ConstrainType> constraints;
-        constraints.insert(ConstrainType::kPrimaryKey);
-        auto column_def_ptr = ColumnDef::Make("c2", column_id ++, DataType(LogicalType::kVarchar, type_info_ptr), constraints);
+        HashSet<ConstraintType> constraints;
+        constraints.insert(ConstraintType::kPrimaryKey);
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id ++,
+                                                    DataType(LogicalType::kVarchar, type_info_ptr),
+                                                    "c2",
+                                                    constraints);
         columns.emplace_back(column_def_ptr);
     }
 
-    TableDef table_def("t1", columns, true);
+    TableDef table_def("t1", columns);
 
     EXPECT_EQ(table_def.name(), "t1");
     EXPECT_EQ(table_def.column_count(), 2);

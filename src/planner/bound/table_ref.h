@@ -4,16 +4,9 @@
 
 #pragma once
 
-namespace infinity {
+#include "parser/table_reference/base_table_reference.h"
 
-enum class TableRefType {
-    kInvalid,
-    kBaseTable,
-    kSubquery,
-    kCrossProduct,
-    kJoin,
-    kDummy,
-};
+namespace infinity {
 
 class TableRef {
 public:
@@ -26,7 +19,7 @@ public:
              alias_(std::move(alias))
              {}
 
-    TableRefType type_{TableRefType::kInvalid};
+    TableRefType type_{TableRefType::kTable};
     String alias_{};
     u64 table_index_{};
 };

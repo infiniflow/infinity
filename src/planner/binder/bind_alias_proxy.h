@@ -5,7 +5,6 @@
 #pragma once
 
 #include "planner/expression_binder.h"
-#include "legacy_parser/parsed_expression.h"
 
 namespace infinity {
 
@@ -13,7 +12,7 @@ class BindAliasProxy {
 public:
     SharedPtr<BaseExpression>
     BindAlias(ExpressionBinder& expression_binder,
-              const hsql::Expr& expr,
+              const ParsedExpr& expr,
               const SharedPtr<BindContext>& bind_context_ptr,
               i64 depth,
               bool root);

@@ -4,20 +4,20 @@
 
 #include "order_binder.h"
 #include "function/function_set.h"
-#include "legacy_parser/statement.h"
-#include "legacy_parser/expression/parsed_raw_expression.h"
 #include "expression/column_expression.h"
 
 namespace infinity {
 
 void
-OrderBinder::PushExtraExprToSelectList(const hsql::Expr *expr, const SharedPtr<BindContext>& bind_context_ptr) {
-    if(expr->type == hsql::kExprLiteralInt) {
+OrderBinder::PushExtraExprToSelectList(ParsedExpr* expr, const SharedPtr<BindContext>& bind_context_ptr) {
+    if(expr->type_ == ParsedExprType::kConstant) {
+        ConstantExpr* order_by_index = (ConstantExpr*)expr;
+        PlannerAssert(order_by_index->literal_type_ == LiteralType::kInteger, "Error Order by expression")
         // Order by 1, means order by 1st select list item.
         return ;
     }
 
-    String expr_name = Statement::ExprAsColumnName(expr);
+    String expr_name = expr->GetName();
 
     if(bind_context_ptr->select_alias2index_.contains(expr_name)) {
         return ;
@@ -28,26 +28,30 @@ OrderBinder::PushExtraExprToSelectList(const hsql::Expr *expr, const SharedPtr<B
     }
 
     bind_context_ptr->select_expr_name2index_[expr_name] = bind_context_ptr->select_expression_.size();
-    SharedPtr<ParsedRawExpression> raw_expr = MakeShared<ParsedRawExpression>(expr);
-    bind_context_ptr->select_expression_.emplace_back(raw_expr);
+    bind_context_ptr->select_expression_.emplace_back(expr);
 }
 
 SharedPtr<BaseExpression>
-OrderBinder::BuildExpression(const hsql::Expr &expr,
+OrderBinder::BuildExpression(const ParsedExpr& expr,
                              const SharedPtr<BindContext>& bind_context_ptr,
                              i64 depth,
                              bool root) {
     i64 column_id = -1;
 
     // If the expr is from projection, then create a column reference from projection.
-    if(expr.type == hsql::kExprLiteralInt) {
-        column_id = expr.ival;
-        if (column_id >= bind_context_ptr->project_exprs_.size()) {
-            PlannerError("Order by are going to use nonexistent column from select list.")
+    if(expr.type_ == ParsedExprType::kConstant) {
+        ConstantExpr& const_expr = (ConstantExpr&)expr;
+        if(const_expr.literal_type_ == LiteralType::kInteger) {
+            column_id = const_expr.integer_value_;
+            if (column_id >= bind_context_ptr->project_exprs_.size()) {
+                PlannerError("Order by are going to use nonexistent column from select list.")
+            }
+            -- column_id;
+        } else {
+            PlannerError("Order by non-integer constant value.")
         }
-        -- column_id;
     } else {
-        String expr_name = Statement::ExprAsColumnName(&expr);
+        String expr_name = expr.GetName();
 
         if(bind_context_ptr->select_alias2index_.contains(expr_name)) {
             column_id = bind_context_ptr->select_alias2index_[expr_name];

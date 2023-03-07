@@ -12,12 +12,10 @@ class LogicalDropTable : public LogicalNode {
 public:
     LogicalDropTable(u64 node_id,
                      SharedPtr<String> schema_name,
-                     SharedPtr<String> table_name,
-                     u64 table_index)
+                     SharedPtr<String> table_name)
         : LogicalNode(node_id, LogicalNodeType::kDropTable),
           schema_name_(std::move(schema_name)),
-          table_name_(std::move(table_name)),
-          table_index_(table_index)
+          table_name_(std::move(table_name))
           {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
@@ -43,15 +41,9 @@ public:
         return schema_name_;
     }
 
-    [[nodiscard]] inline u64
-    table_index() const {
-        return table_index_;
-    }
-
 private:
     SharedPtr<String> table_name_{};
     SharedPtr<String> schema_name_{};
-    u64 table_index_{};
 };
 
 }

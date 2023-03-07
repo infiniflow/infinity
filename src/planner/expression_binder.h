@@ -9,7 +9,7 @@
 #include "expression/base_expression.h"
 #include "expression/subquery_expression.h"
 #include "function/function.h"
-#include "legacy_parser/parsed_expression.h"
+#include "parser/expression.h"
 
 #include <memory>
 
@@ -32,39 +32,33 @@ public:
     ~ExpressionBinder() = default;
 
     SharedPtr<BaseExpression>
-    Bind(const hsql::Expr &expr,
+    Bind(const ParsedExpr& expr,
          const SharedPtr<BindContext>& bind_context_ptr,
          i64 depth,
          bool root);
 
     // Bind expression entry
     virtual SharedPtr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr,
+    BuildExpression(const ParsedExpr& expr,
                     const SharedPtr<BindContext>& bind_context_ptr,
                     i64 depth,
                     bool root);
 
     virtual SharedPtr<BaseExpression>
-    BuildValueExpr(const hsql::Expr &expr,
+    BuildValueExpr(const ConstantExpr& expr,
                    const SharedPtr<BindContext>& bind_context_ptr,
                    i64 depth,
                    bool root);
 
     // Bind column reference expression also include correlated column reference.
     virtual SharedPtr<BaseExpression>
-    BuildColExpr(const hsql::Expr &expr,
-                 const SharedPtr<BindContext>& bind_context_ptr,
-                 i64 depth,
-                 bool root);
-
-    SharedPtr<BaseExpression>
-    BuildColExpr(const SharedPtr<ParsedColumnExpression>& expr,
+    BuildColExpr(const ColumnExpr& expr,
                  const SharedPtr<BindContext>& bind_context_ptr,
                  i64 depth,
                  bool root);
 
     virtual SharedPtr<BaseExpression>
-    BuildFuncExpr(const hsql::Expr &expr,
+    BuildFuncExpr(const FunctionExpr& expr,
                   const SharedPtr<BindContext>& bind_context_ptr,
                   i64 depth,
                   bool root);
@@ -73,41 +67,20 @@ public:
     CheckFuncType(FunctionType func_type) const {}
 
     virtual SharedPtr<BaseExpression>
-    BuildOperatorExpr(const hsql::Expr &expr,
-                      const SharedPtr<BindContext>& bind_context_ptr,
-                      i64 depth,
-                      bool root);
-
-    virtual SharedPtr<BaseExpression>
-    BuildCastExpr(const hsql::Expr &expr,
+    BuildCastExpr(const CastExpr& expr,
                   const SharedPtr<BindContext>& bind_context_ptr,
                   i64 depth,
                   bool root);
 
     virtual SharedPtr<BaseExpression>
-    BuildCaseExpr(const hsql::Expr &expr,
+    BuildCaseExpr(const CaseExpr& expr,
                   const SharedPtr<BindContext>& bind_context_ptr,
                   i64 depth,
                   bool root);
-
-    virtual SharedPtr<BaseExpression>
-    BuildBinaryScalarExpr(String& op,
-                          const hsql::Expr* left,
-                          const hsql::Expr* right,
-                          const SharedPtr<BindContext>& bind_context_ptr,
-                          i64 depth,
-                          bool root);
-
-    virtual SharedPtr<BaseExpression>
-    BuildUnaryScalarExpr(String& op,
-                         const hsql::Expr* expr,
-                         const SharedPtr<BindContext>& bind_context_ptr,
-                         i64 depth,
-                         bool root);
 
     // Bind subquery expression.
     virtual SharedPtr<SubqueryExpression>
-    BuildSubquery(const hsql::SelectStatement& select,
+    BuildSubquery(const SubqueryExpr& expr,
                   const SharedPtr<BindContext>& bind_context_ptr,
                   SubqueryType subquery_type,
                   i64 depth,

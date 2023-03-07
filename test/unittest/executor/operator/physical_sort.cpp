@@ -48,16 +48,22 @@ TEST_F(PhysicalSortTest, test1) {
     DataType col_type = DataType(LogicalType::kBoolean);
     column_types.emplace_back(col_type);
     String col_name = "col1";
-    SharedPtr<ColumnDef> col_def = ColumnDef::Make(col_name, 0, col_type, Set<ConstrainType>());
+    SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0,
+                                                         col_type,
+                                                         col_name,
+                                                         HashSet<ConstraintType>());
     columns.emplace_back(col_def);
 
     col_type = DataType(LogicalType::kBigInt);
     column_types.emplace_back(col_type);
     col_name = "col2";
-    col_def = ColumnDef::Make(col_name, 0, col_type, Set<ConstrainType>());
+    col_def = MakeShared<ColumnDef>(1,
+                                    col_type,
+                                    col_name,
+                                    HashSet<ConstraintType>());
     columns.emplace_back(col_def);
 
-    SharedPtr<TableDef> table_def = TableDef::Make("input_table", columns, false);
+    SharedPtr<TableDef> table_def = TableDef::Make("input_table", columns);
 
     SharedPtr<Table> input_table = Table::Make(table_def, TableType::kIntermediate);
 

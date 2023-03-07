@@ -20,7 +20,37 @@ SubqueryExpr::~SubqueryExpr() {
 
 String
 SubqueryExpr::ToString() const {
-    return "Subquery Expression";
+    std::stringstream ss;
+    if(left_ != nullptr) {
+        ss << left_->ToString() << " ";
+    }
+
+    switch(subquery_type_) {
+        case SubqueryType::kExists: {
+            ss << "EXISTS(";
+            break;
+        }
+        case SubqueryType::kNotExists: {
+            ss << "NOT EXISTS(";
+            break;
+        }
+        case SubqueryType::kIn: {
+            ss << "IN(";
+            break;
+        }
+        case SubqueryType::kNotIn: {
+            ss << "NOT IN(";
+            break;
+        }
+        default: {
+            ss << "(";
+            break;
+        }
+    }
+
+    ss << select_->ToString() << ")";
+
+    return ss.str();
 }
 
 }

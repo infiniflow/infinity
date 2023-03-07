@@ -2,6 +2,8 @@
 // Created by jinhai on 23-2-25.
 //
 
+#pragma once
+
 #include <utility>
 
 #include "extra_ddl_info.h"
@@ -42,20 +44,44 @@ public:
 
 class ColumnDef : public TableElement {
 public:
+    ColumnDef(i64 id,
+              DataType column_type,
+              String column_name,
+              HashSet<ConstraintType> constraints)
+              : TableElement(TableElementType::kColumn),
+              id_(id),
+              column_type_(std::move(column_type)),
+              name_(std::move(column_name)),
+              constraints_(std::move(constraints))
+    {}
+
     ColumnDef(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr)
             : TableElement(TableElementType::kColumn), column_type_(logical_type, std::move(type_info_ptr)) {}
 
     inline
-    ~ColumnDef() override {
-        if(constraints_ != nullptr) {
-            delete constraints_;
-            constraints_ = nullptr;
-        }
+    ~ColumnDef() override = default;
+
+    String
+    ToString() const;
+
+    inline String&
+    name() { return name_; }
+
+    [[nodiscard]] inline i64
+    id() const {
+        return id_;
     }
 
+    inline DataType&
+    type() {
+        return column_type_;
+    }
+
+public:
+    i64 id_{-1};
     DataType column_type_;
     String name_{};
-    HashSet<ConstraintType>* constraints_{nullptr};
+    HashSet<ConstraintType> constraints_{};
 };
 
 struct ColumnType {

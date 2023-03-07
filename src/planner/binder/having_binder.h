@@ -9,7 +9,7 @@
 
 namespace infinity {
 
-class HavingBinder : public ExpressionBinder {
+class HavingBinder final: public ExpressionBinder {
 public:
     explicit
     HavingBinder(SharedPtr<QueryContext>& query_context,
@@ -19,22 +19,22 @@ public:
 
     // Bind expression entry
     SharedPtr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr,
+    BuildExpression(const ParsedExpr& expr,
                     const SharedPtr<BindContext>& bind_context_ptr,
                     i64 depth,
-                    bool root) override;
+                    bool root) final;
 
     SharedPtr<BaseExpression>
-    BuildColExpr(const hsql::Expr &expr,
+    BuildColExpr(const ColumnExpr& expr,
                  const SharedPtr<BindContext>& bind_context_ptr,
                  i64 depth,
-                 bool root) override;
+                 bool root) final;
 
     SharedPtr<BaseExpression>
-    BuildFuncExpr(const hsql::Expr &expr,
+    BuildFuncExpr(const FunctionExpr& expr,
                   const SharedPtr<BindContext>& bind_context_ptr,
                   i64 depth,
-                  bool root) override;
+                  bool root) final;
 
 //    // Bind column reference expression also include correlated column reference.
 //    SharedPtr<BaseExpression>

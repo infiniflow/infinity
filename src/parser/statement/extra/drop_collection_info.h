@@ -7,7 +7,7 @@
 
 namespace infinity {
 
-class DropCollectionInfo : public ExtraDDLInfo {
+class DropCollectionInfo final : public ExtraDDLInfo {
 public:
     explicit
     DropCollectionInfo() : ExtraDDLInfo(DDLType::kCollection) {}
@@ -16,7 +16,7 @@ public:
     ToString() const final;
 
     String schema_name_{"Default"};
-    String table_name_{};
+    String collection_name_{};
 };
 
 }

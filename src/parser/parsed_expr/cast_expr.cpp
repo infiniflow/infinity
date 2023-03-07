@@ -15,7 +15,9 @@ CastExpr::~CastExpr() {
 
 [[nodiscard]] String
 CastExpr::ToString() const {
-    return "cast expression";
+    std::stringstream ss;
+    ss << "CAST(" << expr_->ToString() << "  AS " << data_type_.ToString() << ")";
+    return ss.str();
 }
 
 }

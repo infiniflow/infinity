@@ -43,7 +43,10 @@ PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
         expr_states.emplace_back(ExpressionState::CreateState(expr));
 
         // column definition
-        SharedPtr<ColumnDef> col_def = ColumnDef::Make(expr->ToString(), idx, expr->Type(), Set<ConstrainType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
+                                                             expr->Type(),
+                                                             expr->ToString(),
+                                                             HashSet<ConstraintType>());
         projection_columns.emplace_back(col_def);
 
         // for output block
@@ -53,7 +56,7 @@ PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
     }
 
     // output table definition
-    SharedPtr<TableDef> projection_tabledef = TableDef::Make("projection", projection_columns, false);
+    SharedPtr<TableDef> projection_tabledef = TableDef::Make("projection", projection_columns);
     SharedPtr<Table> projection_table = Table::Make(projection_tabledef, TableType::kAggregate);
 
     if(left_ == nullptr) {

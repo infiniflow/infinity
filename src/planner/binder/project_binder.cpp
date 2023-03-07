@@ -5,17 +5,16 @@
 #include "common/utility/infinity_assert.h"
 #include "function/function_set.h"
 #include "project_binder.h"
-#include "legacy_parser/statement.h"
 #include "expression/column_expression.h"
 
 namespace infinity {
 
 SharedPtr<BaseExpression>
-ProjectBinder::BuildExpression(const hsql::Expr &expr,
+ProjectBinder::BuildExpression(const ParsedExpr& expr,
                                const SharedPtr<BindContext>& bind_context_ptr,
                                i64 depth,
                                bool root) {
-    String expr_name = Statement::ExprAsColumnName(&expr);
+    String expr_name = expr.GetName();
 
     // If the expr isn't from aggregate function and coming from group by lists.
     if (!this->binding_agg_func_ && bind_context_ptr->group_index_by_name_.contains(expr_name)) {
@@ -54,7 +53,7 @@ ProjectBinder::BuildExpression(const hsql::Expr &expr,
 }
 
 SharedPtr<BaseExpression>
-ProjectBinder::BuildFuncExpr(const hsql::Expr &expr,
+ProjectBinder::BuildFuncExpr(const FunctionExpr& expr,
                              const SharedPtr<BindContext>& bind_context_ptr,
                              i64 depth,
                              bool root) {
@@ -70,7 +69,7 @@ ProjectBinder::BuildFuncExpr(const hsql::Expr &expr,
     auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
-        String expr_name = Statement::ExprAsColumnName(&expr);
+        String expr_name = expr.GetName();
         i64 aggregate_index = bind_context_ptr->aggregate_exprs_.size();
         bind_context_ptr->aggregate_exprs_.emplace_back(func_expr_ptr);
         bind_context_ptr->aggregate_index_by_name_[expr_name] = aggregate_index;
@@ -92,7 +91,7 @@ ProjectBinder::BuildFuncExpr(const hsql::Expr &expr,
 }
 
 SharedPtr<BaseExpression>
-ProjectBinder::BuildColExpr(const hsql::Expr &expr,
+ProjectBinder::BuildColExpr(const ColumnExpr& expr,
                             const SharedPtr<BindContext>& bind_context_ptr,
                             i64 depth,
                             bool root) {

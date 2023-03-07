@@ -27,26 +27,27 @@ PhysicalCrossProduct::Execute(std::shared_ptr<QueryContext>& query_context) {
         i64 column_idx{0};
         const Vector<SharedPtr<ColumnDef>> &left_column_defs = left_table_->definition_ptr_->columns();
         for (const SharedPtr<ColumnDef> &input_col_def: left_column_defs) {
-            SharedPtr<ColumnDef> output_col_def = ColumnDef::Make(input_col_def->name(),
-                                                                  column_idx,
-                                                                  input_col_def->type(),
-                                                                  input_col_def->constrains());
+            SharedPtr<ColumnDef> output_col_def = MakeShared<ColumnDef>(column_idx,
+                                                                        input_col_def->type(),
+                                                                        input_col_def->name(),
+                                                                        input_col_def->constraints_);
+
             columns_def.emplace_back(output_col_def);
             ++column_idx;
         }
 
         const Vector<SharedPtr<ColumnDef>> &right_column_defs = right_table_->definition_ptr_->columns();
         for (const SharedPtr<ColumnDef> &input_col_def: right_column_defs) {
-            SharedPtr<ColumnDef> output_col_def = ColumnDef::Make(input_col_def->name(),
-                                                                  column_idx,
-                                                                  input_col_def->type(),
-                                                                  input_col_def->constrains());
+            SharedPtr<ColumnDef> output_col_def = MakeShared<ColumnDef>(column_idx,
+                                                                        input_col_def->type(),
+                                                                        input_col_def->name(),
+                                                                        input_col_def->constraints_);
             columns_def.emplace_back(output_col_def);
             ++column_idx;
         }
     }
 
-    SharedPtr<TableDef> cross_product_table_def = TableDef::Make("cross_product", columns_def, false);
+    SharedPtr<TableDef> cross_product_table_def = TableDef::Make("cross_product", columns_def);
     SharedPtr<Table> cross_product_table = Table::Make(cross_product_table_def, TableType::kCrossProduct);
 
     // Loop left table and scan right table

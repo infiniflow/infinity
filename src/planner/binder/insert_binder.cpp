@@ -8,7 +8,7 @@
 namespace infinity {
 
 SharedPtr<BaseExpression>
-InsertBinder::BuildExpression(const hsql::Expr &expr,
+InsertBinder::BuildExpression(const ParsedExpr& expr,
                               const SharedPtr<BindContext>& bind_context_ptr,
                               i64 depth,
                               bool root) {

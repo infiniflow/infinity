@@ -6,13 +6,14 @@
 
 #include <utility>
 
-#include "legacy_parser/parsed_expression.h"
 #include "planner/bind_context.h"
-#include "planner/select_expression.h"
 #include "bound_select_statement.h"
-#include "sql/SelectStatement.h"
 #include "storage/view.h"
 #include "planner/binder/bind_alias_proxy.h"
+#include "parser/table_reference/table_reference.h"
+#include "parser/table_reference/subquery_reference.h"
+#include "parser/table_reference/cross_product_reference.h"
+#include "parser/table_reference/join_reference.h"
 
 namespace infinity {
 
@@ -24,7 +25,7 @@ public:
         {}
 
     SharedPtr<BoundSelectStatement>
-    BindSelect(const hsql::SelectStatement& statement);
+    BindSelect(const SelectStatement& statement);
 
     SharedPtr<QueryContext> query_context_ptr_;
 
@@ -33,19 +34,19 @@ public:
 private:
     SharedPtr<TableRef>
     BuildFromClause(SharedPtr<QueryContext>& query_context,
-                    const hsql::TableRef *from_table);
+                    const BaseTableReference* from_table);
 
     SharedPtr<TableRef>
     BuildDummyTable(SharedPtr<QueryContext>& query_context);
 
     SharedPtr<TableRef>
     BuildTable(SharedPtr<QueryContext>& query_context,
-               const hsql::TableRef *from_table);
+               const TableReference* table_reference);
 
     SharedPtr<TableRef>
     BuildSubquery(SharedPtr<QueryContext>& query_context,
                   const String &table_alias,
-                  const hsql::SelectStatement &select_stmt);
+                  const SubqueryReference* subquery_reference);
 
     SharedPtr<TableRef>
     BuildCTE(SharedPtr<QueryContext>& query_context,
@@ -53,46 +54,45 @@ private:
 
     SharedPtr<TableRef>
     BuildBaseTable(SharedPtr<QueryContext>& query_context,
-                   const hsql::TableRef* from_table,
-                   const String &schema_name);
+                   const TableReference* table_reference);
 
     SharedPtr<TableRef>
     BuildView(SharedPtr<QueryContext>& query_context,
-              const hsql::TableRef* from_table,
-              const String &schema_name);
+              const TableReference* from_table);
 
     SharedPtr<TableRef>
     BuildCrossProduct(SharedPtr<QueryContext>& query_context,
-                      const hsql::TableRef *from_table);
+                      const CrossProductReference* cross_product);
 
     SharedPtr<TableRef>
     BuildJoin(SharedPtr<QueryContext>& query_context,
-              const hsql::TableRef *from_table);
+              const JoinReference* join_reference);
 
-    Vector<SharedPtr<ParsedExpression>>
+    void
     UnfoldStarExpression(SharedPtr<QueryContext>& query_context,
-                         const Vector<hsql::Expr *> &select_list);
+                         const Vector<ParsedExpr *>& input_select_list,
+                         Vector<ParsedExpr*>& output_select_list);
 
     void
     GenerateColumns(const SharedPtr<Binding>& binding,
                     const String& table_name,
-                    Vector<SharedPtr<ParsedExpression>>& output_select_list);
+                    Vector<ParsedExpr*>& output_select_list);
 
     void
     BuildGroupBy(SharedPtr<QueryContext>& query_context,
-                 const hsql::SelectStatement& select,
+                 const SelectStatement& select,
                  const SharedPtr<BindAliasProxy>& bind_alias_proxy,
                  SharedPtr<BoundSelectStatement>& select_statement);
 
     void
     BuildHaving(SharedPtr<QueryContext>& query_context,
-                const hsql::SelectStatement& select,
+                const SelectStatement& select,
                 const SharedPtr<BindAliasProxy>& bind_alias_proxy,
                 SharedPtr<BoundSelectStatement>& select_statement);
 
     void
     PushOrderByToProject(SharedPtr<QueryContext>& query_context,
-                         const hsql::SelectStatement& statement);
+                         const SelectStatement& statement);
 
     void
     BuildSelectList(SharedPtr<QueryContext>& query_context,
@@ -100,12 +100,12 @@ private:
 
     void
     BuildOrderBy(SharedPtr<QueryContext>& query_context,
-                 const hsql::SelectStatement& statement,
+                 const SelectStatement& statement,
                  SharedPtr<BoundSelectStatement>& bound_statement) const;
 
     void
     BuildLimit(SharedPtr<QueryContext>& query_context,
-               const hsql::SelectStatement& statement,
+               const SelectStatement& statement,
                SharedPtr<BoundSelectStatement>& bound_statement) const;
 
     void

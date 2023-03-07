@@ -41,7 +41,7 @@ PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
     // Generate the result table
     Vector<SharedPtr<ColumnDef>> column_defs;
     SharedPtr<TableDef> table_def_ptr
-            = MakeShared<TableDef>("Tables", column_defs, false);
+            = MakeShared<TableDef>("Tables", column_defs);
     output_ = MakeShared<Table>(table_def_ptr, TableType::kResult);
 }
 

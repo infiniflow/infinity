@@ -6,16 +6,17 @@
 
 namespace infinity {
 
-class InsertBinder : public ExpressionBinder {
+class InsertBinder final : public ExpressionBinder {
 public:
-    explicit InsertBinder(SharedPtr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
+    explicit
+    InsertBinder(SharedPtr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
     SharedPtr<BaseExpression>
-    BuildExpression(const hsql::Expr &expr,
+    BuildExpression(const ParsedExpr &expr,
                     const SharedPtr<BindContext>& bind_context_ptr,
                     i64 depth,
-                    bool root) override;
+                    bool root) final;
 
 //    // Bind column reference expression also include correlated column reference.
 //    SharedPtr<BaseExpression>

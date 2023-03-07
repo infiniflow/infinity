@@ -21,6 +21,11 @@ public:
     [[nodiscard]] String
     ToString() const final;
 
+    [[nodiscard]] inline DDLType
+    ddl_type() const {
+        return create_info_->type_;
+    }
+
     UniquePtr<ExtraDDLInfo> create_info_{};
 
 };

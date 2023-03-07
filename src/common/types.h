@@ -4,30 +4,15 @@
 
 #pragma once
 
-#include <string>
+#include "parser/table_reference/join_reference.h"
+#include "parser/statement/select_statement.h"
 
 namespace infinity {
 
-enum class JoinType {
-    kInvalid,
-    kInner,
-    kLeft,
-    kRight,
-    kFull,
-    kCross,
-    kNatural
-};
-
-std::string
+String
 ToString(JoinType type);
 
-enum class OrderByType {
-    kAscending,
-    kDescending
-    // Default order by type also should be given.
-};
-
-std::string
-ToString(OrderByType type);
+String
+ToString(OrderType type);
 
 }

@@ -12,12 +12,10 @@ class PhysicalDropTable : public PhysicalOperator {
 public:
     explicit PhysicalDropTable(SharedPtr<String> schema_name,
                                SharedPtr<String> tbl_name,
-                               u64 table_index,
                                uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kDropTable, nullptr, nullptr, id),
         schema_name_(std::move(schema_name)),
-        table_name_(std::move(tbl_name)),
-        table_index_(table_index)
+        table_name_(std::move(tbl_name))
         {}
 
     ~PhysicalDropTable() override = default;
@@ -29,9 +27,8 @@ public:
     Execute(SharedPtr<QueryContext>& query_context) override;
 
 private:
-    SharedPtr<String> schema_name_;
-    SharedPtr<String> table_name_;
-    u64 table_index_;
+    SharedPtr<String> schema_name_{};
+    SharedPtr<String> table_name_{};
 };
 
 }

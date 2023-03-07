@@ -15,14 +15,13 @@ ScalarFunctionSet::AddFunction(const ScalarFunction& func) {
 ScalarFunction
 ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>> &input_arguments) {
 
-
-    int64_t lowest_cost = std::numeric_limits<int64_t>::max();
-    size_t function_count = functions_.size();
-    Vector<int64_t> candidates_index;
+    i64 lowest_cost = std::numeric_limits<i64>::max();
+    SizeT function_count = functions_.size();
+    Vector<i64> candidates_index;
 
     for(auto i = 0; i < function_count; ++ i) {
         ScalarFunction& function = functions_[i];
-        int64_t cost = MatchFunctionCost(function, input_arguments);
+        i64 cost = MatchFunctionCost(function, input_arguments);
         if(cost >= 0 && cost <= lowest_cost) {
             // Have matched function and may be one of the candidate
             if(cost == lowest_cost) {
@@ -60,7 +59,7 @@ ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>> 
     return functions_[candidates_index[0]];
 }
 
-int64_t
+i64
 ScalarFunctionSet::MatchFunctionCost(const ScalarFunction& func,
                                      const Vector<SharedPtr<BaseExpression>>& arguments) {
     // TODO: variable argument list function need to handled here.
@@ -71,10 +70,10 @@ ScalarFunctionSet::MatchFunctionCost(const ScalarFunction& func,
     }
 
     auto argument_count = arguments.size();
-    int64_t total_cost = 0;
+    i64 total_cost = 0;
     for(auto i = 0; i < argument_count; ++ i) {
         // Get the cost from argument to parameter
-        int64_t type_cast_cost = DataType::CastRule(arguments[i]->Type(), func.parameter_types_[i]);
+        i64 type_cast_cost = DataType::CastRule(arguments[i]->Type(), func.parameter_types_[i]);
         if(type_cast_cost < 0) {
             // Can't cast the value type;
             return -1;

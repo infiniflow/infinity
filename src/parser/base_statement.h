@@ -22,7 +22,6 @@ enum class StatementType {
     kAlter,
     kShow,
     kExplain,
-    kSet,
 };
 
 class BaseStatement {
@@ -33,8 +32,13 @@ public:
     virtual
     ~BaseStatement() = default;
 
-    virtual String
+    [[nodiscard]] virtual String
     ToString() const = 0;
+
+    [[nodiscard]] inline StatementType
+    Type() const {
+        return type_;
+    }
 
     StatementType type_{StatementType::kInvalidStmt};
     SizeT stmt_location_{0};

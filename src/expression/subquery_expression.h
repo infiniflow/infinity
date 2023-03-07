@@ -4,20 +4,11 @@
 
 #pragma once
 
+#include "parser/parsed_expr/subquery_expr.h"
 #include "base_expression.h"
 #include "planner/bound_select_statement.h"
 
 namespace infinity {
-
-enum class SubqueryType {
-    kInvalid,
-    kScalar,
-    kExists,
-    kNotExists,
-    kIn,
-    kNotIn,
-    kAny,
-};
 
 class SubqueryExpression : public BaseExpression {
 public:

@@ -24,6 +24,7 @@ enum class TableRefType {
     kJoin,
     kTable,
     kSubquery,
+    kDummy,
 };
 
 class BaseTableReference {

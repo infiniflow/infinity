@@ -26,7 +26,6 @@ String FunctionExpr::ToString() const {
     }
     ss << ')';
     return ss.str();
-    PlannerError("Not reachable.")
 }
 
 }

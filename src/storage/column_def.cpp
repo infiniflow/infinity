@@ -1,7 +1,7 @@
 //
 // Created by jinhai on 22-12-25.
 //
-
+#if 0
 #include "column_def.h"
 
 namespace infinity {
@@ -35,3 +35,5 @@ ColumnDef::ToString() const {
 }
 
 }
+
+#endif
