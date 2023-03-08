@@ -19,8 +19,8 @@ PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
 
     // TODO: execute insert into table;
     Vector<DataType> output_types;
-    uint64_t value_count = value_list_.size();
-    for(uint64_t idx = 0; idx < value_count; ++ idx) {
+    SizeT value_count = value_list_.size();
+    for(SizeT idx = 0; idx < value_count; ++ idx) {
         if (value_list_[idx]->type() != ExpressionType::kValue) {
             ExecutorError("Not value expression.");
         }
@@ -29,7 +29,7 @@ PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
 
     SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
     output_block->Init(output_types);
-    for(uint64_t idx = 0; idx < value_count; ++ idx) {
+    for(SizeT idx = 0; idx < value_count; ++ idx) {
         SharedPtr<ValueExpression> value_expr_ptr = std::static_pointer_cast<ValueExpression>(value_list_[idx]);
         value_expr_ptr->AppendToChunk(output_block->column_vectors[idx]);
     }

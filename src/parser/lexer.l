@@ -159,24 +159,19 @@ YEARS           { return YEARS; }
 
 [-+*/(){},.;<>=^%:?[\]|]    { return yytext[0]; }
 
-[0-9]+"."[0-9]* |
+-?[0-9]+"."[0-9]* |
 "."[0-9]*  {
     yylval->double_value = atof(yytext);
     return DOUBLE_VALUE;
 }
 
-[0-9]+ {
+-?[0-9]+ {
     errno = 0;
     yylval->long_value = strtoll(yytext, nullptr, 0);
     if (errno) {
         return fprintf(stderr, "[SQL-Lexer-Error] Integer cannot be parsed - is it out of range?");
         return 0;
     }
-    return LONG_VALUE;
-}
-
--9223372036854775808 {
-    yylval->long_value = LONG_MIN;
     return LONG_VALUE;
 }
 
