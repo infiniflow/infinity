@@ -51,6 +51,12 @@ file(GLOB_RECURSE
         storage/*.cpp
         )
 
+file(GLOB_RECURSE
+        test_helper_src
+        CONFIGURE_DEPENDS
+        test_helper/*.cpp
+        )
+
 add_executable(test_main
         main.cpp
         ${bin_src}
@@ -60,6 +66,7 @@ add_executable(test_main
         ${main_test_src}
         ${planner_test_src}
         ${storage_src}
+        ${test_helper_src}
         )
 
 target_link_libraries(test_main
@@ -75,6 +82,7 @@ target_link_libraries(test_main
 add_executable(test_parser
         main.cpp
         ${parser_test_src}
+        ${test_helper_src}
         )
 
 target_link_libraries(test_parser

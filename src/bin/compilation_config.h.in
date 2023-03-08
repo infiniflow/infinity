@@ -13,6 +13,8 @@
 #define GIT_COMMIT_ID "@GIT_COMMIT_ID@"
 #define BUILD_TYPE "@CMAKE_BUILD_TYPE@"
 
+#define TEST_DATA_PATH "@TEST_DATA_PATH@"
+
 
 
 

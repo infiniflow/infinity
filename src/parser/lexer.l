@@ -180,6 +180,15 @@ YEARS           { return YEARS; }
     return LONG_VALUE;
 }
 
+\"[^\"\n]+\" {
+    // total length - 2 of quota + 1 null char
+    long str_len = strlen(yytext) - 1;
+    yylval->str_value = (char*)malloc(str_len);
+    memset(yylval->str_value, 0, str_len);
+    memcpy(yylval->str_value, (char*)(yytext + 1), str_len - 1);
+    return IDENTIFIER;
+}
+
 [A-Za-z][A-Za-z0-9_]* {
     yylval->str_value = strdup(yytext);
     return IDENTIFIER;

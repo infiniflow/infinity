@@ -7,6 +7,7 @@
 #include "common/types/internal_types.h"
 #include "parser/parser_result.h"
 #include "parser/sql_parser.h"
+#include "bin/compilation_config.h"
 
 #include <filesystem>
 #include <fstream>
@@ -30,7 +31,8 @@ TEST_F(SQLFileParsingTest, tpch) {
     SharedPtr <ParserResult> result = MakeShared<ParserResult>();
 
     // Get all tpch sql text;
-    std::filesystem::path file_path("../../../test/unittest/parser/test_data/tpch");
+    String path = String(TEST_DATA_PATH) + "/tpch";
+    std::filesystem::path file_path(path);
 
     for(const auto& p: std::filesystem::recursive_directory_iterator(file_path)) {
 //        std::cout << p.path().c_str() << std::endl;
@@ -65,8 +67,10 @@ TEST_F(SQLFileParsingTest, hyrise) {
     SharedPtr <ParserResult> result = MakeShared<ParserResult>();
 
     // Get all tpch sql text;
-    std::filesystem::path good_sql_path("../../../test/unittest/parser/test_data/hyrise/good.sql");
-    std::filesystem::path bad_sql_path("../../../test/unittest/parser/test_data/hyrise/bad.sql");
+    String good_sql = String(TEST_DATA_PATH) + "/hyrise/good.sql";
+    String bad_sql = String(TEST_DATA_PATH) + "/hyrise/bad.sql";
+    std::filesystem::path good_sql_path(good_sql);
+    std::filesystem::path bad_sql_path(bad_sql);
 
     Vector<String> sqls;
     ReadSQLs(good_sql_path, sqls);

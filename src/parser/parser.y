@@ -18,6 +18,7 @@ void yyerror(YYLTYPE * llocp, void* lexer, ParserResult* result, const char* msg
 #include "parser/table_reference/cross_product_reference.h"
 #include "parser/table_reference/table_reference.h"
 #include "parser/table_reference/subquery_reference.h"
+#include "parser_helper.h"
 
 #include <vector>
 
@@ -409,8 +410,11 @@ explainable_statement : create_statement { $$ = $1; }
 create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     $$ = new CreateStatement();
     UniquePtr<CreateSchemaInfo> create_schema_info = MakeUnique<CreateSchemaInfo>();
+
+    ParserHelper::ToLower($4);
     create_schema_info->schema_name_ = $4;
     free($4);
+
     $$->create_info_ = std::move(create_schema_info);
     $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 }
@@ -499,6 +503,7 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     free($6->table_name_ptr_);
     delete $6;
 
+    ParserHelper::ToLower($4);
     create_index_info->index_name_ = $4;
     free($4);
 
@@ -556,6 +561,7 @@ IDENTIFIER column_type {
     }
     $$ = new ColumnDef($2.logical_type_, type_info_ptr);
 
+    ParserHelper::ToLower($1);
     $$->name_ = $1;
     free($1);
     /*
@@ -594,6 +600,7 @@ IDENTIFIER column_type {
     }
     $$ = new ColumnDef($2.logical_type_, type_info_ptr);
 
+    ParserHelper::ToLower($1);
     $$->name_ = $1;
     $$->constraints_ = *$3;
     delete $3;
@@ -708,10 +715,12 @@ table_constraint : PRIMARY KEY '(' identifier_array ')' {
 
 identifier_array : IDENTIFIER {
     $$ = new Vector<String>();
+    ParserHelper::ToLower($1);
     $$->emplace_back($1);
     free($1);
 }
 | identifier_array ',' IDENTIFIER {
+    ParserHelper::ToLower($3);
     $1->emplace_back($3);
     free($3);
     $$ = $1;
@@ -820,6 +829,7 @@ update_expr_array: update_expr {
 
 update_expr : IDENTIFIER '=' expr {
     $$ = new UpdateExpr();
+    ParserHelper::ToLower($1);
     $$->column_name = $1;
     free($1);
     $$->value = $3;
@@ -833,8 +843,11 @@ update_expr : IDENTIFIER '=' expr {
 drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     $$ = new DropStatement();
     UniquePtr<DropSchemaInfo> drop_schema_info = MakeUnique<DropSchemaInfo>();
+
+    ParserHelper::ToLower($4);
     drop_schema_info->schema_name_ = $4;
     free($4);
+
     $$->drop_info_ = std::move(drop_schema_info);
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 };
@@ -1199,12 +1212,15 @@ table_reference_name : table_name table_alias {
 table_name : IDENTIFIER {
     if(!result->IsError()) {
         $$ = new TableName();
+        ParserHelper::ToLower($1);
         $$->table_name_ptr_ = $1;
     }
 }
 | IDENTIFIER '.' IDENTIFIER {
     if(!result->IsError()) {
         $$ = new TableName();
+        ParserHelper::ToLower($1);
+        ParserHelper::ToLower($3);
         $$->schema_name_ptr_ = $1;
         $$->table_name_ptr_ = $3;
     }
@@ -1213,14 +1229,17 @@ table_name : IDENTIFIER {
 /* AS 'table_alias' or AS 'table_alias(col1_alias, col2_alias ... )' */
 table_alias : AS IDENTIFIER {
     $$ = new TableAlias();
+    ParserHelper::ToLower($2);
     $$->alias_ = $2;
 }
 | IDENTIFIER {
     $$ = new TableAlias();
+    ParserHelper::ToLower($1);
     $$->alias_ = $1;
 }
 | AS IDENTIFIER '(' identifier_array ')' {
     $$ = new TableAlias();
+    ParserHelper::ToLower($2);
     $$->alias_ = $2;
     $$->column_alias_array_ = $4;
 }
@@ -1248,6 +1267,7 @@ with_expr_list: with_expr {
 
 with_expr: IDENTIFIER AS '(' select_clause_with_modifier ')' {
     $$ = new WithExpr();
+    ParserHelper::ToLower($1);
     $$->alias_ = $1;
     free($1);
     $$->select_ = $4;
@@ -1342,6 +1362,7 @@ constant_expr_array: constant_expr {
 
 expr_alias : expr AS IDENTIFIER {
     $$ = $1;
+    ParserHelper::ToLower($3);
     $$->alias_ = $3;
     free($3);
 }
@@ -1372,6 +1393,7 @@ operand: '(' expr ')' {
 
 function_expr : IDENTIFIER '(' ')' {
     FunctionExpr* func_expr = new FunctionExpr();
+    ParserHelper::ToLower($1);
     func_expr->func_name_ = $1;
     free($1);
     func_expr->arguments_ = nullptr;
@@ -1379,6 +1401,7 @@ function_expr : IDENTIFIER '(' ')' {
 }
 | IDENTIFIER '(' expr_array ')' {
     FunctionExpr* func_expr = new FunctionExpr();
+    ParserHelper::ToLower($1);
     func_expr->func_name_ = $1;
     free($1);
     func_expr->arguments_ = $3;
@@ -1386,6 +1409,7 @@ function_expr : IDENTIFIER '(' ')' {
 }
 | IDENTIFIER '(' DISTINCT expr_array ')' {
     FunctionExpr* func_expr = new FunctionExpr();
+    ParserHelper::ToLower($1);
     func_expr->func_name_ = $1;
     free($1);
     func_expr->arguments_ = $4;
@@ -1692,12 +1716,14 @@ subquery_expr: EXISTS '(' select_without_paren ')' {
 
 column_expr : IDENTIFIER {
     ColumnExpr* column_expr = new ColumnExpr();
+    ParserHelper::ToLower($1);
     column_expr->names_.emplace_back($1);
     free($1);
     $$ = column_expr;
 }
 | column_expr '.' IDENTIFIER {
     ColumnExpr* column_expr = (ColumnExpr*)$1;
+    ParserHelper::ToLower($3);
     column_expr->names_.emplace_back($3);
     free($3);
     $$ = column_expr;
