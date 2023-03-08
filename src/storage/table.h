@@ -87,10 +87,15 @@ public:
         return definition_ptr_->columns()[idx]->type();
     }
 
-    void
+    inline void
     Append(const SharedPtr<DataBlock>& data_block) {
         data_blocks_.emplace_back(data_block);
         row_count_ += data_block->row_count();
+    }
+
+    inline void
+    Insert(const SharedPtr<DataBlock>& data_block) {
+        NotImplementError("Insert data block");
     }
 
 public:

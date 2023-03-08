@@ -5,12 +5,19 @@
 #pragma once
 
 #include "base_expression.h"
+#include "function/cast/bound_cast_func.h"
 
 namespace infinity {
 
 class CastExpression: public BaseExpression {
 public:
-    CastExpression(const SharedPtr<BaseExpression>& argument, DataType target_type);
+    CastExpression(BoundCastFunc cast_function,
+                   const SharedPtr<BaseExpression>& argument,
+                   DataType target_type)
+                   : BaseExpression(ExpressionType::kCast, {argument}),
+                   target_type_(std::move(target_type)),
+                   func_(cast_function)
+    {}
 
     inline DataType
     Type() const override {
@@ -26,10 +33,10 @@ public:
     static SharedPtr<BaseExpression>
     AddCastToType(const SharedPtr<BaseExpression>& expr, const DataType &target_type);
 
+    BoundCastFunc func_;
+
 private:
     DataType target_type_;
-
-    // TODO: Cast function should be scalar function
 };
 
 }

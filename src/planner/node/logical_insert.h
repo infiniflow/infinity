@@ -55,6 +55,34 @@ public:
         return table_index_;
     }
 
+public:
+    static bool
+    NeedCastInInsert(const DataType& from, const DataType& to) {
+        if(from.type() == to.type()) {
+            switch (from.type()) {
+                case kVarchar: {
+                    auto* from_type_info = (VarcharInfo*)from.type_info().get();
+                    auto* to_type_info = (VarcharInfo*)to.type_info().get();
+                    if(to_type_info->length_limit() >= from_type_info->length_limit()) {
+                        return false;
+                    }
+                    break;
+                }
+                case kChar: {
+                    auto* from_type_info = (CharInfo*)from.type_info().get();
+                    auto* to_type_info = (CharInfo*)to.type_info().get();
+                    if(to_type_info->length_limit() >= from_type_info->length_limit()) {
+                        return false;
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+        return true;
+    }
+
 private:
     SharedPtr<Table> table_ptr_{};
     Vector<SharedPtr<BaseExpression>> value_list_{};

@@ -64,6 +64,14 @@ TEST_F(LogicalPlannerTpchTest, test1) {
         SQLRunner::Run(input_sql, false);
     }
 
+    // Insert LINEITEM table
+    {
+        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_lineitem.sql";
+        std::ifstream t(ddl_sql.c_str());
+        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+        SQLRunner::Run(input_sql, false);
+    }
+
     // DROP tables;
     {
         String ddl_sql = String(TEST_DATA_PATH) + "/tpch/drop.sql";

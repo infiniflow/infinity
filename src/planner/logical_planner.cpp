@@ -19,6 +19,7 @@
 #include "planner/node/logical_create_collection.h"
 #include "planner/node/logical_create_schema.h"
 #include "planner/node/logical_create_view.h"
+#include "function/cast/cast_function.h"
 
 namespace infinity {
 
@@ -152,9 +153,17 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement) {
             if(value_type == table_column_type) {
                 rewrite_value_list[table_column_id] = value_list[column_idx];
             } else {
-                // If the inserted value type mismatches with table column type, cast the inserted value type to correct one.
-                SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(value_list[column_idx], table_column_type);
-                rewrite_value_list[table_column_id] = cast_expr;
+                if(LogicalInsert::NeedCastInInsert(value_type, table_column_type)) {
+                    // If the inserted value type mismatches with table column type, cast the inserted value type to correct one.
+                    BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, table_column_type);
+                    SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast,
+                                                                                     value_list[column_idx],
+                                                                                     table_column_type);
+                    rewrite_value_list[table_column_id] = cast_expr;
+                } else {
+                    // LogicalType are same and type info is also OK.
+                    rewrite_value_list[column_idx] = value_list[column_idx];
+                }
             }
             ++ column_idx;
         }
@@ -172,8 +181,16 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement) {
             if(table_column_type == value_type) {
                 rewrite_value_list[column_idx] = value_list[column_idx];
             } else {
-                SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(value_list[column_idx], table_column_type);
-                rewrite_value_list[column_idx] = cast_expr;
+                if(LogicalInsert::NeedCastInInsert(value_type, table_column_type)) {
+                    BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, table_column_type);
+                    SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast,
+                                                                                     value_list[column_idx],
+                                                                                     table_column_type);
+                    rewrite_value_list[column_idx] = cast_expr;
+                } else {
+                    // LogicalType are same and type info is also OK.
+                    rewrite_value_list[column_idx] = value_list[column_idx];
+                }
             }
         }
         value_list = rewrite_value_list;

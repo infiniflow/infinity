@@ -4,6 +4,7 @@
 
 #include "cast_expression.h"
 #include "common/utility/infinity_assert.h"
+#include "function/cast/cast_function.h"
 
 #include <sstream>
 #include <utility>
@@ -17,7 +18,8 @@ CastExpression::AddCastToType(const SharedPtr<BaseExpression>& source_expr_ptr, 
     }
 
     if(CastExpression::CanCast(source_expr_ptr->Type(), target_type)) {
-        return std::make_shared<CastExpression>(source_expr_ptr, target_type);
+        BoundCastFunc cast = CastFunction::GetBoundFunc(source_expr_ptr->Type(), target_type);
+        return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
         PlannerError("Can't cast from: " + source_expr_ptr->Type().ToString() + " to" + target_type.ToString());
     }
@@ -123,11 +125,6 @@ CastExpression::CanCast(const DataType& source, const DataType& target) {
     }
 #endif
 }
-
-
-CastExpression::CastExpression(const SharedPtr<BaseExpression> &argument,
-                               DataType data_type)
-   : BaseExpression(ExpressionType::kCast, {argument}), target_type_(std::move(data_type)) {}
 
 String
 CastExpression::ToString() const {

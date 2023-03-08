@@ -98,7 +98,14 @@ ExpressionEvaluator::Execute(const SharedPtr<CastExpression>& expr,
     Vector<SharedPtr<ColumnVector>>& child_output = child_state->OutputColumnVectors();
     Execute(child_expr, child_state, child_output);
 
-    ExecutorError("Cast function isn't implemented yet.");
+    SizeT block_count = child_output.size();
+    CastParameters cast_parameters;
+    for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
+        expr->func_.function(child_output[block_id],
+                             output_column_vector[block_id],
+                             child_output[block_id]->Size(),
+                             cast_parameters);
+    }
 }
 
 void

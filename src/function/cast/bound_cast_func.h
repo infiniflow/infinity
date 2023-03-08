@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "common/column_vector/column_vector.h"
+
 namespace infinity {
 
 struct CastParameters {
