@@ -16,35 +16,36 @@ public:
     HashSet<i64> bound_select_index_;
 
 public:
-    explicit GroupBinder(SharedPtr<QueryContext>& query_context,
-                         const SharedPtr<BindAliasProxy>& bind_alias_proxy)
-                         : ExpressionBinder(query_context),
-                         bind_alias_proxy_(bind_alias_proxy) {}
+    explicit
+    GroupBinder(SharedPtr<QueryContext>& query_context,
+                const SharedPtr<BindAliasProxy>& bind_alias_proxy)
+                : ExpressionBinder(query_context),
+                bind_alias_proxy_(bind_alias_proxy) {}
 
     // Bind expression entry
     SharedPtr<BaseExpression>
     BuildExpression(const ParsedExpr& expr,
-                    const SharedPtr<BindContext>& bind_context_ptr,
+                    BindContext* bind_context_ptr,
                     i64 depth,
                     bool root) override;
 
     SharedPtr<BaseExpression>
     BindColumnReference(const ColumnExpr& expr,
-                         const SharedPtr<BindContext>& bind_context_ptr);
+                         BindContext* bind_context_ptr);
 
     SharedPtr<BaseExpression>
     BindConstantExpression(const ConstantExpr& expr,
-                           const SharedPtr<BindContext>& bind_context_ptr);
+                           BindContext* bind_context_ptr);
 
     SharedPtr<BaseExpression>
     BuildColExpr(const ColumnExpr& expr,
-                 const SharedPtr<BindContext>& bind_context_ptr,
+                 BindContext* bind_context_ptr,
                  i64 depth,
                  bool root) override;
 
     SharedPtr<BaseExpression>
     BuildFuncExpr(const FunctionExpr& expr,
-                  const SharedPtr<BindContext>& bind_context_ptr,
+                  BindContext* bind_context_ptr,
                   i64 depth,
                   bool root) override;
 
@@ -53,7 +54,7 @@ public:
 
     SharedPtr<SubqueryExpression>
     BuildSubquery(const SubqueryExpr& select,
-                  const SharedPtr<BindContext>& bind_context_ptr,
+                  BindContext* bind_context_ptr,
                   SubqueryType subquery_type,
                   i64 depth,
                   bool root) final;

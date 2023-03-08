@@ -32,13 +32,24 @@ struct CommonTableExpressionInfo {
 class BindContext {
 public:
     static inline SharedPtr<BindContext>
-    Make(SharedPtr<BindContext> parent) {
-        return MakeShared<BindContext>(std::move(parent));
+    Make(const SharedPtr<BindContext>& parent) {
+        return MakeShared<BindContext>(parent);
+    }
+
+    static inline SharedPtr<BindContext>
+    Make(BindContext* parent) {
+        return MakeShared<BindContext>(parent);
     }
 
 public:
-    explicit BindContext(SharedPtr<BindContext> parent)
-        : parent_(std::move(parent)) {
+    explicit
+    BindContext(const SharedPtr<BindContext>& parent)
+        : parent_(parent.get()) {
+        binding_context_id_ = GenerateBindingContextIndex();
+    }
+
+    explicit
+    BindContext(BindContext* parent) : parent_(parent) {
         binding_context_id_ = GenerateBindingContextIndex();
     }
 
@@ -47,7 +58,7 @@ public:
     void Destroy();
 
     // Parent bind context
-    SharedPtr<BindContext> parent_;
+    BindContext* parent_{nullptr};
 
     // Left and right child bind context
     SharedPtr<BindContext> left_child_;

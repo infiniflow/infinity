@@ -8,7 +8,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 WhereBinder::BuildExpression(const ParsedExpr& expr,
-                             const SharedPtr<BindContext>& bind_context_ptr,
+                             BindContext* bind_context_ptr,
                              i64 depth,
                              bool root) {
     SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
@@ -17,7 +17,7 @@ WhereBinder::BuildExpression(const ParsedExpr& expr,
 
 SharedPtr<BaseExpression>
 WhereBinder::BuildColExpr(const ColumnExpr& expr,
-                          const SharedPtr<BindContext>& bind_context_ptr,
+                          BindContext* bind_context_ptr,
                           i64 depth,
                           bool root) {
     // Step 1. Trying to bind the column to current binding. (done)

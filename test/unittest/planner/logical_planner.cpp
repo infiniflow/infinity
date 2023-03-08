@@ -97,14 +97,48 @@ RunSQL(const infinity::String& sql_text, bool print) {
     }
 }
 
+void
+BuildLogicalPlan(const infinity::String& sql_text) {
+    using namespace infinity;
+
+    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
+    parser->Parse(sql_text, parsed_result);
+
+    if(parsed_result->IsError()) {
+        ParserError(parsed_result->error_message_)
+    }
+
+    SharedPtr<Session> session_ptr = MakeShared<Session>();
+    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr, session_ptr->transaction());
+    query_context_ptr->set_current_schema(session_ptr->current_schema());
+
+    LogicalPlanner logical_planner(query_context_ptr);
+    Optimizer optimizer(query_context_ptr);
+    PhysicalPlanner physical_planner(query_context_ptr);
+
+    PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
+
+    BaseStatement* statement = (*parsed_result->statements_ptr_)[0];
+    logical_planner.Build(statement);
+    parsed_result->Reset();
+}
+
 TEST_F(LogicalPlannerTest, test1) {
     using namespace infinity;
 
     RunSQL("create table t1(a bigint, b bigint);", false);
-    RunSQL("show tables;", false);
     RunSQL("insert into t1 values(1, 2);", false);
     RunSQL("insert into t1 values(2, 4);", false);
+    RunSQL("insert into t1 values(3, 6);", false);
+    RunSQL("create table t2(a bigint, b bigint);", false);
+    RunSQL("insert into t2 values(10, 20);", false);
+    RunSQL("insert into t2 values(20, 40);", false);
+    RunSQL("create table t3(a bigint, b bigint);", false);
+    RunSQL("insert into t3 values(5, 25);", false);
+    RunSQL("insert into t3 values(15, 35);", false);
     RunSQL("show tables;", false);
+#if 1
     {
         const String sql_text = "select * from t1;";
         RunSQL(sql_text, true);
@@ -141,6 +175,30 @@ TEST_F(LogicalPlannerTest, test1) {
         const String sql_text = "select a, b from t1 group by a, b;";
         RunSQL(sql_text, true);
     }
+    {
+        const String sql_text = "select sum(b), b from t1 group by a;";
+        EXPECT_THROW(RunSQL(sql_text, true), PlannerException);
+    }
+    {
+        const String sql_text = "select sum(b), b from t1;";
+        EXPECT_THROW(RunSQL(sql_text, true), PlannerException);
+    }
+
+    {
+        const String sql_text = "select sum(b), count(a) from t1;";
+        RunSQL(sql_text, true);
+    }
+#endif
+    {
+        const String sql_text = "select * from t1, t2;";
+        RunSQL(sql_text, true);
+    }
+#if 1
+    {
+        const String sql_text = "select * from t1, t2, t3 where t1.a < 3;";
+        RunSQL(sql_text, true);
+    }
+#endif
 //    {
 //        // Only check the ast.
 //        const String sql_text = "(SELECT * FROM students INTERSECT SELECT * FROM students_2) UNION SELECT * FROM students_3 ORDER BY grade ASC;";

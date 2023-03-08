@@ -10,7 +10,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 GroupBinder::BuildExpression(const ParsedExpr& expr,
-                             const SharedPtr<BindContext>& bind_context_ptr,
+                             BindContext* bind_context_ptr,
                              i64 depth,
                              bool root) {
     SharedPtr<BaseExpression> result = nullptr;
@@ -59,7 +59,7 @@ GroupBinder::BuildExpression(const ParsedExpr& expr,
 
 SharedPtr<BaseExpression>
 GroupBinder::BindColumnReference(const ColumnExpr& expr,
-                                 const SharedPtr<BindContext>& bind_context_ptr) {
+                                 BindContext* bind_context_ptr) {
     // Either the expr is a column or a alias
     String column_name = expr.GetName();
 
@@ -84,7 +84,7 @@ GroupBinder::BindColumnReference(const ColumnExpr& expr,
 
 SharedPtr<BaseExpression>
 GroupBinder::BindConstantExpression(const ConstantExpr& expr,
-                                    const SharedPtr<BindContext>& bind_context_ptr) {
+                                    BindContext* bind_context_ptr) {
     PlannerAssert(expr.literal_type_ == LiteralType::kInteger, "Not an integer.")
     i64 select_idx = expr.integer_value_;
 
@@ -110,7 +110,7 @@ GroupBinder::BindConstantExpression(const ConstantExpr& expr,
 
 SharedPtr<BaseExpression>
 GroupBinder::BuildColExpr(const ColumnExpr& expr,
-                          const SharedPtr<BindContext>& bind_context_ptr,
+                          BindContext* bind_context_ptr,
                           i64 depth,
                           bool root) {
 
@@ -126,7 +126,7 @@ GroupBinder::BuildColExpr(const ColumnExpr& expr,
 
 SharedPtr<BaseExpression>
 GroupBinder::BuildFuncExpr(const FunctionExpr& expr,
-                           const SharedPtr<BindContext>& bind_context_ptr,
+                           BindContext* bind_context_ptr,
                            i64 depth,
                            bool root) {
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
@@ -143,7 +143,7 @@ GroupBinder::CheckFuncType(FunctionType func_type) const {
 
 SharedPtr<SubqueryExpression>
 GroupBinder::BuildSubquery(const SubqueryExpr& select,
-                           const SharedPtr<BindContext>& bind_context_ptr,
+                           BindContext* bind_context_ptr,
                            SubqueryType subquery_type,
                            i64 depth,
                            bool root) {

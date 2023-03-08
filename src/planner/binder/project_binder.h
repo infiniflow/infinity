@@ -16,19 +16,19 @@ public:
     // Bind expression entry
     SharedPtr<BaseExpression>
     BuildExpression(const ParsedExpr& expr,
-                    const SharedPtr<BindContext>& bind_context_ptr,
+                    BindContext* bind_context_ptr,
                     i64 depth,
                     bool root) final;
 
     SharedPtr<BaseExpression>
     BuildFuncExpr(const FunctionExpr& expr,
-                  const SharedPtr<BindContext>& bind_context_ptr,
+                  BindContext* bind_context_ptr,
                   i64 depth,
                   bool root) final;
 
     SharedPtr<BaseExpression>
     BuildColExpr(const ColumnExpr& expr,
-                 const SharedPtr<BindContext>& bind_context_ptr,
+                 BindContext* bind_context_ptr,
                  i64 depth,
                  bool root) final;
 

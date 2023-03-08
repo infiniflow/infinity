@@ -13,7 +13,7 @@ public:
     SharedPtr<BaseExpression>
     BindAlias(ExpressionBinder& expression_binder,
               const ParsedExpr& expr,
-              const SharedPtr<BindContext>& bind_context_ptr,
+              BindContext* bind_context_ptr,
               i64 depth,
               bool root);
 private:

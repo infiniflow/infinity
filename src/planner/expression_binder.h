@@ -33,33 +33,33 @@ public:
 
     SharedPtr<BaseExpression>
     Bind(const ParsedExpr& expr,
-         const SharedPtr<BindContext>& bind_context_ptr,
+         BindContext* bind_context_ptr,
          i64 depth,
          bool root);
 
     // Bind expression entry
     virtual SharedPtr<BaseExpression>
     BuildExpression(const ParsedExpr& expr,
-                    const SharedPtr<BindContext>& bind_context_ptr,
+                    BindContext* bind_context_ptr,
                     i64 depth,
                     bool root);
 
     virtual SharedPtr<BaseExpression>
     BuildValueExpr(const ConstantExpr& expr,
-                   const SharedPtr<BindContext>& bind_context_ptr,
+                   BindContext* bind_context_ptr,
                    i64 depth,
                    bool root);
 
     // Bind column reference expression also include correlated column reference.
     virtual SharedPtr<BaseExpression>
     BuildColExpr(const ColumnExpr& expr,
-                 const SharedPtr<BindContext>& bind_context_ptr,
+                 BindContext* bind_context_ptr,
                  i64 depth,
                  bool root);
 
     virtual SharedPtr<BaseExpression>
     BuildFuncExpr(const FunctionExpr& expr,
-                  const SharedPtr<BindContext>& bind_context_ptr,
+                  BindContext* bind_context_ptr,
                   i64 depth,
                   bool root);
 
@@ -68,20 +68,20 @@ public:
 
     virtual SharedPtr<BaseExpression>
     BuildCastExpr(const CastExpr& expr,
-                  const SharedPtr<BindContext>& bind_context_ptr,
+                  BindContext* bind_context_ptr,
                   i64 depth,
                   bool root);
 
     virtual SharedPtr<BaseExpression>
     BuildCaseExpr(const CaseExpr& expr,
-                  const SharedPtr<BindContext>& bind_context_ptr,
+                  BindContext* bind_context_ptr,
                   i64 depth,
                   bool root);
 
     // Bind subquery expression.
     virtual SharedPtr<SubqueryExpression>
     BuildSubquery(const SubqueryExpr& expr,
-                  const SharedPtr<BindContext>& bind_context_ptr,
+                  BindContext* bind_context_ptr,
                   SubqueryType subquery_type,
                   i64 depth,
                   bool root);

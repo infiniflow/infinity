@@ -23,7 +23,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 ExpressionBinder::Bind(const ParsedExpr& expr,
-                       const SharedPtr<BindContext>& bind_context_ptr,
+                       BindContext* bind_context_ptr,
                        i64 depth,
                        bool root) {
     // Call implemented BuildExpression
@@ -42,7 +42,7 @@ ExpressionBinder::Bind(const ParsedExpr& expr,
 
 SharedPtr<BaseExpression>
 ExpressionBinder::BuildExpression(const ParsedExpr& expr,
-                                  const SharedPtr<BindContext>& bind_context_ptr,
+                                  BindContext* bind_context_ptr,
                                   i64 depth,
                                   bool root) {
     switch (expr.type_) {
@@ -76,7 +76,7 @@ ExpressionBinder::BuildExpression(const ParsedExpr& expr,
 
 SharedPtr<BaseExpression>
 ExpressionBinder::BuildValueExpr(const ConstantExpr& expr,
-                                 const SharedPtr<BindContext>& bind_context_ptr,
+                                 BindContext* bind_context_ptr,
                                  i64 depth,
                                  bool root) {
     switch(expr.literal_type_) {
@@ -120,7 +120,7 @@ ExpressionBinder::BuildValueExpr(const ConstantExpr& expr,
 
 SharedPtr<BaseExpression>
 ExpressionBinder::BuildColExpr(const ColumnExpr& expr,
-                               const SharedPtr<BindContext>& bind_context_ptr,
+                               BindContext* bind_context_ptr,
                                i64 depth,
                                bool root) {
     ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, expr);
@@ -130,7 +130,7 @@ ExpressionBinder::BuildColExpr(const ColumnExpr& expr,
 
 SharedPtr<BaseExpression>
 ExpressionBinder::BuildFuncExpr(const FunctionExpr& expr,
-                                const SharedPtr<BindContext>& bind_context_ptr,
+                                BindContext* bind_context_ptr,
                                 i64 depth,
                                 bool root) {
 
@@ -173,7 +173,7 @@ ExpressionBinder::BuildFuncExpr(const FunctionExpr& expr,
 
 SharedPtr<BaseExpression>
 ExpressionBinder::BuildCastExpr(const CastExpr& expr,
-                                const SharedPtr<BindContext>& bind_context_ptr,
+                                BindContext* bind_context_ptr,
                                 i64 depth,
                                 bool root) {
     SharedPtr<BaseExpression> source_expr_ptr = BuildExpression(*expr.expr_, bind_context_ptr, depth, false);
@@ -182,7 +182,7 @@ ExpressionBinder::BuildCastExpr(const CastExpr& expr,
 
 SharedPtr<BaseExpression>
 ExpressionBinder::BuildCaseExpr(const CaseExpr& expr,
-                                const SharedPtr<BindContext>& bind_context_ptr,
+                                BindContext* bind_context_ptr,
                                 i64 depth,
                                 bool root) {
     PlannerAssert(expr.case_check_array_, "No when and then expression");
@@ -258,7 +258,7 @@ ExpressionBinder::BuildCaseExpr(const CaseExpr& expr,
 // Bind subquery expression.
 SharedPtr<SubqueryExpression>
 ExpressionBinder::BuildSubquery(const SubqueryExpr& expr,
-                                const SharedPtr<BindContext>& bind_context_ptr,
+                                BindContext* bind_context_ptr,
                                 SubqueryType subquery_type,
                                 i64 depth,
                                 bool root) {

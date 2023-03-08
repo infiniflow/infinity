@@ -122,7 +122,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement) {
     for (const auto* parsed_expr : *statement->values_) {
         SharedPtr<BaseExpression> value_expr
                 = bind_context_ptr->expression_binder_->BuildExpression(*parsed_expr,
-                                                                        bind_context_ptr,
+                                                                        bind_context_ptr.get(),
                                                                         0,
                                                                         true);
         value_list.emplace_back(value_expr);

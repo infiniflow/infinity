@@ -20,25 +20,25 @@ public:
     // Bind expression entry
     SharedPtr<BaseExpression>
     BuildExpression(const ParsedExpr& expr,
-                    const SharedPtr<BindContext>& bind_context_ptr,
+                    BindContext* bind_context_ptr,
                     i64 depth,
                     bool root) final;
 
     SharedPtr<BaseExpression>
     BuildColExpr(const ColumnExpr& expr,
-                 const SharedPtr<BindContext>& bind_context_ptr,
+                 BindContext* bind_context_ptr,
                  i64 depth,
                  bool root) final;
 
     SharedPtr<BaseExpression>
     BuildFuncExpr(const FunctionExpr& expr,
-                  const SharedPtr<BindContext>& bind_context_ptr,
+                  BindContext* bind_context_ptr,
                   i64 depth,
                   bool root) final;
 
 //    // Bind column reference expression also include correlated column reference.
 //    SharedPtr<BaseExpression>
-//    BuildColRefExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
+//    BuildColRefExpr(const hsql::Expr &expr, BindContext* bind_context_ptr) override;
 private:
 
     const SharedPtr<BindAliasProxy>& bind_alias_proxy_;

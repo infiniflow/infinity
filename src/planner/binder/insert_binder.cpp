@@ -9,7 +9,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 InsertBinder::BuildExpression(const ParsedExpr& expr,
-                              const SharedPtr<BindContext>& bind_context_ptr,
+                              BindContext* bind_context_ptr,
                               i64 depth,
                               bool root) {
     SharedPtr<BaseExpression> result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);

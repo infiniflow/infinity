@@ -9,7 +9,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 LimitBinder::BuildExpression(const ParsedExpr& expr,
-                             const SharedPtr<BindContext>& bind_context_ptr,
+                             BindContext* bind_context_ptr,
                              i64 depth,
                              bool root) {
     switch(expr.type_) {
@@ -26,7 +26,7 @@ LimitBinder::BuildExpression(const ParsedExpr& expr,
 
 SharedPtr<BaseExpression>
 LimitBinder::BuildFuncExpr(const FunctionExpr& expr,
-                           const SharedPtr<BindContext>& bind_context_ptr,
+                           BindContext* bind_context_ptr,
                            i64 depth,
                            bool root) {
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
@@ -38,7 +38,7 @@ LimitBinder::BuildFuncExpr(const FunctionExpr& expr,
 
 SharedPtr<BaseExpression>
 LimitBinder::BuildColExpr(const ColumnExpr& expr,
-                          const SharedPtr<BindContext>& bind_context_ptr,
+                          BindContext* bind_context_ptr,
                           i64 depth,
                           bool root) {
     if(expr.star_) {

@@ -109,7 +109,7 @@ QueryBinder::BindSelect(const SelectStatement& statement) {
     if (statement.where_expr_) {
         auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr =
-                where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_, 0, true);
+                where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
 
         bound_select_statement->where_conditions_ =
                 SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
@@ -624,7 +624,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
 
     // SharedPtr<BaseExpression> on_condition_ptr
     auto on_condition_ptr = join_binder->BuildExpression(*from_table->condition_,
-                                                         this->bind_context_ptr_,
+                                                         this->bind_context_ptr_.get(),
                                                          0,
                                                          true);
 
@@ -741,7 +741,7 @@ QueryBinder::BuildGroupBy(SharedPtr<QueryContext>& query_context,
             const ParsedExpr& expr = *(*select.group_by_list_)[idx];
 
             // Call GroupBinder BuildExpression
-            SharedPtr<BaseExpression> group_by_expr = group_binder->Bind(expr, this->bind_context_ptr_, 0, true);
+            SharedPtr<BaseExpression> group_by_expr = group_binder->Bind(expr, this->bind_context_ptr_.get(), 0, true);
         }
 
         select_statement->group_by_expressions_ = bind_context_ptr_->group_exprs_;
@@ -763,7 +763,7 @@ QueryBinder::BuildHaving(SharedPtr<QueryContext>& query_context,
         // Set having binder
         auto having_binder = MakeShared<HavingBinder>(query_context, bind_alias_proxy);
         SharedPtr<BaseExpression> having_expr = having_binder->Bind(*(select.having_expr_),
-                                                                    bind_context_ptr_,
+                                                                    bind_context_ptr_.get(),
                                                                     0,
                                                                     true);
         select_statement->having_expressions_ = SplitExpressionByDelimiter(having_expr, ConjunctionType::kAnd);
@@ -798,7 +798,7 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
     for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
         const ParsedExpr* select_expr = bind_context_ptr_->select_expression_[column_id];
         SharedPtr<BaseExpression> bound_expr = project_binder->Bind(*select_expr,
-                                                                    this->bind_context_ptr_,
+                                                                    this->bind_context_ptr_.get(),
                                                                     0,
                                                                     true);
         String expr_name = bound_expr->ToString();
@@ -835,7 +835,7 @@ QueryBinder::BuildOrderBy(SharedPtr<QueryContext>& query_context,
     for(const OrderByExpr* order_expr: *statement.order_by_list) {
         bound_statement->order_by_types_.emplace_back(order_expr->type_);
         auto bound_order_expr = order_binder->Bind(*order_expr->expr_,
-                                                   this->bind_context_ptr_,
+                                                   this->bind_context_ptr_.get(),
                                                    0,
                                                    true);
         bound_statement->order_by_expressions_.emplace_back(bound_order_expr);
@@ -848,11 +848,11 @@ QueryBinder::BuildLimit(SharedPtr<QueryContext>& query_context,
                         SharedPtr<BoundSelectStatement>& bound_statement) const {
     auto limit_binder = MakeShared<LimitBinder>(query_context);
     bound_statement->limit_expression_
-            = limit_binder->Bind(*statement.limit_expr_, this->bind_context_ptr_, 0, true);
+            = limit_binder->Bind(*statement.limit_expr_, this->bind_context_ptr_.get(), 0, true);
 
     if(statement.offset_expr_ != nullptr) {
         bound_statement->offset_expression_
-                = limit_binder->Bind(*statement.offset_expr_, this->bind_context_ptr_, 0, true);
+                = limit_binder->Bind(*statement.offset_expr_, this->bind_context_ptr_.get(), 0, true);
     }
 }
 

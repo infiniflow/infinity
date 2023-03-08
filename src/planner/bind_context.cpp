@@ -16,10 +16,6 @@ BindContext::~BindContext() {
 void
 BindContext::Destroy() {
     // TODO: Bind context need to release the resource carefully.
-    if(parent_ != nullptr) {
-        parent_->Destroy();
-        parent_ = nullptr;
-    }
 
     // Release raw pointer
     for(auto* expr: select_expression_) {

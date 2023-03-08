@@ -11,7 +11,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 HavingBinder::BuildExpression(const ParsedExpr& expr,
-                              const SharedPtr<BindContext>& bind_context_ptr,
+                              BindContext* bind_context_ptr,
                               i64 depth,
                               bool root) {
 
@@ -62,7 +62,7 @@ HavingBinder::BuildExpression(const ParsedExpr& expr,
 
 SharedPtr<BaseExpression>
 HavingBinder::BuildColExpr(const ColumnExpr& expr,
-                           const SharedPtr<BindContext>& bind_context_ptr,
+                           BindContext* bind_context_ptr,
                            i64 depth,
                            bool root) {
 
@@ -85,7 +85,7 @@ HavingBinder::BuildColExpr(const ColumnExpr& expr,
 
 SharedPtr<BaseExpression>
 HavingBinder::BuildFuncExpr(const FunctionExpr& expr,
-                            const SharedPtr<BindContext>& bind_context_ptr,
+                            BindContext* bind_context_ptr,
                             i64 depth,
                             bool root) {
 

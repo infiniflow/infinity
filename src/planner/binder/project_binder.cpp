@@ -11,7 +11,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression>
 ProjectBinder::BuildExpression(const ParsedExpr& expr,
-                               const SharedPtr<BindContext>& bind_context_ptr,
+                               BindContext* bind_context_ptr,
                                i64 depth,
                                bool root) {
     String expr_name = expr.GetName();
@@ -54,7 +54,7 @@ ProjectBinder::BuildExpression(const ParsedExpr& expr,
 
 SharedPtr<BaseExpression>
 ProjectBinder::BuildFuncExpr(const FunctionExpr& expr,
-                             const SharedPtr<BindContext>& bind_context_ptr,
+                             BindContext* bind_context_ptr,
                              i64 depth,
                              bool root) {
 
@@ -92,7 +92,7 @@ ProjectBinder::BuildFuncExpr(const FunctionExpr& expr,
 
 SharedPtr<BaseExpression>
 ProjectBinder::BuildColExpr(const ColumnExpr& expr,
-                            const SharedPtr<BindContext>& bind_context_ptr,
+                            BindContext* bind_context_ptr,
                             i64 depth,
                             bool root) {
     auto bound_column_expr = ExpressionBinder::BuildColExpr(expr, bind_context_ptr, depth, root);

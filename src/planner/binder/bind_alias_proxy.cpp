@@ -10,7 +10,7 @@ namespace infinity {
 SharedPtr<BaseExpression>
 BindAliasProxy::BindAlias(ExpressionBinder& expression_binder,
                           const ParsedExpr& expr,
-                          const SharedPtr<BindContext>& bind_context_ptr,
+                          BindContext* bind_context_ptr,
                           i64 depth,
                           bool root) {
     String expr_name = expr.GetName();

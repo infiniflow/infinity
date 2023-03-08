@@ -33,7 +33,7 @@ OrderBinder::PushExtraExprToSelectList(ParsedExpr* expr, const SharedPtr<BindCon
 
 SharedPtr<BaseExpression>
 OrderBinder::BuildExpression(const ParsedExpr& expr,
-                             const SharedPtr<BindContext>& bind_context_ptr,
+                             BindContext* bind_context_ptr,
                              i64 depth,
                              bool root) {
     i64 column_id = -1;
