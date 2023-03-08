@@ -45,6 +45,9 @@ public:
     Vector<SharedPtr<BaseExpression>> aggregates_{};
     HashTable hash_table_;
 
+    void
+    SimpleAggregate(SharedPtr<Table>& output_table);
+
 private:
     SharedPtr<Table> input_table_{};
     u64 groupby_index_{};

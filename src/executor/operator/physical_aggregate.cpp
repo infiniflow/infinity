@@ -24,7 +24,13 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
 
     Vector<SharedPtr<ColumnDef>> groupby_columns;
     SizeT group_count = groups_.size();
-    ExecutorAssert(group_count > 0, "Aggregate without group by cases are not implemented now.");
+
+    if(group_count == 0) {
+        // Aggregate without group by expression
+        // e.g. SELECT count(a) FROM table;
+        SimpleAggregate(this->output_);
+        return ;
+    }
 
     groupby_columns.reserve(group_count);
 
@@ -115,7 +121,7 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
         }
 
         // output aggregate table definition
-        SharedPtr<TableDef> aggregate_tabledef = TableDef::Make("aggregate", groupby_columns);
+        SharedPtr<TableDef> aggregate_tabledef = TableDef::Make("aggregate", aggregate_columns);
         output_aggregate_table = Table::Make(aggregate_tabledef, TableType::kAggregate);
 
         // Loop blocks
@@ -124,18 +130,23 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
         for(SizeT block_idx = 0; block_idx < input_data_block_count; ++ block_idx) {
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_types);
-
-            const SharedPtr<DataBlock>& block_ptr = grouped_input_table->GetDataBlockById(block_idx);
+            Vector<SharedPtr<DataBlock>> input_blocks{grouped_input_table->GetDataBlockById(block_idx)};
 //            block_map[groupby_index_] = block_ptr;
 //            block_map[input_table_index_] = block_ptr;
             // Loop aggregate expression
             ExpressionEvaluator evaluator;
             for(SizeT expr_idx = 0; expr_idx < aggregates_count; ++ expr_idx) {
+                Vector<SharedPtr<ColumnVector>> blocks_column;
+                blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
                 evaluator.Execute(aggregates_[expr_idx],
                                   expr_states[expr_idx],
-                                  block_ptr,
-                                  block_ptr->row_count(),
-                                  output_data_block->column_vectors[expr_idx]);
+                                  input_blocks,
+                                  blocks_column);
+                if(blocks_column[0].get() != output_data_block->column_vectors[expr_idx].get()) {
+                    // column vector in blocks column might be changed to the column vector from column reference.
+                    // This check and assignment is to make sure the right column vector are assign to output_data_block
+                    output_data_block->column_vectors[expr_idx] = blocks_column[0];
+                }
             }
 
             output_data_block->Finalize();
@@ -532,4 +543,65 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
 #endif
 }
 
+void
+PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
+    SizeT aggregates_count = aggregates_.size();
+    ExecutorAssert(aggregates_count > 0, "Simple Aggregate without aggregate expression");
+
+    // Prepare the output table columns
+    Vector<SharedPtr<ColumnDef>> aggregate_columns;
+    aggregate_columns.reserve(aggregates_count);
+
+    // Prepare the expression states
+    Vector<SharedPtr<ExpressionState>> expr_states;
+    expr_states.reserve(aggregates_.size());
+
+    // Prepare the output block
+    Vector<DataType> output_types;
+    output_types.reserve(aggregates_count);
+
+    SizeT input_data_block_count = input_table_->DataBlockCount();
+    for (i64 idx = 0; auto &expr: aggregates_) {
+        // expression state
+        expr_states.emplace_back(ExpressionState::CreateState(expr, input_data_block_count));
+
+        // column definition
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
+                                                             expr->Type(),
+                                                             expr->ToString(),
+                                                             HashSet<ConstraintType>());
+        aggregate_columns.emplace_back(col_def);
+
+        // for output block
+        output_types.emplace_back(expr->Type());
+
+        ++idx;
+    }
+
+    // output aggregate table definition
+    SharedPtr<TableDef> aggregate_tabledef = TableDef::Make("aggregate", aggregate_columns);
+    output_table = Table::Make(aggregate_tabledef, TableType::kAggregate);
+
+    SharedPtr<DataBlock> output_data_block = DataBlock::Make();
+    output_data_block->Init(output_types);
+    // Loop blocks
+
+    ExpressionEvaluator evaluator;
+    for (SizeT expr_idx = 0; expr_idx < aggregates_count; ++expr_idx) {
+        Vector<SharedPtr<ColumnVector>> blocks_column;
+        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
+        evaluator.Execute(aggregates_[expr_idx],
+                          expr_states[expr_idx],
+                          input_table_->data_blocks_,
+                          blocks_column);
+        if(blocks_column[0].get() != output_data_block->column_vectors[expr_idx].get()) {
+            // column vector in blocks column might be changed to the column vector from column reference.
+            // This check and assignment is to make sure the right column vector are assign to output_data_block
+            output_data_block->column_vectors[expr_idx] = blocks_column[0];
+        }
+    }
+
+    output_data_block->Finalize();
+    output_table->Append(output_data_block);
+}
 }

@@ -107,8 +107,9 @@ DataBlock::Finalize() {
             continue;
         } else {
             if(first_flat_column_vector) {
-                StorageAssert(row_count == column_vectors[idx]->Size(),
-                              "Column vectors in same data block have different size.")
+                if(row_count != column_vectors[idx]->Size()) {
+                    StorageError("Column vectors in same data block have different size.")
+                }
             } else {
                 first_flat_column_vector = true;
                 row_count = column_vectors[idx]->Size();

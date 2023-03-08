@@ -216,7 +216,7 @@ ExpressionExecutor::Execute(const SharedPtr<AggregateExpression>& expr,
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    SharedPtr<ColumnVector>& child_output = child_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& child_output = child_state->OutputColumnVectors()[0];
     Execute(child_expr, child_state, child_output, count);
 
     ExecutorError("Aggregate function isn't implemented yet.");
@@ -232,7 +232,7 @@ ExpressionExecutor::Execute(const SharedPtr<CastExpression>& expr,
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    SharedPtr<ColumnVector>& child_output = child_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& child_output = child_state->OutputColumnVectors()[0];
     Execute(child_expr, child_state, child_output, count);
 
     ExecutorError("Cast function isn't implemented yet.");
@@ -257,7 +257,7 @@ ExpressionExecutor::Execute(const SharedPtr<ConjunctionExpression>& expr,
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    SharedPtr<ColumnVector>& left_output = left_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& left_output = left_state->OutputColumnVectors()[0];
     Execute(left_expr, left_state, left_output, count);
 
     // Process right child expression
@@ -266,7 +266,7 @@ ExpressionExecutor::Execute(const SharedPtr<ConjunctionExpression>& expr,
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    SharedPtr<ColumnVector>& right_output = right_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& right_output = right_state->OutputColumnVectors()[0];
     Execute(right_expr, right_state, right_output, count);
 
     ExecutorError("Conjunction function isn't implemented yet.");
@@ -293,7 +293,7 @@ ExpressionExecutor::Execute(const SharedPtr<FunctionExpression>& expr,
     for(SizeT i = 0; i < argument_count; ++ i) {
         SharedPtr<ExpressionState>& argument_state = state->Children()[i];
         SharedPtr<BaseExpression>& argument_expr = expr->arguments()[i];
-        SharedPtr<ColumnVector>& argument_output = argument_state->OutputColumnVector();
+        SharedPtr<ColumnVector>& argument_output = argument_state->OutputColumnVectors()[0];
         Execute(argument_expr, argument_state, argument_output, count);
         output_columns.emplace_back(argument_output);
     }
@@ -311,19 +311,19 @@ ExpressionExecutor::Execute(const SharedPtr<BetweenExpression>& expr,
     // Lower expression execution
     SharedPtr<ExpressionState>& lower_state = state->Children()[0];
     SharedPtr<BaseExpression>& lower_expr = expr->arguments()[0];
-    SharedPtr<ColumnVector>& lower_output = lower_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& lower_output = lower_state->OutputColumnVectors()[0];
     Execute(lower_expr, lower_state, lower_output, count);
 
     // Input expression execution
     SharedPtr<ExpressionState>& input_state = state->Children()[1];
     SharedPtr<BaseExpression>& input_expr = expr->arguments()[1];
-    SharedPtr<ColumnVector>& input_output = input_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& input_output = input_state->OutputColumnVectors()[0];
     Execute(input_expr, input_state, input_output, count);
 
     // Upper expression execution
     SharedPtr<ExpressionState>& upper_state = state->Children()[1];
     SharedPtr<BaseExpression>& upper_expr = expr->arguments()[1];
-    SharedPtr<ColumnVector>& upper_output = upper_state->OutputColumnVector();
+    SharedPtr<ColumnVector>& upper_output = upper_state->OutputColumnVectors()[0];
     Execute(input_expr, input_state, input_output, count);
 
     ExecutorError("Between expression execution isn't implemented yet.");

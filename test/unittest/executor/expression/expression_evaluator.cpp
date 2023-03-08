@@ -85,15 +85,20 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
         SharedPtr<DataBlock> data_block = DataBlock::Make();
         DataType data_type(LogicalType::kBigInt);
         data_block->Init({data_type});
+        Vector<SharedPtr<DataBlock>> input_blocks;
+        input_blocks.emplace_back(data_block);
 
         SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
 
         output_column_vector->Initialize();
+        Vector<SharedPtr<ColumnVector>> blocks_column;
+        blocks_column.emplace_back(output_column_vector);
+
         expr_evaluator.Execute(func_expr,
                                expr_state,
-                               data_block,
-                               0,
-                               output_column_vector);
+                               input_blocks,
+                               blocks_column);
+        // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), 0);
     }
 
@@ -116,9 +121,21 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
             EXPECT_EQ(value.value_.big_int, i64(i));
         }
 
+        Vector<SharedPtr<DataBlock>> input_blocks;
+        input_blocks.emplace_back(data_block);
+
         SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
         output_column_vector->Initialize();
-        expr_evaluator.Execute(func_expr, expr_state, data_block, row_count, output_column_vector);
+
+        Vector<SharedPtr<ColumnVector>> blocks_column;
+        blocks_column.emplace_back(output_column_vector);
+
+        expr_evaluator.Execute(func_expr,
+                               expr_state,
+                               input_blocks,
+                               blocks_column);
+
+        // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), row_count);
 
         for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
@@ -179,9 +196,20 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
         DataType data_type(LogicalType::kBigInt);
         data_block->Init({data_type});
 
+        Vector<SharedPtr<DataBlock>> input_blocks;
+        input_blocks.emplace_back(data_block);
+
         SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
         output_column_vector->Initialize();
-        expr_evaluator.Execute(func_expr, expr_state, data_block, 0, output_column_vector);
+
+        Vector<SharedPtr<ColumnVector>> blocks_column;
+        blocks_column.emplace_back(output_column_vector);
+
+        expr_evaluator.Execute(func_expr,
+                               expr_state,
+                               input_blocks,
+                               blocks_column);
+        // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), 0);
     }
 
@@ -198,6 +226,9 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
             column_ptr->AppendValue(value);
         }
         data_block->Init({column_ptr});
+        Vector<SharedPtr<DataBlock>> input_blocks;
+        input_blocks.emplace_back(data_block);
+
         for(SizeT i = 0; i < row_count; ++ i) {
             Value value = data_block->GetValue(0, i);
             EXPECT_EQ(value.type().type(), LogicalType::kBigInt);
@@ -206,7 +237,15 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
 
         SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
         output_column_vector->Initialize();
-        expr_evaluator.Execute(func_expr, expr_state, data_block, row_count, output_column_vector);
+
+        Vector<SharedPtr<ColumnVector>> blocks_column;
+        blocks_column.emplace_back(output_column_vector);
+
+        expr_evaluator.Execute(func_expr,
+                               expr_state,
+                               input_blocks,
+                               blocks_column);
+        // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), row_count);
 
         for(SizeT row_id = 0; row_id < row_count; ++ row_id) {

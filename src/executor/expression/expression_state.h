@@ -24,48 +24,48 @@ class ExpressionState {
 public:
     // Static functions
     static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<BaseExpression>& expression);
+    CreateState(const SharedPtr<BaseExpression>& expression, SizeT block_count = 1);
 
     static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<AggregateExpression>& agg_expr);
+    CreateState(const SharedPtr<AggregateExpression>& agg_expr, SizeT block_count);
 
     static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<BetweenExpression>& agg_expr);
+    CreateState(const SharedPtr<BetweenExpression>& agg_expr, SizeT block_count);
 
     static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<CaseExpression>& agg_expr);
+    CreateState(const SharedPtr<CaseExpression>& agg_expr, SizeT block_count);
 
     static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<CastExpression>& agg_expr);
+    CreateState(const SharedPtr<CastExpression>& agg_expr, SizeT block_count);
 
     static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<ReferenceExpression>& agg_expr);
+    CreateState(const SharedPtr<ReferenceExpression>& agg_expr, SizeT block_count);
 
     static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<ConjunctionExpression>& agg_expr);
+    CreateState(const SharedPtr<ConjunctionExpression>& agg_expr, SizeT block_count);
 
     static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<FunctionExpression>& agg_expr);
+    CreateState(const SharedPtr<FunctionExpression>& agg_expr, SizeT block_count);
 
     static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<ValueExpression>& agg_expr);
+    CreateState(const SharedPtr<ValueExpression>& agg_expr, SizeT block_count);
 public:
     void
-    AddChild(const SharedPtr<BaseExpression>& expression);
+    AddChild(const SharedPtr<BaseExpression>& expression, SizeT block_count);
 
     Vector<SharedPtr<ExpressionState>>&
     Children() {
         return children_;
     }
 
-    SharedPtr<ColumnVector>&
-    OutputColumnVector() {
-        return output_data_block_.column_vectors[0];
+    Vector<SharedPtr<ColumnVector>>&
+    OutputColumnVectors() {
+        return column_vectors_;
     }
 private:
     Vector<SharedPtr<ExpressionState>> children_;
     String name_;
-    DataBlock output_data_block_;
+    Vector<SharedPtr<ColumnVector>> column_vectors_;
 };
 
 }
