@@ -132,14 +132,14 @@ DateType::ConvertFromString(const char* date_ptr, SizeT length, DateType& date) 
             continue;
         }
         if(std::isdigit(date_ptr[pos])) {
-            year += (date_ptr[pos] - '0') * 10;
+            year = year * 10 + (date_ptr[pos] - '0');
             ++ pos;
             if(year > 9999) return false;
             continue;
         }
         break;
     }
-    if(date_ptr[pos] != '-' or date_ptr[pos] != '/') {
+    if(date_ptr[pos] != '-' && date_ptr[pos] != '/') {
         return false;
     }
     ++ pos; // skip - and /
@@ -152,14 +152,14 @@ DateType::ConvertFromString(const char* date_ptr, SizeT length, DateType& date) 
             continue;
         }
         if(std::isdigit(date_ptr[pos])) {
-            month += (date_ptr[pos] - '0') * 10;
+            month = month * 10 + (date_ptr[pos] - '0');
             ++ pos;
             if(month > 12) return false;
             continue;
         }
         break;
     }
-    if(date_ptr[pos] != '-' or date_ptr[pos] != '/') {
+    if(date_ptr[pos] != '-' && date_ptr[pos] != '/') {
         return false;
     }
     ++ pos; // skip - and /
@@ -172,7 +172,7 @@ DateType::ConvertFromString(const char* date_ptr, SizeT length, DateType& date) 
             continue;
         }
         if(std::isdigit(date_ptr[pos])) {
-            day += (date_ptr[pos] - '0') * 10;
+            day = day * 10 + (date_ptr[pos] - '0');
             ++ pos;
             if(day > 31) return false;
             continue;
@@ -180,7 +180,7 @@ DateType::ConvertFromString(const char* date_ptr, SizeT length, DateType& date) 
         break;
     }
 
-    if(pos >= length) {
+    if(pos > length) {
         return false;
     }
 
