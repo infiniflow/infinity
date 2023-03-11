@@ -64,13 +64,13 @@ TEST_F(LogicalPlannerTpchTest, test1) {
 //        SQLRunner::Run(input_sql, false);
 //    }
 //
-//    // Insert LINEITEM table
-//    {
-//        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_lineitem.sql";
-//        std::ifstream t(ddl_sql.c_str());
-//        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-//        SQLRunner::Run(input_sql, false);
-//    }
+    // Insert LINEITEM table
+    {
+        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_lineitem.sql";
+        std::ifstream t(ddl_sql.c_str());
+        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+        SQLRunner::Run(input_sql, false);
+    }
 //
 //    // Insert NATION table
 //    {
@@ -88,34 +88,42 @@ TEST_F(LogicalPlannerTpchTest, test1) {
 //        SQLRunner::Run(input_sql, false);
 //    }
 
-    // Insert PARTS table
-    {
-        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_parts.sql";
-        std::ifstream t(ddl_sql.c_str());
-        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-        SQLRunner::Run(input_sql, false);
-    }
+//    // Insert PARTS table
+//    {
+//        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_parts.sql";
+//        std::ifstream t(ddl_sql.c_str());
+//        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+//        SQLRunner::Run(input_sql, false);
+//    }
+//
+//    // Insert PARTSUPP table
+//    {
+//        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_partsupp.sql";
+//        std::ifstream t(ddl_sql.c_str());
+//        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+//        SQLRunner::Run(input_sql, false);
+//    }
+//
+//    // Insert REGION table
+//    {
+//        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_region.sql";
+//        std::ifstream t(ddl_sql.c_str());
+//        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+//        SQLRunner::Run(input_sql, false);
+//    }
+//
+//    // Insert SUPPLIER table
+//    {
+//        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_supplier.sql";
+//        std::ifstream t(ddl_sql.c_str());
+//        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+//        SQLRunner::Run(input_sql, false);
+//    }
 
-    // Insert PARTSUPP table
     {
-        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_partsupp.sql";
-        std::ifstream t(ddl_sql.c_str());
-        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-        SQLRunner::Run(input_sql, false);
-    }
-
-    // Insert REGION table
-    {
-        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_region.sql";
-        std::ifstream t(ddl_sql.c_str());
-        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-        SQLRunner::Run(input_sql, false);
-    }
-
-    // Insert SUPPLIER table
-    {
-        String ddl_sql = String(TEST_DATA_PATH) + "/tpch/insert_supplier.sql";
-        std::ifstream t(ddl_sql.c_str());
+        // Q1
+        String sql_text = String(TEST_DATA_PATH) + "/tpch/q01.sql";
+        std::ifstream t(sql_text.c_str());
         String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
         SQLRunner::Run(input_sql, false);
     }

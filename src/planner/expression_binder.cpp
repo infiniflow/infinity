@@ -96,14 +96,44 @@ ExpressionBinder::BuildValueExpr(const ConstantExpr& expr,
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kDate: {
-            // TODO: convert from date string (expr.name) to date int64
-            PlannerError("Date isn't supported during binding period.");
+            SizeT date_str_len = std::strlen(expr.date_value_);
+            DateT date_value;
+            date_value.FromString(expr.date_value_, date_str_len);
+            Value value = Value::MakeDate(date_value);
+            return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kInterval: {
             // IntervalT should be a struct including the type of the value and an value of the interval
             // It will be bound into a ValueExpression here.
-            PlannerError("Interval isn't supported during binding period.");
-            break;
+            IntervalT interval_value(expr.integer_value_);
+            switch(expr.interval_type_) {
+                case IntervalExprType::kSecond: {
+                    interval_value.unit = TimeUnit::kSecond;
+                    break;
+                }
+                case IntervalExprType::kMinute: {
+                    interval_value.unit = TimeUnit::kMinute;
+                    break;
+                }
+                case IntervalExprType::kHour: {
+                    interval_value.unit = TimeUnit::kHour;
+                    break;
+                }
+                case IntervalExprType::kDay: {
+                    interval_value.unit = TimeUnit::kDay;
+                    break;
+                }
+                case IntervalExprType::kMonth: {
+                    interval_value.unit = TimeUnit::kMonth;
+                    break;
+                }
+                case IntervalExprType::kYear: {
+                    interval_value.unit = TimeUnit::kYear;
+                    break;
+                }
+            }
+            Value value = Value::MakeInterval(interval_value);
+            return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kBoolean: {
             Value value = Value::MakeBool(expr.bool_value_);
@@ -137,6 +167,20 @@ ExpressionBinder::BuildFuncExpr(const FunctionExpr& expr,
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
 
     CheckFuncType(function_set_ptr->type_);
+
+    // Check if it is count(*)
+    if(function_set_ptr->name() == "COUNT") {
+        if(expr.arguments_->size() == 1) {
+            if((*expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
+                ColumnExpr* col_expr = (ColumnExpr*)(*expr.arguments_)[0];
+                if(col_expr->star_) {
+                    delete (*expr.arguments_)[0];
+                    (*expr.arguments_)[0] = new ConstantExpr(LiteralType::kBoolean);
+                }
+            }
+        }
+    }
+
 
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(expr.arguments_->size());

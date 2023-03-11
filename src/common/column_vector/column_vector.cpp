@@ -1563,8 +1563,9 @@ ColumnVector::AppendByPtr(const ptr_t value_ptr) {
 
 void
 ColumnVector::ShallowCopy(const ColumnVector &other) {
-    StorageAssert(this->data_type_ == other.data_type_,
-                  "Attempt to shallow copy: " + other.data_type_.ToString() + "column vector to: " + this->data_type_.ToString());
+    if(this->data_type_ != other.data_type_) {
+        StorageError("Attempt to shallow copy: " + other.data_type_.ToString() + " column vector to: " + this->data_type_.ToString());
+    }
     if(this->buffer_ != other.buffer_) {
         this->buffer_ = other.buffer_;
     }

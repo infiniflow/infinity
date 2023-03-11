@@ -9,7 +9,9 @@ namespace infinity {
 ColumnIdentifier
 ColumnIdentifier::MakeColumnIdentifier(SharedPtr<QueryContext>& query_context,
                                        const ColumnExpr& expr) {
-    PlannerAssert(expr.star_ == false, "Star expression should be unfolded before.")
+    if(expr.star_) {
+        PlannerError("Star expression should be unfolded before.");
+    }
 
     SharedPtr<String> db_name_ptr = nullptr;
     SharedPtr<String> schema_name_ptr = nullptr;
