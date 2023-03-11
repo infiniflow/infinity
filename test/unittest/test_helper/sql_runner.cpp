@@ -61,12 +61,13 @@ SQLRunner::Run(const String& sql_text, bool print) {
         query_result.result_ = pipeline->GetResult();
         query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
-        if(query_result.result_ == nullptr) {
-            LOG_TRACE("No result!\n");
-        } else{
-            LOG_TRACE("{}\n", query_result.ToString());
-        }
+//        if(query_result.result_ == nullptr) {
+//            LOG_TRACE("No result!");
+//        } else{
+//            LOG_TRACE("{}", query_result.ToString());
+//        }
     }
+    LOG_TRACE("{} statements executed.", statement_count);
     parsed_result->Reset();
     return String();
 }

@@ -44,11 +44,55 @@ TEST_F(VarcharTest, varchar_cast0) {
             EXPECT_EQ(v1.ToString(), s1);
 
             BooleanT target{false};
-            TryCastVarchar::Run(v1, target);
+            bool result = TryCastVarchar::Run(v1, target);
             EXPECT_TRUE(target);
+            EXPECT_TRUE(result);
         }
 
         s1 = "false";
+        {
+            VarcharType v1;
+            v1.Initialize(s1);
+            EXPECT_EQ(v1.length, s1.length());
+            EXPECT_EQ(v1.ToString(), s1);
+
+            BooleanT target{true};
+            bool result = TryCastVarchar::Run(v1, target);
+            EXPECT_FALSE(target);
+            EXPECT_TRUE(result);
+        }
+
+        s1 = "falsk";
+        {
+            VarcharType v1;
+            v1.Initialize(s1);
+            EXPECT_EQ(v1.length, s1.length());
+            EXPECT_EQ(v1.ToString(), s1);
+
+            BooleanT target{true};
+            bool result = TryCastVarchar::Run(v1, target);
+            EXPECT_FALSE(result);
+        }
+    }
+
+    {
+        auto varchar_info = VarcharInfo::Make(65);
+        DataType source_type(LogicalType::kVarchar, varchar_info);
+        String s1 = "-128";
+
+        {
+            VarcharType v1;
+            v1.Initialize(s1);
+            EXPECT_EQ(v1.length, s1.length());
+            EXPECT_EQ(v1.ToString(), s1);
+
+            TinyIntT target{0};
+            bool result = TryCastVarchar::Run(v1, target);
+            EXPECT_TRUE(result);
+            EXPECT_EQ(target, -128);
+        }
+
+        s1 = "127";
         {
             DataType target_type(LogicalType::kBoolean);
 
@@ -57,9 +101,39 @@ TEST_F(VarcharTest, varchar_cast0) {
             EXPECT_EQ(v1.length, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
-            BooleanT target{true};
-            TryCastVarchar::Run(v1, target);
-            EXPECT_FALSE(target);
+            TinyIntT target{0};
+            bool result = TryCastVarchar::Run(v1, target);
+            EXPECT_TRUE(result);
+            EXPECT_EQ(target, 127);
+        }
+
+        s1 = "190";
+        {
+            DataType target_type(LogicalType::kBoolean);
+
+            VarcharType v1;
+            v1.Initialize(s1);
+            EXPECT_EQ(v1.length, s1.length());
+            EXPECT_EQ(v1.ToString(), s1);
+
+            TinyIntT target{0};
+            bool result = TryCastVarchar::Run(v1, target);
+            EXPECT_TRUE(result);
+        }
+
+        s1 = "abc";
+        {
+            DataType target_type(LogicalType::kBoolean);
+
+            VarcharType v1;
+            v1.Initialize(s1);
+            EXPECT_EQ(v1.length, s1.length());
+            EXPECT_EQ(v1.ToString(), s1);
+
+            TinyIntT target{0};
+            bool result = TryCastVarchar::Run(v1, target);
+            EXPECT_FALSE(result);
+            EXPECT_EQ(target, 0);
         }
     }
 }

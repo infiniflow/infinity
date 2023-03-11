@@ -9,10 +9,14 @@
 #include "common/types/data_type.h"
 #include "common/types/internal_types.h"
 #include "common/utility/infinity_assert.h"
+#include "common/types/info/char_info.h"
+#include "common/types/info/varchar_info.h"
 
 namespace infinity {
 
 struct TryCastVarchar;
+struct TryCastVarcharToChar;
+struct TryCastVarcharToVarchar;
 
 inline static BoundCastFunc
 BindVarcharCast(const DataType& source, const DataType& target) {
@@ -55,7 +59,10 @@ BindVarcharCast(const DataType& source, const DataType& target) {
             NotImplementError("Varchar to Decimal128")
         }
         case kChar: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, CharT, TryCastVarchar>);
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorWithType<VarcharT, CharT, TryCastVarcharToChar>);
+        }
+        case kVarchar: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<VarcharT, VarcharT, TryCastVarcharToVarchar>);
         }
         case kDate: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DateT, TryCastVarchar>);
@@ -70,7 +77,7 @@ BindVarcharCast(const DataType& source, const DataType& target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, TimestampT, TryCastVarchar>);
         }
         case kTimestampTZ: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, TimestampTZT, TryCastVarchar>);
+            NotImplementError("Cast from varchar to timstamp_tz")
         }
         case kInterval: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, IntervalT, TryCastVarchar>);
@@ -166,10 +173,17 @@ template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, TinyIntT& target) {
     i64 value{0};
+    char *endptr{nullptr};
+    SizeT len{0};
     if(source.IsInlined()) {
-        value = std::strtol(source.prefix, nullptr, 10);
+        value = std::strtol(source.prefix, &endptr, 10);
+        len = (endptr - source.prefix);
     } else {
-        value = std::strtol(source.ptr, nullptr, 10);
+        value = std::strtol(source.ptr, &endptr, 10);
+        len = (endptr - source.ptr);
+    }
+    if(len != source.length) {
+        return false;
     }
     target = static_cast<TinyIntT>(value);
     return true;
@@ -180,10 +194,15 @@ template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, SmallIntT& target) {
     i64 value{0};
+    char *endptr{nullptr};
+    SizeT len{0};
     if(source.IsInlined()) {
-        value = std::strtol(source.prefix, nullptr, 10);
+        value = std::strtol(source.prefix, &endptr, 10);
     } else {
-        value = std::strtol(source.ptr, nullptr, 10);
+        value = std::strtol(source.ptr, &endptr, 10);
+    }
+    if(len != source.length) {
+        return false;
     }
     target = static_cast<SmallIntT>(value);
     return true;
@@ -194,10 +213,15 @@ template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, IntegerT& target) {
     i64 value{0};
+    char *endptr{nullptr};
+    SizeT len{0};
     if(source.IsInlined()) {
-        value = std::strtol(source.prefix, nullptr, 10);
+        value = std::strtol(source.prefix, &endptr, 10);
     } else {
-        value = std::strtol(source.ptr, nullptr, 10);
+        value = std::strtol(source.ptr, &endptr, 10);
+    }
+    if(len != source.length) {
+        return false;
     }
     target = static_cast<IntegerT>(value);
     return true;
@@ -207,10 +231,15 @@ TryCastVarchar::Run(const VarcharT& source, IntegerT& target) {
 template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, i64& target) {
+    char *endptr{nullptr};
+    SizeT len{0};
     if(source.IsInlined()) {
-        target = std::strtol(source.prefix, nullptr, 10);
+        target = std::strtol(source.prefix, &endptr, 10);
     } else {
-        target = std::strtol(source.ptr, nullptr, 10);
+        target = std::strtol(source.ptr, &endptr, 10);
+    }
+    if(len != source.length) {
+        return false;
     }
     return true;
 }
@@ -226,10 +255,15 @@ TryCastVarchar::Run(const VarcharT& source, HugeIntT& target) {
 template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, FloatT& target) {
+    char *endptr{nullptr};
+    SizeT len{0};
     if(source.IsInlined()) {
-        target = std::strtof(source.prefix, nullptr);
+        target = std::strtof(source.prefix, &endptr);
     } else {
-        target = std::strtof(source.ptr, nullptr);
+        target = std::strtof(source.ptr, &endptr);
+    }
+    if(len != source.length) {
+        return false;
     }
     return true;
 }
@@ -238,12 +272,145 @@ TryCastVarchar::Run(const VarcharT& source, FloatT& target) {
 template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, DoubleT& target) {
+    char *endptr{nullptr};
+    SizeT len{0};
     if(source.IsInlined()) {
-        target = std::strtod(source.prefix, nullptr);
+        target = std::strtod(source.prefix, &endptr);
     } else {
-        target = std::strtod(source.ptr, nullptr);
+        target = std::strtod(source.ptr, &endptr);
+    }
+    if(len != source.length) {
+        return false;
     }
     return true;
 }
+
+// Cast VarcharT to DateT type
+template<>
+inline bool
+TryCastVarchar::Run(const VarcharT& source, DateT& target) {
+    if(source.IsInlined()) {
+        target.FromString(source.prefix, source.length);
+    } else {
+        target.FromString(source.ptr, source.length);
+    }
+    return true;
+}
+
+// Cast VarcharT to TimeT type
+template<>
+inline bool
+TryCastVarchar::Run(const VarcharT& source, TimeT& target) {
+    NotImplementError("Cast from varchar to time")
+    return true;
+}
+
+// Cast VarcharT to DateTimeT type
+template<>
+inline bool
+TryCastVarchar::Run(const VarcharT& source, DateTimeT& target) {
+    NotImplementError("Cast from varchar to datetime")
+    return true;
+}
+
+// Cast VarcharT to TimestampT type
+template<>
+inline bool
+TryCastVarchar::Run(const VarcharT& source, TimestampT& target) {
+    NotImplementError("Cast from varchar to timestamp")
+    return true;
+}
+
+// Cast VarcharT to IntervalT type
+template<>
+inline bool
+TryCastVarchar::Run(const VarcharT& source, IntervalT& target) {
+    NotImplementError("Cast from varchar to interval")
+    return true;
+}
+
+struct TryCastVarcharToChar {
+    template<typename SourceType, typename TargetType>
+    static inline bool
+    Run(const SourceType& source,
+        const DataType& source_type,
+        TargetType &target,
+        const DataType& target_type){
+        FunctionError("Not support to cast from " + source_type.ToString()
+                      + " to " + target_type.ToString());
+    }
+};
+
+// Cast VarcharT to CharT type
+template<>
+inline bool
+TryCastVarcharToChar::Run(const VarcharT& source,
+                          const DataType& source_type,
+                          CharT& target,
+                          const DataType& target_type) {
+    SizeT char_len_limit = ((CharInfo*)(target_type.type_info().get()))->length_limit();
+
+    SizeT transferred_bytes{0};
+    if(source.length <= char_len_limit) {
+        transferred_bytes = source.length;
+    } else {
+        transferred_bytes = char_len_limit;
+    }
+    if(source.IsInlined()) {
+        memcpy(target.ptr, source.prefix, transferred_bytes);
+    } else {
+        memcpy(target.ptr, source.ptr, transferred_bytes);
+    }
+    return true;
+}
+
+struct TryCastVarcharToVarchar {
+    template<typename SourceType, typename TargetType>
+    static inline bool
+    Run(const SourceType& source,
+        const DataType& source_type,
+        TargetType &target,
+        const DataType& target_type,
+        const SharedPtr<ColumnVector>& vector_ptr){
+        FunctionError("Not support to cast from " + source_type.ToString()
+                      + " to " + target_type.ToString());
+    }
+};
+
+// Cast VarcharT to CharT type
+template<>
+inline bool
+TryCastVarcharToVarchar::Run(const VarcharT& source,
+                             const DataType& source_type,
+                             VarcharT & target,
+                             const DataType& target_type,
+                             const SharedPtr<ColumnVector>& vector_ptr) {
+
+    SizeT varchar_len_limit = ((VarcharInfo*)(target_type.type_info().get()))->length_limit();
+
+    SizeT transferred_bytes{0};
+    if(source.length <= varchar_len_limit) {
+        transferred_bytes = source.length;
+    } else {
+        transferred_bytes = varchar_len_limit;
+    }
+
+    if(transferred_bytes <= VarcharT::INLINE_LENGTH) {
+        // inline varchar
+        memcpy(target.prefix, source.ptr, transferred_bytes);
+        memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - transferred_bytes);
+    } else {
+        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
+                   "Varchar column vector should use MemoryVectorBuffer. ");
+        // Set varchar prefix
+        memcpy(target.prefix, source.ptr, VarcharT::PREFIX_LENGTH);
+
+        ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(transferred_bytes);
+        memcpy(ptr, source.ptr, transferred_bytes);
+        target.ptr = ptr;
+    }
+    return true;
+}
+
 
 }

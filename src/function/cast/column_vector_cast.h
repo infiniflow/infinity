@@ -72,6 +72,33 @@ struct TryCastValueToVarlen {
 };
 
 template<typename Operator>
+struct TryCastValueWithType {
+    // Now, this class is used to cast value to CharT
+    template<typename SourceValueType, typename TargetValueType>
+    inline static void
+    Execute(const SourceValueType& input, TargetValueType& result, Bitmask* nulls_ptr, size_t idx, void* state_ptr) {
+        auto* cast_data_ptr = (ColumnVectorCastData*)(state_ptr);
+//        LOG_TRACE("{}, {}", cast_data_ptr->source_type_.ToString(), cast_data_ptr->target_type_.ToString());
+        if(Operator::template Run<SourceValueType, TargetValueType>(input,
+                                                                    cast_data_ptr->source_type_,
+                                                                    result,
+                                                                    cast_data_ptr->target_type_)) {
+            return ;
+        }
+
+        nulls_ptr->SetFalse(idx);
+        result = NullValue<TargetValueType>();
+
+        auto* data_ptr = (ColumnVectorCastData*)(state_ptr);
+        // This convert is failed
+        data_ptr->all_converted_ = false;
+//        data_ptr->source_type_  =
+//        data_ptr->target_type_  =
+//        data_ptr->result_ref_
+    }
+};
+
+template<typename Operator>
 struct TryCastValueToVarlenWithType {
     template<typename SourceValueType, typename TargetValueType>
     inline static void
@@ -126,6 +153,13 @@ template <class SourceType, class TargetType, class Operator>
 inline static bool
 TryCastColumnVectorToVarlenWithType(const SharedPtr<ColumnVector>&source, SharedPtr<ColumnVector>&target, size_t count, CastParameters &parameters) {
     bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValueToVarlenWithType<Operator>>(source, target, count, parameters);
+    return result;
+}
+
+template <class SourceType, class TargetType, class Operator>
+inline static bool
+TryCastColumnVectorWithType(const SharedPtr<ColumnVector>&source, SharedPtr<ColumnVector>&target, size_t count, CastParameters &parameters) {
+    bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValueWithType<Operator>>(source, target, count, parameters);
     return result;
 }
 

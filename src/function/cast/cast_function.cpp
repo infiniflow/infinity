@@ -6,6 +6,7 @@
 #include "bool_cast.h"
 #include "integer_cast.h"
 #include "float_cast.h"
+#include "varchar_cast.h"
 
 namespace infinity {
 
@@ -83,7 +84,7 @@ CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
         }
         case kVarchar: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
+            return BindVarcharCast(source, target);
         }
         case kDate: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
