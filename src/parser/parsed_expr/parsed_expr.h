@@ -15,6 +15,7 @@ enum class ParsedExprType {
     kParameter,
     kColumn,
     kFunction,
+    kBetween,
     kOperator,
     kSubquery,
     kCase,

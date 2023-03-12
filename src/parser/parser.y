@@ -1590,13 +1590,11 @@ conjunction_expr: expr AND expr {
 };
 
 between_expr: operand BETWEEN operand AND operand {
-    FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = "between_and";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
-    func_expr->arguments_->emplace_back($1);
-    func_expr->arguments_->emplace_back($3);
-    func_expr->arguments_->emplace_back($5);
-    $$ = func_expr;
+    BetweenExpr* between_expr = new BetweenExpr();
+    between_expr->value_ = $1;
+    between_expr->upper_bound_ = $3;
+    between_expr->lower_bound_ = $5;
+    $$ = between_expr;
 }
 
 in_expr: operand IN '(' expr_array ')' {

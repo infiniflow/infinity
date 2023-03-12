@@ -45,6 +45,12 @@ public:
                     bool root);
 
     virtual SharedPtr<BaseExpression>
+    BuildBetweenExpr(const BetweenExpr& expr,
+                     BindContext* bind_context_ptr,
+                     i64 depth,
+                     bool root);
+
+    virtual SharedPtr<BaseExpression>
     BuildValueExpr(const ConstantExpr& expr,
                    BindContext* bind_context_ptr,
                    i64 depth,

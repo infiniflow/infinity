@@ -59,6 +59,9 @@ ExpressionBinder::BuildExpression(const ParsedExpr& expr,
             // subquery expression
             return BuildSubquery((const SubqueryExpr&)expr, bind_context_ptr, SubqueryType::kScalar, depth, root);
         }
+        case ParsedExprType::kBetween: {
+            return BuildBetweenExpr((const BetweenExpr&)expr, bind_context_ptr, depth, root);
+        }
         case ParsedExprType::kCase: {
             return BuildCaseExpr((const CaseExpr&)expr, bind_context_ptr, depth, root);
         }
@@ -72,6 +75,57 @@ ExpressionBinder::BuildExpression(const ParsedExpr& expr,
     }
 
     return SharedPtr<BaseExpression>();
+}
+
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildBetweenExpr(const BetweenExpr& expr,
+                                   BindContext* bind_context_ptr,
+                                   i64 depth,
+                                   bool root) {
+    auto value_ptr = BuildExpression(*expr.value_, bind_context_ptr, depth, false);
+    auto lower_ptr = BuildExpression(*expr.lower_bound_, bind_context_ptr, depth, false);
+    auto upper_ptr = BuildExpression(*expr.upper_bound_, bind_context_ptr, depth, false);
+
+    auto &catalog = Infinity::instance().catalog();
+    SharedPtr<FunctionExpression> left_function_expr{nullptr}, right_function_expr{nullptr};
+
+    {
+        String left_func = ">";
+        Vector<SharedPtr<BaseExpression>> arguments;
+        arguments.reserve(2);
+        arguments.emplace_back(value_ptr);
+        arguments.emplace_back(lower_ptr);
+        SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(left_func);
+        CheckFuncType(function_set_ptr->type_);
+        auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+        ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
+        left_function_expr = MakeShared<FunctionExpression>(scalar_function, arguments);
+    }
+
+    {
+        String left_func = "<";
+        Vector<SharedPtr<BaseExpression>> arguments;
+        arguments.reserve(2);
+        arguments.emplace_back(value_ptr);
+        arguments.emplace_back(upper_ptr);
+        SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(left_func);
+        CheckFuncType(function_set_ptr->type_);
+        auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+        ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
+        right_function_expr = MakeShared<FunctionExpression>(scalar_function, arguments);
+    }
+
+    String and_func = "and";
+    Vector<SharedPtr<BaseExpression>> arguments;
+    arguments.reserve(2);
+    arguments.emplace_back(left_function_expr);
+    arguments.emplace_back(right_function_expr);
+
+    SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(and_func);
+    CheckFuncType(function_set_ptr->type_);
+    auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+    ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
+    return MakeShared<FunctionExpression>(scalar_function, arguments);
 }
 
 SharedPtr<BaseExpression>

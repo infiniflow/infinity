@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "parsed_expr/between_expr.h"
 #include "parsed_expr/constant_expr.h"
 #include "parsed_expr/column_expr.h"
 #include "parsed_expr/function_expr.h"
