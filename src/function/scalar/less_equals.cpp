@@ -108,7 +108,7 @@ RegisterLessEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateLessEqualsFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
 //    GenerateLessEqualsFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
-//    GenerateLessEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
+    GenerateLessEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
 //    GenerateLessEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
 //    GenerateLessEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
 //    GenerateLessEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));

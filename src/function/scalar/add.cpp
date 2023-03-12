@@ -114,6 +114,20 @@ AddFunction::Run(Decimal128T left, Decimal128T right, Decimal128T& result) {
     NotImplementError("Decimal128 + Decimal128");
 }
 
+// Date + Interval
+template<>
+inline bool
+AddFunction::Run(DateT left, IntervalT right, DateT& result) {
+    return DateT::Add(left, right, result);
+}
+
+// Interval + Date
+template<>
+inline bool
+AddFunction::Run(IntervalT left, DateT right, DateT& result) {
+    return DateT::Add(right, left, result);
+}
+
 // DateTime + Interval
 template<>
 inline bool
@@ -275,6 +289,20 @@ RegisterAddFunction(const UniquePtr<Catalog> &catalog_ptr) {
             { DataType(LogicalType::kDecimal128) },
             &ScalarFunction::BinaryFunctionWithFailure<Decimal128T, Decimal128T, Decimal128T, AddFunction>);
     function_set_ptr->AddFunction(add_function_decimal128);
+
+    ScalarFunction add_function_date_interval(
+            func_name,
+            { DataType(LogicalType::kDate), DataType(LogicalType::kInterval) },
+            { DataType(LogicalType::kDate) },
+            &ScalarFunction::BinaryFunctionWithFailure<DateT, IntervalT, DateT, AddFunction>);
+    function_set_ptr->AddFunction(add_function_date_interval);
+
+    ScalarFunction add_function_interval_date(
+            func_name,
+            { DataType(LogicalType::kInterval), DataType(LogicalType::kDate) },
+            { DataType(LogicalType::kDate) },
+            &ScalarFunction::BinaryFunctionWithFailure<DateT, IntervalT, DateT, AddFunction>);
+    function_set_ptr->AddFunction(add_function_interval_date);
 
     ScalarFunction add_function_datetime_interval(
             func_name,

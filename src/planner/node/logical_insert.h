@@ -64,6 +64,8 @@ public:
                     auto* from_type_info = (VarcharInfo*)from.type_info().get();
                     auto* to_type_info = (VarcharInfo*)to.type_info().get();
                     if(to_type_info->length_limit() >= from_type_info->length_limit()) {
+                        // Unify the length limit of insert varchar
+                        from_type_info->UpdateLengthLimit(to_type_info->length_limit());
                         return false;
                     }
                     break;
@@ -72,6 +74,8 @@ public:
                     auto* from_type_info = (CharInfo*)from.type_info().get();
                     auto* to_type_info = (CharInfo*)to.type_info().get();
                     if(to_type_info->length_limit() >= from_type_info->length_limit()) {
+                        // Unify the length limit of insert char
+                        from_type_info->UpdateLengthLimit(to_type_info->length_limit());
                         return false;
                     }
                     break;

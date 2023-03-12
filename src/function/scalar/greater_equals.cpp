@@ -108,7 +108,7 @@ RegisterGreaterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateGreaterEqualsFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
 //    GenerateGreaterEqualsFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
-//    GenerateGreaterEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
+    GenerateGreaterEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
 //    GenerateGreaterEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
 //    GenerateGreaterEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
 //    GenerateGreaterEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));

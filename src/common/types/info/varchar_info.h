@@ -20,7 +20,7 @@ public:
     Make();
 
     explicit
-    VarcharInfo(size_t limit) : TypeInfo(TypeInfoType::kVarchar), length_limit_(limit) {}
+    VarcharInfo(SizeT limit) : TypeInfo(TypeInfoType::kVarchar), length_limit_(limit) {}
 
     ~VarcharInfo() override = default;
 
@@ -28,14 +28,19 @@ public:
     operator==(const TypeInfo& other) const override;
 
     // Varchar type costs 16 bytes.
-    [[nodiscard]] size_t
+    [[nodiscard]] SizeT
     Size() const override {  return 16u; }
 
-    [[nodiscard]] size_t
+    [[nodiscard]] SizeT
     length_limit() const { return length_limit_; }
 
+    inline void
+    UpdateLengthLimit(SizeT new_length_limit) {
+        length_limit_ = new_length_limit;
+    }
+
 private:
-    size_t length_limit_ {0};
+    SizeT length_limit_ {0};
 };
 
 }

@@ -135,12 +135,12 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
 //            block_map[input_table_index_] = block_ptr;
             // Loop aggregate expression
             ExpressionEvaluator evaluator;
+            evaluator.Init(input_blocks);
             for(SizeT expr_idx = 0; expr_idx < aggregates_count; ++ expr_idx) {
                 Vector<SharedPtr<ColumnVector>> blocks_column;
                 blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
                 evaluator.Execute(aggregates_[expr_idx],
                                   expr_states[expr_idx],
-                                  input_blocks,
                                   blocks_column);
                 if(blocks_column[0].get() != output_data_block->column_vectors[expr_idx].get()) {
                     // column vector in blocks column might be changed to the column vector from column reference.
@@ -251,13 +251,26 @@ PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, Shared
                             NotImplementError("Decimal128 data shuffle isn't implemented.")
                         }
                         case kVarchar: {
-                            NotImplementError("Varchar data shuffle isn't implemented.")
+                            VarcharT& dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx];
+                            VarcharT& src_ref = ((VarcharT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            if(src_ref.IsInlined()) {
+                                memcpy((char*)&dst_ref, (char*)&src_ref, sizeof(VarcharT));
+                            } else {
+                                dst_ref.length = src_ref.length;
+                                memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
+
+                                dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->heap_mgr_->Allocate(src_ref.length);
+                                memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
+                            }
+                            break;
                         }
                         case kChar: {
                             NotImplementError("Char data shuffle isn't implemented.")
                         }
                         case kDate: {
-                            NotImplementError("Date data shuffle isn't implemented.")
+                            ((DateT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
+                                    = ((DateT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            break;
                         }
                         case kTime: {
                             NotImplementError("Time data shuffle isn't implemented.")
@@ -381,13 +394,26 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
                     NotImplementError("Decimal128 data shuffle isn't implemented.")
                 }
                 case kVarchar: {
-                    NotImplementError("Varchar data shuffle isn't implemented.")
+                    VarcharT& dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
+                    VarcharT& src_ref = ((VarcharT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    if(src_ref.IsInlined()) {
+                        memcpy((char*)&dst_ref, (char*)&src_ref, sizeof(VarcharT));
+                    } else {
+                        dst_ref.length = src_ref.length;
+                        memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
+
+                        dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->heap_mgr_->Allocate(src_ref.length);
+                        memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
+                    }
+                    break;
                 }
                 case kChar: {
                     NotImplementError("Char data shuffle isn't implemented.")
                 }
                 case kDate: {
-                    NotImplementError("Date data shuffle isn't implemented.")
+                    ((DateT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
+                            = ((DateT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    break;
                 }
                 case kTime: {
                     NotImplementError("Time data shuffle isn't implemented.")
@@ -587,12 +613,12 @@ PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
     // Loop blocks
 
     ExpressionEvaluator evaluator;
+    evaluator.Init(input_table_->data_blocks_);
     for (SizeT expr_idx = 0; expr_idx < aggregates_count; ++expr_idx) {
         Vector<SharedPtr<ColumnVector>> blocks_column;
         blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
         evaluator.Execute(aggregates_[expr_idx],
                           expr_states[expr_idx],
-                          input_table_->data_blocks_,
                           blocks_column);
         if(blocks_column[0].get() != output_data_block->column_vectors[expr_idx].get()) {
             // column vector in blocks column might be changed to the column vector from column reference.

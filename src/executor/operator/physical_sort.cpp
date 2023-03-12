@@ -134,7 +134,17 @@ public:
                     NotImplementError("Decimal128 comparation isn't implemented.")
                 }
                 case kVarchar: {
-                    NotImplementError("Varchar comparation isn't implemented.")
+                    VarcharType& left_ref = ((VarcharType *)(left_column->data()))[left.offset];
+                    VarcharType& right_ref = ((VarcharType*)(right_column->data()))[right.offset];
+                    if(left_ref == right_ref) {
+                        continue;
+                    }
+
+                    if(order_type == OrderType::kAsc) {
+                        return left_ref < right_ref;
+                    } else {
+                        return left_ref > right_ref;
+                    }
                 }
                 case kChar: {
                     NotImplementError("Char comparation isn't implemented.")
@@ -342,7 +352,18 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
                         NotImplementError("Decimal128 data shuffle isn't implemented.")
                     }
                     case kVarchar: {
-                        NotImplementError("Varchar data shuffle isn't implemented.")
+                        VarcharT& dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
+                        VarcharT& src_ref = ((VarcharT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                        if(src_ref.IsInlined()) {
+                            memcpy((char*)&dst_ref, (char*)&src_ref, sizeof(VarcharT));
+                        } else {
+                            dst_ref.length = src_ref.length;
+                            memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
+
+                            dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->heap_mgr_->Allocate(src_ref.length);
+                            memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
+                        }
+                        break;
                     }
                     case kChar: {
                         NotImplementError("Char data shuffle isn't implemented.")

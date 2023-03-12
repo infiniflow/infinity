@@ -107,7 +107,7 @@ RegisterGreaterFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateGreaterFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
 //    GenerateGreaterFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
-//    GenerateGreaterFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
+    GenerateGreaterFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
 //    GenerateGreaterFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
 //    GenerateGreaterFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
 //    GenerateGreaterFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));

@@ -75,6 +75,147 @@ VarcharType::operator=(VarcharType&& other) noexcept {
     return *this;
 }
 
+bool
+VarcharType::operator==(const VarcharType& other) const {
+    if(this->length != other.length) return false;
+    if(this->IsInlined()) {
+        return strncmp(this->prefix, other.prefix, this->length) == 0;
+    } else {
+        if(strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH) != 0) {
+            return false;
+        }
+        return strncmp(this->ptr, other.ptr, this->length) == 0;
+    }
+}
+
+bool
+VarcharType::operator>(const VarcharType& other) const {
+    if(this->length > other.length) {
+        SizeT len = other.length;
+        if(this->IsInlined()) {
+            if(other.IsInlined()) {
+                return strncmp(this->prefix, other.prefix, len) >= 0;
+            } else {
+                // Impossible: this is inline but other isn't.
+            }
+        } else {
+            // This isn't inline.
+            if(other.IsInlined()) {
+                int res = strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH);
+                if(res != 0) {
+                    return res > 0;
+                }
+
+                return strncmp(this->ptr, other.prefix, len) > 0;
+            } else {
+                int res = strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH);
+                if(res != 0) {
+                    return res > 0;
+                }
+                return strncmp(this->ptr, other.ptr, len) > 0;
+            }
+        }
+    } else {
+        // this->length <= other.length
+        SizeT len = this->length;
+        if(this->IsInlined()) {
+            if(other.IsInlined()) {
+                return strncmp(this->prefix, other.prefix, len) > 0;
+            } else {
+                // Impossible.
+            }
+        } else {
+            if(other.IsInlined()) {
+                int res = strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH);
+                if(res != 0) {
+                    return res > 0;
+                }
+
+                return strncmp(this->ptr, other.prefix, len) > 0;
+            } else {
+                int res = strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH);
+                if(res != 0) {
+                    return res > 0;
+                }
+                return strncmp(this->ptr, other.ptr, len) > 0;
+            }
+        }
+    }
+    ExecutorError("Not reachable")
+}
+
+bool
+VarcharType::operator<=(const VarcharType& other) const {
+    return !operator>(other);
+}
+
+bool
+VarcharType::operator<(const VarcharType& other) const {
+    if(this->length > other.length) {
+        SizeT len = other.length;
+        if(this->IsInlined()) {
+            if(other.IsInlined()) {
+                return strncmp(this->prefix, other.prefix, len) < 0;
+            } else {
+                // Impossible: this is inline but other isn't.
+            }
+        } else {
+            // This isn't inline.
+            if(other.IsInlined()) {
+                int res = strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH);
+                if(res != 0) {
+                    return res < 0;
+                }
+
+                return strncmp(this->ptr, other.prefix, len) < 0;
+            } else {
+                int res = strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH);
+                if(res != 0) {
+                    return res < 0;
+                }
+                return strncmp(this->ptr, other.ptr, len) < 0;
+            }
+        }
+    } else {
+        // this->length <= other.length
+        SizeT len = this->length;
+        if(this->IsInlined()) {
+            if(other.IsInlined()) {
+                return strncmp(this->prefix, other.prefix, len) > 0;
+            } else {
+                // Impossible.
+            }
+        } else {
+            if(other.IsInlined()) {
+                int res = strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH);
+                if(res > 0) {
+                    return true;
+                } else if (res < 0) {
+                    return false;
+                }
+
+                return strncmp(this->ptr, other.prefix, len) > 0;
+            } else {
+                int res = strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH);
+                if(res > 0) {
+                    return true;
+                } else if (res < 0) {
+                    return false;
+                }
+                return strncmp(this->ptr, other.ptr, len) > 0;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool
+VarcharType::operator>=(const VarcharType& other) const {
+    return !operator<(other);
+}
+
+
 
 void
 VarcharType::DeepCopy(const VarcharType &other) {

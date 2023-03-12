@@ -6,6 +6,7 @@
 
 #include "common/types/internal_types.h"
 #include "common/utility/infinity_assert.h"
+#include "interval_type.h"
 
 namespace infinity {
 
@@ -47,9 +48,38 @@ private:
     IsDateValid(i32 year, i32 month, i32 day);
 
 public:
+    inline bool
+    operator==(const DateType& other) const {
+        return this->value == other.value;
+    }
 
+    inline bool
+    operator>=(const DateType& other) const {
+        return this->value >= other.value;
+    }
 
+    inline bool
+    operator>(const DateType& other) const {
+        return this->value > other.value;
+    }
 
+    inline bool
+    operator<=(const DateType& other) const {
+        return this->value <= other.value;
+    }
+
+    inline bool
+    operator<(const DateType& other) const {
+        return this->value < other.value;
+    }
+
+public:
+    // Operation
+    static bool
+    Add(DateType input, IntervalType interval, DateType& output);
+
+    static bool
+    Subtract(DateType input, IntervalType interval, DateType& output);
 };
 
 }

@@ -19,6 +19,9 @@ constexpr static i32 EPOCH_YEAR = 1970;
 
 constexpr static i32 YEAR_LEAP = 400;
 constexpr static i32 DAYS_PER_YEAR_LEAP = 146097;
+constexpr static i32 DAY_HOUR = 24;
+constexpr static i32 DAY_MINUTE = DAY_HOUR * 60;
+constexpr static i32 DAY_SECOND = DAY_MINUTE * 60;
 
 static const i32
 NORMAL_DAYS[13] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -184,13 +187,7 @@ DateType::ConvertFromString(const char* date_ptr, SizeT length, DateType& date) 
         return false;
     }
 
-    if(!IsDateValid(year, month, day)) {
-        return false;
-    }
-
-    YMD2Date(year, month, day, date);
-
-    return true;
+    return YMD2Date(year, month, day, date);
 }
 
 bool
@@ -331,6 +328,96 @@ DateType::IsDateValid(i32 year, i32 month, i32 day) {
     } else {
         return day <= NORMAL_DAYS[month];
     }
+}
+
+bool
+DateType::Add(DateType input, IntervalType interval, DateType& output) {
+    switch(interval.unit) {
+        case kYear: {
+            i32 year{0}, month{0}, day{0};
+            if(!Date2YMD(input.value, year, month, day)) {
+                return false;
+            }
+            year += interval.value;
+            return YMD2Date(year, month, day, output);
+        }
+        case kMonth: {
+            i32 year{0}, month{0}, day{0};
+            if(!Date2YMD(input.value, year, month, day)) {
+                return false;
+            }
+            year += interval.value / 12;
+            month += interval.value % 12;
+            return YMD2Date(year, month, day, output);
+        }
+        case kDay: {
+            input.value += interval.value;
+            output = input;
+            return true;
+        }
+        case kHour: {
+            input.value += interval.value / DAY_HOUR;
+            output = input;
+            return true;
+        }
+        case kMinute: {
+            input.value += interval.value / DAY_MINUTE;
+            return true;
+        }
+        case kSecond: {
+            input.value += interval.value / DAY_SECOND;
+            return true;
+        }
+        case kInvalidUnit: {
+            ExecutorError("Invalid interval unit.");
+        }
+    }
+    return false;
+}
+
+bool
+DateType::Subtract(DateType input, IntervalType interval, DateType& output) {
+    switch(interval.unit) {
+        case kYear: {
+            i32 year{0}, month{0}, day{0};
+            if(!Date2YMD(input.value, year, month, day)) {
+                return false;
+            }
+            year -= interval.value;
+            return YMD2Date(year, month, day, output);
+        }
+        case kMonth: {
+            i32 year{0}, month{0}, day{0};
+            if(!Date2YMD(input.value, year, month, day)) {
+                return false;
+            }
+            year -= interval.value / 12;
+            month -= interval.value % 12;
+            return YMD2Date(year, month, day, output);
+        }
+        case kDay: {
+            input.value -= interval.value;
+            output = input;
+            return true;
+        }
+        case kHour: {
+            input.value -= interval.value / DAY_HOUR;
+            output = input;
+            return true;
+        }
+        case kMinute: {
+            input.value -= interval.value / DAY_MINUTE;
+            return true;
+        }
+        case kSecond: {
+            input.value -= interval.value / DAY_SECOND;
+            return true;
+        }
+        case kInvalidUnit: {
+            ExecutorError("Invalid interval unit.");
+        }
+    }
+    return false;
 }
 
 }

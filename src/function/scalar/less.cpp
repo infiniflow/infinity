@@ -109,7 +109,7 @@ RegisterLessFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateLessFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
 //    GenerateLessFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
-//    GenerateLessFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
+    GenerateLessFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
 //    GenerateLessFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
 //    GenerateLessFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
 //    GenerateLessFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));

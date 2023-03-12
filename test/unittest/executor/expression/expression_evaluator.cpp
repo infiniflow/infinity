@@ -94,9 +94,9 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
         Vector<SharedPtr<ColumnVector>> blocks_column;
         blocks_column.emplace_back(output_column_vector);
 
+        expr_evaluator.Init(input_blocks);
         expr_evaluator.Execute(func_expr,
                                expr_state,
-                               input_blocks,
                                blocks_column);
         // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), 0);
@@ -130,9 +130,9 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
         Vector<SharedPtr<ColumnVector>> blocks_column;
         blocks_column.emplace_back(output_column_vector);
 
+        expr_evaluator.Init(input_blocks);
         expr_evaluator.Execute(func_expr,
                                expr_state,
-                               input_blocks,
                                blocks_column);
 
         // blocks_column[0] == output_column_vector
@@ -205,9 +205,9 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
         Vector<SharedPtr<ColumnVector>> blocks_column;
         blocks_column.emplace_back(output_column_vector);
 
+        expr_evaluator.Init(input_blocks);
         expr_evaluator.Execute(func_expr,
                                expr_state,
-                               input_blocks,
                                blocks_column);
         // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), 0);
@@ -241,9 +241,9 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
         Vector<SharedPtr<ColumnVector>> blocks_column;
         blocks_column.emplace_back(output_column_vector);
 
+        expr_evaluator.Init(input_blocks);
         expr_evaluator.Execute(func_expr,
                                expr_state,
-                               input_blocks,
                                blocks_column);
         // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), row_count);

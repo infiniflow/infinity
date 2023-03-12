@@ -33,6 +33,11 @@ public:
     [[nodiscard]] SizeT
     length_limit() const { return length_limit_; }
 
+    inline void
+    UpdateLengthLimit(SizeT new_length_limit) {
+        length_limit_ = new_length_limit;
+    }
+
 private:
     SizeT length_limit_ {0};
 };

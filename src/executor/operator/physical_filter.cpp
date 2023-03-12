@@ -31,24 +31,50 @@ PhysicalFilter::Init() {
 void
 PhysicalFilter::Execute(SharedPtr<QueryContext>& query_context) {
     // Get input from left child
-    executor.Init({condition_});
     input_table_ = left_->output();
     ExecutorAssert(input_table_ != nullptr, "No input.");
 
-    Vector<SharedPtr<ColumnDef>> columns;
-    columns.reserve(1);
-    for(SizeT idx = 0; idx < 1; ++ idx) {
-        DataType col_type(LogicalType::kBoolean);
-        String col_name = "bool_col";
-
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type,col_name, HashSet<ConstraintType>());
-        columns.emplace_back(col_def);
-    }
-    SharedPtr<TableDef> table_def = TableDef::Make("selected", columns);
-    SharedPtr<Table> selected_table = Table::Make(table_def, TableType::kIntermediate);
-
     // Execute the expression on the input table
-    executor.Select(input_table_, selected_table);
+    SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
+
+    // Output data block column types
+    Vector<DataType> output_types;
+    SizeT column_count = input_table_->ColumnCount();
+    output_types.reserve(column_count);
+
+    Vector<SharedPtr<ColumnDef>> columns;
+    columns.reserve(column_count);
+
+    for(SizeT idx = 0; idx < column_count; ++ idx) {
+        DataType column_type = input_table_->GetColumnTypeById(idx);
+        String column_name = input_table_->GetColumnNameById(idx);
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
+                                                             column_type,
+                                                             column_name,
+                                                             HashSet<ConstraintType>());
+        columns.emplace_back(col_def);
+
+        output_types.emplace_back(column_type);
+    }
+    SharedPtr<TableDef> selected_table_def = TableDef::Make("selected", columns);
+    SharedPtr<Table> selected_table = Table::Make(selected_table_def, TableType::kIntermediate);
+
+    SizeT input_data_block_count = input_table_->DataBlockCount();
+    for(SizeT idx = 0; idx < input_data_block_count; ++ idx) {
+        SharedPtr<DataBlock> input_data_block = input_table_->GetDataBlockById(idx);
+        SizeT row_count = input_data_block->row_count();
+        SharedPtr<DataBlock> output_data_block = DataBlock::Make();
+
+        SizeT selected_count = selector_.Select(condition_,
+                                                condition_state,
+                                                input_data_block,
+                                                output_data_block,
+                                                row_count);
+
+        if(selected_count > 0) {
+            selected_table->Append(output_data_block);
+        }
+    }
 
     output_ = selected_table;
 }

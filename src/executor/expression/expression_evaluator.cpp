@@ -9,16 +9,8 @@
 namespace infinity {
 
 void
-ExpressionEvaluator::Execute(const SharedPtr<BaseExpression>& expression,
-                             SharedPtr<ExpressionState>& state,
-                             const Vector<SharedPtr<DataBlock>>& input_data_block,
-                             Vector<SharedPtr<ColumnVector>>& output_column_vector) {
+ExpressionEvaluator::Init(const Vector<SharedPtr<DataBlock>>& input_data_block) {
     input_data_blocks_ = input_data_block;
-    ExecutorAssert(state != nullptr, "Expression state need to be initialized before.")
-    ExecutorAssert(expression != nullptr, "No expression.")
-
-    // output_column_vector needs to be initialized before.
-    Execute(expression, state, output_column_vector);
 }
 
 void

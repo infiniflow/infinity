@@ -31,15 +31,26 @@ public:
                 const SharedPtr<ColumnVector>& input_column_vector) {
         // Loop execute state update according to the input column vector
 
-        if(input_column_vector->vector_type_ == ColumnVectorType::kFlat) {
-            SizeT row_count = input_column_vector->Size();
-            auto* input_ptr = (InputType*)(input_column_vector->data());
-            for(SizeT idx = 0; idx < row_count; ++ idx) {
-                ((AggregateState*)state)->Update(input_ptr, idx);
+        switch(input_column_vector->vector_type_) {
+            case ColumnVectorType::kFlat: {
+                SizeT row_count = input_column_vector->Size();
+                auto* input_ptr = (InputType*)(input_column_vector->data());
+                for(SizeT idx = 0; idx < row_count; ++ idx) {
+                    ((AggregateState*)state)->Update(input_ptr, idx);
+                }
+                break;
             }
-
-        } else {
-            NotImplementError("Other type of column vector isn't implemented")
+            case ColumnVectorType::kConstant: {
+                auto* input_ptr = (InputType*)(input_column_vector->data());
+                ((AggregateState*)state)->Update(input_ptr, 0);
+                break;
+            }
+            case ColumnVectorType::kHeterogeneous: {
+                NotImplementError("Heterogeneous type isn't implemented")
+            }
+            default: {
+                NotImplementError("Other type of column vector isn't implemented")
+            }
         }
     }
 

@@ -128,6 +128,14 @@ TEST_F(LogicalPlannerTpchTest, test1) {
         SQLRunner::Run(input_sql, false);
     }
 
+//    {
+//        // Q6
+//        String sql_text = String(TEST_DATA_PATH) + "/tpch/q06.sql";
+//        std::ifstream t(sql_text.c_str());
+//        String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+//        SQLRunner::Run(input_sql, false);
+//    }
+
     // DROP tables;
     {
         String ddl_sql = String(TEST_DATA_PATH) + "/tpch/drop.sql";

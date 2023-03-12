@@ -110,6 +110,13 @@ SubFunction::Run(Decimal128T left, Decimal128T right, Decimal128T& result) {
     NotImplementError("Decimal128 - Decimal128");
 }
 
+// DateT - Interval
+template<>
+inline bool
+SubFunction::Run(DateT left, IntervalT right, DateT& result) {
+    return DateT::Subtract(left, right, result);
+}
+
 // DateTime - Interval
 template<>
 inline bool
@@ -249,6 +256,13 @@ RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
             { DataType(LogicalType::kDecimal128) },
             &ScalarFunction::BinaryFunctionWithFailure<Decimal128T, Decimal128T, Decimal128T, SubFunction>);
     function_set_ptr->AddFunction(sub_function_decimal128);
+
+    ScalarFunction sub_function_date_interval(
+            func_name,
+            { DataType(LogicalType::kDate), DataType(LogicalType::kInterval) },
+            { DataType(LogicalType::kDate) },
+            &ScalarFunction::BinaryFunctionWithFailure<DateT, IntervalT, DateT, SubFunction>);
+    function_set_ptr->AddFunction(sub_function_date_interval);
 
     ScalarFunction sub_function_datetime_interval(
             func_name,

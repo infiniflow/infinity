@@ -13,10 +13,7 @@ namespace infinity {
 class ExpressionEvaluator {
 public:
     void
-    Execute(const SharedPtr<BaseExpression>& expression,
-            SharedPtr<ExpressionState>& state,
-            const Vector<SharedPtr<DataBlock>>& input_data_block,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
+    Init(const Vector<SharedPtr<DataBlock>>& input_data_block);
 
     void
     Execute(const SharedPtr<BaseExpression>& expr,

@@ -34,7 +34,23 @@ public:
     VarcharType(VarcharType&& other) noexcept;
     VarcharType& operator=(const VarcharType& other);
     VarcharType& operator=(VarcharType&& other) noexcept;
+public:
+    bool
+    operator==(const VarcharType& other) const;
 
+    bool
+    operator>=(const VarcharType& other) const;
+
+    bool
+    operator>(const VarcharType& other) const;
+
+    bool
+    operator<=(const VarcharType& other) const;
+
+    bool
+    operator<(const VarcharType& other) const;
+
+public:
     void
     DeepCopy(const VarcharType& other);
 

@@ -109,7 +109,7 @@ RegisterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateEqualsFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
 //    GenerateEqualsFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
-//    GenerateEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
+    GenerateEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
 //    GenerateEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
 //    GenerateEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
 //    GenerateEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));

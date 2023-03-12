@@ -7,6 +7,7 @@
 #include "executor/physical_operator.h"
 #include "expression/base_expression.h"
 #include "executor/expression/expression_executor.h"
+#include "executor/expression/expression_selector.h"
 
 namespace infinity {
 
@@ -32,6 +33,7 @@ private:
     const SharedPtr<BaseExpression>& condition_;
 
     ExpressionExecutor executor;
+    ExpressionSelector selector_;
 
     SharedPtr<Table> input_table_{};
 };

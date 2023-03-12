@@ -51,6 +51,11 @@ PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
 void
 PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
     SizeT column_count = value_list_.size();
+    if(column_count != table_ptr_->ColumnCount()) {
+        ExecutorError(fmt::format("Insert values count{} isn't matched with table column count{}.",
+                                  column_count,
+                                  table_ptr_->ColumnCount()));
+    }
 
     // Prepare the expression states
     Vector<SharedPtr<ExpressionState>> expr_states;
@@ -72,12 +77,12 @@ PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
     Vector<SharedPtr<DataBlock>> input_blocks{};
 
     ExpressionEvaluator evaluator;
+    evaluator.Init(input_blocks);
     for(SizeT expr_idx = 0; expr_idx < column_count; ++ expr_idx) {
         Vector<SharedPtr<ColumnVector>> blocks_column;
         blocks_column.emplace_back(output_block->column_vectors[expr_idx]);
         evaluator.Execute(value_list_[expr_idx],
                           expr_states[expr_idx],
-                          input_blocks,
                           blocks_column);
         if(blocks_column[0].get() != output_block->column_vectors[expr_idx].get()) {
             ExecutorError("Unexpected error");
