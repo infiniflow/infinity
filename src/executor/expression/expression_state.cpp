@@ -17,12 +17,8 @@ ExpressionState::CreateState(const SharedPtr<BaseExpression> &expression, SizeT 
             return CreateState(std::static_pointer_cast<CastExpression>(expression), block_count);
         case ExpressionType::kCase:
             return CreateState(std::static_pointer_cast<CaseExpression>(expression), block_count);
-        case ExpressionType::kConjunction:
-            return CreateState(std::static_pointer_cast<ConjunctionExpression>(expression), block_count);
         case ExpressionType::kFunction:
             return CreateState(std::static_pointer_cast<FunctionExpression>(expression), block_count);
-        case ExpressionType::kBetween:
-            return CreateState(std::static_pointer_cast<BetweenExpression>(expression), block_count);
         case ExpressionType::kValue:
             return CreateState(std::static_pointer_cast<ValueExpression>(expression), block_count);
         case ExpressionType::kReference:
@@ -45,41 +41,6 @@ ExpressionState::CreateState(const SharedPtr<AggregateExpression>& agg_expr, Siz
     column->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
     result->column_vectors_.emplace_back(column);
 //    result->output_data_block_.Init({agg_expr->Type()});
-    return result;
-}
-
-SharedPtr<ExpressionState>
-ExpressionState::CreateState(const SharedPtr<BetweenExpression>& between_expr, SizeT block_count) {
-    ExecutorAssert(between_expr->arguments().size() == 3, "Between expression arguments error.");
-
-    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
-
-    // input expression
-    result->AddChild(between_expr->arguments()[0], block_count);
-
-    // lower expression
-    result->AddChild(between_expr->arguments()[1], block_count);
-
-    // upper expression
-    result->AddChild(between_expr->arguments()[2], block_count);
-
-    Vector<ColumnVectorType> result_column_vector_type(block_count, ColumnVectorType::kConstant);
-    for(SizeT idx = 0; idx < block_count; ++ idx) {
-        for(auto& child_state: result->Children()) {
-            // Once a child column vector isn't kConstant, the result column vector will be kFlat;
-            if(child_state->OutputColumnVectors()[idx]->vector_type() != ColumnVectorType::kConstant) {
-                result_column_vector_type[idx] = ColumnVectorType::kFlat;
-            }
-        }
-    }
-
-    result->column_vectors_.reserve(block_count);
-    for(SizeT idx = 0; idx < block_count; ++ idx) {
-        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(between_expr->Type());
-        column->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
-        result->column_vectors_.emplace_back(column);
-    }
-//    result->output_data_block_.Init({between_expr->Type()});
     return result;
 }
 
@@ -141,33 +102,6 @@ ExpressionState::CreateState(const SharedPtr<ReferenceExpression>& column_expr, 
         result->column_vectors_.emplace_back(column);
     }
 //    result->output_data_block_.Init({column});
-    return result;
-}
-
-SharedPtr<ExpressionState>
-ExpressionState::CreateState(const SharedPtr<ConjunctionExpression>& conjunction_expr, SizeT block_count) {
-    SharedPtr<ExpressionState> result = SharedPtr<ExpressionState>();
-    ExecutorAssert(conjunction_expr->arguments().size() == 2, "Conjunction function arguments error.");
-
-    result->AddChild(conjunction_expr->arguments()[0], block_count);
-    result->AddChild(conjunction_expr->arguments()[1], block_count);
-
-    Vector<ColumnVectorType> result_column_vector_type(block_count, ColumnVectorType::kConstant);
-    for(SizeT idx = 0; idx < block_count; ++ idx) {
-        for(auto& child_state: result->Children()) {
-            // Once a child column vector isn't kConstant, the result column vector will be kFlat;
-            if(child_state->OutputColumnVectors()[idx]->vector_type() != ColumnVectorType::kConstant) {
-                result_column_vector_type[idx] = ColumnVectorType::kFlat;
-            }
-        }
-    }
-
-    result->column_vectors_.reserve(block_count);
-    for(SizeT idx = 0; idx < block_count; ++ idx) {
-        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(conjunction_expr->Type());
-        column->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
-        result->column_vectors_.emplace_back(column);
-    }
     return result;
 }
 

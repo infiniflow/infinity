@@ -36,22 +36,12 @@ public:
             Vector<SharedPtr<ColumnVector>>& output_column_vector);
 
     void
-    Execute(const SharedPtr<ConjunctionExpression>& expr,
-            SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
-
-    void
     Execute(const SharedPtr<ColumnExpression>& expr,
             SharedPtr<ExpressionState>& state,
             Vector<SharedPtr<ColumnVector>>& output_column_vecto);
 
     void
     Execute(const SharedPtr<FunctionExpression>& expr,
-            SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
-
-    void
-    Execute(const SharedPtr<BetweenExpression>& expr,
             SharedPtr<ExpressionState>& state,
             Vector<SharedPtr<ColumnVector>>& output_column_vector);
 

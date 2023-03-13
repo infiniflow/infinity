@@ -25,14 +25,10 @@ ExpressionEvaluator::Execute(const SharedPtr<BaseExpression>& expr,
             return Execute(std::static_pointer_cast<CastExpression>(expr), state, output_column);
         case ExpressionType::kCase:
             return Execute(std::static_pointer_cast<CaseExpression>(expr), state, output_column);
-        case ExpressionType::kConjunction:
-            return Execute(std::static_pointer_cast<ConjunctionExpression>(expr), state, output_column);
         case ExpressionType::kColumn:
             return Execute(std::static_pointer_cast<ColumnExpression>(expr), state, output_column);
         case ExpressionType::kFunction:
             return Execute(std::static_pointer_cast<FunctionExpression>(expr), state, output_column);
-        case ExpressionType::kBetween:
-            return Execute(std::static_pointer_cast<BetweenExpression>(expr), state, output_column);
         case ExpressionType::kValue:
             return Execute(std::static_pointer_cast<ValueExpression>(expr), state, output_column);
         case ExpressionType::kReference:
@@ -108,31 +104,6 @@ ExpressionEvaluator::Execute(const SharedPtr<CaseExpression>& expr,
 }
 
 void
-ExpressionEvaluator::Execute(const SharedPtr<ConjunctionExpression>& expr,
-                             SharedPtr<ExpressionState>& state,
-                             Vector<SharedPtr<ColumnVector>>& output_column_vector) {
-    // Process left child expression
-    SharedPtr<ExpressionState>& left_state = state->Children()[0];
-    SharedPtr<BaseExpression>& left_expr = expr->arguments()[0];
-    // Create output chunk.
-    // TODO: Now output chunk is pre-allocate memory in expression state
-    // TODO: In the future, it can be implemented as on-demand allocation.
-    Vector<SharedPtr<ColumnVector>>& left_output = left_state->OutputColumnVectors();
-    Execute(left_expr, left_state, left_output);
-
-    // Process right child expression
-    SharedPtr<ExpressionState>& right_state = state->Children()[1];
-    SharedPtr<BaseExpression>& right_expr = expr->arguments()[1];
-    // Create output chunk.
-    // TODO: Now output chunk is pre-allocate memory in expression state
-    // TODO: In the future, it can be implemented as on-demand allocation.
-    Vector<SharedPtr<ColumnVector>>& right_output = right_state->OutputColumnVectors();
-    Execute(right_expr, right_state, right_output);
-
-    ExecutorError("Conjunction function isn't implemented yet.");
-}
-
-void
 ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression>& expr,
                              SharedPtr<ExpressionState>& state,
                              Vector<SharedPtr<ColumnVector>>& output_column_vector) {
@@ -167,33 +138,6 @@ ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression>& expr,
         func_input_data_block.Init(output_matrix[block_id]);
         expr->func_.function_(func_input_data_block, output_column_vector[block_id]);
     }
-}
-
-void
-ExpressionEvaluator::Execute(const SharedPtr<BetweenExpression>& expr,
-                             SharedPtr<ExpressionState>& state,
-                             Vector<SharedPtr<ColumnVector>>& output_column_vector) {
-
-    // Lower expression execution
-    SharedPtr<ExpressionState>& lower_state = state->Children()[0];
-    SharedPtr<BaseExpression>& lower_expr = expr->arguments()[0];
-    Vector<SharedPtr<ColumnVector>>& lower_output = lower_state->OutputColumnVectors();
-    Execute(lower_expr, lower_state, lower_output);
-
-    // Input expression execution
-    SharedPtr<ExpressionState>& input_state = state->Children()[1];
-    SharedPtr<BaseExpression>& input_expr = expr->arguments()[1];
-    Vector<SharedPtr<ColumnVector>>& input_output = input_state->OutputColumnVectors();
-    Execute(input_expr, input_state, input_output);
-
-    // Upper expression execution
-    SharedPtr<ExpressionState>& upper_state = state->Children()[1];
-    SharedPtr<BaseExpression>& upper_expr = expr->arguments()[1];
-    Vector<SharedPtr<ColumnVector>>& upper_output = upper_state->OutputColumnVectors();
-    Execute(input_expr, input_state, input_output);
-
-    ExecutorError("Between expression execution isn't implemented yet.");
-
 }
 
 void

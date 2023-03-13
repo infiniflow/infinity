@@ -30,9 +30,6 @@ public:
     CreateState(const SharedPtr<AggregateExpression>& agg_expr, SizeT block_count);
 
     static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<BetweenExpression>& agg_expr, SizeT block_count);
-
-    static SharedPtr<ExpressionState>
     CreateState(const SharedPtr<CaseExpression>& agg_expr, SizeT block_count);
 
     static SharedPtr<ExpressionState>
@@ -40,9 +37,6 @@ public:
 
     static SharedPtr<ExpressionState>
     CreateState(const SharedPtr<ReferenceExpression>& agg_expr, SizeT block_count);
-
-    static SharedPtr<ExpressionState>
-    CreateState(const SharedPtr<ConjunctionExpression>& agg_expr, SizeT block_count);
 
     static SharedPtr<ExpressionState>
     CreateState(const SharedPtr<FunctionExpression>& agg_expr, SizeT block_count);
