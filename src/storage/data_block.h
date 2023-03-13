@@ -65,6 +65,9 @@ public:
     void
     UnionWith(const SharedPtr<DataBlock>& other);
 
+    void
+    AppendWith(const SharedPtr<DataBlock>& other);
+
 public:
     [[nodiscard]] inline SizeT
     column_count() const {

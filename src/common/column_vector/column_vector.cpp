@@ -21,7 +21,9 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
         // If the vector is constant, all elements are the same, so the select is meaningless.
         capacity_ = other.capacity();
     } else {
-        capacity_ = input_select.Size();
+//        capacity_ = input_select.Size();
+        // Select size might not be the power of 2. Then, we use DEFAULT_VECTOR_SIZE;
+        capacity_ = DEFAULT_VECTOR_SIZE;
     }
 
 
@@ -503,6 +505,10 @@ ColumnVector::CopyRow(const ColumnVector& other, SizeT dst_idx, SizeT src_idx) {
         tail_index_ = 1;
     } else {
         StorageAssert(dst_idx < tail_index_, "Attempting to access invalid position of target column vector");
+    }
+    if(other.vector_type_ == ColumnVectorType::kConstant) {
+        // Copy from constant vector, only first row have value.
+        src_idx = 0;
     }
 
     StorageAssert(src_idx < other.tail_index_, "Attempting to access invalid position of source column vector");
@@ -1559,6 +1565,353 @@ ColumnVector::AppendByPtr(const ptr_t value_ptr) {
     StorageAssert(tail_index_ < capacity_,
                   fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
     SetByPtr(tail_index_ ++, value_ptr);
+}
+
+void
+ColumnVector::AppendWith(const ColumnVector &other) {
+    StorageAssert(this->data_type_ == other.data_type_,
+                  fmt::format("Attempt to append column vector{} to column vector{}",
+                              other.data_type().ToString(),
+                              this->data_type().ToString()));
+    StorageAssert(this->tail_index_ + other.tail_index_ < this->capacity_,
+                  fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.",
+                              other.tail_index_,
+                              this->tail_index_,
+                              this->capacity_));
+
+    SizeT count = other.tail_index_;
+    switch(data_type_.type()) {
+
+        case kBoolean: {
+            auto* src_ptr = (BooleanT*)(other.data_ptr_);
+            BooleanT* dst_ptr = &((BooleanT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kTinyInt: {
+            auto* src_ptr = (TinyIntT*)(other.data_ptr_);
+            TinyIntT* dst_ptr = &((TinyIntT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kSmallInt: {
+            auto* src_ptr = (SmallIntT*)(other.data_ptr_);
+            SmallIntT* dst_ptr = &((SmallIntT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kInteger: {
+            auto* src_ptr = (IntegerT*)(other.data_ptr_);
+            IntegerT* dst_ptr = &((IntegerT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kBigInt: {
+            auto* src_ptr = (BigIntT*)(other.data_ptr_);
+            BigIntT* dst_ptr = &((BigIntT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kHugeInt: {
+            auto* src_ptr = (HugeIntT*)(other.data_ptr_);
+            HugeIntT* dst_ptr = &((HugeIntT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kFloat: {
+            auto* src_ptr = (FloatT*)(other.data_ptr_);
+            FloatT* dst_ptr = &((FloatT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kDouble: {
+            auto* src_ptr = (DoubleT*)(other.data_ptr_);
+            DoubleT* dst_ptr = &((DoubleT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kDecimal16: {
+            auto* src_ptr = (Decimal16T*)(other.data_ptr_);
+            Decimal16T* dst_ptr = &((Decimal16T*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kDecimal32: {
+            auto* src_ptr = (Decimal32T*)(other.data_ptr_);
+            Decimal32T* dst_ptr = &((Decimal32T*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kDecimal64: {
+            auto* src_ptr = (Decimal64T*)(other.data_ptr_);
+            Decimal64T* dst_ptr = &((Decimal64T*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kDecimal128: {
+            auto* src_ptr = (Decimal128T*)(other.data_ptr_);
+            Decimal128T* dst_ptr = &((Decimal128T*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kVarchar: {
+            // Copy string
+            auto* base_src_ptr = (VarcharT*)(other.data_ptr_);
+            VarcharT* base_dst_ptr = &((VarcharT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                VarcharT& src_ref = base_src_ptr[idx];
+                VarcharT& dst_ref = base_dst_ptr[idx];
+                if(src_ref.IsInlined()) {
+                    memcpy(dst_ref.prefix, src_ref.prefix, src_ref.length);
+                } else {
+                    memcpy(dst_ref.prefix, src_ref.prefix, VarcharType::PREFIX_LENGTH);
+                    ptr_t ptr = this->buffer_->heap_mgr_->Allocate(src_ref.length);
+                    memcpy(ptr, src_ref.ptr, src_ref.length);
+                    dst_ref.ptr = ptr;
+                }
+                dst_ref.length = src_ref.length;
+            }
+            break;
+        }
+        case kChar: {
+            auto* base_src_ptr = (CharT*)(other.data_ptr_);
+            ptr_t base_dst_ptr = data_ptr_ + this->tail_index_ * data_type_.Size();
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                ptr_t src_ptr = base_src_ptr->ptr + idx * data_type_.Size();
+                ptr_t dst_ptr = base_dst_ptr + idx * data_type_.Size();
+                memcpy(dst_ptr, src_ptr, data_type_.Size());
+            }
+            break;
+        }
+        case kDate: {
+            auto* src_ptr = (DateT*)(other.data_ptr_);
+            DateT* dst_ptr = &((DateT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kTime: {
+            auto* src_ptr = (TimeT*)(other.data_ptr_);
+            TimeT* dst_ptr = &((TimeT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kDateTime: {
+            auto* src_ptr = (DateTimeT*)(other.data_ptr_);
+            DateTimeT* dst_ptr = &((DateTimeT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kTimestamp: {
+            auto* src_ptr = (TimestampT*)(other.data_ptr_);
+            TimestampT* dst_ptr = &((TimestampT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kTimestampTZ: {
+            auto* src_ptr = (TimestampTZT*)(other.data_ptr_);
+            TimestampTZT* dst_ptr = &((TimestampTZT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kInterval: {
+            auto* src_ptr = (IntervalT*)(other.data_ptr_);
+            IntervalT* dst_ptr = &((IntervalT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kArray: {
+            NotImplementError("Array copy")
+            break;
+        }
+        case kTuple: {
+            TypeError("Shouldn't store tuple directly, a tuple is flatten as many columns");
+        }
+        case kPoint: {
+            auto* src_ptr = (PointT*)(other.data_ptr_);
+            PointT* dst_ptr = &((PointT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kLine: {
+            auto* src_ptr = (LineT*)(other.data_ptr_);
+            LineT* dst_ptr = &((LineT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kLineSeg: {
+            auto* src_ptr = (LineSegT*)(other.data_ptr_);
+            LineSegT* dst_ptr = &((LineSegT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kBox: {
+            auto* src_ptr = (BoxT*)(other.data_ptr_);
+            BoxT* dst_ptr = &((BoxT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kPath: {
+            auto* base_src_ptr = (PathT*)(other.data_ptr_);
+            PathT* base_dst_ptr = &((PathT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                PathT& src_ref = base_src_ptr[idx];
+                u32 point_count = src_ref.point_count;
+                PathT& dst_ref = base_dst_ptr[idx];
+
+                // Allocate the mem
+                SizeT point_area_size = point_count * sizeof(PointT);
+                ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+
+                // Copy the point data
+                memcpy(ptr, src_ref.ptr, point_area_size);
+
+                dst_ref.ptr = ptr;
+                dst_ref.point_count = point_count;
+                dst_ref.closed = src_ref.closed;
+            }
+            break;
+        }
+        case kPolygon: {
+            auto* base_src_ptr = (PolygonT*)(other.data_ptr_);
+            PolygonT* base_dst_ptr = &((PolygonT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                PolygonT& src_ref = base_src_ptr[idx];
+                u32 point_count = src_ref.point_count;
+                PolygonT& dst_ref = base_dst_ptr[idx];
+
+                // Allocate the mem
+                SizeT point_area_size = point_count * sizeof(PointT);
+                ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+
+                // Copy the point data
+                memcpy(ptr, src_ref.ptr, point_area_size);
+
+                dst_ref.ptr = ptr;
+                dst_ref.point_count = point_count;
+                dst_ref.bounding_box = src_ref.bounding_box;
+            }
+            break;
+        }
+        case kCircle: {
+            auto* src_ptr = (CircleT*)(other.data_ptr_);
+            CircleT* dst_ptr = &((CircleT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kBitmap: {
+            auto* base_src_ptr = (BitmapT*)(other.data_ptr_);
+            BitmapT* base_dst_ptr = &((BitmapT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                BitmapT& src_ref = base_src_ptr[idx];
+                u64 bit_count = src_ref.count;
+                u64 unit_count = BitmapT::UnitCount(bit_count);
+
+                BitmapT& dst_ref = base_dst_ptr[idx];
+
+                // Allocate the mem
+                SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
+                ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
+                memcpy(ptr, (void*)(src_ref.ptr), bit_area_size);
+
+                dst_ref.count = bit_count;
+                dst_ref.ptr = (u64*)ptr;
+            }
+            break;
+        }
+        case kUuid: {
+            auto* src_ptr = (UuidT*)(other.data_ptr_);
+            UuidT* dst_ptr = &((UuidT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        case kBlob: {
+            auto* base_src_ptr = (BlobT*)(other.data_ptr_);
+            BlobT* base_dst_ptr = &((BlobT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                BlobT& src_ref = base_src_ptr[idx];
+                BlobT& dst_ref = base_dst_ptr[idx];
+
+                // Allocate the mem
+                ptr_t ptr = this->buffer_->heap_mgr_->Allocate(src_ref.size);
+                memcpy(ptr, (void*)(src_ref.ptr), src_ref.size);
+
+                dst_ref.size = src_ref.size;
+                dst_ref.ptr = ptr;
+            }
+            break;
+        }
+        case kEmbedding: {
+            auto* base_src_ptr = (EmbeddingT*)(other.data_ptr_);
+            ptr_t base_dst_ptr = data_ptr_ + this->tail_index_ * data_type_.Size();
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                ptr_t src_ptr = base_src_ptr->ptr + idx * data_type_.Size();
+                ptr_t dst_ptr = base_dst_ptr + idx * data_type_.Size();
+                memcpy(dst_ptr, src_ptr, data_type_.Size());
+            }
+            break;
+        }
+        case kMixed: {
+            auto* src_ptr = (MixedT*)(other.data_ptr_);
+            MixedT* dst_ptr = &((MixedT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++ idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
+        default: {
+            TypeError("Attempt to store an unaccepted type");
+            // Null/Missing/Invalid
+        }
+    }
+    this->tail_index_ += count;
 }
 
 void

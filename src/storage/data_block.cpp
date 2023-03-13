@@ -149,6 +149,27 @@ DataBlock::UnionWith(const SharedPtr<DataBlock>& other) {
     column_vectors.insert(column_vectors.end(), other->column_vectors.begin(), other->column_vectors.end());
 }
 
+void
+DataBlock::AppendWith(const SharedPtr<DataBlock>& other) {
+    if(other->column_count() != this->column_count()) {
+        StorageError(fmt::format("Attempt merge block with column count {} into block with column count {}",
+                                 other->column_count(),
+                                 this->column_count()));
+    }
+    if(this->row_count_ + other->row_count_ > this->capacity_) {
+        StorageError(fmt::format("Attempt append block with row count {} into block with row count{}, "
+                                 "which exceeds the capacity {}",
+                                 other->row_count(),
+                                 this->row_count(),
+                                 this->capacity()));
+    }
+
+    SizeT column_count = this->column_count();
+    for(SizeT idx = 0; idx < column_count; ++ idx) {
+        this->column_vectors[idx]->AppendWith(*other->column_vectors[idx]);
+    }
+}
+
 }
 
 

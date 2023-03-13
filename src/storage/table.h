@@ -70,8 +70,8 @@ public:
         return data_blocks_.size();
     }
 
-    [[nodiscard]] SharedPtr<DataBlock>
-    GetDataBlockById(SizeT idx) const {
+    [[nodiscard]] SharedPtr<DataBlock>&
+    GetDataBlockById(SizeT idx) {
         StorageAssert(idx < data_blocks_.size(), "Attempt to access invalid index: " +
                       std::to_string(idx) + "/" + std::to_string(DataBlockCount()))
         return data_blocks_[idx];
@@ -90,12 +90,12 @@ public:
     inline void
     Append(const SharedPtr<DataBlock>& data_block) {
         data_blocks_.emplace_back(data_block);
-        row_count_ += data_block->row_count();
+        UpdateRowCount(data_block->row_count());
     }
 
     inline void
-    Insert(const SharedPtr<DataBlock>& data_block) {
-        NotImplementError("Insert data block");
+    UpdateRowCount(SizeT row_count) {
+        row_count_ += row_count;
     }
 
 public:

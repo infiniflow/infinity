@@ -36,6 +36,10 @@ TEST_F(SQLFileParsingTest, tpch) {
 
     for(const auto& p: std::filesystem::recursive_directory_iterator(file_path)) {
 //        std::cout << p.path().c_str() << std::endl;
+        String filename = p.path().filename();
+        if(filename == "README.md") {
+            continue;
+        }
         std::ifstream t(p.path().c_str());
         String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
         parser->Parse(input_sql, result);

@@ -65,6 +65,8 @@ public:
 private:
     Vector<SharedPtr<ExpressionState>> children_;
     String name_;
+
+    // output blocks and each block have one output column;
     Vector<SharedPtr<ColumnVector>> column_vectors_;
 };
 

@@ -119,6 +119,9 @@ public:
     AppendByPtr(const ptr_t value_ptr);
 
     void
+    AppendWith(const ColumnVector &other);
+
+    void
     ShallowCopy(const ColumnVector &other);
 
     // Enlarge the column vector capacity.

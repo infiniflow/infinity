@@ -91,7 +91,20 @@ PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
 
     output_block->Finalize();
 
-    table_ptr_->Append(output_block);
+    SizeT block_count = table_ptr_->DataBlockCount();
+    if(block_count == 0) {
+        table_ptr_->Append(output_block);
+    } else {
+        SizeT last_block_id = block_count - 1;
+        SharedPtr<DataBlock>& last_block = table_ptr_->GetDataBlockById(last_block_id);
+        if(last_block->row_count() + output_block->row_count() <= last_block->capacity()) {
+            last_block->AppendWith(output_block);
+            last_block->Finalize();
+            table_ptr_->UpdateRowCount(output_block->row_count());
+        } else {
+            table_ptr_->Append(output_block);
+        }
+    }
 
     // Generate the result table
     Vector<SharedPtr<ColumnDef>> column_defs;

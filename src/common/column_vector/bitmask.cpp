@@ -29,7 +29,9 @@ Bitmask::Reset() {
 void
 Bitmask::Initialize(SizeT count) {
     TypeAssert(count_ == 0, "Bitmask is already initialized.")
-    TypeAssert((count & (count - 1)) == 0, "Capacity need to be N power of 2.");
+    if((count & (count - 1)) != 0) {
+        TypeError("Capacity need to be N power of 2.");
+    }
     count_ = count;
 }
 
