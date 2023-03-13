@@ -20,8 +20,8 @@ String ConstantExpr::ToString() const {
     switch(literal_type_) {
         case LiteralType::kBoolean:
             return fmt::format("{}", bool_value_);
-        case LiteralType::kFloat:
-            return fmt::format("{}", float_value_);
+        case LiteralType::kDouble:
+            return fmt::format("{}", double_value_);
         case LiteralType::kString:
             return fmt::format("{}", str_value_);
         case LiteralType::kInteger:

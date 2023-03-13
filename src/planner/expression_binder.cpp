@@ -145,8 +145,8 @@ ExpressionBinder::BuildValueExpr(const ConstantExpr& expr,
             Value value = Value::MakeVarchar(expr.str_value_, type_info_ptr);
             return MakeShared<ValueExpression>(value);
         }
-        case LiteralType::kFloat: {
-            Value value = Value::MakeDouble(expr.float_value_);
+        case LiteralType::kDouble: {
+            Value value = Value::MakeDouble(expr.double_value_);
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kDate: {

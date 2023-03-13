@@ -4704,8 +4704,8 @@ yyreduce:
                                                   {
     BetweenExpr* between_expr = new BetweenExpr();
     between_expr->value_ = (yyvsp[-4].expr_t);
-    between_expr->upper_bound_ = (yyvsp[-2].expr_t);
-    between_expr->lower_bound_ = (yyvsp[0].expr_t);
+    between_expr->lower_bound_ = (yyvsp[-2].expr_t);
+    between_expr->upper_bound_ = (yyvsp[0].expr_t);
     (yyval.expr_t) = between_expr;
 }
 #line 4712 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
@@ -4967,8 +4967,8 @@ yyreduce:
   case 237: /* constant_expr: DOUBLE_VALUE  */
 #line 1759 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kFloat);
-    const_expr->float_value_ = (yyvsp[0].double_value);
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kDouble);
+    const_expr->double_value_ = (yyvsp[0].double_value);
     (yyval.expr_t) = const_expr;
 }
 #line 4975 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"

@@ -10,7 +10,7 @@ namespace infinity {
 
 enum class LiteralType {
     kBoolean,
-    kFloat,
+    kDouble,
     kString,
     kInteger,
     kNull,
@@ -42,7 +42,7 @@ public:
 
     bool bool_value_{false};
     i64 integer_value_{0};
-    double float_value_{0};
+    double double_value_{0};
     char* str_value_{nullptr};
     IntervalExprType interval_type_{IntervalExprType::kSecond};
     char* date_value_{nullptr};

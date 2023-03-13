@@ -1592,8 +1592,8 @@ conjunction_expr: expr AND expr {
 between_expr: operand BETWEEN operand AND operand {
     BetweenExpr* between_expr = new BetweenExpr();
     between_expr->value_ = $1;
-    between_expr->upper_bound_ = $3;
-    between_expr->lower_bound_ = $5;
+    between_expr->lower_bound_ = $3;
+    between_expr->upper_bound_ = $5;
     $$ = between_expr;
 }
 
@@ -1757,8 +1757,8 @@ constant_expr: STRING {
     $$ = const_expr;
 }
 | DOUBLE_VALUE {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kFloat);
-    const_expr->float_value_ = $1;
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kDouble);
+    const_expr->double_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE {

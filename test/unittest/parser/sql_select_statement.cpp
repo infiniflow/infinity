@@ -85,7 +85,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             EXPECT_EQ(const_expr->date_value_, nullptr);
             EXPECT_EQ(const_expr->str_value_, nullptr);
             EXPECT_EQ(const_expr->integer_value_, 1);
-            EXPECT_FLOAT_EQ(const_expr->float_value_, 0);
+            EXPECT_FLOAT_EQ(const_expr->double_value_, 0);
             EXPECT_EQ(const_expr->interval_type_, IntervalExprType::kSecond);
             EXPECT_EQ(const_expr->date_value_, nullptr);
             EXPECT_EQ(const_expr->bool_value_, false);
@@ -275,7 +275,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto child_args = *arg1_expr->arguments_;
                 EXPECT_EQ(child_args[0]->type_, ParsedExprType::kConstant);
                 auto* child_arg0_expr =  (ConstantExpr *)child_args[0];
-                EXPECT_FLOAT_EQ(child_arg0_expr->float_value_, 5.2);
+                EXPECT_FLOAT_EQ(child_arg0_expr->double_value_, 5.2);
             }
 
             {
@@ -343,7 +343,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
                 EXPECT_EQ(child1_args->type_, ParsedExprType::kConstant);
                 auto* child1_args_expr =  (ConstantExpr *)child1_args;
-                EXPECT_FLOAT_EQ(child1_args_expr->float_value_, 3.2);
+                EXPECT_FLOAT_EQ(child1_args_expr->double_value_, 3.2);
             }
 
             EXPECT_EQ(select_statement->select_distinct_, false);
@@ -753,7 +753,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                         EXPECT_EQ(col_expr->names_[0], "b");
                         EXPECT_EQ((*f_expr->arguments_)[1]->type_, ParsedExprType::kConstant);
                         auto *const_expr = (ConstantExpr *) ((*f_expr->arguments_)[1]);
-                        EXPECT_FLOAT_EQ(const_expr->float_value_, 3.5);
+                        EXPECT_FLOAT_EQ(const_expr->double_value_, 3.5);
                     }
                     EXPECT_EQ(when_then->then_->type_, ParsedExprType::kConstant);
                     {
@@ -1158,7 +1158,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
             SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[0]);
             auto* cast_expr = (CastExpr*)(*(select->select_list_))[0];
             auto* arg1_expr = (ConstantExpr*)(cast_expr->expr_);
-            EXPECT_FLOAT_EQ(arg1_expr->float_value_, 5.3);
+            EXPECT_FLOAT_EQ(arg1_expr->double_value_, 5.3);
             EXPECT_EQ(cast_expr->data_type_.type(), LogicalType::kBigInt);
         }
 
