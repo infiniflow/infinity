@@ -12,7 +12,7 @@ PhysicalHashJoin::Init() {
 }
 
 void
-PhysicalHashJoin::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalHashJoin::Execute(SharedPtr<QueryContext>& query_context) {
 
 }
 

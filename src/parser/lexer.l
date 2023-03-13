@@ -30,6 +30,7 @@ static thread_local std::stringstream string_buffer;
 
 ALL             { return ALL; }
 ALTER           { return ALTER; }
+ANALYZE         { return ANALYZE; }
 AND             { return AND; }
 AS              { return AS; }
 AST             { return AST; }

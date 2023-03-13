@@ -12,7 +12,7 @@ PhysicalExport::Init() {
 }
 
 void
-PhysicalExport::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalExport::Execute(SharedPtr<QueryContext>& query_context) {
 
 }
 

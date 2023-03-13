@@ -12,7 +12,7 @@ PhysicalNestedLoopJoin::Init() {
 }
 
 void
-PhysicalNestedLoopJoin::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalNestedLoopJoin::Execute(SharedPtr<QueryContext>& query_context) {
 
 }
 

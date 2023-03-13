@@ -107,6 +107,10 @@ private:
     
     [[nodiscard]] SharedPtr<PhysicalOperator>
     BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    // Explain
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildExplain(const SharedPtr<LogicalNode>& logical_operator) const;
 };
 
 

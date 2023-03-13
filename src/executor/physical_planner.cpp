@@ -42,6 +42,8 @@
 #include "planner/node/logical_limit.h"
 #include "planner/node/logical_aggregate.h"
 #include "planner/node/logical_cross_product.h"
+#include "planner/node/logical_explain.h"
+#include "executor/operator/physical_explain.h"
 
 #include <limits>
 
@@ -152,6 +154,10 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
         }
         case LogicalNodeType::kIntersect: {
             result = BuildIntersect(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kExplain: {
+            result = BuildExplain(logical_operator);
             break;
         }
         default: {
@@ -414,6 +420,26 @@ PhysicalPlanner::BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) 
     SharedPtr<LogicalDummyScan> logical_chunk_scan =
             std::static_pointer_cast<LogicalDummyScan>(logical_operator);
     return MakeShared<PhysicalDummyScan>(logical_chunk_scan->node_id());
+}
+
+SharedPtr<PhysicalOperator>
+PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode>& logical_operator) const {
+
+    auto input_logical_node = logical_operator->left_node();
+    SharedPtr<PhysicalOperator> input_physical_operator{nullptr};
+    if(input_logical_node != nullptr) {
+        input_physical_operator = BuildPhysicalOperator(input_logical_node);
+    }
+
+    SharedPtr<LogicalExplain> logical_explain =
+            std::static_pointer_cast<LogicalExplain>(logical_operator);
+
+    SharedPtr<PhysicalExplain> explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
+                                                                          logical_explain->explain_type(),
+                                                                          logical_explain->TextArray(),
+                                                                          nullptr);
+
+    return explain_node;
 }
 
 }

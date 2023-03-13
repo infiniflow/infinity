@@ -42,6 +42,7 @@ enum class LogicalNodeType: uint8_t {
     kDummyScan,
 
     // ?
+    kExplain,
     kAlias,
     kMock,
     kValidate,

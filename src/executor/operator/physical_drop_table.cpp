@@ -14,7 +14,7 @@ PhysicalDropTable::Init() {
 }
 
 void
-PhysicalDropTable::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalDropTable::Execute(SharedPtr<QueryContext>& query_context) {
     Infinity::instance().catalog()->DeleteTable(*schema_name_, *table_name_);
 
     // Generate the result

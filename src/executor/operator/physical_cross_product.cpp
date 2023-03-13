@@ -12,7 +12,7 @@ PhysicalCrossProduct::Init() {
 }
 
 void
-PhysicalCrossProduct::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalCrossProduct::Execute(SharedPtr<QueryContext>& query_context) {
     ExecutorAssert(left_->output() != nullptr, "No left input.");
     ExecutorAssert(right_->output() != nullptr, "No right input.");
     left_table_ = left_->output();

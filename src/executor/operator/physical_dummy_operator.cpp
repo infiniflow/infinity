@@ -12,7 +12,7 @@ PhysicalDummyOperator::Init() {
 }
 
 void
-PhysicalDummyOperator::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalDummyOperator::Execute(SharedPtr<QueryContext>& query_context) {
 
 }
 

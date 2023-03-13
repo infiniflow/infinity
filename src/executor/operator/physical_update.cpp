@@ -12,7 +12,7 @@ PhysicalUpdate::Init() {
 }
 
 void
-PhysicalUpdate::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalUpdate::Execute(SharedPtr<QueryContext>& query_context) {
 
 }
 

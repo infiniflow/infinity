@@ -12,8 +12,8 @@ namespace infinity {
 class LogicalDropView final : public LogicalNode {
 public:
     LogicalDropView(u64 node_id,
-                          SharedPtr<String> schema_name,
-                          SharedPtr<String> view_name)
+                    SharedPtr<String> schema_name,
+                    SharedPtr<String> view_name)
             : LogicalNode(node_id, LogicalNodeType::kDropTable),
               schema_name_(std::move(schema_name)),
               view_name_(std::move(view_name))

@@ -12,7 +12,7 @@ PhysicalImport::Init() {
 }
 
 void
-PhysicalImport::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalImport::Execute(SharedPtr<QueryContext>& query_context) {
 
 }
 

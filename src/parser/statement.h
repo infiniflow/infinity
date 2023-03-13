@@ -16,3 +16,15 @@
 #include "parser/statement/alter_statement.h"
 #include "parser/statement/show_statement.h"
 #include "parser/statement/explain_statement.h"
+
+namespace infinity {
+
+class Statement {
+public:
+    static void
+    BuildString(const BaseStatement* statement,
+                SharedPtr<Vector<SharedPtr<String>>>& stmt_string,
+                i64 intent_size = 0);
+};
+
+}

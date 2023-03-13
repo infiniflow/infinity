@@ -9,6 +9,7 @@
 namespace infinity {
 
 enum class ExplainType {
+    kAnalyze,
     kAst,
     kUnOpt,
     kOpt,

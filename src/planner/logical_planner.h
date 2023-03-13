@@ -34,108 +34,108 @@ public:
     }
 
     void
-    Build(const BaseStatement* statement);
+    Build(const BaseStatement* statement, SharedPtr<BindContext> bind_context_ptr = nullptr);
 
     void
-    BuildSelect(const SelectStatement* statement);
+    BuildSelect(const SelectStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildInsert(const InsertStatement* statement);
+    BuildInsert(const InsertStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildInsertValue(const InsertStatement* statement);
+    BuildInsertValue(const InsertStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildInsertSelect(const InsertStatement* statement);
+    BuildInsertSelect(const InsertStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Update operator
     void
-    BuildUpdate(const UpdateStatement* statement);
+    BuildUpdate(const UpdateStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Delete operator
     void
-    BuildDelete(const DeleteStatement* statement);
+    BuildDelete(const DeleteStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Create operator
     void
-    BuildCreate(const CreateStatement* statement);
+    BuildCreate(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildCreateSchema(const CreateStatement* statement);
+    BuildCreateSchema(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildCreateTable(const CreateStatement* statement);
+    BuildCreateTable(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildCreateCollection(const CreateStatement* statement);
+    BuildCreateCollection(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildCreateView(const CreateStatement* statement);
+    BuildCreateView(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildCreateIndex(const CreateStatement* statement);
+    BuildCreateIndex(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Drop operator
     void
-    BuildDrop(const DropStatement* statement);
+    BuildDrop(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildDropTable(const DropStatement* statement);
+    BuildDropTable(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildDropCollection(const DropStatement* statement);
+    BuildDropCollection(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildDropSchema(const DropStatement* statement);
+    BuildDropSchema(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildDropIndex(const DropStatement* statement);
+    BuildDropIndex(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildDropView(const DropStatement* statement);
+    BuildDropView(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Prepare operator
     void
-    BuildPrepare(const PrepareStatement* statement);
+    BuildPrepare(const PrepareStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Execute operator
     void
-    BuildExecute(const ExecuteStatement* statement);
+    BuildExecute(const ExecuteStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
 
     void
-    BuildCopy(const CopyStatement* statement);
+    BuildCopy(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
     // Export operator
     void
-    BuildExport(const CopyStatement* statement);
+    BuildExport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildExportCsv(const CopyStatement* statement);
+    BuildExportCsv(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Import operator
     void
-    BuildImport(const CopyStatement* statement);
+    BuildImport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildImportCsv(const CopyStatement* statement);
+    BuildImportCsv(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Alter operator
     void
-    BuildAlter(const AlterStatement* statement);
+    BuildAlter(const AlterStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Show operator
     void
-    BuildShow(const ShowStatement* statement);
+    BuildShow(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildShowColumns(const ShowStatement* statement);
+    BuildShowColumns(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
-    BuildShowTables(const ShowStatement* statement);
+    BuildShowTables(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Transaction operator
     void
-    BuildExplain(const ExplainStatement* statement);
+    BuildExplain(const ExplainStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     [[nodiscard]] SharedPtr<LogicalNode>
     LogicalPlan() const {

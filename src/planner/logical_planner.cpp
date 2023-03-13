@@ -20,58 +20,63 @@
 #include "planner/node/logical_create_schema.h"
 #include "planner/node/logical_create_view.h"
 #include "function/cast/cast_function.h"
+#include "planner/node/logical_explain.h"
+#include "parser/statement.h"
 
 namespace infinity {
 
 void
-LogicalPlanner::Build(const BaseStatement* statement) {
+LogicalPlanner::Build(const BaseStatement* statement, SharedPtr<BindContext> bind_context_ptr) {
+    if(bind_context_ptr == nullptr) {
+        bind_context_ptr = BindContext::Make(nullptr);
+    }
     switch (statement->Type()) {
         case StatementType::kSelect: {
-            BuildSelect(static_cast<const SelectStatement*>(statement));
+            BuildSelect(static_cast<const SelectStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kInsert: {
-            BuildInsert(static_cast<const InsertStatement*>(statement));
+            BuildInsert(static_cast<const InsertStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kUpdate: {
-            BuildUpdate(static_cast<const UpdateStatement*>(statement));
+            BuildUpdate(static_cast<const UpdateStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kDelete: {
-            BuildDelete(static_cast<const DeleteStatement*>(statement));
+            BuildDelete(static_cast<const DeleteStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kCreate: {
-            BuildCreate(static_cast<const CreateStatement*>(statement));
+            BuildCreate(static_cast<const CreateStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kDrop: {
-            BuildDrop(static_cast<const DropStatement*>(statement));
+            BuildDrop(static_cast<const DropStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kShow: {
-            BuildShow(static_cast<const ShowStatement*>(statement));
+            BuildShow(static_cast<const ShowStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kCopy: {
-            BuildCopy(static_cast<const CopyStatement*>(statement));
+            BuildCopy(static_cast<const CopyStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kExplain: {
-            BuildExplain(static_cast<const ExplainStatement*>(statement));
+            BuildExplain(static_cast<const ExplainStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kPrepare: {
-            BuildPrepare(static_cast<const PrepareStatement*>(statement));
+            BuildPrepare(static_cast<const PrepareStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kExecute: {
-            BuildExecute(static_cast<const ExecuteStatement*>(statement));
+            BuildExecute(static_cast<const ExecuteStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kAlter: {
-            BuildAlter(static_cast<const AlterStatement*>(statement));
+            BuildAlter(static_cast<const AlterStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kInvalidStmt: {
@@ -82,8 +87,7 @@ LogicalPlanner::Build(const BaseStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildSelect(const SelectStatement* statement) {
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
+LogicalPlanner::BuildSelect(const SelectStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_,
                                                                       bind_context_ptr);
     SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*statement);
@@ -91,17 +95,16 @@ LogicalPlanner::BuildSelect(const SelectStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildInsert(const InsertStatement* statement) {
+LogicalPlanner::BuildInsert(const InsertStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     if(statement->select_ == nullptr) {
-        return BuildInsertValue(statement);
+        return BuildInsertValue(statement, bind_context_ptr);
     } else {
-        return BuildInsertSelect(statement);
+        return BuildInsertSelect(statement, bind_context_ptr);
     }
 }
 
 void
-LogicalPlanner::BuildInsertValue(const InsertStatement* statement) {
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
+LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     bind_context_ptr->expression_binder_ = MakeShared<InsertBinder>(query_context_ptr_);
 
     // Get schema name
@@ -209,41 +212,41 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildInsertSelect(const InsertStatement* statement) {
+LogicalPlanner::BuildInsertSelect(const InsertStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     PlannerError("Inserting select isn't supported.");
 }
 
 void
-LogicalPlanner::BuildUpdate(const UpdateStatement* statement) {
+LogicalPlanner::BuildUpdate(const UpdateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     PlannerError("Update isn't supported.");
 }
 
 void
-LogicalPlanner::BuildDelete(const DeleteStatement* statement) {
+LogicalPlanner::BuildDelete(const DeleteStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     PlannerError("Delete isn't supported.");
 }
 
 void
-LogicalPlanner::BuildCreate(const CreateStatement* statement) {
+LogicalPlanner::BuildCreate(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
-            BuildCreateTable(statement);
+            BuildCreateTable(statement, bind_context_ptr);
             break;
         }
         case DDLType::kCollection: {
-            BuildCreateCollection(statement);
+            BuildCreateCollection(statement, bind_context_ptr);
             break;
         }
         case DDLType::kView: {
-            BuildCreateView(statement);
+            BuildCreateView(statement, bind_context_ptr);
             break;
         }
         case DDLType::kIndex: {
-            BuildCreateIndex(statement);
+            BuildCreateIndex(statement, bind_context_ptr);
             break;
         }
         case DDLType::kSchema: {
-            BuildCreateSchema(statement);
+            BuildCreateSchema(statement, bind_context_ptr);
             break;
         }
         default: {
@@ -253,7 +256,7 @@ LogicalPlanner::BuildCreate(const CreateStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildCreateTable(const CreateStatement* statement) {
+LogicalPlanner::BuildCreateTable(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     auto* create_table_info = (CreateTableInfo*)statement->create_info_.get();
 
     // Check if columns is given.
@@ -273,7 +276,6 @@ LogicalPlanner::BuildCreateTable(const CreateStatement* statement) {
     SharedPtr<TableDef> table_def_ptr
             = MakeShared<TableDef>(create_table_info->table_name_, columns);
 
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
     SharedPtr<LogicalNode> logical_create_table_operator
             = LogicalCreateTable::Make(bind_context_ptr->GetNewLogicalNodeId(),
                                        schema_name_ptr,
@@ -294,13 +296,12 @@ LogicalPlanner::BuildCreateTable(const CreateStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildCreateCollection(const CreateStatement* statement) {
+LogicalPlanner::BuildCreateCollection(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     auto* create_collection_info = (CreateCollectionInfo*)statement->create_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_collection_info->schema_name_);
     SharedPtr<String> collection_name_ptr = MakeShared<String>(create_collection_info->collection_name_);
 
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
     SharedPtr<LogicalNode> logical_create_collection_operator
             = LogicalCreateCollection::Make(bind_context_ptr->GetNewLogicalNodeId(),
                                             schema_name_ptr,
@@ -314,12 +315,11 @@ LogicalPlanner::BuildCreateCollection(const CreateStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildCreateSchema(const CreateStatement* statement) {
+LogicalPlanner::BuildCreateSchema(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     auto* create_schema_info = (CreateSchemaInfo*)statement->create_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_schema_info->schema_name_);
 
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
     SharedPtr<LogicalNode> logical_create_schema_operator
             = LogicalCreateSchema::Make(bind_context_ptr->GetNewLogicalNodeId(),
                                         schema_name_ptr,
@@ -331,7 +331,7 @@ LogicalPlanner::BuildCreateSchema(const CreateStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildCreateView(const CreateStatement* statement) {
+LogicalPlanner::BuildCreateView(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     auto* create_view_info = (CreateViewInfo*)statement->create_info_.get();
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_view_info->schema_name_);
     SharedPtr<String> view_name_ptr = MakeShared<String>(create_view_info->view_name_);
@@ -345,8 +345,6 @@ LogicalPlanner::BuildCreateView(const CreateStatement* statement) {
         columns.emplace_back(column_name);
     }
 
-
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
     SharedPtr<LogicalNode> logical_create_view_operator
             = LogicalCreateView::Make(bind_context_ptr->GetNewLogicalNodeId(),
                                             schema_name_ptr,
@@ -360,31 +358,31 @@ LogicalPlanner::BuildCreateView(const CreateStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildCreateIndex(const CreateStatement* statement) {
+LogicalPlanner::BuildCreateIndex(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     PlannerError("Creating index isn't supported.");
 }
 
 void
-LogicalPlanner::BuildDrop(const DropStatement* statement) {
+LogicalPlanner::BuildDrop(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     switch(statement->ddl_type()) {
         case DDLType::kTable: {
-            BuildDropTable(statement);
+            BuildDropTable(statement, bind_context_ptr);
             break;
         }
         case DDLType::kCollection: {
-            BuildDropCollection(statement);
+            BuildDropCollection(statement, bind_context_ptr);
             break;
         }
         case DDLType::kSchema: {
-            BuildDropSchema(statement);
+            BuildDropSchema(statement, bind_context_ptr);
             break;
         }
         case DDLType::kIndex: {
-            BuildDropIndex(statement);
+            BuildDropIndex(statement, bind_context_ptr);
             break;
         }
         case DDLType::kView: {
-            BuildDropView(statement);
+            BuildDropView(statement, bind_context_ptr);
             break;
         }
         case DDLType::kInvalid: {
@@ -394,8 +392,7 @@ LogicalPlanner::BuildDrop(const DropStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildDropTable(const DropStatement* statement) {
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
+LogicalPlanner::BuildDropTable(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     auto* drop_table_info = (DropTableInfo*)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr{nullptr};
@@ -417,8 +414,7 @@ LogicalPlanner::BuildDropTable(const DropStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildDropCollection(const DropStatement* statement) {
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
+LogicalPlanner::BuildDropCollection(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     auto* drop_collection_info = (DropCollectionInfo*)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr{nullptr};
@@ -439,8 +435,7 @@ LogicalPlanner::BuildDropCollection(const DropStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildDropSchema(const DropStatement* statement) {
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
+LogicalPlanner::BuildDropSchema(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     auto* drop_schema_info = (DropSchemaInfo*)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_schema_info->schema_name_);
@@ -455,8 +450,7 @@ LogicalPlanner::BuildDropSchema(const DropStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildDropIndex(const DropStatement* statement) {
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
+LogicalPlanner::BuildDropIndex(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     auto* drop_index_info = (DropIndexInfo*)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_index_info->schema_name_);
@@ -473,8 +467,7 @@ LogicalPlanner::BuildDropIndex(const DropStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildDropView(const DropStatement* statement) {
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
+LogicalPlanner::BuildDropView(const DropStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     auto* drop_view_info = (DropViewInfo*)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_view_info->schema_name_);
@@ -491,31 +484,31 @@ LogicalPlanner::BuildDropView(const DropStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildPrepare(const PrepareStatement* statement) {
+LogicalPlanner::BuildPrepare(const PrepareStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     PlannerError("Prepare statement isn't supported.");
 }
 
 void
-LogicalPlanner::BuildExecute(const ExecuteStatement* statement) {
+LogicalPlanner::BuildExecute(const ExecuteStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     PlannerError("Execute statement isn't supported.");
 }
 
 void
-LogicalPlanner::BuildCopy(const CopyStatement* statement) {
+LogicalPlanner::BuildCopy(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     if(statement->copy_from_) {
         // Import
-        BuildImport(statement);
+        BuildImport(statement, bind_context_ptr);
     } else {
         // Export
-        BuildExport(statement);
+        BuildExport(statement, bind_context_ptr);
     }
 }
 
 void
-LogicalPlanner::BuildExport(const CopyStatement* statement) {
+LogicalPlanner::BuildExport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     switch(statement->copy_file_type_) {
         case CopyFileType::kCSV:
-            return BuildExportCsv(statement);
+            return BuildExportCsv(statement, bind_context_ptr);
         default: {
             PlannerError("Export data to unsupported file type.")
         }
@@ -523,15 +516,15 @@ LogicalPlanner::BuildExport(const CopyStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildExportCsv(const CopyStatement* statement) {
+LogicalPlanner::BuildExportCsv(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     PlannerError("Exporting to CSV file isn't supported.");
 }
 
 void
-LogicalPlanner::BuildImport(const CopyStatement* statement) {
+LogicalPlanner::BuildImport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     switch(statement->copy_file_type_) {
         case CopyFileType::kCSV:
-            return BuildImportCsv(statement);
+            return BuildImportCsv(statement, bind_context_ptr);
         default: {
             PlannerError("Export data to unsupported file type.")
         }
@@ -539,23 +532,23 @@ LogicalPlanner::BuildImport(const CopyStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildImportCsv(const CopyStatement* statement) {
+LogicalPlanner::BuildImportCsv(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     PlannerError("Import from CSV file isn't supported.");
 }
 
 void
-LogicalPlanner::BuildAlter(const AlterStatement* statement) {
+LogicalPlanner::BuildAlter(const AlterStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     NotImplementError("BuildAlter")
 }
 
 void
-LogicalPlanner::BuildShow(const ShowStatement* statement) {
+LogicalPlanner::BuildShow(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     switch(statement->show_type_) {
         case ShowStmtType::kTables : {
-            return BuildShowTables(statement);
+            return BuildShowTables(statement, bind_context_ptr);
         }
         case ShowStmtType::kColumns : {
-            return BuildShowColumns(statement);
+            return BuildShowColumns(statement, bind_context_ptr);
         }
         default:
             PlannerError("Unexpected show statement type.");
@@ -563,14 +556,12 @@ LogicalPlanner::BuildShow(const ShowStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildShowColumns(const ShowStatement* statement) {
+LogicalPlanner::BuildShowColumns(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     PlannerError("Show columns isn't supported.");
 }
 
 void
-LogicalPlanner::BuildShowTables(const ShowStatement* statement) {
-    SharedPtr<BindContext> bind_context_ptr = BindContext::Make(nullptr);
-
+LogicalPlanner::BuildShowTables(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     SharedPtr<LogicalNode> logical_chunk_scan =
             MakeShared<LogicalChunkScan>(bind_context_ptr->GetNewLogicalNodeId(),
                                          ChunkScanType::kShowTables,
@@ -595,8 +586,23 @@ LogicalPlanner::BuildShowTables(const ShowStatement* statement) {
 }
 
 void
-LogicalPlanner::BuildExplain(const ExplainStatement* statement) {
-    NotImplementError("Build explain statement plan.");
+LogicalPlanner::BuildExplain(const ExplainStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
+    SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_,
+                                                                      bind_context_ptr);
+
+
+    SharedPtr<LogicalExplain> explain_node = MakeShared<LogicalExplain>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                        statement->type_);
+
+    if(statement->type_ == ExplainType::kAst) {
+        SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
+        Statement::BuildString(statement->statement_, texts_ptr);
+        explain_node->SetText(texts_ptr);
+    } else {
+        Build(statement->statement_, bind_context_ptr);
+        explain_node->set_left_node(this->logical_plan_);
+    }
+    this->logical_plan_ = explain_node;
 }
 
 }

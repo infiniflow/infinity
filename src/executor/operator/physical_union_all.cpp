@@ -12,7 +12,7 @@ PhysicalUnionAll::Init() {
 }
 
 void
-PhysicalUnionAll::Execute(std::shared_ptr<QueryContext>& query_context) {
+PhysicalUnionAll::Execute(SharedPtr<QueryContext>& query_context) {
 
 }
 
