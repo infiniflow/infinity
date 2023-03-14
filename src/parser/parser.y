@@ -1439,25 +1439,25 @@ function_expr : IDENTIFIER '(' ')' {
     $$ = func_expr;
 }
 | NOT operand {
-  FunctionExpr* func_expr = new FunctionExpr();
-  func_expr->func_name_ = "not";
-  func_expr->arguments_ = new Vector<ParsedExpr*>();
-  func_expr->arguments_->emplace_back($2);
-  $$ = func_expr;
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "not";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($2);
+    $$ = func_expr;
 }
 | '-' operand {
-  FunctionExpr* func_expr = new FunctionExpr();
-  func_expr->func_name_ = "-";
-  func_expr->arguments_ = new Vector<ParsedExpr*>();
-  func_expr->arguments_->emplace_back($2);
-  $$ = func_expr;
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "-";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($2);
+    $$ = func_expr;
 }
 | '+' operand {
-  FunctionExpr* func_expr = new FunctionExpr();
-  func_expr->func_name_ = "+";
-  func_expr->arguments_ = new Vector<ParsedExpr*>();
-  func_expr->arguments_->emplace_back($2);
-  $$ = func_expr;
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "+";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back($2);
+    $$ = func_expr;
 }
 | operand '-' operand {
     FunctionExpr* func_expr = new FunctionExpr();

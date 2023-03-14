@@ -4425,11 +4425,11 @@ yyreduce:
   case 196: /* function_expr: NOT operand  */
 #line 1441 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
               {
-  FunctionExpr* func_expr = new FunctionExpr();
-  func_expr->func_name_ = "not";
-  func_expr->arguments_ = new Vector<ParsedExpr*>();
-  func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
-  (yyval.expr_t) = func_expr;
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "not";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
+    (yyval.expr_t) = func_expr;
 }
 #line 4435 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
@@ -4437,11 +4437,11 @@ yyreduce:
   case 197: /* function_expr: '-' operand  */
 #line 1448 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
               {
-  FunctionExpr* func_expr = new FunctionExpr();
-  func_expr->func_name_ = "-";
-  func_expr->arguments_ = new Vector<ParsedExpr*>();
-  func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
-  (yyval.expr_t) = func_expr;
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "-";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
+    (yyval.expr_t) = func_expr;
 }
 #line 4447 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
@@ -4449,11 +4449,11 @@ yyreduce:
   case 198: /* function_expr: '+' operand  */
 #line 1455 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
               {
-  FunctionExpr* func_expr = new FunctionExpr();
-  func_expr->func_name_ = "+";
-  func_expr->arguments_ = new Vector<ParsedExpr*>();
-  func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
-  (yyval.expr_t) = func_expr;
+    FunctionExpr* func_expr = new FunctionExpr();
+    func_expr->func_name_ = "+";
+    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
+    (yyval.expr_t) = func_expr;
 }
 #line 4459 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
