@@ -106,7 +106,7 @@ public:
         names_ptr_ = nullptr;
     }
 
-    String
+    [[nodiscard]] String
     ToString() const;
 
     Vector<String>* names_ptr_{nullptr};

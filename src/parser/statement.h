@@ -16,6 +16,7 @@
 #include "parser/statement/alter_statement.h"
 #include "parser/statement/show_statement.h"
 #include "parser/statement/explain_statement.h"
+#include "parser/table_reference/base_table_reference.h"
 
 namespace infinity {
 
@@ -49,7 +50,13 @@ public:
     static void
     BuildSelect(const SelectStatement* statement,
                 SharedPtr<Vector<SharedPtr<String>>>& stmt_string,
-                i64 intent_size);
+                i64 intent_size,
+                SharedPtr<String> alias_ptr = nullptr);
+
+    static void
+    BuildBaseTableRef(const BaseTableReference* table_ref,
+                      SharedPtr<Vector<SharedPtr<String>>>& stmt_string,
+                      i64 intent_size);
 
     static void
     BuildShow(const ShowStatement* statement,
