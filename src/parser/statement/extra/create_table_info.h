@@ -106,6 +106,9 @@ public:
         names_ptr_ = nullptr;
     }
 
+    String
+    ToString() const;
+
     Vector<String>* names_ptr_{nullptr};
     ConstraintType constraint_{ConstraintType::kNotNull};
 };

@@ -60,12 +60,14 @@ Statement::BuildString(const BaseStatement* statement,
                     break;
                 }
                 case DDLType::kTable: {
-                    String create_schema = String(intent_size, ' ') + "CREATE TABLE: ";
-                    result->emplace_back(MakeShared<String>(create_schema));
+                    String create_table = String(intent_size, ' ') + "CREATE TABLE: ";
+                    result->emplace_back(MakeShared<String>(create_table));
                     auto* table_info = (CreateTableInfo*)create_statement->create_info_.get();
                     intent_size += 2;
-                    String schema_name = String(intent_size, ' ') + "name: " + table_info->table_name_;
+                    String schema_name = String(intent_size, ' ') + "schema: " + table_info->schema_name_;
                     result->emplace_back(MakeShared<String>(schema_name));
+                    String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
+                    result->emplace_back(MakeShared<String>(table_name));
                     String conflict = String(intent_size, ' ') + "conflict type: ";
                     switch(table_info->conflict_type_) {
                         case ConflictType::kInvalid: {
@@ -83,6 +85,29 @@ Statement::BuildString(const BaseStatement* statement,
                             break;
                     }
                     result->emplace_back(MakeShared<String>(conflict));
+                    String column_names = String(intent_size, ' ') + "columns: (";
+
+                    SizeT column_count = table_info->column_defs_.size();
+                    if(column_count == 0) {
+                        PlannerError("Table definition without any columns");
+                    }
+
+                    for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+                        column_names += table_info->column_defs_[idx]->ToString() + ", ";
+                    }
+                    column_names += table_info->column_defs_.back()->ToString();
+                    column_names += ")";
+                    result->emplace_back(MakeShared<String>(column_names));
+
+                    SizeT constraint_count = table_info->constraints_.size();
+                    if(constraint_count > 0) {
+                        String constraints_str = "Constraints: (";
+                        for(SizeT idx = 0; idx < constraint_count - 1; ++ idx) {
+                            constraints_str += table_info->constraints_[idx]->ToString() + ", ";
+                        }
+                        constraints_str += table_info->constraints_.back()->ToString() + ")";
+                        result->emplace_back(MakeShared<String>(constraints_str));
+                    }
                     break;
                 }
                 case DDLType::kCollection: {
@@ -90,13 +115,14 @@ Statement::BuildString(const BaseStatement* statement,
                     result->emplace_back(MakeShared<String>(create_collection));
                     auto* collection_info = (CreateCollectionInfo*)create_statement->create_info_.get();
                     intent_size += 2;
-                    String schema_name = String(intent_size, ' ') + "name: " + collection_info->collection_name_;
+                    String schema_name = String(intent_size, ' ') + "schema: " + collection_info->schema_name_;
                     result->emplace_back(MakeShared<String>(schema_name));
+                    String collection_name = String(intent_size, ' ') + "name: " + collection_info->collection_name_;
+                    result->emplace_back(MakeShared<String>(collection_name));
                     String conflict = String(intent_size, ' ') + "conflict type: ";
                     switch(collection_info->conflict_type_) {
                         case ConflictType::kInvalid: {
                             PlannerError("Unexpected create schema conflict type")
-                            break;
                         }
                         case ConflictType::kIgnore:
                             conflict += "Ignore";

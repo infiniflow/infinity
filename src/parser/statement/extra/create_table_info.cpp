@@ -25,11 +25,10 @@ ConstrainTypeToString(ConstraintType type) {
 String
 ColumnDef::ToString() const {
     std::stringstream ss;
-    ss << "(" << name_ << " " << column_type_.ToString();
+    ss << name_ << " " << column_type_.ToString();
     for(auto& constraint: constraints_) {
         ss << " " << ConstrainTypeToString(constraint);
     }
-    ss << ")";
     return ss.str();
 }
 
@@ -53,6 +52,22 @@ CreateTableInfo::ToString() const {
     return ss.str();
 }
 
+String
+TableConstraint::ToString() const {
+    std::stringstream ss;
+    ss << ConstrainTypeToString(constraint_) << "(";
+    SizeT name_count = names_ptr_->size();
+    if(name_count > 0) {
+        for(SizeT idx = 0; idx < name_count - 1; ++ idx) {
+            ss << names_ptr_->at(idx) << ", ";
+        }
+        ss << names_ptr_->back();
+    } else {
+        TypeError("Table constraint without any columns involved.")
+    }
+    ss << ")";
+    return ss.str();
+}
 
 }
 
