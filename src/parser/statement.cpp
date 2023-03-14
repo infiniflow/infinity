@@ -21,8 +21,26 @@ Statement::BuildString(const BaseStatement* statement,
         }
         case StatementType::kCopy:
             break;
-        case StatementType::kInsert:
+        case StatementType::kInsert: {
+            auto* insert_statement = (InsertStatement*)statement;
+            result->emplace_back(MakeShared<String>("INSERT: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "schema: " + insert_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + insert_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String values = String(intent_size, ' ') + "values: ";
+            SizeT value_count = insert_statement->values_->size();
+            if(value_count == 0) {
+                PlannerError("Insert value list is empty");
+            }
+            for(SizeT idx = 0; idx < value_count - 1; ++ idx) {
+                values += insert_statement->values_->at(idx)->ToString() + ", ";
+            }
+            values += insert_statement->values_->back()->ToString();
+            result->emplace_back(MakeShared<String>(values));
             break;
+        }
         case StatementType::kUpdate:
             break;
         case StatementType::kDelete:

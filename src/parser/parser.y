@@ -328,7 +328,7 @@ struct SQL_LTYPE {
 %type <expr_t>                  expr expr_alias constant_expr interval_expr column_expr function_expr subquery_expr
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
 %type <expr_t>                  conjunction_expr cast_expr case_expr
-%type <expr_array_t>            expr_array group_by_clause constant_expr_array
+%type <expr_array_t>            expr_array group_by_clause
 %type <update_expr_t>           update_expr;
 %type <update_expr_array_t>     update_expr_array;
 %type <case_check_array_t>      case_check_array;
@@ -745,7 +745,7 @@ delete_statement : DELETE FROM table_name where_clause {
 /*
  * INSERT STATEMENT
  */
-insert_statement: INSERT INTO table_name optional_identifier_array VALUES '(' constant_expr_array ')' {
+insert_statement: INSERT INTO table_name optional_identifier_array VALUES '(' expr_array ')' {
     $$ = new InsertStatement();
     if($3->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $3->schema_name_ptr_;
@@ -1357,6 +1357,7 @@ expr_array : expr_alias {
     $$ = $1;
 };
 
+/*
 constant_expr_array: constant_expr {
     $$ = new Vector<ParsedExpr*>();
     $$->emplace_back($1);
@@ -1365,6 +1366,7 @@ constant_expr_array: constant_expr {
     $1->emplace_back($3);
     $$ = $1;
 }
+*/
 
 expr_alias : expr AS IDENTIFIER {
     $$ = $1;
