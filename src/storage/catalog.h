@@ -17,20 +17,20 @@ public:
     CreateSchema(const SharedPtr<SchemaDefinition>& schema_definition);
 
     void
-    DeleteSchema(const String& schema_name);
+    DeleteSchema(String schema_name);
 
     // Table related methods
     SharedPtr<Table>
-    GetTableByName(const String& schema_name, const String& table_name);
+    GetTableByName(String schema_name, const String& table_name);
 
     void
-    AddTable(const String& schema_name, const SharedPtr<Table>& table_def);
+    AddTable(String schema_name, const SharedPtr<Table>& table_def);
 
     void
-    DeleteTable(const String& schema_name, const String& table_name);
+    DeleteTable(String schema_name, const String& table_name);
 
     std::vector<SharedPtr<Table>>
-    GetTables(const String& schema_name);
+    GetTables(String schema_name);
 
     // View related methods
     SharedPtr<View>

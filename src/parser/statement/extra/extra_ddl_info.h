@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "common/utility/infinity_assert.h"
 #include "common/types/internal_types.h"
 
 namespace infinity {
@@ -23,6 +24,9 @@ enum class ConflictType {
     kError,
     kReplace
 };
+
+String
+ConflictTypeToStr(ConflictType type);
 
 class ExtraDDLInfo {
 public:

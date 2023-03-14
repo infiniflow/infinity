@@ -23,7 +23,7 @@ public:
     LogicalCreateSchema(u64 node_id,
                             SharedPtr<String> schema_name,
                             ConflictType conflict_type)
-            : LogicalNode(node_id, LogicalNodeType::kCreateTable),
+            : LogicalNode(node_id, LogicalNodeType::kCreateSchema),
               schema_name_(std::move(schema_name)),
               conflict_type_(conflict_type)
     {}
@@ -44,6 +44,11 @@ public:
     [[nodiscard]] inline SharedPtr<String>
     schema_name() const {
         return schema_name_;
+    }
+
+    [[nodiscard]] inline ConflictType
+    conflict_type() const {
+        return conflict_type_;
     }
 
 private:

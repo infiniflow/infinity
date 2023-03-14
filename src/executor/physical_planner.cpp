@@ -44,6 +44,10 @@
 #include "planner/node/logical_cross_product.h"
 #include "planner/node/logical_explain.h"
 #include "executor/operator/physical_explain.h"
+#include "planner/node/logical_create_schema.h"
+#include "executor/operator/physical_create_schema.h"
+#include "planner/node/logical_drop_schema.h"
+#include "executor/operator/physical_drop_schema.h"
 
 #include <limits>
 
@@ -59,8 +63,16 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
             result = BuildCreateTable(logical_operator);
             break;
         }
+        case LogicalNodeType::kCreateSchema: {
+            result = BuildCreateSchema(logical_operator);
+            break;
+        }
         case LogicalNodeType::kDropTable: {
             result = BuildDropTable(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kDropSchema: {
+            result = BuildDropSchema(logical_operator);
             break;
         }
         case LogicalNodeType::kCreateView: {
@@ -183,6 +195,16 @@ PhysicalPlanner::BuildCreateTable(const SharedPtr<LogicalNode> &logical_operator
 }
 
 SharedPtr<PhysicalOperator>
+PhysicalPlanner::BuildCreateSchema(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalCreateSchema> logical_create_schema =
+            std::static_pointer_cast<LogicalCreateSchema>(logical_operator);
+    return MakeShared<PhysicalCreateSchema>(
+            logical_create_schema->schema_name(),
+            logical_create_schema->conflict_type(),
+            logical_create_schema->node_id());
+}
+
+SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildPreparedPlan(const SharedPtr<LogicalNode> &logical_operator) const {
     return MakeShared<PhysicalPreparedPlan>(logical_operator->node_id());
 }
@@ -200,6 +222,16 @@ PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) 
             logical_drop_table->schema_name(),
             logical_drop_table->table_name(),
             logical_drop_table->node_id());
+}
+
+SharedPtr<PhysicalOperator>
+PhysicalPlanner::BuildDropSchema(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalDropSchema> logical_drop_schema =
+            std::static_pointer_cast<LogicalDropSchema>(logical_operator);
+    return MakeShared<PhysicalDropSchema>(
+            logical_drop_schema->schema_name(),
+            logical_drop_schema->conflict_type(),
+            logical_drop_schema->node_id());
 }
 
 SharedPtr<PhysicalOperator>

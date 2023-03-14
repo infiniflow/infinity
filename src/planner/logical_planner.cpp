@@ -22,6 +22,7 @@
 #include "function/cast/cast_function.h"
 #include "planner/node/logical_explain.h"
 #include "parser/statement.h"
+#include "explain_logical_plan.h"
 
 namespace infinity {
 
@@ -442,7 +443,8 @@ LogicalPlanner::BuildDropSchema(const DropStatement* statement, SharedPtr<BindCo
 
     SharedPtr<LogicalNode> logical_drop_schema
             = MakeShared<LogicalDropSchema>(bind_context_ptr->GetNewLogicalNodeId(),
-                                           schema_name_ptr);
+                                            schema_name_ptr,
+                                            drop_schema_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_schema;
     this->names_ptr_->emplace_back(String("OK"));
@@ -594,14 +596,27 @@ LogicalPlanner::BuildExplain(const ExplainStatement* statement, SharedPtr<BindCo
     SharedPtr<LogicalExplain> explain_node = MakeShared<LogicalExplain>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                         statement->type_);
 
-    if(statement->type_ == ExplainType::kAst) {
-        SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-        Statement::BuildString(statement->statement_, texts_ptr);
-        explain_node->SetText(texts_ptr);
-    } else {
-        Build(statement->statement_, bind_context_ptr);
-        explain_node->set_left_node(this->logical_plan_);
+    switch(statement->type_) {
+        case ExplainType::kAst: {
+            SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
+            Statement::Explain(statement->statement_, texts_ptr);
+            explain_node->SetText(texts_ptr);
+            break;
+        }
+        case ExplainType::kUnOpt: {
+            Build(statement->statement_, bind_context_ptr);
+            SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
+            ExplainLogicalPlan::Explain(this->logical_plan_.get(), texts_ptr);
+            explain_node->SetText(texts_ptr);
+            break;
+        }
+        default: {
+            Build(statement->statement_, bind_context_ptr);
+            explain_node->set_left_node(this->logical_plan_);
+            this->logical_plan_ = explain_node;
+        }
     }
+
     this->logical_plan_ = explain_node;
 }
 

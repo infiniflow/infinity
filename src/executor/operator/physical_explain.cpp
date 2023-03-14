@@ -42,6 +42,15 @@ PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
         }
         case ExplainType::kUnOpt: {
             title = "Unoptimized Logical Plan";
+            SizeT row_count = this->texts_->size();
+            SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
+
+            column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
+            for(SizeT idx = 0; idx < row_count; ++ idx) {
+                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx], varchar_info);
+                column_vector_ptr->AppendValue(str_v);
+            }
+            output_data_block->Init({column_vector_ptr});
             break;
         }
         case ExplainType::kOpt: {

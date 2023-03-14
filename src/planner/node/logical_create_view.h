@@ -31,7 +31,7 @@ public:
                       SharedPtr<String> view_name,
                       Vector<SharedPtr<String>> columns,
                       ConflictType conflict_type)
-            : LogicalNode(node_id, LogicalNodeType::kCreateTable),
+            : LogicalNode(node_id, LogicalNodeType::kCreateView),
               schema_name_(std::move(schema_name)),
               view_name_(std::move(view_name)),
               columns_(std::move(columns)),

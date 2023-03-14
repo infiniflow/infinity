@@ -23,9 +23,9 @@ namespace infinity {
 class Statement {
 public:
     static void
-    BuildString(const BaseStatement* statement,
-                SharedPtr<Vector<SharedPtr<String>>>& stmt_string,
-                i64 intent_size = 0);
+    Explain(const BaseStatement* statement,
+            SharedPtr<Vector<SharedPtr<String>>>& stmt_string,
+            i64 intent_size = 0);
 
     static void
     BuildCreate(const CreateStatement* statement,

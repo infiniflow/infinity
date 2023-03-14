@@ -39,8 +39,10 @@ enum class PhysicalOperatorType: uint8_t {
     // DDL
     kAlter,
     kCreateTable,
+    kCreateSchema,
     kCreateView,
     kDropTable,
+    kDropSchema,
     kDropView,
 
     // misc

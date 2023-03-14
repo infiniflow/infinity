@@ -30,6 +30,7 @@ enum class LogicalNodeType: uint8_t {
     // DDL
     kAlter,
     kCreateTable,
+    kCreateSchema,
     kCreateView,
     kDropTable,
     kDropSchema,
@@ -43,11 +44,5 @@ enum class LogicalNodeType: uint8_t {
 
     // ?
     kExplain,
-    kAlias,
-    kMock,
-    kValidate,
-    kStoredTable,
-    kStaticTable,
-    kRoot,
     kPrepare,
 };

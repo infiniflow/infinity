@@ -27,6 +27,9 @@ private:
     BuildCreateTable(const SharedPtr<LogicalNode>& logical_operator) const;
 
     [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildCreateSchema(const SharedPtr<LogicalNode>& logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
     BuildPreparedPlan(const SharedPtr<LogicalNode>& logical_operator) const;
 
     [[nodiscard]] SharedPtr<PhysicalOperator>
@@ -35,6 +38,9 @@ private:
     // Drop operator
     [[nodiscard]] SharedPtr<PhysicalOperator>
     BuildDropTable(const SharedPtr<LogicalNode>& logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildDropSchema(const SharedPtr<LogicalNode>& logical_operator) const;
 
     [[nodiscard]] SharedPtr<PhysicalOperator>
     BuildDropView(const SharedPtr<LogicalNode>& logical_operator) const;

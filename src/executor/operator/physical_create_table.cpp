@@ -53,5 +53,4 @@ PhysicalCreateTable::Execute(SharedPtr<QueryContext>& query_context) {
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 
-
 }

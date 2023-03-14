@@ -10,7 +10,11 @@ namespace infinity {
 
 void
 Catalog::CreateSchema(const SharedPtr<SchemaDefinition>& schema_definition) {
-    const String& schema_name = schema_definition->name();
+    String schema_name = schema_definition->name();
+    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
+        return std::tolower(c);
+    });
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         SharedPtr<Schema> schema_ptr = MakeShared<Schema>(schema_name, schema_id_counter_ ++);
         schemas_[schema_name] = schema_ptr;
@@ -20,7 +24,15 @@ Catalog::CreateSchema(const SharedPtr<SchemaDefinition>& schema_definition) {
 }
 
 void
-Catalog::DeleteSchema(const String &schema_name) {
+Catalog::DeleteSchema(String schema_name) {
+    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
+        return std::tolower(c);
+    });
+
+    if(schema_name == "default") {
+        CatalogError("Default schema can't be dropped.");
+    }
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, can't be dropped: " + schema_name);
     }
@@ -28,7 +40,11 @@ Catalog::DeleteSchema(const String &schema_name) {
 }
 
 SharedPtr<Table>
-Catalog::GetTableByName(const String& schema_name, const String& table_name) {
+Catalog::GetTableByName(String schema_name, const String& table_name) {
+    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
+        return std::tolower(c);
+    });
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found: " + schema_name);
     }
@@ -36,7 +52,11 @@ Catalog::GetTableByName(const String& schema_name, const String& table_name) {
 }
 
 void
-Catalog::AddTable(const String& schema_name, const SharedPtr<Table> &table_def) {
+Catalog::AddTable(String schema_name, const SharedPtr<Table> &table_def) {
+    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
+        return std::tolower(c);
+    });
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, table can't be created: " + schema_name);
     }
@@ -44,7 +64,11 @@ Catalog::AddTable(const String& schema_name, const SharedPtr<Table> &table_def) 
 }
 
 void
-Catalog::DeleteTable(const String& schema_name, const String &table_name) {
+Catalog::DeleteTable(String schema_name, const String &table_name) {
+    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
+        return std::tolower(c);
+    });
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, table can't be deleted: " + schema_name);
     }
@@ -52,7 +76,11 @@ Catalog::DeleteTable(const String& schema_name, const String &table_name) {
 }
 
 Vector<SharedPtr<Table>>
-Catalog::GetTables(const String& schema_name) {
+Catalog::GetTables(String schema_name) {
+    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
+        return std::tolower(c);
+    });
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("No schema: " + schema_name);
     }

@@ -11,20 +11,20 @@
 namespace infinity {
 
 void
-Statement::BuildString(const BaseStatement* statement,
-                       SharedPtr<Vector<SharedPtr<String>>>& result,
-                       i64 intent_size) {
+Statement::Explain(const BaseStatement* statement,
+                   SharedPtr<Vector<SharedPtr<String>>>& stmt_string,
+                   i64 intent_size) {
     switch(statement->Type()) {
         case StatementType::kSelect: {
-            BuildSelect((SelectStatement*)statement, result, intent_size);
+            BuildSelect((SelectStatement*)statement, stmt_string, intent_size);
             break;
         }
         case StatementType::kCopy: {
-            BuildCopy((CopyStatement*)statement, result, intent_size);
+            BuildCopy((CopyStatement*)statement, stmt_string, intent_size);
             break;
         }
         case StatementType::kInsert: {
-            BuildInsert((InsertStatement*)statement, result, intent_size);
+            BuildInsert((InsertStatement*)statement, stmt_string, intent_size);
             break;
         }
         case StatementType::kUpdate:
@@ -32,11 +32,11 @@ Statement::BuildString(const BaseStatement* statement,
         case StatementType::kDelete:
             break;
         case StatementType::kCreate: {
-            BuildCreate((CreateStatement*)statement, result, intent_size);
+            BuildCreate((CreateStatement*)statement, stmt_string, intent_size);
             break;
         }
         case StatementType::kDrop: {
-            BuildDrop((DropStatement*)statement, result, intent_size);
+            BuildDrop((DropStatement*)statement, stmt_string, intent_size);
             break;
         }
         case StatementType::kPrepare:
@@ -46,7 +46,7 @@ Statement::BuildString(const BaseStatement* statement,
         case StatementType::kAlter:
             break;
         case StatementType::kShow: {
-            BuildShow((ShowStatement*)statement, result, intent_size);
+            BuildShow((ShowStatement*)statement, stmt_string, intent_size);
             break;
         }
         default: {
@@ -73,22 +73,7 @@ Statement::BuildCreate(const CreateStatement* create_statement,
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "name: " + schema_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
-            String conflict = String(intent_size, ' ') + "conflict type: ";
-            switch(schema_info->conflict_type_) {
-                case ConflictType::kInvalid: {
-                    PlannerError("Unexpected create schema conflict type")
-                    break;
-                }
-                case ConflictType::kIgnore:
-                    conflict += "Ignore";
-                    break;
-                case ConflictType::kError:
-                    conflict += "Issue error";
-                    break;
-                case ConflictType::kReplace:
-                    conflict += "Replace";
-                    break;
-            }
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -101,22 +86,7 @@ Statement::BuildCreate(const CreateStatement* create_statement,
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
-            String conflict = String(intent_size, ' ') + "conflict type: ";
-            switch(table_info->conflict_type_) {
-                case ConflictType::kInvalid: {
-                    PlannerError("Unexpected create schema conflict type")
-                    break;
-                }
-                case ConflictType::kIgnore:
-                    conflict += "Ignore";
-                    break;
-                case ConflictType::kError:
-                    conflict += "Issue error";
-                    break;
-                case ConflictType::kReplace:
-                    conflict += "Replace";
-                    break;
-            }
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(table_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             String column_names = String(intent_size, ' ') + "columns: (";
 
@@ -152,21 +122,7 @@ Statement::BuildCreate(const CreateStatement* create_statement,
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
-            String conflict = String(intent_size, ' ') + "conflict type: ";
-            switch(collection_info->conflict_type_) {
-                case ConflictType::kInvalid: {
-                    PlannerError("Unexpected create schema conflict type")
-                }
-                case ConflictType::kIgnore:
-                    conflict += "Ignore";
-                    break;
-                case ConflictType::kError:
-                    conflict += "Issue error";
-                    break;
-                case ConflictType::kReplace:
-                    conflict += "Replace";
-                    break;
-            }
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -216,22 +172,7 @@ Statement::BuildDrop(const DropStatement* drop_statement,
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "name: " + schema_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
-            String conflict = String(intent_size, ' ') + "conflict type: ";
-            switch(schema_info->conflict_type_) {
-                case ConflictType::kInvalid: {
-                    PlannerError("Unexpected create schema conflict type")
-                    break;
-                }
-                case ConflictType::kIgnore:
-                    conflict += "Ignore";
-                    break;
-                case ConflictType::kError:
-                    conflict += "Issue error";
-                    break;
-                case ConflictType::kReplace:
-                    conflict += "Replace";
-                    break;
-            }
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -244,6 +185,8 @@ Statement::BuildDrop(const DropStatement* drop_statement,
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(table_info->conflict_type_);
+            result->emplace_back(MakeShared<String>(conflict));
             break;
         }
         case DDLType::kCollection: {
@@ -255,21 +198,7 @@ Statement::BuildDrop(const DropStatement* drop_statement,
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
-            String conflict = String(intent_size, ' ') + "conflict type: ";
-            switch(collection_info->conflict_type_) {
-                case ConflictType::kInvalid: {
-                    PlannerError("Unexpected create schema conflict type")
-                }
-                case ConflictType::kIgnore:
-                    conflict += "Ignore";
-                    break;
-                case ConflictType::kError:
-                    conflict += "Issue error";
-                    break;
-                case ConflictType::kReplace:
-                    conflict += "Replace";
-                    break;
-            }
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }

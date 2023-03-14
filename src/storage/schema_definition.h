@@ -4,16 +4,30 @@
 
 #pragma once
 
+#include "common/types/internal_types.h"
 #include <string>
+
+namespace infinity {
 
 class SchemaDefinition {
 public:
-    SchemaDefinition(std::string schema_name, bool if_exists)
-        : name_(std::move(schema_name)), if_exists_(if_exists) {}
-    [[nodiscard]] const std::string& name() const { return name_; }
-    [[nodiscard]] bool if_exists() const { return if_exists_; }
+    SchemaDefinition(SharedPtr<String> schema_name, ConflictType conflict_type)
+            : name_(std::move(schema_name)), conflict_type_(conflict_type)
+            {}
+
+    [[nodiscard]] const String&
+    name() const {
+        return *name_;
+    }
+
+    [[nodiscard]] ConflictType
+    conflict_type() const {
+        return conflict_type_;
+    }
+
 private:
-    std::string name_;
-    bool if_exists_ = false;
+    SharedPtr<String> name_;
+    ConflictType conflict_type_{ConflictType::kInvalid};
 };
 
+}

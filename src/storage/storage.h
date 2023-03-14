@@ -14,9 +14,10 @@ class Infinity;
 
 class Storage {
 public:
-    explicit Storage(std::string data_path);
+    explicit
+    Storage(String data_path);
 
-    [[nodiscard]] inline std::unique_ptr<Catalog>&
+    [[nodiscard]] inline UniquePtr<Catalog>&
     catalog() noexcept {
         return catalog_;
     }
@@ -28,8 +29,8 @@ public:
     Uninit();
 
 private:
-    std::string data_path_;
-    std::unique_ptr<Catalog> catalog_;
+    String data_path_;
+    UniquePtr<Catalog> catalog_;
 };
 
 }

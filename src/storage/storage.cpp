@@ -18,7 +18,8 @@ void
 Storage::Init() {
 
     // Update schema need to begin transaction
-    std::shared_ptr<SchemaDefinition> schema_def_ptr = std::make_shared<SchemaDefinition>("Default", false);
+    SharedPtr<String> schema_name = MakeShared<String>("Default");
+    SharedPtr<SchemaDefinition> schema_def_ptr = MakeShared<SchemaDefinition>(schema_name, ConflictType::kError);
     catalog_->CreateSchema(schema_def_ptr);
     // Commit transaction
 
