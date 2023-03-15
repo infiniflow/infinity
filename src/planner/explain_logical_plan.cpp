@@ -25,10 +25,14 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
             break;
         case LogicalNodeType::kLimit:
             break;
-        case LogicalNodeType::kFilter:
+        case LogicalNodeType::kFilter: {
+            Explain((LogicalFilter*)statement, result, intent_size);
             break;
-        case LogicalNodeType::kProjection:
+        }
+        case LogicalNodeType::kProjection: {
+            Explain((LogicalProject*)statement, result, intent_size);
             break;
+        }
         case LogicalNodeType::kSort:
             break;
         case LogicalNodeType::kDelete:
@@ -196,6 +200,51 @@ ExplainLogicalPlan::Explain(const LogicalDropCollection* drop_node,
     drop_str += *drop_node->schema_name() + "." + *drop_node->collection_name()
                 + " conflict type: " + ConflictTypeToStr(drop_node->conflict_type());
     result->emplace_back(MakeShared<String>(drop_str));
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalProject* project_node,
+                    SharedPtr<Vector<SharedPtr<String>>>& result,
+                    i64 intent_size) {
+    String drop_str;
+    if(intent_size != 0) {
+        drop_str = String(intent_size - 2, ' ') + "-> PROJECT: ";
+    } else {
+        drop_str = "PROJECT: ";
+    }
+
+    SizeT expr_count = project_node->expressions_.size();
+    if(expr_count == 0) {
+        PlannerError("No expression list in projection node.");
+    }
+    for(SizeT idx = 0; idx < expr_count - 1; ++ idx) {
+        drop_str += project_node->expressions_[idx]->ToString() + ", ";
+    }
+    drop_str += project_node->expressions_.back()->ToString();
+    result->emplace_back(MakeShared<String>(drop_str));
+    if(project_node->left_node() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(project_node->left_node().get(), result, intent_size);
+    }
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalFilter* filter_node,
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
+    String filter_str;
+    if(intent_size != 0) {
+        filter_str = String(intent_size - 2, ' ') + "-> FILTER: ";
+    } else {
+        filter_str = "FILTER: ";
+    }
+    filter_str += filter_node->expression()->ToString();
+    intent_size += 2;
+    result->emplace_back(MakeShared<String>(filter_str));
+    if(filter_node->left_node() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(filter_node->left_node().get(), result, intent_size);
+    }
 }
 
 }

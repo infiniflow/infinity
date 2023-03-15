@@ -34,8 +34,18 @@ public:
         return left_node_;
     }
 
+    [[nodiscard]] inline const SharedPtr<LogicalNode>&
+    left_node() const {
+        return left_node_;
+    }
+
     [[nodiscard]] inline SharedPtr<LogicalNode>&
     right_node() {
+        return right_node_;
+    }
+
+    [[nodiscard]] inline const SharedPtr<LogicalNode>&
+    right_node() const {
         return right_node_;
     }
 

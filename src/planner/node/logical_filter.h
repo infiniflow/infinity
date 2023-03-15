@@ -35,6 +35,11 @@ public:
     expression() {
         return expression_;
     }
+
+    [[nodiscard]] inline const SharedPtr<BaseExpression>&
+    expression() const {
+        return expression_;
+    }
 private:
     SharedPtr<BaseExpression> expression_{};
 };

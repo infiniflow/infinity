@@ -11,6 +11,8 @@
 #include "planner/node/logical_drop_schema.h"
 #include "planner/node/logical_drop_table.h"
 #include "planner/node/logical_drop_collection.h"
+#include "planner/node/logical_project.h"
+#include "planner/node/logical_filter.h"
 
 namespace infinity {
 
@@ -48,6 +50,16 @@ public:
 
     static void
     Explain(const LogicalDropCollection* create_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalProject* project_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalFilter* filter_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 
