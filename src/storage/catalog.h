@@ -21,46 +21,46 @@ public:
 
     // Table related methods
     SharedPtr<Table>
-    GetTableByName(String schema_name, const String& table_name);
+    GetTableByName(String schema_name, String table_name);
 
     void
     AddTable(String schema_name, const SharedPtr<Table>& table_def);
 
     void
-    DeleteTable(String schema_name, const String& table_name);
+    DeleteTable(String schema_name, String table_name);
 
     std::vector<SharedPtr<Table>>
     GetTables(String schema_name);
 
     // View related methods
     SharedPtr<View>
-    GetViewByName(const String& schema_name, const String& view_name);
+    GetViewByName(String schema_name, String view_name);
 
     void
-    AddView(const String& schema_name, const SharedPtr<View>& view);
+    AddView(String schema_name, const SharedPtr<View>& view);
 
     void
-    DeleteView(const String& schema_name, const String& view_name);
+    DeleteView(String schema_name, String view_name);
 
     // Function related methods
     SharedPtr<FunctionSet>
-    GetFunctionSetByName(String& function_name);
+    GetFunctionSetByName(String function_name);
 
     void
     AddFunctionSet(const SharedPtr<FunctionSet>& function_set);
 
     void
-    DeleteFunctionSet(const String& function_name);
+    DeleteFunctionSet(String function_name);
 
     // Table Function related methods
     SharedPtr<TableFunction>
-    GetTableFunctionByName(const String& function_name);
+    GetTableFunctionByName(String function_name);
 
     void
     AddTableFunction(const SharedPtr<TableFunction>& table_function);
 
     void
-    DeleteTableFunction(const String& function_name);
+    DeleteTableFunction(String function_name);
 
     ~Catalog() override = default;
 

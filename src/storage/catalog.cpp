@@ -11,9 +11,7 @@ namespace infinity {
 void
 Catalog::CreateSchema(const SharedPtr<SchemaDefinition>& schema_definition) {
     String schema_name = schema_definition->name();
-    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
-        return std::tolower(c);
-    });
+    StringToLower(schema_name);
 
     if(schemas_.find(schema_name) == schemas_.end()) {
         SharedPtr<Schema> schema_ptr = MakeShared<Schema>(schema_name, schema_id_counter_ ++);
@@ -25,9 +23,7 @@ Catalog::CreateSchema(const SharedPtr<SchemaDefinition>& schema_definition) {
 
 void
 Catalog::DeleteSchema(String schema_name) {
-    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
-        return std::tolower(c);
-    });
+    StringToLower(schema_name);
 
     if(schema_name == "default") {
         CatalogError("Default schema can't be dropped.");
@@ -40,10 +36,9 @@ Catalog::DeleteSchema(String schema_name) {
 }
 
 SharedPtr<Table>
-Catalog::GetTableByName(String schema_name, const String& table_name) {
-    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
-        return std::tolower(c);
-    });
+Catalog::GetTableByName(String schema_name, String table_name) {
+    StringToLower(schema_name);
+    StringToLower(table_name);
 
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found: " + schema_name);
@@ -53,9 +48,7 @@ Catalog::GetTableByName(String schema_name, const String& table_name) {
 
 void
 Catalog::AddTable(String schema_name, const SharedPtr<Table> &table_def) {
-    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
-        return std::tolower(c);
-    });
+    StringToLower(schema_name);
 
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, table can't be created: " + schema_name);
@@ -64,10 +57,9 @@ Catalog::AddTable(String schema_name, const SharedPtr<Table> &table_def) {
 }
 
 void
-Catalog::DeleteTable(String schema_name, const String &table_name) {
-    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
-        return std::tolower(c);
-    });
+Catalog::DeleteTable(String schema_name, String table_name) {
+    StringToLower(schema_name);
+    StringToLower(table_name);
 
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, table can't be deleted: " + schema_name);
@@ -77,9 +69,7 @@ Catalog::DeleteTable(String schema_name, const String &table_name) {
 
 Vector<SharedPtr<Table>>
 Catalog::GetTables(String schema_name) {
-    std::transform(schema_name.begin(), schema_name.end(), schema_name.begin(), [](const auto c) {
-        return std::tolower(c);
-    });
+    StringToLower(schema_name);
 
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("No schema: " + schema_name);
@@ -94,7 +84,10 @@ Catalog::GetTables(String schema_name) {
 }
 
 SharedPtr<View>
-Catalog::GetViewByName(const String& schema_name, const String& view_name) {
+Catalog::GetViewByName(String schema_name, String view_name) {
+    StringToLower(schema_name);
+    StringToLower(view_name);
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found: " + schema_name);
     }
@@ -102,7 +95,8 @@ Catalog::GetViewByName(const String& schema_name, const String& view_name) {
 }
 
 void
-Catalog::AddView(const String& schema_name, const SharedPtr<View>& view) {
+Catalog::AddView(String schema_name, const SharedPtr<View>& view) {
+    StringToLower(schema_name);
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, view can't be created: " + schema_name);
     }
@@ -110,7 +104,9 @@ Catalog::AddView(const String& schema_name, const SharedPtr<View>& view) {
 }
 
 void
-Catalog::DeleteView(const String& schema_name, const String& view_name) {
+Catalog::DeleteView(String schema_name, String view_name) {
+    StringToLower(schema_name);
+    StringToLower(view_name);
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, view can't be deleted: " + schema_name);
     }
@@ -118,11 +114,9 @@ Catalog::DeleteView(const String& schema_name, const String& view_name) {
 }
 
 SharedPtr<FunctionSet>
-Catalog::GetFunctionSetByName(String& function_name) {
+Catalog::GetFunctionSetByName(String function_name) {
     // Transfer the function to upper case.
-    std::transform(function_name.begin(), function_name.end(), function_name.begin(), [](const auto c) {
-        return std::toupper(c);
-    });
+    StringToLower(function_name);
 
     if(!function_sets_.contains(function_name)) {
         CatalogError("No function name: " + function_name);
@@ -132,7 +126,8 @@ Catalog::GetFunctionSetByName(String& function_name) {
 
 void
 Catalog::AddFunctionSet(const SharedPtr<FunctionSet>& function_set) {
-    const String& name = function_set->name();
+    String name = function_set->name();
+    StringToLower(name);
     if(function_sets_.contains(name)) {
         CatalogError("Trying to add duplicated function name into catalog: " + name);
     }
@@ -140,7 +135,8 @@ Catalog::AddFunctionSet(const SharedPtr<FunctionSet>& function_set) {
 }
 
 void
-Catalog::DeleteFunctionSet(const String& function_name) {
+Catalog::DeleteFunctionSet(String function_name) {
+    StringToLower(function_name);
     if(!function_sets_.contains(function_name)) {
         CatalogError("Delete not exist function: " + function_name);
     }
@@ -148,7 +144,8 @@ Catalog::DeleteFunctionSet(const String& function_name) {
 }
 
 SharedPtr<TableFunction>
-Catalog::GetTableFunctionByName(const String& function_name) {
+Catalog::GetTableFunctionByName(String function_name) {
+    StringToLower(function_name);
     if(!table_functions_.contains(function_name)) {
         CatalogError("No table function name: " + function_name);
     }
@@ -157,7 +154,8 @@ Catalog::GetTableFunctionByName(const String& function_name) {
 
 void
 Catalog::AddTableFunction(const SharedPtr<TableFunction>& table_function) {
-    const String& name = table_function->name();
+    String name = table_function->name();
+    StringToLower(name);
     if(table_functions_.contains(name)) {
         CatalogError("Trying to add duplicated table function name into catalog: " + name);
     }
@@ -165,7 +163,8 @@ Catalog::AddTableFunction(const SharedPtr<TableFunction>& table_function) {
 }
 
 void
-Catalog::DeleteTableFunction(const String& function_name) {
+Catalog::DeleteTableFunction(String function_name) {
+    StringToLower(function_name);
     if(!table_functions_.contains(function_name)) {
         CatalogError("Delete not exist table function: " + function_name);
     }

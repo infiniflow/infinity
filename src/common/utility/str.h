@@ -17,6 +17,13 @@ namespace infinity {
 String
 TrimPath(const String& path);
 
+inline void
+StringToLower(String& str) {
+    std::transform(str.begin(), str.end(), str.begin(), [](const auto c) {
+        return std::tolower(c);
+    });
+}
+
 // trim from start (in place)
 inline void
 ltrim(String &s) {
