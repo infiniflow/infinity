@@ -26,7 +26,7 @@ public:
                             SharedPtr<String> collection_name_,
                             u64 table_index,
                             ConflictType conflict_type)
-            : LogicalNode(node_id, LogicalNodeType::kCreateTable),
+            : LogicalNode(node_id, LogicalNodeType::kCreateCollection),
               schema_name_(std::move(schema_name)),
               collection_name_(std::move(collection_name_)),
               table_index_(table_index),
@@ -59,6 +59,11 @@ public:
     [[nodiscard]] inline u64
     table_index() const {
         return table_index_;
+    }
+
+    [[nodiscard]] inline ConflictType
+    conflict_type() const {
+        return conflict_type_;
     }
 
 private:

@@ -429,7 +429,8 @@ LogicalPlanner::BuildDropCollection(const DropStatement* statement, SharedPtr<Bi
     SharedPtr<LogicalNode> logical_drop_collection
             = MakeShared<LogicalDropCollection>(bind_context_ptr->GetNewLogicalNodeId(),
                                                 schema_name_ptr,
-                                                MakeShared<String>(drop_collection_info->collection_name_));
+                                                MakeShared<String>(drop_collection_info->collection_name_),
+                                                drop_collection_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_collection;
     this->names_ptr_->emplace_back(String("OK"));

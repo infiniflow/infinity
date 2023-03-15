@@ -46,6 +46,10 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
         case LogicalNodeType::kCreateTable: {
             break;
         }
+        case LogicalNodeType::kCreateCollection: {
+            Explain((LogicalCreateCollection*)statement, result, intent_size);
+            break;
+        }
         case LogicalNodeType::kCreateSchema: {
             Explain((LogicalCreateSchema*)statement, result, intent_size);
             break;
@@ -54,6 +58,10 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
             break;
         case LogicalNodeType::kDropTable: {
             Explain((LogicalDropTable*)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kDropCollection: {
+            Explain((LogicalDropCollection*)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kDropSchema: {
@@ -106,7 +114,16 @@ void
 ExplainLogicalPlan::Explain(const LogicalCreateCollection* create_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
+    String create_str;
+    if(intent_size != 0) {
+        create_str = String(intent_size - 2, ' ') + "-> CREATE COLLECTION: ";
+    } else {
+        create_str = "CREATE COLLECTION: ";
+    }
 
+    create_str += *create_node->schema_name() + "." + *create_node->collection_name()
+                + " conflict type: " + ConflictTypeToStr(create_node->conflict_type());
+    result->emplace_back(MakeShared<String>(create_str));
 }
 
 void
@@ -144,7 +161,16 @@ void
 ExplainLogicalPlan::Explain(const LogicalDropCollection* drop_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
+    String drop_str;
+    if(intent_size != 0) {
+        drop_str = String(intent_size - 2, ' ') + "-> DROP COLLECTION: ";
+    } else {
+        drop_str = "DROP COLLECTION: ";
+    }
 
+    drop_str += *drop_node->schema_name() + "." + *drop_node->collection_name()
+                + " conflict type: " + ConflictTypeToStr(drop_node->conflict_type());
+    result->emplace_back(MakeShared<String>(drop_str));
 }
 
 }
