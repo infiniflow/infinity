@@ -52,8 +52,10 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
         }
         case LogicalNodeType::kCreateView:
             break;
-        case LogicalNodeType::kDropTable:
+        case LogicalNodeType::kDropTable: {
+            Explain((LogicalDropTable*)statement, result, intent_size);
             break;
+        }
         case LogicalNodeType::kDropSchema: {
             Explain((LogicalDropSchema*)statement, result, intent_size);
             break;
@@ -126,7 +128,16 @@ void
 ExplainLogicalPlan::Explain(const LogicalDropTable* drop_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
+    String drop_str;
+    if(intent_size != 0) {
+        drop_str = String(intent_size - 2, ' ') + "-> DROP TABLE: ";
+    } else {
+        drop_str = "DROP TABLE: ";
+    }
 
+    drop_str += *drop_node->schema_name() + "." + *drop_node->table_name()
+             + " conflict type: " + ConflictTypeToStr(drop_node->conflict_type());
+    result->emplace_back(MakeShared<String>(drop_str));
 }
 
 void

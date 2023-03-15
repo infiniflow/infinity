@@ -407,7 +407,8 @@ LogicalPlanner::BuildDropTable(const DropStatement* statement, SharedPtr<BindCon
     SharedPtr<LogicalNode> logical_drop_table
             = MakeShared<LogicalDropTable>(bind_context_ptr->GetNewLogicalNodeId(),
                                            schema_name_ptr,
-                                           table_name_ptr);
+                                           table_name_ptr,
+                                           drop_table_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_table;
     this->names_ptr_->emplace_back(String("OK"));
