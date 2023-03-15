@@ -77,8 +77,10 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
             break;
         case LogicalNodeType::kChunkScan:
             break;
-        case LogicalNodeType::kTableScan:
+        case LogicalNodeType::kTableScan:{
+            Explain((LogicalTableScan*)statement, result, intent_size);
             break;
+        }
         case LogicalNodeType::kViewScan:
             break;
         case LogicalNodeType::kDummyScan:
@@ -206,11 +208,11 @@ void
 ExplainLogicalPlan::Explain(const LogicalProject* project_node,
                     SharedPtr<Vector<SharedPtr<String>>>& result,
                     i64 intent_size) {
-    String drop_str;
+    String project_str;
     if(intent_size != 0) {
-        drop_str = String(intent_size - 2, ' ') + "-> PROJECT: ";
+        project_str = String(intent_size - 2, ' ') + "-> PROJECT: ";
     } else {
-        drop_str = "PROJECT: ";
+        project_str = "PROJECT: ";
     }
 
     SizeT expr_count = project_node->expressions_.size();
@@ -218,10 +220,10 @@ ExplainLogicalPlan::Explain(const LogicalProject* project_node,
         PlannerError("No expression list in projection node.");
     }
     for(SizeT idx = 0; idx < expr_count - 1; ++ idx) {
-        drop_str += project_node->expressions_[idx]->ToString() + ", ";
+        project_str += project_node->expressions_[idx]->ToString() + ", ";
     }
-    drop_str += project_node->expressions_.back()->ToString();
-    result->emplace_back(MakeShared<String>(drop_str));
+    project_str += project_node->expressions_.back()->ToString();
+    result->emplace_back(MakeShared<String>(project_str));
     if(project_node->left_node() != nullptr) {
         intent_size += 2;
         ExplainLogicalPlan::Explain(project_node->left_node().get(), result, intent_size);
@@ -246,5 +248,34 @@ ExplainLogicalPlan::Explain(const LogicalFilter* filter_node,
         ExplainLogicalPlan::Explain(filter_node->left_node().get(), result, intent_size);
     }
 }
+
+void
+ExplainLogicalPlan::Explain(const LogicalTableScan* filter_node,
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
+    String table_scan_str;
+    if(intent_size != 0) {
+        table_scan_str = String(intent_size - 2, ' ') + "-> TABLE SCAN: ";
+    } else {
+        table_scan_str = "TABLE SCAN: ";
+    }
+
+    table_scan_str += filter_node->table_alias_ + "(";
+    SizeT column_count = filter_node->column_names_.size();
+    if(column_count == 0) {
+        PlannerError(fmt::format("No column in table: {}.", filter_node->table_alias_));
+    }
+    for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+        table_scan_str += filter_node->column_names_[idx] + ", ";
+    }
+    table_scan_str += filter_node->column_names_.back() + ")";
+    result->emplace_back(MakeShared<String>(table_scan_str));
+
+    if(filter_node->left_node() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(filter_node->left_node().get(), result, intent_size);
+    }
+}
+
 
 }
