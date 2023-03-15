@@ -44,6 +44,7 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
         case LogicalNodeType::kAlter:
             break;
         case LogicalNodeType::kCreateTable: {
+            Explain((LogicalCreateTable*)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kCreateCollection: {
@@ -107,7 +108,31 @@ void
 ExplainLogicalPlan::Explain(const LogicalCreateTable* create_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
+    String create_str;
+    if(intent_size != 0) {
+        create_str = String(intent_size - 2, ' ') + "-> CREATE TABLE: ";
+    } else {
+        create_str = "CREATE TABLE: ";
+    }
 
+    create_str += *create_node->schema_name() + "."
+               + create_node->table_definitions()->name()
+               + " conflict type: " + ConflictTypeToStr(create_node->conflict_type());
+    result->emplace_back(MakeShared<String>(create_str));
+
+    SizeT column_count = create_node->table_definitions()->column_count();
+    if(column_count == 0) {
+        PlannerError("No columns in the table");
+    }
+    const Vector<SharedPtr<ColumnDef>>& columns = create_node->table_definitions()->columns();
+
+    intent_size += 2;
+    String columns_str = String(intent_size, ' ') + "Columns: ";
+    for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+        columns_str += columns[idx]->ToString() + ", ";
+    }
+    columns_str += columns.back()->ToString();
+    result->emplace_back(MakeShared<String>(columns_str));
 }
 
 void
