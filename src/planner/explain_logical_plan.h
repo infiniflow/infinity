@@ -20,6 +20,7 @@
 #include "planner/node/logical_cross_product.h"
 #include "planner/node/logical_join.h"
 #include "planner/node/logical_insert.h"
+#include "planner/node/logical_chunk_scan.h"
 
 namespace infinity {
 
@@ -46,17 +47,17 @@ public:
             i64 intent_size = 0);
 
     static void
-    Explain(const LogicalDropSchema* create_node,
+    Explain(const LogicalDropSchema* drop_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 
     static void
-    Explain(const LogicalDropTable* create_node,
+    Explain(const LogicalDropTable* drop_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 
     static void
-    Explain(const LogicalDropCollection* create_node,
+    Explain(const LogicalDropCollection* drop_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 
@@ -81,17 +82,17 @@ public:
             i64 intent_size = 0);
 
     static void
-    Explain(const LogicalAggregate* table_scan_node,
+    Explain(const LogicalAggregate* aggregate_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 
     static void
-    Explain(const LogicalSort* table_scan_node,
+    Explain(const LogicalSort* sort_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 
     static void
-    Explain(const LogicalLimit* table_scan_node,
+    Explain(const LogicalLimit* limit_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 
@@ -101,7 +102,12 @@ public:
             i64 intent_size = 0);
 
     static void
-    Explain(const LogicalJoin* cross_product_node,
+    Explain(const LogicalJoin* join_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalChunkScan* chunk_scan_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 

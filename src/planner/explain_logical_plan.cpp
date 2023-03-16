@@ -87,8 +87,10 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
         }
         case LogicalNodeType::kDropView:
             break;
-        case LogicalNodeType::kChunkScan:
+        case LogicalNodeType::kChunkScan: {
+            Explain((LogicalChunkScan*)statement, result, intent_size);
             break;
+        }
         case LogicalNodeType::kTableScan:{
             Explain((LogicalTableScan*)statement, result, intent_size);
             break;
@@ -460,6 +462,25 @@ ExplainLogicalPlan::Explain(const LogicalJoin* join_node,
 
     if(join_node->right_node() != nullptr) {
         ExplainLogicalPlan::Explain(join_node->right_node().get(), result, intent_size);
+    }
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalChunkScan* chunk_scan_node,
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
+    String chunk_scan_str;
+    if(intent_size != 0) {
+        chunk_scan_str = String(intent_size - 2, ' ') + "-> CHUNK SCAN: ";
+    } else {
+        chunk_scan_str = "CHUNK SCAN: ";
+    }
+    chunk_scan_str += ToString(chunk_scan_node->scan_type());
+    result->emplace_back(MakeShared<String>(chunk_scan_str));
+
+    if(chunk_scan_node->left_node() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(chunk_scan_node->left_node().get(), result, intent_size);
     }
 }
 

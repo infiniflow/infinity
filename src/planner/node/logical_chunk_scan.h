@@ -17,6 +17,9 @@ enum class ChunkScanType {
     kIntermediate,
 };
 
+String
+ToString(ChunkScanType type);
+
 class LogicalChunkScan: public LogicalNode {
 public:
     explicit

@@ -133,7 +133,6 @@ public:
     void
     BuildShowTables(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
-    // Transaction operator
     void
     BuildExplain(const ExplainStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 

@@ -8,6 +8,19 @@
 namespace infinity {
 
 String
+ToString(ChunkScanType type) {
+    switch(type) {
+        case ChunkScanType::kShowTables:
+            return "Show tables";
+        case ChunkScanType::kShowColumn:
+            return "Show column";
+        default: {
+            PlannerError("Invalid chunk scan type");
+        }
+    }
+}
+
+String
 LogicalChunkScan::ToString(i64& space) {
     std::stringstream ss;
     String arrow_str;
