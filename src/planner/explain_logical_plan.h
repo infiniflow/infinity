@@ -14,6 +14,10 @@
 #include "planner/node/logical_project.h"
 #include "planner/node/logical_filter.h"
 #include "planner/node/logical_table_scan.h"
+#include "planner/node/logical_sort.h"
+#include "planner/node/logical_limit.h"
+#include "planner/node/logical_aggregate.h"
+#include "planner/node/logical_cross_product.h"
 
 namespace infinity {
 
@@ -65,7 +69,27 @@ public:
             i64 intent_size = 0);
 
     static void
-    Explain(const LogicalTableScan* filter_node,
+    Explain(const LogicalTableScan* table_scan_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalAggregate* table_scan_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalSort* table_scan_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalLimit* table_scan_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalCrossProduct* cross_product_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 

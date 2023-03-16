@@ -11,8 +11,10 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
                             SharedPtr<Vector<SharedPtr<String>>> &result,
                             i64 intent_size) {
     switch(statement->operator_type()) {
-        case LogicalNodeType::kAggregate:
+        case LogicalNodeType::kAggregate: {
+            Explain((LogicalAggregate*)statement, result, intent_size);
             break;
+        }
         case LogicalNodeType::kExcept:
             break;
         case LogicalNodeType::kUnion:
@@ -21,10 +23,14 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
             break;
         case LogicalNodeType::kJoin:
             break;
-        case LogicalNodeType::kCrossProduct:
+        case LogicalNodeType::kCrossProduct: {
+            Explain((LogicalCrossProduct*)statement, result, intent_size);
             break;
-        case LogicalNodeType::kLimit:
+        }
+        case LogicalNodeType::kLimit: {
+            Explain((LogicalLimit*)statement, result, intent_size);
             break;
+        }
         case LogicalNodeType::kFilter: {
             Explain((LogicalFilter*)statement, result, intent_size);
             break;
@@ -33,8 +39,10 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
             Explain((LogicalProject*)statement, result, intent_size);
             break;
         }
-        case LogicalNodeType::kSort:
+        case LogicalNodeType::kSort: {
+            Explain((LogicalSort*)statement, result, intent_size);
             break;
+        }
         case LogicalNodeType::kDelete:
             break;
         case LogicalNodeType::kUpdate:
@@ -241,7 +249,6 @@ ExplainLogicalPlan::Explain(const LogicalFilter* filter_node,
         filter_str = "FILTER: ";
     }
     filter_str += filter_node->expression()->ToString();
-    intent_size += 2;
     result->emplace_back(MakeShared<String>(filter_str));
     if(filter_node->left_node() != nullptr) {
         intent_size += 2;
@@ -250,7 +257,7 @@ ExplainLogicalPlan::Explain(const LogicalFilter* filter_node,
 }
 
 void
-ExplainLogicalPlan::Explain(const LogicalTableScan* filter_node,
+ExplainLogicalPlan::Explain(const LogicalTableScan* table_scan_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
     String table_scan_str;
@@ -260,22 +267,137 @@ ExplainLogicalPlan::Explain(const LogicalTableScan* filter_node,
         table_scan_str = "TABLE SCAN: ";
     }
 
-    table_scan_str += filter_node->table_alias_ + "(";
-    SizeT column_count = filter_node->column_names_.size();
+    table_scan_str += table_scan_node->table_alias_ + "(";
+    SizeT column_count = table_scan_node->column_names_.size();
     if(column_count == 0) {
-        PlannerError(fmt::format("No column in table: {}.", filter_node->table_alias_));
+        PlannerError(fmt::format("No column in table: {}.", table_scan_node->table_alias_));
     }
     for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
-        table_scan_str += filter_node->column_names_[idx] + ", ";
+        table_scan_str += table_scan_node->column_names_[idx] + ", ";
     }
-    table_scan_str += filter_node->column_names_.back() + ")";
+    table_scan_str += table_scan_node->column_names_.back() + ")";
     result->emplace_back(MakeShared<String>(table_scan_str));
 
-    if(filter_node->left_node() != nullptr) {
+    if(table_scan_node->left_node() != nullptr) {
         intent_size += 2;
-        ExplainLogicalPlan::Explain(filter_node->left_node().get(), result, intent_size);
+        ExplainLogicalPlan::Explain(table_scan_node->left_node().get(), result, intent_size);
     }
 }
 
+void
+ExplainLogicalPlan::Explain(const LogicalAggregate* aggregate_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String agg_str;
+    if(intent_size != 0) {
+        agg_str = String(intent_size - 2, ' ') + "-> AGGREGATE: ";
+    } else {
+        agg_str = "AGGREGATE: ";
+    }
+
+    SizeT groups_count = aggregate_node->groups_.size();
+    SizeT aggregates_count = aggregate_node->aggregates_.size();
+    if(groups_count == 0 && aggregate_node == 0) {
+        PlannerError("Both groups and aggregates are empty.")
+    }
+
+    if(aggregates_count != 0) {
+        for(SizeT idx = 0; idx < aggregates_count - 1; ++ idx) {
+            agg_str += aggregate_node->aggregates_[idx]->ToString() + ", ";
+        }
+        agg_str += aggregate_node->aggregates_.back()->ToString();
+        if(groups_count != 0) {
+            agg_str += ", ";
+        }
+    }
+
+    if(groups_count != 0) {
+        agg_str += "GROUP BY: ";
+        for(SizeT idx = 0; idx < groups_count - 1; ++ idx) {
+            agg_str += aggregate_node->groups_[idx]->ToString() + ", ";
+        }
+        agg_str += aggregate_node->groups_.back()->ToString();
+    }
+
+    result->emplace_back(MakeShared<String>(agg_str));
+
+    if(aggregate_node->left_node() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(aggregate_node->left_node().get(), result, intent_size);
+    }
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalSort* sort_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String sort_str;
+    if(intent_size != 0) {
+        sort_str = String(intent_size - 2, ' ') + "-> ORDER BY: ";
+    } else {
+        sort_str = "ORDER BY: ";
+    }
+
+    SizeT order_by_count = sort_node->expressions_.size();
+    if(order_by_count == 0) {
+        PlannerError("ORDER BY without any expression.")
+    }
+
+    for(SizeT idx = 0; idx < order_by_count - 1; ++ idx) {
+        sort_str += sort_node->expressions_[idx]->ToString() + " " + ToString(sort_node->order_by_types_[idx]) + ", ";
+    }
+    result->emplace_back(MakeShared<String>(sort_str));
+
+    if(sort_node->left_node() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(sort_node->left_node().get(), result, intent_size);
+    }
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalLimit* limit_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String limit_str;
+    if(intent_size != 0) {
+        limit_str = String(intent_size - 2, ' ') + "-> LIMIT: ";
+    } else {
+        limit_str = "LIMIT: ";
+    }
+
+    limit_str += limit_node->limit_expression_->ToString();
+    if(limit_node->offset_expression_ != 0) {
+        limit_str += ", OFFSET: " + limit_node->offset_expression_->ToString();
+    }
+
+    result->emplace_back(MakeShared<String>(limit_str));
+
+    if(limit_node->left_node() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(limit_node->left_node().get(), result, intent_size);
+    }
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalCrossProduct* cross_product_node,
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
+    String cross_product_str;
+    if(intent_size != 0) {
+        cross_product_str = String(intent_size - 2, ' ') + "-> CROSS PRODUCT: ";
+    } else {
+        cross_product_str = "CROSS PRODUCT: ";
+    }
+    result->emplace_back(MakeShared<String>(cross_product_str));
+
+    intent_size += 2;
+    if(cross_product_node->left_node() != nullptr) {
+        ExplainLogicalPlan::Explain(cross_product_node->left_node().get(), result, intent_size);
+    }
+
+    if(cross_product_node->left_node() != nullptr) {
+        ExplainLogicalPlan::Explain(cross_product_node->left_node().get(), result, intent_size);
+    }
+}
 
 }
