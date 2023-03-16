@@ -507,18 +507,25 @@ SharedPtr<TableRef>
 QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
                        const JoinReference* from_table) {
 
-    String alias = from_table->alias_->alias_ != nullptr ? from_table->alias_->alias_ : String();
+    String alias{};
+
+    if(from_table->alias_ != nullptr && from_table->alias_->alias_ != nullptr) {
+        alias = from_table->alias_->alias_;
+    }
+
     auto result = MakeShared<JoinTableRef>(bind_context_ptr_->GenerateTableIndex(), alias);
 
     result->join_type_ = from_table->join_type_;
 
     // Build left child
-    SharedPtr<QueryBinder> left_query_binder = MakeShared<QueryBinder>(query_context, this->bind_context_ptr_);
+    auto left_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
+    SharedPtr<QueryBinder> left_query_binder = MakeShared<QueryBinder>(query_context, left_bind_context_ptr);
     auto left_bound_table_ref = left_query_binder->BuildFromClause(query_context, from_table->left_);
     this->bind_context_ptr_->AddLeftChild(left_query_binder->bind_context_ptr_);
 
     // Build right child
-    SharedPtr<QueryBinder> right_query_binder = MakeShared<QueryBinder>(query_context, this->bind_context_ptr_);
+    auto right_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
+    SharedPtr<QueryBinder> right_query_binder = MakeShared<QueryBinder>(query_context, right_bind_context_ptr);
     auto right_bound_table_ref = right_query_binder->BuildFromClause(query_context, from_table->right_);
     this->bind_context_ptr_->AddRightChild(right_query_binder->bind_context_ptr_);
 

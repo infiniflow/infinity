@@ -18,6 +18,7 @@
 #include "planner/node/logical_limit.h"
 #include "planner/node/logical_aggregate.h"
 #include "planner/node/logical_cross_product.h"
+#include "planner/node/logical_join.h"
 
 namespace infinity {
 
@@ -90,6 +91,11 @@ public:
 
     static void
     Explain(const LogicalCrossProduct* cross_product_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalJoin* cross_product_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 

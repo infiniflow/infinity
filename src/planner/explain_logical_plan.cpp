@@ -21,8 +21,10 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
             break;
         case LogicalNodeType::kIntersect:
             break;
-        case LogicalNodeType::kJoin:
+        case LogicalNodeType::kJoin: {
+            Explain((LogicalJoin*)statement, result, intent_size);
             break;
+        }
         case LogicalNodeType::kCrossProduct: {
             Explain((LogicalCrossProduct*)statement, result, intent_size);
             break;
@@ -397,6 +399,37 @@ ExplainLogicalPlan::Explain(const LogicalCrossProduct* cross_product_node,
 
     if(cross_product_node->left_node() != nullptr) {
         ExplainLogicalPlan::Explain(cross_product_node->left_node().get(), result, intent_size);
+    }
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalJoin* join_node,
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
+    String join_str;
+    if(intent_size != 0) {
+        join_str = String(intent_size - 2, ' ') + "-> ";
+    }
+    join_str += ToString(join_node->join_type_) + ": ";
+
+    SizeT conditions_count = join_node->conditions_.size();
+    if(conditions_count == 0) {
+        PlannerError("JOIN without any condition.")
+    }
+
+    for(SizeT idx = 0; idx < conditions_count - 1; ++ idx) {
+        join_str += join_node->conditions_[idx]->ToString() + ", ";
+    }
+    join_str += join_node->conditions_.back()->ToString();
+    result->emplace_back(MakeShared<String>(join_str));
+
+    intent_size += 2;
+    if(join_node->left_node() != nullptr) {
+        ExplainLogicalPlan::Explain(join_node->left_node().get(), result, intent_size);
+    }
+
+    if(join_node->right_node() != nullptr) {
+        ExplainLogicalPlan::Explain(join_node->right_node().get(), result, intent_size);
     }
 }
 
