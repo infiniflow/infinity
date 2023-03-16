@@ -24,11 +24,13 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
         case ChunkScanType::kShowTables: {
             // Define output table schema
             Vector<SharedPtr<ColumnDef>> column_defs = {
-                    MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "table_name", HashSet<ConstraintType>()),
-                    MakeShared<ColumnDef>(1, DataType(LogicalType::kBigInt), "column_count", HashSet<ConstraintType>()),
-                    MakeShared<ColumnDef>(2, DataType(LogicalType::kBigInt), "row_count", HashSet<ConstraintType>()),
-                    MakeShared<ColumnDef>(3, DataType(LogicalType::kBigInt), "block_count", HashSet<ConstraintType>()),
-                    MakeShared<ColumnDef>(4, DataType(LogicalType::kBigInt), "block_size", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "schema", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "table", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(2, DataType(LogicalType::kVarchar), "type", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(3, DataType(LogicalType::kBigInt), "column_count", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(4, DataType(LogicalType::kBigInt), "row_count", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(5, DataType(LogicalType::kBigInt), "block_count", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(6, DataType(LogicalType::kBigInt), "block_size", HashSet<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = MakeShared<TableDef>("Tables", column_defs);
@@ -41,8 +43,12 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
             // Prepare the output data block
             SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
             auto table_name_type_info_ptr = VarcharInfo::Make(TABLE_NAME_LIMIT);
+            auto schema_name_type_info_ptr = VarcharInfo::Make(SCHEMA_NAME_LIMIT);
+            auto base_table_type_info_ptr = VarcharInfo::Make(BASE_TABLE_TYPE_LIMIT);
             Vector<DataType> column_types {
                 DataType(LogicalType::kVarchar, table_name_type_info_ptr),
+                DataType(LogicalType::kVarchar, schema_name_type_info_ptr),
+                DataType(LogicalType::kVarchar, base_table_type_info_ptr),
                 DataType(LogicalType::kBigInt),
                 DataType(LogicalType::kBigInt),
                 DataType(LogicalType::kBigInt),
@@ -55,7 +61,16 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
 
                 size_t column_id = 0;
                 {
-                    // Append table name to the 1st column
+                    // Append schema name to the 1 column
+                    const String& schema_name = table->SchemaName();
+                    Value value = Value::MakeVarchar(schema_name, schema_name_type_info_ptr);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
+
+                ++ column_id;
+                {
+                    // Append table name to the 0 column
                     const String& table_name = table->TableName();
                     Value value = Value::MakeVarchar(table_name, table_name_type_info_ptr);
                     ValueExpression value_expr(value);
@@ -64,7 +79,16 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
 
                 ++ column_id;
                 {
-                    // Append column count the 2nd column
+                    // Append base table type to the 2 column
+                    const String& base_table_type = ToString(table->kind());
+                    Value value = Value::MakeVarchar(base_table_type, base_table_type_info_ptr);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
+
+                ++ column_id;
+                {
+                    // Append column count the 3 column
                     Value value = Value::MakeBigInt(static_cast<i64>(table->ColumnCount()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -72,7 +96,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
 
                 ++ column_id;
                 {
-                    // Append row count the 3rd column
+                    // Append row count the 4 column
                     Value value = Value::MakeBigInt(static_cast<i64>(table->row_count()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -80,7 +104,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
 
                 ++ column_id;
                 {
-                    // Append block count the 4th column
+                    // Append block count the 5 column
                     Value value = Value::MakeBigInt(static_cast<i64>(table->DataBlockCount()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -88,7 +112,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
 
                 ++ column_id;
                 {
-                    // Append block limit the 5th column
+                    // Append block limit the 6 column
                     Value value = Value::MakeBigInt(Infinity::instance().config()->option_.default_row_count_);
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

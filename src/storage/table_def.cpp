@@ -9,7 +9,7 @@ namespace infinity {
 String
 TableDef::ToString() const {
     std::stringstream ss;
-    ss << name_ << '[';
+    ss << table_name_ << '[';
     for(size_t i = 0; auto& column_ptr: this->columns_) {
         ss << column_ptr->name();
         ++ i;

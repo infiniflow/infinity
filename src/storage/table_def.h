@@ -18,7 +18,8 @@ public:
 public:
     explicit
     TableDef(String table_name, Vector<SharedPtr<ColumnDef>> columns)
-            : columns_(std::move(columns)), name_(std::move(table_name)) {
+            : columns_(std::move(columns)),
+            table_name_(std::move(table_name)) {
         SizeT column_count = columns_.size();
         for(SizeT idx = 0; idx < column_count; ++ idx) {
             column_name2id_[columns_[idx]->name()] = idx;
@@ -37,7 +38,12 @@ public:
 
     [[nodiscard]] inline const String&
     name() const {
-        return name_;
+        return table_name_;
+    }
+
+    [[nodiscard]] inline const String&
+    schema_name() const {
+        return schema_name_;
     }
 
     [[nodiscard]] inline SizeT
@@ -58,7 +64,8 @@ public:
 private:
     Vector<SharedPtr<ColumnDef>> columns_{};
     HashMap<String, SizeT> column_name2id_{};
-    String name_{};
+    String table_name_{};
+    String schema_name_{"Default"};
 };
 }
 

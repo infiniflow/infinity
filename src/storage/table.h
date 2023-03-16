@@ -8,6 +8,7 @@
 
 #include "table_def.h"
 #include "data_block.h"
+#include "base_table.h"
 
 namespace infinity {
 
@@ -24,7 +25,7 @@ enum class TableType {
     kResult,
 };
 
-class Table {
+class Table : public BaseTable {
 public:
     static inline SharedPtr<Table>
     Make(SharedPtr<TableDef> table_def_ptr, TableType type) {
@@ -34,7 +35,8 @@ public:
 public:
     explicit
     Table(SharedPtr<TableDef> table_def_ptr, TableType type)
-        : definition_ptr_(std::move(table_def_ptr)),
+        : BaseTable(BaseTableType::kTable),
+        definition_ptr_(std::move(table_def_ptr)),
         row_count_(0),
         type_(type)
         {}
@@ -48,6 +50,11 @@ public:
     [[nodiscard]] String
     TableName() const {
         return definition_ptr_->name();
+    }
+
+    [[nodiscard]] inline const String&
+    SchemaName() const {
+        return definition_ptr_->schema_name();
     }
 
     SizeT

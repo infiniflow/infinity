@@ -15,9 +15,11 @@
 #include "executor/operator/physical_aggregate.h"
 #include "executor/operator/physical_alter.h"
 #include "executor/operator/physical_create_table.h"
+#include "executor/operator/physical_create_collection.h"
 #include "executor/operator/physical_create_view.h"
 #include "executor/operator/physical_delete.h"
 #include "executor/operator/physical_drop_table.h"
+#include "executor/operator/physical_drop_collection.h"
 #include "executor/operator/physical_export.h"
 #include "executor/operator/physical_filter.h"
 #include "executor/operator/physical_hash_join.h"
@@ -48,6 +50,8 @@
 #include "executor/operator/physical_create_schema.h"
 #include "planner/node/logical_drop_schema.h"
 #include "executor/operator/physical_drop_schema.h"
+#include "planner/node/logical_create_collection.h"
+#include "planner/node/logical_drop_collection.h"
 
 #include <limits>
 
@@ -63,12 +67,20 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
             result = BuildCreateTable(logical_operator);
             break;
         }
+        case LogicalNodeType::kCreateCollection: {
+            result = BuildCreateCollection(logical_operator);
+            break;
+        }
         case LogicalNodeType::kCreateSchema: {
             result = BuildCreateSchema(logical_operator);
             break;
         }
         case LogicalNodeType::kDropTable: {
             result = BuildDropTable(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kDropCollection: {
+            result = BuildDropCollection(logical_operator);
             break;
         }
         case LogicalNodeType::kDropSchema: {
@@ -195,6 +207,18 @@ PhysicalPlanner::BuildCreateTable(const SharedPtr<LogicalNode> &logical_operator
 }
 
 SharedPtr<PhysicalOperator>
+PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalCreateCollection> logical_create_collection =
+            std::static_pointer_cast<LogicalCreateCollection>(logical_operator);
+    return MakeShared<PhysicalCreateCollection>(
+            logical_create_collection->schema_name(),
+            logical_create_collection->collection_name(),
+            logical_create_collection->conflict_type(),
+            logical_create_collection->table_index(),
+            logical_operator->node_id());
+}
+
+SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildCreateSchema(const SharedPtr<LogicalNode> &logical_operator) const {
     SharedPtr<LogicalCreateSchema> logical_create_schema =
             std::static_pointer_cast<LogicalCreateSchema>(logical_operator);
@@ -222,6 +246,17 @@ PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) 
             logical_drop_table->schema_name(),
             logical_drop_table->table_name(),
             logical_drop_table->node_id());
+}
+
+SharedPtr<PhysicalOperator>
+PhysicalPlanner::BuildDropCollection(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalDropCollection> logical_drop_collection =
+            std::static_pointer_cast<LogicalDropCollection>(logical_operator);
+    return MakeShared<PhysicalDropCollection>(
+            logical_drop_collection->schema_name(),
+            logical_drop_collection->collection_name(),
+            logical_drop_collection->conflict_type(),
+            logical_drop_collection->node_id());
 }
 
 SharedPtr<PhysicalOperator>
