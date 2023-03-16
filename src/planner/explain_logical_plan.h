@@ -19,6 +19,7 @@
 #include "planner/node/logical_aggregate.h"
 #include "planner/node/logical_cross_product.h"
 #include "planner/node/logical_join.h"
+#include "planner/node/logical_insert.h"
 
 namespace infinity {
 
@@ -56,6 +57,11 @@ public:
 
     static void
     Explain(const LogicalDropCollection* create_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalInsert* insert_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 

@@ -28,7 +28,7 @@ public:
         return {};
     }
 
-    String 
+    String
     ToString(i64& space) final;
 
     inline String
@@ -36,17 +36,28 @@ public:
         return "LogicalInsert";
     }
 
-    void 
+    inline void
     set_value_list(const Vector<SharedPtr<BaseExpression>>& value_list) {
         value_list_ = value_list;
     }
 
-    SharedPtr<Table>& table_ptr() {
+    inline SharedPtr<Table>&
+    table_ptr() {
         return table_ptr_;
     }
 
-    Vector<SharedPtr<BaseExpression>>&
+    inline const SharedPtr<Table>&
+    table_ptr() const {
+        return table_ptr_;
+    }
+
+    inline Vector<SharedPtr<BaseExpression>>&
     value_list() {
+        return value_list_;
+    }
+
+    inline const Vector<SharedPtr<BaseExpression>>&
+    value_list() const {
         return value_list_;
     }
 

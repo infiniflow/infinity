@@ -49,8 +49,10 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
             break;
         case LogicalNodeType::kUpdate:
             break;
-        case LogicalNodeType::kInsert:
+        case LogicalNodeType::kInsert: {
+            Explain((LogicalInsert*)statement, result, intent_size);
             break;
+        }
         case LogicalNodeType::kImport:
             break;
         case LogicalNodeType::kExport:
@@ -212,6 +214,34 @@ ExplainLogicalPlan::Explain(const LogicalDropCollection* drop_node,
     drop_str += *drop_node->schema_name() + "." + *drop_node->collection_name()
                 + " conflict type: " + ConflictTypeToStr(drop_node->conflict_type());
     result->emplace_back(MakeShared<String>(drop_str));
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalInsert* insert_node,
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
+    String insert_str;
+    if(intent_size != 0) {
+        insert_str = String(intent_size - 2, ' ') + "-> INSERT: ";
+    } else {
+        insert_str = "INSERT: ";
+    }
+
+    insert_str += insert_node->table_ptr()->TableName() + "(";
+    SizeT value_count = insert_node->value_list().size();
+    if(value_count == 0) {
+        PlannerError("No value list in insert statement");
+    }
+    for(SizeT idx = 0; idx < value_count - 1; ++ idx) {
+        auto& value_expr = insert_node->value_list()[idx];
+        insert_str += value_expr->ToString() + ", ";
+    }
+    insert_str += insert_node->value_list().back()->ToString();
+    result->emplace_back(MakeShared<String>(insert_str));
+    if(insert_node->left_node() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(insert_node->left_node().get(), result, intent_size);
+    }
 }
 
 void
