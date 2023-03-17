@@ -13,6 +13,7 @@ public:
     explicit
     PhysicalDropTable(SharedPtr<String> schema_name,
                       SharedPtr<String> tbl_name,
+                      ConflictType conflict_type,
                       u64 id)
         : PhysicalOperator(PhysicalOperatorType::kDropTable, nullptr, nullptr, id),
         schema_name_(std::move(schema_name)),
@@ -27,9 +28,25 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline SharedPtr<String>
+    schema_name() const {
+        return schema_name_;
+    }
+
+    inline SharedPtr<String>
+    table_name() const {
+        return table_name_;
+    }
+
+    inline ConflictType
+    conflict_type() const {
+        return conflict_type_;
+    }
+
 private:
     SharedPtr<String> schema_name_{};
     SharedPtr<String> table_name_{};
+    ConflictType conflict_type_{ConflictType::kInvalid};
 };
 
 }

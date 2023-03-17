@@ -71,7 +71,7 @@ Statement::BuildCreate(const CreateStatement* create_statement,
             result->emplace_back(MakeShared<String>(create_schema));
             auto* schema_info = (CreateSchemaInfo*)create_statement->create_info_.get();
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "name: " + schema_info->schema_name_;
+            String schema_name = String(intent_size, ' ') + "table_name: " + schema_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
@@ -120,7 +120,7 @@ Statement::BuildCreate(const CreateStatement* create_statement,
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "schema: " + collection_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
-            String collection_name = String(intent_size, ' ') + "name: " + collection_info->collection_name_;
+            String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
             String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
@@ -170,7 +170,7 @@ Statement::BuildDrop(const DropStatement* drop_statement,
             result->emplace_back(MakeShared<String>(drop_schema));
             auto* schema_info = (DropSchemaInfo*)drop_statement->drop_info_.get();
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "name: " + schema_info->schema_name_;
+            String schema_name = String(intent_size, ' ') + "table_name: " + schema_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
@@ -196,7 +196,7 @@ Statement::BuildDrop(const DropStatement* drop_statement,
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "schema: " + collection_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
-            String collection_name = String(intent_size, ' ') + "name: " + collection_info->collection_name_;
+            String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
             String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));

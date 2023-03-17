@@ -51,7 +51,7 @@ public:
 private:
     SharedPtr<String> table_name_{};
     SharedPtr<String> schema_name_{};
-    ConflictType conflict_type_{ConflictType::kError};
+    ConflictType conflict_type_{ConflictType::kInvalid};
 };
 
 }

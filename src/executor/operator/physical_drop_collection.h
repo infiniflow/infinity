@@ -28,6 +28,21 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline SharedPtr<String>
+    schema_name() const {
+        return schema_name_;
+    }
+
+    inline SharedPtr<String>
+    collection_name() const {
+        return collection_name_;
+    }
+
+    inline ConflictType
+    conflict_type() const {
+        return conflict_type_;
+    }
+
 private:
     SharedPtr<String> schema_name_{};
     SharedPtr<String> collection_name_{};

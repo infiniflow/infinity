@@ -35,7 +35,7 @@ public:
 public:
     explicit
     Table(SharedPtr<TableDef> table_def_ptr, TableType type)
-        : BaseTable(BaseTableType::kTable, table_def_ptr->schema_name(), table_def_ptr->name()),
+        : BaseTable(BaseTableType::kTable, table_def_ptr->schema_name(), table_def_ptr->table_name()),
         definition_ptr_(std::move(table_def_ptr)),
         row_count_(0),
         type_(type)
@@ -49,7 +49,7 @@ public:
 
     [[nodiscard]] String
     TableName() const {
-        return definition_ptr_->name();
+        return definition_ptr_->table_name();
     }
 
     [[nodiscard]] inline const String&

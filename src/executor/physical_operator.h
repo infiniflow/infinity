@@ -60,6 +60,11 @@ public:
         return output_;
     }
 
+    inline PhysicalOperatorType
+    operator_type() const {
+        return operator_type_;
+    }
+
 protected:
     u64 operator_id_;
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};

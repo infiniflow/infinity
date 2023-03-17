@@ -52,6 +52,8 @@
 #include "executor/operator/physical_drop_schema.h"
 #include "planner/node/logical_create_collection.h"
 #include "planner/node/logical_drop_collection.h"
+#include "planner/node/logical_join.h"
+#include "explain_physical_plan.h"
 
 #include <limits>
 
@@ -202,6 +204,7 @@ PhysicalPlanner::BuildCreateTable(const SharedPtr<LogicalNode> &logical_operator
     return MakeShared<PhysicalCreateTable>(
             logical_create_table->schema_name(),
             logical_create_table->table_definitions(),
+            logical_create_table->conflict_type(),
             logical_create_table->table_index(),
             logical_operator->node_id());
 }
@@ -245,6 +248,7 @@ PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) 
     return MakeShared<PhysicalDropTable>(
             logical_drop_table->schema_name(),
             logical_drop_table->table_name(),
+            logical_drop_table->conflict_type(),
             logical_drop_table->node_id());
 }
 
@@ -330,7 +334,27 @@ PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) 
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalHashJoin>(logical_operator->node_id());
+
+    auto left_node = logical_operator->left_node();
+    auto right_node = logical_operator->right_node();
+    PlannerAssert(left_node != nullptr, "Join node has no left child.");
+    PlannerAssert(right_node != nullptr, "Join node has no right child.");
+
+    SharedPtr<LogicalJoin> logical_join
+            = std::static_pointer_cast<LogicalJoin>(logical_operator);
+
+    SharedPtr<PhysicalOperator> left_physical_operator{};
+    SharedPtr<PhysicalOperator> right_physical_operator{};
+
+    left_physical_operator = BuildPhysicalOperator(left_node);
+    right_physical_operator = BuildPhysicalOperator(right_node);
+
+    return MakeShared<PhysicalNestedLoopJoin>(logical_operator->node_id(),
+                                              logical_join->table_index_,
+                                              logical_join->join_type_,
+                                              logical_join->conditions_,
+                                              left_physical_operator,
+                                              right_physical_operator);
 }
 
 SharedPtr<PhysicalOperator>
@@ -461,7 +485,7 @@ PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) 
         if(name2index.contains(column_name)) {
             column_ids.emplace_back(name2index[column_name]);
         } else {
-            PlannerError("Unknown column name: " + column_name + " when building physical plan.");
+            PlannerError("Unknown column table_name: " + column_name + " when building physical plan.");
         }
     }
 
@@ -501,10 +525,20 @@ PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode>& logical_operator) co
     SharedPtr<LogicalExplain> logical_explain =
             std::static_pointer_cast<LogicalExplain>(logical_operator);
 
-    SharedPtr<PhysicalExplain> explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
-                                                                          logical_explain->explain_type(),
-                                                                          logical_explain->TextArray(),
-                                                                          nullptr);
+    SharedPtr<PhysicalExplain> explain_node{nullptr};
+    if(logical_explain->explain_type() == ExplainType::kPhysical) {
+        SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
+        ExplainPhysicalPlan::Explain(input_physical_operator.get(), texts_ptr);
+        explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
+                                                   logical_explain->explain_type(),
+                                                   texts_ptr,
+                                                   input_physical_operator);
+    } else {
+        explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
+                                                   logical_explain->explain_type(),
+                                                   logical_explain->TextArray(),
+                                                   input_physical_operator);
+    }
 
     return explain_node;
 }

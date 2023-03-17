@@ -15,7 +15,7 @@ String LogicalCreateTable::ToString(i64& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Create Table: " << *schema_name_ << "." << table_definitions_->ToString();
+    ss << String(space, ' ') << arrow_str << "Create Table: " << *schema_name_ << "." << table_definition_->ToString();
     space += arrow_str.size();
 
     return ss.str();

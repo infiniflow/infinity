@@ -2095,7 +2095,7 @@ yydestruct (const char *yymsg,
     case YYSYMBOL_table_name: /* table_name  */
 #line 208 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
             {
-    fprintf(stderr, "destroy table name\n");
+    fprintf(stderr, "destroy table table_name\n");
     if ((((*yyvaluep).table_name_t)) != nullptr) {
         free(((*yyvaluep).table_name_t)->schema_name_ptr_);
         free(((*yyvaluep).table_name_t)->table_name_ptr_);

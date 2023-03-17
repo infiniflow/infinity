@@ -19,7 +19,7 @@ ColumnIdentifier::MakeColumnIdentifier(SharedPtr<QueryContext>& query_context,
     SharedPtr<String> column_name_ptr = nullptr;
 
     i64 name_count = expr.names_.size();
-    PlannerAssert(name_count <= 4 && name_count > 0, "Invalid field count of the column name.");
+    PlannerAssert(name_count <= 4 && name_count > 0, "Invalid field count of the column table_name.");
     -- name_count;
     column_name_ptr = MakeShared<String>(expr.names_[name_count]);
     -- name_count;

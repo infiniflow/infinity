@@ -44,7 +44,7 @@ QueryBinder::BindSelect(const SelectStatement& statement) {
             WithExpr* with_expr = (*statement.with_exprs_)[i];
             String name = with_expr->alias_;
             if(bind_context_ptr_->CTE_map_.contains(name)) {
-                PlannerError("WITH query name: " + name + " occurs more than once.");
+                PlannerError("WITH query table_name: " + name + " occurs more than once.");
             }
 
             PlannerAssert(with_expr->select_->type_ == StatementType::kSelect, "Non-select statement in WITH clause.");
@@ -583,7 +583,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
 
                 auto& left_column_binding_names = result->left_bind_context_->binding_names_by_column_[column_name];
 
-                PlannerAssert(left_column_binding_names.size() == 1, "Ambiguous column name: " + column_name + " in left table");
+                PlannerAssert(left_column_binding_names.size() == 1, "Ambiguous column table_name: " + column_name + " in left table");
 
                 auto& left_binding_name = left_column_binding_names[0];
                 auto& left_binding_ptr = result->left_bind_context_->binding_by_name_[left_binding_name];
@@ -602,7 +602,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
 
                 auto& right_column_binding_names = result->right_bind_context_->binding_names_by_column_[column_name];
 
-                PlannerAssert(right_column_binding_names.size() == 1, "Ambiguous column name: " + column_name + " in right table");
+                PlannerAssert(right_column_binding_names.size() == 1, "Ambiguous column table_name: " + column_name + " in right table");
 
 
                 auto& right_binding_name = right_column_binding_names[0];

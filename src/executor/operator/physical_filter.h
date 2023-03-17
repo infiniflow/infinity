@@ -16,7 +16,7 @@ public:
     explicit
     PhysicalFilter(u64 id,
                    SharedPtr<PhysicalOperator> left,
-                   const SharedPtr<BaseExpression>& condition)
+                   SharedPtr<BaseExpression> condition)
                    : PhysicalOperator(PhysicalOperatorType::kFilter, left, nullptr, id),
                      condition_(condition)
                      {}
@@ -29,8 +29,13 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline const SharedPtr<BaseExpression>&
+    condition() const {
+        return condition_;
+    }
+
 private:
-    const SharedPtr<BaseExpression>& condition_;
+    SharedPtr<BaseExpression> condition_;
 
     ExpressionExecutor executor;
     ExpressionSelector selector_;

@@ -16,12 +16,14 @@ public:
     explicit
     PhysicalCreateTable(SharedPtr<String> schema_name,
                         SharedPtr<TableDef> table_def_ptr,
+                        ConflictType conflict_type,
                         u64 table_index,
                         uint64_t id);
 
     explicit
     PhysicalCreateTable(SharedPtr<String> schema_name,
                         const SharedPtr<PhysicalOperator>& input,
+                        ConflictType conflict_type,
                         u64 table_index,
                         uint64_t id);
 
@@ -38,11 +40,21 @@ public:
         return table_index_;
     }
 
+    inline const SharedPtr<TableDef>&
+    table_definition() const {
+        return table_def_ptr_;
+    }
+
+    inline ConflictType
+    conflict_type() const {
+        return conflict_type_;
+    }
+
 private:
     SharedPtr<TableDef> table_def_ptr_{};
     SharedPtr<String> schema_name_{};
     u64 table_index_{};
-
+    ConflictType conflict_type_{ConflictType::kInvalid};
 };
 
 }

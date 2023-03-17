@@ -136,7 +136,7 @@ ExplainLogicalPlan::Explain(const LogicalCreateTable* create_node,
     }
 
     create_str += *create_node->schema_name() + "."
-               + create_node->table_definitions()->name()
+               + create_node->table_definitions()->table_name()
                + " conflict type: " + ConflictTypeToStr(create_node->conflict_type());
     result->emplace_back(MakeShared<String>(create_str));
 

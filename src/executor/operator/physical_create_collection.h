@@ -33,10 +33,25 @@ public:
         return table_index_;
     }
 
+    inline SharedPtr<String>
+    schema_name() const {
+        return schema_name_;
+    }
+
+    inline SharedPtr<String>
+    collection_name() const {
+        return collection_name_;
+    }
+
+    inline ConflictType
+    conflict_type() const {
+        return conflict_type_;
+    }
+
 private:
     SharedPtr<String> schema_name_{};
     SharedPtr<String> collection_name_{};
-    ConflictType conflict_type_{};
+    ConflictType conflict_type_{ConflictType::kInvalid};
     u64 table_index_{};
 
 };

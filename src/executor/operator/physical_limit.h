@@ -29,6 +29,16 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline const SharedPtr<BaseExpression>&
+    limit_expr() const {
+        return limit_expr_;
+    }
+
+    inline const SharedPtr<BaseExpression>&
+    offset_expr() const {
+        return offset_expr_;
+    }
+
     static SharedPtr<Table>
     GetLimitOutput(const SharedPtr<Table>& input_table, i64 limit, i64 offset);
 

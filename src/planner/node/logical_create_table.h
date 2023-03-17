@@ -30,7 +30,7 @@ public:
                        ConflictType conflict_type)
         : LogicalNode(node_id, LogicalNodeType::kCreateTable),
           schema_name_(std::move(schema_name)),
-          table_definitions_(std::move(table_def_ptr)),
+          table_definition_(std::move(table_def_ptr)),
           table_index_(table_index),
           conflict_type_(conflict_type)
           {}
@@ -50,7 +50,7 @@ public:
 
     [[nodiscard]] SharedPtr<TableDef>
     table_definitions() const {
-        return table_definitions_;
+        return table_definition_;
     }
 
     [[nodiscard]] SharedPtr<String>
@@ -70,7 +70,7 @@ public:
 
 private:
     SharedPtr<String> schema_name_{};
-    SharedPtr<TableDef> table_definitions_{};
+    SharedPtr<TableDef> table_definition_{};
     u64 table_index_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
 };

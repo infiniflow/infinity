@@ -250,7 +250,7 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
             // TODO: What will happen, when different tables have the same column name?
             Vector<String>& binding_names = binding_names_by_column_[column_name_ref];
             if(binding_names.size() > 1) {
-                PlannerError("Ambiguous column name: " + column_identifier.ToString());
+                PlannerError("Ambiguous column table_name: " + column_identifier.ToString());
             }
 
             String& binding_name = binding_names[0];

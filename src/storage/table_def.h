@@ -37,7 +37,7 @@ public:
     }
 
     [[nodiscard]] inline const String&
-    name() const {
+    table_name() const {
         return table_name_;
     }
 

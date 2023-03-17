@@ -60,7 +60,7 @@ TEST_F(TableDefTest, test1) {
 
     TableDef table_def("t1", columns);
 
-    EXPECT_EQ(table_def.name(), "t1");
+    EXPECT_EQ(table_def.table_name(), "t1");
     EXPECT_EQ(table_def.column_count(), 2);
     EXPECT_EQ(table_def.GetColIdByName("c1"), 0);
     EXPECT_EQ(table_def.GetColIdByName("c2"), 1);

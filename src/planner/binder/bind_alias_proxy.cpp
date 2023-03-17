@@ -23,7 +23,7 @@ BindAliasProxy::BindAlias(ExpressionBinder& expression_binder,
     const ParsedExpr* select_expr = bind_context_ptr->select_expression_[alias_pair->second];
 
     if(binding_alias_) {
-        PlannerError("Trying to bind an alias name: " + expr_name + " in another alias");
+        PlannerError("Trying to bind an alias table_name: " + expr_name + " in another alias");
     }
 
     binding_alias_ = true;

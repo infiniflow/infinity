@@ -27,6 +27,11 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline ChunkScanType
+    scan_type() const {
+        return scan_type_;
+    }
+
 private:
     ChunkScanType scan_type_{ChunkScanType::kInvalid};
     u64 table_index_{};

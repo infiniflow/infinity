@@ -29,6 +29,16 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline const SharedPtr<Table>&
+    table() const {
+        return table_ptr_;
+    }
+
+    inline const Vector<SharedPtr<BaseExpression>>&
+    value_list() const {
+        return value_list_;
+    }
+
 private:
     SharedPtr<Table> table_ptr_{};
     Vector<SharedPtr<BaseExpression>> value_list_{};

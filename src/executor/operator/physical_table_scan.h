@@ -37,6 +37,21 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline String
+    table_alias() const {
+        return table_alias_;
+    }
+
+    inline const Vector<String>&
+    column_names() const {
+        return column_names_;
+    }
+
+    inline const Vector<DataType>&
+    column_types() const {
+        return column_types_;
+    }
+
 private:
     String table_alias_{};
     u64 table_index_{};

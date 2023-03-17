@@ -114,7 +114,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
 
     // Get table name
     if(table_name.empty()) {
-        PlannerError("Insert statement missing table name.");
+        PlannerError("Insert statement missing table table_name.");
     }
     // Check schema and table in the catalog
     SharedPtr<BaseTable> base_table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, table_name);

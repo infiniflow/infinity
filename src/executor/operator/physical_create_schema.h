@@ -29,6 +29,16 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline SharedPtr<String>
+    schema_name() const {
+        return schema_name_;
+    }
+
+    inline ConflictType
+    conflict_type() const {
+        return conflict_type_;
+    }
+
 private:
     SharedPtr<String> schema_name_{};
     ConflictType conflict_type_{ConflictType::kInvalid};

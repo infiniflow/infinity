@@ -146,7 +146,7 @@ Catalog::GetFunctionSetByName(String function_name) {
     StringToLower(function_name);
 
     if(!function_sets_.contains(function_name)) {
-        CatalogError("No function name: " + function_name);
+        CatalogError("No function table_name: " + function_name);
     }
     return function_sets_[function_name];
 }
@@ -156,7 +156,7 @@ Catalog::AddFunctionSet(const SharedPtr<FunctionSet>& function_set) {
     String name = function_set->name();
     StringToLower(name);
     if(function_sets_.contains(name)) {
-        CatalogError("Trying to add duplicated function name into catalog: " + name);
+        CatalogError("Trying to add duplicated function table_name into catalog: " + name);
     }
     function_sets_.emplace(name, function_set);
 }
@@ -174,7 +174,7 @@ SharedPtr<TableFunction>
 Catalog::GetTableFunctionByName(String function_name) {
     StringToLower(function_name);
     if(!table_functions_.contains(function_name)) {
-        CatalogError("No table function name: " + function_name);
+        CatalogError("No table function table_name: " + function_name);
     }
     return table_functions_[function_name];
 }
@@ -184,7 +184,7 @@ Catalog::AddTableFunction(const SharedPtr<TableFunction>& table_function) {
     String name = table_function->name();
     StringToLower(name);
     if(table_functions_.contains(name)) {
-        CatalogError("Trying to add duplicated table function name into catalog: " + name);
+        CatalogError("Trying to add duplicated table function table_name into catalog: " + name);
     }
     table_functions_.emplace(name, table_function);
 }

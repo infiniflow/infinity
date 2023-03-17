@@ -27,7 +27,7 @@ namespace infinity {
 class ExplainLogicalPlan {
 public:
     static void
-    Explain(const LogicalNode* statement,
+    Explain(const LogicalNode* logical_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 

@@ -206,7 +206,7 @@ struct SQL_LTYPE {
 } <with_expr_list_t>
 
 %destructor {
-    fprintf(stderr, "destroy table name\n");
+    fprintf(stderr, "destroy table table_name\n");
     if (($$) != nullptr) {
         free($$->schema_name_ptr_);
         free($$->table_name_ptr_);
