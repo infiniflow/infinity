@@ -35,7 +35,7 @@ public:
 public:
     explicit
     Table(SharedPtr<TableDef> table_def_ptr, TableType type)
-        : BaseTable(BaseTableType::kTable),
+        : BaseTable(BaseTableType::kTable, table_def_ptr->schema_name(), table_def_ptr->name()),
         definition_ptr_(std::move(table_def_ptr)),
         row_count_(0),
         type_(type)

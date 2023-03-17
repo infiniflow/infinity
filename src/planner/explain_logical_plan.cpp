@@ -429,8 +429,8 @@ ExplainLogicalPlan::Explain(const LogicalCrossProduct* cross_product_node,
         ExplainLogicalPlan::Explain(cross_product_node->left_node().get(), result, intent_size);
     }
 
-    if(cross_product_node->left_node() != nullptr) {
-        ExplainLogicalPlan::Explain(cross_product_node->left_node().get(), result, intent_size);
+    if(cross_product_node->right_node() != nullptr) {
+        ExplainLogicalPlan::Explain(cross_product_node->right_node().get(), result, intent_size);
     }
 }
 

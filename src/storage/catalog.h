@@ -20,16 +20,22 @@ public:
     DeleteSchema(String schema_name);
 
     // Table related methods
-    SharedPtr<Table>
+    SharedPtr<BaseTable>
     GetTableByName(String schema_name, String table_name);
 
     void
-    AddTable(String schema_name, const SharedPtr<Table>& table_def);
+    CreateTable(String schema_name, const SharedPtr<Table>& table_def);
 
     void
     DeleteTable(String schema_name, String table_name);
 
-    std::vector<SharedPtr<Table>>
+    void
+    AddCollection(String schema_name, String collection_name);
+
+    void
+    DeleteCollection(String schema_name, String collection_name);
+
+    Vector<SharedPtr<BaseTable>>
     GetTables(String schema_name);
 
     // View related methods

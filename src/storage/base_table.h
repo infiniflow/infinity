@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "common/types/internal_types.h"
 #include "common/utility/infinity_assert.h"
 
@@ -33,14 +35,28 @@ ToString(BaseTableType type) {
 class BaseTable {
 public:
     explicit
-    BaseTable(BaseTableType kind) : kind_(kind) {}
+    BaseTable(BaseTableType kind, String schema_name, String table_name)
+        : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
 
-    inline BaseTableType
+    [[nodiscard]] inline BaseTableType
     kind() const {
         return kind_;
     }
 
     BaseTableType kind_{BaseTableType::kInvalid};
+
+    [[nodiscard]] inline String
+    schema_name() const {
+        return schema_name_;
+    }
+
+    [[nodiscard]] inline String
+    table_name() const {
+        return table_name_;
+    }
+
+    String schema_name_{};
+    String table_name_{};
 };
 
 }

@@ -117,9 +117,11 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
         PlannerError("Insert statement missing table name.");
     }
     // Check schema and table in the catalog
-    SharedPtr<Table> table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name,
-                                                                                table_name);
-    if(table_ptr == nullptr) { PlannerError(schema_name + "." + table_name + " not exists.")}
+    SharedPtr<BaseTable> base_table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, table_name);
+    if(base_table_ptr == nullptr) { PlannerError(schema_name + "." + table_name + " not exists.")}
+
+    PlannerAssert(base_table_ptr->kind() == BaseTableType::kTable, "Currently, collection isn't supported.");
+    SharedPtr<Table> table_ptr = std::static_pointer_cast<Table>(base_table_ptr);
 
     // Create value list
     Vector<SharedPtr<BaseExpression>> value_list;
@@ -615,7 +617,6 @@ LogicalPlanner::BuildExplain(const ExplainStatement* statement, SharedPtr<BindCo
         default: {
             Build(statement->statement_, bind_context_ptr);
             explain_node->set_left_node(this->logical_plan_);
-            this->logical_plan_ = explain_node;
         }
     }
 

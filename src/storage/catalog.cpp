@@ -3,8 +3,11 @@
 //
 
 #include "catalog.h"
+
+#include <utility>
 #include "schema.h"
 #include "common/utility/infinity_assert.h"
+#include "collection.h"
 
 namespace infinity {
 
@@ -35,7 +38,7 @@ Catalog::DeleteSchema(String schema_name) {
     schemas_.erase(schema_name);
 }
 
-SharedPtr<Table>
+SharedPtr<BaseTable>
 Catalog::GetTableByName(String schema_name, String table_name) {
     StringToLower(schema_name);
     StringToLower(table_name);
@@ -47,7 +50,7 @@ Catalog::GetTableByName(String schema_name, String table_name) {
 }
 
 void
-Catalog::AddTable(String schema_name, const SharedPtr<Table> &table_def) {
+Catalog::CreateTable(String schema_name, const SharedPtr<Table> &table_def) {
     StringToLower(schema_name);
 
     if(schemas_.find(schema_name) == schemas_.end()) {
@@ -67,7 +70,31 @@ Catalog::DeleteTable(String schema_name, String table_name) {
     schemas_[schema_name]->DeleteTable(table_name);
 }
 
-Vector<SharedPtr<Table>>
+void
+Catalog::AddCollection(String schema_name, String collection_name) {
+    StringToLower(schema_name);
+
+    if(schemas_.find(schema_name) == schemas_.end()) {
+        CatalogError("Schema not found, table can't be created: " + schema_name);
+    }
+
+    String copied_schema_name = schema_name;
+    SharedPtr<Collection> collection_ptr = MakeShared<Collection>(std::move(schema_name), std::move(collection_name));
+    schemas_[copied_schema_name]->AddTable(collection_ptr);
+}
+
+void
+Catalog::DeleteCollection(String schema_name, String collection_name) {
+    StringToLower(schema_name);
+    StringToLower(collection_name);
+
+    if(schemas_.find(schema_name) == schemas_.end()) {
+        CatalogError("Schema not found, collection can't be deleted: " + schema_name);
+    }
+    schemas_[schema_name]->DeleteTable(collection_name);
+}
+
+Vector<SharedPtr<BaseTable>>
 Catalog::GetTables(String schema_name) {
     StringToLower(schema_name);
 
@@ -75,7 +102,7 @@ Catalog::GetTables(String schema_name) {
         CatalogError("No schema: " + schema_name);
     }
 
-    Vector<SharedPtr<Table>> output;
+    Vector<SharedPtr<BaseTable>> output;
     for(auto& elem: schemas_[schema_name]->tables()) {
         output.emplace_back(elem.second);
     }

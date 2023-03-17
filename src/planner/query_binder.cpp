@@ -341,11 +341,13 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
     } else {
         schema_name = from_table->schema_name_;
     }
-    auto table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, from_table->table_name_);
-    if(table_ptr == nullptr) {
+    auto base_table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, from_table->table_name_);
+    if(base_table_ptr == nullptr) {
         // Not found in catalog
         return nullptr;
     }
+    PlannerAssert(base_table_ptr->kind() == BaseTableType::kTable, "Currently, collection isn't supported.");
+    SharedPtr<Table> table_ptr = std::static_pointer_cast<Table>(base_table_ptr);
 
     // TODO: Handle table and column alias
     u64 table_index = this->bind_context_ptr_->GenerateTableIndex();

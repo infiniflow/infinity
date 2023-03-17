@@ -7,7 +7,7 @@
 
 namespace infinity {
 
-SharedPtr<Table>
+SharedPtr<BaseTable>
 Schema::GetTableByName(const String &name) {
     if (tables_.find(name) == tables_.end()) {
         // Table not found
@@ -17,8 +17,8 @@ Schema::GetTableByName(const String &name) {
 }
 
 void
-Schema::AddTable(const SharedPtr<Table>& table) {
-    const String& table_name = table->TableName();
+Schema::AddTable(const SharedPtr<BaseTable>& table) {
+    const String& table_name = table->table_name();
     if (tables_.find(table_name) == tables_.end()) {
         tables_[table_name] = table;
     } else {

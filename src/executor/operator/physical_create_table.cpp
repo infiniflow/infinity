@@ -41,7 +41,7 @@ void
 PhysicalCreateTable::Execute(SharedPtr<QueryContext>& query_context) {
 //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
     SharedPtr<Table> table_ptr = MakeShared<Table>(table_def_ptr_, TableType::kDataTable);
-    Infinity::instance().catalog()->AddTable(*schema_name_, table_ptr);
+    Infinity::instance().catalog()->CreateTable(*schema_name_, table_ptr);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
