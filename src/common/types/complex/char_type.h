@@ -100,6 +100,16 @@ public:
         return std::strlen(ptr) + 1;
     }
 
+    [[nodiscard]] inline ptr_t
+    GetDataPtr() const {
+        return this->ptr;
+    }
+
+    [[nodiscard]] inline SizeT
+    Length() const {
+        return std::strlen(ptr);
+    }
+
     [[nodiscard]] String
     ToString() const {
         return {ptr, std::strlen(ptr)};

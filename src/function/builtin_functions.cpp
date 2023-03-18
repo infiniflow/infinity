@@ -37,6 +37,7 @@
 
 // Table function
 #include "table/table_scan.h"
+#include "function/scalar/like.h"
 
 namespace infinity {
 
@@ -84,6 +85,10 @@ BuiltinFunctions::RegisterScalarFunction() {
     RegisterLessEqualsFunction(catalog_ptr_);
     RegisterGreaterFunction(catalog_ptr_);
     RegisterGreaterEqualsFunction(catalog_ptr_);
+
+    // like function
+    RegisterLikeFunction(catalog_ptr_);
+    RegisterNotLikeFunction(catalog_ptr_);
 }
 
 void

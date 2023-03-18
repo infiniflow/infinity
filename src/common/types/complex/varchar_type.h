@@ -50,6 +50,20 @@ public:
     bool
     operator<(const VarcharType& other) const;
 
+    [[nodiscard]] inline ptr_t
+    GetDataPtr() const {
+        if(IsInlined()) {
+            return (ptr_t)(prefix);
+        } else {
+            return this->ptr;
+        }
+    }
+
+    inline SizeT
+    GetDataLen() const {
+        return this->length;
+    }
+
 public:
     void
     DeepCopy(const VarcharType& other);
