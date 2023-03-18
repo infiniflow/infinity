@@ -532,12 +532,12 @@ PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode>& logical_operator) co
         explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
                                                    logical_explain->explain_type(),
                                                    texts_ptr,
-                                                   input_physical_operator);
+                                                   nullptr);
     } else {
         explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
                                                    logical_explain->explain_type(),
                                                    logical_explain->TextArray(),
-                                                   input_physical_operator);
+                                                   nullptr);
     }
 
     return explain_node;

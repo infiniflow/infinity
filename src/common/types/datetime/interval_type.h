@@ -25,10 +25,8 @@ struct IntervalType {
     inline explicit
     IntervalType(i32 v) : value(v) {}
 
-    [[nodiscard]] inline String
-    ToString() const {
-        TypeError("ToString() isn't implemented");
-    }
+    String
+    ToString() const;
 
     inline void
     Reset() {

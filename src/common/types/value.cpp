@@ -1262,36 +1262,44 @@ Value::TryCastAs(const DataType &target_type, Value &new_value) const {
 String
 Value::ToString() const {
     switch(type_.type()) {
-        case kBoolean:
-            return value_.boolean ? "true": "false";
-        case kTinyInt:
+        case kBoolean: {
+            return value_.boolean ? "true" : "false";
+        }
+        case kTinyInt: {
             return std::to_string(value_.tiny_int);
-        case kSmallInt:
+        }
+        case kSmallInt: {
             return std::to_string(value_.small_int);
-        case kInteger:
+        }
+        case kInteger: {
             return std::to_string(value_.integer);
-        case kBigInt:
+        }
+        case kBigInt: {
             return std::to_string(value_.big_int);
-        case kHugeInt:
+        }
+        case kHugeInt: {
             return value_.huge_int.ToString();
-        case kFloat:
+        }
+        case kFloat: {
             return std::to_string(value_.float32);
-        case kDouble:
+        }
+        case kDouble: {
             return std::to_string(value_.float64);
+        }
         case kDecimal16:
-            break;
         case kDecimal32:
-            break;
         case kDecimal64:
-            break;
         case kDecimal128:
             break;
-        case kVarchar:
-            break;
-        case kChar:
-            break;
-        case kDate:
-            break;
+        case kVarchar: {
+            return value_.varchar.ToString();
+        }
+        case kChar: {
+            return value_.char_n.ToString();
+        }
+        case kDate: {
+            return value_.date.ToString();
+        }
         case kTime:
             break;
         case kDateTime:
@@ -1300,8 +1308,9 @@ Value::ToString() const {
             break;
         case kTimestampTZ:
             break;
-        case kInterval:
-            break;
+        case kInterval: {
+            return value_.interval.ToString();
+        }
         case kArray:
             break;
         case kTuple:

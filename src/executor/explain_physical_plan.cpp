@@ -415,6 +415,7 @@ ExplainPhysicalPlan::Explain(const PhysicalSort* sort_node,
     for(SizeT idx = 0; idx < order_by_count - 1; ++ idx) {
         sort_str += sort_node->expressions_[idx]->ToString() + " " + ToString(sort_node->order_by_types_[idx]) + ", ";
     }
+    sort_str += sort_node->expressions_.back()->ToString();
     result->emplace_back(MakeShared<String>(sort_str));
 
     if(sort_node->left() != nullptr) {
