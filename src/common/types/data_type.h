@@ -9,29 +9,6 @@
 
 #include "internal_types.h"
 
-#include "common/types/number/decimal_type.h"
-#include "common/types/number/huge_int.h"
-#include "common/types/complex/varchar_type.h"
-#include "common/types/complex/char_type.h"
-#include "common/types/datetime/datetime_type.h"
-#include "common/types/datetime/interval_type.h"
-#include "common/types/datetime/date_type.h"
-#include "common/types/datetime/time_type.h"
-#include "common/types/datetime/timestamp_type.h"
-#include "common/types/datetime/timestamp_tz_type.h"
-#include "common/types/complex/embedding_type.h"
-#include "common/types/geo/point_type.h"
-#include "common/types/geo/line_type.h"
-#include "common/types/geo/line_segment_type.h"
-#include "common/types/geo/box_type.h"
-#include "common/types/geo/path_type.h"
-#include "common/types/geo/polygon_type.h"
-#include "common/types/geo/circle_type.h"
-#include "common/types/complex/blob_type.h"
-#include "common/types/complex/uuid_type.h"
-#include "common/types/complex/bitmap_type.h"
-#include "common/types/heterogenous/mixed_type.h"
-
 #include <string>
 
 namespace infinity {

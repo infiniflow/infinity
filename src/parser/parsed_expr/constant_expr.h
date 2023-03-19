@@ -5,6 +5,7 @@
 #pragma once
 
 #include "parsed_expr.h"
+#include "common/types/logical_type.h"
 
 namespace infinity {
 
@@ -16,15 +17,6 @@ enum class LiteralType {
     kNull,
     kDate,
     kInterval,
-};
-
-enum class IntervalExprType {
-    kSecond,
-    kMinute,
-    kHour,
-    kDay,
-    kMonth,
-    kYear,
 };
 
 class ConstantExpr : public ParsedExpr {
@@ -44,7 +36,7 @@ public:
     i64 integer_value_{0};
     double double_value_{0};
     char* str_value_{nullptr};
-    IntervalExprType interval_type_{IntervalExprType::kSecond};
+    TimeUnit interval_type_{TimeUnit::kInvalidUnit};
     char* date_value_{nullptr};
 };
 

@@ -1788,73 +1788,73 @@ constant_expr: STRING {
 
 interval_expr: LONG_VALUE SECONDS {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kSecond;
+    const_expr->interval_type_ = TimeUnit::kSecond;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE SECOND {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kSecond;
+    const_expr->interval_type_ = TimeUnit::kSecond;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE MINUTES {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kMinute;
+    const_expr->interval_type_ = TimeUnit::kMinute;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE MINUTE {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kMinute;
+    const_expr->interval_type_ = TimeUnit::kMinute;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE HOURS {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kHour;
+    const_expr->interval_type_ = TimeUnit::kHour;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE HOUR {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kHour;
+    const_expr->interval_type_ = TimeUnit::kHour;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE DAYS {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kDay;
+    const_expr->interval_type_ = TimeUnit::kDay;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE DAY {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kDay;
+    const_expr->interval_type_ = TimeUnit::kDay;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE MONTHS {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kMonth;
+    const_expr->interval_type_ = TimeUnit::kMonth;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE MONTH {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kMonth;
+    const_expr->interval_type_ = TimeUnit::kMonth;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE YEARS {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kYear;
+    const_expr->interval_type_ = TimeUnit::kYear;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE YEAR {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kYear;
+    const_expr->interval_type_ = TimeUnit::kYear;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 };

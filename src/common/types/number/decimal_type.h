@@ -95,7 +95,7 @@ public:
     i64 upper{0};
     i64 lower{0};
 };
-
+#if 0
 struct DecimalType {
 public:
     static LogicalType
@@ -136,5 +136,5 @@ public:
     }
 private:
 };
-
+#endif
 }

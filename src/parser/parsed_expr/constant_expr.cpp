@@ -34,23 +34,26 @@ String ConstantExpr::ToString() const {
         }
         case LiteralType::kInterval: {
             switch(interval_type_) {
-                case IntervalExprType::kSecond: {
+                case TimeUnit::kSecond: {
                     return fmt::format("{} seconds", integer_value_);
                 }
-                case IntervalExprType::kMinute: {
+                case TimeUnit::kMinute: {
                     return fmt::format("{} minutes", integer_value_);
                 }
-                case IntervalExprType::kHour: {
+                case TimeUnit::kHour: {
                     return fmt::format("{} hours", integer_value_);
                 }
-                case IntervalExprType::kDay: {
+                case TimeUnit::kDay: {
                     return fmt::format("{} days", integer_value_);
                 }
-                case IntervalExprType::kMonth: {
+                case TimeUnit::kMonth: {
                     return fmt::format("{} months", integer_value_);
                 }
-                case IntervalExprType::kYear: {
+                case TimeUnit::kYear: {
                     return fmt::format("{} years", integer_value_);
+                }
+                default: {
+                    PlannerError("Invalid interval type.");
                 }
             }
             break;

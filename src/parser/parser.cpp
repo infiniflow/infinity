@@ -4994,7 +4994,7 @@ yyreduce:
 #line 1789 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                   {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kSecond;
+    const_expr->interval_type_ = TimeUnit::kSecond;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5005,7 +5005,7 @@ yyreduce:
 #line 1795 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                     {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kSecond;
+    const_expr->interval_type_ = TimeUnit::kSecond;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5016,7 +5016,7 @@ yyreduce:
 #line 1801 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                      {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kMinute;
+    const_expr->interval_type_ = TimeUnit::kMinute;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5027,7 +5027,7 @@ yyreduce:
 #line 1807 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                     {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kMinute;
+    const_expr->interval_type_ = TimeUnit::kMinute;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5038,7 +5038,7 @@ yyreduce:
 #line 1813 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kHour;
+    const_expr->interval_type_ = TimeUnit::kHour;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5049,7 +5049,7 @@ yyreduce:
 #line 1819 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                   {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kHour;
+    const_expr->interval_type_ = TimeUnit::kHour;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5060,7 +5060,7 @@ yyreduce:
 #line 1825 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                   {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kDay;
+    const_expr->interval_type_ = TimeUnit::kDay;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5071,7 +5071,7 @@ yyreduce:
 #line 1831 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                  {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kDay;
+    const_expr->interval_type_ = TimeUnit::kDay;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5082,7 +5082,7 @@ yyreduce:
 #line 1837 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                     {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kMonth;
+    const_expr->interval_type_ = TimeUnit::kMonth;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5093,7 +5093,7 @@ yyreduce:
 #line 1843 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kMonth;
+    const_expr->interval_type_ = TimeUnit::kMonth;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5104,7 +5104,7 @@ yyreduce:
 #line 1849 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                    {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kYear;
+    const_expr->interval_type_ = TimeUnit::kYear;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }
@@ -5115,7 +5115,7 @@ yyreduce:
 #line 1855 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                   {
     ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = IntervalExprType::kYear;
+    const_expr->interval_type_ = TimeUnit::kYear;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.expr_t) = const_expr;
 }

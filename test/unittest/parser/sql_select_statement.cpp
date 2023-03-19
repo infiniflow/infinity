@@ -86,7 +86,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             EXPECT_EQ(const_expr->str_value_, nullptr);
             EXPECT_EQ(const_expr->integer_value_, 1);
             EXPECT_FLOAT_EQ(const_expr->double_value_, 0);
-            EXPECT_EQ(const_expr->interval_type_, IntervalExprType::kSecond);
+            EXPECT_EQ(const_expr->interval_type_, TimeUnit::kSecond);
             EXPECT_EQ(const_expr->date_value_, nullptr);
             EXPECT_EQ(const_expr->bool_value_, false);
         }
@@ -1215,7 +1215,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
             EXPECT_EQ(arg0->names_[0], "a");
 
             ConstantExpr* arg1 = (ConstantExpr*)(*func_expr->arguments_)[1];
-            EXPECT_EQ(arg1->interval_type_, IntervalExprType::kDay);
+            EXPECT_EQ(arg1->interval_type_, TimeUnit::kDay);
             EXPECT_EQ(arg1->integer_value_, 3);
         }
 
@@ -1241,7 +1241,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
             CastExpr* arg10 = (CastExpr*)(*arg1->arguments_)[0];
             EXPECT_EQ(arg10->data_type_.type(), LogicalType::kDate);
             ConstantExpr* arg11 = (ConstantExpr*)(*arg1->arguments_)[1];
-            EXPECT_EQ(arg11->interval_type_, IntervalExprType::kDay);
+            EXPECT_EQ(arg11->interval_type_, TimeUnit::kDay);
             EXPECT_EQ(arg11->integer_value_, 15);
         }
 
@@ -1273,7 +1273,7 @@ TEST_F(SelectStatementParsingTest, good_test4) {
             CastExpr* arg10 = (CastExpr*)(*arg1->arguments_)[0];
             EXPECT_EQ(arg10->data_type_.type(), LogicalType::kDate);
             ConstantExpr* arg11 = (ConstantExpr*)(*arg1->arguments_)[1];
-            EXPECT_EQ(arg11->interval_type_, IntervalExprType::kDay);
+            EXPECT_EQ(arg11->interval_type_, TimeUnit::kDay);
             EXPECT_EQ(arg11->integer_value_, 15);
         }
 

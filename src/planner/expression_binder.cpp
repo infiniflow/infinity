@@ -160,32 +160,10 @@ ExpressionBinder::BuildValueExpr(const ConstantExpr& expr,
             // IntervalT should be a struct including the type of the value and an value of the interval
             // It will be bound into a ValueExpression here.
             IntervalT interval_value(expr.integer_value_);
-            switch(expr.interval_type_) {
-                case IntervalExprType::kSecond: {
-                    interval_value.unit = TimeUnit::kSecond;
-                    break;
-                }
-                case IntervalExprType::kMinute: {
-                    interval_value.unit = TimeUnit::kMinute;
-                    break;
-                }
-                case IntervalExprType::kHour: {
-                    interval_value.unit = TimeUnit::kHour;
-                    break;
-                }
-                case IntervalExprType::kDay: {
-                    interval_value.unit = TimeUnit::kDay;
-                    break;
-                }
-                case IntervalExprType::kMonth: {
-                    interval_value.unit = TimeUnit::kMonth;
-                    break;
-                }
-                case IntervalExprType::kYear: {
-                    interval_value.unit = TimeUnit::kYear;
-                    break;
-                }
+            if(expr.interval_type_ == TimeUnit::kInvalidUnit) {
+                PlannerError("Invalid time unit");
             }
+            interval_value.unit = expr.interval_type_;
             Value value = Value::MakeInterval(interval_value);
             return MakeShared<ValueExpression>(value);
         }

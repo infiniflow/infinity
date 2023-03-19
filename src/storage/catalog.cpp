@@ -146,7 +146,7 @@ Catalog::GetFunctionSetByName(String function_name) {
     StringToLower(function_name);
 
     if(!function_sets_.contains(function_name)) {
-        CatalogError("No function table_name: " + function_name);
+        CatalogError("No function name: " + function_name);
     }
     return function_sets_[function_name];
 }

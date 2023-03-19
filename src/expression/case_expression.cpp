@@ -38,8 +38,9 @@ CaseExpression::ToString() const {
 
 DataType
 CaseExpression::Type() const {
-    // expression_common_type(then()->data_type(), otherwise()->data_type());
-    // Fixme: this type need to refactor.
+    // Fixme: this type need to refactor:
+    // Check each then expr and else expr to get the largest type to return.
+
     return DataType(LogicalType::kBoolean);
 }
 
