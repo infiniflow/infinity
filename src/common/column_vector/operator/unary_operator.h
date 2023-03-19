@@ -13,7 +13,7 @@ class UnaryOperator {
 public:
     template <typename InputType, typename ResultType, typename Operator>
     static void inline
-    Execute(const SharedPtr<ColumnVector>& input, SharedPtr<ColumnVector>& result, size_t count, void* state_ptr, bool nullable) {
+    Execute(const SharedPtr<ColumnVector>& input, SharedPtr<ColumnVector>& result, SizeT count, void* state_ptr, bool nullable) {
         const auto* input_ptr = (const InputType*)(input->data_ptr_);
         const SharedPtr<Bitmask>& input_null = input->nulls_ptr_;
 
@@ -78,9 +78,9 @@ private:
     ExecuteFlat(const InputType* __restrict input_ptr,
                 ResultType* __restrict result_ptr,
                 SharedPtr<Bitmask>& result_null,
-                size_t count,
+                SizeT count,
                 void* state_ptr) {
-        for (size_t i = 0; i < count; i++) {
+        for (SizeT i = 0; i < count; i++) {
              Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
         }
     }
@@ -91,13 +91,13 @@ private:
                         const SharedPtr<Bitmask>& input_null,
                         ResultType* __restrict result_ptr,
                         SharedPtr<Bitmask>& result_null,
-                        size_t count,
+                        SizeT count,
                         void* state_ptr) {
         if(input_null->IsAllTrue()) {
             // Initialized all true to output null bitmask.
             result_null->SetAllTrue();
 
-            for (size_t i = 0; i < count; i++) {
+            for (SizeT i = 0; i < count; i++) {
                 // Not valid for embedding type, since the embedding type width isn't sizeof(EmbeddingT)
                 Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
             }
@@ -105,8 +105,8 @@ private:
             result_null->DeepCopy(*input_null);
 
             const u64* input_null_data = input_null->GetData();
-            size_t unit_count = BitmaskBuffer::UnitCount(count);
-            for(size_t i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++ i, end_index += BitmaskBuffer::UNIT_BITS) {
+            SizeT unit_count = BitmaskBuffer::UnitCount(count);
+            for(SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++ i, end_index += BitmaskBuffer::UNIT_BITS) {
                 if(input_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     while(start_index < end_index) {
@@ -120,7 +120,7 @@ private:
                     // all data of 64 rows are null
                     ;
                 } else {
-                    size_t original_start = start_index;
+                    SizeT original_start = start_index;
                     while(start_index < end_index) {
                         if(input_null->IsTrue(start_index - original_start)) {
                             // This row isn't null
@@ -142,9 +142,9 @@ private:
     ExecuteHeterogeneous(const InputType* __restrict input_ptr,
                          ResultType* __restrict result_ptr,
                          SharedPtr<Bitmask>& result_null,
-                         size_t count,
+                         SizeT count,
                          void* state_ptr) {
-        for (size_t i = 0; i < count; i++) {
+        for (SizeT i = 0; i < count; i++) {
             Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
         }
     }
