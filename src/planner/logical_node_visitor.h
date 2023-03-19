@@ -14,6 +14,7 @@
 #include "expression/conjunction_expression.h"
 #include "expression/function_expression.h"
 #include "expression/value_expression.h"
+#include "expression/in_expression.h"
 
 namespace infinity {
 
@@ -57,6 +58,9 @@ public:
 
     virtual SharedPtr<BaseExpression>
     VisitReplace(const SharedPtr<ValueExpression>& expression);
+
+    virtual SharedPtr<BaseExpression>
+    VisitReplace(const SharedPtr<InExpression>& expression);
 };
 
 }

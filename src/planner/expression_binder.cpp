@@ -69,6 +69,9 @@ ExpressionBinder::BuildExpression(const ParsedExpr& expr,
             // cast function expression
             return BuildCastExpr((const CastExpr&)expr, bind_context_ptr, depth, root);
         }
+        case ParsedExprType::kIn: {
+            return BuildInExpr((const InExpr&)expr, bind_context_ptr, depth, root);
+        }
         default: {
             PlannerError("Unexpected expression type.");
         }
@@ -329,6 +332,32 @@ ExpressionBinder::BuildCaseExpr(const CaseExpr& expr,
     case_expression_ptr->AddElseExpr(else_expr_ptr);
 
     return case_expression_ptr;
+}
+
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildInExpr(const InExpr& expr,
+                              BindContext* bind_context_ptr,
+                              i64 depth,
+                              bool root) {
+    auto bound_left_expr = BuildExpression(*expr.left_, bind_context_ptr, depth, false);
+
+    SizeT argument_count = expr.arguments_->size();
+    Vector<SharedPtr<BaseExpression>> arguments;
+    arguments.reserve(argument_count);
+
+    for(SizeT idx = 0; idx < argument_count; ++ idx) {
+        auto bound_argument_expr = BuildExpression(*expr.arguments_->at(idx), bind_context_ptr, depth, false);
+        arguments.emplace_back(bound_argument_expr);
+    }
+
+    InType in_type{InType::kIn};
+    if(expr.not_in_) {
+        in_type = InType::kNotIn;
+    } else {
+        in_type = InType::kIn;
+    }
+    SharedPtr<InExpression> in_expression_ptr = MakeShared<InExpression>(in_type, bound_left_expr, arguments);
+    return in_expression_ptr;
 }
 
 // Bind subquery expression.

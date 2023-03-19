@@ -1627,18 +1627,16 @@ between_expr: operand BETWEEN operand AND operand {
 }
 
 in_expr: operand IN '(' expr_array ')' {
-    FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = "in";
-    func_expr->arguments_ = $4;
-    func_expr->arguments_->emplace_back($1);
-    $$ = func_expr;
+    InExpr* in_expr = new InExpr(true);
+    in_expr->left_ = $1;
+    in_expr->arguments_ = $4;
+    $$ = in_expr;
 }
 | operand NOT IN '(' expr_array ')' {
-    FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = "not_in";
-    func_expr->arguments_ = $5;
-    func_expr->arguments_->emplace_back($1);
-    $$ = func_expr;
+    InExpr* in_expr = new InExpr(false);
+    in_expr->left_ = $1;
+    in_expr->arguments_ = $5;
+    $$ = in_expr;
 };
 
 case_expr: CASE expr case_check_array END {

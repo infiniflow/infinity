@@ -150,6 +150,31 @@ ExpressionState::CreateState(const SharedPtr<ValueExpression>& value_expr, SizeT
     return result;
 }
 
+SharedPtr<ExpressionState>
+ExpressionState::CreateState(const SharedPtr<InExpression>& in_expr, SizeT block_count) {
+    SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
+    result->AddChild(in_expr->left_operand(), block_count);
+
+    for(auto& argument_expr: in_expr->arguments()) {
+        result->AddChild(argument_expr, block_count);
+    }
+
+    Vector<ColumnVectorType> result_column_vector_type(block_count, ColumnVectorType::kConstant);
+    for(SizeT idx = 0; idx < block_count; ++ idx) {
+        if(result->Children()[0]->OutputColumnVectors()[idx]->vector_type() != ColumnVectorType::kConstant) {
+            result_column_vector_type[idx] = ColumnVectorType::kFlat;
+        }
+    }
+
+    result->column_vectors_.reserve(block_count);
+    for(SizeT idx = 0; idx < block_count; ++ idx) {
+        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(in_expr->Type());
+        column->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+        result->column_vectors_.emplace_back(column);
+    }
+    return result;
+}
+
 void
 ExpressionState::AddChild(const SharedPtr<BaseExpression> &expression, SizeT block_count) {
     children_.emplace_back(CreateState(expression, block_count));

@@ -3,6 +3,7 @@
 //
 
 #include "expression_evaluator.h"
+#include "expression/in_expression.h"
 
 #include <utility>
 
@@ -33,6 +34,8 @@ ExpressionEvaluator::Execute(const SharedPtr<BaseExpression>& expr,
             return Execute(std::static_pointer_cast<ValueExpression>(expr), state, output_column);
         case ExpressionType::kReference:
             return Execute(std::static_pointer_cast<ReferenceExpression>(expr), state, output_column);
+        case ExpressionType::kIn:
+            return Execute(std::static_pointer_cast<InExpression>(expr), state, output_column);
         default:
             ExecutorError("Unknown expression type: " + expr->ToString());
     }
@@ -152,8 +155,8 @@ ExpressionEvaluator::Execute(const SharedPtr<ValueExpression>& expr,
 
 void
 ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression>& expr,
-                            SharedPtr<ExpressionState>& state,
-                            Vector<SharedPtr<ColumnVector>>& output_column_vector) {
+                             SharedPtr<ExpressionState>& state,
+                             Vector<SharedPtr<ColumnVector>>& output_column_vector) {
     SizeT column_index = expr->column_index();
     SizeT block_count = this->input_data_blocks_.size();
     for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
@@ -161,6 +164,33 @@ ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression>& expr,
         ExecutorAssert(column_index < this->input_data_blocks_[block_id]->column_count(), "Invalid column index");
         output_column_vector[block_id] = this->input_data_blocks_[block_id]->column_vectors[column_index];
     }
+}
+
+void
+ExpressionEvaluator::Execute(const SharedPtr<InExpression>& expr,
+                             SharedPtr<ExpressionState>& state,
+                             Vector<SharedPtr<ColumnVector>>& output_column_vector) {
+    SizeT block_count = state->Children()[0]->OutputColumnVectors().size();
+    SizeT argument_count = expr->arguments().size();
+    Vector<Vector<SharedPtr<ColumnVector>>> output_matrix(block_count);
+    for(SizeT i = 0; i < argument_count; ++ i) {
+        for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
+            output_matrix[block_id].reserve(block_count);
+        }
+
+        SharedPtr<ExpressionState>& argument_state = state->Children()[i];
+        SharedPtr<BaseExpression>& argument_expr = expr->arguments()[i];
+        Vector<SharedPtr<ColumnVector>>& argument_output = argument_state->OutputColumnVectors();
+        Execute(argument_expr, argument_state, argument_output);
+        for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
+            output_matrix[block_id].emplace_back(argument_output[block_id]);
+        }
+    }
+
+    ExecutorError(fmt::format("One by one to execute {} block data in IN expression", block_count));
+//    for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
+//
+//    }
 }
 
 }

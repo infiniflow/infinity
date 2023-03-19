@@ -176,6 +176,20 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             }
             break;
         }
+        case ExpressionType::kIn: {
+            auto in_expression = std::static_pointer_cast<InExpression>(expression);
+
+            VisitExpression(in_expression->left_operand());
+            for(auto& argument: in_expression->arguments()) {
+                VisitExpression(argument);
+            }
+
+            result = VisitReplace(in_expression);
+            if(result != nullptr) {
+                expression = result;
+            }
+            break;
+        }
         default: {
             PlannerError("Unexpected expression type: " + expression->ToString())
         }
@@ -318,6 +332,11 @@ LogicalNodeVisitor::VisitReplace(const SharedPtr<FunctionExpression>& expression
 
 SharedPtr<BaseExpression>
 LogicalNodeVisitor::VisitReplace(const SharedPtr<ValueExpression>& expression) {
+    return nullptr;
+}
+
+SharedPtr<BaseExpression>
+LogicalNodeVisitor::VisitReplace(const SharedPtr<InExpression>& expression) {
     return nullptr;
 }
 

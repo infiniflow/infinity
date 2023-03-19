@@ -55,6 +55,11 @@ public:
             SharedPtr<ExpressionState>& state,
             Vector<SharedPtr<ColumnVector>>& output_column_vector);
 
+    void
+    Execute(const SharedPtr<InExpression>& expr,
+            SharedPtr<ExpressionState>& state,
+            Vector<SharedPtr<ColumnVector>>& output_column_vector);
+
 private:
     Vector<SharedPtr<DataBlock>> input_data_blocks_;
     bool in_aggregate_{false};

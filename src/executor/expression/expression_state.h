@@ -17,6 +17,7 @@
 #include "expression/value_expression.h"
 #include "storage/data_block.h"
 #include "expression/reference_expression.h"
+#include "expression/in_expression.h"
 
 namespace infinity {
 
@@ -43,6 +44,10 @@ public:
 
     static SharedPtr<ExpressionState>
     CreateState(const SharedPtr<ValueExpression>& agg_expr, SizeT block_count);
+
+    static SharedPtr<ExpressionState>
+    CreateState(const SharedPtr<InExpression>& in_expr, SizeT block_count);
+
 public:
     void
     AddChild(const SharedPtr<BaseExpression>& expression, SizeT block_count);

@@ -12,7 +12,8 @@ BetweenExpr::~BetweenExpr() {
     delete lower_bound_;
 }
 
-String BetweenExpr::ToString() const {
+String
+BetweenExpr::ToString() const {
     std::stringstream ss;
     ss << value_->ToString() << " BETWEEN " << upper_bound_->ToString() << " AND " << lower_bound_->ToString();
     return ss.str();

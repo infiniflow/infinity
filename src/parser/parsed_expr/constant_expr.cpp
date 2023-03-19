@@ -16,7 +16,8 @@ ConstantExpr::~ConstantExpr() {
     }
 }
 
-String ConstantExpr::ToString() const {
+String
+ConstantExpr::ToString() const {
     switch(literal_type_) {
         case LiteralType::kBoolean:
             return fmt::format("{}", bool_value_);

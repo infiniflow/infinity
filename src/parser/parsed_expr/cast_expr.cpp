@@ -13,7 +13,7 @@ CastExpr::~CastExpr() {
     }
 }
 
-[[nodiscard]] String
+String
 CastExpr::ToString() const {
     std::stringstream ss;
     ss << "CAST(" << expr_->ToString() << "  AS " << data_type_.ToString() << ")";

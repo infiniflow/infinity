@@ -1,12 +1,17 @@
 //
-// Created by jinhai on 23-2-28.
+// Created by jinhai on 23-3-19.
 //
 
-#include "function_expr.h"
+#include "in_expr.h"
 
 namespace infinity {
 
-FunctionExpr::~FunctionExpr() {
+InExpr::~InExpr() {
+    if(left_ != nullptr) {
+        delete left_;
+        left_ = nullptr;
+    }
+
     if(arguments_ != nullptr) {
         for (auto& expr_ptr: *arguments_) {
             delete expr_ptr;
@@ -17,9 +22,14 @@ FunctionExpr::~FunctionExpr() {
 }
 
 String
-FunctionExpr::ToString() const {
+InExpr::ToString() const {
     std::stringstream ss;
-    ss << func_name_ << '(';
+    ss << left_->ToString();
+    if(not_in_) {
+        ss<< "NOT IN (";
+    } else {
+        ss << "IN (";
+    }
     if(arguments_ != nullptr) {
         for (ParsedExpr *expr_ptr: *arguments_) {
             ss << expr_ptr->ToString();

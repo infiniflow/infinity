@@ -19,7 +19,8 @@ enum class ParsedExprType {
     kOperator,
     kSubquery,
     kCase,
-    kCast
+    kCast,
+    kIn,
 };
 
 class ParsedExpr {

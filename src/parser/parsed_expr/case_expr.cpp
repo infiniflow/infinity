@@ -35,7 +35,7 @@ CaseExpr::~CaseExpr() {
     }
 }
 
-[[nodiscard]] String
+String
 CaseExpr::ToString() const {
     std::stringstream ss;
 
