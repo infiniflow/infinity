@@ -1555,11 +1555,34 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
-| EXTRACT '(' constant_expr FROM operand ')' {
+| EXTRACT '(' STRING FROM operand ')' {
     FunctionExpr* func_expr = new FunctionExpr();
     func_expr->func_name_ = "extract";
     func_expr->arguments_ = new Vector<ParsedExpr*>();
-    func_expr->arguments_->emplace_back($3);
+    ParserHelper::ToLower($3);
+    TimeUnit time_unit = TimeUnit::kInvalidUnit;
+    if(strcmp($3, "year") == 0) {
+        time_unit = TimeUnit::kYear;
+    } else if(strcmp($3, "month") == 0) {
+        time_unit = TimeUnit::kMonth;
+    } else if(strcmp($3, "day") == 0) {
+        time_unit = TimeUnit::kDay;
+    } else if(strcmp($3, "hour") == 0) {
+        time_unit = TimeUnit::kHour;
+    } else if(strcmp($3, "minute") == 0) {
+        time_unit = TimeUnit::kMinute;
+    } else if(strcmp($3, "second") == 0) {
+        time_unit = TimeUnit::kSecond;
+    } else {
+        yyerror(&yyloc, scanner, result, "Invalid column expression format");
+        YYERROR;
+    }
+
+    free($3);
+    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kTimeUnit);
+    const_expr->time_unit_ = time_unit;
+
+    func_expr->arguments_->emplace_back(const_expr);
     func_expr->arguments_->emplace_back($5);
     $$ = func_expr;
 }

@@ -86,7 +86,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             EXPECT_EQ(const_expr->str_value_, nullptr);
             EXPECT_EQ(const_expr->integer_value_, 1);
             EXPECT_FLOAT_EQ(const_expr->double_value_, 0);
-            EXPECT_EQ(const_expr->interval_type_, TimeUnit::kSecond);
+            EXPECT_EQ(const_expr->interval_type_, TimeUnit::kInvalidUnit);
             EXPECT_EQ(const_expr->date_value_, nullptr);
             EXPECT_EQ(const_expr->bool_value_, false);
         }
@@ -248,14 +248,9 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto* arg0_expr =  (ConstantExpr *)args[0];
                 EXPECT_EQ(arg0_expr->integer_value_, 10);
 
-                EXPECT_EQ(args[1]->type_, ParsedExprType::kFunction);
-                auto* arg1_expr =  (FunctionExpr *)args[1];
-                EXPECT_EQ(arg1_expr->func_name_, "-");
-                EXPECT_EQ(arg1_expr->arguments_->size(), 1);
-                auto child_args = *arg1_expr->arguments_;
-                EXPECT_EQ(child_args[0]->type_, ParsedExprType::kConstant);
-                auto* child_arg0_expr =  (ConstantExpr *)child_args[0];
-                EXPECT_EQ(child_arg0_expr->integer_value_, 20);
+                EXPECT_EQ(args[1]->type_, ParsedExprType::kConstant);
+                auto* arg1_expr =  (ConstantExpr *)args[1];
+                EXPECT_EQ(arg1_expr->integer_value_, -20);
             }
 
             {
@@ -268,14 +263,9 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto* arg0_expr =  (ConstantExpr *)args[0];
                 EXPECT_EQ(arg0_expr->integer_value_, 10);
 
-                EXPECT_EQ(args[1]->type_, ParsedExprType::kFunction);
-                auto* arg1_expr =  (FunctionExpr *)args[1];
-                EXPECT_EQ(arg1_expr->func_name_, "-");
-                EXPECT_EQ(arg1_expr->arguments_->size(), 1);
-                auto child_args = *arg1_expr->arguments_;
-                EXPECT_EQ(child_args[0]->type_, ParsedExprType::kConstant);
-                auto* child_arg0_expr =  (ConstantExpr *)child_args[0];
-                EXPECT_FLOAT_EQ(child_arg0_expr->double_value_, 5.2);
+                EXPECT_EQ(args[1]->type_, ParsedExprType::kConstant);
+                auto* arg1_expr =  (ConstantExpr *)args[1];
+                EXPECT_FLOAT_EQ(arg1_expr->double_value_, -5.2);
             }
 
             {
@@ -333,7 +323,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto child1_args = (*having_expr->arguments_)[1];
                 EXPECT_EQ(child0_args->type_, ParsedExprType::kFunction);
                 auto* child0_function_expr =  (FunctionExpr *)child0_args;
-                EXPECT_EQ(child0_function_expr->func_name_, "AVG");
+                EXPECT_EQ(child0_function_expr->func_name_, "avg");
                 EXPECT_EQ(child0_function_expr->arguments_->size(), 1);
                 auto child0_function_arg_expr = (*child0_function_expr->arguments_)[0];
                 EXPECT_EQ(child0_function_arg_expr->type_, ParsedExprType::kColumn);
@@ -356,7 +346,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
             EXPECT_EQ((*select_statement->select_list_)[1]->type_, ParsedExprType::kFunction);
             auto* func_expr = (FunctionExpr*)(*select_statement->select_list_)[1];
-            EXPECT_EQ(func_expr->func_name_, "AVG");
+            EXPECT_EQ(func_expr->func_name_, "avg");
             EXPECT_EQ(func_expr->arguments_->size(), 1);
             auto func_arg_expr = (*func_expr->arguments_)[0];
             EXPECT_EQ(func_arg_expr->type_, ParsedExprType::kColumn);
@@ -523,24 +513,23 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
             EXPECT_NE(select_statement->where_expr_, nullptr);
             {
-                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
-                auto *func_expr = (FunctionExpr *) (select_statement->where_expr_);
-                EXPECT_EQ(func_expr->func_name_, "between_and");
+                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kBetween);
+                auto *between_expr = (BetweenExpr *) (select_statement->where_expr_);
                 {
-                    auto *arg0_expr = (*func_expr->arguments_)[0];
+                    auto *arg0_expr = between_expr->value_;
                     EXPECT_EQ(arg0_expr->type_, ParsedExprType::kColumn);
                     auto *arg0_col_expr = (ColumnExpr *) (arg0_expr);
                     EXPECT_EQ(arg0_col_expr->names_[0], "a");
                 }
                 {
-                    auto *arg1_expr = (*func_expr->arguments_)[1];
+                    auto *arg1_expr = between_expr->lower_bound_;
                     EXPECT_EQ(arg1_expr->type_, ParsedExprType::kConstant);
                     auto *arg1_constant_expr = (ConstantExpr *) (arg1_expr);
                     EXPECT_EQ(arg1_constant_expr->literal_type_, LiteralType::kInteger);
                     EXPECT_EQ(arg1_constant_expr->integer_value_, 1);
                 }
                 {
-                    auto *arg3_expr = (*func_expr->arguments_)[2];
+                    auto *arg3_expr = between_expr->upper_bound_;
                     EXPECT_EQ(arg3_expr->type_, ParsedExprType::kConstant);
                     auto *arg3_constant_expr = (ConstantExpr *) (arg3_expr);
                     EXPECT_EQ(arg3_constant_expr->literal_type_, LiteralType::kInteger);
@@ -599,7 +588,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                         {
                             EXPECT_EQ((*subquery_select->select_list_)[0]->type_, ParsedExprType::kFunction);
                             auto *subquery_func_expr = (FunctionExpr *) (*subquery_select->select_list_)[0];
-                            EXPECT_EQ(subquery_func_expr->func_name_, "MIN");
+                            EXPECT_EQ(subquery_func_expr->func_name_, "min");
                             EXPECT_EQ((*subquery_func_expr->arguments_)[0]->type_, ParsedExprType::kColumn);
                             auto* subquery_func_arg_col_expr = (ColumnExpr*)(*subquery_func_expr->arguments_)[0];
                             EXPECT_EQ(subquery_func_arg_col_expr->names_[0], "c");
@@ -665,7 +654,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kFunction);
                 auto *func_expr = (FunctionExpr *) (*select_statement->select_list_)[0];
-                EXPECT_EQ(func_expr->func_name_, "MIN");
+                EXPECT_EQ(func_expr->func_name_, "min");
                 EXPECT_EQ((*func_expr->arguments_)[0]->type_, ParsedExprType::kCase);
                 CaseExpr* case_expr = (CaseExpr*)(*func_expr->arguments_)[0];
                 EXPECT_EQ(case_expr->expr_, nullptr);
@@ -1124,7 +1113,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
             EXPECT_EQ(func_expr->func_name_, "extract");
             auto* arg1_expr = (ConstantExpr*)(*(func_expr->arguments_))[0];
             auto* arg2_expr = (ConstantExpr*)(*(func_expr->arguments_))[1];
-            EXPECT_STREQ(arg1_expr->str_value_, "year");
+            EXPECT_EQ(arg1_expr->time_unit_, TimeUnit::kYear);
             EXPECT_STREQ(arg2_expr->date_value_, "2025-03-04");
         }
 
@@ -1138,7 +1127,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
             {
                 auto* arg11_expr = (ConstantExpr*)(*(arg1_expr->arguments_))[0];
                 auto* arg12_expr = (ColumnExpr*)(*(arg1_expr->arguments_))[1];
-                EXPECT_STREQ(arg11_expr->str_value_, "year");
+                EXPECT_EQ(arg11_expr->time_unit_, TimeUnit::kYear);
                 EXPECT_EQ(arg12_expr->names_[0], "a");
             }
             EXPECT_EQ(arg2_expr->integer_value_, 2023);

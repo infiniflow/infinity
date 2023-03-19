@@ -17,6 +17,7 @@ enum class LiteralType {
     kNull,
     kDate,
     kInterval,
+    kTimeUnit,
 };
 
 class ConstantExpr : public ParsedExpr {
@@ -37,6 +38,7 @@ public:
     double double_value_{0};
     char* str_value_{nullptr};
     TimeUnit interval_type_{TimeUnit::kInvalidUnit};
+    TimeUnit time_unit_{TimeUnit::kInvalidUnit};
     char* date_value_{nullptr};
 };
 
