@@ -56,7 +56,6 @@ String ConstantExpr::ToString() const {
                     PlannerError("Invalid interval type.");
                 }
             }
-            break;
         }
     }
     PlannerError("Unexpected branch");

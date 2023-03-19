@@ -1557,32 +1557,30 @@ function_expr : IDENTIFIER '(' ')' {
 }
 | EXTRACT '(' STRING FROM operand ')' {
     FunctionExpr* func_expr = new FunctionExpr();
-    func_expr->func_name_ = "extract";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
     ParserHelper::ToLower($3);
-    TimeUnit time_unit = TimeUnit::kInvalidUnit;
     if(strcmp($3, "year") == 0) {
-        time_unit = TimeUnit::kYear;
+        func_expr->func_name_ = "extract_year";
+        func_expr->arguments_ = new Vector<ParsedExpr*>();
     } else if(strcmp($3, "month") == 0) {
-        time_unit = TimeUnit::kMonth;
+        func_expr->func_name_ = "extract_month";
+        func_expr->arguments_ = new Vector<ParsedExpr*>();
     } else if(strcmp($3, "day") == 0) {
-        time_unit = TimeUnit::kDay;
+        func_expr->func_name_ = "extract_day";
+        func_expr->arguments_ = new Vector<ParsedExpr*>();
     } else if(strcmp($3, "hour") == 0) {
-        time_unit = TimeUnit::kHour;
+        func_expr->func_name_ = "extract_hour";
+        func_expr->arguments_ = new Vector<ParsedExpr*>();
     } else if(strcmp($3, "minute") == 0) {
-        time_unit = TimeUnit::kMinute;
+        func_expr->func_name_ = "extract_minute";
+        func_expr->arguments_ = new Vector<ParsedExpr*>();
     } else if(strcmp($3, "second") == 0) {
-        time_unit = TimeUnit::kSecond;
+        func_expr->func_name_ = "extract_second";
+        func_expr->arguments_ = new Vector<ParsedExpr*>();
     } else {
         yyerror(&yyloc, scanner, result, "Invalid column expression format");
         YYERROR;
     }
-
     free($3);
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kTimeUnit);
-    const_expr->time_unit_ = time_unit;
-
-    func_expr->arguments_->emplace_back(const_expr);
     func_expr->arguments_->emplace_back($5);
     $$ = func_expr;
 }

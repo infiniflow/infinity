@@ -114,7 +114,7 @@ DateType::ToString() const {
     if(!Date2YMD(value, year, month, day)) {
         ExecutorError(fmt::format("Invalid date: {}-{}-{}", year, month, day));
     }
-    return fmt::format("{:04d}-{:02d}-{:02d}", year, month, day);
+    return fmt::format("{}-{:02d}-{:02d}", year, month, day);
 }
 
 bool
@@ -418,6 +418,36 @@ DateType::Subtract(DateType input, IntervalType interval, DateType& output) {
         }
     }
     return false;
+}
+
+i64
+DateType::GetDatePart(DateType input, TimeUnit unit) {
+    i32 year{}, month{}, day{};
+    auto result = Date2YMD(input.value, year, month, day);
+    ExecutorAssert(result, "Invalid date value");
+    switch(unit) {
+        case TimeUnit::kYear: {
+            return year;
+        }
+        case TimeUnit::kMonth: {
+            return month;
+        }
+        case TimeUnit::kDay: {
+            return day;
+        }
+        case TimeUnit::kHour: {
+            ExecutorError("Can't extract hour from date");
+        }
+        case TimeUnit::kMinute: {
+            ExecutorError("Can't extract minute from date");
+        }
+        case TimeUnit::kSecond: {
+            ExecutorError("Can't extract second from date");
+        }
+        default: {
+            ExecutorError("Invalid time unit");
+        }
+    }
 }
 
 }

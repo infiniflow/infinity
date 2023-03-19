@@ -1110,11 +1110,9 @@ TEST_F(SelectStatementParsingTest, good_test3) {
         {
             SelectStatement *select = (SelectStatement *) ((*result->statements_ptr_)[0]);
             auto* func_expr = (FunctionExpr*)(*(select->select_list_))[0];
-            EXPECT_EQ(func_expr->func_name_, "extract");
+            EXPECT_EQ(func_expr->func_name_, "extract_year");
             auto* arg1_expr = (ConstantExpr*)(*(func_expr->arguments_))[0];
-            auto* arg2_expr = (ConstantExpr*)(*(func_expr->arguments_))[1];
-            EXPECT_EQ(arg1_expr->time_unit_, TimeUnit::kYear);
-            EXPECT_STREQ(arg2_expr->date_value_, "2025-03-04");
+            EXPECT_STREQ(arg1_expr->date_value_, "2025-03-04");
         }
 
         {
@@ -1123,11 +1121,9 @@ TEST_F(SelectStatementParsingTest, good_test3) {
             EXPECT_EQ(func_expr->func_name_, "<");
             auto* arg1_expr = (FunctionExpr*)(*(func_expr->arguments_))[0];
             auto* arg2_expr = (ConstantExpr*)(*(func_expr->arguments_))[1];
-            EXPECT_EQ(arg1_expr->func_name_, "extract");
+            EXPECT_EQ(arg1_expr->func_name_, "extract_year");
             {
-                auto* arg11_expr = (ConstantExpr*)(*(arg1_expr->arguments_))[0];
-                auto* arg12_expr = (ColumnExpr*)(*(arg1_expr->arguments_))[1];
-                EXPECT_EQ(arg11_expr->time_unit_, TimeUnit::kYear);
+                auto* arg12_expr = (ColumnExpr*)(*(arg1_expr->arguments_))[0];
                 EXPECT_EQ(arg12_expr->names_[0], "a");
             }
             EXPECT_EQ(arg2_expr->integer_value_, 2023);

@@ -80,6 +80,9 @@ public:
 
     static bool
     Subtract(DateType input, IntervalType interval, DateType& output);
+
+    static i64
+    GetDatePart(DateType input, TimeUnit unit);
 };
 
 }

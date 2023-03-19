@@ -24,9 +24,11 @@
 #include "scalar/greater_equals.h"
 
 // Logical scalar function
-
 #include "scalar/or.h"
 #include "scalar/and.h"
+
+#include "function/scalar/like.h"
+#include "function/scalar/extract.h"
 
 // Aggregate function
 #include "aggregate/avg.h"
@@ -37,7 +39,6 @@
 
 // Table function
 #include "table/table_scan.h"
-#include "function/scalar/like.h"
 
 namespace infinity {
 
@@ -89,6 +90,9 @@ BuiltinFunctions::RegisterScalarFunction() {
     // like function
     RegisterLikeFunction(catalog_ptr_);
     RegisterNotLikeFunction(catalog_ptr_);
+
+    // extract function
+    RegisterExtractFunction(catalog_ptr_);
 }
 
 void
