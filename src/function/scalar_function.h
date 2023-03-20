@@ -236,11 +236,12 @@ public:
     UnaryFunctionToVarlen(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 1, "Unary function: input column count isn't one.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
+        ScalarFunctionData function_data(output.get());
         UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectToVarlenWrapper<Operation>>(
                 input.column_vectors[0],
                 output,
                 input.row_count(),
-                nullptr,
+                &function_data,
                 true);
     }
 
@@ -250,11 +251,12 @@ public:
     UnaryFunctionToVarlenWithFailure(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 1, "Unary function: input column count isn't one.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
+        ScalarFunctionData function_data(output.get());
         UnaryOperator::Execute<InputType, OutputType, UnaryTryOpToVarlenWrapper<Operation>>(
                 input.column_vectors[0],
                 output,
                 input.row_count(),
-                nullptr,
+                &function_data,
                 true);
     }
 
@@ -294,12 +296,13 @@ public:
     BinaryFunctionToVarlen(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
+        ScalarFunctionData function_data(output.get());
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectToVarlenWrapper<Operation>>(
                 input.column_vectors[0],
                 input.column_vectors[1],
                 output,
                 input.row_count(),
-                nullptr,
+                &function_data,
                 true);
     }
 
@@ -309,12 +312,13 @@ public:
     BinaryFunctionToVarlenWithFailure(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 2, "Binary function: input column count isn't two.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
+        ScalarFunctionData function_data(output.get());
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpToVarlenWrapper<Operation>>(
                 input.column_vectors[0],
                 input.column_vectors[1],
                 output,
                 input.row_count(),
-                nullptr,
+                &function_data,
                 true);
     }
 
@@ -356,13 +360,14 @@ public:
     TernaryFunctionToVarlen(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 3, "Ternary function: input column count isn't three.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
+        ScalarFunctionData function_data(output.get());
         TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryOpDirectToVarlenWrapper<Operation>>(
                 input.column_vectors[0],
                 input.column_vectors[1],
                 input.column_vectors[2],
                 output,
                 input.row_count(),
-                nullptr,
+                &function_data,
                 true);
     }
 
@@ -372,13 +377,14 @@ public:
     TernaryFunctionToVarlenWithFailure(const DataBlock& input, SharedPtr<ColumnVector>& output) {
         ExecutorAssert(input.column_count() == 3, "Ternary function: input column count isn't three.");
         ExecutorAssert(input.Finalized(), "Input data block is finalized");
+        ScalarFunctionData function_data(output.get());
         TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpToVarlenWrapper<Operation>>(
                 input.column_vectors[0],
                 input.column_vectors[1],
                 input.column_vectors[2],
                 output,
                 input.row_count(),
-                nullptr,
+                &function_data,
                 true);
     }
 };
