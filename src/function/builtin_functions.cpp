@@ -37,6 +37,9 @@
 #include "aggregate/min.h"
 #include "aggregate/sum.h"
 
+// String function
+#include "function/scalar/substring.h"
+
 // Table function
 #include "table/table_scan.h"
 
@@ -93,6 +96,9 @@ BuiltinFunctions::RegisterScalarFunction() {
 
     // extract function
     RegisterExtractFunction(catalog_ptr_);
+
+    // string functions
+    RegisterSubstringFunction(catalog_ptr_);
 }
 
 void
