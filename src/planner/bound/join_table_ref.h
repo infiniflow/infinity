@@ -5,7 +5,7 @@
 #pragma once
 
 #include "table_ref.h"
-#include "common/types.h"
+#include "parser/table_reference/join_reference.h"
 
 namespace infinity {
 

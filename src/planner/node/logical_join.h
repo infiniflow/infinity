@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "common/types.h"
 #include "planner/logical_node.h"
+#include "parser/table_reference/join_reference.h"
 
 namespace infinity {
 

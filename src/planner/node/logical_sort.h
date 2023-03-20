@@ -5,7 +5,6 @@
 #pragma once
 
 #include "planner/logical_node.h"
-#include "common/types.h"
 
 namespace infinity {
 

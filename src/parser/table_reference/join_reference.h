@@ -20,6 +20,9 @@ enum class JoinType {
     kAnti,
 };
 
+String
+ToString(JoinType type);
+
 class JoinReference: public BaseTableReference {
 
 public:

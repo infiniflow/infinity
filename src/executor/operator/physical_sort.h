@@ -6,7 +6,6 @@
 
 #include "expression/base_expression.h"
 #include "executor/physical_operator.h"
-#include "common/types.h"
 #include "executor/expression/expression_executor.h"
 
 namespace infinity {

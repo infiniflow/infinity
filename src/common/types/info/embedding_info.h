@@ -15,13 +15,13 @@ class EmbeddingInfo : public TypeInfo {
 public:
 
     inline static SharedPtr<EmbeddingInfo>
-    Make(EmbeddingDataType embedding_data_type, size_t dimension) {
+    Make(EmbeddingDataType embedding_data_type, SizeT dimension) {
         TypeAssert(dimension <= EMBEDDING_LIMIT,
                    "Embedding dimension should less than " + std::to_string(EMBEDDING_LIMIT))
         return MakeShared<EmbeddingInfo>(embedding_data_type, dimension);
     }
 
-    explicit EmbeddingInfo(EmbeddingDataType type, size_t dimension):
+    explicit EmbeddingInfo(EmbeddingDataType type, SizeT dimension):
             TypeInfo(TypeInfoType::kEmbedding),
             embedding_data_type_(type),
             dimension_(dimension)
@@ -32,7 +32,7 @@ public:
     bool
     operator==(const TypeInfo& other) const override;
 
-    [[nodiscard]] inline size_t
+    [[nodiscard]] inline SizeT
     Size() const override {
         return EmbeddingType::EmbeddingSize(embedding_data_type_, dimension_);
     }
@@ -42,13 +42,13 @@ public:
         return embedding_data_type_;
     }
 
-    [[nodiscard]] inline size_t
+    [[nodiscard]] inline SizeT
     Dimension() const noexcept {
         return dimension_;
     }
 private:
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
-    size_t dimension_;
+    SizeT dimension_;
 };
 
 }

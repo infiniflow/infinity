@@ -35,6 +35,9 @@ enum OrderType {
     kDesc
 };
 
+String
+ToString(OrderType type);
+
 struct OrderByExpr {
     ~OrderByExpr() {
         delete expr_;

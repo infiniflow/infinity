@@ -6,7 +6,6 @@
 
 #include "planner/bound/table_ref.h"
 #include "bound_statement.h"
-#include "common/types.h"
 
 namespace infinity {
 
