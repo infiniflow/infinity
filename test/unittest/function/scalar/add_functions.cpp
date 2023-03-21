@@ -430,8 +430,8 @@ TEST_F(AddFunctionsTest, add_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kDecimal16);
-        DataType result_type(LogicalType::kDecimal16);
+        DataType data_type(LogicalType::kDecimal);
+        DataType result_type(LogicalType::kDecimal);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
                                                                                  "t1",
                                                                                  1,
@@ -449,82 +449,7 @@ TEST_F(AddFunctionsTest, add_func) {
         inputs.emplace_back(col2_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Decimal16, Decimal16)->Decimal16", func.ToString().c_str());
-    }
-
-    {
-        Vector<SharedPtr<BaseExpression>> inputs;
-
-        DataType data_type(LogicalType::kDecimal32);
-        DataType result_type(LogicalType::kDecimal32);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-
-        inputs.emplace_back(col1_expr_ptr);
-        inputs.emplace_back(col2_expr_ptr);
-
-        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Decimal32, Decimal32)->Decimal32", func.ToString().c_str());
-    }
-
-    {
-        Vector<SharedPtr<BaseExpression>> inputs;
-
-        DataType data_type(LogicalType::kDecimal64);
-        DataType result_type(LogicalType::kDecimal64);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-
-        inputs.emplace_back(col1_expr_ptr);
-        inputs.emplace_back(col2_expr_ptr);
-
-        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Decimal64, Decimal64)->Decimal64", func.ToString().c_str());
-    }
-
-    {
-        Vector<SharedPtr<BaseExpression>> inputs;
-
-        DataType data_type(LogicalType::kDecimal128);
-        DataType result_type(LogicalType::kDecimal128);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-
-        inputs.emplace_back(col1_expr_ptr);
-        inputs.emplace_back(col2_expr_ptr);
-
-        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Decimal128, Decimal128)->Decimal128", func.ToString().c_str());
+        EXPECT_STREQ("+(Decimal, Decimal)->Decimal", func.ToString().c_str());
     }
 
     {
@@ -625,56 +550,6 @@ TEST_F(AddFunctionsTest, add_func) {
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("+(Interval, Timestamp)->Timestamp", func.ToString().c_str());
-    }
-
-    {
-        Vector<SharedPtr<BaseExpression>> inputs;
-
-        DataType data1_type(LogicalType::kTimestampTZ);
-        DataType data2_type(LogicalType::kInterval);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data1_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data2_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-
-        inputs.emplace_back(col1_expr_ptr);
-        inputs.emplace_back(col2_expr_ptr);
-
-        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(TimestampTZ, Interval)->TimestampTZ", func.ToString().c_str());
-    }
-
-    {
-        Vector<SharedPtr<BaseExpression>> inputs;
-
-        DataType data1_type(LogicalType::kInterval);
-        DataType data2_type(LogicalType::kTimestampTZ);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data1_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data2_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-
-        inputs.emplace_back(col1_expr_ptr);
-        inputs.emplace_back(col2_expr_ptr);
-
-        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("+(Interval, TimestampTZ)->TimestampTZ", func.ToString().c_str());
     }
 
     {

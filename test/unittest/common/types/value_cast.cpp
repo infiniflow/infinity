@@ -9,7 +9,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "common/types/info/varchar_info.h"
-#include "common/types/info/char_info.h"
 
 class ValueCastTest : public BaseTest {
     void
@@ -275,48 +274,9 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
     }
 
     {
-        // TinyInt to Decimal16
-        DataType target_type(LogicalType::kDecimal16);
-        Value target_value(LogicalType::kDecimal16);
-
-        TinyIntT source = std::numeric_limits<TinyIntT>::min();
-        Value value = Value::MakeTinyInt(source);
-        {
-            EXPECT_EQ(value.GetValue<TinyIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // TinyInt to Decimal32
-        DataType target_type(LogicalType::kDecimal32);
-        Value target_value(LogicalType::kDecimal32);
-
-        TinyIntT source = std::numeric_limits<TinyIntT>::min();
-        Value value = Value::MakeTinyInt(source);
-        {
-            EXPECT_EQ(value.GetValue<TinyIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // TinyInt to Decimal64
-        DataType target_type(LogicalType::kDecimal64);
-        Value target_value(LogicalType::kDecimal64);
-
-        TinyIntT source = std::numeric_limits<TinyIntT>::min();
-        Value value = Value::MakeTinyInt(source);
-        {
-            EXPECT_EQ(value.GetValue<TinyIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // TinyInt to Decimal128
-        DataType target_type(LogicalType::kDecimal128);
-        Value target_value(LogicalType::kDecimal128);
+        // TinyInt to Decimal
+        DataType target_type(LogicalType::kDecimal);
+        Value target_value(LogicalType::kDecimal);
 
         TinyIntT source = std::numeric_limits<TinyIntT>::min();
         Value value = Value::MakeTinyInt(source);
@@ -597,48 +557,9 @@ TEST_F(ValueCastTest, smallint_value_cast) {
     }
 
     {
-        // SmallInt to Decimal16
-        DataType target_type(LogicalType::kDecimal16);
-        Value target_value(LogicalType::kDecimal16);
-
-        SmallIntT source = std::numeric_limits<SmallIntT>::min();
-        Value value = Value::MakeSmallInt(source);
-        {
-            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // SmallInt to Decimal32
-        DataType target_type(LogicalType::kDecimal32);
-        Value target_value(LogicalType::kDecimal32);
-
-        SmallIntT source = std::numeric_limits<SmallIntT>::min();
-        Value value = Value::MakeSmallInt(source);
-        {
-            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // SmallInt to Decimal64
-        DataType target_type(LogicalType::kDecimal64);
-        Value target_value(LogicalType::kDecimal64);
-
-        SmallIntT source = std::numeric_limits<SmallIntT>::min();
-        Value value = Value::MakeSmallInt(source);
-        {
-            EXPECT_EQ(value.GetValue<SmallIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // SmallInt to Decimal128
-        DataType target_type(LogicalType::kDecimal128);
-        Value target_value(LogicalType::kDecimal128);
+        // SmallInt to Decimal
+        DataType target_type(LogicalType::kDecimal);
+        Value target_value(LogicalType::kDecimal);
 
         SmallIntT source = std::numeric_limits<SmallIntT>::min();
         Value value = Value::MakeSmallInt(source);
@@ -933,48 +854,9 @@ TEST_F(ValueCastTest, integer_value_cast) {
     }
 
     {
-        // IntegerT to Decimal16
-        DataType target_type(LogicalType::kDecimal16);
-        Value target_value(LogicalType::kDecimal16);
-
-        IntegerT source = std::numeric_limits<IntegerT>::min();
-        Value value = Value::MakeInt(source);
-        {
-            EXPECT_EQ(value.GetValue<IntegerT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // IntegerT to Decimal32
-        DataType target_type(LogicalType::kDecimal32);
-        Value target_value(LogicalType::kDecimal32);
-
-        IntegerT source = std::numeric_limits<IntegerT>::min();
-        Value value = Value::MakeInt(source);
-        {
-            EXPECT_EQ(value.GetValue<IntegerT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // IntegerT to Decimal64
-        DataType target_type(LogicalType::kDecimal64);
-        Value target_value(LogicalType::kDecimal64);
-
-        IntegerT source = std::numeric_limits<IntegerT>::min();
-        Value value = Value::MakeInt(source);
-        {
-            EXPECT_EQ(value.GetValue<IntegerT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // IntegerT to Decimal128
-        DataType target_type(LogicalType::kDecimal128);
-        Value target_value(LogicalType::kDecimal128);
+        // IntegerT to Decimal
+        DataType target_type(LogicalType::kDecimal);
+        Value target_value(LogicalType::kDecimal);
 
         IntegerT source = std::numeric_limits<IntegerT>::min();
         Value value = Value::MakeInt(source);
@@ -1286,48 +1168,9 @@ TEST_F(ValueCastTest, bigint_value_cast) {
     }
 
     {
-        // BigIntT to Decimal16
-        DataType target_type(LogicalType::kDecimal16);
-        Value target_value(LogicalType::kDecimal16);
-
-        BigIntT source = std::numeric_limits<BigIntT>::min();
-        Value value = Value::MakeBigInt(source);
-        {
-            EXPECT_EQ(value.GetValue<BigIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // BigIntT to Decimal32
-        DataType target_type(LogicalType::kDecimal32);
-        Value target_value(LogicalType::kDecimal32);
-
-        BigIntT source = std::numeric_limits<BigIntT>::min();
-        Value value = Value::MakeBigInt(source);
-        {
-            EXPECT_EQ(value.GetValue<BigIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // BigIntT to Decimal64
-        DataType target_type(LogicalType::kDecimal64);
-        Value target_value(LogicalType::kDecimal64);
-
-        BigIntT source = std::numeric_limits<BigIntT>::min();
-        Value value = Value::MakeBigInt(source);
-        {
-            EXPECT_EQ(value.GetValue<BigIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // BigIntT to Decimal128
-        DataType target_type(LogicalType::kDecimal128);
-        Value target_value(LogicalType::kDecimal128);
+        // BigIntT to Decimal
+        DataType target_type(LogicalType::kDecimal);
+        Value target_value(LogicalType::kDecimal);
 
         BigIntT source = std::numeric_limits<BigIntT>::min();
         Value value = Value::MakeBigInt(source);
@@ -1449,48 +1292,9 @@ TEST_F(ValueCastTest, hugeint_value_cast) {
     }
 
     {
-        // HugeIntT to Decimal16
-        DataType target_type(LogicalType::kDecimal16);
-        Value target_value(LogicalType::kDecimal16);
-
-        HugeIntT source = std::numeric_limits<HugeIntT>::min();
-        Value value = Value::MakeHugeInt(source);
-        {
-            EXPECT_EQ(value.GetValue<HugeIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // BigIntT to Decimal32
-        DataType target_type(LogicalType::kDecimal32);
-        Value target_value(LogicalType::kDecimal32);
-
-        HugeIntT source = std::numeric_limits<HugeIntT>::min();
-        Value value = Value::MakeHugeInt(source);
-        {
-            EXPECT_EQ(value.GetValue<HugeIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // BigIntT to Decimal64
-        DataType target_type(LogicalType::kDecimal64);
-        Value target_value(LogicalType::kDecimal64);
-
-        HugeIntT source = std::numeric_limits<HugeIntT>::min();
-        Value value = Value::MakeHugeInt(source);
-        {
-            EXPECT_EQ(value.GetValue<HugeIntT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // BigIntT to Decimal128
-        DataType target_type(LogicalType::kDecimal128);
-        Value target_value(LogicalType::kDecimal128);
+        // BigIntT to Decimal
+        DataType target_type(LogicalType::kDecimal);
+        Value target_value(LogicalType::kDecimal);
 
         HugeIntT source = std::numeric_limits<HugeIntT>::min();
         Value value = Value::MakeHugeInt(source);
@@ -1724,48 +1528,9 @@ TEST_F(ValueCastTest, float_value_cast) {
     }
 
     {
-        // FloatT to Decimal16
-        DataType target_type(LogicalType::kDecimal16);
-        Value target_value(LogicalType::kDecimal16);
-
-        FloatT source = std::numeric_limits<FloatT>::min();
-        Value value = Value::MakeFloat(source);
-        {
-            EXPECT_EQ(value.GetValue<FloatT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // FloatT to Decimal32
-        DataType target_type(LogicalType::kDecimal32);
-        Value target_value(LogicalType::kDecimal32);
-
-        FloatT source = std::numeric_limits<FloatT>::min();
-        Value value = Value::MakeFloat(source);
-        {
-            EXPECT_EQ(value.GetValue<FloatT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // FloatT to Decimal64
-        DataType target_type(LogicalType::kDecimal64);
-        Value target_value(LogicalType::kDecimal64);
-
-        FloatT source = std::numeric_limits<FloatT>::min();
-        Value value = Value::MakeFloat(source);
-        {
-            EXPECT_EQ(value.GetValue<FloatT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // FloatT to Decimal128
-        DataType target_type(LogicalType::kDecimal128);
-        Value target_value(LogicalType::kDecimal128);
+        // FloatT to Decimal
+        DataType target_type(LogicalType::kDecimal);
+        Value target_value(LogicalType::kDecimal);
 
         FloatT source = std::numeric_limits<FloatT>::lowest();
         Value value = Value::MakeFloat(source);
@@ -2015,48 +1780,9 @@ TEST_F(ValueCastTest, double_value_cast) {
     }
 
     {
-        // DoubleT to Decimal16
-        DataType target_type(LogicalType::kDecimal16);
-        Value target_value(LogicalType::kDecimal16);
-
-        DoubleT source = std::numeric_limits<DoubleT>::min();
-        Value value = Value::MakeDouble(source);
-        {
-            EXPECT_EQ(value.GetValue<DoubleT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // DoubleT to Decimal32
-        DataType target_type(LogicalType::kDecimal32);
-        Value target_value(LogicalType::kDecimal32);
-
-        DoubleT source = std::numeric_limits<DoubleT>::min();
-        Value value = Value::MakeDouble(source);
-        {
-            EXPECT_EQ(value.GetValue<DoubleT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // DoubleT to Decimal64
-        DataType target_type(LogicalType::kDecimal64);
-        Value target_value(LogicalType::kDecimal64);
-
-        DoubleT source = std::numeric_limits<DoubleT>::min();
-        Value value = Value::MakeDouble(source);
-        {
-            EXPECT_EQ(value.GetValue<DoubleT>(), source);
-            EXPECT_THROW(value.TryCastAs(target_type, target_value), NotImplementException);
-        }
-    }
-
-    {
-        // DoubleT to Decimal128
-        DataType target_type(LogicalType::kDecimal128);
-        Value target_value(LogicalType::kDecimal128);
+        // DoubleT to Decimal
+        DataType target_type(LogicalType::kDecimal);
+        Value target_value(LogicalType::kDecimal);
 
         DoubleT source = std::numeric_limits<DoubleT>::lowest();
         Value value = Value::MakeDouble(source);

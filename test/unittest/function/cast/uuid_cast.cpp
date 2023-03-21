@@ -62,7 +62,7 @@ TEST_F(UuidCastTest, uuid_cast1) {
 
     // Call BindUuidCast with wrong type of parameters
     {
-        DataType target_type(LogicalType::kDecimal16);
+        DataType target_type(LogicalType::kDecimal);
         EXPECT_THROW(BindUuidCast(target_type), TypeException);
     }
 

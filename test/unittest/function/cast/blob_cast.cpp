@@ -74,7 +74,7 @@ TEST_F(BlobCastTest, blob_cast1) {
 
     // Call BindBlobCast with wrong type of parameters
     {
-        DataType target_type(LogicalType::kDecimal16);
+        DataType target_type(LogicalType::kDecimal);
         EXPECT_THROW(BindBlobCast(target_type), TypeException);
     }
 

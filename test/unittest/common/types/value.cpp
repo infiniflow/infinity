@@ -9,7 +9,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "common/types/info/varchar_info.h"
-#include "common/types/info/char_info.h"
 
 class ValueTest : public BaseTest {
     void
@@ -183,33 +182,11 @@ TEST_F(ValueTest, MakeAndGet) {
     value = Value::MakeDouble(3.232);
     EXPECT_FLOAT_EQ(value.GetValue<DoubleT>(), 3.232);
 
-    // Decimal16
-    Decimal16T decimal_16(100);
-    SharedPtr<TypeInfo> type_info_ptr = Decimal16Info::Make(4, 4);
-    value = Value::MakeDecimal16(decimal_16, type_info_ptr);
-    EXPECT_EQ(value.GetValue<Decimal16T>(), decimal_16);
-
-    // Decimal32
-    Decimal32T decimal_32(1000);
-
-    type_info_ptr.reset();
-    type_info_ptr = Decimal32Info::Make(9, 9);
-    value = Value::MakeDecimal32(decimal_32, type_info_ptr);
-    EXPECT_EQ(value.GetValue<Decimal32T>(), decimal_32);
-
-    // Decimal64
-    Decimal64T decimal_64(10000);
-    type_info_ptr.reset();
-    type_info_ptr = Decimal64Info::Make(18, 18);
-    value = Value::MakeDecimal64(decimal_64, type_info_ptr);
-    EXPECT_EQ(value.GetValue<Decimal64T>(), decimal_64);
-
-    // Decimal128
-    Decimal128T decimal_128(10000, 10001);
-    type_info_ptr.reset();
-    type_info_ptr = Decimal128Info::Make(38, 38);
-    value = Value::MakeDecimal128(decimal_128, type_info_ptr);
-    EXPECT_EQ(value.GetValue<Decimal128T>(), decimal_128);
+    // Decimal
+    DecimalT decimal_value(10000, 10001);
+    SharedPtr<TypeInfo> type_info_ptr = DecimalInfo::Make(38, 38);
+    value = Value::MakeDecimal(decimal_value, type_info_ptr);
+    EXPECT_EQ(value.GetValue<DecimalT>(), decimal_value);
 
     // Varchar (inline)
     auto varchar_info = VarcharInfo::Make(65);
@@ -221,19 +198,6 @@ TEST_F(ValueTest, MakeAndGet) {
     value = Value::MakeVarchar("Hello World, Hello World", varchar_info);
     EXPECT_EQ(value.GetValue<VarcharT>().IsInlined(), false);
     EXPECT_EQ(value.GetValue<VarcharT>().ToString(), "Hello World, Hello World");
-
-    // CharT
-    {
-        String str = "Hello";
-        auto char_info = CharInfo::Make(64);
-        value = Value::MakeChar(str, char_info);
-
-        CharT char_n = value.GetValue<CharT>();
-        EXPECT_EQ(char_n.ptr, value.value_.char_n.ptr);
-        // CharT need to manually SetNull or Reset.
-        value.value_.char_n.Reset();
-        char_n.SetNull();
-    }
 
     // Date
     {
@@ -276,18 +240,6 @@ TEST_F(ValueTest, MakeAndGet) {
             value = Value::MakeTimestamp(timestamp);
             EXPECT_EQ(value.GetValue<TimestampT>().date, i);
             EXPECT_EQ(value.GetValue<TimestampT>().time, 3600 - i);
-        }
-    }
-
-    // TimestampTz
-    {
-        TimestampTZT timestamp_tz;
-        for(i32 i = 0; i < 365; ++ i) {
-            timestamp_tz.date = i;
-            timestamp_tz.time = 3600 - i;
-            value = Value::MakeTimestampTz(timestamp_tz);
-            EXPECT_EQ(value.GetValue<TimestampTZT>().date, i);
-            EXPECT_EQ(value.GetValue<TimestampTZT>().time, 3600 - i);
         }
     }
 

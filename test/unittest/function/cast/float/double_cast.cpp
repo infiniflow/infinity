@@ -156,28 +156,9 @@ TEST_F(DoubleCastTest, double_cast0) {
     }
 
     // TODO:
-    // Cast to decimal16/32/64/128
     {
         DoubleT source = std::numeric_limits<DoubleT>::lowest();
-        Decimal16T target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
-    }
-
-    {
-        DoubleT source = std::numeric_limits<DoubleT>::lowest();
-        Decimal32T target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
-    }
-
-    {
-        DoubleT source = std::numeric_limits<DoubleT>::lowest();
-        Decimal64T target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
-    }
-
-    {
-        DoubleT source = std::numeric_limits<DoubleT>::lowest();
-        Decimal128T target;
+        DecimalT target;
         EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
     }
 

@@ -26,26 +26,8 @@ MinusFunction::Run(HugeIntT value, HugeIntT &result) {
 
 template<>
 inline bool
-MinusFunction::Run(Decimal16T value, Decimal16T &result) {
-    NotImplementError("No implementation on minus decimal16")
-}
-
-template<>
-inline bool
-MinusFunction::Run(Decimal32T value, Decimal32T &result) {
-    NotImplementError("No implementation on minus decimal32")
-}
-
-template<>
-inline bool
-MinusFunction::Run(Decimal64T value, Decimal64T &result) {
-    NotImplementError("No implementation on minus decimal64")
-}
-
-template<>
-inline bool
-MinusFunction::Run(Decimal128T value, Decimal128T &result) {
-    NotImplementError("No implementation on minus decimal128")
+MinusFunction::Run(DecimalT value, DecimalT &result) {
+    NotImplementError("No implementation on minus Decimal")
 }
 
 template<>
@@ -143,33 +125,12 @@ RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::UnaryFunctionWithFailure<DoubleT, DoubleT, MinusFunction>);
     function_set_ptr->AddFunction(minus_double);
 
-    ScalarFunction minus_decimal16(
+    ScalarFunction minus_decimal(
             func_name,
-            {DataType(LogicalType::kDecimal16)},
-            DataType(LogicalType::kDecimal16),
-            &ScalarFunction::UnaryFunctionWithFailure<Decimal16T, Decimal16T, MinusFunction>);
-    function_set_ptr->AddFunction(minus_decimal16);
-
-    ScalarFunction minus_decimal32(
-            func_name,
-            {DataType(LogicalType::kDecimal32)},
-            DataType(LogicalType::kDecimal32),
-            &ScalarFunction::UnaryFunctionWithFailure<Decimal32T, Decimal32T, MinusFunction>);
-    function_set_ptr->AddFunction(minus_decimal32);
-
-    ScalarFunction minus_decimal64(
-            func_name,
-            {DataType(LogicalType::kDecimal64)},
-            DataType(LogicalType::kDecimal64),
-            &ScalarFunction::UnaryFunctionWithFailure<Decimal64T, Decimal64T, MinusFunction>);
-    function_set_ptr->AddFunction(minus_decimal64);
-
-    ScalarFunction minus_decimal128(
-            func_name,
-            {DataType(LogicalType::kDecimal128)},
-            DataType(LogicalType::kDecimal128),
-            &ScalarFunction::UnaryFunctionWithFailure<Decimal128T, Decimal128T, MinusFunction>);
-    function_set_ptr->AddFunction(minus_decimal128);
+            {DataType(LogicalType::kDecimal)},
+            DataType(LogicalType::kDecimal),
+            &ScalarFunction::UnaryFunctionWithFailure<DecimalT, DecimalT, MinusFunction>);
+    function_set_ptr->AddFunction(minus_decimal);
 
     ScalarFunction minus_mixed(
             func_name,

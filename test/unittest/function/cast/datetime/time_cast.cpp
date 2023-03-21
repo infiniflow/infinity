@@ -57,7 +57,7 @@ TEST_F(TimeCastTest, date_cast1) {
 
     // Call BindDateCast with wrong type of parameters
     {
-        DataType target_type(LogicalType::kDecimal16);
+        DataType target_type(LogicalType::kDecimal);
         EXPECT_THROW(BindTimeCast(target_type), TypeException);
     }
 

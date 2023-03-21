@@ -84,33 +84,12 @@ RegisterPlusFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::NoOpFunction);
     function_set_ptr->AddFunction(plus_double);
 
-    ScalarFunction plus_decimal16(
+    ScalarFunction plus_decimal(
             func_name,
-            {DataType(LogicalType::kDecimal16)},
-            DataType(LogicalType::kDecimal16),
+            {DataType(LogicalType::kDecimal)},
+            DataType(LogicalType::kDecimal),
             &ScalarFunction::NoOpFunction);
-    function_set_ptr->AddFunction(plus_decimal16);
-
-    ScalarFunction plus_decimal32(
-            func_name,
-            {DataType(LogicalType::kDecimal32)},
-            DataType(LogicalType::kDecimal32),
-            &ScalarFunction::NoOpFunction);
-    function_set_ptr->AddFunction(plus_decimal32);
-
-    ScalarFunction plus_decimal64(
-            func_name,
-            {DataType(LogicalType::kDecimal64)},
-            DataType(LogicalType::kDecimal64),
-            &ScalarFunction::NoOpFunction);
-    function_set_ptr->AddFunction(plus_decimal64);
-
-    ScalarFunction plus_decimal128(
-            func_name,
-            {DataType(LogicalType::kDecimal128)},
-            DataType(LogicalType::kDecimal128),
-            &ScalarFunction::NoOpFunction);
-    function_set_ptr->AddFunction(plus_decimal128);
+    function_set_ptr->AddFunction(plus_decimal);
 
     ScalarFunction plus_mixed(
             func_name,

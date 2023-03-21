@@ -82,32 +82,11 @@ SubFunction::Run(DoubleT left, DoubleT right, DoubleT& result) {
     return true;
 }
 
-// Decimal16 - Decimal16 = Decimal16
+// Decimal - Decimal = Decimal
 template<>
 inline bool
-SubFunction::Run(Decimal16T left, Decimal16T right, Decimal16T& result) {
-    NotImplementError("Decimal16 - Decimal16");
-}
-
-// Decimal32 - Decimal32 = Decimal32
-template<>
-inline bool
-SubFunction::Run(Decimal32T left, Decimal32T right, Decimal32T& result) {
-    NotImplementError("Decimal32 - Decimal32");
-}
-
-// Decimal64 - Decimal64 = Decimal64
-template<>
-inline bool
-SubFunction::Run(Decimal64T left, Decimal64T right, Decimal64T& result) {
-    NotImplementError("Decimal64 - Decimal64");
-}
-
-// Decimal128 - Decimal128 = Decimal128
-template<>
-inline bool
-SubFunction::Run(Decimal128T left, Decimal128T right, Decimal128T& result) {
-    NotImplementError("Decimal128 - Decimal128");
+SubFunction::Run(DecimalT left, DecimalT right, DecimalT& result) {
+    NotImplementError("Decimal - Decimal");
 }
 
 // DateT - Interval
@@ -128,13 +107,6 @@ SubFunction::Run(DateTimeT left, IntervalT right, DateTimeT& result) {
 template<>
 inline bool
 SubFunction::Run(TimestampT left, IntervalT right, TimestampT& result) {
-    NotImplementError("TimestampT - IntervalT");
-}
-
-// TimestampTZT - Interval
-template<>
-inline bool
-SubFunction::Run(TimestampTZT left, IntervalT right, TimestampTZT& result) {
     NotImplementError("TimestampT - IntervalT");
 }
 
@@ -229,33 +201,12 @@ RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::BinaryFunctionWithFailure<double, double, double, SubFunction>);
     function_set_ptr->AddFunction(sub_function_double);
 
-    ScalarFunction sub_function_decimal16(
+    ScalarFunction sub_function_decimal(
             func_name,
-            { DataType(LogicalType::kDecimal16), DataType(LogicalType::kDecimal16) },
-            { DataType(LogicalType::kDecimal16) },
-            &ScalarFunction::BinaryFunctionWithFailure<Decimal16T, Decimal16T, Decimal16T, SubFunction>);
-    function_set_ptr->AddFunction(sub_function_decimal16);
-
-    ScalarFunction sub_function_decimal32(
-            func_name,
-            { DataType(LogicalType::kDecimal32), DataType(LogicalType::kDecimal32) },
-            { DataType(LogicalType::kDecimal32) },
-            &ScalarFunction::BinaryFunctionWithFailure<Decimal32T, Decimal32T, Decimal32T, SubFunction>);
-    function_set_ptr->AddFunction(sub_function_decimal32);
-
-    ScalarFunction sub_function_decimal64(
-            func_name,
-            { DataType(LogicalType::kDecimal64), DataType(LogicalType::kDecimal64) },
-            { DataType(LogicalType::kDecimal64) },
-            &ScalarFunction::BinaryFunctionWithFailure<Decimal64T, Decimal64T, Decimal64T, SubFunction>);
-    function_set_ptr->AddFunction(sub_function_decimal64);
-
-    ScalarFunction sub_function_decimal128(
-            func_name,
-            { DataType(LogicalType::kDecimal128), DataType(LogicalType::kDecimal128) },
-            { DataType(LogicalType::kDecimal128) },
-            &ScalarFunction::BinaryFunctionWithFailure<Decimal128T, Decimal128T, Decimal128T, SubFunction>);
-    function_set_ptr->AddFunction(sub_function_decimal128);
+            { DataType(LogicalType::kDecimal), DataType(LogicalType::kDecimal) },
+            { DataType(LogicalType::kDecimal) },
+            &ScalarFunction::BinaryFunctionWithFailure<DecimalT, DecimalT, DecimalT, SubFunction>);
+    function_set_ptr->AddFunction(sub_function_decimal);
 
     ScalarFunction sub_function_date_interval(
             func_name,
@@ -277,13 +228,6 @@ RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
             { DataType(LogicalType::kTimestamp) },
             &ScalarFunction::BinaryFunctionWithFailure<TimestampT, IntervalT, TimestampT, SubFunction>);
     function_set_ptr->AddFunction(sub_function_timestamp_interval);
-
-    ScalarFunction sub_function_timestamptz_interval(
-            func_name,
-            { DataType(LogicalType::kTimestampTZ), DataType(LogicalType::kInterval) },
-            { DataType(LogicalType::kTimestampTZ) },
-            &ScalarFunction::BinaryFunctionWithFailure<TimestampTZT, IntervalT, TimestampTZT, SubFunction>);
-    function_set_ptr->AddFunction(sub_function_timestamptz_interval);
 
     ScalarFunction sub_function_mixed_bigint(
             func_name,

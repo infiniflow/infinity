@@ -62,19 +62,7 @@ TEST_F(NullValueTest, null_value_test1) {
         EXPECT_EQ(null_value, std::numeric_limits<DoubleT>::infinity());
     }
     {
-        auto null_value = NullValue<Decimal16Type>();
-        EXPECT_EQ(null_value.value, std::numeric_limits<i16>::infinity());
-    }
-    {
-        auto null_value = NullValue<Decimal32Type>();
-        EXPECT_EQ(null_value.value, std::numeric_limits<i32>::infinity());
-    }
-    {
-        auto null_value = NullValue<Decimal64Type>();
-        EXPECT_EQ(null_value.value, std::numeric_limits<i64>::infinity());
-    }
-    {
-        auto null_value = NullValue<Decimal128Type>();
+        auto null_value = NullValue<DecimalType>();
         EXPECT_EQ(null_value.upper, std::numeric_limits<i64>::infinity());
         EXPECT_EQ(null_value.lower, std::numeric_limits<i64>::infinity());
     }
@@ -103,11 +91,6 @@ using IntervalT = IntervalType;
     }
     {
         auto null_value = NullValue<TimestampT>();
-        EXPECT_EQ(null_value.date, std::numeric_limits<i32>::infinity());
-        EXPECT_EQ(null_value.time, std::numeric_limits<i32>::infinity());
-    }
-    {
-        auto null_value = NullValue<TimestampTZT>();
         EXPECT_EQ(null_value.date, std::numeric_limits<i32>::infinity());
         EXPECT_EQ(null_value.time, std::numeric_limits<i32>::infinity());
     }

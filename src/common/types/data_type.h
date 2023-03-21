@@ -28,21 +28,16 @@ using HugeIntT = HugeInt;
 using FloatT = float;
 using DoubleT = double;
 
-using Decimal16T = Decimal16Type;
-using Decimal32T = Decimal32Type;
-using Decimal64T = Decimal64Type;
-using Decimal128T = Decimal128Type;
+using DecimalT = DecimalType;
 
 // String
 using VarcharT = VarcharType;
-using CharT = CharType;
 
 // Date and Time
 using DateT = DateType;
 using TimeT = TimeType;
 using DateTimeT = DateTimeType;
 using TimestampT = TimestampType;
-using TimestampTZT = TimestampTZType;
 using IntervalT = IntervalType;
 
 // Nest types
@@ -160,17 +155,12 @@ template <> String DataType::TypeToString<BigIntT>();
 template <> String DataType::TypeToString<HugeIntT>();
 template <> String DataType::TypeToString<FloatT>();
 template <> String DataType::TypeToString<DoubleT>();
-template <> String DataType::TypeToString<Decimal16T>();
-template <> String DataType::TypeToString<Decimal32T>();
-template <> String DataType::TypeToString<Decimal64T>();
-template <> String DataType::TypeToString<Decimal128T>();
+template <> String DataType::TypeToString<DecimalT>();
 template <> String DataType::TypeToString<VarcharT>();
-template <> String DataType::TypeToString<CharT>();
 template <> String DataType::TypeToString<DateT>();
 template <> String DataType::TypeToString<TimeT>();
 template <> String DataType::TypeToString<DateTimeT>();
 template <> String DataType::TypeToString<TimestampT>();
-template <> String DataType::TypeToString<TimestampTZT>();
 template <> String DataType::TypeToString<IntervalT>();
 template <> String DataType::TypeToString<ArrayT>();
 //template <> String DataType::TypeToString<TupleT>() { return "Tuple"; }

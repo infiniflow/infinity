@@ -156,22 +156,7 @@ TEST_F(FloatCastTest, float_cast0) {
     // Cast to decimal16/32/64/128
     {
         FloatT source = std::numeric_limits<FloatT>::lowest();
-        Decimal16T target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
-    }
-    {
-        FloatT source = std::numeric_limits<FloatT>::lowest();
-        Decimal32T target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
-    }
-    {
-        FloatT source = std::numeric_limits<FloatT>::lowest();
-        Decimal64T target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
-    }
-    {
-        FloatT source = std::numeric_limits<FloatT>::lowest();
-        Decimal128T target;
+        DecimalT target;
         EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), NotImplementException);
     }
 

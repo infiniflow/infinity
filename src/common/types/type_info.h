@@ -13,12 +13,8 @@ enum class TypeInfoType {
     kInvalid,
 
     // Primitive
-    kDecimal16,
-    kDecimal32,
-    kDecimal64,
-    kDecimal128,
+    kDecimal,
     kVarchar,
-    kChar,
 
     // Nested
     kArray,

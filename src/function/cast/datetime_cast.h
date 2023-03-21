@@ -27,9 +27,6 @@ BindDateTimeCast(DataType& target) {
         case LogicalType::kTimestamp: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<DateTimeT, TimestampT, DateTimeTryCastToFixlen>);
         }
-        case LogicalType::kTimestampTZ: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<DateTimeT, TimestampTZT, DateTimeTryCastToFixlen>);
-        }
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<DateTimeT, VarcharT, DateTimeTryCastToVarlen>);
         }
@@ -72,12 +69,6 @@ DateTimeTryCastToFixlen::Run(DateTimeT source, TimeT &target) {
 template<>
 inline bool
 DateTimeTryCastToFixlen::Run(DateTimeT source, TimestampT &target) {
-    NotImplementError("Not implemented");
-}
-
-template<>
-inline bool
-DateTimeTryCastToFixlen::Run(DateTimeT source, TimestampTZT &target) {
     NotImplementError("Not implemented");
 }
 

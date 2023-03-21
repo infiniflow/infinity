@@ -136,7 +136,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -540,7 +540,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -836,7 +836,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal128)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);

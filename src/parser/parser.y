@@ -534,16 +534,12 @@ table_column :
 IDENTIFIER column_type {
     SharedPtr<TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
-        case LogicalType::kChar: {
-            type_info_ptr = CharInfo::Make($2.width);
-            break;
-        }
         case LogicalType::kVarchar: {
             type_info_ptr = VarcharInfo::Make($2.width);
             break;
         }
-        case LogicalType::kDecimal64: {
-            type_info_ptr = Decimal64Info::Make($2.precision, $2.scale);
+        case LogicalType::kDecimal: {
+            type_info_ptr = DecimalInfo::Make($2.precision, $2.scale);
             break;
         }
         case LogicalType::kBlob: {
@@ -573,16 +569,12 @@ IDENTIFIER column_type {
 | IDENTIFIER column_type column_constraints {
     SharedPtr<TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
-        case LogicalType::kChar: {
-            type_info_ptr = CharInfo::Make($2.width);
-            break;
-        }
         case LogicalType::kVarchar: {
             type_info_ptr = VarcharInfo::Make($2.width);
             break;
         }
-        case LogicalType::kDecimal64: {
-            type_info_ptr = Decimal64Info::Make($2.precision, $2.scale);
+        case LogicalType::kDecimal: {
+            type_info_ptr = DecimalInfo::Make($2.precision, $2.scale);
             break;
         }
         case LogicalType::kBlob: {
@@ -635,11 +627,11 @@ BOOLEAN { $$ = ColumnType{LogicalType::kBoolean}; }
 | POLYGON { $$ = ColumnType{LogicalType::kPolygon}; }
 | CIRCLE { $$ = ColumnType{LogicalType::kCircle}; }
 // Variable types
-| CHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kChar, $3}; }
+| CHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kVarchar, $3}; }
 | VARCHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kVarchar, $3}; }
-| DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kDecimal64, 0, $3, $5}; }
-| DECIMAL '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kDecimal64, 0, $3, 0}; }
-| DECIMAL { $$ = ColumnType{LogicalType::kDecimal64, 0, 0, 0}; }
+| DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kDecimal, 0, $3, $5}; }
+| DECIMAL '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kDecimal, 0, $3, 0}; }
+| DECIMAL { $$ = ColumnType{LogicalType::kDecimal, 0, 0, 0}; }
 | BLOB '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kBlob, $3}; }
 | BITMAP '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kBitmap, $3}; }
 | EMBEDDING '(' BIT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemBit}; }
@@ -1682,16 +1674,12 @@ case_check_array: WHEN expr THEN expr {
 cast_expr: CAST '(' expr AS column_type ')' {
     SharedPtr<TypeInfo> type_info_ptr{nullptr};
     switch($5.logical_type_) {
-        case LogicalType::kChar: {
-            type_info_ptr = CharInfo::Make($5.width);
-            break;
-        }
         case LogicalType::kVarchar: {
             type_info_ptr = VarcharInfo::Make($5.width);
             break;
         }
-        case LogicalType::kDecimal64: {
-            type_info_ptr = Decimal64Info::Make($5.precision, $5.scale);
+        case LogicalType::kDecimal: {
+            type_info_ptr = DecimalInfo::Make($5.precision, $5.scale);
             break;
         }
         case LogicalType::kBlob: {

@@ -1,5 +1,5 @@
 //
-// Created by JinHai on 2022/10/28.
+// Created by JinHai on 2022/11/29.
 //
 
 #pragma once
@@ -11,15 +11,36 @@
 
 namespace infinity {
 
-struct DecimalInfo {
+class DecimalInfo : public TypeInfo {
+public:
 
-static SharedPtr<TypeInfo>
-Make(i64 precision, i64 scale);
+    static SharedPtr<DecimalInfo>
+    Make(i64 precision, i64 scale);
 
-static LogicalType
-GetDecimalType(i64 precision, i64 scale);
+    explicit DecimalInfo(i64 precision, i64 scale) :
+    TypeInfo(TypeInfoType::kDecimal), precision_(precision), scale_(scale) {
+//        GlobalResourceUsage::IncrObjectCount();
+    }
 
+    ~DecimalInfo() override {
+//        GlobalResourceUsage::DecrObjectCount();
+    }
+
+    bool
+    operator==(const TypeInfo& other) const override;
+
+    [[nodiscard]] i64
+    precision() const { return precision_; }
+
+    [[nodiscard]] i64
+    scale() const { return scale_; }
+
+    [[nodiscard]] size_t
+    Size() const override { return 16u; }
+
+private:
+    i64 precision_;
+    i64 scale_;
 };
 
 }
-

@@ -47,24 +47,17 @@ enum LogicalType: i8 {
     kFloat,
     kDouble,
 
-    // Decimal * 4
-    kDecimal16,
-    kDecimal32,
-    kDecimal64,
-    kDecimal128,
+    // Decimal * 1
+    kDecimal,
 
     // Varchar * 1
     kVarchar,
 
-    // Char * 1
-    kChar,
-
-    // Date and Time * 6
+    // Date and Time * 5
     kDate,
     kTime,
     kDateTime,
     kTimestamp,
-    kTimestampTZ,
     kInterval,
 
     // Nested types * 2

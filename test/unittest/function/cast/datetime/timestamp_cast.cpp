@@ -56,11 +56,6 @@ TEST_F(TimestampCastTest, datetime_cast0) {
     }
     {
         TimestampT source;
-        TimestampTZT target;
-        EXPECT_THROW(TimestampTryCastToFixlen::Run(source, target), NotImplementException);
-    }
-    {
-        TimestampT source;
         VarcharT target;
 
         auto varchar_info = VarcharInfo::Make(65);
@@ -78,7 +73,7 @@ TEST_F(TimestampCastTest, datetime_cast1) {
 
     // Call BindTimestapCast with wrong type of parameters
     {
-        DataType target_type(LogicalType::kDecimal16);
+        DataType target_type(LogicalType::kDecimal);
         EXPECT_THROW(BindTimestampCast(target_type), TypeException);
     }
 
@@ -124,18 +119,6 @@ TEST_F(TimestampCastTest, datetime_cast1) {
     // cast datetime column vector to timestamp column vector
     {
         DataType target_type(LogicalType::kDateTime);
-        auto source2target_ptr = BindTimestampCast(target_type);
-        EXPECT_NE(source2target_ptr.function, nullptr);
-
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
-        col_target->Initialize();
-
-        CastParameters cast_parameters;
-        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
-    }
-    // cast datetime column vector to timestamp timezone column vector
-    {
-        DataType target_type(LogicalType::kTimestampTZ);
         auto source2target_ptr = BindTimestampCast(target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 

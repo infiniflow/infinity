@@ -25,13 +25,6 @@ SubstrFunction::Run(VarcharT first, BigIntT second, BigIntT third, VarcharT& res
     return true;
 }
 
-template<>
-inline bool
-SubstrFunction::Run(CharT first, BigIntT second, BigIntT third, VarcharT& result, ColumnVector* column_vector_ptr) {
-    LOG_TRACE("{} from pos {} len {}", first.ToString(), second, third);
-    return true;
-}
-
 void
 RegisterSubstringFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "substring";

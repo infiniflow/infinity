@@ -9,7 +9,6 @@
 #include "common/types/data_type.h"
 #include "common/types/internal_types.h"
 #include "common/utility/infinity_assert.h"
-#include "common/types/info/char_info.h"
 #include "common/types/info/varchar_info.h"
 
 namespace infinity {
@@ -46,20 +45,8 @@ BindVarcharCast(const DataType& source, const DataType& target) {
         case kDouble: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DoubleT, TryCastVarchar>);
         }
-        case kDecimal16: {
-            NotImplementError("Varchar to Decimal16")
-        }
-        case kDecimal32: {
-            NotImplementError("Varchar to Decimal32")
-        }
-        case kDecimal64: {
-            NotImplementError("Varchar to Decimal64")
-        }
-        case kDecimal128: {
-            NotImplementError("Varchar to Decimal128")
-        }
-        case kChar: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorWithType<VarcharT, CharT, TryCastVarcharToChar>);
+        case kDecimal: {
+            NotImplementError("Varchar to Decimal")
         }
         case kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<VarcharT, VarcharT, TryCastVarcharToVarchar>);
@@ -75,9 +62,6 @@ BindVarcharCast(const DataType& source, const DataType& target) {
         }
         case kTimestamp: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, TimestampT, TryCastVarchar>);
-        }
-        case kTimestampTZ: {
-            NotImplementError("Cast from varchar to timstamp_tz")
         }
         case kInterval: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, IntervalT, TryCastVarchar>);
@@ -340,29 +324,6 @@ struct TryCastVarcharToChar {
                       + " to " + target_type.ToString());
     }
 };
-
-// Cast VarcharT to CharT type
-template<>
-inline bool
-TryCastVarcharToChar::Run(const VarcharT& source,
-                          const DataType& source_type,
-                          CharT& target,
-                          const DataType& target_type) {
-    SizeT char_len_limit = ((CharInfo*)(target_type.type_info().get()))->length_limit();
-
-    SizeT transferred_bytes{0};
-    if(source.length <= char_len_limit) {
-        transferred_bytes = source.length;
-    } else {
-        transferred_bytes = char_len_limit;
-    }
-    if(source.IsInlined()) {
-        memcpy(target.ptr, source.prefix, transferred_bytes);
-    } else {
-        memcpy(target.ptr, source.ptr, transferred_bytes);
-    }
-    return true;
-}
 
 struct TryCastVarcharToVarchar {
     template<typename SourceType, typename TargetType>

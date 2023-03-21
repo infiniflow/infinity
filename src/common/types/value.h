@@ -5,10 +5,7 @@
 #pragma once
 
 #include "data_type.h"
-#include "common/types/info/decimal16_info.h"
-#include "common/types/info/decimal32_info.h"
-#include "common/types/info/decimal64_info.h"
-#include "common/types/info/decimal128_info.h"
+#include "common/types/info/decimal_info.h"
 #include "common/types/info/embedding_info.h"
 #include "common/utility/infinity_assert.h"
 
@@ -46,16 +43,7 @@ public:
     MakeDouble(DoubleT input);
 
     static Value
-    MakeDecimal16(Decimal16T input, const SharedPtr<TypeInfo>& type_info_ptr);
-
-    static Value
-    MakeDecimal32(Decimal32T input, const SharedPtr<TypeInfo>& type_info_ptr);
-
-    static Value
-    MakeDecimal64(Decimal64T input, const SharedPtr<TypeInfo>& type_info_ptr);
-
-    static Value
-    MakeDecimal128(Decimal128T input, const SharedPtr<TypeInfo>& type_info_ptr);
+    MakeDecimal(DecimalT input, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
     MakeVarchar(VarcharT& input_ref, const SharedPtr<TypeInfo>& type_info_ptr);
@@ -65,12 +53,6 @@ public:
 
     static Value
     MakeVarchar(const char* ptr, const SharedPtr<TypeInfo>& type_info_ptr);
-
-    static Value
-    MakeChar(const String& str, const SharedPtr<TypeInfo>& type_info_ptr);
-
-    static Value
-    MakeChar(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr);
 
     static Value
     MakeDate(DateT input);
@@ -83,9 +65,6 @@ public:
 
     static Value
     MakeTimestamp(TimestampT input);
-
-    static Value
-    MakeTimestampTz(TimestampTZT input);
 
     static Value
     MakeInterval(IntervalT input);
@@ -188,7 +167,7 @@ private:
 public:
     DataType type_;
     union UnionValue {
-        BooleanT boolean;
+        BooleanT boolean{};
 
         TinyIntT tiny_int;
         SmallIntT small_int;
@@ -197,19 +176,14 @@ public:
         HugeIntT huge_int;
         FloatT   float32;
         DoubleT  float64;
-        Decimal16T decimal16;
-        Decimal32T decimal32;
-        Decimal64T decimal64;
-        Decimal128T decimal128;
+        DecimalT decimal;
 
         VarcharT varchar;
-        CharT char_n;
 
         DateT    date;
         TimeT    time;
         DateTimeT datetime;
         TimestampT timestamp;
-        TimestampTZT  timestamp_tz;
         IntervalT  interval;
 
         PointT     point;
@@ -266,17 +240,12 @@ template <> BigIntT Value::GetValue() const;
 template <> HugeIntT Value::GetValue() const;
 template <> FloatT Value::GetValue() const;
 template <> DoubleT Value::GetValue() const;
-template <> Decimal16T Value::GetValue() const;
-template <> Decimal32T Value::GetValue() const;
-template <> Decimal64T Value::GetValue() const;
-template <> Decimal128T Value::GetValue() const;
+template <> DecimalT Value::GetValue() const;
 template <> VarcharT Value::GetValue() const;
-template <> CharT Value::GetValue() const;
 template <> DateT Value::GetValue() const;
 template <> TimeT Value::GetValue() const;
 template <> DateTimeT Value::GetValue() const;
 template <> TimestampT Value::GetValue() const;
-template <> TimestampTZT Value::GetValue() const;
 template <> IntervalT Value::GetValue() const;
 template <> ArrayT Value::GetValue() const;
 template <> PointT Value::GetValue() const;

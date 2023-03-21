@@ -72,7 +72,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
 
     // Call BindEmbeddingCast with wrong type of parameters
     {
-        DataType target_type(LogicalType::kDecimal16);
+        DataType target_type(LogicalType::kDecimal);
         EXPECT_THROW(BindEmbeddingCast(target_type), TypeException);
     }
 

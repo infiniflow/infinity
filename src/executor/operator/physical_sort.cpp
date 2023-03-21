@@ -121,17 +121,8 @@ public:
                         return left_value > right_value;
                     }
                 }
-                case kDecimal16: {
-                    NotImplementError("Decimal16 comparation isn't implemented.")
-                }
-                case kDecimal32: {
-                    NotImplementError("Decimal32 comparation isn't implemented.")
-                }
-                case kDecimal64: {
-                    NotImplementError("Decimal64 comparation isn't implemented.")
-                }
-                case kDecimal128: {
-                    NotImplementError("Decimal128 comparation isn't implemented.")
+                case kDecimal: {
+                    NotImplementError("Decimal comparation isn't implemented.")
                 }
                 case kVarchar: {
                     VarcharType& left_ref = ((VarcharType *)(left_column->data()))[left.offset];
@@ -146,9 +137,6 @@ public:
                         return left_ref > right_ref;
                     }
                 }
-                case kChar: {
-                    NotImplementError("Char comparation isn't implemented.")
-                }
                 case kDate: {
                     NotImplementError("Date comparation isn't implemented.")
                 }
@@ -160,9 +148,6 @@ public:
                 }
                 case kTimestamp: {
                     NotImplementError("Timestamp comparation isn't implemented.")
-                }
-                case kTimestampTZ: {
-                    NotImplementError("TimestampTZ comparation isn't implemented.")
                 }
                 case kInterval: {
                     NotImplementError("Interval comparation isn't implemented.")
@@ -339,17 +324,8 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
                                 = ((DoubleT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                         break;
                     }
-                    case kDecimal16: {
-                        NotImplementError("Decimal16 data shuffle isn't implemented.")
-                    }
-                    case kDecimal32: {
-                        NotImplementError("Decimal32 data shuffle isn't implemented.")
-                    }
-                    case kDecimal64: {
-                        NotImplementError("Decimal64 data shuffle isn't implemented.")
-                    }
-                    case kDecimal128: {
-                        NotImplementError("Decimal128 data shuffle isn't implemented.")
+                    case kDecimal: {
+                        NotImplementError("Decimal data shuffle isn't implemented.")
                     }
                     case kVarchar: {
                         VarcharT& dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
@@ -365,9 +341,6 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
                         }
                         break;
                     }
-                    case kChar: {
-                        NotImplementError("Char data shuffle isn't implemented.")
-                    }
                     case kDate: {
                         NotImplementError("Date data shuffle isn't implemented.")
                     }
@@ -379,9 +352,6 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
                     }
                     case kTimestamp: {
                         NotImplementError("Timestamp data shuffle isn't implemented.")
-                    }
-                    case kTimestampTZ: {
-                        NotImplementError("TimestampTZ data shuffle isn't implemented.")
                     }
                     case kInterval: {
                         NotImplementError("Interval data shuffle isn't implemented.")

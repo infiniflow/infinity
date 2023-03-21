@@ -20,21 +20,16 @@ static const char* type2name[] = {
     "HugeInt",
     "Float",
     "Double",
-    "Decimal16",
-    "Decimal32",
-    "Decimal64",
-    "Decimal128",
+    "Decimal",
 
     // String
     "Varchar",
-    "Char",
 
     // Date and Time
     "Date",
     "Time",
     "DateTime",
     "Timestamp",
-    "TimestampTZ",
     "Interval",
 
     // Nested types
@@ -81,24 +76,17 @@ static i64 type_size[] = {
     4, // Float
     8, // Double
 
-    // Decimal * 4
-    2, // Decimal16
-    4, // Decimal32
-    8, // Decimal64
-    16, // Decimal128
+    // Decimal * 1
+    16, // Decimal
 
     // Varchar * 1
     16, // Varchar
-
-    // Char * 1
-    8,  // Char
 
     // Date and Time * 6
     4, // Date
     4, // Time
     8, // DateTime
     8, // Timestamp
-    8, // TimestampTZ
     8, // Interval
 
     // Nested types
@@ -183,17 +171,12 @@ template <> String DataType::TypeToString<BigIntT>() { return "BigInt"; }
 template <> String DataType::TypeToString<HugeIntT>() { return "HugeInt"; }
 template <> String DataType::TypeToString<FloatT>() { return "Float"; }
 template <> String DataType::TypeToString<DoubleT>() { return "Double"; }
-template <> String DataType::TypeToString<Decimal16T>() { return "Decimal16"; }
-template <> String DataType::TypeToString<Decimal32T>() { return "Decimal32"; }
-template <> String DataType::TypeToString<Decimal64T>() { return "Decimal64"; }
-template <> String DataType::TypeToString<Decimal128T>() { return "Decimal128"; }
+template <> String DataType::TypeToString<DecimalT>() { return "Decimal"; }
 template <> String DataType::TypeToString<VarcharT>() { return "Varchar"; }
-template <> String DataType::TypeToString<CharT>() { return "Char"; }
 template <> String DataType::TypeToString<DateT>() { return "Date"; }
 template <> String DataType::TypeToString<TimeT>() { return "Time"; }
 template <> String DataType::TypeToString<DateTimeT>() { return "DateTime"; }
 template <> String DataType::TypeToString<TimestampT>() { return "Timestamp"; }
-template <> String DataType::TypeToString<TimestampTZT>() { return "TimestampTZ"; }
 template <> String DataType::TypeToString<IntervalT>() { return "Interval"; }
 template <> String DataType::TypeToString<ArrayT>() { return "Array"; }
 //template <> String DataType::TypeToString<TupleT>() { return "Tuple"; }

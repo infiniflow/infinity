@@ -74,17 +74,6 @@ LikeFunction::Run(VarcharT& left, VarcharT& right, bool & result) {
     result = LikeOperator(left_ptr, left_len, right_ptr, right_len);
 }
 
-template<>
-inline void
-LikeFunction::Run(CharT& left, VarcharT& right, bool & result) {
-    ptr_t left_ptr = left.GetDataPtr();
-    SizeT left_len = left.Length();
-    ptr_t right_ptr = right.GetDataPtr();
-    SizeT right_len = right.GetDataLen();
-
-    result = LikeOperator(left_ptr, left_len, right_ptr, right_len);
-}
-
 struct NotLikeFunction {
     template<typename TA, typename TB, typename TC>
     static inline void
@@ -104,17 +93,6 @@ NotLikeFunction::Run(VarcharT& left, VarcharT& right, bool & result) {
     result = !LikeOperator(left_ptr, left_len, right_ptr, right_len);
 }
 
-template<>
-inline void
-NotLikeFunction::Run(CharT& left, VarcharT& right, bool & result) {
-    ptr_t left_ptr = left.GetDataPtr();
-    SizeT left_len = left.Length();
-    ptr_t right_ptr = right.GetDataPtr();
-    SizeT right_len = right.GetDataLen();
-
-    result = !LikeOperator(left_ptr, left_len, right_ptr, right_len);
-}
-
 void
 RegisterLikeFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "like";
@@ -127,13 +105,6 @@ RegisterLikeFunction(const UniquePtr<Catalog> &catalog_ptr) {
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, LikeFunction>);
     function_set_ptr->AddFunction(varchar_like_function);
-
-    ScalarFunction char_like_function(
-            func_name,
-            { DataType(LogicalType::kChar), DataType(LogicalType::kVarchar) },
-            DataType(kBoolean),
-            &ScalarFunction::BinaryFunction<CharT, VarcharT, BooleanT, LikeFunction>);
-    function_set_ptr->AddFunction(char_like_function);
 
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }
@@ -150,13 +121,6 @@ RegisterNotLikeFunction(const UniquePtr<Catalog> &catalog_ptr) {
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, NotLikeFunction>);
     function_set_ptr->AddFunction(varchar_not_like_function);
-
-    ScalarFunction char_not_like_function(
-            func_name,
-            { DataType(LogicalType::kChar), DataType(LogicalType::kVarchar) },
-            DataType(kBoolean),
-            &ScalarFunction::BinaryFunction<CharT, VarcharT, BooleanT, NotLikeFunction>);
-    function_set_ptr->AddFunction(char_not_like_function);
 
     catalog_ptr->AddFunctionSet(function_set_ptr);
 }

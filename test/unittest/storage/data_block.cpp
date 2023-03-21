@@ -7,7 +7,6 @@
 #include "storage/data_block.h"
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/varchar_info.h"
-#include "common/types/info/char_info.h"
 #include "common/types/info/array_info.h"
 #include "common/types/info/embedding_info.h"
 #include "main/profiler/base_profiler.h"
@@ -51,24 +50,17 @@ TEST_F(DataBlockTest, test1) {
     column_types.emplace_back(LogicalType::kFloat);
     column_types.emplace_back(LogicalType::kDouble);
 
-    // Decimal * 4
-    column_types.emplace_back(LogicalType::kDecimal16, DecimalInfo::Make(4, 2));
-    column_types.emplace_back(LogicalType::kDecimal32, DecimalInfo::Make(9, 2));
-    column_types.emplace_back(LogicalType::kDecimal64, DecimalInfo::Make(18, 2));
-    column_types.emplace_back(LogicalType::kDecimal128, DecimalInfo::Make(38, 2));
+    // Decimal * 1
+    column_types.emplace_back(LogicalType::kDecimal, DecimalInfo::Make(38, 2));
 
     // Varchar * 1
     column_types.emplace_back(LogicalType::kVarchar, VarcharInfo::Make(65));
-
-    // Char * 1
-    column_types.emplace_back(LogicalType::kChar, CharInfo::Make(128));
 
     // Date and Time * 6
     column_types.emplace_back(LogicalType::kDate);
     column_types.emplace_back(LogicalType::kTime);
     column_types.emplace_back(LogicalType::kDateTime);
     column_types.emplace_back(LogicalType::kTimestamp);
-    column_types.emplace_back(LogicalType::kTimestampTZ);
     column_types.emplace_back(LogicalType::kInterval);
 
     // Nested types * 2

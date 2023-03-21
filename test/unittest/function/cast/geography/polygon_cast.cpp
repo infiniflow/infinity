@@ -75,7 +75,7 @@ TEST_F(PolygonCastTest, polygon_cast1) {
     // Call BindGeographyCast with wrong type of parameters
     {
         DataType source_type(LogicalType::kPolygon);
-        DataType target_type(LogicalType::kDecimal16);
+        DataType target_type(LogicalType::kDecimal);
         EXPECT_THROW(BindGeographyCast<PolygonT>(source_type, target_type), TypeException);
     }
 

@@ -103,29 +103,8 @@ RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr) {
     }
     {
         AggregateFunction count_function
-                = UnaryAggregate<CountState<Decimal16T, BigIntT>, Decimal16T, BigIntT>(func_name,
-                                                                                       DataType(LogicalType::kDecimal16),
-                                                                                       DataType(LogicalType::kBigInt));
-        function_set_ptr->AddFunction(count_function);
-    }
-    {
-        AggregateFunction count_function
-                = UnaryAggregate<CountState<Decimal32T, BigIntT>, Decimal32T, BigIntT>(func_name,
-                                                                                       DataType(LogicalType::kDecimal32),
-                                                                                       DataType(LogicalType::kBigInt));
-        function_set_ptr->AddFunction(count_function);
-    }
-    {
-        AggregateFunction count_function
-                = UnaryAggregate<CountState<Decimal64T, BigIntT>, Decimal64T, BigIntT>(func_name,
-                                                                                       DataType(LogicalType::kDecimal64),
-                                                                                       DataType(LogicalType::kBigInt));
-        function_set_ptr->AddFunction(count_function);
-    }
-    {
-        AggregateFunction count_function
-                = UnaryAggregate<CountState<Decimal128T, BigIntT>, Decimal128T, BigIntT>(func_name,
-                                                                                         DataType(LogicalType::kDecimal128),
+                = UnaryAggregate<CountState<DecimalT, BigIntT>, DecimalT, BigIntT>(func_name,
+                                                                                         DataType(LogicalType::kDecimal),
                                                                                          DataType(LogicalType::kBigInt));
         function_set_ptr->AddFunction(count_function);
     }
@@ -134,13 +113,6 @@ RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr) {
                 = UnaryAggregate<CountState<VarcharT, BigIntT>, VarcharT, BigIntT>(func_name,
                                                                                    DataType(LogicalType::kVarchar),
                                                                                    DataType(LogicalType::kBigInt));
-        function_set_ptr->AddFunction(count_function);
-    }
-    {
-        AggregateFunction count_function
-                = UnaryAggregate<CountState<CharT, BigIntT>, CharT, BigIntT>(func_name,
-                                                                             DataType(LogicalType::kChar),
-                                                                             DataType(LogicalType::kBigInt));
         function_set_ptr->AddFunction(count_function);
     }
     {
@@ -169,13 +141,6 @@ RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr) {
                 = UnaryAggregate<CountState<TimestampT, BigIntT>, TimestampT, BigIntT>(func_name,
                                                                                        DataType(LogicalType::kTimestamp),
                                                                                        DataType(LogicalType::kBigInt));
-        function_set_ptr->AddFunction(count_function);
-    }
-    {
-        AggregateFunction count_function
-                = UnaryAggregate<CountState<TimestampTZT, BigIntT>, TimestampTZT, BigIntT>(func_name,
-                                                                                         DataType(LogicalType::kTimestampTZ),
-                                                                                         DataType(LogicalType::kBigInt));
         function_set_ptr->AddFunction(count_function);
     }
     {

@@ -71,16 +71,7 @@ CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
         case kDouble: {
             return BindFloatCast<DoubleT>(source, target);
         }
-        case kDecimal16: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
-        case kDecimal32: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
-        case kDecimal64: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
-        case kDecimal128: {
+        case kDecimal: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
         }
         case kVarchar: {
@@ -96,9 +87,6 @@ CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
         }
         case kTimestamp: {
-            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
-        }
-        case kTimestampTZ: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
         }
         case kInterval: {

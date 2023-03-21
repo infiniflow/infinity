@@ -132,25 +132,10 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
     }
 
     // TODO:
-    // Cast to decimal16/32/64/128
+    // Cast to decimal
     {
         TinyIntT source = std::numeric_limits<TinyIntT>::lowest();
-        Decimal16T target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), NotImplementException);
-    }
-    {
-        TinyIntT source = std::numeric_limits<TinyIntT>::lowest();
-        Decimal32T target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), NotImplementException);
-    }
-    {
-        TinyIntT source = std::numeric_limits<TinyIntT>::lowest();
-        Decimal64T target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), NotImplementException);
-    }
-    {
-        TinyIntT source = std::numeric_limits<TinyIntT>::lowest();
-        Decimal128T target;
+        DecimalT target;
         EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), NotImplementException);
     }
 
@@ -353,48 +338,9 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
         }
     }
 
-    // cast tiny int column vector to decimal16 column vector
+    // cast tiny int column vector to decimal column vector
     {
-        DataType target_type(LogicalType::kDecimal16);
-        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
-        EXPECT_NE(tiny2decimal_ptr.function, nullptr);
-
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
-        col_target->Initialize();
-
-        CastParameters cast_parameters;
-        EXPECT_THROW(tiny2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
-    }
-
-    // cast tiny int column vector to decimal32 column vector
-    {
-        DataType target_type(LogicalType::kDecimal32);
-        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
-        EXPECT_NE(tiny2decimal_ptr.function, nullptr);
-
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
-        col_target->Initialize();
-
-        CastParameters cast_parameters;
-        EXPECT_THROW(tiny2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
-    }
-
-    // cast tiny int column vector to decimal64 column vector
-    {
-        DataType target_type(LogicalType::kDecimal64);
-        auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
-        EXPECT_NE(tiny2decimal_ptr.function, nullptr);
-
-        SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
-        col_target->Initialize();
-
-        CastParameters cast_parameters;
-        EXPECT_THROW(tiny2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
-    }
-
-    // cast tiny int column vector to decimal128 column vector
-    {
-        DataType target_type(LogicalType::kDecimal128);
+        DataType target_type(LogicalType::kDecimal);
         auto tiny2decimal_ptr = BindIntegerCast<TinyIntT>(source_type, target_type);
         EXPECT_NE(tiny2decimal_ptr.function, nullptr);
 

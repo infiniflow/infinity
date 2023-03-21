@@ -48,21 +48,9 @@ BindIntegerCast(const DataType &source, const DataType &target) {
             return BoundCastFunc(
                     &ColumnVectorCast::TryCastColumnVector<SourceType, DoubleT, IntegerTryCastToFixlen>);
         }
-        case LogicalType::kDecimal16: {
+        case LogicalType::kDecimal: {
             return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Decimal16T, IntegerTryCastToFixlen>);
-        }
-        case LogicalType::kDecimal32: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Decimal32T, IntegerTryCastToFixlen>);
-        }
-        case LogicalType::kDecimal64: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Decimal64T, IntegerTryCastToFixlen>);
-        }
-        case LogicalType::kDecimal128: {
-            return BoundCastFunc(
-                    &ColumnVectorCast::TryCastColumnVector<SourceType, Decimal128T, IntegerTryCastToFixlen>);
+                    &ColumnVectorCast::TryCastColumnVector<SourceType, DecimalT, IntegerTryCastToFixlen>);
         }
         case LogicalType::kVarchar: {
             return BoundCastFunc(
@@ -139,22 +127,7 @@ IntegerTryCastToFixlen::Run(TinyIntT source, DoubleT &target) {
 // TODO
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Decimal16T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Decimal32T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Decimal64T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(TinyIntT source, Decimal128T &target) {
+IntegerTryCastToFixlen::Run(TinyIntT source, DecimalT &target) {
     NotImplementError("Not implemented");
 }
 
@@ -226,22 +199,7 @@ IntegerTryCastToFixlen::Run(SmallIntT source, DoubleT &target) {
 // TODO
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Decimal16T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Decimal32T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Decimal64T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(SmallIntT source, Decimal128T &target) {
+IntegerTryCastToFixlen::Run(SmallIntT source, DecimalT &target) {
     NotImplementError("Not implemented");
 }
 
@@ -316,22 +274,7 @@ IntegerTryCastToFixlen::Run(IntegerT source, DoubleT &target) {
 // TODO
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Decimal16T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Decimal32T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Decimal64T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(IntegerT source, Decimal128T &target) {
+IntegerTryCastToFixlen::Run(IntegerT source, DecimalT &target) {
     NotImplementError("Not implemented");
 }
 
@@ -410,22 +353,7 @@ IntegerTryCastToFixlen::Run(BigIntT source, DoubleT &target) {
 // TODO
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Decimal16T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Decimal32T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Decimal64T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(BigIntT source, Decimal128T &target) {
+IntegerTryCastToFixlen::Run(BigIntT source, DecimalT &target) {
     NotImplementError("Not implemented");
 }
 
@@ -498,22 +426,7 @@ IntegerTryCastToFixlen::Run(HugeIntT source, DoubleT &target) {
 // TODO
 template<>
 inline bool
-IntegerTryCastToFixlen::Run(HugeIntT source, Decimal16T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(HugeIntT source, Decimal32T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(HugeIntT source, Decimal64T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-IntegerTryCastToFixlen::Run(HugeIntT source, Decimal128T &target) {
+IntegerTryCastToFixlen::Run(HugeIntT source, DecimalT &target) {
     NotImplementError("Not implemented");
 }
 

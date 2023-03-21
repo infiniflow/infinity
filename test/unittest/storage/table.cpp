@@ -7,7 +7,6 @@
 #include "storage/data_block.h"
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/varchar_info.h"
-#include "common/types/info/char_info.h"
 #include "common/types/info/array_info.h"
 #include "common/types/info/embedding_info.h"
 #include "main/profiler/base_profiler.h"

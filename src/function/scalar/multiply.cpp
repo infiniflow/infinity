@@ -79,32 +79,11 @@ MulFunction::Run(DoubleT left, DoubleT right, DoubleT& result) {
     return true;
 }
 
-// Decimal16 * Decimal16 = Decimal16
+// Decimal * Decimal = Decimal
 template<>
 inline bool
-MulFunction::Run(Decimal16T left, Decimal16T right, Decimal16T& result) {
-    NotImplementError("Decimal16 * Decimal16");
-}
-
-// Decimal32 * Decimal32 = Decimal32
-template<>
-inline bool
-MulFunction::Run(Decimal32T left, Decimal32T right, Decimal32T& result) {
-    NotImplementError("Decimal32 * Decimal32");
-}
-
-// Decimal64 * Decimal64 = Decimal64
-template<>
-inline bool
-MulFunction::Run(Decimal64T left, Decimal64T right, Decimal64T& result) {
-    NotImplementError("Decimal64 * Decimal64");
-}
-
-// Decimal128 * Decimal128 = Decimal128
-template<>
-inline bool
-MulFunction::Run(Decimal128T left, Decimal128T right, Decimal128T& result) {
-    NotImplementError("Decimal128 * Decimal128");
+MulFunction::Run(DecimalT left, DecimalT right, DecimalT& result) {
+    NotImplementError("Decimal * Decimal");
 }
 
 // Mixed Type * i64
@@ -197,33 +176,12 @@ RegisterMulFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_double);
 
-    ScalarFunction mul_function_decimal16(
+    ScalarFunction mul_function_Decimal(
             func_name,
-            { DataType(LogicalType::kDecimal16), DataType(LogicalType::kDecimal16) },
-            { DataType(LogicalType::kDecimal16) },
-            &ScalarFunction::BinaryFunctionWithFailure<Decimal16T, Decimal16T, Decimal16T, MulFunction>);
-    function_set_ptr->AddFunction(mul_function_decimal16);
-
-    ScalarFunction mul_function_decimal32(
-            func_name,
-            { DataType(LogicalType::kDecimal32), DataType(LogicalType::kDecimal32) },
-            { DataType(LogicalType::kDecimal32) },
-            &ScalarFunction::BinaryFunctionWithFailure<Decimal32T, Decimal32T, Decimal32T, MulFunction>);
-    function_set_ptr->AddFunction(mul_function_decimal32);
-
-    ScalarFunction mul_function_decimal64(
-            func_name,
-            { DataType(LogicalType::kDecimal64), DataType(LogicalType::kDecimal64) },
-            { DataType(LogicalType::kDecimal64) },
-            &ScalarFunction::BinaryFunctionWithFailure<Decimal64T, Decimal64T, Decimal64T, MulFunction>);
-    function_set_ptr->AddFunction(mul_function_decimal64);
-
-    ScalarFunction mul_function_decimal128(
-            func_name,
-            { DataType(LogicalType::kDecimal128), DataType(LogicalType::kDecimal128) },
-            { DataType(LogicalType::kDecimal128) },
-            &ScalarFunction::BinaryFunctionWithFailure<Decimal128T, Decimal128T, Decimal128T, MulFunction>);
-    function_set_ptr->AddFunction(mul_function_decimal128);
+            { DataType(LogicalType::kDecimal), DataType(LogicalType::kDecimal) },
+            { DataType(LogicalType::kDecimal) },
+            &ScalarFunction::BinaryFunctionWithFailure<DecimalT, DecimalT, DecimalT, MulFunction>);
+    function_set_ptr->AddFunction(mul_function_Decimal);
 
 
     ScalarFunction add_function_mixed_bigint(

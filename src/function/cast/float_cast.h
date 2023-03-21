@@ -49,16 +49,7 @@ BindFloatCast(const DataType &source, const DataType &target) {
             return BoundCastFunc(
                     &ColumnVectorCast::TryCastColumnVector<SourceType, DoubleT, FloatTryCastToFixlen>);
         }
-        case LogicalType::kDecimal16: {
-            NotImplementError("Not implement cast from numeric to decimal16 type.");
-        }
-        case LogicalType::kDecimal32: {
-            NotImplementError("Not implement cast from numeric to decimal32 type.");
-        }
-        case LogicalType::kDecimal64: {
-            NotImplementError("Not implement cast from numeric to decimal64 type.");
-        }
-        case LogicalType::kDecimal128: {
+        case LogicalType::kDecimal: {
             NotImplementError("Not implement cast from numeric to decimal128 type.");
         }
         case LogicalType::kVarchar: {
@@ -150,22 +141,7 @@ FloatTryCastToFixlen::Run(FloatT source, DoubleT &target) {
 // TODO
 template<>
 inline bool
-FloatTryCastToFixlen::Run(FloatT source, Decimal16T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-FloatTryCastToFixlen::Run(FloatT source, Decimal32T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-FloatTryCastToFixlen::Run(FloatT source, Decimal64T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-FloatTryCastToFixlen::Run(FloatT source, Decimal128T &target) {
+FloatTryCastToFixlen::Run(FloatT source, DecimalT &target) {
     NotImplementError("Not implemented");
 }
 
@@ -253,22 +229,7 @@ FloatTryCastToFixlen::Run(DoubleT source, FloatT &target) {
 // TODO
 template<>
 inline bool
-FloatTryCastToFixlen::Run(DoubleT source, Decimal16T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-FloatTryCastToFixlen::Run(DoubleT source, Decimal32T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-FloatTryCastToFixlen::Run(DoubleT source, Decimal64T &target) {
-    NotImplementError("Not implemented");
-}
-template<>
-inline bool
-FloatTryCastToFixlen::Run(DoubleT source, Decimal128T &target) {
+FloatTryCastToFixlen::Run(DoubleT source, DecimalT &target) {
     NotImplementError("Not implemented");
 }
 

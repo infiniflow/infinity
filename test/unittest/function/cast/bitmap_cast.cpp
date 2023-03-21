@@ -73,7 +73,7 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
 
     // Call BindBitmapCast with wrong type of parameters
     {
-        DataType target_type(LogicalType::kDecimal16);
+        DataType target_type(LogicalType::kDecimal);
         EXPECT_THROW(BindBitmapCast(target_type), TypeException);
     }
 

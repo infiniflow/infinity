@@ -335,44 +335,11 @@ RegisterAvgFunction(const UniquePtr<Catalog> &catalog_ptr) {
     }
 
     {
-        // Decimal16 average function isn't implemented
+        // Decimal average function isn't implemented
 #if 0
         AggregateFunction avg_function
-                = UnaryAggregate<AvgState<Decimal16T, DoubleT>, Decimal16T, DoubleT>(func_name,
-                                                                                 DataType(LogicalType::kDecimal16),
-                                                                                 DataType(LogicalType::kDouble));
-        function_set_ptr->AddFunction(avg_function);
-#endif
-    }
-
-    {
-        // Decimal32 average function isn't implemented
-#if 0
-        AggregateFunction avg_function
-                = UnaryAggregate<AvgState<Decimal32T, DoubleT>, Decimal32T, DoubleT>(func_name,
-                                                                                     DataType(LogicalType::kDecimal32),
-                                                                                     DataType(LogicalType::kDouble));
-        function_set_ptr->AddFunction(avg_function);
-#endif
-    }
-
-    {
-        // Decimal64 average function isn't implemented
-#if 0
-        AggregateFunction avg_function
-                = UnaryAggregate<AvgState<Decimal64T, DoubleT>, Decimal64T, DoubleT>(func_name,
-                                                                                     DataType(LogicalType::kDecimal64),
-                                                                                     DataType(LogicalType::kDouble));
-        function_set_ptr->AddFunction(avg_function);
-#endif
-    }
-
-    {
-        // Decimal128 average function isn't implemented
-#if 0
-        AggregateFunction avg_function
-                = UnaryAggregate<AvgState<Decimal128T, DoubleT>, Decimal128T, DoubleT>(func_name,
-                                                                                     DataType(LogicalType::kDecimal128),
+                = UnaryAggregate<AvgState<DecimalT, DoubleT>, DecimalT, DoubleT>(func_name,
+                                                                                     DataType(LogicalType::kDecimal),
                                                                                      DataType(LogicalType::kDouble));
         function_set_ptr->AddFunction(avg_function);
 #endif

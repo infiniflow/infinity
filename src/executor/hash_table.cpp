@@ -21,12 +21,8 @@ HashTable::Init(const Vector<DataType>& types) {
             case kHugeInt:
             case kFloat:
             case kDouble:
-            case kDecimal16:
-            case kDecimal32:
-            case kDecimal64:
-            case kDecimal128:
+            case kDecimal:
             case kVarchar:
-            case kChar:
             case kDate:
             case kTime:
             case kDateTime:
@@ -34,7 +30,6 @@ HashTable::Init(const Vector<DataType>& types) {
                 break; // All these type can be hashed.
             }
             case kTimestamp:
-            case kTimestampTZ:
             case kInterval:
             case kArray:
             case kTuple:

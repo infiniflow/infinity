@@ -354,39 +354,12 @@ RegisterMaxFunction(const UniquePtr<Catalog> &catalog_ptr) {
         function_set_ptr->AddFunction(max_function);
     }
 #if 0
+
     {
         AggregateFunction max_function
-                = UnaryAggregate<MaxState<Decimal16T, Decimal16T>, Decimal16T, Decimal16T>(func_name,
-                                                                                           DataType(LogicalType::kDecimal16),
-                                                                                           DataType(LogicalType::kDecimal16));
-        function_set_ptr->AddFunction(max_function);
-    }
-    {
-        AggregateFunction max_function
-                = UnaryAggregate<MaxState<Decimal32T, Decimal32T>, Decimal32T, Decimal32T>(func_name,
-                                                                                           DataType(LogicalType::kDecimal32),
-                                                                                           DataType(LogicalType::kDecimal32));
-        function_set_ptr->AddFunction(max_function);
-    }
-    {
-        AggregateFunction max_function
-                = UnaryAggregate<MaxState<Decimal64T, Decimal64T>, Decimal64T, Decimal64T>(func_name,
-                                                                                           DataType(LogicalType::kDecimal64),
-                                                                                           DataType(LogicalType::kDecimal64));
-        function_set_ptr->AddFunction(max_function);
-    }
-    {
-        AggregateFunction max_function
-                = UnaryAggregate<MaxState<Decimal128T, Decimal128T>, Decimal128T, Decimal128T>(func_name,
-                                                                                               DataType(LogicalType::kDecimal128),
-                                                                                               DataType(LogicalType::kDecimal128));
-        function_set_ptr->AddFunction(max_function);
-    }
-    {
-        AggregateFunction max_function
-                = UnaryAggregate<MaxState<CharT, CharT>, CharT, CharT>(func_name,
-                                                                       DataType(LogicalType::kChar),
-                                                                       DataType(LogicalType::kChar));
+                = UnaryAggregate<MaxState<DecimalT, DecimalT>, DecimalT, DecimalT>(func_name,
+                                                                                   DataType(LogicalType::kDecimal),
+                                                                                   DataType(LogicalType::kDecimal));
         function_set_ptr->AddFunction(max_function);
     }
     {

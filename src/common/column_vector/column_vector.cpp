@@ -108,28 +108,12 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
                 CopyFrom<DoubleT>(other.data(), this->data(), tail_index_, input_select);
                 break;
             }
-            case kDecimal16: {
-                CopyFrom<Decimal16T>(other.data(), this->data(), tail_index_, input_select);
-                break;
-            }
-            case kDecimal32: {
-                CopyFrom<Decimal32T>(other.data(), this->data(), tail_index_, input_select);
-                break;
-            }
-            case kDecimal64: {
-                CopyFrom<Decimal64T>(other.data(), this->data(), tail_index_, input_select);
-                break;
-            }
-            case kDecimal128: {
-                CopyFrom<Decimal128T>(other.data(), this->data(), tail_index_, input_select);
+            case kDecimal: {
+                CopyFrom<DecimalT>(other.data(), this->data(), tail_index_, input_select);
                 break;
             }
             case kVarchar: {
                 CopyFrom<VarcharT>(other.data(), this->data(), tail_index_, input_select);
-                break;
-            }
-            case kChar: {
-                CopyFrom<CharT>(other.data(), this->data(), tail_index_, input_select);
                 break;
             }
             case kDate: {
@@ -146,10 +130,6 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
             }
             case kTimestamp: {
                 CopyFrom<TimestampT>(other.data(), this->data(), tail_index_, input_select);
-                break;
-            }
-            case kTimestampTZ: {
-                CopyFrom<TimestampTZT>(other.data(), this->data(), tail_index_, input_select);
                 break;
             }
             case kInterval: {
@@ -378,28 +358,12 @@ ColumnVector::Initialize(ColumnVectorType vector_type,
                 CopyFrom<DoubleT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case kDecimal16: {
-                CopyFrom<Decimal16T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
-                break;
-            }
-            case kDecimal32: {
-                CopyFrom<Decimal32T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
-                break;
-            }
-            case kDecimal64: {
-                CopyFrom<Decimal64T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
-                break;
-            }
-            case kDecimal128: {
-                CopyFrom<Decimal128T>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+            case kDecimal: {
+                CopyFrom<DecimalT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case kVarchar: {
                 CopyFrom<VarcharT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
-                break;
-            }
-            case kChar: {
-                CopyFrom<CharT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case kDate: {
@@ -416,10 +380,6 @@ ColumnVector::Initialize(ColumnVectorType vector_type,
             }
             case kTimestamp: {
                 CopyFrom<TimestampT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
-                break;
-            }
-            case kTimestampTZ: {
-                CopyFrom<TimestampTZT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case kInterval: {
@@ -545,28 +505,12 @@ ColumnVector::CopyRow(const ColumnVector& other, SizeT dst_idx, SizeT src_idx) {
             CopyRowFrom<DoubleT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
-        case kDecimal16: {
-            CopyRowFrom<Decimal16T>(other.data(), src_idx, this->data(), dst_idx);
-            break;
-        }
-        case kDecimal32: {
-            CopyRowFrom<Decimal32T>(other.data(), src_idx, this->data(), dst_idx);
-            break;
-        }
-        case kDecimal64: {
-            CopyRowFrom<Decimal64T>(other.data(), src_idx, this->data(), dst_idx);
-            break;
-        }
-        case kDecimal128: {
-            CopyRowFrom<Decimal128T>(other.data(), src_idx, this->data(), dst_idx);
+        case kDecimal: {
+            CopyRowFrom<DecimalT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kVarchar: {
             CopyRowFrom<VarcharT>(other.data(), src_idx, this->data(), dst_idx);
-            break;
-        }
-        case kChar: {
-            CopyRowFrom<CharT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kDate: {
@@ -583,10 +527,6 @@ ColumnVector::CopyRow(const ColumnVector& other, SizeT dst_idx, SizeT src_idx) {
         }
         case kTimestamp: {
             CopyRowFrom<TimestampT>(other.data(), src_idx, this->data(), dst_idx);
-            break;
-        }
-        case kTimestampTZ: {
-            CopyRowFrom<TimestampTZT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kInterval: {
@@ -714,39 +654,15 @@ ColumnVector::ToString() const {
             }
             break;
         }
-        case kDecimal16: {
+        case kDecimal: {
             for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((Decimal16T *) data_ptr_)[row_index].ToString() << std::endl;
-            }
-            break;
-        }
-        case kDecimal32: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((Decimal32T *) data_ptr_)[row_index].ToString() << std::endl;
-            }
-            break;
-        }
-        case kDecimal64: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((Decimal64T *) data_ptr_)[row_index].ToString() << std::endl;
-            }
-            break;
-        }
-        case kDecimal128: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((Decimal128T *) data_ptr_)[row_index].ToString() << std::endl;
+                ss << ((DecimalT *) data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kVarchar: {
             for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
                 ss << ((VarcharT *) data_ptr_)[row_index].ToString() << std::endl;
-            }
-            break;
-        }
-        case kChar: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((CharT *) data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
@@ -771,12 +687,6 @@ ColumnVector::ToString() const {
         case kTimestamp: {
             for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
                 ss << ((TimestampT *) data_ptr_)[row_index].ToString() << std::endl;
-            }
-            break;
-        }
-        case kTimestampTZ: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((TimestampTZT *) data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
@@ -905,16 +815,7 @@ ColumnVector::ToString(SizeT row_index) const {
         case kDouble: {
             return std::to_string(((DoubleT *) data_ptr_)[row_index]);
         }
-        case kDecimal16: {
-            TypeError("Not implemented");
-        }
-        case kDecimal32: {
-            TypeError("Not implemented");
-        }
-        case kDecimal64: {
-            TypeError("Not implemented");
-        }
-        case kDecimal128: {
+        case kDecimal: {
             TypeError("Not implemented");
         }
         case kVarchar: {
@@ -924,10 +825,6 @@ ColumnVector::ToString(SizeT row_index) const {
             } else {
                 return {varchar_ptr.ptr, varchar_ptr.length};
             }
-        }
-        case kChar: {
-            CharT char_ptr = ((CharT *) data_ptr_)[row_index];
-            return {char_ptr.ptr, data_type_.type_info()->Size()};
         }
         case kDate: {
             TypeError("Not implemented");
@@ -939,9 +836,6 @@ ColumnVector::ToString(SizeT row_index) const {
             TypeError("Not implemented");
         }
         case kTimestamp: {
-            TypeError("Not implemented");
-        }
-        case kTimestampTZ: {
             TypeError("Not implemented");
         }
         case kInterval: {
@@ -1034,24 +928,11 @@ ColumnVector::GetValue(SizeT index) const {
         case kDouble: {
             return Value::MakeDouble(((DoubleT *) data_ptr_)[index]);
         }
-        case kDecimal16: {
-            return Value::MakeDecimal16(((Decimal16T *) data_ptr_)[index], data_type_.type_info());
-        }
-        case kDecimal32: {
-            return Value::MakeDecimal32(((Decimal32T *) data_ptr_)[index], data_type_.type_info());
-        }
-        case kDecimal64: {
-            return Value::MakeDecimal64(((Decimal64T *) data_ptr_)[index], data_type_.type_info());
-        }
-        case kDecimal128: {
-            return Value::MakeDecimal128(((Decimal128T *) data_ptr_)[index], data_type_.type_info());
+        case kDecimal: {
+            return Value::MakeDecimal(((DecimalT *) data_ptr_)[index], data_type_.type_info());
         }
         case kVarchar: {
             return Value::MakeVarchar(((VarcharT *) data_ptr_)[index], data_type_.type_info());
-        }
-        case kChar: {
-            ptr_t ptr = data_ptr_ + index * data_type_.Size();
-            return Value::MakeChar(ptr, data_type_.type_info());
         }
         case kDate: {
             return Value::MakeDate(((DateT *) data_ptr_)[index]);
@@ -1064,9 +945,6 @@ ColumnVector::GetValue(SizeT index) const {
         }
         case kTimestamp: {
             return Value::MakeTimestamp(((TimestampT *) data_ptr_)[index]);
-        }
-        case kTimestampTZ: {
-            return Value::MakeTimestampTz(((TimestampTZT *) data_ptr_)[index]);
         }
         case kInterval: {
             return Value::MakeInterval(((IntervalT *) data_ptr_)[index]);
@@ -1168,20 +1046,8 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
             ((DoubleT *) data_ptr_)[index] = value.GetValue<DoubleT>();
             break;
         }
-        case kDecimal16: {
-            ((Decimal16T *) data_ptr_)[index] = value.GetValue<Decimal16T>();
-            break;
-        }
-        case kDecimal32: {
-            ((Decimal32T *) data_ptr_)[index] = value.GetValue<Decimal32T>();
-            break;
-        }
-        case kDecimal64: {
-            ((Decimal64T *) data_ptr_)[index] = value.GetValue<Decimal64T>();
-            break;
-        }
-        case kDecimal128: {
-            ((Decimal128T *) data_ptr_)[index] = value.GetValue<Decimal128T>();
+        case kDecimal: {
+            ((DecimalT *) data_ptr_)[index] = value.GetValue<DecimalT>();
             break;
         }
         case kVarchar: {
@@ -1199,11 +1065,6 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
             ((VarcharT *) data_ptr_)[index].length = varchar_len;
             break;
         }
-        case kChar: {
-            ptr_t ptr = data_ptr_ + index * data_type_.Size();
-            memcpy(ptr, value.value_.char_n.ptr, data_type_.Size());
-            break;
-        }
         case kDate: {
             ((DateT *) data_ptr_)[index] = value.GetValue<DateT>();
             break;
@@ -1218,10 +1079,6 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
         }
         case kTimestamp: {
             ((TimestampT *) data_ptr_)[index] = value.GetValue<TimestampT>();
-            break;
-        }
-        case kTimestampTZ: {
-            ((TimestampTZT *) data_ptr_)[index] = value.GetValue<TimestampTZT>();
             break;
         }
         case kInterval: {
@@ -1378,20 +1235,8 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             ((DoubleT*)data_ptr_)[index] = *(DoubleT*)(value_ptr);
             break;
         }
-        case kDecimal16: {
-            ((Decimal16T*)data_ptr_)[index] = *(Decimal16T*)(value_ptr);
-            break;
-        }
-        case kDecimal32: {
-            ((Decimal32T*)data_ptr_)[index] = *(Decimal32T*)(value_ptr);
-            break;
-        }
-        case kDecimal64: {
-            ((Decimal64T*)data_ptr_)[index] = *(Decimal64T*)(value_ptr);
-            break;
-        }
-        case kDecimal128: {
-            ((Decimal128T*)data_ptr_)[index] = *(Decimal128T*)(value_ptr);
+        case kDecimal: {
+            ((DecimalT *)data_ptr_)[index] = *(DecimalT *)(value_ptr);
             break;
         }
         case kVarchar: {
@@ -1410,12 +1255,6 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             ((VarcharT *) data_ptr_)[index].length = varchar_len;
             break;
         }
-        case kChar: {
-            auto* char_ptr = (CharT*)(value_ptr);
-            ptr_t ptr = data_ptr_ + index * data_type_.Size();
-            memcpy(ptr, char_ptr->ptr, data_type_.Size());
-            break;
-        }
         case kDate: {
             ((DateT*)data_ptr_)[index] = *(DateT*)(value_ptr);
             break;
@@ -1430,10 +1269,6 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
         }
         case kTimestamp: {
             ((TimestampT*)data_ptr_)[index] = *(TimestampT*)(value_ptr);
-            break;
-        }
-        case kTimestampTZ: {
-            ((TimestampTZT*)data_ptr_)[index] = *(TimestampTZT*)(value_ptr);
             break;
         }
         case kInterval: {
@@ -1646,33 +1481,9 @@ ColumnVector::AppendWith(const ColumnVector &other) {
             }
             break;
         }
-        case kDecimal16: {
-            auto* src_ptr = (Decimal16T*)(other.data_ptr_);
-            Decimal16T* dst_ptr = &((Decimal16T*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
-            break;
-        }
-        case kDecimal32: {
-            auto* src_ptr = (Decimal32T*)(other.data_ptr_);
-            Decimal32T* dst_ptr = &((Decimal32T*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
-            break;
-        }
-        case kDecimal64: {
-            auto* src_ptr = (Decimal64T*)(other.data_ptr_);
-            Decimal64T* dst_ptr = &((Decimal64T*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
-            break;
-        }
-        case kDecimal128: {
-            auto* src_ptr = (Decimal128T*)(other.data_ptr_);
-            Decimal128T* dst_ptr = &((Decimal128T*)(data_ptr_))[this->tail_index_];
+        case kDecimal: {
+            auto* src_ptr = (DecimalT*)(other.data_ptr_);
+            DecimalT* dst_ptr = &((DecimalT*)(data_ptr_))[this->tail_index_];
             for(SizeT idx = 0; idx < count; ++ idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
@@ -1694,16 +1505,6 @@ ColumnVector::AppendWith(const ColumnVector &other) {
                     dst_ref.ptr = ptr;
                 }
                 dst_ref.length = src_ref.length;
-            }
-            break;
-        }
-        case kChar: {
-            auto* base_src_ptr = (CharT*)(other.data_ptr_);
-            ptr_t base_dst_ptr = data_ptr_ + this->tail_index_ * data_type_.Size();
-            for(SizeT idx = 0; idx < count; ++ idx) {
-                ptr_t src_ptr = base_src_ptr->ptr + idx * data_type_.Size();
-                ptr_t dst_ptr = base_dst_ptr + idx * data_type_.Size();
-                memcpy(dst_ptr, src_ptr, data_type_.Size());
             }
             break;
         }
@@ -1734,14 +1535,6 @@ ColumnVector::AppendWith(const ColumnVector &other) {
         case kTimestamp: {
             auto* src_ptr = (TimestampT*)(other.data_ptr_);
             TimestampT* dst_ptr = &((TimestampT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
-            break;
-        }
-        case kTimestampTZ: {
-            auto* src_ptr = (TimestampTZT*)(other.data_ptr_);
-            TimestampTZT* dst_ptr = &((TimestampTZT*)(data_ptr_))[this->tail_index_];
             for(SizeT idx = 0; idx < count; ++ idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }

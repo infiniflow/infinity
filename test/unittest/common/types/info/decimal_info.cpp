@@ -2,17 +2,15 @@
 // Created by JinHai on 2022/11/29.
 //
 
-
-
 #include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/types/data_type.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
-#include "common/types/info/decimal16_info.h"
+#include "common/types/info/decimal_info.h"
 
-class Decimal16InfoTest : public BaseTest {
+class DecimalInfoTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
@@ -28,14 +26,14 @@ class Decimal16InfoTest : public BaseTest {
     }
 };
 
-TEST_F(Decimal16InfoTest, decimal_info_A) {
+TEST_F(DecimalInfoTest, decimal_info_A) {
     using namespace infinity;
 
-    EXPECT_THROW(Decimal16Info::Make(5, 5), TypeException);
-    EXPECT_THROW(Decimal16Info::Make(4, 5), TypeException);
+    EXPECT_THROW(DecimalInfo::Make(39, 39), TypeException);
+    EXPECT_THROW(DecimalInfo::Make(38, 39), TypeException);
 
-    auto decimal16_info = Decimal16Info::Make(4, 4);
-    EXPECT_EQ(decimal16_info->scale(), 4);
-    EXPECT_EQ(decimal16_info->precision(), 4);
-    EXPECT_EQ(decimal16_info->Size(), 2);
+    auto decimal_info = DecimalInfo::Make(38, 38);
+    EXPECT_EQ(decimal_info->scale(), 38);
+    EXPECT_EQ(decimal_info->precision(), 38);
+    EXPECT_EQ(decimal_info->Size(), 16);
 }

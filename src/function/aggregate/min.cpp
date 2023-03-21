@@ -353,37 +353,9 @@ RegisterMinFunction(const UniquePtr<Catalog> &catalog_ptr) {
 #if 0
     {
         AggregateFunction max_function
-                = UnaryAggregate<MinState<Decimal16T, Decimal16T>, Decimal16T, Decimal16T>(func_name,
-                                                                                           DataType(LogicalType::kDecimal16),
-                                                                                           DataType(LogicalType::kDecimal16));
-        function_set_ptr->AddFunction(max_function);
-    }
-    {
-        AggregateFunction max_function
-                = UnaryAggregate<MinState<Decimal32T, Decimal32T>, Decimal32T, Decimal32T>(func_name,
-                                                                                           DataType(LogicalType::kDecimal32),
-                                                                                           DataType(LogicalType::kDecimal32));
-        function_set_ptr->AddFunction(max_function);
-    }
-    {
-        AggregateFunction max_function
-                = UnaryAggregate<MinState<Decimal64T, Decimal64T>, Decimal64T, Decimal64T>(func_name,
-                                                                                           DataType(LogicalType::kDecimal64),
-                                                                                           DataType(LogicalType::kDecimal64));
-        function_set_ptr->AddFunction(max_function);
-    }
-    {
-        AggregateFunction max_function
-                = UnaryAggregate<MinState<Decimal128T, Decimal128T>, Decimal128T, Decimal128T>(func_name,
-                                                                                               DataType(LogicalType::kDecimal128),
-                                                                                               DataType(LogicalType::kDecimal128));
-        function_set_ptr->AddFunction(max_function);
-    }
-    {
-        AggregateFunction max_function
-                = UnaryAggregate<MinState<CharT, CharT>, CharT, CharT>(func_name,
-                                                                       DataType(LogicalType::kChar),
-                                                                       DataType(LogicalType::kChar));
+                = UnaryAggregate<MinState<DecimalT, DecimalT>, DecimalT, DecimalT>(func_name,
+                                                                                   DataType(LogicalType::kDecimal),
+                                                                                   DataType(LogicalType::kDecimal));
         function_set_ptr->AddFunction(max_function);
     }
     {

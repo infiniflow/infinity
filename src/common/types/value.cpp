@@ -5,7 +5,6 @@
 #include "value.h"
 #include "common/utility/infinity_assert.h"
 #include "common/types/info/embedding_info.h"
-#include "common/types/info/char_info.h"
 #include "main/stats/global_resource_usage.h"
 #include "function/cast/cast_function.h"
 
@@ -87,33 +86,9 @@ Value::MakeDouble(DoubleT input) {
 }
 
 Value
-Value::MakeDecimal16(Decimal16T input, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kDecimal16, type_info_ptr);
-    value.value_.decimal16 = input;
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeDecimal32(Decimal32T input, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kDecimal32, type_info_ptr);
-    value.value_.decimal32 = input;
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeDecimal64(Decimal64T input, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kDecimal64, type_info_ptr);
-    value.value_.decimal64 = input;
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeDecimal128(Decimal128T input, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kDecimal128, type_info_ptr);
-    value.value_.decimal128 = input;
+Value::MakeDecimal(DecimalT input, const SharedPtr<TypeInfo>& type_info_ptr) {
+    Value value(LogicalType::kDecimal, type_info_ptr);
+    value.value_.decimal = input;
     value.is_null_ = false;
     return value;
 }
@@ -138,28 +113,6 @@ Value
 Value::MakeVarchar(const char* ptr, const SharedPtr<TypeInfo>& type_info_ptr) {
     Value value(LogicalType::kVarchar, type_info_ptr);
     value.value_.varchar.Initialize(ptr);
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeChar(const String& str, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kChar, type_info_ptr);
-    SharedPtr<CharInfo> char_info_ptr = std::static_pointer_cast<CharInfo>(type_info_ptr);
-    SizeT len_limit = char_info_ptr->length_limit();
-    CharT char_n(len_limit);
-
-    char_n.Initialize(str, len_limit);
-    value.value_.char_n.SetNull();
-    value.value_.char_n = std::move(char_n);
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeChar(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
-    Value value(LogicalType::kChar, std::move(type_info_ptr));
-    value.value_.char_n.ptr = ptr;
     value.is_null_ = false;
     return value;
 }
@@ -192,14 +145,6 @@ Value
 Value::MakeTimestamp(TimestampT input) {
     Value value(LogicalType::kTimestamp);
     value.value_.timestamp = input;
-    value.is_null_ = false;
-    return value;
-}
-
-Value
-Value::MakeTimestampTz(TimestampTZT input) {
-    Value value(LogicalType::kTimestampTZ);
-    value.value_.timestamp_tz = input;
     value.is_null_ = false;
     return value;
 }
@@ -388,40 +333,16 @@ Value::GetValue() const {
     return value_.float64;
 }
 
-template <> Decimal16T
+template <> DecimalT
 Value::GetValue() const {
-TypeAssert(type_.type() == LogicalType::kDecimal16, "Not matched type: " + type_.ToString())
-return value_.decimal16;
-}
-
-template <> Decimal32T
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kDecimal32, "Not matched type: " + type_.ToString())
-    return value_.decimal32;
-}
-
-template <> Decimal64T
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kDecimal64, "Not matched type: " + type_.ToString())
-    return value_.decimal64;
-}
-
-template <> Decimal128T
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kDecimal128, "Not matched type: " + type_.ToString())
-    return value_.decimal128;
+    TypeAssert(type_.type() == LogicalType::kDecimal, "Not matched type: " + type_.ToString())
+    return value_.decimal;
 }
 
 template <> VarcharT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kVarchar, "Not matched type: " + type_.ToString())
     return value_.varchar;
-}
-
-template <> CharT
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kChar, "Not matched type: " + type_.ToString())
-    return value_.char_n;
 }
 
 template <> DateT
@@ -446,12 +367,6 @@ template <> TimestampT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kTimestamp, "Not matched type: " + type_.ToString())
     return value_.timestamp;
-}
-
-template <> TimestampTZT
-Value::GetValue() const {
-    TypeAssert(type_.type() == LogicalType::kTimestampTZ, "Not matched type: " + type_.ToString())
-    return value_.timestamp_tz;
 }
 
 template <> IntervalT
@@ -661,29 +576,13 @@ Value::Init(bool in_constructor) {
             value_.float64 = 0;
             break;
         }
-        case kDecimal16: {
-            value_.decimal16.value = 0;
-            break;
-        }
-        case kDecimal32: {
-            value_.decimal32.value = 0;
-            break;
-        }
-        case kDecimal64: {
-            value_.decimal64.value = 0;
-            break;
-        }
-        case kDecimal128: {
-            value_.decimal128.Reset();
+        case kDecimal: {
+            value_.decimal.Reset();
             break;
         }
         case kVarchar: {
             value_.varchar.ptr = nullptr;
             value_.varchar.length = 0;
-            break;
-        }
-        case kChar: {
-            value_.char_n.SetNull();
             break;
         }
         case kDate: {
@@ -700,10 +599,6 @@ Value::Init(bool in_constructor) {
         }
         case kTimestamp: {
             value_.timestamp.Reset();
-            break;
-        }
-        case kTimestampTZ: {
-            value_.timestamp_tz.Reset();
             break;
         }
         case kInterval: {
@@ -813,24 +708,9 @@ Value::CopyUnionValue(const Value& other) {
             value_.float64 = other.value_.float64;
             break;
         }
-        case kDecimal16: {
+        case kDecimal: {
             // trivial copy-assignment
-            value_.decimal16 = other.value_.decimal16;
-            break;
-        }
-        case kDecimal32: {
-            // trivial copy-assignment
-            value_.decimal32 = other.value_.decimal32;
-            break;
-        }
-        case kDecimal64: {
-            // trivial copy-assignment
-            value_.decimal64 = other.value_.decimal64;
-            break;
-        }
-        case kDecimal128: {
-            // trivial copy-assignment
-            value_.decimal128 = other.value_.decimal128;
+            value_.decimal = other.value_.decimal;
             break;
         }
         case kVarchar: {
@@ -856,11 +736,6 @@ Value::CopyUnionValue(const Value& other) {
         case kTimestamp: {
             // trivial copy-assignment
             value_.timestamp = other.value_.timestamp;
-            break;
-        }
-        case kTimestampTZ: {
-            // trivial copy-assignment
-            value_.timestamp_tz = other.value_.timestamp_tz;
             break;
         }
         case kInterval: {
@@ -985,29 +860,12 @@ Value::MoveUnionValue(Value&& other) noexcept {
             this->value_.float64 = other.value_.float64;
             break;
         }
-        case kDecimal16: {
-            this->value_.decimal16 = other.value_.decimal16;
-            break;
-        }
-        case kDecimal32: {
-            this->value_.decimal32 = other.value_.decimal32;
-            break;
-        }
-        case kDecimal64: {
-            this->value_.decimal64 = other.value_.decimal64;
-            break;
-        }
-        case kDecimal128: {
-            this->value_.decimal128 = other.value_.decimal128;
+        case kDecimal: {
+            this->value_.decimal = other.value_.decimal;
             break;
         }
         case kVarchar: {
             this->value_.varchar = std::move(other.value_.varchar);
-            break;
-        }
-        case kChar: {
-            this->value_.char_n = other.value_.char_n;
-            other.value_.char_n.SetNull();
             break;
         }
         case kDate: {
@@ -1024,10 +882,6 @@ Value::MoveUnionValue(Value&& other) noexcept {
         }
         case kTimestamp: {
             this->value_.timestamp = other.value_.timestamp;
-            break;
-        }
-        case kTimestampTZ: {
-            this->value_.timestamp_tz = other.value_.timestamp_tz;
             break;
         }
         case kInterval: {
@@ -1135,20 +989,8 @@ Value::Reset() {
             value_.float64 = 0;
             break;
         }
-        case kDecimal16: {
-            value_.decimal16.value = 0;
-            break;
-        }
-        case kDecimal32: {
-            value_.decimal32.value = 0;
-            break;
-        }
-        case kDecimal64: {
-            value_.decimal64.value = 0;
-            break;
-        }
-        case kDecimal128: {
-            value_.decimal128.Reset();
+        case kDecimal: {
+            value_.decimal.Reset();
             break;
         }
         case kVarchar: {
@@ -1169,10 +1011,6 @@ Value::Reset() {
         }
         case kTimestamp: {
             value_.timestamp.Reset();
-            break;
-        }
-        case kTimestampTZ: {
-            value_.timestamp_tz.Reset();
             break;
         }
         case kInterval: {
@@ -1286,59 +1124,86 @@ Value::ToString() const {
         case kDouble: {
             return std::to_string(value_.float64);
         }
-        case kDecimal16:
-        case kDecimal32:
-        case kDecimal64:
-        case kDecimal128:
+        case kDecimal: {
+            NotImplementError("Decimal")
             break;
+        }
         case kVarchar: {
             return value_.varchar.ToString();
-        }
-        case kChar: {
-            return value_.char_n.ToString();
         }
         case kDate: {
             return value_.date.ToString();
         }
-        case kTime:
+        case kTime: {
+            NotImplementError("Time")
             break;
-        case kDateTime:
+        }
+        case kDateTime: {
+            NotImplementError("DateTime")
             break;
-        case kTimestamp:
+        }
+        case kTimestamp: {
+            NotImplementError("Timestamp")
             break;
-        case kTimestampTZ:
-            break;
+        }
         case kInterval: {
             return value_.interval.ToString();
         }
-        case kArray:
+        case kArray: {
+            NotImplementError("Array")
             break;
-        case kTuple:
+        }
+        case kTuple: {
+            NotImplementError("Tuple")
             break;
-        case kPoint:
+        }
+        case kPoint: {
+            NotImplementError("Point")
             break;
-        case kLine:
+        }
+        case kLine: {
+            NotImplementError("Line")
             break;
-        case kLineSeg:
+        }
+        case kLineSeg: {
+            NotImplementError("Line Seg")
             break;
-        case kBox:
+        }
+        case kBox: {
+            NotImplementError("Box")
             break;
-        case kPath:
+        }
+        case kPath: {
+            NotImplementError("Path")
             break;
-        case kPolygon:
+        }
+        case kPolygon: {
+            NotImplementError("Polygon")
             break;
-        case kCircle:
+        }
+        case kCircle: {
+            NotImplementError("Circle")
             break;
-        case kBitmap:
+        }
+        case kBitmap: {
+            NotImplementError("Bitmap")
             break;
-        case kUuid:
+        }
+        case kUuid: {
+            NotImplementError("Uuid")
             break;
-        case kBlob:
+        }
+        case kBlob: {
             return value_.blob.ToString();
-        case kEmbedding:
+        }
+        case kEmbedding: {
+            NotImplementError("Embedding")
             break;
-        case kMixed:
+        }
+        case kMixed: {
+            NotImplementError("Mixed")
             break;
+        }
         case kNull:
             break;
         case kMissing:

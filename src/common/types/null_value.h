@@ -67,27 +67,9 @@ NullValue() {
 }
 
 template <>
-inline Decimal16T
+inline DecimalT
 NullValue() {
-    return Decimal16T(std::numeric_limits<i16>::infinity());
-}
-
-template <>
-inline Decimal32T
-NullValue() {
-    return Decimal32T(std::numeric_limits<i32>::infinity());
-}
-
-template <>
-inline Decimal64T
-NullValue() {
-    return Decimal64T(std::numeric_limits<i64>::infinity());
-}
-
-template <>
-inline Decimal128T
-NullValue() {
-    return Decimal128T(std::numeric_limits<i64>::infinity(), std::numeric_limits<i64>::infinity());
+    return DecimalT(std::numeric_limits<i64>::infinity(), std::numeric_limits<i64>::infinity());
 }
 
 template <>
@@ -118,12 +100,6 @@ template <>
 inline TimestampT
 NullValue() {
     return TimestampT(std::numeric_limits<i32>::infinity(), std::numeric_limits<i32>::infinity());
-}
-
-template <>
-inline TimestampTZT
-NullValue() {
-    return TimestampTZT(std::numeric_limits<i32>::infinity(), std::numeric_limits<i32>::infinity());
 }
 
 template <>

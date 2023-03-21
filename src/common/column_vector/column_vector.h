@@ -238,20 +238,6 @@ ColumnVector::CopyFrom<VarcharT>(const_ptr_t __restrict src,
 
 template<>
 inline void
-ColumnVector::CopyFrom<CharT>(const_ptr_t __restrict src,
-                              ptr_t __restrict dst,
-                              SizeT count,
-                              const Selection& input_select) {
-    for(SizeT idx = 0; idx < count; ++ idx) {
-        SizeT row_id = input_select[idx];
-        const_ptr_t src_ptr = src + row_id * data_type_size_;
-        ptr_t dst_ptr = dst + idx * data_type_size_;
-        memcpy(dst_ptr, src_ptr, data_type_size_);
-    }
-}
-
-template<>
-inline void
 ColumnVector::CopyFrom<PathT>(const_ptr_t __restrict src,
                               ptr_t __restrict dst,
                               SizeT count,
@@ -396,22 +382,6 @@ ColumnVector::CopyFrom<VarcharT>(const_ptr_t __restrict src,
             dst_ptr->ptr = ptr;
         }
         dst_ptr->length = varchar_len;
-        ++ dest_start_idx;
-    }
-}
-
-template<>
-inline void
-ColumnVector::CopyFrom<CharT>(const_ptr_t __restrict src,
-                              ptr_t __restrict dst,
-                              SizeT source_start_idx,
-                              SizeT dest_start_idx,
-                              SizeT count) {
-    SizeT source_end_idx = source_start_idx + count;
-    for(SizeT idx = source_start_idx; idx < source_end_idx; ++ idx) {
-        const_ptr_t src_ptr = src + idx * data_type_size_;
-        ptr_t dst_ptr = dst + dest_start_idx * data_type_size_;
-        memcpy(dst_ptr, src_ptr, data_type_size_);
         ++ dest_start_idx;
     }
 }
@@ -566,17 +536,6 @@ ColumnVector::CopyRowFrom<VarcharT>(const_ptr_t __restrict src,
         dst_ptr->ptr = ptr;
     }
     dst_ptr->length = varchar_len;
-}
-
-template<>
-inline void
-ColumnVector::CopyRowFrom<CharT>(const_ptr_t __restrict src,
-                                 SizeT src_idx,
-                                 ptr_t __restrict dst,
-                                 SizeT dst_idx) {
-    const_ptr_t src_ptr = src + src_idx * data_type_size_;
-    ptr_t dst_ptr = dst + dst_idx * data_type_size_;
-    memcpy(dst_ptr, src_ptr, data_type_size_);
 }
 
 template<>

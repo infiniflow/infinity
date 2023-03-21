@@ -238,17 +238,8 @@ PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, Shared
                                     = ((DoubleT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
-                        case kDecimal16: {
-                            NotImplementError("Decimal16 data shuffle isn't implemented.")
-                        }
-                        case kDecimal32: {
-                            NotImplementError("Decimal32 data shuffle isn't implemented.")
-                        }
-                        case kDecimal64: {
-                            NotImplementError("Decimal64 data shuffle isn't implemented.")
-                        }
-                        case kDecimal128: {
-                            NotImplementError("Decimal128 data shuffle isn't implemented.")
+                        case kDecimal: {
+                            NotImplementError("Decimal data shuffle isn't implemented.")
                         }
                         case kVarchar: {
                             VarcharT& dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx];
@@ -264,9 +255,6 @@ PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, Shared
                             }
                             break;
                         }
-                        case kChar: {
-                            NotImplementError("Char data shuffle isn't implemented.")
-                        }
                         case kDate: {
                             ((DateT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
                                     = ((DateT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
@@ -280,9 +268,6 @@ PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, Shared
                         }
                         case kTimestamp: {
                             NotImplementError("Timestamp data shuffle isn't implemented.")
-                        }
-                        case kTimestampTZ: {
-                            NotImplementError("TimestampTZ data shuffle isn't implemented.")
                         }
                         case kInterval: {
                             NotImplementError("Interval data shuffle isn't implemented.")
@@ -381,17 +366,8 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
                             = ((DoubleT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
-                case kDecimal16: {
-                    NotImplementError("Decimal16 data shuffle isn't implemented.")
-                }
-                case kDecimal32: {
-                    NotImplementError("Decimal32 data shuffle isn't implemented.")
-                }
-                case kDecimal64: {
-                    NotImplementError("Decimal64 data shuffle isn't implemented.")
-                }
-                case kDecimal128: {
-                    NotImplementError("Decimal128 data shuffle isn't implemented.")
+                case kDecimal: {
+                    NotImplementError("Decimal data shuffle isn't implemented.")
                 }
                 case kVarchar: {
                     VarcharT& dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
@@ -407,9 +383,6 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
                     }
                     break;
                 }
-                case kChar: {
-                    NotImplementError("Char data shuffle isn't implemented.")
-                }
                 case kDate: {
                     ((DateT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
                             = ((DateT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
@@ -423,9 +396,6 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
                 }
                 case kTimestamp: {
                     NotImplementError("Timestamp data shuffle isn't implemented.")
-                }
-                case kTimestampTZ: {
-                    NotImplementError("TimestampTZ data shuffle isn't implemented.")
                 }
                 case kInterval: {
                     NotImplementError("Interval data shuffle isn't implemented.")
@@ -507,23 +477,11 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
                             = ((DoubleT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
-                case kDecimal16: {
-                    NotImplementError("Decimal16 data shuffle isn't implemented.")
-                }
-                case kDecimal32: {
-                    NotImplementError("Decimal32 data shuffle isn't implemented.")
-                }
-                case kDecimal64: {
-                    NotImplementError("Decimal64 data shuffle isn't implemented.")
-                }
-                case kDecimal128: {
-                    NotImplementError("Decimal128 data shuffle isn't implemented.")
+                case kDecimal: {
+                    NotImplementError("Decimal data shuffle isn't implemented.")
                 }
                 case kVarchar: {
                     NotImplementError("Varchar data shuffle isn't implemented.")
-                }
-                case kChar: {
-                    NotImplementError("Char data shuffle isn't implemented.")
                 }
                 case kDate: {
                     NotImplementError("Date data shuffle isn't implemented.")
