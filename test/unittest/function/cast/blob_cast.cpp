@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "function/cast/blob_cast.h"
-#include "common/types/info/varchar_info.h"
+
 
 class BlobCastTest : public BaseTest {
     void
@@ -58,8 +58,7 @@ TEST_F(BlobCastTest, blob_cast0) {
         BlobT source(blob_ptr, blob_len);
         VarcharT target;
 
-        auto varchar_info = VarcharInfo::Make(65);
-        DataType data_type(LogicalType::kVarchar, varchar_info);
+        DataType data_type(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 

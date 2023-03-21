@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "function/cast/integer_cast.h"
-#include "common/types/info/varchar_info.h"
+
 
 class SmallIntegerCastTest : public BaseTest {
     void
@@ -150,8 +150,8 @@ TEST_F(SmallIntegerCastTest, small_integer_cast0) {
         VarcharT target;
         String src_str, tgt_str;
 
-        auto varchar_info = VarcharInfo::Make(65);
-        DataType data_type(LogicalType::kVarchar, varchar_info);
+
+        DataType data_type(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 

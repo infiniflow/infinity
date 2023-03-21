@@ -11,7 +11,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "function/cast/time_cast.h"
-#include "common/types/info/varchar_info.h"
+
 
 class TimeCastTest : public BaseTest {
     void
@@ -42,8 +42,8 @@ TEST_F(TimeCastTest, date_cast0) {
         TimeT source;
         VarcharT target;
 
-        auto varchar_info = VarcharInfo::Make(65);
-        DataType data_type(LogicalType::kVarchar, varchar_info);
+
+        DataType data_type(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar = MakeShared<ColumnVector>(data_type);
         col_varchar->Initialize();
 

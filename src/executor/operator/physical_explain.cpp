@@ -15,8 +15,7 @@ void
 PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
     String title;
 
-    SharedPtr<VarcharInfo> varchar_info = VarcharInfo::Make(256);
-    DataType data_type(LogicalType::kVarchar, varchar_info);
+    DataType data_type(LogicalType::kVarchar);
     auto column_vector_ptr = ColumnVector::Make(data_type);
 
     auto output_data_block = DataBlock::Make();
@@ -34,7 +33,7 @@ PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
 
             column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
             for(SizeT idx = 0; idx < row_count; ++ idx) {
-                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx], varchar_info);
+                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
                 column_vector_ptr->AppendValue(str_v);
             }
             output_data_block->Init({column_vector_ptr});
@@ -47,7 +46,7 @@ PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
 
             column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
             for(SizeT idx = 0; idx < row_count; ++ idx) {
-                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx], varchar_info);
+                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
                 column_vector_ptr->AppendValue(str_v);
             }
             output_data_block->Init({column_vector_ptr});
@@ -60,7 +59,7 @@ PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
 
             column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
             for(SizeT idx = 0; idx < row_count; ++ idx) {
-                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx], varchar_info);
+                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
                 column_vector_ptr->AppendValue(str_v);
             }
             output_data_block->Init({column_vector_ptr});
@@ -73,7 +72,7 @@ PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
 
             column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
             for(SizeT idx = 0; idx < row_count; ++ idx) {
-                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx], varchar_info);
+                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
                 column_vector_ptr->AppendValue(str_v);
             }
             output_data_block->Init({column_vector_ptr});

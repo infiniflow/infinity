@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "function/cast/cast_table.h"
-#include "common/types/info/varchar_info.h"
+
 
 class CastTableTest : public BaseTest {
     void

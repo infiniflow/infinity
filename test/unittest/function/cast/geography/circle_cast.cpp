@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "function/cast/geography_cast.h"
-#include "common/types/info/varchar_info.h"
+
 
 class CircleCastTest : public BaseTest {
     void
@@ -45,8 +45,8 @@ TEST_F(CircleCastTest, circle_cast0) {
         CircleT source(p1, r);
         VarcharT target;
 
-        auto varchar_info = VarcharInfo::Make(65);
-        DataType data_type(LogicalType::kVarchar, varchar_info);
+
+        DataType data_type(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 

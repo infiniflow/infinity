@@ -534,10 +534,6 @@ table_column :
 IDENTIFIER column_type {
     SharedPtr<TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
-        case LogicalType::kVarchar: {
-            type_info_ptr = VarcharInfo::Make($2.width);
-            break;
-        }
         case LogicalType::kDecimal: {
             type_info_ptr = DecimalInfo::Make($2.precision, $2.scale);
             if(type_info_ptr == nullptr) {
@@ -545,10 +541,6 @@ IDENTIFIER column_type {
                 delete $1;
                 YYERROR;
             }
-            break;
-        }
-        case LogicalType::kBlob: {
-            type_info_ptr = BlobInfo::Make($2.width);
             break;
         }
         case LogicalType::kBitmap: {
@@ -574,16 +566,8 @@ IDENTIFIER column_type {
 | IDENTIFIER column_type column_constraints {
     SharedPtr<TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
-        case LogicalType::kVarchar: {
-            type_info_ptr = VarcharInfo::Make($2.width);
-            break;
-        }
         case LogicalType::kDecimal: {
             type_info_ptr = DecimalInfo::Make($2.precision, $2.scale);
-            break;
-        }
-        case LogicalType::kBlob: {
-            type_info_ptr = BlobInfo::Make($2.width);
             break;
         }
         case LogicalType::kBitmap: {
@@ -1679,16 +1663,8 @@ case_check_array: WHEN expr THEN expr {
 cast_expr: CAST '(' expr AS column_type ')' {
     SharedPtr<TypeInfo> type_info_ptr{nullptr};
     switch($5.logical_type_) {
-        case LogicalType::kVarchar: {
-            type_info_ptr = VarcharInfo::Make($5.width);
-            break;
-        }
         case LogicalType::kDecimal: {
             type_info_ptr = DecimalInfo::Make($5.precision, $5.scale);
-            break;
-        }
-        case LogicalType::kBlob: {
-            type_info_ptr = BlobInfo::Make($5.width);
             break;
         }
         case LogicalType::kBitmap: {

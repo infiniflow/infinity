@@ -9,7 +9,6 @@
 #include "common/types/data_type.h"
 #include "common/types/internal_types.h"
 #include "common/utility/infinity_assert.h"
-#include "common/types/info/varchar_info.h"
 
 namespace infinity {
 
@@ -49,7 +48,7 @@ BindVarcharCast(const DataType& source, const DataType& target) {
             NotImplementError("Varchar to Decimal")
         }
         case kVarchar: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<VarcharT, VarcharT, TryCastVarcharToVarchar>);
+            PlannerError("Varchar to Varchar")
         }
         case kDate: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DateT, TryCastVarchar>);
@@ -312,66 +311,5 @@ TryCastVarchar::Run(const VarcharT& source, IntervalT& target) {
     NotImplementError("Cast from varchar to interval")
     return true;
 }
-
-struct TryCastVarcharToChar {
-    template<typename SourceType, typename TargetType>
-    static inline bool
-    Run(const SourceType& source,
-        const DataType& source_type,
-        TargetType &target,
-        const DataType& target_type){
-        FunctionError("Not support to cast from " + source_type.ToString()
-                      + " to " + target_type.ToString());
-    }
-};
-
-struct TryCastVarcharToVarchar {
-    template<typename SourceType, typename TargetType>
-    static inline bool
-    Run(const SourceType& source,
-        const DataType& source_type,
-        TargetType &target,
-        const DataType& target_type,
-        const SharedPtr<ColumnVector>& vector_ptr){
-        FunctionError("Not support to cast from " + source_type.ToString()
-                      + " to " + target_type.ToString());
-    }
-};
-
-// Cast VarcharT to CharT type
-template<>
-inline bool
-TryCastVarcharToVarchar::Run(const VarcharT& source,
-                             const DataType& source_type,
-                             VarcharT & target,
-                             const DataType& target_type,
-                             const SharedPtr<ColumnVector>& vector_ptr) {
-
-    SizeT varchar_len_limit = ((VarcharInfo*)(target_type.type_info().get()))->length_limit();
-
-    SizeT transferred_bytes{0};
-    if(source.length <= varchar_len_limit) {
-        transferred_bytes = source.length;
-    } else {
-        transferred_bytes = varchar_len_limit;
-    }
-
-    if(transferred_bytes <= VarcharT::INLINE_LENGTH) {
-        // inline varchar
-        memcpy(target.prefix, source.ptr, transferred_bytes);
-        memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - transferred_bytes);
-    } else {
-        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                   "Varchar column vector should use MemoryVectorBuffer. ");
-        // Set varchar prefix
-        memcpy(target.prefix, source.ptr, VarcharT::PREFIX_LENGTH);
-
-        ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(transferred_bytes);
-        memcpy(ptr, source.ptr, transferred_bytes);
-        target.ptr = ptr;
-    }
-    return true;
-}
-
 
 }

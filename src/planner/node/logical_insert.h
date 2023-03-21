@@ -46,7 +46,7 @@ public:
         return table_ptr_;
     }
 
-    inline const SharedPtr<Table>&
+    [[nodiscard]] inline const SharedPtr<Table>&
     table_ptr() const {
         return table_ptr_;
     }
@@ -56,7 +56,7 @@ public:
         return value_list_;
     }
 
-    inline const Vector<SharedPtr<BaseExpression>>&
+    [[nodiscard]] inline const Vector<SharedPtr<BaseExpression>>&
     value_list() const {
         return value_list_;
     }
@@ -71,16 +71,9 @@ public:
     NeedCastInInsert(const DataType& from, const DataType& to) {
         if(from.type() == to.type()) {
             switch (from.type()) {
-                case kVarchar: {
-                    auto* from_type_info = (VarcharInfo*)from.type_info().get();
-                    auto* to_type_info = (VarcharInfo*)to.type_info().get();
-                    if(to_type_info->length_limit() >= from_type_info->length_limit()) {
-                        // Unify the length limit of insert varchar
-                        from_type_info->UpdateLengthLimit(to_type_info->length_limit());
-                        return false;
-                    }
-                    break;
-                }
+                // Embedding
+                // Bitmap
+                // Decimal
                 default:
                     break;
             }

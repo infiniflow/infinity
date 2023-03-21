@@ -932,7 +932,7 @@ ColumnVector::GetValue(SizeT index) const {
             return Value::MakeDecimal(((DecimalT *) data_ptr_)[index], data_type_.type_info());
         }
         case kVarchar: {
-            return Value::MakeVarchar(((VarcharT *) data_ptr_)[index], data_type_.type_info());
+            return Value::MakeVarchar(((VarcharT *) data_ptr_)[index]);
         }
         case kDate: {
             return Value::MakeDate(((DateT *) data_ptr_)[index]);

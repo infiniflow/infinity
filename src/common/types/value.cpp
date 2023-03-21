@@ -94,24 +94,24 @@ Value::MakeDecimal(DecimalT input, const SharedPtr<TypeInfo>& type_info_ptr) {
 }
 
 Value
-Value::MakeVarchar(VarcharT& input, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kVarchar, type_info_ptr);
+Value::MakeVarchar(VarcharT& input) {
+    Value value(LogicalType::kVarchar);
     value.value_.varchar = input;
     value.is_null_ = false;
     return value;
 }
 
 Value
-Value::MakeVarchar(const String& str, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kVarchar, type_info_ptr);
+Value::MakeVarchar(const String& str) {
+    Value value(LogicalType::kVarchar);
     value.value_.varchar.Initialize(str);
     value.is_null_ = false;
     return value;
 }
 
 Value
-Value::MakeVarchar(const char* ptr, const SharedPtr<TypeInfo>& type_info_ptr) {
-    Value value(LogicalType::kVarchar, type_info_ptr);
+Value::MakeVarchar(const char* ptr) {
+    Value value(LogicalType::kVarchar);
     value.value_.varchar.Initialize(ptr);
     value.is_null_ = false;
     return value;

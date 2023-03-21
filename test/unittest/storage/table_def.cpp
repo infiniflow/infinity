@@ -4,7 +4,6 @@
 
 #include <gtest/gtest.h>
 #include "base_test.h"
-#include "common/types/info/varchar_info.h"
 #include "storage/table_def.h"
 #include "main/profiler/base_profiler.h"
 #include "main/logger.h"
@@ -48,11 +47,10 @@ TEST_F(TableDefTest, test1) {
 
     }
     {
-        auto type_info_ptr = VarcharInfo::Make(128);
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
         auto column_def_ptr = MakeShared<ColumnDef>(column_id ++,
-                                                    DataType(LogicalType::kVarchar, type_info_ptr),
+                                                    DataType(LogicalType::kVarchar),
                                                     "c2",
                                                     constraints);
         columns.emplace_back(column_def_ptr);

@@ -8,7 +8,7 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
-#include "common/types/info/varchar_info.h"
+
 //#include "storage/catalog.h"
 //#include "func/builtin_functions.h"
 

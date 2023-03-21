@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "function/cast/varchar_cast.h"
-#include "common/types/info/varchar_info.h"
+
 
 class VarcharTest : public BaseTest {
     void
@@ -31,8 +31,8 @@ class VarcharTest : public BaseTest {
 TEST_F(VarcharTest, varchar_cast0) {
     using namespace infinity;
     {
-        auto varchar_info = VarcharInfo::Make(65);
-        DataType source_type(LogicalType::kVarchar, varchar_info);
+
+        DataType source_type(LogicalType::kVarchar);
         String s1 = "true";
 
         {
@@ -76,8 +76,8 @@ TEST_F(VarcharTest, varchar_cast0) {
     }
 
     {
-        auto varchar_info = VarcharInfo::Make(65);
-        DataType source_type(LogicalType::kVarchar, varchar_info);
+
+        DataType source_type(LogicalType::kVarchar);
         String s1 = "-128";
 
         {

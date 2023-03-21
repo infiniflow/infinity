@@ -46,13 +46,13 @@ public:
     MakeDecimal(DecimalT input, const SharedPtr<TypeInfo>& type_info_ptr);
 
     static Value
-    MakeVarchar(VarcharT& input_ref, const SharedPtr<TypeInfo>& type_info_ptr);
+    MakeVarchar(VarcharT& input_ref);
 
     static Value
-    MakeVarchar(const String& str, const SharedPtr<TypeInfo>& type_info_ptr);
+    MakeVarchar(const String& str);
 
     static Value
-    MakeVarchar(const char* ptr, const SharedPtr<TypeInfo>& type_info_ptr);
+    MakeVarchar(const char* ptr);
 
     static Value
     MakeDate(DateT input);

@@ -8,7 +8,7 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
-#include "common/types/info/varchar_info.h"
+
 
 class ValueCastTest : public BaseTest {
     void
@@ -29,8 +29,8 @@ class ValueCastTest : public BaseTest {
 TEST_F(ValueCastTest, bool_value_cast) {
     using namespace infinity;
 
-    DataType target_type(LogicalType::kVarchar, VarcharInfo::Make(64));
-    Value target_value(LogicalType::kVarchar, VarcharInfo::Make(64));
+    DataType target_type(LogicalType::kVarchar);
+    Value target_value(LogicalType::kVarchar);
 
     Value value = Value::MakeBool(true);
     {
@@ -288,8 +288,8 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
 
     {
         // TinyInt to Varchar
-        DataType target_type(LogicalType::kVarchar, VarcharInfo::Make(64));
-        Value target_value(LogicalType::kVarchar, VarcharInfo::Make(64));
+        DataType target_type(LogicalType::kVarchar);
+        Value target_value(LogicalType::kVarchar);
 
         Value value = Value::MakeTinyInt(std::numeric_limits<TinyIntT>::min());
         {
@@ -571,8 +571,8 @@ TEST_F(ValueCastTest, smallint_value_cast) {
 
     {
         // SmallInt to Varchar
-        DataType target_type(LogicalType::kVarchar, VarcharInfo::Make(64));
-        Value target_value(LogicalType::kVarchar, VarcharInfo::Make(64));
+        DataType target_type(LogicalType::kVarchar);
+        Value target_value(LogicalType::kVarchar);
 
         SmallIntT source = std::numeric_limits<SmallIntT>::min();
         Value value = Value::MakeSmallInt(source);
@@ -868,8 +868,8 @@ TEST_F(ValueCastTest, integer_value_cast) {
 
     {
         // Integer to Varchar
-        DataType target_type(LogicalType::kVarchar, VarcharInfo::Make(64));
-        Value target_value(LogicalType::kVarchar, VarcharInfo::Make(64));
+        DataType target_type(LogicalType::kVarchar);
+        Value target_value(LogicalType::kVarchar);
 
         IntegerT source = std::numeric_limits<IntegerT>::min();
         Value value = Value::MakeInt(source);
@@ -1182,8 +1182,8 @@ TEST_F(ValueCastTest, bigint_value_cast) {
 
     {
         // BigIntT to Varchar
-        DataType target_type(LogicalType::kVarchar, VarcharInfo::Make(64));
-        Value target_value(LogicalType::kVarchar, VarcharInfo::Make(64));
+        DataType target_type(LogicalType::kVarchar);
+        Value target_value(LogicalType::kVarchar);
 
         BigIntT source = std::numeric_limits<BigIntT>::min();
         Value value = Value::MakeBigInt(source);
@@ -1306,8 +1306,8 @@ TEST_F(ValueCastTest, hugeint_value_cast) {
 
     {
         // HugeIntT to Varchar
-        DataType target_type(LogicalType::kVarchar, VarcharInfo::Make(64));
-        Value target_value(LogicalType::kVarchar, VarcharInfo::Make(64));
+        DataType target_type(LogicalType::kVarchar);
+        Value target_value(LogicalType::kVarchar);
 
         HugeIntT source = std::numeric_limits<HugeIntT>::min();
         Value value = Value::MakeHugeInt(source);
@@ -1542,8 +1542,8 @@ TEST_F(ValueCastTest, float_value_cast) {
 
     {
         // FloatT to Varchar
-        DataType target_type(LogicalType::kVarchar, VarcharInfo::Make(64));
-        Value target_value(LogicalType::kVarchar, VarcharInfo::Make(64));
+        DataType target_type(LogicalType::kVarchar);
+        Value target_value(LogicalType::kVarchar);
 
         FloatT source = std::numeric_limits<FloatT>::min();
         Value value = Value::MakeFloat(source);
@@ -1794,8 +1794,8 @@ TEST_F(ValueCastTest, double_value_cast) {
 
     {
         // DoubleT to Varchar
-        DataType target_type(LogicalType::kVarchar, VarcharInfo::Make(64));
-        Value target_value(LogicalType::kVarchar, VarcharInfo::Make(64));
+        DataType target_type(LogicalType::kVarchar);
+        Value target_value(LogicalType::kVarchar);
 
         DoubleT source = std::numeric_limits<DoubleT>::min();
         Value value = Value::MakeDouble(source);

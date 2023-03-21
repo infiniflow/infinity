@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "function/cast/embedding_cast.h"
-#include "common/types/info/varchar_info.h"
+
 
 class EmbeddingCastTest : public BaseTest {
     void
@@ -55,8 +55,8 @@ class EmbeddingCastTest : public BaseTest {
 //        }
 //
 //        VarcharT target;
-//        auto varchar_info = VarcharInfo::Make(65);
-//        DataType target_data_type(LogicalType::kVarchar, varchar_info);
+//
+//        DataType target_data_type(LogicalType::kVarchar);
 //
 //        ColumnVector col_varchar(target_data_type);
 //        col_varchar.Initialize();

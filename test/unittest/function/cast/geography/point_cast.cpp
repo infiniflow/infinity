@@ -11,7 +11,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "function/cast/geography_cast.h"
-#include "common/types/info/varchar_info.h"
+
 
 class PointCastTest : public BaseTest {
     void
@@ -42,8 +42,8 @@ TEST_F(PointCastTest, point_cast0) {
         PointT source;
         VarcharT target;
 
-        auto varchar_info = VarcharInfo::Make(65);
-        DataType data_type(LogicalType::kVarchar, varchar_info);
+
+        DataType data_type(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 

@@ -10,7 +10,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "function/cast/integer_cast.h"
-#include "common/types/info/varchar_info.h"
 
 class HugeIntCastTest : public BaseTest {
     void
@@ -78,8 +77,7 @@ TEST_F(HugeIntCastTest, hugeint_cast0) {
         HugeIntT source(std::numeric_limits<i64>::max(), std::numeric_limits<i64>::max());
         VarcharT target;
 
-        auto varchar_info = VarcharInfo::Make(65);
-        DataType data_type(LogicalType::kVarchar, varchar_info);
+        DataType data_type(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 

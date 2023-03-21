@@ -10,9 +10,7 @@
 #include "parser/statement/statement_common.h"
 #include "parser/statement/select_statement.h"
 #include "common/types/data_type.h"
-#include "common/types/info/varchar_info.h"
 #include "common/types/info/decimal_info.h"
-#include "common/types/info/blob_info.h"
 #include "common/types/info/bitmap_info.h"
 #include "common/types/info/embedding_info.h"
 

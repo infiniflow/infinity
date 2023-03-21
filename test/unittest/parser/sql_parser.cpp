@@ -310,8 +310,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto& column_def = create_table_info->column_defs_[22];
                 EXPECT_EQ(column_def->name_, "w");
-                SharedPtr<TypeInfo> type_info = VarcharInfo::Make(100);
-                DataType column_type(LogicalType::kVarchar, type_info);
+                DataType column_type(LogicalType::kVarchar);
                 EXPECT_EQ(column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0);
             }
@@ -346,8 +345,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto& column_def = create_table_info->column_defs_[26];
                 EXPECT_EQ(column_def->name_, "aa");
-                SharedPtr<TypeInfo> type_info = BlobInfo::Make(10);
-                DataType column_type(LogicalType::kBlob, type_info);
+                DataType column_type(LogicalType::kBlob);
                 EXPECT_EQ(column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0);
             }

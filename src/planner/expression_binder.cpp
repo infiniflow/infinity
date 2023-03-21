@@ -12,8 +12,6 @@
 #include "function/scalar_function_set.h"
 #include "function/aggregate_function_set.h"
 
-#include "common/types/info/varchar_info.h"
-
 #include "common/utility/infinity_assert.h"
 #include "main/infinity.h"
 #include "expression_binder.h"
@@ -143,9 +141,7 @@ ExpressionBinder::BuildValueExpr(const ConstantExpr& expr,
         }
         case LiteralType::kString: {
             auto data_type = DataType(LogicalType::kVarchar);
-            i64 varchar_len = static_cast<i64>(std::strlen(expr.str_value_));
-            auto type_info_ptr = VarcharInfo::Make(varchar_len);
-            Value value = Value::MakeVarchar(expr.str_value_, type_info_ptr);
+            Value value = Value::MakeVarchar(expr.str_value_);
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kDouble: {

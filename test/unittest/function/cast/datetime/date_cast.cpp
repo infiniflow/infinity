@@ -11,7 +11,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "function/cast/date_cast.h"
-#include "common/types/info/varchar_info.h"
+
 
 class DateCastTest : public BaseTest {
     void
@@ -53,8 +53,8 @@ TEST_F(DateCastTest, date_cast0) {
         DateT source;
         VarcharT target;
 
-        auto varchar_info = VarcharInfo::Make(65);
-        DataType data_type(LogicalType::kVarchar, varchar_info);
+
+        DataType data_type(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 

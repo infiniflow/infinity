@@ -9,7 +9,7 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
-#include "common/types/info/varchar_info.h"
+
 
 class ColumnVectorVarcharTest : public BaseTest {
     void
@@ -30,8 +30,7 @@ class ColumnVectorVarcharTest : public BaseTest {
 TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     using namespace infinity;
 
-    auto varchar_info = VarcharInfo::Make(65);
-    DataType data_type(LogicalType::kVarchar, varchar_info);
+    DataType data_type(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -60,7 +59,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "hello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
@@ -112,7 +111,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
         String s = "hello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
@@ -200,8 +199,8 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     using namespace infinity;
 
-    auto varchar_info = VarcharInfo::Make(65);
-    DataType data_type(LogicalType::kVarchar, varchar_info);
+    
+    DataType data_type(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -231,7 +230,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     for(i64 i = 0; i < 1; ++ i) {
         String s = "hello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
@@ -296,7 +295,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     for(i64 i = 0; i < 1; ++ i) {
         String s = "hello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
@@ -316,15 +315,15 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
     using namespace infinity;
 
-    auto varchar_info = VarcharInfo::Make(65);
-    DataType data_type(LogicalType::kVarchar, varchar_info);
+    
+    DataType data_type(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "hello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
     }
 
@@ -374,15 +373,15 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
 TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
     using namespace infinity;
 
-    auto varchar_info = VarcharInfo::Make(65);
-    DataType data_type(LogicalType::kVarchar, varchar_info);
+    
+    DataType data_type(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "hello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
     }
 
@@ -432,8 +431,8 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
 TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     using namespace infinity;
 
-    auto varchar_info = VarcharInfo::Make(65);
-    DataType data_type(LogicalType::kVarchar, varchar_info);
+    
+    DataType data_type(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -462,7 +461,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "hellohellohello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
@@ -514,7 +513,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
         String s = "hellohellohello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
@@ -605,8 +604,8 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
     using namespace infinity;
 
-    auto varchar_info = VarcharInfo::Make(65);
-    DataType data_type(LogicalType::kVarchar, varchar_info);
+    
+    DataType data_type(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
@@ -636,7 +635,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     for(i64 i = 0; i < 1; ++ i) {
         String s = "hellohellohello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
@@ -701,7 +700,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     for(i64 i = 0; i < 1; ++ i) {
         String s = "hellohellohello" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
@@ -721,8 +720,8 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     using namespace infinity;
 
-    auto varchar_info = VarcharInfo::Make(65);
-    DataType data_type(LogicalType::kVarchar, varchar_info);
+    
+    DataType data_type(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -751,7 +750,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "Professional" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
@@ -809,7 +808,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
         String s = "Professional" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
@@ -861,7 +860,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         String s = "Professional" + std::to_string(i);
         VarcharT varchar_value(s);
-        Value v = Value::MakeVarchar(varchar_value, varchar_info);
+        Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);

@@ -9,7 +9,7 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
-#include "common/types/info/varchar_info.h"
+
 #include "storage/catalog.h"
 #include "function/scalar/less_equals.h"
 #include "function/scalar_function_set.h"
@@ -487,11 +487,8 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        SharedPtr<TypeInfo> type_info_ptr1 = VarcharInfo::Make(64);
-        SharedPtr<TypeInfo> type_info_ptr2 = VarcharInfo::Make(128);
-
-        DataType data_type1(LogicalType::kVarchar, type_info_ptr1);
-        DataType data_type2(LogicalType::kVarchar, type_info_ptr2);
+        DataType data_type1(LogicalType::kVarchar);
+        DataType data_type2(LogicalType::kVarchar);
         DataType result_type(LogicalType::kBoolean);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type1,
                                                                                  "t1",
@@ -523,11 +520,11 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
 
         for (SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
-                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i), type_info_ptr1));
-                data_block.AppendValue(1, Value::MakeVarchar("Helloworld" + std::to_string(i), type_info_ptr2));
+                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
+                data_block.AppendValue(1, Value::MakeVarchar("Helloworld" + std::to_string(i)));
             } else {
-                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i), type_info_ptr1));
-                data_block.AppendValue(1, Value::MakeVarchar("helloworld" + std::to_string(i), type_info_ptr2));
+                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
+                data_block.AppendValue(1, Value::MakeVarchar("helloworld" + std::to_string(i)));
             }
         }
         data_block.Finalize();

@@ -11,7 +11,7 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
-#include "common/types/info/varchar_info.h"
+
 #include "storage/catalog.h"
 #include "function/scalar/substring.h"
 #include "function/scalar_function_set.h"
@@ -49,8 +49,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
 
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        auto varchar_info = VarcharInfo::Make(65);
-        DataType data_type0(LogicalType::kVarchar, varchar_info);
+        DataType data_type0(LogicalType::kVarchar);
         SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(data_type0,
                                                                                 "t1",
                                                                                 1,
@@ -91,7 +90,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         for(SizeT idx = 0; idx < row_count; ++ idx) {
             String s = "hello" + std::to_string(idx);
             VarcharT varchar_value(s);
-            Value v = Value::MakeVarchar(varchar_value, varchar_info);
+            Value v = Value::MakeVarchar(varchar_value);
             col0->AppendValue(v);
             Value vx = col0->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
@@ -107,7 +106,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
 
         DataBlock data_block;
         data_block.Init({col0, col1, col2});
-        DataType result_type(LogicalType::kVarchar, varchar_info);
+        DataType result_type(LogicalType::kVarchar);
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);

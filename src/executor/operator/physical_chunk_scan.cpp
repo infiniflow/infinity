@@ -5,7 +5,6 @@
 #include "common/utility/infinity_assert.h"
 #include "common/types/logical_type.h"
 #include "common/types/internal_types.h"
-#include "common/types/info/varchar_info.h"
 #include "expression/value_expression.h"
 #include "physical_chunk_scan.h"
 #include "main/infinity.h"
@@ -43,13 +42,10 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
 
             // Prepare the output data block
             SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-            auto table_name_type_info_ptr = VarcharInfo::Make(TABLE_NAME_LIMIT);
-            auto schema_name_type_info_ptr = VarcharInfo::Make(SCHEMA_NAME_LIMIT);
-            auto base_table_type_info_ptr = VarcharInfo::Make(BASE_TABLE_TYPE_LIMIT);
             Vector<DataType> column_types {
-                DataType(LogicalType::kVarchar, table_name_type_info_ptr),
-                DataType(LogicalType::kVarchar, schema_name_type_info_ptr),
-                DataType(LogicalType::kVarchar, base_table_type_info_ptr),
+                DataType(LogicalType::kVarchar),
+                DataType(LogicalType::kVarchar),
+                DataType(LogicalType::kVarchar),
                 DataType(LogicalType::kBigInt),
                 DataType(LogicalType::kBigInt),
                 DataType(LogicalType::kBigInt),
@@ -65,7 +61,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
                 {
                     // Append schema name to the 1 column
                     const String& schema_name = base_table->schema_name();
-                    Value value = Value::MakeVarchar(schema_name, schema_name_type_info_ptr);
+                    Value value = Value::MakeVarchar(schema_name);
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                 }
@@ -74,7 +70,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
                 {
                     // Append table name to the 0 column
                     const String& table_name = base_table->table_name();
-                    Value value = Value::MakeVarchar(table_name, table_name_type_info_ptr);
+                    Value value = Value::MakeVarchar(table_name);
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                 }
@@ -83,7 +79,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
                 {
                     // Append base table type to the 2 column
                     const String& base_table_type_str = ToString(base_table_type);
-                    Value value = Value::MakeVarchar(base_table_type_str, base_table_type_info_ptr);
+                    Value value = Value::MakeVarchar(base_table_type_str);
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                 }

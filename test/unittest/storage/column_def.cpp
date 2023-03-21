@@ -4,7 +4,6 @@
 
 #include <gtest/gtest.h>
 #include "base_test.h"
-#include "common/types/info/varchar_info.h"
 #include "main/profiler/base_profiler.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
@@ -45,12 +44,11 @@ TEST_F(ColumnDefTest, test1) {
 TEST_F(ColumnDefTest, test2) {
     using namespace infinity;
 
-    auto type_info_ptr = VarcharInfo::Make(128);
 
     HashSet<ConstraintType> constraints;
     constraints.insert(ConstraintType::kPrimaryKey);
-    auto column_def_ptr = MakeShared<ColumnDef>(3, DataType(LogicalType::kVarchar, type_info_ptr), "c2", constraints);
-    EXPECT_EQ(column_def_ptr->type(), DataType(LogicalType::kVarchar, type_info_ptr));
+    auto column_def_ptr = MakeShared<ColumnDef>(3, DataType(LogicalType::kVarchar), "c2", constraints);
+    EXPECT_EQ(column_def_ptr->type(), DataType(LogicalType::kVarchar));
     EXPECT_EQ(column_def_ptr->id(), 3);
     EXPECT_EQ(column_def_ptr->name(), "c2");
     EXPECT_EQ(column_def_ptr->ToString(), "c2 Varchar PrimaryKey");

@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "executor/expression/expression_executor.h"
-#include "common/types/info/varchar_info.h"
+
 #include "storage/catalog.h"
 #include "function/scalar/subtract.h"
 #include "function/scalar/add.h"

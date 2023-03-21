@@ -45,8 +45,7 @@ public:
     };
 
     virtual
-    ~TypeInfo() {
-    }
+    ~TypeInfo() = default;
 
     virtual bool
     operator==(const TypeInfo& other) const = 0;

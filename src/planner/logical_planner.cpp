@@ -12,7 +12,6 @@
 #include "expression/cast_expression.h"
 #include "planner/node/logical_insert.h"
 #include "planner/node/logical_chunk_scan.h"
-#include "common/types/info/varchar_info.h"
 #include "planner/node/logical_drop_index.h"
 #include "planner/node/logical_drop_view.h"
 #include "planner/node/logical_drop_collection.h"
@@ -583,8 +582,7 @@ LogicalPlanner::BuildShowTables(const ShowStatement* statement, SharedPtr<BindCo
     this->names_ptr_->emplace_back(String("block_count"));
     this->names_ptr_->emplace_back(String("block_size"));
 
-    auto table_name_type_info_ptr = VarcharInfo::Make(TABLE_NAME_LIMIT);
-    this->types_ptr_->emplace_back(DataType(LogicalType::kVarchar, table_name_type_info_ptr));
+    this->types_ptr_->emplace_back(DataType(LogicalType::kVarchar));
     this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
     this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
     this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
