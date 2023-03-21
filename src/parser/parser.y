@@ -540,6 +540,11 @@ IDENTIFIER column_type {
         }
         case LogicalType::kDecimal: {
             type_info_ptr = DecimalInfo::Make($2.precision, $2.scale);
+            if(type_info_ptr == nullptr) {
+                yyerror(&yyloc, scanner, result, "Fail to create decimal info.");
+                delete $1;
+                YYERROR;
+            }
             break;
         }
         case LogicalType::kBlob: {

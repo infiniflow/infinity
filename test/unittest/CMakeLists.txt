@@ -66,6 +66,7 @@ add_executable(test_main
         ${main_test_src}
         ${planner_test_src}
         ${storage_src}
+        ${parser_test_src}
         ${test_helper_src}
         )
 
@@ -76,19 +77,4 @@ target_link_libraries(test_main
         gmock_main
         infinity_core
         tlsf
-        )
-
-
-add_executable(test_parser
-        main.cpp
-        ${parser_test_src}
-        ${test_helper_src}
-        )
-
-target_link_libraries(test_parser
-        gtest
-        gtest_main
-        gmock
-        gmock_main
-        infinity_core
         )

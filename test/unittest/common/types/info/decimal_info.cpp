@@ -30,7 +30,7 @@ TEST_F(DecimalInfoTest, decimal_info_A) {
     using namespace infinity;
 
     EXPECT_THROW(DecimalInfo::Make(39, 39), TypeException);
-    EXPECT_THROW(DecimalInfo::Make(38, 39), TypeException);
+    EXPECT_EQ(DecimalInfo::Make(38, 39), nullptr);
 
     auto decimal_info = DecimalInfo::Make(38, 38);
     EXPECT_EQ(decimal_info->scale(), 38);

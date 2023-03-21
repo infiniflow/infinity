@@ -87,7 +87,7 @@ TEST_F(SQLParserTest, good_test2) {
                            "                 w varchar(100), "
                            "                 x decimal, "
                            "                 y decimal(10), "
-                           "                 z decimal(12, 14), "
+                           "                 z decimal(14, 12), "
                            "                 aa blob(10), "
                            "                 ab bitmap(16), "
                            "                 ac embedding(bit, 256), "
@@ -308,15 +308,6 @@ TEST_F(SQLParserTest, good_test2) {
             }
 
             {
-                auto& column_def = create_table_info->column_defs_[21];
-                EXPECT_EQ(column_def->name_, "v");
-                SharedPtr<TypeInfo> type_info = CharInfo::Make(10);
-                DataType column_type(LogicalType::kChar, type_info);
-                EXPECT_EQ(column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_.size(), 0);
-            }
-
-            {
                 auto& column_def = create_table_info->column_defs_[22];
                 EXPECT_EQ(column_def->name_, "w");
                 SharedPtr<TypeInfo> type_info = VarcharInfo::Make(100);
@@ -328,8 +319,8 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto& column_def = create_table_info->column_defs_[23];
                 EXPECT_EQ(column_def->name_, "x");
-                SharedPtr<TypeInfo> type_info = Decimal64Info::Make(0, 0);
-                DataType column_type(LogicalType::kDecimal64, type_info);
+                SharedPtr<TypeInfo> type_info = DecimalInfo::Make(0, 0);
+                DataType column_type(LogicalType::kDecimal, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0);
             }
@@ -337,8 +328,8 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto& column_def = create_table_info->column_defs_[24];
                 EXPECT_EQ(column_def->name_, "y");
-                SharedPtr<TypeInfo> type_info = Decimal64Info::Make(10, 0);
-                DataType column_type(LogicalType::kDecimal64, type_info);
+                SharedPtr<TypeInfo> type_info = DecimalInfo::Make(10, 0);
+                DataType column_type(LogicalType::kDecimal, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0);
             }
@@ -346,8 +337,8 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto& column_def = create_table_info->column_defs_[25];
                 EXPECT_EQ(column_def->name_, "z");
-                SharedPtr<TypeInfo> type_info = Decimal64Info::Make(12, 14);
-                DataType column_type(LogicalType::kDecimal64, type_info);
+                SharedPtr<TypeInfo> type_info = DecimalInfo::Make(14, 12);
+                DataType column_type(LogicalType::kDecimal, type_info);
                 EXPECT_EQ(column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0);
             }
