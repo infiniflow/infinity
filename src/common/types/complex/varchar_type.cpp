@@ -275,6 +275,12 @@ VarcharType::Initialize(const char* input_ptr, size_t input_len) {
 }
 
 void
+VarcharType::InitializeAsEmptyStr() {
+    length = 0;
+    ptr = nullptr;
+}
+
+void
 VarcharType::Reset(bool clean_memory) {
     if(!clean_memory) {
         length = 0;

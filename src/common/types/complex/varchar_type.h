@@ -77,6 +77,9 @@ public:
     void
     Initialize(const char* ptr, size_t len);
 
+    void
+    InitializeAsEmptyStr();
+
     [[nodiscard]] inline bool
     IsInlined() const {
         return length <= INLINE_LENGTH;
