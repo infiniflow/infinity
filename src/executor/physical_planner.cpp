@@ -54,6 +54,7 @@
 #include "planner/node/logical_drop_collection.h"
 #include "planner/node/logical_join.h"
 #include "explain_physical_plan.h"
+#include "planner/node/logical_create_view.h"
 
 #include <limits>
 
@@ -238,7 +239,12 @@ PhysicalPlanner::BuildPreparedPlan(const SharedPtr<LogicalNode> &logical_operato
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildCreateView(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalCreateView>(logical_operator->node_id());
+    SharedPtr<LogicalCreateView> logical_create_view =
+            std::static_pointer_cast<LogicalCreateView>(logical_operator);
+    return MakeShared<PhysicalCreateView>(logical_operator->node_id(),
+                                          logical_create_view->names_ptr(),
+                                          logical_create_view->types_ptr(),
+                                          logical_create_view->create_view_info());
 }
 
 SharedPtr<PhysicalOperator>

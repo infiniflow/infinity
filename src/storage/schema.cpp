@@ -45,7 +45,7 @@ Schema::GetViewByName(const String &name) {
 
 void
 Schema::AddView(const SharedPtr<View>& view) {
-    const String& view_name = view->name();
+    const String& view_name = view->view_name();
     if (views_.find(view_name) == views_.end()) {
         views_[view_name] = view;
     } else {

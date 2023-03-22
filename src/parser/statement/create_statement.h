@@ -26,7 +26,7 @@ public:
         return create_info_->type_;
     }
 
-    UniquePtr<ExtraDDLInfo> create_info_{};
+    SharedPtr<ExtraDDLInfo> create_info_{};
 
 };
 

@@ -7,6 +7,8 @@
 #include <utility>
 
 #include "planner/logical_node.h"
+#include "planner/bound_select_statement.h"
+#include "parser/statement/extra/create_view_info.h"
 
 namespace infinity {
 
@@ -14,28 +16,24 @@ class LogicalCreateView : public LogicalNode {
 public:
     static inline SharedPtr<LogicalCreateView>
     Make(u64 node_id,
-         const SharedPtr<String>& schema_name,
-         const SharedPtr<String>& view_name,
-         const Vector<SharedPtr<String>>& columns,
-         ConflictType conflict_type) {
+         const SharedPtr<Vector<String>>& names_ptr,
+         const SharedPtr<Vector<DataType>>& types_ptr,
+         const SharedPtr<CreateViewInfo>& create_view_info) {
         return MakeShared<LogicalCreateView>(node_id,
-                                             schema_name,
-                                             view_name,
-                                             columns,
-                                             conflict_type);
+                                             names_ptr,
+                                             types_ptr,
+                                             create_view_info);
     }
 
 public:
     LogicalCreateView(u64 node_id,
-                      SharedPtr<String> schema_name,
-                      SharedPtr<String> view_name,
-                      Vector<SharedPtr<String>> columns,
-                      ConflictType conflict_type)
+                      SharedPtr<Vector<String>> names_ptr,
+                      SharedPtr<Vector<DataType>> types_ptr,
+                      SharedPtr<CreateViewInfo> create_view_info)
             : LogicalNode(node_id, LogicalNodeType::kCreateView),
-              schema_name_(std::move(schema_name)),
-              view_name_(std::move(view_name)),
-              columns_(std::move(columns)),
-              conflict_type_(conflict_type)
+              names_ptr_(std::move(names_ptr)),
+              types_ptr_(std::move(types_ptr)),
+              create_view_info_(std::move(create_view_info))
     {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
@@ -51,21 +49,25 @@ public:
         return "LogicalCreateView";
     }
 
-    [[nodiscard]] inline SharedPtr<String>
-    view_name() const {
-        return view_name_;
+    [[nodiscard]] inline const SharedPtr<Vector<String>>&
+    names_ptr() const {
+        return names_ptr_;
+    };
+
+    [[nodiscard]] inline const SharedPtr<Vector<DataType>>&
+    types_ptr() const {
+        return types_ptr_;
     }
 
-    [[nodiscard]] inline SharedPtr<String>
-    schema_name() const {
-        return schema_name_;
+    [[nodiscard]] inline const SharedPtr<CreateViewInfo>&
+    create_view_info() const  {
+        return create_view_info_;
     }
 
 private:
-    SharedPtr<String> schema_name_{};
-    SharedPtr<String> view_name_{};
-    Vector<SharedPtr<String>> columns_{};
-    ConflictType conflict_type_{ConflictType::kInvalid};
+    SharedPtr<Vector<String>> names_ptr_{};
+    SharedPtr<Vector<DataType>> types_ptr_{};
+    SharedPtr<CreateViewInfo> create_view_info_{nullptr};
 };
 
 }

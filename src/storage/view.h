@@ -4,8 +4,13 @@
 
 #pragma once
 
+#include <utility>
+
 #include "common/types/internal_types.h"
 #include "parser/statement/select_statement.h"
+#include "common/types/data_type.h"
+#include "planner/bound_select_statement.h"
+#include "parser/statement/extra/create_view_info.h"
 
 // A view means a logical plan
 namespace infinity {
@@ -14,22 +19,39 @@ class LogicalNode;
 
 class View {
 public:
-    View(String view_name,
-         String sql_text,
-         SelectStatement* select_statement_,
-         Vector<String> column_names);
+    explicit
+    View(SharedPtr<CreateViewInfo> create_view_info,
+         SharedPtr<Vector<String>> column_names,
+         SharedPtr<Vector<DataType>> column_types)
+         : create_view_info_(std::move(create_view_info)),
+         column_names_(std::move(column_names)),
+         column_types_(std::move(column_types))
+         {}
 
-    [[nodiscard]] const String& name() const { return name_; }
-    [[nodiscard]] const String& sql_text() const { return sql_text_; }
-    const SelectStatement* GetSQLStatement() { return select_statement_; }
-    [[nodiscard]] const Vector<String>& column_names() const { return column_names_; }
+    [[nodiscard]] inline const String&
+    view_name() const {
+        return create_view_info_->view_name_;
+    }
+
+    const SelectStatement*
+    GetSQLStatement() {
+        return create_view_info_->select_;
+    }
+
+    [[nodiscard]] inline const SharedPtr<Vector<String>>&
+    column_names() const {
+        return column_names_;
+    };
+
+    inline const SharedPtr<Vector<DataType>>&
+    column_types() const {
+        return column_types_;
+    };
 
 private:
-    String name_;
-    String sql_text_;
-    SharedPtr<LogicalNode> logical_plan_;
-    SelectStatement* select_statement_;
-    Vector<String> column_names_;
+    SharedPtr<CreateViewInfo> create_view_info_{};
+    SharedPtr<Vector<String>> column_names_{};
+    SharedPtr<Vector<DataType>> column_types_{};
 };
 }
 

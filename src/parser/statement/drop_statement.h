@@ -25,7 +25,7 @@ public:
         return drop_info_->type_;
     }
 
-    UniquePtr<ExtraDDLInfo> drop_info_;
+    SharedPtr<ExtraDDLInfo> drop_info_;
 };
 
 }

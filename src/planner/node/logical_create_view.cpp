@@ -16,7 +16,8 @@ LogicalCreateView::ToString(i64& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Create View: " << *schema_name_ << "." << *view_name_;
+    ss << String(space, ' ') << arrow_str << "Create View: " << create_view_info_->schema_name_
+       << "." << create_view_info_->view_name_;
     space += arrow_str.size();
 
     return ss.str();

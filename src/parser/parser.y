@@ -409,27 +409,27 @@ explainable_statement : create_statement { $$ = $1; }
 /* CREATE SCHEMA schema_name; */
 create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     $$ = new CreateStatement();
-    UniquePtr<CreateSchemaInfo> create_schema_info = MakeUnique<CreateSchemaInfo>();
+    SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
 
     ParserHelper::ToLower($4);
     create_schema_info->schema_name_ = $4;
     free($4);
 
-    $$->create_info_ = std::move(create_schema_info);
+    $$->create_info_ = create_schema_info;
     $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 }
 
 /* CREATE COLLECTION collection_name; */
 | CREATE COLLECTION if_not_exists table_name {
     $$ = new CreateStatement();
-    UniquePtr<CreateCollectionInfo> create_collection_info = std::make_unique<CreateCollectionInfo>();
+    SharedPtr<CreateCollectionInfo> create_collection_info = MakeShared<CreateCollectionInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         create_collection_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
     }
     create_collection_info->collection_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
-    $$->create_info_ = std::move(create_collection_info);
+    $$->create_info_ = create_collection_info;
     $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
     delete $4;
 }
@@ -437,7 +437,7 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 /* CREATE TABLE table_name ( column list ); */
 | CREATE TABLE if_not_exists table_name '(' table_element_array ')' {
     $$ = new CreateStatement();
-    UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
+    SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         create_table_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -455,13 +455,13 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     }
     delete $6;
 
-    $$->create_info_ = std::move(create_table_info);
+    $$->create_info_ = create_table_info;
     $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 }
 /* CREATE TABLE table_name AS SELECT .... ; */
 | CREATE TABLE if_not_exists table_name AS select_statement {
     $$ = new CreateStatement();
-    UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
+    SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         create_table_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -472,12 +472,12 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 
     create_table_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
     create_table_info->select_ = $6;
-    $$->create_info_ = std::move(create_table_info);
+    $$->create_info_ = create_table_info;
 }
 /* CREATE VIEW table_name AS SELECT .... ; */
 | CREATE VIEW if_not_exists table_name optional_identifier_array AS select_statement {
     $$ = new CreateStatement();
-    UniquePtr<CreateViewInfo> create_view_info = MakeUnique<CreateViewInfo>();
+    SharedPtr<CreateViewInfo> create_view_info = MakeShared<CreateViewInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         create_view_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -489,12 +489,12 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     create_view_info->view_columns_ = $5;
     create_view_info->select_ = $7;
     create_view_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
-    $$->create_info_ = std::move(create_view_info);
+    $$->create_info_ = create_view_info;
 }
 /* CREATE INDEX index_name ON table_name (column1) ; */
 | CREATE INDEX if_not_exists IDENTIFIER ON table_name '(' identifier_array ')' {
     $$ = new CreateStatement();
-    UniquePtr<CreateIndexInfo> create_index_info = MakeUnique<CreateIndexInfo>();
+    SharedPtr<CreateIndexInfo> create_index_info = MakeShared<CreateIndexInfo>();
     if($6->schema_name_ptr_ != nullptr) {
         create_index_info->schema_name_ = $6->schema_name_ptr_;
         free($6->schema_name_ptr_);
@@ -509,7 +509,7 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 
     create_index_info->column_names_ = $8;
     create_index_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
-    $$->create_info_ = std::move(create_index_info);
+    $$->create_info_ = create_index_info;
 };
 
 table_element_array : table_element {
@@ -829,27 +829,27 @@ update_expr : IDENTIFIER '=' expr {
 /* DROP SCHEMA schema_name; */
 drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     $$ = new DropStatement();
-    UniquePtr<DropSchemaInfo> drop_schema_info = MakeUnique<DropSchemaInfo>();
+    SharedPtr<DropSchemaInfo> drop_schema_info = MakeShared<DropSchemaInfo>();
 
     ParserHelper::ToLower($4);
     drop_schema_info->schema_name_ = $4;
     free($4);
 
-    $$->drop_info_ = std::move(drop_schema_info);
+    $$->drop_info_ = drop_schema_info;
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 };
 
 /* DROP COLLECTION collection_name; */
 | DROP COLLECTION if_exists table_name {
     $$ = new DropStatement();
-    std::unique_ptr<DropCollectionInfo> drop_collection_info = std::make_unique<DropCollectionInfo>();
+    SharedPtr<DropCollectionInfo> drop_collection_info = std::make_unique<DropCollectionInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         drop_collection_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
     }
     drop_collection_info->collection_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
-    $$->drop_info_ = std::move(drop_collection_info);
+    $$->drop_info_ = drop_collection_info;
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
     delete $4;
 }
@@ -857,14 +857,14 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
 /* DROP TABLE table_name; */
 | DROP TABLE if_exists table_name {
     $$ = new DropStatement();
-    std::unique_ptr<DropTableInfo> drop_table_info = std::make_unique<DropTableInfo>();
+    SharedPtr<DropTableInfo> drop_table_info = std::make_unique<DropTableInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         drop_table_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
     }
     drop_table_info->table_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
-    $$->drop_info_ = std::move(drop_table_info);
+    $$->drop_info_ = drop_table_info;
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
     delete $4;
 }
@@ -872,14 +872,14 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
 /* DROP VIEW view_name; */
 | DROP VIEW if_exists table_name {
     $$ = new DropStatement();
-    std::unique_ptr<DropViewInfo> drop_view_info = std::make_unique<DropViewInfo>();
+    SharedPtr<DropViewInfo> drop_view_info = std::make_unique<DropViewInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         drop_view_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
     }
     drop_view_info->view_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
-    $$->drop_info_ = std::move(drop_view_info);
+    $$->drop_info_ = drop_view_info;
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
     delete $4;
 }
@@ -887,7 +887,7 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
 /* DROP INDEX index_name; */
 | DROP INDEX if_exists table_name {
     $$ = new DropStatement();
-    UniquePtr<DropIndexInfo> drop_index_info = MakeUnique<DropIndexInfo>();
+    SharedPtr<DropIndexInfo> drop_index_info = MakeShared<DropIndexInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         drop_index_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -896,7 +896,7 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     free($4->table_name_ptr_);
     delete $4;
 
-    $$->drop_info_ = std::move(drop_index_info);
+    $$->drop_info_ = drop_index_info;
     $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
 };
 

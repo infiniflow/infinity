@@ -43,6 +43,10 @@ Catalog::GetTableByName(String schema_name, String table_name) {
     StringToLower(schema_name);
     StringToLower(table_name);
 
+    if(schema_name.empty()) {
+        schema_name = "default";
+    }
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found: " + schema_name);
     }
@@ -52,6 +56,10 @@ Catalog::GetTableByName(String schema_name, String table_name) {
 void
 Catalog::CreateTable(String schema_name, const SharedPtr<Table> &table_def) {
     StringToLower(schema_name);
+
+    if(schema_name.empty()) {
+        schema_name = "default";
+    }
 
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, table can't be created: " + schema_name);
@@ -64,6 +72,10 @@ Catalog::DeleteTable(String schema_name, String table_name) {
     StringToLower(schema_name);
     StringToLower(table_name);
 
+    if(schema_name.empty()) {
+        schema_name = "default";
+    }
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, table can't be deleted: " + schema_name);
     }
@@ -71,8 +83,12 @@ Catalog::DeleteTable(String schema_name, String table_name) {
 }
 
 void
-Catalog::AddCollection(String schema_name, String collection_name) {
+Catalog::CreateCollection(String schema_name, String collection_name) {
     StringToLower(schema_name);
+
+    if(schema_name.empty()) {
+        schema_name = "default";
+    }
 
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, table can't be created: " + schema_name);
@@ -87,6 +103,10 @@ void
 Catalog::DeleteCollection(String schema_name, String collection_name) {
     StringToLower(schema_name);
     StringToLower(collection_name);
+
+    if(schema_name.empty()) {
+        schema_name = "default";
+    }
 
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, collection can't be deleted: " + schema_name);
@@ -115,6 +135,10 @@ Catalog::GetViewByName(String schema_name, String view_name) {
     StringToLower(schema_name);
     StringToLower(view_name);
 
+    if(schema_name.empty()) {
+        schema_name = "default";
+    }
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found: " + schema_name);
     }
@@ -122,8 +146,12 @@ Catalog::GetViewByName(String schema_name, String view_name) {
 }
 
 void
-Catalog::AddView(String schema_name, const SharedPtr<View>& view) {
+Catalog::CreateView(String schema_name, const SharedPtr<View>& view) {
     StringToLower(schema_name);
+    if(schema_name.empty()) {
+        schema_name = "default";
+    }
+
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, view can't be created: " + schema_name);
     }

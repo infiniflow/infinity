@@ -334,25 +334,32 @@ LogicalPlanner::BuildCreateSchema(const CreateStatement* statement, SharedPtr<Bi
 
 void
 LogicalPlanner::BuildCreateView(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    auto* create_view_info = (CreateViewInfo*)statement->create_info_.get();
-    SharedPtr<String> schema_name_ptr = MakeShared<String>(create_view_info->schema_name_);
-    SharedPtr<String> view_name_ptr = MakeShared<String>(create_view_info->view_name_);
+    SharedPtr<CreateViewInfo> create_view_info = std::static_pointer_cast<CreateViewInfo>(statement->create_info_);
 
     // Check if columns is given.
-    Vector<SharedPtr<String>> columns;
+    SharedPtr<Vector<String>> columns_ptr;
     SizeT column_count = create_view_info->view_columns_->size();
-    columns.reserve(column_count);
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
-        SharedPtr<String> column_name = MakeShared<String>((*(create_view_info->view_columns_))[idx]);
-        columns.emplace_back(column_name);
+
+    // Build create view statement
+    SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_,
+                                                                      bind_context_ptr);
+    SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*create_view_info->select_);
+
+    if(column_count == 0) {
+        // Not specify the view column
+        columns_ptr = bound_statement_ptr->names_ptr_;
+    } else {
+        // Specify the view column
+        PlannerAssert(column_count == bound_statement_ptr->names_ptr_->size(),
+                      "Create view column count isn't matched.")
+        columns_ptr = MakeShared<Vector<String>>(*(create_view_info->view_columns_));
     }
 
     SharedPtr<LogicalNode> logical_create_view_operator
             = LogicalCreateView::Make(bind_context_ptr->GetNewLogicalNodeId(),
-                                            schema_name_ptr,
-                                            view_name_ptr,
-                                            columns,
-                                            create_view_info->conflict_type_);
+                                      columns_ptr,
+                                      bound_statement_ptr->types_ptr_,
+                                      create_view_info);
 
     this->logical_plan_ = logical_create_view_operator;
     this->names_ptr_->emplace_back(String("OK"));

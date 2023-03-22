@@ -26,7 +26,7 @@ public:
     virtual
     ~LogicalNode() = default;
 
-    virtual Vector<ColumnBinding>
+    [[nodiscard]] virtual Vector<ColumnBinding>
     GetColumnBindings() const = 0;
 
     [[nodiscard]] inline SharedPtr<LogicalNode>&

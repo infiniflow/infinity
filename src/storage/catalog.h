@@ -30,7 +30,7 @@ public:
     DeleteTable(String schema_name, String table_name);
 
     void
-    AddCollection(String schema_name, String collection_name);
+    CreateCollection(String schema_name, String collection_name);
 
     void
     DeleteCollection(String schema_name, String collection_name);
@@ -43,7 +43,7 @@ public:
     GetViewByName(String schema_name, String view_name);
 
     void
-    AddView(String schema_name, const SharedPtr<View>& view);
+    CreateView(String schema_name, const SharedPtr<View>& view);
 
     void
     DeleteView(String schema_name, String view_name);

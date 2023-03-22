@@ -2749,13 +2749,13 @@ yyreduce:
 #line 410 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                           {
     (yyval.create_stmt) = new CreateStatement();
-    UniquePtr<CreateSchemaInfo> create_schema_info = MakeUnique<CreateSchemaInfo>();
+    SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
 
     ParserHelper::ToLower((yyvsp[0].str_value));
     create_schema_info->schema_name_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 
-    (yyval.create_stmt)->create_info_ = std::move(create_schema_info);
+    (yyval.create_stmt)->create_info_ = create_schema_info;
     (yyval.create_stmt)->create_info_->conflict_type_ = (yyvsp[-1].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
 }
 #line 2762 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
@@ -2765,14 +2765,14 @@ yyreduce:
 #line 423 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                              {
     (yyval.create_stmt) = new CreateStatement();
-    UniquePtr<CreateCollectionInfo> create_collection_info = std::make_unique<CreateCollectionInfo>();
+    SharedPtr<CreateCollectionInfo> create_collection_info = MakeShared<CreateCollectionInfo>();
     if((yyvsp[0].table_name_t)->schema_name_ptr_ != nullptr) {
         create_collection_info->schema_name_ = (yyvsp[0].table_name_t)->schema_name_ptr_;
         free((yyvsp[0].table_name_t)->schema_name_ptr_);
     }
     create_collection_info->collection_name_ = (yyvsp[0].table_name_t)->table_name_ptr_;
     free((yyvsp[0].table_name_t)->table_name_ptr_);
-    (yyval.create_stmt)->create_info_ = std::move(create_collection_info);
+    (yyval.create_stmt)->create_info_ = create_collection_info;
     (yyval.create_stmt)->create_info_->conflict_type_ = (yyvsp[-1].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
     delete (yyvsp[0].table_name_t);
 }
@@ -2783,7 +2783,7 @@ yyreduce:
 #line 438 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                     {
     (yyval.create_stmt) = new CreateStatement();
-    UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
+    SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
     if((yyvsp[-3].table_name_t)->schema_name_ptr_ != nullptr) {
         create_table_info->schema_name_ = (yyvsp[-3].table_name_t)->schema_name_ptr_;
         free((yyvsp[-3].table_name_t)->schema_name_ptr_);
@@ -2801,7 +2801,7 @@ yyreduce:
     }
     delete (yyvsp[-1].table_element_array_t);
 
-    (yyval.create_stmt)->create_info_ = std::move(create_table_info);
+    (yyval.create_stmt)->create_info_ = create_table_info;
     (yyval.create_stmt)->create_info_->conflict_type_ = (yyvsp[-4].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
 }
 #line 2808 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
@@ -2811,7 +2811,7 @@ yyreduce:
 #line 462 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                             {
     (yyval.create_stmt) = new CreateStatement();
-    UniquePtr<CreateTableInfo> create_table_info = MakeUnique<CreateTableInfo>();
+    SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
     if((yyvsp[-2].table_name_t)->schema_name_ptr_ != nullptr) {
         create_table_info->schema_name_ = (yyvsp[-2].table_name_t)->schema_name_ptr_;
         free((yyvsp[-2].table_name_t)->schema_name_ptr_);
@@ -2822,7 +2822,7 @@ yyreduce:
 
     create_table_info->conflict_type_ = (yyvsp[-3].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
     create_table_info->select_ = (yyvsp[0].select_stmt);
-    (yyval.create_stmt)->create_info_ = std::move(create_table_info);
+    (yyval.create_stmt)->create_info_ = create_table_info;
 }
 #line 2828 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
@@ -2831,7 +2831,7 @@ yyreduce:
 #line 478 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                                      {
     (yyval.create_stmt) = new CreateStatement();
-    UniquePtr<CreateViewInfo> create_view_info = MakeUnique<CreateViewInfo>();
+    SharedPtr<CreateViewInfo> create_view_info = MakeShared<CreateViewInfo>();
     if((yyvsp[-3].table_name_t)->schema_name_ptr_ != nullptr) {
         create_view_info->schema_name_ = (yyvsp[-3].table_name_t)->schema_name_ptr_;
         free((yyvsp[-3].table_name_t)->schema_name_ptr_);
@@ -2843,7 +2843,7 @@ yyreduce:
     create_view_info->view_columns_ = (yyvsp[-2].identifier_array_t);
     create_view_info->select_ = (yyvsp[0].select_stmt);
     create_view_info->conflict_type_ = (yyvsp[-4].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
-    (yyval.create_stmt)->create_info_ = std::move(create_view_info);
+    (yyval.create_stmt)->create_info_ = create_view_info;
 }
 #line 2849 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
@@ -2852,7 +2852,7 @@ yyreduce:
 #line 495 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                                                {
     (yyval.create_stmt) = new CreateStatement();
-    UniquePtr<CreateIndexInfo> create_index_info = MakeUnique<CreateIndexInfo>();
+    SharedPtr<CreateIndexInfo> create_index_info = MakeShared<CreateIndexInfo>();
     if((yyvsp[-3].table_name_t)->schema_name_ptr_ != nullptr) {
         create_index_info->schema_name_ = (yyvsp[-3].table_name_t)->schema_name_ptr_;
         free((yyvsp[-3].table_name_t)->schema_name_ptr_);
@@ -2867,7 +2867,7 @@ yyreduce:
 
     create_index_info->column_names_ = (yyvsp[-1].identifier_array_t);
     create_index_info->conflict_type_ = (yyvsp[-6].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
-    (yyval.create_stmt)->create_info_ = std::move(create_index_info);
+    (yyval.create_stmt)->create_info_ = create_index_info;
 }
 #line 2873 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
     break;
@@ -3510,13 +3510,13 @@ yyreduce:
 #line 830 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                                  {
     (yyval.drop_stmt) = new DropStatement();
-    UniquePtr<DropSchemaInfo> drop_schema_info = MakeUnique<DropSchemaInfo>();
+    SharedPtr<DropSchemaInfo> drop_schema_info = MakeShared<DropSchemaInfo>();
 
     ParserHelper::ToLower((yyvsp[0].str_value));
     drop_schema_info->schema_name_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 
-    (yyval.drop_stmt)->drop_info_ = std::move(drop_schema_info);
+    (yyval.drop_stmt)->drop_info_ = drop_schema_info;
     (yyval.drop_stmt)->drop_info_->conflict_type_ = (yyvsp[-1].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
 }
 #line 3523 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"
@@ -3526,14 +3526,14 @@ yyreduce:
 #line 843 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                        {
     (yyval.drop_stmt) = new DropStatement();
-    std::unique_ptr<DropCollectionInfo> drop_collection_info = std::make_unique<DropCollectionInfo>();
+    SharedPtr<DropCollectionInfo> drop_collection_info = std::make_unique<DropCollectionInfo>();
     if((yyvsp[0].table_name_t)->schema_name_ptr_ != nullptr) {
         drop_collection_info->schema_name_ = (yyvsp[0].table_name_t)->schema_name_ptr_;
         free((yyvsp[0].table_name_t)->schema_name_ptr_);
     }
     drop_collection_info->collection_name_ = (yyvsp[0].table_name_t)->table_name_ptr_;
     free((yyvsp[0].table_name_t)->table_name_ptr_);
-    (yyval.drop_stmt)->drop_info_ = std::move(drop_collection_info);
+    (yyval.drop_stmt)->drop_info_ = drop_collection_info;
     (yyval.drop_stmt)->drop_info_->conflict_type_ = (yyvsp[-1].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
     delete (yyvsp[0].table_name_t);
 }
@@ -3544,14 +3544,14 @@ yyreduce:
 #line 858 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                   {
     (yyval.drop_stmt) = new DropStatement();
-    std::unique_ptr<DropTableInfo> drop_table_info = std::make_unique<DropTableInfo>();
+    SharedPtr<DropTableInfo> drop_table_info = std::make_unique<DropTableInfo>();
     if((yyvsp[0].table_name_t)->schema_name_ptr_ != nullptr) {
         drop_table_info->schema_name_ = (yyvsp[0].table_name_t)->schema_name_ptr_;
         free((yyvsp[0].table_name_t)->schema_name_ptr_);
     }
     drop_table_info->table_name_ = (yyvsp[0].table_name_t)->table_name_ptr_;
     free((yyvsp[0].table_name_t)->table_name_ptr_);
-    (yyval.drop_stmt)->drop_info_ = std::move(drop_table_info);
+    (yyval.drop_stmt)->drop_info_ = drop_table_info;
     (yyval.drop_stmt)->drop_info_->conflict_type_ = (yyvsp[-1].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
     delete (yyvsp[0].table_name_t);
 }
@@ -3562,14 +3562,14 @@ yyreduce:
 #line 873 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                  {
     (yyval.drop_stmt) = new DropStatement();
-    std::unique_ptr<DropViewInfo> drop_view_info = std::make_unique<DropViewInfo>();
+    SharedPtr<DropViewInfo> drop_view_info = std::make_unique<DropViewInfo>();
     if((yyvsp[0].table_name_t)->schema_name_ptr_ != nullptr) {
         drop_view_info->schema_name_ = (yyvsp[0].table_name_t)->schema_name_ptr_;
         free((yyvsp[0].table_name_t)->schema_name_ptr_);
     }
     drop_view_info->view_name_ = (yyvsp[0].table_name_t)->table_name_ptr_;
     free((yyvsp[0].table_name_t)->table_name_ptr_);
-    (yyval.drop_stmt)->drop_info_ = std::move(drop_view_info);
+    (yyval.drop_stmt)->drop_info_ = drop_view_info;
     (yyval.drop_stmt)->drop_info_->conflict_type_ = (yyvsp[-1].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
     delete (yyvsp[0].table_name_t);
 }
@@ -3580,7 +3580,7 @@ yyreduce:
 #line 888 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
                                   {
     (yyval.drop_stmt) = new DropStatement();
-    UniquePtr<DropIndexInfo> drop_index_info = MakeUnique<DropIndexInfo>();
+    SharedPtr<DropIndexInfo> drop_index_info = MakeShared<DropIndexInfo>();
     if((yyvsp[0].table_name_t)->schema_name_ptr_ != nullptr) {
         drop_index_info->schema_name_ = (yyvsp[0].table_name_t)->schema_name_ptr_;
         free((yyvsp[0].table_name_t)->schema_name_ptr_);
@@ -3589,7 +3589,7 @@ yyreduce:
     free((yyvsp[0].table_name_t)->table_name_ptr_);
     delete (yyvsp[0].table_name_t);
 
-    (yyval.drop_stmt)->drop_info_ = std::move(drop_index_info);
+    (yyval.drop_stmt)->drop_info_ = drop_index_info;
     (yyval.drop_stmt)->drop_info_->conflict_type_ = (yyvsp[-1].bool_value) ? ConflictType::kIgnore : ConflictType::kError;
 }
 #line 3596 "/home/jinhai/Documents/development/infinity/src/parser/parser.cpp"

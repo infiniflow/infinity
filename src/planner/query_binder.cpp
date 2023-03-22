@@ -386,23 +386,17 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
 SharedPtr<TableRef>
 QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
                        const TableReference* from_table) {
-    String schema_name;
-    if(from_table->schema_name_.empty()) {
-        schema_name = "Default";
-    } else {
-        schema_name = from_table->schema_name_;
-    }
-
-    String view_name = from_table->table_name_;
-    SharedPtr<View> view_ptr = Infinity::instance().catalog()->GetViewByName(schema_name, view_name);
+    SharedPtr<View> view_ptr = Infinity::instance().catalog()->GetViewByName(from_table->schema_name_,
+                                                                             from_table->table_name_);
     if(view_ptr == nullptr) {
         // Not found in catalog
         return nullptr;
     }
 
     // Build view scan operator
-    PlannerAssert(!(this->bind_context_ptr_->IsViewBound(view_name)), "View: " + view_name + " is bound before!");
-    this->bind_context_ptr_->BoundView(view_name);
+    PlannerAssert(!(this->bind_context_ptr_->IsViewBound(from_table->table_name_)),
+                  "View: " + from_table->table_name_ + " is bound before!");
+    this->bind_context_ptr_->BoundView(from_table->table_name_);
 
     const SelectStatement* select_stmt_ptr = view_ptr->GetSQLStatement();
 
@@ -417,7 +411,7 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
 
     u64 view_index = this->bind_context_ptr_->GenerateTableIndex();
     // Add binding into bind context
-    this->bind_context_ptr_->AddViewBinding(view_name,
+    this->bind_context_ptr_->AddViewBinding(from_table->table_name_,
                                             view_index,
                                             *bound_statement_ptr->types_ptr_,
                                             *bound_statement_ptr->names_ptr_);
@@ -425,7 +419,7 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
     // Use view name as the subquery table reference name
     auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr,
                                                                bind_context_ptr_->GenerateTableIndex(),
-                                                               view_name);
+                                                               from_table->table_name_);
 
     // TODO: Not care about the correlated expression
 
