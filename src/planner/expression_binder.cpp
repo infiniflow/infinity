@@ -267,6 +267,7 @@ ExpressionBinder::BuildCaseExpr(const CaseExpr& expr,
     // two kinds of case statement, please check:
     // https://docs.oracle.com/en/database/oracle/oracle-database/21/lnpls/CASE-statement.html
 
+    DataType return_type{kInvalid};
     if(expr.expr_) {
         // Simple case
         SharedPtr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr_, bind_context_ptr, depth, false);
@@ -298,6 +299,7 @@ ExpressionBinder::BuildCaseExpr(const CaseExpr& expr,
                                                                       depth,
                                                                       false);
             case_expression_ptr->AddCaseCheck(when_expr_ptr, then_expr_ptr);
+            return_type.MaxDataType(then_expr_ptr->Type());
         }
     } else {
         // Searched case
@@ -316,17 +318,20 @@ ExpressionBinder::BuildCaseExpr(const CaseExpr& expr,
                                                                       depth,
                                                                       false);
             case_expression_ptr->AddCaseCheck(when_expr_ptr, then_expr_ptr);
+            return_type.MaxDataType(then_expr_ptr->Type());
         }
     }
     // Construct else expression
     SharedPtr<BaseExpression> else_expr_ptr;
     if (expr.else_expr_ != nullptr) {
         else_expr_ptr = BuildExpression(*expr.else_expr_, bind_context_ptr, depth, false);
+        return_type.MaxDataType(else_expr_ptr->Type());
     } else {
         else_expr_ptr = MakeShared<ValueExpression>(Value::MakeNull());
     }
     case_expression_ptr->AddElseExpr(else_expr_ptr);
 
+    case_expression_ptr->SetReturnType(return_type);
     return case_expression_ptr;
 }
 

@@ -18,9 +18,9 @@ static const char* type2name[] = {
     "Integer",
     "BigInt",
     "HugeInt",
+    "Decimal",
     "Float",
     "Double",
-    "Decimal",
 
     // String
     "Varchar",
@@ -72,12 +72,12 @@ static i64 type_size[] = {
     8, // BigInt
     16, // HugeInt
 
+    // Decimal * 1
+    16, // Decimal
+
     // Float * 2
     4, // Float
     8, // Double
-
-    // Decimal * 1
-    16, // Decimal
 
     // Varchar * 1
     16, // Varchar
@@ -158,9 +158,53 @@ DataType::Size() const {
     return type_size[type_];
 }
 
-int64_t
+i64
 DataType::CastRule(const DataType &from, const DataType &to) {
     return CastTable::instance().GetCastCost(from.type_, to.type_);
+}
+
+void
+DataType::MaxDataType(const DataType& right) {
+    if(*this == right) {
+        return ;
+    }
+
+    if(this->type_ == LogicalType::kInvalid) {
+        *this = right;
+        return ;
+    }
+
+    if(right.type_ == LogicalType::kInvalid) {
+        return ;
+    }
+
+    if(this->IsNumeric() && right.IsNumeric()) {
+        if(this->type_ > right.type_) {
+            return ;
+        } else {
+            *this = right;
+            return ;
+        }
+    }
+
+    if(this->type_ == LogicalType::kVarchar) {
+        return ;
+    }
+    if(right.type_ == LogicalType::kVarchar) {
+        *this = right;
+        return ;
+    }
+
+    if(this->type_ == LogicalType::kDateTime and right.type_ == LogicalType::kTimestamp) {
+        *this = right;
+        return ;
+    }
+
+    if(this->type_ == LogicalType::kTimestamp and right.type_ == LogicalType::kDateTime) {
+        return ;
+    }
+
+    NotImplementError(fmt::format("Max type of left: {} and right: {}", this->ToString(), right.ToString()));
 }
 
 template <> String DataType::TypeToString<BooleanT>() { return "Boolean"; }

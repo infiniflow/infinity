@@ -38,10 +38,7 @@ CaseExpression::ToString() const {
 
 DataType
 CaseExpression::Type() const {
-    // Fixme: this type need to refactor:
-    // Check each then expr and else expr to get the largest type to return.
-
-    return DataType(LogicalType::kBoolean);
+    return return_type_;
 }
 
 }

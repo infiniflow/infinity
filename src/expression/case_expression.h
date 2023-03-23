@@ -44,9 +44,15 @@ public:
         return else_expr_;
     }
 
+    inline void
+    SetReturnType(DataType type) {
+        return_type_ = type;
+    }
+
 private:
     Vector<CaseCheck> case_check_;
     SharedPtr<BaseExpression> else_expr_;
+    DataType return_type_{LogicalType::kInvalid};
 };
 
 }

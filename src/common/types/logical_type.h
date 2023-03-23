@@ -43,12 +43,12 @@ enum LogicalType: i8 {
     kBigInt,
     kHugeInt,
 
+    // Decimal * 1
+    kDecimal,
+
     // Float * 2
     kFloat,
     kDouble,
-
-    // Decimal * 1
-    kDecimal,
 
     // Varchar * 1
     kVarchar,

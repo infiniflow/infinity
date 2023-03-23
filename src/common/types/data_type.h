@@ -76,8 +76,7 @@ public:
     DataType(LogicalType logical_type): type_(logical_type), type_info_(nullptr) {
     }
 
-    ~DataType() {
-    }
+    ~DataType() = default;
 
     DataType(const DataType& other): type_(other.type_), type_info_(other.type_info_) {
     }
@@ -126,6 +125,25 @@ public:
         type_info_.reset();
     }
 
+    inline bool
+    IsNumeric() const {
+        switch(type_) {
+            case kTinyInt:
+            case kSmallInt:
+            case kInteger:
+            case kBigInt:
+            case kHugeInt:
+            case kFloat:
+            case kDouble:
+            case kDecimal: {
+                return true;
+            }
+            default: {
+                return false;
+            }
+        }
+    }
+
 private:
 
     LogicalType type_{LogicalType::kInvalid};
@@ -139,6 +157,9 @@ public:
     template<typename T>
     static String
     TypeToString();
+
+    void
+    MaxDataType(const DataType& right);
 };
 
 template<typename T>
