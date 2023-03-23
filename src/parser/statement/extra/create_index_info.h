@@ -19,7 +19,7 @@ public:
     ToString() const final;
 
     String index_name_{};
-    String schema_name_{"Default"};
+    String schema_name_{"default"};
     String table_name_{};
 
     Vector<String>* column_names_{nullptr};

@@ -406,7 +406,7 @@ LogicalPlanner::BuildDropTable(const DropStatement* statement, SharedPtr<BindCon
 
     SharedPtr<String> schema_name_ptr{nullptr};
     if(drop_table_info->schema_name_.empty()) {
-        schema_name_ptr = MakeShared<String>("Default");
+        schema_name_ptr = MakeShared<String>("default");
     } else{
         schema_name_ptr = MakeShared<String>(drop_table_info->schema_name_);
     }
@@ -429,7 +429,7 @@ LogicalPlanner::BuildDropCollection(const DropStatement* statement, SharedPtr<Bi
 
     SharedPtr<String> schema_name_ptr{nullptr};
     if(drop_collection_info->schema_name_.empty()) {
-        schema_name_ptr = MakeShared<String>("Default");
+        schema_name_ptr = MakeShared<String>("default");
     } else{
         schema_name_ptr = MakeShared<String>(drop_collection_info->schema_name_);
     }
@@ -471,7 +471,8 @@ LogicalPlanner::BuildDropIndex(const DropStatement* statement, SharedPtr<BindCon
     SharedPtr<LogicalNode> logical_drop_index
             = MakeShared<LogicalDropIndex>(bind_context_ptr->GetNewLogicalNodeId(),
                                            schema_name_ptr,
-                                           index_name_ptr);
+                                           index_name_ptr,
+                                           drop_index_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_index;
     this->names_ptr_->emplace_back(String("OK"));
@@ -556,8 +557,12 @@ LogicalPlanner::BuildAlter(const AlterStatement* statement, SharedPtr<BindContex
 void
 LogicalPlanner::BuildShow(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     switch(statement->show_type_) {
-        case ShowStmtType::kTables : {
+        case ShowStmtType::kTables :
+        case ShowStmtType::kCollections: {
             return BuildShowTables(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kViews : {
+            return BuildShowViews(statement, bind_context_ptr);
         }
         case ShowStmtType::kColumns : {
             return BuildShowColumns(statement, bind_context_ptr);
@@ -577,23 +582,34 @@ LogicalPlanner::BuildShowTables(const ShowStatement* statement, SharedPtr<BindCo
     SharedPtr<LogicalNode> logical_chunk_scan =
             MakeShared<LogicalChunkScan>(bind_context_ptr->GetNewLogicalNodeId(),
                                          ChunkScanType::kShowTables,
+                                         query_context_ptr_->schema_name(),
                                          bind_context_ptr->GenerateTableIndex());
 
     // FIXME: check if we need to append operator
 //    this->AppendOperator(logical_chunk_scan, bind_context_ptr);
     this->logical_plan_ = logical_chunk_scan;
 
-    this->names_ptr_->emplace_back(String("table_name"));
-    this->names_ptr_->emplace_back(String("column_count"));
-    this->names_ptr_->emplace_back(String("row_count"));
-    this->names_ptr_->emplace_back(String("block_count"));
-    this->names_ptr_->emplace_back(String("block_size"));
+//    this->names_ptr_->emplace_back(String("table_name"));
+//    this->names_ptr_->emplace_back(String("column_count"));
+//    this->names_ptr_->emplace_back(String("row_count"));
+//    this->names_ptr_->emplace_back(String("block_count"));
+//    this->names_ptr_->emplace_back(String("block_size"));
+//
+//    this->types_ptr_->emplace_back(DataType(LogicalType::kVarchar));
+//    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
+//    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
+//    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
+//    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
+}
 
-    this->types_ptr_->emplace_back(DataType(LogicalType::kVarchar));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
+void
+LogicalPlanner::BuildShowViews(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_chunk_scan =
+            MakeShared<LogicalChunkScan>(bind_context_ptr->GetNewLogicalNodeId(),
+                                         ChunkScanType::kShowViews,
+                                         query_context_ptr_->schema_name(),
+                                         bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_chunk_scan;
 }
 
 void

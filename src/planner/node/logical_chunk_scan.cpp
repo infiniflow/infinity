@@ -12,6 +12,8 @@ ToString(ChunkScanType type) {
     switch(type) {
         case ChunkScanType::kShowTables:
             return "Show tables";
+        case ChunkScanType::kShowViews:
+            return "Show views";
         case ChunkScanType::kShowColumn:
             return "Show column";
         default: {

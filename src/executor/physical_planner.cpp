@@ -55,6 +55,7 @@
 #include "planner/node/logical_join.h"
 #include "explain_physical_plan.h"
 #include "planner/node/logical_create_view.h"
+#include "planner/node/logical_drop_view.h"
 
 #include <limits>
 
@@ -281,7 +282,12 @@ PhysicalPlanner::BuildDropSchema(const SharedPtr<LogicalNode> &logical_operator)
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildDropView(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalDropView>(logical_operator->node_id());
+    SharedPtr<LogicalDropView> logical_drop_view =
+            std::static_pointer_cast<LogicalDropView>(logical_operator);
+    return MakeShared<PhysicalDropView>(logical_drop_view->schema_name(),
+                                        logical_drop_view->view_name(),
+                                        logical_drop_view->conflict_type(),
+                                        logical_drop_view->node_id());
 }
 
 SharedPtr<PhysicalOperator>
@@ -471,6 +477,7 @@ PhysicalPlanner::BuildChunkScan(const SharedPtr<LogicalNode> &logical_operator) 
             std::static_pointer_cast<LogicalChunkScan>(logical_operator);
     return MakeShared<PhysicalChunkScan>(logical_chunk_scan->node_id(),
                                          logical_chunk_scan->scan_type(),
+                                         logical_chunk_scan->schema_name(),
                                          logical_chunk_scan->table_index());
 }
 

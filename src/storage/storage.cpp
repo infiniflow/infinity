@@ -18,7 +18,7 @@ void
 Storage::Init() {
 
     // Update schema need to begin transaction
-    SharedPtr<String> schema_name = MakeShared<String>("Default");
+    SharedPtr<String> schema_name = MakeShared<String>("default");
     SharedPtr<SchemaDefinition> schema_def_ptr = MakeShared<SchemaDefinition>(schema_name, ConflictType::kError);
     catalog_->CreateSchema(schema_def_ptr);
     // Commit transaction

@@ -168,6 +168,22 @@ Catalog::DeleteView(String schema_name, String view_name) {
     schemas_[schema_name]->DeleteView(view_name);
 }
 
+Vector<SharedPtr<View>>
+Catalog::GetViews(String schema_name) {
+    StringToLower(schema_name);
+
+    if(schemas_.find(schema_name) == schemas_.end()) {
+        CatalogError("No schema: " + schema_name);
+    }
+
+    Vector<SharedPtr<View>> output;
+    for(auto& elem: schemas_[schema_name]->views()) {
+        output.emplace_back(elem.second);
+    }
+
+    return output;
+}
+
 SharedPtr<FunctionSet>
 Catalog::GetFunctionSetByName(String function_name) {
     // Transfer the function to upper case.

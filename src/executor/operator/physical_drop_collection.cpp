@@ -15,7 +15,16 @@ PhysicalDropCollection::Init() {
 
 void
 PhysicalDropCollection::Execute(SharedPtr<QueryContext>& query_context) {
-    NotImplementError("Physical drop collection execution")
+    Infinity::instance().catalog()->DeleteTable(*schema_name_, *collection_name_);
+
+    // Generate the result
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+            MakeShared<ColumnDef>(0, DataType(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+    };
+
+    SharedPtr<TableDef> result_table_def_ptr
+            = MakeShared<TableDef>("Tables", column_defs);
+    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 
 }

@@ -134,6 +134,9 @@ public:
     BuildShowTables(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
+    BuildShowViews(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
+
+    void
     BuildExplain(const ExplainStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     [[nodiscard]] SharedPtr<LogicalNode>

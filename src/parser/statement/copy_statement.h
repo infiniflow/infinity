@@ -32,7 +32,7 @@ public:
     bool copy_from_{false};
     String file_path_{};
     String table_name_{};
-    String schema_name_{"Default"};
+    String schema_name_{"default"};
     bool header_{false};
     CopyFileType copy_file_type_{CopyFileType::kCSV};
     char delimiter_{','};

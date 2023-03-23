@@ -14,7 +14,7 @@ public:
     [[nodiscard]] String
     ToString() const final;
 
-    String schema_name_{"Default"};
+    String schema_name_{"default"};
     String index_name_{};
 };
 

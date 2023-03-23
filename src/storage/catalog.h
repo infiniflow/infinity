@@ -48,6 +48,9 @@ public:
     void
     DeleteView(String schema_name, String view_name);
 
+    Vector<SharedPtr<View>>
+    GetViews(String schema_name);
+
     // Function related methods
     SharedPtr<FunctionSet>
     GetFunctionSetByName(String function_name);

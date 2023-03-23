@@ -337,7 +337,7 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
                             const TableReference* from_table) {
     String schema_name;
     if(from_table->schema_name_.empty()) {
-        schema_name = "Default";
+        schema_name = "default";
     } else {
         schema_name = from_table->schema_name_;
     }

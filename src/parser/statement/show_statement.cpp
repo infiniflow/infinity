@@ -14,6 +14,14 @@ ShowStatement::ToString() const {
             ss << "Show tables, schema: " << schema_name_;
             break;
         }
+        case ShowStmtType::kCollections: {
+            ss << "Show collections, schema: " << schema_name_;
+            break;
+        }
+        case ShowStmtType::kViews: {
+            ss << "Show views, schema: " << schema_name_;
+            break;
+        }
         case ShowStmtType::kColumns: {
             ss << "Describe table: " << schema_name_ << "." << table_name_;
             break;

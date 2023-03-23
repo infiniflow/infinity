@@ -46,6 +46,11 @@ public:
         return tables_;
     }
 
+    inline HashMap<String, SharedPtr<View>>&
+    views() {
+        return views_;
+    }
+
 private:
     HashMap<String, SharedPtr<BaseTable>> tables_;
     HashMap<String, SharedPtr<View>> views_;

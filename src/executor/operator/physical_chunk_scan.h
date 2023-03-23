@@ -13,9 +13,13 @@ namespace infinity {
 
 class PhysicalChunkScan : public PhysicalOperator {
 public:
-    explicit PhysicalChunkScan(u64 id, ChunkScanType type, u64 table_index)
+    explicit PhysicalChunkScan(u64 id,
+                               ChunkScanType type,
+                               String schema_name,
+                               u64 table_index)
             : PhysicalOperator(PhysicalOperatorType::kChunkScan, nullptr, nullptr,id),
             scan_type_(type),
+            schema_name_(std::move(schema_name)),
             table_index_(table_index)
             {}
 
@@ -31,9 +35,19 @@ public:
     scan_type() const {
         return scan_type_;
     }
+private:
+    void
+    ExecuteShowTable(SharedPtr<QueryContext>& query_context);
+
+    void
+    ExecuteShowViews(SharedPtr<QueryContext>& query_context);
+
+    void
+    ExecuteShowColumns(SharedPtr<QueryContext>& query_context);
 
 private:
     ChunkScanType scan_type_{ChunkScanType::kInvalid};
+    String schema_name_{};
     u64 table_index_{};
 };
 

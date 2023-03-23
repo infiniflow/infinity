@@ -106,7 +106,7 @@ TEST_F(SQLParserTest, good_test2) {
             EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kError);
 
             auto* create_table_info = (CreateTableInfo*)(create_statement->create_info_.get());
-            EXPECT_EQ(create_table_info->schema_name_, String("Default"));
+            EXPECT_EQ(create_table_info->schema_name_, String("default"));
             EXPECT_EQ(create_table_info->table_name_, String("t1"));
             EXPECT_EQ(create_table_info->column_defs_.size(), 30);
 

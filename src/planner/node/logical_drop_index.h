@@ -9,13 +9,15 @@ class LogicalDropIndex final : public LogicalNode {
 public:
     LogicalDropIndex(u64 node_id,
                      SharedPtr<String> schema_name,
-                     SharedPtr<String> index_name)
+                     SharedPtr<String> index_name,
+                     ConflictType conflict_type)
             : LogicalNode(node_id, LogicalNodeType::kDropSchema),
               schema_name_(std::move(schema_name)),
-              index_name_(std::move(index_name))
-    {}
+              index_name_(std::move(index_name)),
+              conflict_type_(conflict_type)
+            {}
 
-    inline Vector<ColumnBinding>
+    [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {
         return {};
     }
@@ -37,9 +39,15 @@ public:
     index_name() const {
         return index_name_;
     }
+
+    [[nodiscard]] inline ConflictType
+    conflict_type() const {
+        return conflict_type_;
+    }
 private:
     SharedPtr<String> schema_name_{};
     SharedPtr<String> index_name_{};
+    ConflictType conflict_type_{ConflictType::kInvalid};
 };
 
 }

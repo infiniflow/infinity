@@ -65,7 +65,7 @@ private:
     Vector<SharedPtr<ColumnDef>> columns_{};
     HashMap<String, SizeT> column_name2id_{};
     String table_name_{};
-    String schema_name_{"Default"};
+    String schema_name_{"default"};
 };
 }
 

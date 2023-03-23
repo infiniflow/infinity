@@ -14,7 +14,7 @@ public:
     LogicalDropView(u64 node_id,
                     SharedPtr<String> schema_name,
                     SharedPtr<String> view_name)
-            : LogicalNode(node_id, LogicalNodeType::kDropTable),
+            : LogicalNode(node_id, LogicalNodeType::kDropView),
               schema_name_(std::move(schema_name)),
               view_name_(std::move(view_name))
     {}
@@ -42,9 +42,15 @@ public:
         return schema_name_;
     }
 
+    [[nodiscard]] inline ConflictType
+    conflict_type() const {
+        return conflict_type_;
+    }
+
 private:
     SharedPtr<String> view_name_{};
     SharedPtr<String> schema_name_{};
+    ConflictType conflict_type_{ConflictType::kInvalid};
 };
 
 }

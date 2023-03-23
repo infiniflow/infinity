@@ -146,6 +146,7 @@ VALUES          { return VALUES; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
 VIEW            { return VIEW; }
+VIEWS           { return VIEWS; }
 WHEN            { return WHEN; }
 WHERE           { return WHERE; }
 WITH            { return WITH; }

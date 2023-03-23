@@ -29,6 +29,11 @@ public:
          {}
 
     [[nodiscard]] inline const String&
+    schema_name() const {
+        return create_view_info_->schema_name_;
+    }
+
+    [[nodiscard]] inline const String&
     view_name() const {
         return create_view_info_->view_name_;
     }
@@ -43,7 +48,7 @@ public:
         return column_names_;
     };
 
-    inline const SharedPtr<Vector<DataType>>&
+    [[nodiscard]] inline const SharedPtr<Vector<DataType>>&
     column_types() const {
         return column_types_;
     };

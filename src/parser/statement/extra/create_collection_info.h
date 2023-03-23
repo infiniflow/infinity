@@ -16,7 +16,7 @@ public:
     [[nodiscard]] virtual String
     ToString() const final;
 
-    String schema_name_{"Default"};
+    String schema_name_{"default"};
     String collection_name_{};
 };
 

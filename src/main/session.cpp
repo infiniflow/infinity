@@ -7,7 +7,7 @@
 namespace infinity {
 
 Session::Session()
-    : current_schema_("Default")
+    : current_schema_("default")
       {}
 
 }
