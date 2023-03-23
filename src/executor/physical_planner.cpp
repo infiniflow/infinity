@@ -33,7 +33,7 @@
 #include "executor/operator/physical_sort.h"
 #include "executor/operator/physical_limit.h"
 #include "executor/operator/physical_table_scan.h"
-#include "executor/operator/physical_chunk_scan.h"
+#include "executor/operator/physical_show.h"
 #include "executor/operator/physical_top.h"
 #include "executor/operator/physical_union_all.h"
 #include "executor/operator/physical_update.h"
@@ -127,8 +127,8 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
         }
 
         // Scan
-        case LogicalNodeType::kChunkScan: {
-            result = BuildChunkScan(logical_operator);
+        case LogicalNodeType::kShow: {
+            result = BuildShow(logical_operator);
             break;
         }
         case LogicalNodeType::kTableScan: {
@@ -472,13 +472,13 @@ PhysicalPlanner::BuildExcept(const SharedPtr<LogicalNode> &logical_operator) con
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildChunkScan(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalChunkScan> logical_chunk_scan =
-            std::static_pointer_cast<LogicalChunkScan>(logical_operator);
-    return MakeShared<PhysicalChunkScan>(logical_chunk_scan->node_id(),
-                                         logical_chunk_scan->scan_type(),
-                                         logical_chunk_scan->schema_name(),
-                                         logical_chunk_scan->table_index());
+PhysicalPlanner::BuildShow(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalShow> logical_show =
+            std::static_pointer_cast<LogicalShow>(logical_operator);
+    return MakeShared<PhysicalShow>(logical_show->node_id(),
+                                    logical_show->scan_type(),
+                                    logical_show->schema_name(),
+                                    logical_show->table_index());
 }
 
 SharedPtr<PhysicalOperator>
@@ -521,9 +521,9 @@ PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) c
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalDummyScan> logical_chunk_scan =
+    SharedPtr<LogicalDummyScan> logical_show =
             std::static_pointer_cast<LogicalDummyScan>(logical_operator);
-    return MakeShared<PhysicalDummyScan>(logical_chunk_scan->node_id());
+    return MakeShared<PhysicalDummyScan>(logical_show->node_id());
 }
 
 SharedPtr<PhysicalOperator>

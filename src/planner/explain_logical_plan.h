@@ -20,7 +20,7 @@
 #include "planner/node/logical_cross_product.h"
 #include "planner/node/logical_join.h"
 #include "planner/node/logical_insert.h"
-#include "planner/node/logical_chunk_scan.h"
+#include "planner/node/logical_show.h"
 
 namespace infinity {
 
@@ -107,7 +107,7 @@ public:
             i64 intent_size = 0);
 
     static void
-    Explain(const LogicalChunkScan* chunk_scan_node,
+    Explain(const LogicalShow* show_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 

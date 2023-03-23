@@ -11,7 +11,7 @@
 #include "planner/binder/insert_binder.h"
 #include "expression/cast_expression.h"
 #include "planner/node/logical_insert.h"
-#include "planner/node/logical_chunk_scan.h"
+#include "planner/node/logical_show.h"
 #include "planner/node/logical_drop_index.h"
 #include "planner/node/logical_drop_view.h"
 #include "planner/node/logical_drop_collection.h"
@@ -579,37 +579,25 @@ LogicalPlanner::BuildShowColumns(const ShowStatement* statement, SharedPtr<BindC
 
 void
 LogicalPlanner::BuildShowTables(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    SharedPtr<LogicalNode> logical_chunk_scan =
-            MakeShared<LogicalChunkScan>(bind_context_ptr->GetNewLogicalNodeId(),
-                                         ChunkScanType::kShowTables,
-                                         query_context_ptr_->schema_name(),
-                                         bind_context_ptr->GenerateTableIndex());
+    SharedPtr<LogicalNode> logical_show =
+            MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                    ShowType::kShowTables,
+                                    query_context_ptr_->schema_name(),
+                                    bind_context_ptr->GenerateTableIndex());
 
     // FIXME: check if we need to append operator
-//    this->AppendOperator(logical_chunk_scan, bind_context_ptr);
-    this->logical_plan_ = logical_chunk_scan;
-
-//    this->names_ptr_->emplace_back(String("table_name"));
-//    this->names_ptr_->emplace_back(String("column_count"));
-//    this->names_ptr_->emplace_back(String("row_count"));
-//    this->names_ptr_->emplace_back(String("block_count"));
-//    this->names_ptr_->emplace_back(String("block_size"));
-//
-//    this->types_ptr_->emplace_back(DataType(LogicalType::kVarchar));
-//    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
-//    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
-//    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
-//    this->types_ptr_->emplace_back(DataType(LogicalType::kBigInt));
+//    this->AppendOperator(logical_show, bind_context_ptr);
+    this->logical_plan_ = logical_show;
 }
 
 void
 LogicalPlanner::BuildShowViews(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    SharedPtr<LogicalNode> logical_chunk_scan =
-            MakeShared<LogicalChunkScan>(bind_context_ptr->GetNewLogicalNodeId(),
-                                         ChunkScanType::kShowViews,
-                                         query_context_ptr_->schema_name(),
-                                         bind_context_ptr->GenerateTableIndex());
-    this->logical_plan_ = logical_chunk_scan;
+    SharedPtr<LogicalNode> logical_show =
+            MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                    ShowType::kShowViews,
+                                    query_context_ptr_->schema_name(),
+                                    bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
 }
 
 void

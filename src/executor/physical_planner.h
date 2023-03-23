@@ -109,7 +109,7 @@ private:
 
     // Scan
     [[nodiscard]] SharedPtr<PhysicalOperator>
-    BuildChunkScan(const SharedPtr<LogicalNode> &logical_operator) const;
+    BuildShow(const SharedPtr<LogicalNode> &logical_operator) const;
 
     [[nodiscard]] SharedPtr<PhysicalOperator>
     BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) const;

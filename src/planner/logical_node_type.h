@@ -39,12 +39,12 @@ enum class LogicalNodeType: uint8_t {
     kDropView,
 
     // Scan
-    kChunkScan,
     kTableScan,
     kViewScan,
     kDummyScan,
 
     // ?
+    kShow,
     kExplain,
     kPrepare,
 };

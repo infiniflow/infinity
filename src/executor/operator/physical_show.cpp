@@ -6,34 +6,34 @@
 #include "common/types/logical_type.h"
 #include "common/types/internal_types.h"
 #include "expression/value_expression.h"
-#include "physical_chunk_scan.h"
+#include "physical_show.h"
 #include "main/infinity.h"
 #include "storage/collection.h"
 
 namespace infinity {
 
 void
-PhysicalChunkScan::Init() {
+PhysicalShow::Init() {
 
 }
 
 void
-PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalShow::Execute(SharedPtr<QueryContext>& query_context) {
 
     switch(scan_type_) {
-        case ChunkScanType::kShowTables: {
+        case ShowType::kShowTables: {
             ExecuteShowTable(query_context);
             break;
         }
-        case ChunkScanType::kShowColumn: {
+        case ShowType::kShowColumn: {
             ExecuteShowColumns(query_context);
             break;
         }
-        case ChunkScanType::kShowViews: {
+        case ShowType::kShowViews: {
             ExecuteShowViews(query_context);
             break;
         }
-        case ChunkScanType::kIntermediate: {
+        case ShowType::kIntermediate: {
             NotImplementError("Intermediate type of chunk scan isn't supported now.")
             break;
         }
@@ -44,7 +44,7 @@ PhysicalChunkScan::Execute(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalChunkScan::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
+PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
     // Define output table schema
     Vector<SharedPtr<ColumnDef>> column_defs = {
             MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "schema", HashSet<ConstraintType>()),
@@ -200,7 +200,7 @@ PhysicalChunkScan::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalChunkScan::ExecuteShowViews(SharedPtr<QueryContext>& query_context) {
+PhysicalShow::ExecuteShowViews(SharedPtr<QueryContext>& query_context) {
     // Define output table schema
     Vector<SharedPtr<ColumnDef>> column_defs = {
             MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "schema", HashSet<ConstraintType>()),
@@ -264,7 +264,7 @@ PhysicalChunkScan::ExecuteShowViews(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalChunkScan::ExecuteShowColumns(SharedPtr<QueryContext>& query_context) {
+PhysicalShow::ExecuteShowColumns(SharedPtr<QueryContext>& query_context) {
 
 }
 

@@ -20,8 +20,8 @@ ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
             Explain((PhysicalUnionAll*)op, result, intent_size);
             break;
         }
-        case PhysicalOperatorType::kChunkScan: {
-            Explain((PhysicalChunkScan*)op, result, intent_size);
+        case PhysicalOperatorType::kShow: {
+            Explain((PhysicalShow*)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kTableScan: {
@@ -501,21 +501,21 @@ ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin* join_node,
 }
 
 void
-ExplainPhysicalPlan::Explain(const PhysicalChunkScan* chunk_scan_node,
+ExplainPhysicalPlan::Explain(const PhysicalShow* show_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
-    String chunk_scan_str;
+    String show_str;
     if(intent_size != 0) {
-        chunk_scan_str = String(intent_size - 2, ' ') + "-> CHUNK SCAN: ";
+        show_str = String(intent_size - 2, ' ') + "-> CHUNK SCAN: ";
     } else {
-        chunk_scan_str = "CHUNK SCAN: ";
+        show_str = "CHUNK SCAN: ";
     }
-    chunk_scan_str += ToString(chunk_scan_node->scan_type());
-    result->emplace_back(MakeShared<String>(chunk_scan_str));
+    show_str += ToString(show_node->scan_type());
+    result->emplace_back(MakeShared<String>(show_str));
 
-    if(chunk_scan_node->left() != nullptr) {
+    if(show_node->left() != nullptr) {
         intent_size += 2;
-        ExplainPhysicalPlan::Explain(chunk_scan_node->left().get(), result, intent_size);
+        ExplainPhysicalPlan::Explain(show_node->left().get(), result, intent_size);
     }
 }
 

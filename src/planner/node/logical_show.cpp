@@ -2,19 +2,19 @@
 // Created by JinHai on 2022/7/30.
 //
 
-#include "logical_chunk_scan.h"
+#include "logical_show.h"
 #include <sstream>
 
 namespace infinity {
 
 String
-ToString(ChunkScanType type) {
+ToString(ShowType type) {
     switch(type) {
-        case ChunkScanType::kShowTables:
+        case ShowType::kShowTables:
             return "Show tables";
-        case ChunkScanType::kShowViews:
+        case ShowType::kShowViews:
             return "Show views";
-        case ChunkScanType::kShowColumn:
+        case ShowType::kShowColumn:
             return "Show column";
         default: {
             PlannerError("Invalid chunk scan type");
@@ -23,14 +23,14 @@ ToString(ChunkScanType type) {
 }
 
 String
-LogicalChunkScan::ToString(i64& space) {
+LogicalShow::ToString(i64& space) {
     std::stringstream ss;
     String arrow_str;
     if(space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << "-> " << "ChunkScan: ";
+    ss << String(space, ' ') << "-> " << "Show: ";
     space += arrow_str.size();
 
     return ss.str();

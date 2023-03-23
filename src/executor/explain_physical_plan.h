@@ -20,7 +20,7 @@
 #include "executor/operator/physical_limit.h"
 #include "executor/operator/physical_cross_product.h"
 #include "executor/operator/physical_nested_loop_join.h"
-#include "executor/operator/physical_chunk_scan.h"
+#include "executor/operator/physical_show.h"
 #include "executor/operator/physical_union_all.h"
 #include "executor/operator/physical_index_scan.h"
 #include "executor/operator/physical_dummy_scan.h"
@@ -191,7 +191,7 @@ public:
             i64 intent_size = 0);
 
     static void
-    Explain(const PhysicalChunkScan* chunk_scan_node,
+    Explain(const PhysicalShow* show_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 

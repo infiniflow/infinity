@@ -10,7 +10,7 @@
 
 namespace infinity {
 
-enum class ChunkScanType {
+enum class ShowType {
     kInvalid,
     kShowTables,
     kShowViews,
@@ -19,16 +19,16 @@ enum class ChunkScanType {
 };
 
 String
-ToString(ChunkScanType type);
+ToString(ShowType type);
 
-class LogicalChunkScan: public LogicalNode {
+class LogicalShow: public LogicalNode {
 public:
     explicit
-    LogicalChunkScan(u64 node_id,
-                     ChunkScanType type,
-                     String schema_name,
-                     u64 table_index)
-        : LogicalNode(node_id, LogicalNodeType::kChunkScan),
+    LogicalShow(u64 node_id,
+                ShowType type,
+                String schema_name,
+                u64 table_index)
+        : LogicalNode(node_id, LogicalNodeType::kShow),
         scan_type_(type),
         schema_name_(std::move(schema_name)),
         table_index_(table_index)
@@ -44,10 +44,10 @@ public:
 
     inline String
     name() final {
-        return "LogicalChunkScan";
+        return "LogicalShow";
     }
 
-    [[nodiscard]] ChunkScanType
+    [[nodiscard]] ShowType
     scan_type() const {
         return scan_type_;
     }
@@ -63,7 +63,7 @@ public:
     }
 
 private:
-    ChunkScanType scan_type_{ChunkScanType::kInvalid};
+    ShowType scan_type_{ShowType::kInvalid};
     String schema_name_;
     u64 table_index_{};
 

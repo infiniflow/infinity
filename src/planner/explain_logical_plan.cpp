@@ -87,8 +87,8 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
         }
         case LogicalNodeType::kDropView:
             break;
-        case LogicalNodeType::kChunkScan: {
-            Explain((LogicalChunkScan*)statement, result, intent_size);
+        case LogicalNodeType::kShow: {
+            Explain((LogicalShow*)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kTableScan:{
@@ -466,21 +466,21 @@ ExplainLogicalPlan::Explain(const LogicalJoin* join_node,
 }
 
 void
-ExplainLogicalPlan::Explain(const LogicalChunkScan* chunk_scan_node,
+ExplainLogicalPlan::Explain(const LogicalShow* show_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
-    String chunk_scan_str;
+    String show_str;
     if(intent_size != 0) {
-        chunk_scan_str = String(intent_size - 2, ' ') + "-> CHUNK SCAN: ";
+        show_str = String(intent_size - 2, ' ') + "-> CHUNK SCAN: ";
     } else {
-        chunk_scan_str = "CHUNK SCAN: ";
+        show_str = "CHUNK SCAN: ";
     }
-    chunk_scan_str += ToString(chunk_scan_node->scan_type());
-    result->emplace_back(MakeShared<String>(chunk_scan_str));
+    show_str += ToString(show_node->scan_type());
+    result->emplace_back(MakeShared<String>(show_str));
 
-    if(chunk_scan_node->left_node() != nullptr) {
+    if(show_node->left_node() != nullptr) {
         intent_size += 2;
-        ExplainLogicalPlan::Explain(chunk_scan_node->left_node().get(), result, intent_size);
+        ExplainLogicalPlan::Explain(show_node->left_node().get(), result, intent_size);
     }
 }
 
