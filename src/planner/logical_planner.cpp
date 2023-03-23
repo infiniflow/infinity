@@ -489,7 +489,8 @@ LogicalPlanner::BuildDropView(const DropStatement* statement, SharedPtr<BindCont
     SharedPtr<LogicalNode> logical_drop_view
             = MakeShared<LogicalDropView>(bind_context_ptr->GetNewLogicalNodeId(),
                                           schema_name_ptr,
-                                          view_name_ptr);
+                                          view_name_ptr,
+                                          drop_view_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_view;
     this->names_ptr_->emplace_back(String("OK"));

@@ -506,9 +506,9 @@ ExplainPhysicalPlan::Explain(const PhysicalShow* show_node,
                             i64 intent_size) {
     String show_str;
     if(intent_size != 0) {
-        show_str = String(intent_size - 2, ' ') + "-> CHUNK SCAN: ";
+        show_str = String(intent_size - 2, ' ') + "-> SHOW: ";
     } else {
-        show_str = "CHUNK SCAN: ";
+        show_str = "SHOW: ";
     }
     show_str += ToString(show_node->scan_type());
     result->emplace_back(MakeShared<String>(show_str));
@@ -607,14 +607,34 @@ void
 ExplainPhysicalPlan::Explain(const PhysicalCreateView* create_node,
                              SharedPtr<Vector<SharedPtr<String>>>& result,
                              i64 intent_size) {
-    NotImplementError("Not implemented");
+    String create_str;
+    if(intent_size != 0) {
+        create_str = String(intent_size - 2, ' ') + "-> CREATE VIEW: ";
+    } else {
+        create_str = "CREATE VIEW: ";
+    }
+
+    create_str += create_node->bound_select_statement()->schema_name_ + "."
+                  + create_node->bound_select_statement()->view_name_ +
+                  + " conflict type: " + ConflictTypeToStr(create_node->bound_select_statement()->conflict_type_);
+    result->emplace_back(MakeShared<String>(create_str));
 }
 
 void
 ExplainPhysicalPlan::Explain(const PhysicalDropView* create_node,
                              SharedPtr<Vector<SharedPtr<String>>>& result,
                              i64 intent_size) {
-    NotImplementError("Not implemented");
+    String create_str;
+    if(intent_size != 0) {
+        create_str = String(intent_size - 2, ' ') + "-> CREATE VIEW: ";
+    } else {
+        create_str = "CREATE VIEW: ";
+    }
+
+    create_str += *create_node->schema_name() + "."
+                  + *create_node->view_name() +
+                  + " conflict type: " + ConflictTypeToStr(create_node->conflict_type());
+    result->emplace_back(MakeShared<String>(create_str));
 }
 
 }

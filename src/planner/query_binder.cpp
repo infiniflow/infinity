@@ -341,7 +341,7 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
     } else {
         schema_name = from_table->schema_name_;
     }
-    auto base_table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, from_table->table_name_);
+    auto base_table_ptr = Infinity::instance().catalog()->GetTableByNameNoExcept(schema_name, from_table->table_name_);
     if(base_table_ptr == nullptr) {
         // Not found in catalog
         return nullptr;

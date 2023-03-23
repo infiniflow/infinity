@@ -16,7 +16,8 @@ public:
                      u64 id)
             : PhysicalOperator(PhysicalOperatorType::kDropView, nullptr, nullptr, id),
               schema_name_(std::move(schema_name)),
-              view_name_(std::move(view_name))
+              view_name_(std::move(view_name)),
+              conflict_type_(conflict_type)
             {}
 
     ~PhysicalDropView() override = default;

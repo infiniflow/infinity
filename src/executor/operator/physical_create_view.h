@@ -47,18 +47,11 @@ public:
         return types_ptr_;
     };
 
-    inline ConflictType
-    conflict_type() {
-        return conflict_type_;
-    }
-
 private:
     SharedPtr<CreateViewInfo> create_view_info_{nullptr};
 
     SharedPtr<Vector<String>> names_ptr_{};
     SharedPtr<Vector<DataType>> types_ptr_{};
-
-    ConflictType conflict_type_{ConflictType::kInvalid};
 };
 
 }
