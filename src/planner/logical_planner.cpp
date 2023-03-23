@@ -574,15 +574,24 @@ LogicalPlanner::BuildShow(const ShowStatement* statement, SharedPtr<BindContext>
 
 void
 LogicalPlanner::BuildShowColumns(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    PlannerError("Show columns isn't supported.");
+    SharedPtr<LogicalNode> logical_show =
+            MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                    ShowType::kShowColumn,
+                                    statement->schema_name_,
+                                    statement->table_name_,
+                                    bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
 }
 
 void
 LogicalPlanner::BuildShowTables(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
+    String object_name;
     SharedPtr<LogicalNode> logical_show =
             MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                     ShowType::kShowTables,
                                     query_context_ptr_->schema_name(),
+                                    object_name,
                                     bind_context_ptr->GenerateTableIndex());
 
     // FIXME: check if we need to append operator
@@ -592,10 +601,12 @@ LogicalPlanner::BuildShowTables(const ShowStatement* statement, SharedPtr<BindCo
 
 void
 LogicalPlanner::BuildShowViews(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
+    String object_name;
     SharedPtr<LogicalNode> logical_show =
             MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                     ShowType::kShowViews,
                                     query_context_ptr_->schema_name(),
+                                    object_name,
                                     bind_context_ptr->GenerateTableIndex());
     this->logical_plan_ = logical_show;
 }

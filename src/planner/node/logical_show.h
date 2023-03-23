@@ -27,10 +27,12 @@ public:
     LogicalShow(u64 node_id,
                 ShowType type,
                 String schema_name,
+                String object_name,
                 u64 table_index)
         : LogicalNode(node_id, LogicalNodeType::kShow),
         scan_type_(type),
         schema_name_(std::move(schema_name)),
+        object_name_(object_name),
         table_index_(table_index)
         {}
 
@@ -62,9 +64,15 @@ public:
         return schema_name_;
     }
 
+    [[nodiscard]] inline const String&
+    object_name() const {
+        return object_name_;
+    }
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String schema_name_;
+    String object_name_; // It could be table/collection/view name
     u64 table_index_{};
 
 };

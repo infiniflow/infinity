@@ -23,6 +23,9 @@ public:
     SharedPtr<BaseTable>
     GetTableByName(String schema_name, String table_name);
 
+    SharedPtr<BaseTable>
+    GetTableByNameNoExcept(String schema_name, String table_name) noexcept;
+
     void
     CreateTable(String schema_name, const SharedPtr<Table>& table_def);
 
@@ -41,6 +44,9 @@ public:
     // View related methods
     SharedPtr<View>
     GetViewByName(String schema_name, String view_name);
+
+    SharedPtr<View>
+    GetViewByNameNoExcept(String schema_name, String view_name) noexcept;
 
     void
     CreateView(String schema_name, const SharedPtr<View>& view);

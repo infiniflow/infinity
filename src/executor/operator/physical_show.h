@@ -8,6 +8,8 @@
 
 #include "planner/node/logical_show.h"
 #include "executor/physical_operator.h"
+#include "storage/collection.h"
+#include "storage/view.h"
 
 namespace infinity {
 
@@ -16,10 +18,12 @@ public:
     explicit PhysicalShow(u64 id,
                           ShowType type,
                           String schema_name,
+                          String object_name,
                           u64 table_index)
             : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id),
             scan_type_(type),
             schema_name_(std::move(schema_name)),
+            object_name_(std::move(object_name)),
             table_index_(table_index)
             {}
 
@@ -45,9 +49,19 @@ private:
     void
     ExecuteShowColumns(SharedPtr<QueryContext>& query_context);
 
+    void
+    ExecuteShowTableDetail(SharedPtr<QueryContext>& query_context, const SharedPtr<Table>& table_ptr);
+
+    void
+    ExecuteShowCollectionDetail(SharedPtr<QueryContext>& query_context, const SharedPtr<Collection>& table_ptr);
+
+    void
+    ExecuteShowViewDetail(SharedPtr<QueryContext>& query_context, const SharedPtr<View>& table_ptr);
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String schema_name_{};
+    String object_name_{};
     u64 table_index_{};
 };
 

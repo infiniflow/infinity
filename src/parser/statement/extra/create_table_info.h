@@ -28,6 +28,9 @@ enum class ConstraintType {
     kUnique,
 };
 
+String
+ConstrainTypeToString(ConstraintType type);
+
 class TableElement {
 public:
     explicit

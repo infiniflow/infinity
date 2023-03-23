@@ -80,7 +80,7 @@ PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
     for(auto& base_table: tables) {
 
         BaseTableType base_table_type = base_table->kind_;
-        size_t column_id = 0;
+        SizeT column_id = 0;
         {
             // Append schema name to the 1 column
             const String& schema_name = base_table->schema_name();
@@ -227,7 +227,7 @@ PhysicalShow::ExecuteShowViews(SharedPtr<QueryContext>& query_context) {
 
     for(auto& view: views) {
 
-        size_t column_id = 0;
+        SizeT column_id = 0;
         {
             // Append schema name to the first column
             String schema_name;
@@ -265,7 +265,193 @@ PhysicalShow::ExecuteShowViews(SharedPtr<QueryContext>& query_context) {
 
 void
 PhysicalShow::ExecuteShowColumns(SharedPtr<QueryContext>& query_context) {
+    SharedPtr<BaseTable> table_collection = Infinity::instance().catalog()->GetTableByNameNoExcept(this->schema_name_,
+                                                                                        this->object_name_);
+    if(table_collection != nullptr) {
+        // Table or Collection
+        switch(table_collection->kind()) {
+            case BaseTableType::kInvalid: {
+                ExecutorError("Invalid base table type")
+            }
+            case BaseTableType::kTable: {
+                SharedPtr<Table> table = std::static_pointer_cast<Table>(table_collection);
+                return ExecuteShowTableDetail(query_context, table);
+            }
+            case BaseTableType::kCollection: {
+                SharedPtr<Collection> collection = std::static_pointer_cast<Collection>(table_collection);
+                return ExecuteShowCollectionDetail(query_context, collection);
+            }
+        }
+    }
+    SharedPtr<View> view = Infinity::instance().catalog()->GetViewByNameNoExcept(this->schema_name_,
+                                                                                 this->object_name_);
+    if(view != nullptr) {
+        return ExecuteShowViewDetail(query_context, view);
+    }
 
+    ExecutorError(fmt::format("No table, collection, or view name is {}.{}", this->schema_name_, this->object_name_));
+}
+
+void
+PhysicalShow::ExecuteShowTableDetail(SharedPtr<QueryContext>& query_context,
+                                     const SharedPtr<Table>& table_ptr) {
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column name", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column type", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(3, DataType(LogicalType::kVarchar), "constraint", HashSet<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
+    output_ = MakeShared<Table>(table_def, TableType::kResult);
+
+    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    Vector<DataType> column_types {
+            DataType(LogicalType::kVarchar),
+            DataType(LogicalType::kVarchar),
+            DataType(LogicalType::kVarchar),
+    };
+
+    output_block_ptr->Init(column_types);
+
+    const Vector<SharedPtr<ColumnDef>>& columns = table_ptr->definition_ptr_->columns();
+    for(auto& column: columns) {
+
+        SizeT column_id = 0;
+        {
+            // Append column name to the first column
+            Value value = Value::MakeVarchar(column->name());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++ column_id;
+        {
+            // Append column type to the second column
+            String column_type = column->type().ToString();
+            Value value = Value::MakeVarchar(column_type);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++ column_id;
+        {
+            // Append column constraint to the third column
+            String column_constraint;
+            for(auto& constraint: column->constraints_) {
+                column_constraint += " " + ConstrainTypeToString(constraint);
+            }
+
+            Value value = Value::MakeVarchar(column_constraint);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    output_->Append(output_block_ptr);
+}
+
+void
+PhysicalShow::ExecuteShowCollectionDetail(SharedPtr<QueryContext>& query_context,
+                                          const SharedPtr<Collection>& collection_ptr) {
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column name", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column type", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(3, DataType(LogicalType::kVarchar), "constraint", HashSet<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
+    output_ = MakeShared<Table>(table_def, TableType::kResult);
+
+    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    Vector<DataType> column_types {
+            DataType(LogicalType::kVarchar),
+            DataType(LogicalType::kVarchar),
+            DataType(LogicalType::kVarchar),
+    };
+
+    output_block_ptr->Init(column_types);
+
+#if 0
+    const Vector<SharedPtr<ColumnDef>>& columns = collection_ptr->definition_ptr_->columns();
+    for(auto& column: columns) {
+
+        SizeT column_id = 0;
+        {
+            // Append column name to the first column
+            Value value = Value::MakeVarchar(column->name());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++ column_id;
+        {
+            // Append column type to the second column
+            String column_type = column->type().ToString();
+            Value value = Value::MakeVarchar(column_type);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++ column_id;
+        {
+            // Append column constraint to the third column
+            String column_constraint;
+            for(auto& constraint: column->constraints_) {
+                column_constraint += " " + ConstrainTypeToString(constraint);
+            }
+
+            Value value = Value::MakeVarchar(column_constraint);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+#endif
+    output_block_ptr->Finalize();
+    output_->Append(output_block_ptr);
+}
+
+void
+PhysicalShow::ExecuteShowViewDetail(SharedPtr<QueryContext>& query_context,
+                                    const SharedPtr<View>& view_ptr) {
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column name", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column type", HashSet<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
+    output_ = MakeShared<Table>(table_def, TableType::kResult);
+
+    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    Vector<DataType> column_types {
+            DataType(LogicalType::kVarchar),
+            DataType(LogicalType::kVarchar),
+    };
+
+    output_block_ptr->Init(column_types);
+
+    SizeT column_count = view_ptr->column_names()->size();
+    for(SizeT idx = 0; idx < column_count; ++ idx) {
+        SizeT column_id = 0;
+        {
+            // Append column name to the first column
+            Value value = Value::MakeVarchar(view_ptr->column_names()->at(idx));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++ column_id;
+        {
+            // Append column type to the second column
+            String column_type = view_ptr->column_types()->at(idx).ToString();
+            Value value = Value::MakeVarchar(column_type);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    output_->Append(output_block_ptr);
 }
 
 }

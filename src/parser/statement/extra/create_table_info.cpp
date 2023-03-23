@@ -6,7 +6,7 @@
 
 namespace infinity {
 
-static String
+String
 ConstrainTypeToString(ConstraintType type) {
     switch(type) {
         case ConstraintType::kPrimaryKey:

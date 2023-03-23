@@ -40,6 +40,16 @@ Catalog::DeleteSchema(String schema_name) {
 
 SharedPtr<BaseTable>
 Catalog::GetTableByName(String schema_name, String table_name) {
+    SharedPtr<BaseTable> result = GetTableByNameNoExcept(std::move(schema_name), std::move(table_name));
+    if(result == nullptr) {
+        CatalogError(fmt::format("Table isn't found: {}.{}", schema_name, table_name));
+    } else {
+        return result;
+    }
+}
+
+SharedPtr<BaseTable>
+Catalog::GetTableByNameNoExcept(String schema_name, String table_name) noexcept {
     StringToLower(schema_name);
     StringToLower(table_name);
 
@@ -48,7 +58,7 @@ Catalog::GetTableByName(String schema_name, String table_name) {
     }
 
     if(schemas_.find(schema_name) == schemas_.end()) {
-        CatalogError("Schema not found: " + schema_name);
+        return nullptr;
     }
     return schemas_[schema_name]->GetTableByName(table_name);
 }
@@ -132,6 +142,15 @@ Catalog::GetTables(String schema_name) {
 
 SharedPtr<View>
 Catalog::GetViewByName(String schema_name, String view_name) {
+    SharedPtr<View> result = GetViewByNameNoExcept(std::move(schema_name), std::move(view_name));
+    if(result == nullptr) {
+        CatalogError(fmt::format("View isn't found: {}.{}", schema_name, view_name));
+    }
+    return result;
+}
+
+SharedPtr<View>
+Catalog::GetViewByNameNoExcept(String schema_name, String view_name) noexcept {
     StringToLower(schema_name);
     StringToLower(view_name);
 
@@ -140,7 +159,7 @@ Catalog::GetViewByName(String schema_name, String view_name) {
     }
 
     if(schemas_.find(schema_name) == schemas_.end()) {
-        CatalogError("Schema not found: " + schema_name);
+        return nullptr;
     }
     return schemas_[schema_name]->GetViewByName(view_name);
 }

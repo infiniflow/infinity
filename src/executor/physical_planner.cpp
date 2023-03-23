@@ -478,6 +478,7 @@ PhysicalPlanner::BuildShow(const SharedPtr<LogicalNode> &logical_operator) const
     return MakeShared<PhysicalShow>(logical_show->node_id(),
                                     logical_show->scan_type(),
                                     logical_show->schema_name(),
+                                    logical_show->object_name(),
                                     logical_show->table_index());
 }
 
