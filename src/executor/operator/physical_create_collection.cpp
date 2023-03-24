@@ -29,7 +29,7 @@ PhysicalCreateCollection::Init() {
 
 void
 PhysicalCreateCollection::Execute(SharedPtr<QueryContext>& query_context) {
-    Infinity::instance().catalog()->CreateCollection(*schema_name_, *collection_name_);
+    Infinity::instance().catalog()->CreateCollection(*schema_name_, *collection_name_, conflict_type_);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {

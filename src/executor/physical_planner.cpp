@@ -252,11 +252,11 @@ SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) const {
     SharedPtr<LogicalDropTable> logical_drop_table =
             std::static_pointer_cast<LogicalDropTable>(logical_operator);
-    return MakeShared<PhysicalDropTable>(
-            logical_drop_table->schema_name(),
-            logical_drop_table->table_name(),
-            logical_drop_table->conflict_type(),
-            logical_drop_table->node_id());
+    SharedPtr<PhysicalDropTable> physical_drop_table = MakeShared<PhysicalDropTable>(logical_drop_table->schema_name(),
+                                                                                    logical_drop_table->table_name(),
+                                                                                    logical_drop_table->conflict_type(),
+                                                                                    logical_drop_table->node_id());
+    return physical_drop_table;
 }
 
 SharedPtr<PhysicalOperator>

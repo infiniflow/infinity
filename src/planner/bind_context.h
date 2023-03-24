@@ -80,8 +80,11 @@ public:
 
     // Select list
     Vector<ParsedExpr*> select_expression_;    // ParsedExpr won't be free here.
-    HashMap<String, i64> select_alias2index_;  // Some select item has alias, alias_name -> index
+
+    // Following will be initialized at step 5 of bind select statement
+    HashMap<String, i64> select_alias2index_;  // Some select expr has alias, alias_name -> index
     HashMap<String, i64> select_expr_name2index_; // Select expr name -> index
+
     HashMap<i64, i64> select_index_to_group_by_index_; // select index -> group by index
     HashMap<i64, i64> select_index_to_aggregate_index_; // select index -> aggregate index
 

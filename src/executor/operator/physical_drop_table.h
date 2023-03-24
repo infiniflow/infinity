@@ -17,7 +17,8 @@ public:
                       u64 id)
         : PhysicalOperator(PhysicalOperatorType::kDropTable, nullptr, nullptr, id),
         schema_name_(std::move(schema_name)),
-        table_name_(std::move(tbl_name))
+        table_name_(std::move(tbl_name)),
+        conflict_type_(conflict_type)
         {}
 
     ~PhysicalDropTable() override = default;

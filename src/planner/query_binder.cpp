@@ -80,14 +80,18 @@ QueryBinder::BindSelect(const SelectStatement& statement) {
     i64 select_column_count = bind_context_ptr_->select_expression_.size();
     for(i64 column_index = 0; column_index < select_column_count; ++ column_index) {
         const ParsedExpr* select_expr = bind_context_ptr_->select_expression_[column_index];
-        // Bound column expression is bound due to the star expression, which won't be referenced in other place.
-        // Only consider the Raw Expression case.
+
+        // Check if select expression has alias.
         if(!select_expr->alias_.empty()) {
             if(bind_context_ptr_->select_alias2index_.contains(select_expr->alias_)) {
                 i64 bound_column_index = bind_context_ptr_->select_alias2index_[select_expr->alias_];
                 PlannerError(bind_context_ptr_->select_expression_[bound_column_index]->ToString() + " and "
                              + select_expr->ToString() + " have same alias: " + select_expr->alias_);
             } else {
+                // Store the alias to column index mapping, the mapping will be used in
+                // - where clause binding
+                // - group by clause binding
+                // - having clause binding
                 bind_context_ptr_->select_alias2index_[select_expr->alias_] = column_index;
             }
         } else {

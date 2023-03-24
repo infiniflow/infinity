@@ -17,7 +17,7 @@ Schema::GetTableByName(const String &name) {
 }
 
 void
-Schema::AddTable(const SharedPtr<BaseTable>& table) {
+Schema::AddTable(const SharedPtr<BaseTable>& table, ConflictType conflict_type) {
     const String& table_name = table->table_name();
     if (tables_.find(table_name) == tables_.end()) {
         tables_[table_name] = table;
@@ -27,9 +27,20 @@ Schema::AddTable(const SharedPtr<BaseTable>& table) {
 }
 
 void
-Schema::DeleteTable(const String &table_name) {
+Schema::DeleteTable(const String &table_name, ConflictType conflict_type) {
     if (tables_.find(table_name) == tables_.end()) {
-        CatalogError("Table not found, can't be dropped: " + table_name);
+        switch (conflict_type) {
+            case ConflictType::kIgnore: {
+                return ;
+            }
+            case ConflictType::kError: {
+                CatalogError("Table not found, can't be dropped: " + table_name);
+            }
+            default: {
+                CatalogError("Invalid conflict type when delete table.");
+            }
+        }
+
     }
     tables_.erase(table_name);
 }
@@ -44,7 +55,7 @@ Schema::GetViewByName(const String &name) {
 }
 
 void
-Schema::AddView(const SharedPtr<View>& view) {
+Schema::AddView(const SharedPtr<View>& view, ConflictType conflict_type) {
     const String& view_name = view->view_name();
     if (views_.find(view_name) == views_.end()) {
         views_[view_name] = view;
@@ -54,7 +65,7 @@ Schema::AddView(const SharedPtr<View>& view) {
 }
 
 void
-Schema::DeleteView(const String &view_name) {
+Schema::DeleteView(const String &view_name, ConflictType conflict_type) {
     if (views_.find(view_name) == views_.end()) {
         CatalogError("View not found, can't be dropped: " + view_name);
     }

@@ -17,7 +17,7 @@ public:
     CreateSchema(const SharedPtr<SchemaDefinition>& schema_definition);
 
     void
-    DeleteSchema(String schema_name);
+    DeleteSchema(String schema_name, ConflictType conflict_type);
 
     // Table related methods
     SharedPtr<BaseTable>
@@ -27,16 +27,16 @@ public:
     GetTableByNameNoExcept(String schema_name, String table_name) noexcept;
 
     void
-    CreateTable(String schema_name, const SharedPtr<Table>& table_def);
+    CreateTable(String schema_name, const SharedPtr<Table>& table_def, ConflictType conflict_type);
 
     void
-    DeleteTable(String schema_name, String table_name);
+    DeleteTable(String schema_name, String table_name, ConflictType conflict_type);
 
     void
-    CreateCollection(String schema_name, String collection_name);
+    CreateCollection(String schema_name, String collection_name, ConflictType conflict_type);
 
     void
-    DeleteCollection(String schema_name, String collection_name);
+    DeleteCollection(String schema_name, String collection_name, ConflictType conflict_type);
 
     Vector<SharedPtr<BaseTable>>
     GetTables(String schema_name);
@@ -49,10 +49,10 @@ public:
     GetViewByNameNoExcept(String schema_name, String view_name) noexcept;
 
     void
-    CreateView(String schema_name, const SharedPtr<View>& view);
+    CreateView(String schema_name, const SharedPtr<View>& view, ConflictType conflict_type);
 
     void
-    DeleteView(String schema_name, String view_name);
+    DeleteView(String schema_name, String view_name, ConflictType conflict_type);
 
     Vector<SharedPtr<View>>
     GetViews(String schema_name);

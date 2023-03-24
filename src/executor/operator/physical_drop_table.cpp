@@ -15,7 +15,7 @@ PhysicalDropTable::Init() {
 
 void
 PhysicalDropTable::Execute(SharedPtr<QueryContext>& query_context) {
-    Infinity::instance().catalog()->DeleteTable(*schema_name_, *table_name_);
+    Infinity::instance().catalog()->DeleteTable(*schema_name_, *table_name_, conflict_type_);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {

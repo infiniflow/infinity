@@ -25,7 +25,7 @@ Catalog::CreateSchema(const SharedPtr<SchemaDefinition>& schema_definition) {
 }
 
 void
-Catalog::DeleteSchema(String schema_name) {
+Catalog::DeleteSchema(String schema_name, ConflictType conflict_type) {
     StringToLower(schema_name);
 
     if(schema_name == "default") {
@@ -64,7 +64,7 @@ Catalog::GetTableByNameNoExcept(String schema_name, String table_name) noexcept 
 }
 
 void
-Catalog::CreateTable(String schema_name, const SharedPtr<Table> &table_def) {
+Catalog::CreateTable(String schema_name, const SharedPtr<Table> &table_def, ConflictType conflict_type) {
     StringToLower(schema_name);
 
     if(schema_name.empty()) {
@@ -74,11 +74,11 @@ Catalog::CreateTable(String schema_name, const SharedPtr<Table> &table_def) {
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, table can't be created: " + schema_name);
     }
-    schemas_[schema_name]->AddTable(table_def);
+    schemas_[schema_name]->AddTable(table_def, conflict_type);
 }
 
 void
-Catalog::DeleteTable(String schema_name, String table_name) {
+Catalog::DeleteTable(String schema_name, String table_name, ConflictType conflict_type) {
     StringToLower(schema_name);
     StringToLower(table_name);
 
@@ -89,11 +89,11 @@ Catalog::DeleteTable(String schema_name, String table_name) {
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, table can't be deleted: " + schema_name);
     }
-    schemas_[schema_name]->DeleteTable(table_name);
+    schemas_[schema_name]->DeleteTable(table_name, conflict_type);
 }
 
 void
-Catalog::CreateCollection(String schema_name, String collection_name) {
+Catalog::CreateCollection(String schema_name, String collection_name, ConflictType conflict_type) {
     StringToLower(schema_name);
 
     if(schema_name.empty()) {
@@ -106,11 +106,11 @@ Catalog::CreateCollection(String schema_name, String collection_name) {
 
     String copied_schema_name = schema_name;
     SharedPtr<Collection> collection_ptr = MakeShared<Collection>(std::move(schema_name), std::move(collection_name));
-    schemas_[copied_schema_name]->AddTable(collection_ptr);
+    schemas_[copied_schema_name]->AddTable(collection_ptr, conflict_type);
 }
 
 void
-Catalog::DeleteCollection(String schema_name, String collection_name) {
+Catalog::DeleteCollection(String schema_name, String collection_name, ConflictType conflict_type) {
     StringToLower(schema_name);
     StringToLower(collection_name);
 
@@ -121,7 +121,7 @@ Catalog::DeleteCollection(String schema_name, String collection_name) {
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, collection can't be deleted: " + schema_name);
     }
-    schemas_[schema_name]->DeleteTable(collection_name);
+    schemas_[schema_name]->DeleteTable(collection_name, conflict_type);
 }
 
 Vector<SharedPtr<BaseTable>>
@@ -165,7 +165,7 @@ Catalog::GetViewByNameNoExcept(String schema_name, String view_name) noexcept {
 }
 
 void
-Catalog::CreateView(String schema_name, const SharedPtr<View>& view) {
+Catalog::CreateView(String schema_name, const SharedPtr<View>& view, ConflictType conflict_type) {
     StringToLower(schema_name);
     if(schema_name.empty()) {
         schema_name = "default";
@@ -174,17 +174,17 @@ Catalog::CreateView(String schema_name, const SharedPtr<View>& view) {
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, view can't be created: " + schema_name);
     }
-    schemas_[schema_name]->AddView(view);
+    schemas_[schema_name]->AddView(view, conflict_type);
 }
 
 void
-Catalog::DeleteView(String schema_name, String view_name) {
+Catalog::DeleteView(String schema_name, String view_name, ConflictType conflict_type) {
     StringToLower(schema_name);
     StringToLower(view_name);
     if(schemas_.find(schema_name) == schemas_.end()) {
         CatalogError("Schema not found, view can't be deleted: " + schema_name);
     }
-    schemas_[schema_name]->DeleteView(view_name);
+    schemas_[schema_name]->DeleteView(view_name, conflict_type);
 }
 
 Vector<SharedPtr<View>>

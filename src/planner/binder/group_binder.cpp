@@ -60,6 +60,11 @@ GroupBinder::BuildExpression(const ParsedExpr& expr,
 SharedPtr<BaseExpression>
 GroupBinder::BindColumnReference(const ColumnExpr& expr,
                                  BindContext* bind_context_ptr) {
+    // TODO: refactor:
+    // - Check if the column is from base table.
+    // - Check if the column is from an alias of select list expression.
+    // - Check if the column is from outer queries.
+
     // Either the expr is a column or a alias
     String column_name = expr.GetName();
 

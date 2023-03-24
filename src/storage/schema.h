@@ -21,20 +21,20 @@ public:
     GetTableByName(const String& name);
 
     void
-    AddTable(const SharedPtr<BaseTable>& table_def);
+    AddTable(const SharedPtr<BaseTable>& table_def, ConflictType conflict_type);
 
     void
-    DeleteTable(const String& name);
+    DeleteTable(const String& name, ConflictType conflict_type);
 
     // View related functions
     SharedPtr<View>
     GetViewByName(const String& name);
 
     void
-    AddView(const SharedPtr<View>& view);
+    AddView(const SharedPtr<View>& view, ConflictType conflict_type);
 
     void
-    DeleteView(const String& name);
+    DeleteView(const String& name, ConflictType conflict_type);
 
     [[nodiscard]] inline u64
     schema_id() const {

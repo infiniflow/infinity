@@ -30,8 +30,10 @@ WhereBinder::BuildColExpr(const ColumnExpr& expr,
         return result;
     }
 
+    // The column isn't found, check if it is an alias of select list expression
     if(bind_alias_proxy_ != nullptr) {
-        // Attempt to bind the expr as alias
+        // Yes, it is an alias from select list expression
+        // Extract the expression, and bind it during binding where clause phase .
         result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr, depth, root);
     }
 

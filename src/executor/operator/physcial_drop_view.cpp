@@ -14,7 +14,7 @@ PhysicalDropView::Init() {
 
 void
 PhysicalDropView::Execute(SharedPtr<QueryContext>& query_context) {
-    Infinity::instance().catalog()->DeleteView(*schema_name_, *view_name_);
+    Infinity::instance().catalog()->DeleteView(*schema_name_, *view_name_, conflict_type_);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
