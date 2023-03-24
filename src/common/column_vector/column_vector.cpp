@@ -821,7 +821,7 @@ ColumnVector::ToString(SizeT row_index) const {
         case kVarchar: {
             VarcharT varchar_ptr = ((VarcharT *) data_ptr_)[row_index];
             if(varchar_ptr.IsInlined()) {
-                return {varchar_ptr.prefix, VarcharT::INLINE_LENGTH};
+                return {varchar_ptr.prefix, varchar_ptr.length};
             } else {
                 return {varchar_ptr.ptr, varchar_ptr.length};
             }

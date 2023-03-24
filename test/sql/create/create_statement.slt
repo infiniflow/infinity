@@ -1,8 +1,0 @@
-statement ok
-CREATE TABLE INTEGERS(i INTEGER);
-
-statement ok
-DROP TABLE INTEGERS;
-
-statement ok
-DROP TABLE IF EXISTS NAMES;
