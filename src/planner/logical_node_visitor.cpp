@@ -191,7 +191,7 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             break;
         }
         default: {
-            PlannerError("Unexpected expression type: " + expression->ToString())
+            PlannerError("Unexpected expression type: " + expression->Name())
         }
     }
 }

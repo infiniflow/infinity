@@ -236,9 +236,9 @@ ExplainLogicalPlan::Explain(const LogicalInsert* insert_node,
     }
     for(SizeT idx = 0; idx < value_count - 1; ++ idx) {
         auto& value_expr = insert_node->value_list()[idx];
-        insert_str += value_expr->ToString() + ", ";
+        insert_str += value_expr->Name() + ", ";
     }
-    insert_str += insert_node->value_list().back()->ToString();
+    insert_str += insert_node->value_list().back()->Name();
     result->emplace_back(MakeShared<String>(insert_str));
     if(insert_node->left_node() != nullptr) {
         intent_size += 2;
@@ -262,9 +262,9 @@ ExplainLogicalPlan::Explain(const LogicalProject* project_node,
         PlannerError("No expression list in projection node.");
     }
     for(SizeT idx = 0; idx < expr_count - 1; ++ idx) {
-        project_str += project_node->expressions_[idx]->ToString() + ", ";
+        project_str += project_node->expressions_[idx]->Name() + ", ";
     }
-    project_str += project_node->expressions_.back()->ToString();
+    project_str += project_node->expressions_.back()->Name();
     result->emplace_back(MakeShared<String>(project_str));
     if(project_node->left_node() != nullptr) {
         intent_size += 2;
@@ -282,7 +282,7 @@ ExplainLogicalPlan::Explain(const LogicalFilter* filter_node,
     } else {
         filter_str = "FILTER: ";
     }
-    filter_str += filter_node->expression()->ToString();
+    filter_str += filter_node->expression()->Name();
     result->emplace_back(MakeShared<String>(filter_str));
     if(filter_node->left_node() != nullptr) {
         intent_size += 2;
@@ -337,9 +337,9 @@ ExplainLogicalPlan::Explain(const LogicalAggregate* aggregate_node,
 
     if(aggregates_count != 0) {
         for(SizeT idx = 0; idx < aggregates_count - 1; ++ idx) {
-            agg_str += aggregate_node->aggregates_[idx]->ToString() + ", ";
+            agg_str += aggregate_node->aggregates_[idx]->Name() + ", ";
         }
-        agg_str += aggregate_node->aggregates_.back()->ToString();
+        agg_str += aggregate_node->aggregates_.back()->Name();
         if(groups_count != 0) {
             agg_str += ", ";
         }
@@ -348,9 +348,9 @@ ExplainLogicalPlan::Explain(const LogicalAggregate* aggregate_node,
     if(groups_count != 0) {
         agg_str += "GROUP BY: ";
         for(SizeT idx = 0; idx < groups_count - 1; ++ idx) {
-            agg_str += aggregate_node->groups_[idx]->ToString() + ", ";
+            agg_str += aggregate_node->groups_[idx]->Name() + ", ";
         }
-        agg_str += aggregate_node->groups_.back()->ToString();
+        agg_str += aggregate_node->groups_.back()->Name();
     }
 
     result->emplace_back(MakeShared<String>(agg_str));
@@ -378,7 +378,7 @@ ExplainLogicalPlan::Explain(const LogicalSort* sort_node,
     }
 
     for(SizeT idx = 0; idx < order_by_count - 1; ++ idx) {
-        sort_str += sort_node->expressions_[idx]->ToString() + " " + ToString(sort_node->order_by_types_[idx]) + ", ";
+        sort_str += sort_node->expressions_[idx]->Name() + " " + ToString(sort_node->order_by_types_[idx]) + ", ";
     }
     result->emplace_back(MakeShared<String>(sort_str));
 
@@ -399,9 +399,9 @@ ExplainLogicalPlan::Explain(const LogicalLimit* limit_node,
         limit_str = "LIMIT: ";
     }
 
-    limit_str += limit_node->limit_expression_->ToString();
+    limit_str += limit_node->limit_expression_->Name();
     if(limit_node->offset_expression_ != 0) {
-        limit_str += ", OFFSET: " + limit_node->offset_expression_->ToString();
+        limit_str += ", OFFSET: " + limit_node->offset_expression_->Name();
     }
 
     result->emplace_back(MakeShared<String>(limit_str));
@@ -450,9 +450,9 @@ ExplainLogicalPlan::Explain(const LogicalJoin* join_node,
     }
 
     for(SizeT idx = 0; idx < conditions_count - 1; ++ idx) {
-        join_str += join_node->conditions_[idx]->ToString() + ", ";
+        join_str += join_node->conditions_[idx]->Name() + ", ";
     }
-    join_str += join_node->conditions_.back()->ToString();
+    join_str += join_node->conditions_.back()->Name();
     result->emplace_back(MakeShared<String>(join_str));
 
     intent_size += 2;

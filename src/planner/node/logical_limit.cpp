@@ -16,9 +16,9 @@ LogicalLimit::ToString(i64 &space) {
         arrow_str = "->  ";
     }
 
-    ss << String(space, ' ') << arrow_str << "Limit (limit: " << limit_expression_->ToString();
+    ss << String(space, ' ') << arrow_str << "Limit (limit: " << limit_expression_->Name();
     if(offset_expression_ != nullptr) {
-        ss << ", offset: " << offset_expression_->ToString();
+        ss << ", offset: " << offset_expression_->Name();
     }
     ss << ")";
     space += arrow_str.size();

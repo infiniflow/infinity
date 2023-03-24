@@ -21,7 +21,7 @@ String
 BetweenExpression::ToString() const {
     std::stringstream ss;
 
-    ss << arguments_[1]->ToString() << " Between " << arguments_[0]->ToString() << " And " << arguments_[2]->ToString();
+    ss << arguments_[1]->Name() << " Between " << arguments_[0]->Name() << " And " << arguments_[2]->Name();
 
     return ss.str();
 }

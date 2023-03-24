@@ -15,7 +15,7 @@ String LogicalFilter::ToString(i64& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Logical Filter: " << expression_->ToString();
+    ss << String(space, ' ') << arrow_str << "Logical Filter: " << expression_->Name();
     space += arrow_str.size();
     return ss.str();
 }

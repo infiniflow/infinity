@@ -22,9 +22,9 @@ FunctionExpression::ToString() const {
     } else {
         auto arguments_count = arguments_.size();
         for(auto i = 0; i < arguments_count - 1; ++ i) {
-            ss << arguments_[i]->ToString() << ", ";
+            ss << arguments_[i]->Name() << ", ";
         }
-        ss << arguments_.back()->ToString() << ")";
+        ss << arguments_.back()->Name() << ")";
     }
     return ss.str();
 }

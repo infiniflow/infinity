@@ -39,11 +39,25 @@ public:
                    Vector<SharedPtr<BaseExpression>> arguments)
         : type_(type), arguments_(std::move(arguments)) {};
 
+    explicit
+    BaseExpression(ExpressionType type,
+                   Vector<SharedPtr<BaseExpression>> arguments,
+                   String alias)
+            : type_(type),
+            arguments_(std::move(arguments)),
+            alias_(std::move(alias)) {};
+
     virtual
     ~BaseExpression() = default;
 
-    [[nodiscard]] virtual String
-    ToString() const = 0;
+    inline String
+    Name() const {
+        if(alias_.empty()) {
+            return ToString();
+        } else {
+            return alias_;
+        }
+    }
 
     virtual DataType
     Type() const = 0;
@@ -62,6 +76,9 @@ public:
     String alias_;
 
 protected:
+    [[nodiscard]] virtual String
+    ToString() const = 0;
+
     ExpressionType type_;
     Vector<SharedPtr<BaseExpression>> arguments_;
 };

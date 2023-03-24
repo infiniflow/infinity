@@ -22,6 +22,7 @@ BindingRemapper::VisitReplace(const SharedPtr<ColumnExpression>& expression) {
             return ReferenceExpression::Make(expression->Type(),
                                              expression->table_name(),
                                              expression->column_name(),
+                                             expression->alias_,
                                              idx);
         }
     }

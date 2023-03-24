@@ -23,7 +23,7 @@ InExpression::ToString() const {
 
     std::stringstream op;
 
-    op << left_operand_ptr_->ToString();
+    op << left_operand_ptr_->Name();
 
     switch(in_type_) {
         case InType::kIn:
@@ -39,7 +39,7 @@ InExpression::ToString() const {
     op << "(";
 
     for(auto& argument_ptr: arguments_) {
-        op << argument_ptr->ToString() << ", ";
+        op << argument_ptr->Name() << ", ";
     }
 
     op << ")" << std::endl;

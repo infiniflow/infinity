@@ -51,6 +51,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
             ReferenceExpression::Make(DataType(LogicalType::kBigInt),
                                       "t1",
                                       "c1",
+                                      String(),
                                       0);
     // Value expression
     Value v = Value::MakeBigInt(1);
@@ -161,6 +162,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     SharedPtr<ReferenceExpression> col_expr = MakeShared<ReferenceExpression>(DataType(LogicalType::kBigInt),
                                                                               "t1",
                                                                               "c1",
+                                                                              String(),
                                                                               0);
     // Value expression
     Value v = Value::MakeBigInt(8192);

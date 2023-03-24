@@ -25,12 +25,16 @@ ColumnExpression::ColumnExpression(DataType data_type,
 
 String
 ColumnExpression::ToString() const {
-    std::stringstream ss;
-    if(!table_name_.empty()) {
-        ss << table_name_ << '.';
+    if(alias_.empty()) {
+        std::stringstream ss;
+        if(!table_name_.empty()) {
+            ss << table_name_ << '.';
+        }
+        ss << column_name_;
+        return ss.str();
+    } else {
+        return alias_;
     }
-    ss << column_name_;
-    return ss.str();
 }
 
 }

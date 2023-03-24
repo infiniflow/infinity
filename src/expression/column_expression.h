@@ -10,7 +10,7 @@
 namespace infinity {
 
 
-class ColumnExpression : public BaseExpression {
+class ColumnExpression final : public BaseExpression {
 public:
     static inline SharedPtr<ColumnExpression>
     Make(DataType data_type,
@@ -40,9 +40,6 @@ public:
         return data_type_;
     };
 
-    String
-    ToString() const override;
-
     const String&
     table_name() const {
         return table_name_;
@@ -67,6 +64,10 @@ public:
     binding() const {
         return binding_;
     }
+
+private:
+    String
+    ToString() const final;
 
 private:
 

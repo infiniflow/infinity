@@ -808,7 +808,7 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
                                                                     this->bind_context_ptr_.get(),
                                                                     0,
                                                                     true);
-        String expr_name = bound_expr->ToString();
+        String expr_name = bound_expr->Name();
         if(!(bind_context_ptr_->project_index_by_name_.contains(expr_name))) {
             bind_context_ptr_->project_index_by_name_[expr_name] = column_id;
         }

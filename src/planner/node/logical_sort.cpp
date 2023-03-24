@@ -19,9 +19,9 @@ LogicalSort::ToString(i64& space) {
     ss << String(space, ' ') << arrow_str << "Order by: ";
     size_t expression_count = expressions_.size();
     for(size_t i = 0; i < expression_count - 1; ++ i) {
-        ss << expressions_[i]->ToString() << " " << infinity::ToString(order_by_types_[i]) << ", ";
+        ss << expressions_[i]->Name() << " " << infinity::ToString(order_by_types_[i]) << ", ";
     }
-    ss << expressions_.back()->ToString() << " " << infinity::ToString(order_by_types_.back());
+    ss << expressions_.back()->Name() << " " << infinity::ToString(order_by_types_.back());
     space += arrow_str.size();
 
     return ss.str();

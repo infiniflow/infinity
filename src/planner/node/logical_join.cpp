@@ -41,7 +41,7 @@ LogicalJoin::ToString(i64& space) {
     }
     ss << String(space, ' ') << arrow_str << infinity::ToString(join_type_) << " on ";
     for(auto& condition: conditions_) {
-        ss << condition->ToString() << " ";
+        ss << condition->Name() << " ";
     }
     space += arrow_str.size();
     return ss.str();

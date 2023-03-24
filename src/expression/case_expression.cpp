@@ -29,9 +29,9 @@ CaseExpression::ToString() const {
     std::stringstream ss;
 
     for(auto& check: case_check_) {
-        ss << "When: " << check.when_expr_->ToString() << " Then: " << check.then_expr_->ToString() << std::endl;
+        ss << "When: " << check.when_expr_->Name() << " Then: " << check.then_expr_->Name() << std::endl;
     }
-    ss << "Else: " << else_expr_->ToString() << std::endl;
+    ss << "Else: " << else_expr_->Name() << std::endl;
 
     return ss.str();
 }

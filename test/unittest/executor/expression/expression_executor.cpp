@@ -50,6 +50,7 @@ TEST_F(ExpressionExecutorTest, add_bigint_constant_1) {
             ReferenceExpression::Make(DataType(LogicalType::kBigInt),
                                       "t1",
                                       "c1",
+                                      String(),
                                       0);
     // Value expression
     Value v = Value::MakeBigInt(1);
@@ -180,6 +181,7 @@ TEST_F(ExpressionExecutorTest, subtract_constant_8192_bigint) {
             ReferenceExpression::Make(DataType(LogicalType::kBigInt),
                                       "t1",
                                       "c1",
+                                      String(),
                                       0);
     // Value expression
     Value v = Value::MakeBigInt(8192);

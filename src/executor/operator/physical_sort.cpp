@@ -214,7 +214,7 @@ PhysicalSort::GetOrderTable() const {
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
         DataType col_type = this->expressions_[idx]->Type();
-        String col_name = this->expressions_[idx]->ToString();
+        String col_name = this->expressions_[idx]->Name();
 
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
         columns.emplace_back(col_def);

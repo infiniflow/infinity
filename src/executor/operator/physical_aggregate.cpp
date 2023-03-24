@@ -40,7 +40,7 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
     for(i64 idx = 0; auto& expr: groups_) {
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
                                                              expr->Type(),
-                                                             expr->ToString(),
+                                                             expr->Name(),
                                                              HashSet<ConstraintType>());
         groupby_columns.emplace_back(col_def);
         types.emplace_back(expr->Type());
@@ -110,7 +110,7 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
             // column definition
             SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
                                                                  expr->Type(),
-                                                                 expr->ToString(),
+                                                                 expr->Name(),
                                                                  HashSet<ConstraintType>());
             aggregate_columns.emplace_back(col_def);
 
@@ -552,7 +552,7 @@ PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
         // column definition
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
                                                              expr->Type(),
-                                                             expr->ToString(),
+                                                             expr->Name(),
                                                              HashSet<ConstraintType>());
         aggregate_columns.emplace_back(col_def);
 

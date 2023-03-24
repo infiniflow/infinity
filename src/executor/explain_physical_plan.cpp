@@ -271,9 +271,9 @@ ExplainPhysicalPlan::Explain(const PhysicalInsert* insert_node,
     }
     for(SizeT idx = 0; idx < value_count - 1; ++ idx) {
         auto& value_expr = insert_node->value_list()[idx];
-        insert_str += value_expr->ToString() + ", ";
+        insert_str += value_expr->Name() + ", ";
     }
-    insert_str += insert_node->value_list().back()->ToString();
+    insert_str += insert_node->value_list().back()->Name();
     result->emplace_back(MakeShared<String>(insert_str));
     if(insert_node->left() != nullptr) {
         intent_size += 2;
@@ -297,9 +297,9 @@ ExplainPhysicalPlan::Explain(const PhysicalProject* project_node,
         PlannerError("No expression list in projection node.");
     }
     for(SizeT idx = 0; idx < expr_count - 1; ++ idx) {
-        project_str += project_node->expressions_[idx]->ToString() + ", ";
+        project_str += project_node->expressions_[idx]->Name() + ", ";
     }
-    project_str += project_node->expressions_.back()->ToString();
+    project_str += project_node->expressions_.back()->Name();
     result->emplace_back(MakeShared<String>(project_str));
     if(project_node->left() != nullptr) {
         intent_size += 2;
@@ -317,7 +317,7 @@ ExplainPhysicalPlan::Explain(const PhysicalFilter* filter_node,
     } else {
         filter_str = "FILTER: ";
     }
-    filter_str += filter_node->condition()->ToString();
+    filter_str += filter_node->condition()->Name();
     result->emplace_back(MakeShared<String>(filter_str));
     if(filter_node->left() != nullptr) {
         intent_size += 2;
@@ -372,9 +372,9 @@ ExplainPhysicalPlan::Explain(const PhysicalAggregate* aggregate_node,
 
     if(aggregates_count != 0) {
         for(SizeT idx = 0; idx < aggregates_count - 1; ++ idx) {
-            agg_str += aggregate_node->aggregates_[idx]->ToString() + ", ";
+            agg_str += aggregate_node->aggregates_[idx]->Name() + ", ";
         }
-        agg_str += aggregate_node->aggregates_.back()->ToString();
+        agg_str += aggregate_node->aggregates_.back()->Name();
         if(groups_count != 0) {
             agg_str += ", ";
         }
@@ -383,9 +383,9 @@ ExplainPhysicalPlan::Explain(const PhysicalAggregate* aggregate_node,
     if(groups_count != 0) {
         agg_str += "GROUP BY: ";
         for(SizeT idx = 0; idx < groups_count - 1; ++ idx) {
-            agg_str += aggregate_node->groups_[idx]->ToString() + ", ";
+            agg_str += aggregate_node->groups_[idx]->Name() + ", ";
         }
-        agg_str += aggregate_node->groups_.back()->ToString();
+        agg_str += aggregate_node->groups_.back()->Name();
     }
 
     result->emplace_back(MakeShared<String>(agg_str));
@@ -413,9 +413,9 @@ ExplainPhysicalPlan::Explain(const PhysicalSort* sort_node,
     }
 
     for(SizeT idx = 0; idx < order_by_count - 1; ++ idx) {
-        sort_str += sort_node->expressions_[idx]->ToString() + " " + ToString(sort_node->order_by_types_[idx]) + ", ";
+        sort_str += sort_node->expressions_[idx]->Name() + " " + ToString(sort_node->order_by_types_[idx]) + ", ";
     }
-    sort_str += sort_node->expressions_.back()->ToString();
+    sort_str += sort_node->expressions_.back()->Name();
     result->emplace_back(MakeShared<String>(sort_str));
 
     if(sort_node->left() != nullptr) {
@@ -435,9 +435,9 @@ ExplainPhysicalPlan::Explain(const PhysicalLimit* limit_node,
         limit_str = "LIMIT: ";
     }
 
-    limit_str += limit_node->limit_expr()->ToString();
+    limit_str += limit_node->limit_expr()->Name();
     if(limit_node->offset_expr() != 0) {
-        limit_str += ", OFFSET: " + limit_node->offset_expr()->ToString();
+        limit_str += ", OFFSET: " + limit_node->offset_expr()->Name();
     }
 
     result->emplace_back(MakeShared<String>(limit_str));
@@ -485,9 +485,9 @@ ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin* join_node,
     }
 
     for(SizeT idx = 0; idx < conditions_count - 1; ++ idx) {
-        join_str += join_node->conditions()[idx]->ToString() + ", ";
+        join_str += join_node->conditions()[idx]->Name() + ", ";
     }
-    join_str += join_node->conditions().back()->ToString();
+    join_str += join_node->conditions().back()->Name();
     result->emplace_back(MakeShared<String>(join_str));
 
     intent_size += 2;

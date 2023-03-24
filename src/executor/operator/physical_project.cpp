@@ -45,7 +45,7 @@ PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
         // column definition
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
                                                              expr->Type(),
-                                                             expr->ToString(),
+                                                             expr->Name(),
                                                              HashSet<ConstraintType>());
         projection_columns.emplace_back(col_def);
 

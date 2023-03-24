@@ -98,7 +98,7 @@ ProjectBinder::BuildColExpr(const ColumnExpr& expr,
     auto bound_column_expr = ExpressionBinder::BuildColExpr(expr, bind_context_ptr, depth, root);
     if(bound_column_expr != nullptr && bound_column_name_.empty() && !binding_agg_func_) {
         // Not binding Aggregate function argument.
-        bound_column_name_ = bound_column_expr->ToString();
+        bound_column_name_ = bound_column_expr->Name();
     }
     return bound_column_expr;
 }

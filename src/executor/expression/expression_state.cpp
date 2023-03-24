@@ -24,7 +24,7 @@ ExpressionState::CreateState(const SharedPtr<BaseExpression> &expression, SizeT 
         case ExpressionType::kReference:
             return CreateState(std::static_pointer_cast<ReferenceExpression>(expression), block_count);
         default:
-            ExecutorError("Unknown expression type: " + expression->ToString());
+            ExecutorError("Unknown expression type: " + expression->Name());
     }
 
 }

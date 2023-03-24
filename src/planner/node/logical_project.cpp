@@ -29,9 +29,9 @@ LogicalProject::ToString(i64& space) {
     ss << String(space, ' ') << arrow_str << "Project on: ";
     size_t expression_count = expressions_.size();
     for(size_t i = 0; i < expression_count - 1; ++ i) {
-        ss << expressions_[i]->ToString() << ", ";
+        ss << expressions_[i]->Name() << ", ";
     }
-    ss << expressions_.back()->ToString();
+    ss << expressions_.back()->Name();
     space += arrow_str.size();
 
     return ss.str();

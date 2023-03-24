@@ -15,10 +15,12 @@ public:
     Make(DataType data_type,
          String table_name,
          String column_name,
+         String alias,
          SizeT column_idx) {
         return MakeShared<ReferenceExpression>(std::move(data_type),
                                                std::move(table_name),
                                                std::move(column_name),
+                                               std::move(alias),
                                                column_idx);
     }
 
@@ -27,8 +29,9 @@ public:
     ReferenceExpression(DataType data_type,
                         String table_name,
                         String column_name,
+                        String alias,
                         SizeT column_idx) :
-                        BaseExpression(ExpressionType::kReference, {}),
+                        BaseExpression(ExpressionType::kReference, {}, std::move(alias)),
                         data_type_(std::move(data_type)),
                         table_name_(std::move(table_name)),
                         column_name_(std::move(column_name)),

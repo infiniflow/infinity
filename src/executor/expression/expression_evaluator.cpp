@@ -37,7 +37,7 @@ ExpressionEvaluator::Execute(const SharedPtr<BaseExpression>& expr,
         case ExpressionType::kIn:
             return Execute(std::static_pointer_cast<InExpression>(expr), state, output_column);
         default:
-            ExecutorError("Unknown expression type: " + expr->ToString());
+            ExecutorError("Unknown expression type: " + expr->Name());
     }
 }
 

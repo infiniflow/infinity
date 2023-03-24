@@ -202,7 +202,7 @@ ExpressionExecutor::Execute(const SharedPtr<BaseExpression>& expr,
         case ExpressionType::kReference:
             return Execute(std::static_pointer_cast<ReferenceExpression>(expr), state, output_column, count);
         default:
-            ExecutorError("Unknown expression type: " + expr->ToString());
+            ExecutorError("Unknown expression type: " + expr->Name());
     }
 }
 

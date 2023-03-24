@@ -36,9 +36,9 @@ LogicalAggregate::ToString(i64 &space) {
         ss << "Aggregate on: ";
         SizeT expression_count = aggregates_.size();
         for(SizeT i = 0; i < expression_count - 1; ++ i) {
-            ss << aggregates_[i]->ToString() << ", ";
+            ss << aggregates_[i]->Name() << ", ";
         }
-        ss << aggregates_.back()->ToString();
+        ss << aggregates_.back()->Name();
     }
 
     if(!groups_.empty()) {
@@ -49,9 +49,9 @@ LogicalAggregate::ToString(i64 &space) {
         }
         SizeT expression_count = groups_.size();
         for(SizeT i = 0; i < expression_count - 1; ++ i) {
-            ss << groups_[i]->ToString() << ", ";
+            ss << groups_[i]->Name() << ", ";
         }
-        ss << groups_.back()->ToString();
+        ss << groups_.back()->Name();
     }
     space += arrow_str.size();
 

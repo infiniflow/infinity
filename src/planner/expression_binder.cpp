@@ -35,6 +35,11 @@ ExpressionBinder::Bind(const ParsedExpr& expr,
         // Maybe the correlated expression, trying to bind it in the parent context.
         result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
     }
+
+    if(!expr.alias_.empty()) {
+        result->alias_ = expr.alias_;
+    }
+
     return result;
 }
 
