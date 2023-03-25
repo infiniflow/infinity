@@ -19,6 +19,18 @@ FunctionExpr::~FunctionExpr() {
 String
 FunctionExpr::ToString() const {
     std::stringstream ss;
+
+    if(arguments_->size() == 1) {
+        // Unary argument function
+        ss << func_name_ << '(' << arguments_->at(0)->ToString() << ")";
+        return ss.str();
+    }
+    if(arguments_->size() == 2) {
+        // Binary argument function
+        ss << '(' << arguments_->at(0)->ToString() << " " << func_name_ << " " << arguments_->at(1)->ToString() << ")";
+        return ss.str();
+    }
+
     ss << func_name_ << '(';
     if(arguments_ != nullptr) {
         for (ParsedExpr *expr_ptr: *arguments_) {

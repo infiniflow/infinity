@@ -15,7 +15,23 @@ FunctionExpression::FunctionExpression(ScalarFunction function,
 
 String
 FunctionExpression::ToString() const {
+    if(!alias_.empty()) {
+        return alias_;
+    }
+
     std::stringstream ss;
+    if(arguments_.size() == 1) {
+        // Unary argument function
+        ss << func_.name() << '(' << arguments_.at(0)->Name() << ")";
+        return ss.str();
+    }
+
+    if(arguments_.size() == 2) {
+        // Binary argument function
+        ss << '(' << arguments_.at(0)->Name() << " " << func_.name() << " " << arguments_.at(1)->Name() << ")";
+        return ss.str();
+    }
+
     ss << func_.name()<< "(";
     if(arguments_.empty()) {
         ss << ")";
