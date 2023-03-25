@@ -45,7 +45,6 @@ private:
 
     SharedPtr<TableRef>
     BuildSubquery(SharedPtr<QueryContext>& query_context,
-                  const String &table_alias,
                   const SubqueryReference* subquery_reference);
 
     SharedPtr<TableRef>

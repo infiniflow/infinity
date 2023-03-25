@@ -26,7 +26,7 @@ where
     select
         max(total_revenue)
     from
-        q15_revenue0
+        revenue0
 )
 order by
     s_suppkey

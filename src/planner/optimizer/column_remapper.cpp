@@ -9,9 +9,15 @@ namespace infinity {
 
 void
 BindingRemapper::VisitNode(LogicalNode &op) {
-    VisitNodeChildren(op);
-    VisitNodeExpression(op);
-    bindings_ = op.GetColumnBindings();
+    if(op.operator_type() == LogicalNodeType::kJoin) {
+        VisitNodeChildren(op);
+        bindings_ = op.GetColumnBindings();
+        VisitNodeExpression(op);
+    } else {
+        VisitNodeChildren(op);
+        VisitNodeExpression(op);
+        bindings_ = op.GetColumnBindings();
+    }
 }
 
 SharedPtr<BaseExpression>

@@ -26,7 +26,7 @@ LogicalJoin::LogicalJoin(u64 node_id,
 Vector<ColumnBinding>
 LogicalJoin::GetColumnBindings() const {
     Vector<ColumnBinding> left_binding = this->left_node_->GetColumnBindings();
-    Vector<ColumnBinding> right_binding = this->left_node_->GetColumnBindings();
+    Vector<ColumnBinding> right_binding = this->right_node_->GetColumnBindings();
     left_binding.insert(left_binding.end(), right_binding.begin(), right_binding.end());
     return left_binding;
 }

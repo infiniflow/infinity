@@ -184,12 +184,7 @@ QueryBinder::BuildFromClause(SharedPtr<QueryContext>& query_context,
         case TableRefType::kSubquery: {
             // select t1.a from (select * from t2 as t1);
             auto* subquery_ref = (SubqueryReference*)table_ref;
-            String table_alias;
-            if(subquery_ref->alias_ != nullptr) {
-                // Todo: column alias isn't handling
-                table_alias = subquery_ref->alias_->alias_;
-            }
-            result = BuildSubquery(query_context, table_alias, subquery_ref);
+            result = BuildSubquery(query_context, subquery_ref);
             break;
         }
         case TableRefType::kJoin: {
@@ -260,7 +255,6 @@ QueryBinder::BuildTable(SharedPtr<QueryContext>& query_context,
 
 SharedPtr<TableRef>
 QueryBinder::BuildSubquery(SharedPtr<QueryContext>& query_context,
-                           const String &table_alias,
                            const SubqueryReference* subquery_ref) {
     // Create new bind context and add into context array;
     SharedPtr<BindContext> subquery_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
@@ -275,7 +269,20 @@ QueryBinder::BuildSubquery(SharedPtr<QueryContext>& query_context,
     // Get the subquery result table index as the new from table index
     u64 subquery_table_index = bound_statement_ptr->result_index_;
 
-    String binding_name = table_alias.empty() ? "subquery" + std::to_string(subquery_table_index) : table_alias;
+    String binding_name;
+    if(subquery_ref->alias_ == nullptr) {
+        binding_name = "subquery" + std::to_string(subquery_table_index);
+    } else {
+        binding_name = subquery_ref->alias_->alias_;
+        if(subquery_ref->alias_->column_alias_array_ != nullptr) {
+            // Column alias
+            SizeT column_count = subquery_ref->alias_->column_alias_array_->size();
+            for(SizeT idx = 0; idx < column_count; ++ idx) {
+                bound_statement_ptr->names_ptr_->at(idx) = subquery_ref->alias_->column_alias_array_->at(idx);
+            }
+        }
+    }
+
     // Add binding into bind context
     this->bind_context_ptr_->AddSubqueryBinding(binding_name,
                                                 subquery_table_index,
@@ -417,8 +424,8 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
     // Add binding into bind context
     this->bind_context_ptr_->AddViewBinding(from_table->table_name_,
                                             view_index,
-                                            *bound_statement_ptr->types_ptr_,
-                                            *bound_statement_ptr->names_ptr_);
+                                            *view_ptr->column_types(),
+                                            *view_ptr->column_names());
 
     // Use view name as the subquery table reference name
     auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr,
