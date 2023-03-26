@@ -397,8 +397,8 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
 SharedPtr<TableRef>
 QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
                        const TableReference* from_table) {
-    SharedPtr<View> view_ptr = Infinity::instance().catalog()->GetViewByName(from_table->schema_name_,
-                                                                             from_table->table_name_);
+    SharedPtr<View> view_ptr = Infinity::instance().catalog()->GetViewByNameNoExcept(from_table->schema_name_,
+                                                                                     from_table->table_name_);
     if(view_ptr == nullptr) {
         // Not found in catalog
         return nullptr;
