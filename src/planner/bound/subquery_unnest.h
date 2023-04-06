@@ -15,17 +15,21 @@ public:
     static void
     UnnestSubqueries(SharedPtr<BaseExpression>& expr_ptr,
                      SharedPtr<LogicalNode>& root,
+                     const SharedPtr<QueryContext>& query_context_ptr,
                      const SharedPtr<BindContext>& bind_context);
 
     static SharedPtr<BaseExpression>
     UnnestSubquery(SharedPtr<BaseExpression>& expr_ptr,
                    SharedPtr<LogicalNode>& root,
+                   const SharedPtr<QueryContext>& query_context_ptr,
                    const SharedPtr<BindContext>& bind_context);
 
     static SharedPtr<BaseExpression>
-    UnnestUncorrelated(SharedPtr<SubqueryExpression>& expr_ptr,
-                       SharedPtr<LogicalNode>& left,
-                       SharedPtr<LogicalNode>& right);
+    UnnestUncorrelated(SubqueryExpression* expr_ptr,
+                       SharedPtr<LogicalNode>& root,
+                       SharedPtr<LogicalNode>& subquery_plan,
+                       const SharedPtr<QueryContext>& query_context_ptr,
+                       const SharedPtr<BindContext>& bind_context);
 };
 
 }

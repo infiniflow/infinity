@@ -12,25 +12,27 @@ namespace infinity {
 void
 SubqueryUnnest::UnnestSubqueries(SharedPtr<BaseExpression> &expr_ptr,
                                  SharedPtr<LogicalNode> &root,
+                                 const SharedPtr<QueryContext>& query_context_ptr,
                                  const SharedPtr<BindContext>& bind_context) {
     // 2. Call Unnest Subquery to resolve subquery
     if (expr_ptr->type() == ExpressionType::kSubQuery) {
         // Subquery, need to be unnested.
-        UnnestSubquery(expr_ptr, root, bind_context);
+        UnnestSubquery(expr_ptr, root, query_context_ptr, bind_context);
     }
 }
 
 SharedPtr<BaseExpression>
 SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpression>& expr_ptr,
                                SharedPtr<LogicalNode>& root,
+                               const SharedPtr<QueryContext>& query_context_ptr,
                                const SharedPtr<BindContext>& bind_context) {
     // 1. Check the subquery type: uncorrelated subquery or correlated subquery.
     auto subquery_expr = std::static_pointer_cast<SubqueryExpression>(expr_ptr);
 
-    auto right = subquery_expr->bound_select_statement_ptr_->BuildPlan(bind_context);
+    auto right = subquery_expr->bound_select_statement_ptr_->BuildPlan(query_context_ptr, bind_context);
     // TODO: if the correlated information of the subquery should be stored in bind context.
     // Check the correlated information
-    auto result = UnnestUncorrelated(subquery_expr, root, right);
+    auto result = UnnestUncorrelated(subquery_expr.get(), root, right, query_context_ptr, bind_context);
     // If it isn't a correlated subquery
 
     // 2. Call different function to resolve uncorrelated subquery and correlated subquery.
@@ -40,9 +42,11 @@ SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpression>& expr_ptr,
 }
 
 SharedPtr<BaseExpression>
-SubqueryUnnest::UnnestUncorrelated(SharedPtr<SubqueryExpression>& expr_ptr,
-                   SharedPtr<LogicalNode>& left,
-                   SharedPtr<LogicalNode>& right) {
+SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
+                                   SharedPtr<LogicalNode>& root,
+                                   SharedPtr<LogicalNode>& subquery_plan,
+                                   const SharedPtr<QueryContext>& query_context_ptr,
+                                   const SharedPtr<BindContext>& bind_context) {
     switch(expr_ptr->subquery_type_) {
 
         case SubqueryType::kScalar:

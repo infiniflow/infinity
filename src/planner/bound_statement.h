@@ -15,7 +15,7 @@ public:
     SharedPtr<Vector<DataType>> types_ptr_{};
 
     virtual SharedPtr<LogicalNode>
-    BuildPlan(const SharedPtr<BindContext>& bind_context) = 0;
+    BuildPlan(const SharedPtr<QueryContext>& query_context_ptr, const SharedPtr<BindContext>& bind_context) = 0;
 };
 
 }

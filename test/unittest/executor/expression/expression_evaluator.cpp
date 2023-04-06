@@ -71,7 +71,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(func_expr);
 
     EXPECT_EQ(func_expr->Type(), DataType(LogicalType::kBigInt));
-    EXPECT_STREQ(func_expr->ToString().c_str(), "+(t1.c1, BigInt(1))");
+    EXPECT_STREQ(func_expr->ToString().c_str(), "(c1 + 1)");
 
     ExpressionEvaluator expr_evaluator;
 
@@ -182,7 +182,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(func_expr);
 
     EXPECT_EQ(func_expr->Type(), DataType(LogicalType::kBigInt));
-    EXPECT_STREQ(func_expr->ToString().c_str(), "-(BigInt(8192), t1.c1)");
+    EXPECT_STREQ(func_expr->ToString().c_str(), "(8192 - c1)");
 
     ExpressionEvaluator expr_evaluator;
 

@@ -616,8 +616,10 @@ BOOLEAN { $$ = ColumnType{LogicalType::kBoolean}; }
 | POLYGON { $$ = ColumnType{LogicalType::kPolygon}; }
 | CIRCLE { $$ = ColumnType{LogicalType::kCircle}; }
 // Variable types
-| CHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kVarchar, $3}; }
-| VARCHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kVarchar, $3}; }
+| CHAR { $$ = ColumnType{LogicalType::kVarchar}; }
+| CHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kVarchar}; }
+| VARCHAR { $$ = ColumnType{LogicalType::kVarchar}; }
+| VARCHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kVarchar}; }
 | DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kDecimal, 0, $3, $5}; }
 | DECIMAL '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kDecimal, 0, $3, 0}; }
 | DECIMAL { $$ = ColumnType{LogicalType::kDecimal, 0, 0, 0}; }

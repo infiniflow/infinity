@@ -69,7 +69,7 @@ TEST_F(ExpressionExecutorTest, add_bigint_constant_1) {
     SharedPtr<FunctionExpression> func_expr = MakeShared<FunctionExpression>(func, exprs);
 
     EXPECT_EQ(func_expr->Type(), DataType(LogicalType::kBigInt));
-    EXPECT_STREQ(func_expr->ToString().c_str(), "+(t1.c1, BigInt(1))");
+    EXPECT_STREQ(func_expr->ToString().c_str(), "(c1 + 1)");
 
     ExpressionExecutor expr_executor;
     expr_executor.Init({func_expr});
@@ -200,7 +200,7 @@ TEST_F(ExpressionExecutorTest, subtract_constant_8192_bigint) {
     SharedPtr<FunctionExpression> func_expr = MakeShared<FunctionExpression>(func, exprs);
 
     EXPECT_EQ(func_expr->Type(), DataType(LogicalType::kBigInt));
-    EXPECT_STREQ(func_expr->ToString().c_str(), "-(BigInt(8192), t1.c1)");
+    EXPECT_STREQ(func_expr->ToString().c_str(), "(8192 - c1)");
 
     ExpressionExecutor expr_executor;
     expr_executor.Init({func_expr});

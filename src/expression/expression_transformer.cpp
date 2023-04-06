@@ -3,6 +3,12 @@
 //
 
 #include "expression_transformer.h"
+#include "aggregate_expression.h"
+#include "between_expression.h"
+#include "cast_expression.h"
+#include "function_expression.h"
+#include "in_expression.h"
+#include "case_expression.h"
 
 namespace infinity {
 
@@ -60,17 +66,71 @@ VisitExpression(const SharedPtr<BaseExpression>& expression,
 void
 VisitExpression(const SharedPtr<BaseExpression>& expression,
                 const std::function<void(SharedPtr<BaseExpression> &child)>& visitor) {
-    std::queue<SharedPtr<BaseExpression>> queue;
-    queue.push(expression);
+    switch(expression->type()) {
+        case ExpressionType::kAggregate: {
+            AggregateExpression* agg_expr = (AggregateExpression*)expression.get();
+            for(auto& argument: agg_expr->arguments()) {
+                visitor(argument);
+            }
+            break;
+        }
+        case ExpressionType::kBetween: {
+            BetweenExpression* between_expr = (BetweenExpression*)expression.get();
+            for(auto& argument: between_expr->arguments()) {
+                visitor(argument);
+            }
+            break;
+        }
+        case ExpressionType::kCast:  {
+            CastExpression* cast_expr = (CastExpression*)expression.get();
+            for(auto& argument: cast_expr->arguments()) {
+                visitor(argument);
+            }
+            break;
+        }
+        case ExpressionType::kCase: {
+            CaseExpression* case_expr = (CaseExpression*)expression.get();
+            for(auto& argument: case_expr->arguments()) {
+                visitor(argument);
+            }
+            for(auto& case_when: case_expr->CaseExpr()) {
+                visitor(case_when.when_expr_);
+                visitor(case_when.then_expr_);
+            }
+            visitor(case_expr->ElseExpr());
+            break;
+        }
 
-    while (!queue.empty()) {
-        auto expr = queue.front();
-        queue.pop();
-        visitor(expr);
-        // TODO: Different expression will have different arguments, such as CaseExpression. following part need to be
-        // refactored.
-        for(auto& argument: expr->arguments()) {
-            queue.push(argument);
+        case ExpressionType::kConjunction: {
+            ConjunctionExpression* conjunction_expr = (ConjunctionExpression*)expression.get();
+            for(auto& argument: conjunction_expr->arguments()) {
+                visitor(argument);
+            }
+            break;
+        }
+        case ExpressionType::kFunction: {
+            FunctionExpression* function_expr = (FunctionExpression*)expression.get();
+            for(auto& argument: function_expr->arguments()) {
+                visitor(argument);
+            }
+            break;
+        }
+        case ExpressionType::kIn: {
+            InExpression* function_expr = (InExpression*)expression.get();
+            visitor(function_expr->left_operand());
+
+            for(auto& argument: function_expr->arguments()) {
+                visitor(argument);
+            }
+            break;
+        }
+        case ExpressionType::kSubQuery:
+            break;
+        case ExpressionType::kColumn:
+        case ExpressionType::kValue:
+            break;
+        default: {
+            PlannerError("Unsupported expression type" + expression->Name())
         }
     }
 }
