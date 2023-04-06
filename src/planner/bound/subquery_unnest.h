@@ -30,6 +30,13 @@ public:
                        SharedPtr<LogicalNode>& subquery_plan,
                        const SharedPtr<QueryContext>& query_context_ptr,
                        const SharedPtr<BindContext>& bind_context);
+
+    static SharedPtr<BaseExpression>
+    UnnestCorrelated(SubqueryExpression* expr_ptr,
+                     SharedPtr<LogicalNode>& root,
+                     SharedPtr<LogicalNode>& subquery_plan,
+                     const SharedPtr<QueryContext>& query_context_ptr,
+                     const SharedPtr<BindContext>& bind_context);
 };
 
 }

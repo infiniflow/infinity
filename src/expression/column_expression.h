@@ -65,6 +65,11 @@ public:
         return binding_;
     }
 
+    inline bool
+    IsCorrelated() const {
+        return depth_ > 0;
+    }
+
 private:
     String
     ToString() const final;

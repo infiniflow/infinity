@@ -81,5 +81,14 @@ SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
     PlannerError("Not implement to unnest uncorrelated subquery.");
 }
 
+SharedPtr<BaseExpression>
+SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
+                                 SharedPtr<LogicalNode>& root,
+                                 SharedPtr<LogicalNode>& subquery_plan,
+                                 const SharedPtr<QueryContext>& query_context_ptr,
+                                 const SharedPtr<BindContext>& bind_context) {
+    PlannerError("Not implement to unnest correlated subquery.");
+}
+
 }
 

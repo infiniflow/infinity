@@ -25,3 +25,17 @@ struct ColumnBinding {
 };
 
 }
+
+namespace std {
+
+template<>
+class hash<infinity::ColumnBinding> {
+public:
+    size_t
+    operator()(const infinity::ColumnBinding& rhs) const {
+        return hash<size_t>().operator()(rhs.table_idx) ^ hash<size_t>().operator()(rhs.column_idx);
+    }
+};
+
+}
+

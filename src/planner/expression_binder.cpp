@@ -33,7 +33,7 @@ ExpressionBinder::Bind(const ParsedExpr& expr,
         PlannerAssert(result != nullptr, "Fail to bind the expression: " + expr.GetName());
 
         // Maybe the correlated expression, trying to bind it in the parent context.
-        result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
+        // result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
     }
 
     if(!expr.alias_.empty()) {
@@ -190,7 +190,12 @@ ExpressionBinder::BuildColExpr(const ColumnExpr& expr,
                                i64 depth,
                                bool root) {
     ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, expr);
-    SharedPtr<BaseExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, depth);
+    SharedPtr<ColumnExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, depth);
+    if(column_expr->IsCorrelated()) {
+        // Correlated column expression
+        LOG_TRACE("Has correlated expr {}", column_expr->column_name());
+        bind_context_ptr->AddCorrelatedColumnExpr(column_expr);
+    }
     return column_expr;
 }
 

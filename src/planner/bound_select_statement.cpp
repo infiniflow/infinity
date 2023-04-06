@@ -269,16 +269,22 @@ BoundSelectStatement::UnnestSubquery(SharedPtr<LogicalNode>& root,
     SubqueryExpression* subquery_expr_ptr = (SubqueryExpression*)condition.get();
     SharedPtr<LogicalNode> subquery_plan = subquery_expr_ptr->bound_select_statement_ptr_->BuildPlan(query_context_ptr,
                                                                                                      bind_context);
-
-    // If uncorrelated subquery
-    SharedPtr<BaseExpression> return_expr = SubqueryUnnest::UnnestUncorrelated(subquery_expr_ptr,
-                                                                               root,
-                                                                               subquery_plan,
-                                                                               query_context_ptr,
-                                                                               bind_context);
-    // If correlated subquery
-
-//    SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*create_view_info->select_);
+    SharedPtr<BaseExpression> return_expr = nullptr;
+    if(bind_context->HasCorrelatedColumn()) {
+        // If correlated subquery
+        return_expr = SubqueryUnnest::UnnestCorrelated(subquery_expr_ptr,
+                                                       root,
+                                                       subquery_plan,
+                                                       query_context_ptr,
+                                                       bind_context);
+    } else {
+        // If uncorrelated subquery
+        return_expr = SubqueryUnnest::UnnestUncorrelated(subquery_expr_ptr,
+                                                         root,
+                                                         subquery_plan,
+                                                         query_context_ptr,
+                                                         bind_context);
+    }
     building_subquery_ = false;
     return return_expr;
 }

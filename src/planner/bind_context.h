@@ -7,6 +7,7 @@
 #include "expression/base_expression.h"
 #include "column_identifier.h"
 #include "binding.h"
+#include "expression/column_expression.h"
 
 
 #include <unordered_map>
@@ -124,6 +125,10 @@ public:
     // Bound subquery (TODO: How to get the subquery name?)
     HashSet<String> bound_subquery_set_;
 
+    // Bound correlated column
+    Vector<SharedPtr<ColumnExpression>> correlated_column_exprs_;
+    HashMap<ColumnBinding, SizeT> correlated_column_map_;
+
     // An sequence id
     u64 binding_context_id_{0};
 
@@ -202,10 +207,19 @@ public:
                     const Vector<DataType>& column_types, const Vector<String>& column_names);
 
     // Merge input bind context into this bind context
-    void AddBindContext(const SharedPtr<BindContext>& other_ptr);
+    void
+    AddBindContext(const SharedPtr<BindContext>& other_ptr);
 
-    SharedPtr<BaseExpression>
+    SharedPtr<ColumnExpression>
     ResolveColumnId(const ColumnIdentifier& column_identifier, i64 depth);
+
+    void
+    AddCorrelatedColumnExpr(const SharedPtr<ColumnExpression>& correlated_column);
+
+    inline bool
+    HasCorrelatedColumn() const {
+        return !correlated_column_exprs_.empty();
+    }
 
 private:
     void

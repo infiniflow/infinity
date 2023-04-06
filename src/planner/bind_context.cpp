@@ -233,12 +233,20 @@ BindContext::AddBindContext(const SharedPtr<BindContext>& other_ptr) {
             this->binding_names_by_column_.emplace(column_name, bindings_names);
         }
     }
+
+    for(auto& correlated_column: other_ptr->correlated_column_exprs_) {
+        if(correlated_column_map_.contains(correlated_column->binding())) {
+            continue;
+        }
+        correlated_column_map_.emplace(correlated_column->binding(), correlated_column_map_.size());
+        correlated_column_exprs_.emplace_back(correlated_column);
+    }
 }
 
-SharedPtr<BaseExpression>
+SharedPtr<ColumnExpression>
 BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 depth) {
 
-    SharedPtr<BaseExpression> bound_column_expr;
+    SharedPtr<ColumnExpression> bound_column_expr;
 
     const String& column_name_ref = *column_identifier.column_name_ptr_;
 
@@ -309,6 +317,19 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
     }
 
     PlannerError(column_identifier.ToString() + " isn't found.");
+}
+
+void
+BindContext::AddCorrelatedColumnExpr(const SharedPtr<ColumnExpression>& correlated_column) {
+    if(parent_ != nullptr) {
+        parent_->AddCorrelatedColumnExpr(correlated_column);
+    } else {
+        if(correlated_column_map_.contains(correlated_column->binding())) {
+            return ;
+        }
+        correlated_column_map_.emplace(correlated_column->binding(), correlated_column_exprs_.size());
+        correlated_column_exprs_.emplace_back(correlated_column);
+    }
 }
 
 //void
