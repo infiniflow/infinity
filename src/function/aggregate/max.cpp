@@ -4,7 +4,7 @@
 
 #include <utility>
 
-#include "count.h"
+#include "max.h"
 #include "function/aggregate_function.h"
 #include "function/aggregate_function_set.h"
 

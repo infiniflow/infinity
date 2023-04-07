@@ -6,6 +6,8 @@
 #include "expression/expression_transformer.h"
 
 #include "common/utility/infinity_assert.h"
+#include "planner/node/logical_limit.h"
+#include "expression/value_expression.h"
 
 namespace infinity {
 
@@ -49,10 +51,22 @@ SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
                                    const SharedPtr<BindContext>& bind_context) {
     switch(expr_ptr->subquery_type_) {
 
-        case SubqueryType::kScalar:
+        case SubqueryType::kScalar: {
+            // Step1 Generate limit operator on the subquery
+            SharedPtr<ValueExpression> limit_expression = MakeShared<ValueExpression>(Value::MakeBigInt(1));
+            SharedPtr<ValueExpression> offset_expression = MakeShared<ValueExpression>(Value::MakeBigInt(0));
+            SharedPtr<LogicalLimit> limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
+                                                                     limit_expression,
+                                                                     offset_expression);
+
+            // Step2 Generate aggregate first operator on the limit operator
+
+            // Step3 Generate cross product on the root and subquery plan
+            // Step4 Return the first column of the cross product as the result
             PlannerError("Plan SCALAR uncorrelated subquery");
             break;
-        case SubqueryType::kExists:
+        }
+        case SubqueryType::kExists: {
             // Construct following plan tree:
             // CrossProduct
             // |-> left plan tree
@@ -62,15 +76,19 @@ SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
             //             |-> right plan tree
             PlannerError("Plan EXISTS uncorrelated subquery");
             break;
-        case SubqueryType::kNotExists:
+        }
+        case SubqueryType::kNotExists: {
             PlannerError("Plan not EXISTS uncorrelated subquery");
             break;
-        case SubqueryType::kIn:
+        }
+        case SubqueryType::kIn: {
             PlannerError("Plan IN uncorrelated subquery");
             break;
-        case SubqueryType::kNotIn:
+        }
+        case SubqueryType::kNotIn: {
             PlannerError("Plan not IN uncorrelated subquery");
             break;
+        }
         case SubqueryType::kAny:
             PlannerError("Plan ANY uncorrelated subquery");
             break;
