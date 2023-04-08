@@ -420,7 +420,9 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
 
     this->bind_context_ptr_->AddSubQueryChild(view_bind_context_ptr);
 
-    u64 view_index = this->bind_context_ptr_->GenerateTableIndex();
+    // View table index is the output index of view.
+    u64 view_index = bound_statement_ptr->result_index_;
+
     // Add binding into bind context
     this->bind_context_ptr_->AddViewBinding(from_table->table_name_,
                                             view_index,
