@@ -52,7 +52,7 @@ public:
                     const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
-    BuildFilter(SharedPtr<LogicalNode> root,
+    BuildFilter(SharedPtr<LogicalNode>& root,
                 Vector<SharedPtr<BaseExpression>>& conditions,
                 const SharedPtr<QueryContext>& query_context_ptr,
                 const SharedPtr<BindContext>& bind_context);

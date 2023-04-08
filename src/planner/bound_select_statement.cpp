@@ -213,7 +213,7 @@ BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef>& table_ref,
 }
 
 SharedPtr<LogicalNode>
-BoundSelectStatement::BuildFilter(SharedPtr<LogicalNode> root,
+BoundSelectStatement::BuildFilter(SharedPtr<LogicalNode>& root,
                                   Vector<SharedPtr<BaseExpression>>& conditions,
                                   const SharedPtr<QueryContext>& query_context_ptr,
                                   const SharedPtr<BindContext>& bind_context) {
@@ -254,7 +254,7 @@ BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode>& root,
             // nested subquery
             PlannerError("Nested subquery detected")
         }
-        UnnestSubquery(root, condition, query_context_ptr, bind_context);
+        condition = UnnestSubquery(root, condition, query_context_ptr, bind_context);
     }
 }
 

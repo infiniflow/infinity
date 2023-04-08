@@ -8,6 +8,11 @@
 #include "common/utility/infinity_assert.h"
 #include "planner/node/logical_limit.h"
 #include "expression/value_expression.h"
+#include "main/infinity.h"
+#include "function/aggregate_function_set.h"
+#include "expression/aggregate_expression.h"
+#include "planner/node/logical_aggregate.h"
+#include "planner/node/logical_cross_product.h"
 
 namespace infinity {
 
@@ -55,16 +60,65 @@ SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
             // Step1 Generate limit operator on the subquery
             SharedPtr<ValueExpression> limit_expression = MakeShared<ValueExpression>(Value::MakeBigInt(1));
             SharedPtr<ValueExpression> offset_expression = MakeShared<ValueExpression>(Value::MakeBigInt(0));
-            SharedPtr<LogicalLimit> limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
-                                                                     limit_expression,
-                                                                     offset_expression);
+            SharedPtr<LogicalLimit> limit_node = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
+                                                                          limit_expression,
+                                                                          offset_expression);
 
+            limit_node->set_left_node(subquery_plan);
             // Step2 Generate aggregate first operator on the limit operator
+            auto& catalog = Infinity::instance().catalog();
+            SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName("first");
+            ColumnBinding limit_column_binding = limit_node->GetColumnBindings()[0];
+
+            SharedPtr<ColumnExpression> argument = ColumnExpression::Make(expr_ptr->Type(),
+                                                                          subquery_plan->name(),
+                                                                          limit_column_binding.table_idx,
+                                                                          "",
+                                                                          limit_column_binding.column_idx,
+                                                                          0);
+
+            auto aggregate_function_set_ptr = std::static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
+            AggregateFunction first_function = aggregate_function_set_ptr->GetMostMatchFunction(argument);
+
+            Vector<SharedPtr<BaseExpression>> arguments;
+            arguments.emplace_back(argument);
+            auto first_function_expr = MakeShared<AggregateExpression>(first_function, arguments);
+
+            Vector<SharedPtr<BaseExpression>> groups; // empty group by list
+            Vector<SharedPtr<BaseExpression>> aggregates;
+            aggregates.emplace_back(first_function_expr);
+            u64 group_by_index = bind_context->GenerateTableIndex();
+            u64 aggregate_index = bind_context->GenerateTableIndex();
+            SharedPtr<LogicalAggregate> aggregate_node = MakeShared<LogicalAggregate>(
+                    bind_context->GetNewLogicalNodeId(),
+                    groups,
+                    group_by_index,
+                    aggregates,
+                    aggregate_index);
+
+            aggregate_node->set_left_node(limit_node);
 
             // Step3 Generate cross product on the root and subquery plan
+            u64 cross_product_table_index = bind_context->GenerateTableIndex();
+            String alias = "cross_product" + std::to_string(cross_product_table_index);
+            SharedPtr<LogicalCrossProduct> cross_product_node = MakeShared<LogicalCrossProduct>(
+                    bind_context->GetNewLogicalNodeId(),
+                    alias,
+                    cross_product_table_index,
+                    root,
+                    aggregate_node);
+
+            root = cross_product_node;
             // Step4 Return the first column of the cross product as the result
-            PlannerError("Plan SCALAR uncorrelated subquery");
-            break;
+            SharedPtr<ColumnExpression> result = ColumnExpression::Make(expr_ptr->Type(),
+                                                                          "",
+                                                                          aggregate_index,
+                                                                          first_function.ToString(),
+                                                                          0,
+                                                                          0);
+
+
+            return result;
         }
         case SubqueryType::kExists: {
             // Construct following plan tree:

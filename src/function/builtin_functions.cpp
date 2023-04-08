@@ -33,6 +33,7 @@
 // Aggregate function
 #include "aggregate/avg.h"
 #include "aggregate/count.h"
+#include "aggregate/first.h"
 #include "aggregate/max.h"
 #include "aggregate/min.h"
 #include "aggregate/sum.h"
@@ -58,6 +59,7 @@ void
 BuiltinFunctions::RegisterAggregateFunction() {
     RegisterAvgFunction(catalog_ptr_);
     RegisterCountFunction(catalog_ptr_);
+    RegisterFirstFunction(catalog_ptr_);
     RegisterMaxFunction(catalog_ptr_);
     RegisterMinFunction(catalog_ptr_);
     RegisterSumFunction(catalog_ptr_);
