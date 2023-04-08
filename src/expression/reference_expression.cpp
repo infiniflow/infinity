@@ -8,13 +8,23 @@ namespace infinity {
 
 String
 ReferenceExpression::ToString() const {
-//    std::stringstream ss;
-//    if(!table_name_.empty()) {
-//        ss << table_name_ << '.';
-//    }
-//    ss << column_name_;
-//    return ss.str();
-    return column_name_;
+    if(alias_.empty()) {
+        bool all_digits{true};
+        for(char a: column_name_) {
+            if(!std::isdigit(a)) {
+                all_digits = false;
+                break;
+            }
+        }
+        if(all_digits) {
+            return table_name_ + "." + column_name_;
+        } else {
+            return column_name_;
+        }
+
+    } else {
+        return alias_;
+    }
 }
 
 }

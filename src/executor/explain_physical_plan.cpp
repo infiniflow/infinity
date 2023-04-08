@@ -476,7 +476,9 @@ ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin* join_node,
                             i64 intent_size) {
     String join_str;
     if(intent_size != 0) {
-        join_str = String(intent_size - 2, ' ') + "-> ";
+        join_str = String(intent_size - 2, ' ') + "-> NESTED LOOP JOIN";
+    } else {
+        join_str = "NESTED LOOP JOIN: ";
     }
 
     SizeT conditions_count = join_node->conditions().size();

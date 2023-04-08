@@ -150,7 +150,9 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             PlannerAssert(column_expression->arguments().empty(), "Column expression shouldn't have arguments");
 
             result = VisitReplace(column_expression);
-            PlannerAssert(result != nullptr, "Visit column expression will always rewrite the expression");
+            if(result == nullptr) {
+                PlannerError("Visit column expression will always rewrite the expression");
+            }
             expression = result;
             break;
         }

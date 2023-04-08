@@ -26,12 +26,6 @@ ColumnExpression::ColumnExpression(DataType data_type,
 String
 ColumnExpression::ToString() const {
     if(alias_.empty()) {
-//        std::stringstream ss;
-//        if(!table_name_.empty()) {
-//            ss << table_name_ << '.';
-//        }
-//        ss << column_name_;
-//        return ss.str();
         bool all_digits{true};
         for(char a: column_name_) {
             if(!std::isdigit(a)) {
