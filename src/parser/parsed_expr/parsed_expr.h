@@ -33,8 +33,18 @@ public:
 
     [[nodiscard]] inline String
     GetName() const {
-        if(alias_.empty()) return ToString();
+        if(HasAlias()) return GetAlias();
+        return ToString();
+    }
+
+    inline String
+    GetAlias() const {
         return alias_;
+    }
+
+    [[nodiscard]] inline bool
+    HasAlias() const {
+        return !alias_.empty();
     }
 
     [[nodiscard]] virtual String

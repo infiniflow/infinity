@@ -29,6 +29,9 @@ public:
     [[nodiscard]] virtual Vector<ColumnBinding>
     GetColumnBindings() const = 0;
 
+    virtual SharedPtr<Vector<String>>
+    GetOutputNames() const = 0;
+
     [[nodiscard]] inline SharedPtr<LogicalNode>&
     left_node() {
         return left_node_;

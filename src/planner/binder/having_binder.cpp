@@ -40,7 +40,7 @@ HavingBinder::BuildExpression(const ParsedExpr& expr,
         if(!this->binding_agg_func_) {
             // not in an aggregate function
             i64 aggregate_index = bind_context_ptr->aggregate_index_by_name_[expr_name];
-            const SharedPtr<BaseExpression>& aggregate_expr = bind_context_ptr->group_exprs_[aggregate_index];
+            const SharedPtr<BaseExpression>& aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
 
             SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
                                                                         bind_context_ptr->aggregate_table_name_,
@@ -68,6 +68,7 @@ HavingBinder::BuildColExpr(const ColumnExpr& expr,
 
     // SELECT sum(a) from t1 group by b having sum(a) > 0;
     if(this->binding_agg_func_) {
+        // Try to bind the column expression in aggregate function.
 
         // Check if the column is using an alias from select list.
         auto result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr, depth, root);
@@ -100,12 +101,23 @@ HavingBinder::BuildFuncExpr(const FunctionExpr& expr,
     auto func_expr_ptr = ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
+        // SELECT sum(a) from t1 group by b having sum(a) > 0;
+        // sum(a) is bound here
+
         String expr_name = expr.GetName();
         i64 aggregate_index = bind_context_ptr->aggregate_exprs_.size();
         bind_context_ptr->aggregate_exprs_.emplace_back(func_expr_ptr);
         bind_context_ptr->aggregate_index_by_name_[expr_name] = aggregate_index;
 
         this->binding_agg_func_ = false;
+        SharedPtr<ColumnExpression> result = ColumnExpression::Make(func_expr_ptr->Type(),
+                                                                    bind_context_ptr->aggregate_table_name_,
+                                                                    bind_context_ptr->aggregate_table_index_,
+                                                                    std::to_string(aggregate_index),
+                                                                    aggregate_index,
+                                                                    depth);
+
+        return result;
     }
 
     return func_expr_ptr;

@@ -38,6 +38,11 @@ public:
         return {};
     }
 
+    [[nodiscard]] inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
+
     String
     ToString(i64& space) final;
 

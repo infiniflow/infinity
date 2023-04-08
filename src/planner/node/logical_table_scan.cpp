@@ -45,6 +45,19 @@ LogicalTableScan::GetColumnBindings() const {
     return result;
 }
 
+
+SharedPtr<Vector<String>>
+LogicalTableScan::GetOutputNames() const {
+    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+    SizeT expression_count = column_names_.size();
+    result->reserve(expression_count);
+    for(SizeT i = 0; i < expression_count; ++ i) {
+        result->emplace_back(column_names_[i]);
+    }
+
+    return result;
+}
+
 String
 LogicalTableScan::ToString(i64& space) {
     std::stringstream ss;

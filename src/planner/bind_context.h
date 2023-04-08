@@ -221,6 +221,14 @@ public:
         return !correlated_column_exprs_.empty();
     }
 
+    inline const String&
+    GetTableNameByIndex(u64 index) {
+        if(table_table_index2table_name_.contains(index)) {
+            return table_table_index2table_name_[index];
+        }
+        PlannerError(fmt::format("Can't get table name by table index: {}", index));
+    }
+
 private:
     void
     AddBinding(const SharedPtr<Binding>& binding);

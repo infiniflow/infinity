@@ -18,6 +18,18 @@ LogicalProject::GetColumnBindings() const {
     return result;
 }
 
+SharedPtr<Vector<String>>
+LogicalProject::GetOutputNames() const {
+    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+    SizeT expression_count = expressions_.size();
+    result->reserve(expression_count);
+    for(SizeT i = 0; i < expression_count; ++ i) {
+        result->emplace_back(expressions_[i]->Name());
+    }
+
+    return result;
+}
+
 String
 LogicalProject::ToString(i64& space) {
     std::stringstream ss;

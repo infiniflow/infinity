@@ -20,6 +20,9 @@ public:
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final;
 
+    [[nodiscard]] inline SharedPtr<Vector<String>>
+    GetOutputNames() const final;
+
     String
     ToString(i64& space) final;
 

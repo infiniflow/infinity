@@ -73,7 +73,7 @@ SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
             SharedPtr<ColumnExpression> argument = ColumnExpression::Make(expr_ptr->Type(),
                                                                           subquery_plan->name(),
                                                                           limit_column_binding.table_idx,
-                                                                          "",
+                                                                          "0",
                                                                           limit_column_binding.column_idx,
                                                                           0);
 
@@ -113,7 +113,7 @@ SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
             SharedPtr<ColumnExpression> result = ColumnExpression::Make(expr_ptr->Type(),
                                                                           "",
                                                                           aggregate_index,
-                                                                          first_function.ToString(),
+                                                                          first_function_expr->Name(),
                                                                           0,
                                                                           0);
 

@@ -19,7 +19,12 @@ public:
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {
-        return {};
+        return left_node_->GetColumnBindings();
+    }
+
+    [[nodiscard]] inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return left_node_->GetOutputNames();
     }
 
     [[nodiscard]] SharedPtr<View>

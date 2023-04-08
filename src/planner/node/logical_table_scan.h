@@ -26,6 +26,9 @@ public:
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final;
 
+    [[nodiscard]] inline SharedPtr<Vector<String>>
+    GetOutputNames() const final;
+
     [[nodiscard]] SharedPtr<Table>
     table_ptr() const {
         return table_ptr_;

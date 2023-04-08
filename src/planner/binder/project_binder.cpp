@@ -36,7 +36,7 @@ ProjectBinder::BuildExpression(const ParsedExpr& expr,
     // If the expr is coming from aggregate function list
     if(bind_context_ptr->aggregate_index_by_name_.contains(expr_name)) {
         i64 aggregate_index = bind_context_ptr->aggregate_index_by_name_[expr_name];
-        const SharedPtr<BaseExpression>& aggregate_expr = bind_context_ptr->group_exprs_[aggregate_index];
+        const SharedPtr<BaseExpression>& aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
 
         SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
                                                                     bind_context_ptr->aggregate_table_name_,
@@ -47,6 +47,24 @@ ProjectBinder::BuildExpression(const ParsedExpr& expr,
 
         result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
         return result;
+    }
+
+    if(expr.HasAlias()) {
+        expr_name = expr.ToString();
+        if(bind_context_ptr->aggregate_index_by_name_.contains(expr_name)) {
+            i64 aggregate_index = bind_context_ptr->aggregate_index_by_name_[expr_name];
+            const SharedPtr<BaseExpression>& aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
+
+            SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
+                                                                        bind_context_ptr->aggregate_table_name_,
+                                                                        bind_context_ptr->aggregate_table_index_,
+                                                                        expr_name,
+                                                                        aggregate_index,
+                                                                        depth);
+
+            result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+            return result;
+        }
     }
 
     return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);

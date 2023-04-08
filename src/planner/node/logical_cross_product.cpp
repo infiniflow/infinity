@@ -29,6 +29,21 @@ LogicalCrossProduct::GetColumnBindings() const {
     return left_binding;
 }
 
+SharedPtr<Vector<String>>
+LogicalCrossProduct::GetOutputNames() const {
+    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+    result->reserve(left_node_->GetOutputNames()->size() + right_node_->GetOutputNames()->size());
+    for(auto& name_str: *left_node_->GetOutputNames()) {
+        result->emplace_back(name_str);
+    }
+
+    for(auto& name_str: *right_node_->GetOutputNames()) {
+        result->emplace_back(name_str);
+    }
+
+    return result;
+}
+
 String
 LogicalCrossProduct::ToString(i64& space) {
     std::stringstream ss;

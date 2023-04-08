@@ -21,12 +21,15 @@ public:
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final;
 
+    [[nodiscard]] inline SharedPtr<Vector<String>>
+    GetOutputNames() const final;
+
     String
     ToString(i64& space) final;
 
     inline String
     name() final {
-        return "LogicalProject";
+        return "logical_project_" + std::to_string(table_index_);
     }
 
     Vector<SharedPtr<BaseExpression>> expressions_{};

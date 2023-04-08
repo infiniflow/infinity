@@ -60,7 +60,8 @@ ExpressionBinder::BuildExpression(const ParsedExpr& expr,
         }
         case ParsedExprType::kSubquery: {
             // subquery expression
-            return BuildSubquery((const SubqueryExpr&)expr, bind_context_ptr, SubqueryType::kScalar, depth, root);
+            const SubqueryExpr& sub_expr = (const SubqueryExpr&)expr;
+            return BuildSubquery(sub_expr, bind_context_ptr, sub_expr.subquery_type_, depth, root);
         }
         case ParsedExprType::kBetween: {
             return BuildBetweenExpr((const BetweenExpr&)expr, bind_context_ptr, depth, root);
@@ -379,22 +380,41 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr& expr,
                                 i64 depth,
                                 bool root) {
 
-//    SharedPtr<BindContext> subquery_binding_context_ptr = MakeShared<BindContext>(bind_context_ptr);
-//    SharedPtr<BoundSelectNode> select_node_ptr
-//        = PlanBuilder::BuildSelect(query_context_, select, subquery_binding_context_ptr);
-//
-//    SharedPtr<SubqueryExpression> subquery_expr
-//        = MakeShared<SubqueryExpression>(select_node_ptr, subquery_type);
+    switch(subquery_type) {
 
+        case SubqueryType::kExists:{
+            NotImplementError("Exists");
+        }
+        case SubqueryType::kNotExists:{
+            NotImplementError("Not Exists");
+        }
+        case SubqueryType::kIn:
+        case SubqueryType::kNotIn: {
+            auto bound_left_expr = BuildExpression(*expr.left_, bind_context_ptr, depth, false);
 
-    SharedPtr<BindContext> subquery_binding_context_ptr = BindContext::Make(bind_context_ptr);
-    QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
-    SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
+            SharedPtr<BindContext> subquery_binding_context_ptr = BindContext::Make(bind_context_ptr);
+            QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
+            SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
 
-    SharedPtr<SubqueryExpression> subquery_expr
-            = MakeShared<SubqueryExpression>(bound_statement_ptr, subquery_type);
+            SharedPtr<SubqueryExpression> in_subquery_expr
+                    = MakeShared<SubqueryExpression>(bound_statement_ptr, subquery_type);
+            in_subquery_expr->left_ = bound_left_expr;
+            return in_subquery_expr;
+        }
+        case SubqueryType::kScalar: {
+            SharedPtr<BindContext> subquery_binding_context_ptr = BindContext::Make(bind_context_ptr);
+            QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
+            SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
 
-    return subquery_expr;
+            SharedPtr<SubqueryExpression> subquery_expr
+                    = MakeShared<SubqueryExpression>(bound_statement_ptr, subquery_type);
+
+            return subquery_expr;
+        }
+        case SubqueryType::kAny: {
+            NotImplementError("Any");
+        }
+    }
 }
 //
 //// Bind window function.

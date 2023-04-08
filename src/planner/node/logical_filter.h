@@ -23,6 +23,11 @@ public:
         return left_node_->GetColumnBindings();
     }
 
+    [[nodiscard]] inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return left_node_->GetOutputNames();
+    }
+
     String
     ToString(i64& space) final;
 

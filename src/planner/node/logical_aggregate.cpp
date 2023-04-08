@@ -21,6 +21,21 @@ LogicalAggregate::GetColumnBindings() const {
     return result;
 }
 
+SharedPtr<Vector<String>>
+LogicalAggregate::GetOutputNames() const {
+    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+    SizeT groups_count = groups_.size();
+    SizeT aggregates_count = aggregates_.size();
+    result->reserve(groups_count + aggregates_count);
+    for(SizeT i = 0; i < groups_count; ++ i) {
+        result->emplace_back(groups_[i]->Name());
+    }
+    for(SizeT i = 0; i < aggregates_count; ++ i) {
+        result->emplace_back(aggregates_[i]->Name());
+    }
+    return result;
+}
+
 String
 LogicalAggregate::ToString(i64 &space) {
 
