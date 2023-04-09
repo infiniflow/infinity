@@ -17,6 +17,7 @@
 #include "expression/function_expression.h"
 #include "function/scalar_function_set.h"
 #include "expression/cast_expression.h"
+#include "dependent_join_flattener.h"
 
 namespace infinity {
 
@@ -214,7 +215,106 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
                                  SharedPtr<LogicalNode>& subquery_plan,
                                  const SharedPtr<QueryContext>& query_context_ptr,
                                  const SharedPtr<BindContext>& bind_context) {
-    PlannerError("Not implement to unnest correlated subquery.");
+
+    auto &correlated_columns = bind_context->correlated_column_exprs_;
+
+
+    PlannerAssert(!correlated_columns.empty(), "No correlated column");
+
+    // Valid the correlated columns are from one table.
+    SizeT column_count = correlated_columns.size();
+    SizeT table_index = correlated_columns[0]->binding().table_idx;
+    for(SizeT idx = 1; idx < column_count; ++ idx) {
+        if(table_index != correlated_columns[idx]->binding().table_idx) {
+            PlannerError("Correlated columns can be only from one table, now.")
+        }
+    }
+
+    switch(expr_ptr->subquery_type_) {
+
+        case SubqueryType::kExists: {
+            NotImplementError("Unnest correlated exists subquery.");
+        }
+        case SubqueryType::kNotExists: {
+            NotImplementError("Unnest correlated not exists subquery.");
+        }
+        case SubqueryType::kIn: {
+            NotImplementError("Unnest correlated in subquery.");
+        }
+        case SubqueryType::kNotIn: {
+            NotImplementError("Unnest correlated not in subquery.");
+        }
+        case SubqueryType::kScalar: {
+            DependentJoinFlattener dependent_join_flattener(bind_context);
+
+            dependent_join_flattener.DetectCorrelatedExpressions(subquery_plan);
+
+            // Push down the dependent join
+            auto dependent_join = dependent_join_flattener.PushDependentJoin(subquery_plan);
+            const Vector<ColumnBinding>& subplan_column_bindings = dependent_join->GetColumnBindings();
+
+            // Generate inner join
+            auto& catalog = Infinity::instance().catalog();
+            SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName("=");
+            Vector<SharedPtr<BaseExpression>> join_conditions;
+            SizeT correlated_base_index = dependent_join_flattener.CorrelatedColumnBaseIndex();
+            for (SizeT idx = 0; idx < column_count; ++ idx) {
+                auto& left_column_expr = correlated_columns[idx];
+                SizeT correlated_column_index = correlated_base_index + idx;
+                if (correlated_column_index >= subplan_column_bindings.size()) {
+                    PlannerError(fmt::format("Column index is out of range.{}/{}",
+                                             correlated_column_index, subplan_column_bindings.size()))
+                }
+
+                // Generate new correlated column expression
+                auto& right_column_binding = subplan_column_bindings[correlated_column_index];
+                SharedPtr<ColumnExpression> right_column_expr = ColumnExpression::Make(left_column_expr->Type(),
+                                                                                  left_column_expr->table_name(),
+                                                                                  left_column_expr->binding().table_idx,
+                                                                                  left_column_expr->column_name(),
+                                                                                  left_column_expr->binding().column_idx,
+                                                                                  0);
+
+
+                // Generate join condition expression
+                Vector<SharedPtr<BaseExpression>> function_arguments;
+                function_arguments.reserve(2);
+                function_arguments.emplace_back(left_column_expr);
+                function_arguments.emplace_back(right_column_expr);
+
+                auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+                ScalarFunction equi_function = scalar_function_set_ptr->GetMostMatchFunction(function_arguments);
+
+                SharedPtr<FunctionExpression> function_expr_ptr = MakeShared<FunctionExpression>(equi_function,
+                                                                                                 function_arguments);
+                join_conditions.emplace_back(function_expr_ptr);
+            }
+
+            SizeT join_table_index = bind_context->GenerateTableIndex();
+            String alias = "logical_join" + std::to_string(join_table_index);
+            SharedPtr<LogicalJoin> logical_join = MakeShared<LogicalJoin>(bind_context->GetNewLogicalNodeId(),
+                                                                          JoinType::kInner,
+                                                                          alias,
+                                                                          join_table_index,
+                                                                          join_conditions,
+                                                                          root,
+                                                                          dependent_join);
+            root = logical_join;
+            // Generate result expression
+            SharedPtr<Vector<String>> right_names = dependent_join->GetOutputNames();
+            SharedPtr<ColumnExpression> result = ColumnExpression::Make(expr_ptr->Type(),
+                                                                        alias,
+                                                                        join_table_index,
+                                                                        right_names->at(0),
+                                                                        root->GetOutputNames()->size(),
+                                                                        0);
+            return result;
+        }
+        case SubqueryType::kAny: {
+            NotImplementError("Unnest correlated any subquery.");
+        }
+    }
+    PlannerError("Unreachable")
 }
 
 }

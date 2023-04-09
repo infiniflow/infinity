@@ -487,24 +487,24 @@ PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) 
     SharedPtr<LogicalTableScan> logical_table_scan =
             std::static_pointer_cast<LogicalTableScan>(logical_operator);
 
-    HashMap<String, size_t> name2index;
-    size_t column_count = logical_table_scan->table_ptr()->ColumnCount();
-    for(size_t idx = 0; idx < column_count; ++ idx) {
-        name2index.emplace(logical_table_scan->table_ptr()->GetColumnNameById(idx), idx);
-    }
-
-    Vector<size_t> column_ids;
-    column_ids.reserve(logical_table_scan->column_names_.size());
-    for(const auto& column_name: logical_table_scan->column_names_) {
-        if(name2index.contains(column_name)) {
-            column_ids.emplace_back(name2index[column_name]);
-        } else {
-            PlannerError("Unknown column table_name: " + column_name + " when building physical plan.");
-        }
-    }
+//    HashMap<String, size_t> name2index;
+//    size_t column_count = logical_table_scan->table_ptr()->ColumnCount();
+//    for(size_t idx = 0; idx < column_count; ++ idx) {
+//        name2index.emplace(logical_table_scan->table_ptr()->GetColumnNameById(idx), idx);
+//    }
+//
+//    Vector<size_t> column_ids;
+//    column_ids.reserve(logical_table_scan->column_names_.size());
+//    for(const auto& column_name: logical_table_scan->column_names_) {
+//        if(name2index.contains(column_name)) {
+//            column_ids.emplace_back(name2index[column_name]);
+//        } else {
+//            PlannerError("Unknown column table_name: " + column_name + " when building physical plan.");
+//        }
+//    }
 
     SharedPtr<TableScanFunctionData> table_scan_function_data_ptr
-        = MakeShared<TableScanFunctionData>(logical_table_scan->table_ptr(), column_ids);
+        = MakeShared<TableScanFunctionData>(logical_table_scan->table_ptr(), logical_table_scan->column_ids_);
 
     return MakeShared<PhysicalTableScan>(logical_operator->node_id(),
                                          logical_table_scan->table_alias_,

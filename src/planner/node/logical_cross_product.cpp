@@ -32,12 +32,15 @@ LogicalCrossProduct::GetColumnBindings() const {
 SharedPtr<Vector<String>>
 LogicalCrossProduct::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-    result->reserve(left_node_->GetOutputNames()->size() + right_node_->GetOutputNames()->size());
-    for(auto& name_str: *left_node_->GetOutputNames()) {
+    SharedPtr<Vector<String>> left_output_names = left_node_->GetOutputNames();
+    SharedPtr<Vector<String>> right_output_names = right_node_->GetOutputNames();
+
+    result->reserve(left_output_names->size() + right_output_names->size());
+    for(auto& name_str: *left_output_names) {
         result->emplace_back(name_str);
     }
 
-    for(auto& name_str: *right_node_->GetOutputNames()) {
+    for(auto& name_str: *right_output_names) {
         result->emplace_back(name_str);
     }
 

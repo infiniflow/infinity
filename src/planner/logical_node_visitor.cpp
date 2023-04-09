@@ -192,6 +192,14 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             }
             break;
         }
+        case ExpressionType::kSubQuery: {
+            auto subquery_expression = std::static_pointer_cast<SubqueryExpression>(expression);
+            result = VisitReplace(subquery_expression);
+            if(result != nullptr) {
+                PlannerError("Visit subquery expression will always rewrite the expression");
+            }
+            break;
+        }
         default: {
             PlannerError("Unexpected expression type: " + expression->Name())
         }
@@ -339,6 +347,11 @@ LogicalNodeVisitor::VisitReplace(const SharedPtr<ValueExpression>& expression) {
 
 SharedPtr<BaseExpression>
 LogicalNodeVisitor::VisitReplace(const SharedPtr<InExpression>& expression) {
+    return nullptr;
+}
+
+SharedPtr<BaseExpression>
+LogicalNodeVisitor::VisitReplace(const SharedPtr<SubqueryExpression>& expression) {
     return nullptr;
 }
 

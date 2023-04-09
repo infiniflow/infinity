@@ -39,15 +39,15 @@ JoinReference::ToString() {
 String
 ToString(JoinType type) {
     switch(type) {
-        case JoinType::kInner: return "Inner Join";
-        case JoinType::kLeft: return "Left Join";
-        case JoinType::kRight: return "Right Join";
-        case JoinType::kFull: return "Full Join";
-        case JoinType::kCross: return "Cross Product";
-        case JoinType::kNatural: return "Natural Join";
-        case JoinType::kSemi: return "Semi Join";
-        case JoinType::kMark: return "Mark Join";
-        case JoinType::kAnti: return "Anti Join";
+        case JoinType::kInner: return "INNER JOIN";
+        case JoinType::kLeft: return "LEFT JOIN";
+        case JoinType::kRight: return "RIGHT JOIN";
+        case JoinType::kFull: return "FULL JOIN";
+        case JoinType::kCross: return "CROSS PRODUCT";
+        case JoinType::kNatural: return "NATURAL JOIN";
+        case JoinType::kSemi: return "SEMI JOIN";
+        case JoinType::kMark: return "MARK JOIN";
+        case JoinType::kAnti: return "ANTI JOIN";
     }
     PlannerError("Unreachable");
 }

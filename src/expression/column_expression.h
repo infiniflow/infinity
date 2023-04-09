@@ -55,10 +55,12 @@ public:
         return column_name_;
     }
 
-//    inline i64
-//    column_index() const {
-//        return binding_.column_idx;
-//    }
+
+    inline void
+    SetBinding(SizeT table_idx, SizeT column_idx) {
+        binding_.table_idx = table_idx;
+        binding_.column_idx = column_idx;
+    }
 
     inline ColumnBinding
     binding() const {
@@ -68,6 +70,16 @@ public:
     inline bool
     IsCorrelated() const {
         return depth_ > 0;
+    }
+
+    inline void
+    SetDepth(i64 depth) {
+        depth_ = depth;
+    }
+
+    inline i64
+    depth() const {
+        return depth_;
     }
 
 private:

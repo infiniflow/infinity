@@ -26,6 +26,9 @@ public:
 
     // Used in IN subquery, EXISTS won't use it.
     SharedPtr<BaseExpression> left_{nullptr};
+
+    // Correlated column expressions;
+    Vector<SharedPtr<ColumnExpression>> correlated_columns{};
 private:
 
 };

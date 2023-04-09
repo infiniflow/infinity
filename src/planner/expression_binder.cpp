@@ -382,12 +382,6 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr& expr,
 
     switch(subquery_type) {
 
-        case SubqueryType::kExists:{
-            NotImplementError("Exists");
-        }
-        case SubqueryType::kNotExists:{
-            NotImplementError("Not Exists");
-        }
         case SubqueryType::kIn:
         case SubqueryType::kNotIn: {
             auto bound_left_expr = BuildExpression(*expr.left_, bind_context_ptr, depth, false);
@@ -399,8 +393,11 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr& expr,
             SharedPtr<SubqueryExpression> in_subquery_expr
                     = MakeShared<SubqueryExpression>(bound_statement_ptr, subquery_type);
             in_subquery_expr->left_ = bound_left_expr;
+            in_subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
             return in_subquery_expr;
         }
+        case SubqueryType::kExists:
+        case SubqueryType::kNotExists:
         case SubqueryType::kScalar: {
             SharedPtr<BindContext> subquery_binding_context_ptr = BindContext::Make(bind_context_ptr);
             QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
@@ -409,12 +406,15 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr& expr,
             SharedPtr<SubqueryExpression> subquery_expr
                     = MakeShared<SubqueryExpression>(bound_statement_ptr, subquery_type);
 
+            subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
             return subquery_expr;
         }
         case SubqueryType::kAny: {
             NotImplementError("Any");
         }
     }
+
+    PlannerError("Unreachable");
 }
 //
 //// Bind window function.

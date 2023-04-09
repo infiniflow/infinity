@@ -20,6 +20,7 @@ public:
                      SharedPtr<TableScanFunction> table_scan_func,
                      String table_alias,
                      u64 table_index,
+                     Vector<SizeT> column_ids,
                      Vector<String> column_names,
                      Vector<DataType> column_types);
 
@@ -42,12 +43,13 @@ public:
         return "LogicalTableScan";
     }
 
-    String table_alias_;
-    u64 table_index_;
-    Vector<String> column_names_;
-    Vector<DataType> column_types_;
+    String table_alias_{};
+    u64 table_index_{};
+    Vector<SizeT> column_ids_{};
+    Vector<String> column_names_{};
+    Vector<DataType> column_types_{};
 
-    SharedPtr<TableScanFunction> table_scan_func_ptr_;
+    SharedPtr<TableScanFunction> table_scan_func_ptr_{nullptr};
 private:
     SharedPtr<Table> table_ptr_{nullptr};
 

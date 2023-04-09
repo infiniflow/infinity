@@ -9,7 +9,7 @@
 
 namespace infinity {
 
-class BindingRemapper: public LogicalNodeVisitor{
+class BindingRemapper: public LogicalNodeVisitor {
 public:
     void
     VisitNode(LogicalNode& op) final;

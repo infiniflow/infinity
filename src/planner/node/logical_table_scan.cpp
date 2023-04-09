@@ -14,6 +14,7 @@ LogicalTableScan::LogicalTableScan(u64 node_id,
                                    SharedPtr<TableScanFunction> table_scan_func,
                                    String table_alias,
                                    u64 table_index,
+                                   Vector<SizeT> column_ids,
                                    Vector<String> column_names,
                                    Vector<DataType> column_types)
     : LogicalNode(node_id, LogicalNodeType::kTableScan),
@@ -21,6 +22,7 @@ LogicalTableScan::LogicalTableScan(u64 node_id,
     table_scan_func_ptr_(std::move(table_scan_func)),
     table_alias_(std::move(table_alias)),
     table_index_(table_index),
+    column_ids_(std::move(column_ids)),
     column_names_(std::move(column_names)),
     column_types_(std::move(column_types)) {
 
