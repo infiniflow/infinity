@@ -58,6 +58,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
         case LogicalNodeType::kAggregate: {
             // Push down the dependent join
             auto pushed_plan = PushDependentJoinInternal(subquery_plan->left_node());
+            subquery_plan->set_left_node(pushed_plan);
 
             // then we replace any correlated expressions with the corresponding entry in the correlated_map
             RewriteCorrelatedExpressions rewriter(bind_context_ptr_,
@@ -111,6 +112,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
 
             // Push down the dependent join
             auto pushed_plan = PushDependentJoinInternal(subquery_plan->left_node());
+            subquery_plan->set_left_node(pushed_plan);
 
             // then we replace any correlated expressions with the corresponding entry in the correlated_map
             RewriteCorrelatedExpressions rewriter(bind_context_ptr_,
@@ -124,6 +126,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
 
             // Push down the dependent join
             auto pushed_plan = PushDependentJoinInternal(subquery_plan->left_node());
+            subquery_plan->set_left_node(pushed_plan);
 
             // then we replace any correlated expressions with the corresponding entry in the correlated_map
             RewriteCorrelatedExpressions rewriter(bind_context_ptr_,

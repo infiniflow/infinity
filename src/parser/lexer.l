@@ -110,7 +110,6 @@ NOT             { return NOT; }
 OFFSET          { return OFFSET; }
 ON              { return ON; }
 OR              { return OR; }
-OPT             { return OPT; }
 ORDER           { return ORDER; }
 OUTER           { return OUTER; }
 PATH            { return PATH; }
@@ -120,6 +119,7 @@ POINT           { return POINT; }
 POLYGON         { return POLYGON; }
 PREPARE         { return PREPARE; }
 PRIMARY         { return PRIMARY; }
+RAW             { return RAW; }
 REAL            { return REAL; }
 RIGHT           { return RIGHT; }
 SCHEMA          { return SCHEMA; }
@@ -139,7 +139,6 @@ TRUE            { return TRUE; }
 TINYINT         { return TINYINT; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
-UNOPT           { return UNOPT; }
 UPDATE          { return UPDATE; }
 UUID            { return UUID; }
 VALUES          { return VALUES; }
