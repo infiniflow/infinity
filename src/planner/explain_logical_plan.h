@@ -111,6 +111,8 @@ public:
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 
+    static void
+    Explain(const BaseExpression* base_expression, String& expr_str);
 };
 
 }

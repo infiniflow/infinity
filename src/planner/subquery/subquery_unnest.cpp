@@ -270,9 +270,9 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
                 auto& right_column_binding = subplan_column_bindings[correlated_column_index];
                 SharedPtr<ColumnExpression> right_column_expr = ColumnExpression::Make(left_column_expr->Type(),
                                                                                   left_column_expr->table_name(),
-                                                                                  left_column_expr->binding().table_idx,
+                                                                                  right_column_binding.table_idx,
                                                                                   left_column_expr->column_name(),
-                                                                                  left_column_expr->binding().column_idx,
+                                                                                  right_column_binding.column_idx,
                                                                                   0);
 
 

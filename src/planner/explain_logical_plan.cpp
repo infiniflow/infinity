@@ -3,6 +3,14 @@
 //
 
 #include "explain_logical_plan.h"
+#include "expression/aggregate_expression.h"
+#include "expression/cast_expression.h"
+#include "expression/case_expression.h"
+#include "expression/function_expression.h"
+#include "expression/between_expression.h"
+#include "expression/subquery_expression.h"
+#include "expression/value_expression.h"
+#include "expression/in_expression.h"
 
 namespace infinity {
 
@@ -250,22 +258,34 @@ void
 ExplainLogicalPlan::Explain(const LogicalProject* project_node,
                     SharedPtr<Vector<SharedPtr<String>>>& result,
                     i64 intent_size) {
-    String project_str;
+    String project_header;
     if(intent_size != 0) {
-        project_str = String(intent_size - 2, ' ') + "-> PROJECT: ";
+        project_header = String(intent_size - 2, ' ') + "-> PROJECT: ";
     } else {
-        project_str = "PROJECT: ";
+        project_header = "PROJECT: ";
     }
 
+    project_header += "(" + std::to_string(project_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(project_header));
+
+    // Table index
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(project_node->table_index_);
+    result->emplace_back(MakeShared<String>(table_index));
+
+    // Expressions
+    String expression_str = String(intent_size, ' ') + " - expressions: [";
     SizeT expr_count = project_node->expressions_.size();
     if(expr_count == 0) {
         PlannerError("No expression list in projection node.");
     }
     for(SizeT idx = 0; idx < expr_count - 1; ++ idx) {
-        project_str += project_node->expressions_[idx]->Name() + ", ";
+        Explain(project_node->expressions_[idx].get(), expression_str);
+        expression_str += ", ";
     }
-    project_str += project_node->expressions_.back()->Name();
-    result->emplace_back(MakeShared<String>(project_str));
+    Explain(project_node->expressions_.back().get(), expression_str);
+    expression_str += "]";
+
+    result->emplace_back(MakeShared<String>(expression_str));
     if(project_node->left_node() != nullptr) {
         intent_size += 2;
         ExplainLogicalPlan::Explain(project_node->left_node().get(), result, intent_size);
@@ -276,14 +296,21 @@ void
 ExplainLogicalPlan::Explain(const LogicalFilter* filter_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
-    String filter_str;
+    String filter_node_header;
     if(intent_size != 0) {
-        filter_str = String(intent_size - 2, ' ') + "-> FILTER: ";
+        filter_node_header = String(intent_size - 2, ' ') + "-> FILTER: ";
     } else {
-        filter_str = "FILTER: ";
+        filter_node_header = "FILTER: ";
     }
-    filter_str += filter_node->expression()->Name();
+
+    filter_node_header += "(" + std::to_string(filter_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(filter_node_header));
+
+    // filter expression
+    String filter_str = String(intent_size, ' ') + " - filter: ";
+    Explain(filter_node->expression().get(), filter_str);
     result->emplace_back(MakeShared<String>(filter_str));
+
     if(filter_node->left_node() != nullptr) {
         intent_size += 2;
         ExplainLogicalPlan::Explain(filter_node->left_node().get(), result, intent_size);
@@ -294,23 +321,38 @@ void
 ExplainLogicalPlan::Explain(const LogicalTableScan* table_scan_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
-    String table_scan_str;
+    String table_scan_header;
     if(intent_size != 0) {
-        table_scan_str = String(intent_size - 2, ' ') + "-> TABLE SCAN: ";
+        table_scan_header = String(intent_size - 2, ' ') + "-> TABLE SCAN: ";
     } else {
-        table_scan_str = "TABLE SCAN: ";
+        table_scan_header = "TABLE SCAN: ";
     }
 
-    table_scan_str += table_scan_node->table_alias_ + "(";
+    table_scan_header += "(" + std::to_string(table_scan_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(table_scan_header));
+
+    // Table alias and name
+    String table_name = String(intent_size, ' ') + " - table name: " + table_scan_node->table_alias_ + "(";
+    table_name += table_scan_node->table_ptr()->SchemaName() + ".";
+    table_name += table_scan_node->table_ptr()->TableName() + ")";
+    result->emplace_back(MakeShared<String>(table_name));
+
+    // Table index
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(table_scan_node->table_index_);
+    result->emplace_back(MakeShared<String>(table_index));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output_columns: [";
     SizeT column_count = table_scan_node->column_names_.size();
     if(column_count == 0) {
         PlannerError(fmt::format("No column in table: {}.", table_scan_node->table_alias_));
     }
     for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
-        table_scan_str += table_scan_node->column_names_[idx] + ", ";
+        output_columns += table_scan_node->column_names_[idx] + ", ";
     }
-    table_scan_str += table_scan_node->column_names_.back() + ")";
-    result->emplace_back(MakeShared<String>(table_scan_str));
+    output_columns += table_scan_node->column_names_.back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
 
     if(table_scan_node->left_node() != nullptr) {
         intent_size += 2;
@@ -322,38 +364,56 @@ void
 ExplainLogicalPlan::Explain(const LogicalAggregate* aggregate_node,
         SharedPtr<Vector<SharedPtr<String>>>& result,
         i64 intent_size) {
-    String agg_str;
-    if(intent_size != 0) {
-        agg_str = String(intent_size - 2, ' ') + "-> AGGREGATE: ";
-    } else {
-        agg_str = "AGGREGATE: ";
-    }
-
     SizeT groups_count = aggregate_node->groups_.size();
     SizeT aggregates_count = aggregate_node->aggregates_.size();
     if(groups_count == 0 && aggregate_node == 0) {
         PlannerError("Both groups and aggregates are empty.")
     }
 
+    String agg_header;
+    if(intent_size != 0) {
+        agg_header = String(intent_size - 2, ' ') + "-> AGGREGATE: ";
+    } else {
+        agg_header = "AGGREGATE: ";
+    }
+
+    agg_header += "(" + std::to_string(aggregate_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(agg_header));
+
+    // Aggregate Table index
+    String aggregate_table_index = String(intent_size, ' ') + " - aggregate table index: #"
+                                 + std::to_string(aggregate_node->aggregate_index_);
+    result->emplace_back(MakeShared<String>(aggregate_table_index));
+
+    // Aggregate expressions
+    String aggregate_expression_str = String(intent_size, ' ') + " - aggregate: [";
     if(aggregates_count != 0) {
         for(SizeT idx = 0; idx < aggregates_count - 1; ++ idx) {
-            agg_str += aggregate_node->aggregates_[idx]->Name() + ", ";
+            Explain(aggregate_node->aggregates_[idx].get(), aggregate_expression_str);
+            aggregate_expression_str += ", ";
         }
-        agg_str += aggregate_node->aggregates_.back()->Name();
-        if(groups_count != 0) {
-            agg_str += ", ";
-        }
+        Explain(aggregate_node->aggregates_.back().get(), aggregate_expression_str);
     }
+    aggregate_expression_str += "]";
+    result->emplace_back(MakeShared<String>(aggregate_expression_str));
+
+    // Group by expressions
 
     if(groups_count != 0) {
-        agg_str += "GROUP BY: ";
-        for(SizeT idx = 0; idx < groups_count - 1; ++ idx) {
-            agg_str += aggregate_node->groups_[idx]->Name() + ", ";
-        }
-        agg_str += aggregate_node->groups_.back()->Name();
-    }
+        // Group by table index
+        String group_table_index = String(intent_size, ' ') + " - group by table index: #"
+                                       + std::to_string(aggregate_node->groupby_index_);
+        result->emplace_back(MakeShared<String>(group_table_index));
 
-    result->emplace_back(MakeShared<String>(agg_str));
+        String group_by_expression_str = String(intent_size, ' ') + " - group by: [";
+        for(SizeT idx = 0; idx < groups_count - 1; ++ idx) {
+            Explain(aggregate_node->groups_[idx].get(), group_by_expression_str);
+            aggregate_expression_str += ", ";
+        }
+        Explain(aggregate_node->groups_.back().get(), group_by_expression_str);
+        group_by_expression_str += "]";
+        result->emplace_back(MakeShared<String>(group_by_expression_str));
+    }
 
     if(aggregate_node->left_node() != nullptr) {
         intent_size += 2;
@@ -365,22 +425,29 @@ void
 ExplainLogicalPlan::Explain(const LogicalSort* sort_node,
         SharedPtr<Vector<SharedPtr<String>>>& result,
         i64 intent_size) {
-    String sort_str;
+    String sort_header;
     if(intent_size != 0) {
-        sort_str = String(intent_size - 2, ' ') + "-> ORDER BY: ";
+        sort_header = String(intent_size - 2, ' ') + "-> ORDER BY: ";
     } else {
-        sort_str = "ORDER BY: ";
+        sort_header = "ORDER BY: ";
     }
 
+    sort_header += "(" + std::to_string(sort_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(sort_header));
+
+    String sort_expression_str = String(intent_size, ' ') + " - expressions: [";
     SizeT order_by_count = sort_node->expressions_.size();
     if(order_by_count == 0) {
         PlannerError("ORDER BY without any expression.")
     }
 
     for(SizeT idx = 0; idx < order_by_count - 1; ++ idx) {
-        sort_str += sort_node->expressions_[idx]->Name() + " " + ToString(sort_node->order_by_types_[idx]) + ", ";
+        Explain(sort_node->expressions_[idx].get(), sort_expression_str);
+        sort_expression_str += " " + ToString(sort_node->order_by_types_[idx]);
     }
-    result->emplace_back(MakeShared<String>(sort_str));
+    Explain(sort_node->expressions_.back().get(), sort_expression_str);
+    sort_expression_str += " " + ToString(sort_node->order_by_types_.back());
+    result->emplace_back(MakeShared<String>(sort_expression_str));
 
     if(sort_node->left_node() != nullptr) {
         intent_size += 2;
@@ -392,19 +459,25 @@ void
 ExplainLogicalPlan::Explain(const LogicalLimit* limit_node,
         SharedPtr<Vector<SharedPtr<String>>>& result,
         i64 intent_size) {
-    String limit_str;
+    String limit_header;
     if(intent_size != 0) {
-        limit_str = String(intent_size - 2, ' ') + "-> LIMIT: ";
+        limit_header = String(intent_size - 2, ' ') + "-> LIMIT: ";
     } else {
-        limit_str = "LIMIT: ";
+        limit_header = "LIMIT: ";
     }
 
-    limit_str += limit_node->limit_expression_->Name();
+    limit_header += "(" + std::to_string(limit_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(limit_header));
+
+    String limit_value_str = String(intent_size, ' ') + " - limit: ";
+    Explain(limit_node->limit_expression_.get(), limit_value_str);
+    result->emplace_back(MakeShared<String>(limit_value_str));
+
     if(limit_node->offset_expression_ != 0) {
-        limit_str += ", OFFSET: " + limit_node->offset_expression_->Name();
+        String offset_value_str = String(intent_size, ' ') + " - offset: ";
+        Explain(limit_node->offset_expression_.get(), offset_value_str);
+        result->emplace_back(MakeShared<String>(offset_value_str));
     }
-
-    result->emplace_back(MakeShared<String>(limit_str));
 
     if(limit_node->left_node() != nullptr) {
         intent_size += 2;
@@ -416,13 +489,19 @@ void
 ExplainLogicalPlan::Explain(const LogicalCrossProduct* cross_product_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
-    String cross_product_str;
+    String cross_product_header;
     if(intent_size != 0) {
-        cross_product_str = String(intent_size - 2, ' ') + "-> CROSS PRODUCT: ";
+        cross_product_header = String(intent_size - 2, ' ') + "-> CROSS PRODUCT: ";
     } else {
-        cross_product_str = "CROSS PRODUCT: ";
+        cross_product_header = "CROSS PRODUCT: ";
     }
-    result->emplace_back(MakeShared<String>(cross_product_str));
+    cross_product_header += "(" + std::to_string(cross_product_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(cross_product_header));
+
+    // Table index
+    // TODO: cross product shouldn't generate new table. It is to be deleted.
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(cross_product_node->table_index_);
+    result->emplace_back(MakeShared<String>(table_index));
 
     intent_size += 2;
     if(cross_product_node->left_node() != nullptr) {
@@ -438,11 +517,20 @@ void
 ExplainLogicalPlan::Explain(const LogicalJoin* join_node,
                             SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
-    String join_str;
+    String join_header;
     if(intent_size != 0) {
-        join_str = String(intent_size - 2, ' ') + "-> ";
+        join_header = String(intent_size - 2, ' ') + "-> ";
     }
-    join_str += ToString(join_node->join_type_) + ": ";
+    join_header += ToString(join_node->join_type_);
+    join_header += "(" + std::to_string(join_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(join_header));
+
+    // Table index
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(join_node->table_index_);
+    result->emplace_back(MakeShared<String>(table_index));
+
+    // Conditions
+    String condition_str = String(intent_size, ' ') + " - filters: [";
 
     SizeT conditions_count = join_node->conditions_.size();
     if(conditions_count == 0) {
@@ -450,10 +538,11 @@ ExplainLogicalPlan::Explain(const LogicalJoin* join_node,
     }
 
     for(SizeT idx = 0; idx < conditions_count - 1; ++ idx) {
-        join_str += join_node->conditions_[idx]->Name() + ", ";
+        Explain(join_node->conditions_[idx].get(), condition_str);
+        condition_str += ", ";
     }
-    join_str += join_node->conditions_.back()->Name();
-    result->emplace_back(MakeShared<String>(join_str));
+    Explain(join_node->conditions_.back().get(), condition_str);
+    result->emplace_back(MakeShared<String>(condition_str));
 
     intent_size += 2;
     if(join_node->left_node() != nullptr) {
@@ -481,6 +570,121 @@ ExplainLogicalPlan::Explain(const LogicalShow* show_node,
     if(show_node->left_node() != nullptr) {
         intent_size += 2;
         ExplainLogicalPlan::Explain(show_node->left_node().get(), result, intent_size);
+    }
+}
+
+void
+ExplainLogicalPlan::Explain(const BaseExpression* base_expression, String& expr_str) {
+    switch(base_expression->type()) {
+        case ExpressionType::kAggregate: {
+            AggregateExpression* aggregate_expression = (AggregateExpression*)base_expression;
+            PlannerAssert(aggregate_expression->arguments().size() == 1, "More than one argument in aggregate function")
+            expr_str += aggregate_expression->aggregate_function_.name() + "(";
+            Explain(aggregate_expression->arguments()[0].get(), expr_str);
+            expr_str += ")";
+            break;
+        }
+        case ExpressionType::kCast: {
+            CastExpression* cast_expression = (CastExpression*)base_expression;
+            PlannerAssert(cast_expression->arguments().size() == 1, "More than one argument in cast function")
+            expr_str += "CAST(";
+            Explain(cast_expression->arguments()[0].get(), expr_str);
+            expr_str += " AS " + cast_expression->Type().ToString() + ")";
+            break;
+        }
+        case ExpressionType::kCase: {
+            CaseExpression* case_expression = (CaseExpression*)base_expression;
+
+            expr_str += "CASE ";
+            for(auto& check: case_expression->CaseExpr()) {
+                expr_str += " WHEN(";
+                Explain(check.when_expr_.get(), expr_str);
+                expr_str += ")";
+
+                expr_str += " THEN(";
+                Explain(check.then_expr_.get(), expr_str);
+                expr_str += ")";
+            }
+
+            expr_str += " ELSE";
+            Explain(case_expression->ElseExpr().get(), expr_str);
+            expr_str += " END";
+            break;
+        }
+        case ExpressionType::kColumn: {
+            ColumnExpression* column_expression = (ColumnExpression*)base_expression;
+            expr_str += column_expression->Name() + " (#"
+                     + std::to_string(column_expression->binding().table_idx) + "."
+                     + std::to_string(column_expression->binding().column_idx) + ")";
+            break;
+        }
+        case ExpressionType::kFunction: {
+            FunctionExpression* function_expression = (FunctionExpression*)base_expression;
+            if(function_expression->arguments().empty()) {
+                // No argument function
+                expr_str += function_expression->func_.name() + "()";
+                break;
+            }
+
+            if(function_expression->arguments().size() == 1) {
+                // Unary function
+                expr_str += function_expression->func_.name() + "(";
+                Explain(function_expression->arguments()[0].get(), expr_str);
+                expr_str += ")";
+                break;
+            }
+            if(function_expression->arguments().size() == 2) {
+                // Binary function
+                Explain(function_expression->arguments()[0].get(), expr_str);
+                expr_str += " " + function_expression->func_.name() + " ";
+                Explain(function_expression->arguments()[1].get(), expr_str);
+                break;
+            }
+
+            // More than two arguments function
+            expr_str += function_expression->func_.name() + "(";
+            SizeT argument_count = function_expression->arguments().size();
+            for(SizeT idx = 0; idx < argument_count - 1; ++ idx) {
+                Explain(function_expression->arguments()[idx].get(), expr_str);
+                expr_str += ", ";
+            }
+            Explain(function_expression->arguments().back().get(), expr_str);
+            expr_str += ")";
+            break;
+        }
+        case ExpressionType::kBetween: {
+            BetweenExpression* between_expression = (BetweenExpression*)base_expression;
+            PlannerAssert(between_expression->arguments().size() == 3, "Between expression should have three arguments.")
+            Explain(between_expression->arguments()[0].get(), expr_str);
+            expr_str += " BETWEEN ";
+            Explain(between_expression->arguments()[1].get(), expr_str);
+            expr_str += " AND ";
+            Explain(between_expression->arguments()[2].get(), expr_str);
+            break;
+        }
+        case ExpressionType::kIn: {
+            InExpression* in_expression = (InExpression*)base_expression;
+            expr_str += "IN[";
+            SizeT argument_count = in_expression->arguments().size();
+            for(SizeT idx = 0; idx < argument_count - 1; ++ idx) {
+
+                Explain(in_expression->arguments()[idx].get(), expr_str);
+            }
+            Explain(in_expression->arguments().back().get(), expr_str);
+            expr_str += "]";
+            break;
+        }
+        case ExpressionType::kValue: {
+            ValueExpression* value_expression = (ValueExpression*)base_expression;
+            expr_str += value_expression->ToString();
+            break;
+        }
+        case ExpressionType::kSubQuery:
+        case ExpressionType::kCorrelatedColumn:
+        case ExpressionType::kReference:
+        default: {
+            PlannerError("Unsupported expression type")
+        }
     }
 }
 
