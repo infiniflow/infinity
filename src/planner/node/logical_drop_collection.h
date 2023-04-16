@@ -30,6 +30,11 @@ public:
         return MakeShared<Vector<String>>();
     }
 
+    [[nodiscard]] inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return MakeShared<Vector<DataType>>();
+    }
+
     String
     ToString(i64& space) final;
 

@@ -27,8 +27,11 @@ public:
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>>
+    [[nodiscard]] SharedPtr<Vector<String>>
     GetOutputNames() const final;
+
+    [[nodiscard]] SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final;
 
     [[nodiscard]] SharedPtr<Table>
     table_ptr() const {

@@ -27,6 +27,11 @@ public:
         return left_node_->GetOutputNames();
     }
 
+    [[nodiscard]] inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return left_node_->GetOutputTypes();
+    }
+
     [[nodiscard]] SharedPtr<View>
     view_ptr() const {
         return view_ptr_;

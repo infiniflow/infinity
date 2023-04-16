@@ -29,6 +29,9 @@ public:
     [[nodiscard]] SharedPtr<Vector<String>>
     GetOutputNames() const final;
 
+    [[nodiscard]] SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final;
+
     String
     ToString(i64 &space) final;
 

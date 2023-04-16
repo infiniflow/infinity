@@ -32,6 +32,9 @@ public:
     virtual SharedPtr<Vector<String>>
     GetOutputNames() const = 0;
 
+    virtual SharedPtr<Vector<DataType>>
+    GetOutputTypes() const = 0;
+
     [[nodiscard]] inline SharedPtr<LogicalNode>&
     left_node() {
         return left_node_;

@@ -28,6 +28,11 @@ public:
         return left_node_->GetOutputNames();
     }
 
+    [[nodiscard]] inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return left_node_->GetOutputTypes();
+    }
+
     String
     ToString(i64& space) final;
 

@@ -45,6 +45,23 @@ LogicalCrossProduct::GetOutputNames() const {
     return result;
 }
 
+SharedPtr<Vector<DataType>>
+LogicalCrossProduct::GetOutputTypes() const {
+    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
+    SharedPtr<Vector<DataType>> left_output_names = left_node_->GetOutputTypes();
+    SharedPtr<Vector<DataType>> right_output_names = right_node_->GetOutputTypes();
+    result->reserve(left_output_names->size() + right_output_names->size());
+    for(auto& name_str: *left_output_names) {
+        result->emplace_back(name_str);
+    }
+
+    for(auto& name_str: *right_output_names) {
+        result->emplace_back(name_str);
+    }
+
+    return result;
+}
+
 String
 LogicalCrossProduct::ToString(i64& space) {
     std::stringstream ss;

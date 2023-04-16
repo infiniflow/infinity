@@ -51,12 +51,25 @@ LogicalTableScan::GetColumnBindings() const {
 SharedPtr<Vector<String>>
 LogicalTableScan::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-    SizeT expression_count = column_names_.size();
-    result->reserve(expression_count);
-    for(SizeT i = 0; i < expression_count; ++ i) {
+    SizeT column_count = column_names_.size();
+    result->reserve(column_count);
+    for(SizeT i = 0; i < column_count; ++ i) {
         result->emplace_back(column_names_[i]);
     }
 
+    return result;
+}
+
+
+SharedPtr<Vector<DataType>>
+LogicalTableScan::GetOutputTypes() const {
+
+    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
+    SizeT column_count = column_types_.size();
+    result->reserve(column_count);
+    for(SizeT i = 0; i < column_count; ++ i) {
+        result->emplace_back(column_types_[i]);
+    }
     return result;
 }
 
