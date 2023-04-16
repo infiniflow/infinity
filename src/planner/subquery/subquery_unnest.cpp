@@ -260,7 +260,6 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             root = logical_join;
             // Generate result expression
             SharedPtr<Vector<String>> right_names = dependent_join->GetOutputNames();
-            ColumnBinding right_first_output_binding = subplan_column_bindings[0];
             SharedPtr<ColumnExpression> result = ColumnExpression::Make(expr_ptr->Type(),
                                                                         alias,
                                                                         logical_join->mark_index_,
@@ -270,7 +269,55 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             return result;
         }
         case SubqueryType::kNotExists: {
-            NotImplementError("Unnest correlated not exists subquery.");
+            DependentJoinFlattener dependent_join_flattener(bind_context);
+
+            dependent_join_flattener.DetectCorrelatedExpressions(subquery_plan);
+
+            // Push down the dependent join
+            auto dependent_join = dependent_join_flattener.PushDependentJoin(subquery_plan);
+            const Vector<ColumnBinding>& subplan_column_bindings = dependent_join->GetColumnBindings();
+
+            // Generate inner join
+            Vector<SharedPtr<BaseExpression>> join_conditions;
+            SizeT correlated_base_index = dependent_join_flattener.CorrelatedColumnBaseIndex();
+
+            GenerateJoinConditions(join_conditions,
+                                   correlated_columns,
+                                   subplan_column_bindings,
+                                   correlated_base_index);
+
+            u64 logical_node_id = bind_context->GetNewLogicalNodeId();
+            String alias = "logical_join" + std::to_string(logical_node_id);
+            SharedPtr<LogicalJoin> logical_join = MakeShared<LogicalJoin>(logical_node_id,
+                                                                          JoinType::kMark,
+                                                                          alias,
+                                                                          join_conditions,
+                                                                          root,
+                                                                          dependent_join);
+            logical_join->mark_index_ = bind_context->GenerateTableIndex();
+
+            root = logical_join;
+            // Generate result expression
+            SharedPtr<Vector<String>> right_names = dependent_join->GetOutputNames();
+            SharedPtr<ColumnExpression> mark_column = ColumnExpression::Make(expr_ptr->Type(),
+                                                                        alias,
+                                                                        logical_join->mark_index_,
+                                                                        right_names->at(0),
+                                                                        0,
+                                                                        0);
+
+            // Add NOT function on the mark column
+            auto& catalog = Infinity::instance().catalog();
+            SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName("not");
+            Vector<SharedPtr<BaseExpression>> function_arguments;
+            function_arguments.reserve(1);
+            function_arguments.emplace_back(mark_column);
+            auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+            ScalarFunction equi_function = scalar_function_set_ptr->GetMostMatchFunction(function_arguments);
+
+            SharedPtr<FunctionExpression> function_expr_ptr = MakeShared<FunctionExpression>(equi_function,
+                                                                                             function_arguments);
+            return function_expr_ptr;
         }
         case SubqueryType::kIn: {
             NotImplementError("Unnest correlated in subquery.");

@@ -43,6 +43,7 @@
 
 // Table function
 #include "table/table_scan.h"
+#include "function/scalar/not.h"
 
 namespace infinity {
 
@@ -78,6 +79,7 @@ BuiltinFunctions::RegisterScalarFunction() {
     // Logic functions
     RegisterAndFunction(catalog_ptr_);
     RegisterOrFunction(catalog_ptr_);
+    RegisterNotFunction(catalog_ptr_);
 
     // Math functions
     RegisterAbsFunction(catalog_ptr_);
