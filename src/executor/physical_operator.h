@@ -73,7 +73,6 @@ protected:
 
     std::weak_ptr<OperatorPipeline> operator_pipeline_{};
 
-
     SharedPtr<Table> output_{};
 };
 

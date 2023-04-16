@@ -498,11 +498,6 @@ ExplainLogicalPlan::Explain(const LogicalCrossProduct* cross_product_node,
     cross_product_header += "(" + std::to_string(cross_product_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(cross_product_header));
 
-    // Table index
-    // TODO: cross product shouldn't generate new table. It is to be deleted.
-    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(cross_product_node->table_index_);
-    result->emplace_back(MakeShared<String>(table_index));
-
     intent_size += 2;
     if(cross_product_node->left_node() != nullptr) {
         ExplainLogicalPlan::Explain(cross_product_node->left_node().get(), result, intent_size);
@@ -524,10 +519,6 @@ ExplainLogicalPlan::Explain(const LogicalJoin* join_node,
     join_header += ToString(join_node->join_type_);
     join_header += "(" + std::to_string(join_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(join_header));
-
-    // Table index
-    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(join_node->table_index_);
-    result->emplace_back(MakeShared<String>(table_index));
 
     // Conditions
     String condition_str = String(intent_size, ' ') + " - filters: [";

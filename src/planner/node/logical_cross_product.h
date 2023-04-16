@@ -13,7 +13,6 @@ public:
     explicit
     LogicalCrossProduct(u64 node_id,
                         String alias,
-                        u64 join_index,
                         const SharedPtr<LogicalNode>& left,
                         const SharedPtr<LogicalNode>& right);
 
@@ -32,7 +31,6 @@ public:
     }
 
     String alias_{};
-    u64 table_index_{};
 };
 
 }

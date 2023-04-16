@@ -10,10 +10,16 @@
 namespace infinity {
 class SubqueryTableRef: public TableRef {
 public:
-    explicit SubqueryTableRef(SharedPtr<BoundStatement> subquery_node, u64 table_index, String alias)
-        : TableRef(TableRefType::kSubquery, table_index, std::move(alias)), subquery_node_(std::move(subquery_node)) {}
+    explicit SubqueryTableRef(SharedPtr<BoundStatement> subquery_node,
+                              u64 table_index,
+                              String alias)
+        : TableRef(TableRefType::kSubquery, std::move(alias)),
+        subquery_node_(std::move(subquery_node)),
+        table_index_(table_index)
+        {}
 
     SharedPtr<BoundStatement> subquery_node_{nullptr};
+    u64 table_index_{};
 };
 
 }

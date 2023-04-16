@@ -15,7 +15,6 @@ namespace infinity {
 class PhysicalNestedLoopJoin : public PhysicalOperator {
 public:
     explicit PhysicalNestedLoopJoin(u64 id,
-                                    u64 table_index,
                                     JoinType join_type,
                                     Vector<SharedPtr<BaseExpression>> conditions,
                                     SharedPtr<PhysicalOperator> left,

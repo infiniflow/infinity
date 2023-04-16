@@ -15,7 +15,6 @@ public:
     LogicalJoin(u64 node_id,
                 JoinType join_type,
                 String alias,
-                u64 join_index,
                 Vector<SharedPtr<BaseExpression>> conditions,
                 const SharedPtr<LogicalNode>& left,
                 const SharedPtr<LogicalNode>& right);
@@ -35,7 +34,8 @@ public:
     }
 
     String alias_{};
-    u64 table_index_{};
+
+    u64 mark_index_{}; // Only for mark join
 
 public:
     JoinType join_type_{JoinType::kInner};

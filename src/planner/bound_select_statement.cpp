@@ -168,11 +168,11 @@ BoundSelectStatement::BuildCrossProductTable(SharedPtr<TableRef>& table_ref,
     auto right_node = BuildFrom(cross_product_table_ref->right_table_ref_, query_context_ptr, bind_context);
 
     // TODO: Merge bind context ?
-    String alias("cross_product" + std::to_string(cross_product_table_ref->table_index_));
+    u64 logical_node_id = bind_context->GetNewLogicalNodeId();
+    String alias("cross_product" + std::to_string(logical_node_id));
     SharedPtr<LogicalCrossProduct> logical_cross_product_node =
-            MakeShared<LogicalCrossProduct>(bind_context->GetNewLogicalNodeId(),
+            MakeShared<LogicalCrossProduct>(logical_node_id,
                                             alias,
-                                            cross_product_table_ref->table_index_,
                                             left_node,
                                             right_node);
     return logical_cross_product_node;
@@ -189,12 +189,12 @@ BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef>& table_ref,
     auto right_node = BuildFrom(join_table_ref->right_table_ref_, query_context_ptr, bind_context);
 
     // TODO: Merge bind context ?
-    String alias("join" + std::to_string(join_table_ref->table_index_));
+    u64 logical_node_id = bind_context->GetNewLogicalNodeId();
+    String alias("join" + std::to_string(logical_node_id));
     SharedPtr<LogicalJoin> logical_join_node =
-            MakeShared<LogicalJoin>(bind_context->GetNewLogicalNodeId(),
+            MakeShared<LogicalJoin>(logical_node_id,
                                     join_table_ref->join_type_,
                                     alias,
-                                    join_table_ref->table_index_,
                                     join_table_ref->on_conditions_,
                                     left_node,
                                     right_node);
@@ -205,11 +205,11 @@ SharedPtr<LogicalNode>
 BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef>& table_ref,
                                       const SharedPtr<QueryContext>& query_context_ptr,
                                       const SharedPtr<BindContext>& bind_context) {
-//    auto dummy_table_ref = std::static_pointer_cast<DummyTableRef>(table_ref);
-    String alias("DummyTable" + std::to_string(table_ref->table_index_));
-    SharedPtr<LogicalDummyScan> dummy_scan_node = MakeShared<LogicalDummyScan>(bind_context->GetNewLogicalNodeId(),
+    u64 logical_node_id = bind_context->GetNewLogicalNodeId();
+    String alias("DummyTable" + std::to_string(logical_node_id));
+    SharedPtr<LogicalDummyScan> dummy_scan_node = MakeShared<LogicalDummyScan>(logical_node_id,
                                                                                alias,
-                                                                               table_ref->table_index_);
+                                                                               bind_context->GenerateTableIndex());
     return dummy_scan_node;
 }
 

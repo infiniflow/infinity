@@ -164,12 +164,11 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
                 join_conditions.emplace_back(function_expr_ptr);
             }
 
-            SizeT join_table_index = bind_context_ptr_->GenerateTableIndex();
-            String alias = "logical_join" + std::to_string(join_table_index);
-            SharedPtr<LogicalJoin> logical_join = MakeShared<LogicalJoin>(bind_context_ptr_->GetNewLogicalNodeId(),
+            u64 logical_node_id = bind_context_ptr_->GetNewLogicalNodeId();
+            String alias = "logical_join" + std::to_string(logical_node_id);
+            SharedPtr<LogicalJoin> logical_join = MakeShared<LogicalJoin>(logical_node_id,
                                                                           JoinType::kInner,
                                                                           alias,
-                                                                          join_table_index,
                                                                           join_conditions,
                                                                           subquery_plan->left_node(),
                                                                           subquery_plan->right_node());
@@ -306,12 +305,11 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
             column_types);
 
     // Generate cross product
-    u64 cross_product_table_index = bind_context_ptr_->GenerateTableIndex();
-    String alias = "cross_product" + std::to_string(cross_product_table_index);
+    u64 logical_node_id = bind_context_ptr_->GetNewLogicalNodeId();
+    String alias = "cross_product" + std::to_string(logical_node_id);
     SharedPtr<LogicalCrossProduct> cross_product_node = MakeShared<LogicalCrossProduct>(
-            bind_context_ptr_->GetNewLogicalNodeId(),
+            logical_node_id,
             alias,
-            cross_product_table_index,
             subquery_plan,
             logical_table_scan);
 

@@ -13,8 +13,8 @@ class BindContext;
 class CrossProductTableRef: public TableRef {
 public:
     explicit
-    CrossProductTableRef(u64 table_index, String alias) :
-            TableRef(TableRefType::kCrossProduct, table_index, alias) {}
+    CrossProductTableRef(String alias) :
+            TableRef(TableRefType::kCrossProduct, alias) {}
 
 //    SharedPtr<BindContext> left_bind_context_{};
 //    SharedPtr<BindContext> right_bind_context_{};

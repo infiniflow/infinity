@@ -8,7 +8,7 @@ namespace infinity {
 
 class DummyTableRef: public TableRef  {
 public:
-    explicit DummyTableRef(u64 table_index) : TableRef(TableRefType::kDummy, table_index, "Dummy") {}
+    explicit DummyTableRef() : TableRef(TableRefType::kDummy, "Dummy") {}
 };
 
 }

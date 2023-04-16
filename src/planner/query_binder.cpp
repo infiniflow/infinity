@@ -360,9 +360,6 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
     PlannerAssert(base_table_ptr->kind() == BaseTableType::kTable, "Currently, collection isn't supported.");
     SharedPtr<Table> table_ptr = std::static_pointer_cast<Table>(base_table_ptr);
 
-    // TODO: Handle table and column alias
-    u64 table_index = this->bind_context_ptr_->GenerateTableIndex();
-
     String alias = from_table->GetTableName();
     Vector<DataType> types;
     Vector<String> names;
@@ -381,6 +378,7 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
     SharedPtr<TableScanFunction> scan_function = TableScanFunction::Make("seq_scan");
     SharedPtr<TableScanFunctionData> function_data = MakeShared<TableScanFunctionData>(table_ptr, columns);
 
+    u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(scan_function,
                                               function_data,
                                               alias,
@@ -485,8 +483,7 @@ QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
 
         SharedPtr<QueryBinder> cross_product_query_binder = MakeShared<QueryBinder>(query_context, cross_product_bind_context);
 
-        cross_product_table_ref = MakeShared<CrossProductTableRef>(cross_product_bind_context->GenerateTableIndex(),
-                                                                   "cross product");
+        cross_product_table_ref = MakeShared<CrossProductTableRef>("cross product");
         cross_product_table_ref->left_table_ref_ = left_table_ref;
         cross_product_table_ref->right_table_ref_ = right_table_ref;
 
@@ -503,8 +500,7 @@ QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
     this->bind_context_ptr_->AddLeftChild(left_bind_context);
     this->bind_context_ptr_->AddRightChild(right_bind_context);
 
-    cross_product_table_ref = MakeShared<CrossProductTableRef>(bind_context_ptr_->GenerateTableIndex(),
-                                                               "cross product");
+    cross_product_table_ref = MakeShared<CrossProductTableRef>("cross product");
     cross_product_table_ref->left_table_ref_ = left_table_ref;
     cross_product_table_ref->right_table_ref_ = right_table_ref;
 
@@ -522,7 +518,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
         alias = from_table->alias_->alias_;
     }
 
-    auto result = MakeShared<JoinTableRef>(bind_context_ptr_->GenerateTableIndex(), alias);
+    auto result = MakeShared<JoinTableRef>(alias);
 
     result->join_type_ = from_table->join_type_;
 
@@ -566,10 +562,8 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
 
         if(using_column_names.empty()) {
             // It is cross product, but not a natural join with dummy name
-            u64 cross_product_table_index = bind_context_ptr_->GenerateTableIndex();
-            String cross_product_table_name = "cross_product" + std::to_string(cross_product_table_index);
-            auto cross_product_table_ref = MakeShared<CrossProductTableRef>(cross_product_table_index,
-                                                                            cross_product_table_name);
+            String cross_product_table_name = "cross_product";
+            auto cross_product_table_ref = MakeShared<CrossProductTableRef>(cross_product_table_name);
 //            cross_product_table_ref->left_bind_context_ = result->left_bind_context_;
             cross_product_table_ref->left_table_ref_ = left_bound_table_ref;
 

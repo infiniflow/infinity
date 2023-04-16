@@ -13,8 +13,8 @@ class BindContext;
 
 class JoinTableRef: public TableRef {
 public:
-    explicit JoinTableRef(u64 table_index, String alias) :
-            TableRef(TableRefType::kJoin, table_index, std::move(alias))
+    explicit JoinTableRef(String alias) :
+            TableRef(TableRefType::kJoin, std::move(alias))
     {}
 
     SharedPtr<BindContext> left_bind_context_;

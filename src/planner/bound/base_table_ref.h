@@ -19,11 +19,12 @@ public:
                           u64 table_index,
                           const Vector<String>& column_names,
                           const Vector<DataType>& column_types)
-        : TableRef(TableRefType::kTable, table_index, alias),
+        : TableRef(TableRefType::kTable, alias),
           table_scan_func_(std::move(table_func)),
           table_scan_function_data_(std::move(table_func_data)),
           column_names_(column_names),
-          column_types_(column_types)
+          column_types_(column_types),
+          table_index_(table_index)
           {}
 
     SharedPtr<TableScanFunction> table_scan_func_{};
@@ -31,6 +32,7 @@ public:
 
     Vector<String> column_names_{};
     Vector<DataType> column_types_{};
+    u64 table_index_;
 };
 
 }

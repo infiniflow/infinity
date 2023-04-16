@@ -13,14 +13,12 @@ namespace infinity {
 class PhysicalCrossProduct : public PhysicalOperator {
 public:
     explicit PhysicalCrossProduct(u64 id,
-                                  u64 table_index,
                                   SharedPtr<PhysicalOperator> left,
                                   SharedPtr<PhysicalOperator> right)
         : PhysicalOperator(PhysicalOperatorType::kProduct,
                            std::move(left),
                            std::move(right),
-                           id),
-          output_table_index_(table_index)
+                           id)
         {}
 
     ~PhysicalCrossProduct() override = default;
@@ -34,7 +32,6 @@ public:
 private:
     SharedPtr<Table> left_table_{};
     SharedPtr<Table> right_table_{};
-    u64 output_table_index_{};
 };
 
 }

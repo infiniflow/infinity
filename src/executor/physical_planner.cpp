@@ -362,7 +362,6 @@ PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const
     right_physical_operator = BuildPhysicalOperator(right_node);
 
     return MakeShared<PhysicalNestedLoopJoin>(logical_operator->node_id(),
-                                              logical_join->table_index_,
                                               logical_join->join_type_,
                                               logical_join->conditions_,
                                               left_physical_operator,
@@ -387,7 +386,6 @@ PhysicalPlanner::BuildCrossProduct(const SharedPtr<LogicalNode> &logical_operato
     right_physical_operator = BuildPhysicalOperator(right_node);
 
     return MakeShared<PhysicalCrossProduct>(logical_operator->node_id(),
-                                            logical_cross_product->table_index_,
                                             left_physical_operator,
                                             right_physical_operator);
 }
