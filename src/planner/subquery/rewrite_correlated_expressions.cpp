@@ -27,7 +27,7 @@ RewriteCorrelatedExpressions::VisitReplace(const SharedPtr<ColumnExpression>& ex
         PlannerError("Correlated expression isn't found.")
     }
 
-    expression->SetBinding(parent_table_index_, right_offset_ + entry->second);
+    expression->SetBinding(base_binding_.table_idx, base_binding_.column_idx + entry->second);
     expression->SetDepth(0);
 
     return expression;

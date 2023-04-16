@@ -10,6 +10,8 @@ namespace infinity {
 
 struct ColumnBinding {
 
+    ColumnBinding() = default;
+
     explicit
     ColumnBinding(SizeT tbl_idx, SizeT col_idx) : table_idx(tbl_idx), column_idx(col_idx) {
     }

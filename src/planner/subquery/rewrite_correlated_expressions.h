@@ -12,13 +12,9 @@ class RewriteCorrelatedExpressions final : public LogicalNodeVisitor {
 public:
     explicit
     RewriteCorrelatedExpressions(const SharedPtr<BindContext> &bind_context_ptr,
-                                 SizeT parent_table_index,
-                                 SizeT left_offset,
-                                 SizeT right_offset)
+                                 ColumnBinding base_binding)
                                  :bind_context_ptr_(bind_context_ptr),
-                                 parent_table_index_(parent_table_index),
-                                 left_offset_(left_offset),
-                                 right_offset_(right_offset)
+                                 base_binding_(base_binding)
     {}
 
     void
@@ -32,9 +28,7 @@ public:
 
 private:
     const SharedPtr<BindContext> &bind_context_ptr_;
-    SizeT parent_table_index_{};
-    SizeT left_offset_{};
-    SizeT right_offset_{};
+    ColumnBinding base_binding_{};
 };
 
 }

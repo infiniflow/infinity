@@ -302,11 +302,12 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             root = logical_join;
             // Generate result expression
             SharedPtr<Vector<String>> right_names = dependent_join->GetOutputNames();
+            ColumnBinding right_first_output_binding = subplan_column_bindings[0];
             SharedPtr<ColumnExpression> result = ColumnExpression::Make(expr_ptr->Type(),
                                                                         alias,
-                                                                        join_table_index,
+                                                                        right_first_output_binding.table_idx,
                                                                         right_names->at(0),
-                                                                        root->GetOutputNames()->size(),
+                                                                        right_first_output_binding.column_idx,
                                                                         0);
             return result;
         }

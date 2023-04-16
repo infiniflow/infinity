@@ -24,7 +24,7 @@ public:
 
     inline SizeT
     CorrelatedColumnBaseIndex() const {
-        return right_offset_;
+        return correlated_expression_offset_;
     }
 
 private:
@@ -37,9 +37,8 @@ private:
 private:
     const SharedPtr<BindContext> &bind_context_ptr_;
     HashMap<u64, bool> operator2correlated_expression_map_;
-    SizeT parent_table_index_{};
-    SizeT right_offset_{};
-    SizeT left_offset_{};
+    ColumnBinding base_binding_{};
+    SizeT correlated_expression_offset_{};
 };
 
 }

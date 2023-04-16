@@ -62,9 +62,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
 
             // then we replace any correlated expressions with the corresponding entry in the correlated_map
             RewriteCorrelatedExpressions rewriter(bind_context_ptr_,
-                                                  parent_table_index_,
-                                                  left_offset_,
-                                                  right_offset_);
+                                                  base_binding_);
             rewriter.VisitNode(*subquery_plan);
 
             // Push the correlated column to the group by list
@@ -76,17 +74,18 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
                 SharedPtr<ColumnExpression> new_column = ColumnExpression::Make(
                         correlated_column->Type(),
                         correlated_column->table_name(),
-                        parent_table_index_,
+                        base_binding_.table_idx,
                         correlated_column->column_name(),
-                        right_offset_ + idx,
+                        base_binding_.column_idx + idx,
                         0);
                 aggregate_node->groups_.emplace_back(new_column);
             }
 
             // Update parent table information
-            parent_table_index_ = aggregate_node->groupby_index_;
-            left_offset_ = 0;
-            right_offset_ = column_count;
+            base_binding_.table_idx = aggregate_node->groupby_index_;
+            base_binding_.column_idx = aggregate_node->groups_.size() - column_count;
+
+            correlated_expression_offset_ = column_count;
 
             return subquery_plan;
         }
@@ -116,9 +115,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
 
             // then we replace any correlated expressions with the corresponding entry in the correlated_map
             RewriteCorrelatedExpressions rewriter(bind_context_ptr_,
-                                                  parent_table_index_,
-                                                  left_offset_,
-                                                  right_offset_);
+                                                  base_binding_);
             rewriter.VisitNode(*subquery_plan);
             return subquery_plan;
         }
@@ -130,9 +127,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
 
             // then we replace any correlated expressions with the corresponding entry in the correlated_map
             RewriteCorrelatedExpressions rewriter(bind_context_ptr_,
-                                                  parent_table_index_,
-                                                  left_offset_,
-                                                  right_offset_);
+                                                  base_binding_);
             rewriter.VisitNode(*subquery_plan);
 
             // Push the correlated column to the project list
@@ -144,17 +139,17 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
                 SharedPtr<ColumnExpression> new_column = ColumnExpression::Make(
                         correlated_column->Type(),
                         correlated_column->table_name(),
-                        parent_table_index_,
+                        base_binding_.table_idx,
                         correlated_column->column_name(),
-                        right_offset_ + idx,
+                        base_binding_.column_idx + idx,
                         0);
                 project_node->expressions_.emplace_back(new_column);
             }
 
             // Update parent table information
-            parent_table_index_ = project_node->table_index_;
-            left_offset_ = 0;
-            right_offset_ = column_count;
+            base_binding_.table_idx = project_node->table_index_;
+            base_binding_.column_idx = project_node->expressions_.size() - column_count;
+            correlated_expression_offset_ = column_count;
             return subquery_plan;
         }
         case LogicalNodeType::kSort: {
@@ -247,9 +242,10 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
             subquery_plan,
             logical_table_scan);
 
-    this->parent_table_index_ = cross_product_table_index;
-    this->right_offset_ = subquery_plan->GetOutputNames()->size();
-    this->left_offset_ = 0;
+    this->base_binding_.table_idx = table_index;
+    this->base_binding_.column_idx = 0;
+
+    this->correlated_expression_offset_ = subquery_plan->GetOutputNames()->size();
 
     return cross_product_node;
 }
