@@ -37,6 +37,13 @@ public:
                      SharedPtr<LogicalNode>& subquery_plan,
                      const SharedPtr<QueryContext>& query_context_ptr,
                      const SharedPtr<BindContext>& bind_context);
+
+private:
+    static void
+    GenerateJoinConditions(Vector<SharedPtr<BaseExpression>>& conditions,
+                           const Vector<SharedPtr<ColumnExpression>>& correlated_columns,
+                           const Vector<ColumnBinding>& subplan_column_bindings,
+                           SizeT correlated_base_index);
 };
 
 }
