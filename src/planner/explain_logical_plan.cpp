@@ -443,7 +443,7 @@ ExplainLogicalPlan::Explain(const LogicalSort* sort_node,
 
     for(SizeT idx = 0; idx < order_by_count - 1; ++ idx) {
         Explain(sort_node->expressions_[idx].get(), sort_expression_str);
-        sort_expression_str += " " + ToString(sort_node->order_by_types_[idx]);
+        sort_expression_str += " " + ToString(sort_node->order_by_types_[idx]) + ", ";
     }
     Explain(sort_node->expressions_.back().get(), sort_expression_str);
     sort_expression_str += " " + ToString(sort_node->order_by_types_.back());

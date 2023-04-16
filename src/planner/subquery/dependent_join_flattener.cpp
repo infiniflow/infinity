@@ -9,6 +9,8 @@
 #include "rewrite_correlated_expressions.h"
 #include "planner/node/logical_project.h"
 #include "planner/node/logical_aggregate.h"
+#include "function/scalar_function_set.h"
+#include "planner/node/logical_join.h"
 
 namespace infinity {
 
@@ -34,7 +36,7 @@ DependentJoinFlattener::DetectCorrelatedExpressions(const SharedPtr<LogicalNode>
     }
 
     operator2correlated_expression_map_[logical_node->node_id()] = is_correlated;
-    return true;
+    return is_correlated;
 }
 
 SharedPtr<LogicalNode>
@@ -100,8 +102,79 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
             break;
         }
         case LogicalNodeType::kCrossProduct: {
-            PlannerError("Can't push down through cross product node");
-            break;
+            bool left_has_correlated_expr
+                = operator2correlated_expression_map_.contains(subquery_plan->left_node()->node_id());
+            bool right_has_correlated_expr
+                = operator2correlated_expression_map_.contains(subquery_plan->right_node()->node_id());
+
+            if(!right_has_correlated_expr) {
+                auto pushed_plan = PushDependentJoinInternal(subquery_plan->left_node());
+                subquery_plan->set_left_node(pushed_plan);
+                return subquery_plan;
+            }
+            if(!left_has_correlated_expr) {
+                auto pushed_plan = PushDependentJoinInternal(subquery_plan->right_node());
+                subquery_plan->set_right_node(pushed_plan);
+                return subquery_plan;
+            }
+
+            // Both sides have correlated expression
+            auto left_pushed_plan = PushDependentJoinInternal(subquery_plan->left_node());
+            auto left_correlated_binding = this->base_binding_;
+            auto right_pushed_plan = PushDependentJoinInternal(subquery_plan->right_node());
+            auto right_correlated_binding = this->base_binding_;
+
+            auto& catalog = Infinity::instance().catalog();
+            SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName("=");
+            Vector<SharedPtr<BaseExpression>> join_conditions;
+
+            SizeT column_count = bind_context_ptr_->correlated_column_exprs_.size();
+            join_conditions.reserve(column_count);
+            for(SizeT idx = 0; idx < column_count; ++ idx) {
+                SizeT left_correlated_column_index = left_correlated_binding.column_idx + idx;
+                SizeT right_correlated_column_index = right_correlated_binding.column_idx + idx;
+
+                SharedPtr<ColumnExpression> left_column_expr
+                    = ColumnExpression::Make(bind_context_ptr_->correlated_column_exprs_[idx]->Type(),
+                                             bind_context_ptr_->correlated_column_exprs_[idx]->table_name(),
+                                             left_correlated_binding.table_idx,
+                                             bind_context_ptr_->correlated_column_exprs_[idx]->column_name(),
+                                             left_correlated_column_index,
+                                             0);
+
+                SharedPtr<ColumnExpression> right_column_expr
+                        = ColumnExpression::Make(bind_context_ptr_->correlated_column_exprs_[idx]->Type(),
+                                                 bind_context_ptr_->correlated_column_exprs_[idx]->table_name(),
+                                                 right_correlated_binding.table_idx,
+                                                 bind_context_ptr_->correlated_column_exprs_[idx]->column_name(),
+                                                 right_correlated_column_index,
+                                                 0);
+
+                // Generate join condition expression
+                Vector<SharedPtr<BaseExpression>> function_arguments;
+                function_arguments.reserve(2);
+                function_arguments.emplace_back(left_column_expr);
+                function_arguments.emplace_back(right_column_expr);
+
+                auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+                ScalarFunction equi_function = scalar_function_set_ptr->GetMostMatchFunction(function_arguments);
+
+                SharedPtr<FunctionExpression> function_expr_ptr = MakeShared<FunctionExpression>(equi_function,
+                                                                                                 function_arguments);
+                join_conditions.emplace_back(function_expr_ptr);
+            }
+
+            SizeT join_table_index = bind_context_ptr_->GenerateTableIndex();
+            String alias = "logical_join" + std::to_string(join_table_index);
+            SharedPtr<LogicalJoin> logical_join = MakeShared<LogicalJoin>(bind_context_ptr_->GetNewLogicalNodeId(),
+                                                                          JoinType::kInner,
+                                                                          alias,
+                                                                          join_table_index,
+                                                                          join_conditions,
+                                                                          subquery_plan->left_node(),
+                                                                          subquery_plan->right_node());
+
+            return logical_join;
         }
         case LogicalNodeType::kLimit: {
             PlannerError("Can't push down through limit node");
