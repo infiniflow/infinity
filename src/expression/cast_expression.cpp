@@ -130,7 +130,7 @@ String
 CastExpression::ToString() const {
     std::stringstream ss;
 
-    ss << "Cast(" << arguments_[0]->Name() << " As " << target_type_.ToString();
+    ss << "Cast(" << arguments_[0]->Name() << " As " << target_type_.ToString() << ")";
 
     return ss.str();
 }

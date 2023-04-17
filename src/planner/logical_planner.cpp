@@ -176,6 +176,11 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
         value_list = rewrite_value_list;
     } else {
         SizeT table_column_count = table_ptr->ColumnCount();
+        if(value_list.size() != table_column_count) {
+            PlannerError(fmt::format("INSERT: Table column count ({}) and input value count mismatch ({})",
+                                     table_column_count,
+                                     value_list.size()));
+        }
 
         // Create value list with table column size and null value
         Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
