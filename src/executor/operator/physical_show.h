@@ -39,6 +39,17 @@ public:
     scan_type() const {
         return scan_type_;
     }
+
+    inline const String&
+    schema_name() const {
+        return schema_name_;
+    };
+
+    inline const String&
+    object_name() const {
+        return object_name_;
+    };
+
 private:
     void
     ExecuteShowTable(SharedPtr<QueryContext>& query_context);

@@ -48,7 +48,7 @@ public:
     }
 
     u64
-    operator_id() const {
+    node_id() const {
         return operator_id_;
     }
 

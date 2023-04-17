@@ -48,6 +48,16 @@ public:
     void
     SimpleAggregate(SharedPtr<Table>& output_table);
 
+    inline u64
+    GroupTableIndex() const {
+        return groupby_index_;
+    }
+
+    inline u64
+    AggregateTableIndex() const {
+        return aggregate_index_;
+    }
+
 private:
     SharedPtr<Table> input_table_{};
     u64 groupby_index_{};

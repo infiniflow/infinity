@@ -32,6 +32,11 @@ public:
 
     Vector<SharedPtr<BaseExpression>> expressions_{};
 
+    inline u64
+    TableIndex() const {
+        return projection_table_index_;
+    }
+
 private:
 //    ExpressionExecutor executor;
     u64 projection_table_index_{};

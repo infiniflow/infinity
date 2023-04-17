@@ -25,7 +25,7 @@ SharedPtr<OperatorPipeline> OperatorPipeline::Create(const SharedPtr<PhysicalOpe
 }
 
 OperatorPipeline::OperatorPipeline(SharedPtr<PhysicalOperator> op)
-    : Pipeline(op->operator_id()), operator_(std::move(op)) {}
+    : Pipeline(op->node_id()), operator_(std::move(op)) {}
 
 void
 OperatorPipeline::OnExecute(SharedPtr<QueryContext>& query_context) {

@@ -296,8 +296,8 @@ void
 PhysicalShow::ExecuteShowTableDetail(SharedPtr<QueryContext>& query_context,
                                      const SharedPtr<Table>& table_ptr) {
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column name", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column type", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column_name", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column_type", HashSet<ConstraintType>()),
             MakeShared<ColumnDef>(3, DataType(LogicalType::kVarchar), "constraint", HashSet<ConstraintType>()),
     };
 
@@ -355,8 +355,8 @@ void
 PhysicalShow::ExecuteShowCollectionDetail(SharedPtr<QueryContext>& query_context,
                                           const SharedPtr<Collection>& collection_ptr) {
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column name", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column type", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column_name", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column_type", HashSet<ConstraintType>()),
             MakeShared<ColumnDef>(3, DataType(LogicalType::kVarchar), "constraint", HashSet<ConstraintType>()),
     };
 
@@ -415,8 +415,8 @@ void
 PhysicalShow::ExecuteShowViewDetail(SharedPtr<QueryContext>& query_context,
                                     const SharedPtr<View>& view_ptr) {
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column name", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column type", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column_name", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column_type", HashSet<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);

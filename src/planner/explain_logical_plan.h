@@ -21,6 +21,8 @@
 #include "planner/node/logical_join.h"
 #include "planner/node/logical_insert.h"
 #include "planner/node/logical_show.h"
+#include "planner/node/logical_create_view.h"
+#include "planner/node/logical_drop_view.h"
 
 namespace infinity {
 
@@ -47,6 +49,11 @@ public:
             i64 intent_size = 0);
 
     static void
+    Explain(const LogicalCreateView* create_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
     Explain(const LogicalDropSchema* drop_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
@@ -58,6 +65,11 @@ public:
 
     static void
     Explain(const LogicalDropCollection* drop_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalDropView* drop_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 

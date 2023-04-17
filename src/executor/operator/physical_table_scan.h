@@ -52,6 +52,16 @@ public:
         return column_types_;
     }
 
+    inline const SharedPtr<TableScanFunctionData>&
+    function_data() const {
+        return table_scan_function_data_ptr_;
+    }
+
+    inline u64
+    TableIndex() const {
+        return table_index_;
+    }
+
 private:
     String table_alias_{};
     u64 table_index_{};

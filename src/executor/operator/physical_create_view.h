@@ -47,6 +47,11 @@ public:
         return types_ptr_;
     };
 
+    inline const SharedPtr<CreateViewInfo>&
+    create_view_info() const {
+        return create_view_info_;
+    }
+
 private:
     SharedPtr<CreateViewInfo> create_view_info_{nullptr};
 

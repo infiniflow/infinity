@@ -50,6 +50,11 @@ public:
         return conflict_type_;
     }
 
+    inline const SharedPtr<String>&
+    schema_name() const {
+        return schema_name_;
+    }
+
 private:
     SharedPtr<TableDef> table_def_ptr_{};
     SharedPtr<String> schema_name_{};

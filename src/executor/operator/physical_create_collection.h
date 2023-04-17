@@ -33,12 +33,12 @@ public:
         return table_index_;
     }
 
-    inline SharedPtr<String>
+    inline const SharedPtr<String>&
     schema_name() const {
         return schema_name_;
     }
 
-    inline SharedPtr<String>
+    inline const SharedPtr<String>&
     collection_name() const {
         return collection_name_;
     }
