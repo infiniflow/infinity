@@ -11,6 +11,7 @@
 #include "expression/subquery_expression.h"
 #include "expression/value_expression.h"
 #include "expression/in_expression.h"
+#include "expression/reference_expression.h"
 
 namespace infinity {
 
@@ -658,8 +659,8 @@ ExplainLogicalPlan::Explain(const BaseExpression* base_expression, String& expr_
             expr_str += "IN[";
             SizeT argument_count = in_expression->arguments().size();
             for(SizeT idx = 0; idx < argument_count - 1; ++ idx) {
-
                 Explain(in_expression->arguments()[idx].get(), expr_str);
+                expr_str += ", ";
             }
             Explain(in_expression->arguments().back().get(), expr_str);
             expr_str += "]";
@@ -670,9 +671,15 @@ ExplainLogicalPlan::Explain(const BaseExpression* base_expression, String& expr_
             expr_str += value_expression->ToString();
             break;
         }
+        case ExpressionType::kReference: {
+            ReferenceExpression* reference_expression = (ReferenceExpression*)base_expression;
+            expr_str += reference_expression->Name() + " (#"
+                        + std::to_string(reference_expression->column_index()) + ")";
+            break;
+        }
         case ExpressionType::kSubQuery:
         case ExpressionType::kCorrelatedColumn:
-        case ExpressionType::kReference:
+
         default: {
             PlannerError("Unsupported expression type")
         }
