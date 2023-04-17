@@ -182,17 +182,6 @@ BindContext::AddRightChild(const SharedPtr<BindContext>& right_child) {
 }
 
 void
-BindContext::AddSubQueryChild(const SharedPtr<BindContext>& child) {
-    this->subquery_children_.emplace_back(child);
-
-    // Child query has only one row, parent query will also only have one row.
-    if(child->single_row) {
-        this->single_row = child->single_row;
-    }
-    // TODO: need merge bind context?
-}
-
-void
 BindContext::AddBindContext(const SharedPtr<BindContext>& other_ptr) {
 
     table_names_.reserve(table_names_.size() + other_ptr->table_names_.size());
@@ -262,8 +251,14 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
             }
 
             String& binding_name = binding_names[0];
-            auto binding = binding_by_name_[binding_name];
 
+            auto binding_iter = binding_by_name_.find(binding_name);
+            if(binding_iter == binding_by_name_.end()) {
+                // Found the binding, but the binding don't have the column, which should happen.
+                PlannerError(column_identifier.ToString() + " doesn't exist.");
+            }
+
+            const auto& binding = binding_iter->second;
             if(binding->name2index_.contains(column_name_ref)) {
                 i64 column_id = binding->name2index_[column_name_ref];
                 bound_column_expr = ColumnExpression::Make(
@@ -286,8 +281,9 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
         }
     } else {
         const String& table_name_ref = *column_identifier.table_name_ptr_;
-        auto binding = binding_by_name_[table_name_ref];
-        if(binding != nullptr) {
+        auto binding_iter = binding_by_name_.find(table_name_ref);
+        if(binding_iter != binding_by_name_.end()) {
+            const auto& binding = binding_iter->second;
             if(binding->name2index_.contains(column_name_ref)) {
                 // Find the table and column in the bind context.
                 i64 column_id = binding->name2index_[column_name_ref];
@@ -323,13 +319,26 @@ void
 BindContext::AddCorrelatedColumnExpr(const SharedPtr<ColumnExpression>& correlated_column) {
     if(parent_ != nullptr) {
         parent_->AddCorrelatedColumnExpr(correlated_column);
-    } else {
-        if(correlated_column_map_.contains(correlated_column->binding())) {
-            return ;
-        }
-        correlated_column_map_.emplace(correlated_column->binding(), correlated_column_exprs_.size());
-        correlated_column_exprs_.emplace_back(correlated_column);
     }
+
+    // Not only parent bind context need have the correlated column expression but also current bind context
+    if(correlated_column_map_.contains(correlated_column->binding())) {
+        return ;
+    }
+    correlated_column_map_.emplace(correlated_column->binding(), correlated_column_exprs_.size());
+    correlated_column_exprs_.emplace_back(correlated_column);
+}
+
+const Binding*
+BindContext::GetBindingFromCurrentOrParentByName(const String& binding_name) const {
+    auto binding_iter = binding_by_name_.find(binding_name);
+    if(binding_iter == binding_by_name_.end()) {
+        if(parent_ != nullptr) {
+            return parent_->GetBindingFromCurrentOrParentByName(binding_name);
+        }
+        return nullptr;
+    }
+    return binding_iter->second.get();
 }
 
 //void

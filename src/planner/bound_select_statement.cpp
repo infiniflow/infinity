@@ -25,9 +25,9 @@
 namespace infinity {
 
 SharedPtr<LogicalNode>
-BoundSelectStatement::BuildPlan(const SharedPtr<QueryContext>& query_context_ptr,
-                                const SharedPtr<BindContext>& bind_context) {
+BoundSelectStatement::BuildPlan(const SharedPtr<QueryContext>& query_context_ptr) {
 
+    const SharedPtr<BindContext>& bind_context = this->bind_context_;
     SharedPtr<LogicalNode> root = BuildFrom(table_ref_ptr_,
                                             query_context_ptr,
                                             bind_context);
@@ -153,7 +153,7 @@ BoundSelectStatement::BuildSubqueryTable(SharedPtr<TableRef>& table_ref,
                                          const SharedPtr<BindContext>& bind_context) {
     // SharedPtr<SubqueryTableRef> subquery_table_ref
     auto subquery_table_ref = std::static_pointer_cast<SubqueryTableRef>(table_ref);
-    SharedPtr<LogicalNode> subquery = subquery_table_ref->subquery_node_->BuildPlan(query_context_ptr, bind_context);
+    SharedPtr<LogicalNode> subquery = subquery_table_ref->subquery_node_->BuildPlan(query_context_ptr);
     return subquery;
 }
 
@@ -268,23 +268,22 @@ BoundSelectStatement::UnnestSubquery(SharedPtr<LogicalNode>& root,
 //    SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(query_context_ptr,
 //                                                                      bind_context);
     SubqueryExpression* subquery_expr_ptr = (SubqueryExpression*)condition.get();
-    SharedPtr<LogicalNode> subquery_plan = subquery_expr_ptr->bound_select_statement_ptr_->BuildPlan(query_context_ptr,
-                                                                                                     bind_context);
+    SharedPtr<LogicalNode> subquery_plan = subquery_expr_ptr->bound_select_statement_ptr_->BuildPlan(query_context_ptr);
     SharedPtr<BaseExpression> return_expr = nullptr;
-    if(bind_context->HasCorrelatedColumn()) {
+    if(subquery_expr_ptr->bound_select_statement_ptr_->bind_context_->HasCorrelatedColumn()) {
         // If correlated subquery
         return_expr = SubqueryUnnest::UnnestCorrelated(subquery_expr_ptr,
                                                        root,
                                                        subquery_plan,
                                                        query_context_ptr,
-                                                       bind_context);
+                                                       subquery_expr_ptr->bound_select_statement_ptr_->bind_context_);
     } else {
         // If uncorrelated subquery
         return_expr = SubqueryUnnest::UnnestUncorrelated(subquery_expr_ptr,
                                                          root,
                                                          subquery_plan,
                                                          query_context_ptr,
-                                                         bind_context);
+                                                         subquery_expr_ptr->bound_select_statement_ptr_->bind_context_);
     }
     building_subquery_ = false;
     return return_expr;

@@ -87,7 +87,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
             base_binding_.table_idx = aggregate_node->groupby_index_;
             base_binding_.column_idx = aggregate_node->groups_.size() - column_count;
 
-            correlated_expression_offset_ = column_count;
+            correlated_expression_offset_ = base_binding_.column_idx;
 
             return subquery_plan;
         }
@@ -221,7 +221,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
             // Update parent table information
             base_binding_.table_idx = project_node->table_index_;
             base_binding_.column_idx = project_node->expressions_.size() - column_count;
-            correlated_expression_offset_ = column_count;
+            correlated_expression_offset_ = base_binding_.column_idx;
             return subquery_plan;
         }
         case LogicalNodeType::kSort: {
@@ -286,19 +286,19 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
         column_ids.emplace_back(correlated_columns[idx]->binding().column_idx);
     }
 
-    if(!bind_context_ptr_->binding_by_name_.contains(correlated_columns[0]->table_name())) {
+    const Binding* table_binding_ptr
+        = bind_context_ptr_->GetBindingFromCurrentOrParentByName(correlated_columns[0]->table_name());
+    if(table_binding_ptr == nullptr) {
         PlannerError(fmt::format("Can't find table: {} in binding context.", correlated_columns[0]->table_name()));
     }
-
-    const SharedPtr<Binding>& table_binding = bind_context_ptr_->binding_by_name_[correlated_columns[0]->table_name()];
 
     SharedPtr<TableScanFunction> scan_function = TableScanFunction::Make("seq_scan");
 
     SharedPtr<LogicalTableScan> logical_table_scan = MakeShared<LogicalTableScan>(
             bind_context_ptr_->GetNewLogicalNodeId(),
-            table_binding->table_ptr_,
+            table_binding_ptr->table_ptr_,
             scan_function,
-            table_binding->table_name_,
+            table_binding_ptr->table_name_,
             table_index,
             column_ids,
             column_names,

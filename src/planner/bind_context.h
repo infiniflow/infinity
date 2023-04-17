@@ -65,8 +65,6 @@ public:
     SharedPtr<BindContext> left_child_;
     SharedPtr<BindContext> right_child_;
 
-    Vector<SharedPtr<BindContext>> subquery_children_;
-
     // CTE from CTE alias -> CTE statement
     HashMap<String, SharedPtr<CommonTableExpressionInfo>> CTE_map_;
 
@@ -134,8 +132,6 @@ public:
 
     bool single_row = false;
 public:
-    void
-    AddSubQueryChild(const SharedPtr<BindContext>& child);
 
     void
     AddLeftChild(const SharedPtr<BindContext>& left_child);
@@ -228,6 +224,9 @@ public:
         }
         PlannerError(fmt::format("Can't get table name by table index: {}", index));
     }
+
+    const Binding*
+    GetBindingFromCurrentOrParentByName(const String& binding_name) const;
 
 private:
     void

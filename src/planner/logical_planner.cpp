@@ -91,7 +91,7 @@ LogicalPlanner::BuildSelect(const SelectStatement* statement, SharedPtr<BindCont
     SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_,
                                                                       bind_context_ptr);
     SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*statement);
-    this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_, bind_context_ptr);
+    this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
 }
 
 void
@@ -289,7 +289,7 @@ LogicalPlanner::BuildCreateTable(const CreateStatement* statement, SharedPtr<Bin
         SharedPtr<BindContext> select_bind_context_ptr = BindContext::Make(nullptr);
         QueryBinder select_query_binder(this->query_context_ptr_, select_bind_context_ptr);
         SharedPtr<BoundSelectStatement> bound_statement_ptr = select_query_binder.BindSelect(*create_table_info->select_);
-        logical_create_table_operator->set_left_node(bound_statement_ptr->BuildPlan(this->query_context_ptr_, bind_context_ptr));
+        logical_create_table_operator->set_left_node(bound_statement_ptr->BuildPlan(this->query_context_ptr_));
     }
 
     this->logical_plan_ = logical_create_table_operator;

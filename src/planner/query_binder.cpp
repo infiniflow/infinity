@@ -26,7 +26,7 @@ namespace infinity {
 
 SharedPtr<BoundSelectStatement>
 QueryBinder::BindSelect(const SelectStatement& statement) {
-    SharedPtr<BoundSelectStatement> bound_select_statement = BoundSelectStatement::Make();
+    SharedPtr<BoundSelectStatement> bound_select_statement = BoundSelectStatement::Make(bind_context_ptr_);
     PlannerAssert(statement.select_list_ != nullptr, "SELECT list is needed");
     PlannerAssert(!statement.select_list_->empty(), "SELECT list can't be empty");
 
@@ -263,9 +263,6 @@ QueryBinder::BuildSubquery(SharedPtr<QueryContext>& query_context,
     QueryBinder subquery_binder(this->query_context_ptr_, subquery_bind_context_ptr);
     SharedPtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*subquery_ref->select_statement_);
 
-//    auto bound_select_node_ptr = PlanBuilder::BuildSelect(query_context, select_stmt, subquery_bind_context_ptr);
-    this->bind_context_ptr_->AddSubQueryChild(subquery_bind_context_ptr);
-
     // Get the subquery result table index as the new from table index
     u64 subquery_table_index = bound_statement_ptr->result_index_;
 
@@ -323,8 +320,6 @@ QueryBinder::BuildCTE(SharedPtr<QueryContext>& query_context,
     // Create bound select node and subquery table reference
     QueryBinder subquery_binder(this->query_context_ptr_, subquery_bind_context_ptr);
     SharedPtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*cte->select_statement_);
-
-    this->bind_context_ptr_->AddSubQueryChild(subquery_bind_context_ptr);
 
     u64 cte_table_index = bound_statement_ptr->result_index_;
     // Add binding into bind context
@@ -415,8 +410,6 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
     // Create bound select node and subquery table reference
     QueryBinder subquery_binder(this->query_context_ptr_, view_bind_context_ptr);
     SharedPtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*select_stmt_ptr);
-
-    this->bind_context_ptr_->AddSubQueryChild(view_bind_context_ptr);
 
     // View table index is the output index of view.
     u64 view_index = bound_statement_ptr->result_index_;

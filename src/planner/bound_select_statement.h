@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "planner/bound/table_ref.h"
 #include "bound_statement.h"
 
@@ -12,14 +14,16 @@ namespace infinity {
 struct BoundSelectStatement final : public BoundStatement {
 public:
     static inline SharedPtr<BoundSelectStatement>
-    Make() {
-        return MakeShared<BoundSelectStatement>();
+    Make(SharedPtr<BindContext> bind_context) {
+        return MakeShared<BoundSelectStatement>(std::move(bind_context));
     }
 
 public:
+    inline explicit
+    BoundSelectStatement(SharedPtr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
+
     SharedPtr<LogicalNode>
-    BuildPlan(const SharedPtr<QueryContext>& query_context_ptr,
-              const SharedPtr<BindContext>& bind_context) final;
+    BuildPlan(const SharedPtr<QueryContext>& query_context_ptr) final;
 
     SharedPtr<LogicalNode>
     BuildFrom(SharedPtr<TableRef>& table_ref,
@@ -71,6 +75,8 @@ public:
                    const SharedPtr<BindContext>& bind_context);
 
 public:
+    SharedPtr<BindContext> bind_context_{};
+
     // From clause
     SharedPtr<TableRef> table_ref_ptr_{};
 

@@ -43,7 +43,7 @@ SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpression>& expr_ptr,
     // 1. Check the subquery type: uncorrelated subquery or correlated subquery.
     auto subquery_expr = std::static_pointer_cast<SubqueryExpression>(expr_ptr);
 
-    auto right = subquery_expr->bound_select_statement_ptr_->BuildPlan(query_context_ptr, bind_context);
+    auto right = subquery_expr->bound_select_statement_ptr_->BuildPlan(query_context_ptr);
     // TODO: if the correlated information of the subquery should be stored in bind context.
     // Check the correlated information
     auto result = UnnestUncorrelated(subquery_expr.get(), root, right, query_context_ptr, bind_context);
@@ -352,13 +352,13 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
                                                                                         subplan_column_bindings[0].column_idx,
                                                                                         0);
 
-            if(expr_ptr->Type() == subplan_column_types->at(0)) {
+            if(expr_ptr->left_->Type() == subplan_column_types->at(0)) {
                 in_arguments.emplace_back(subquery_output_column);
             } else {
-                BoundCastFunc cast = CastFunction::GetBoundFunc(subplan_column_types->at(0), expr_ptr->Type());
+                BoundCastFunc cast = CastFunction::GetBoundFunc(subplan_column_types->at(0), expr_ptr->left_->Type());
                 SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast,
                                                                                  subquery_output_column,
-                                                                                 expr_ptr->Type());
+                                                                                 expr_ptr->left_->Type());
                 in_arguments.emplace_back(cast_expr);
             }
 
