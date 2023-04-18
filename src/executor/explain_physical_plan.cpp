@@ -516,6 +516,18 @@ ExplainPhysicalPlan::Explain(const PhysicalFilter* filter_node,
     ExplainLogicalPlan::Explain(filter_node->condition().get(), filter_str);
     result->emplace_back(MakeShared<String>(filter_str));
 
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = filter_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+
     if(filter_node->left() != nullptr) {
         intent_size += 2;
         ExplainPhysicalPlan::Explain(filter_node->left().get(), result, intent_size);
@@ -663,6 +675,18 @@ ExplainPhysicalPlan::Explain(const PhysicalSort* sort_node,
         result->emplace_back(MakeShared<String>(sort_expression_str));
     }
 
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = sort_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+
     if(sort_node->left() != nullptr) {
         intent_size += 2;
         ExplainPhysicalPlan::Explain(sort_node->left().get(), result, intent_size);
@@ -697,6 +721,18 @@ ExplainPhysicalPlan::Explain(const PhysicalLimit* limit_node,
         result->emplace_back(MakeShared<String>(offset_value_str));
     }
 
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = limit_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+
     if(limit_node->left() != nullptr) {
         intent_size += 2;
         ExplainPhysicalPlan::Explain(limit_node->left().get(), result, intent_size);
@@ -716,6 +752,18 @@ ExplainPhysicalPlan::Explain(const PhysicalCrossProduct* cross_product_node,
         }
         cross_product_header += "(" + std::to_string(cross_product_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(cross_product_header));
+    }
+
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = cross_product_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
     }
 
     intent_size += 2;
@@ -759,6 +807,18 @@ ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin* join_node,
         result->emplace_back(MakeShared<String>(condition_str));
     }
 
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = join_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+
     intent_size += 2;
     if(join_node->left() != nullptr) {
         ExplainPhysicalPlan::Explain(join_node->left().get(), result, intent_size);
@@ -783,6 +843,10 @@ ExplainPhysicalPlan::Explain(const PhysicalShow* show_node,
             }
             show_str += "(" + std::to_string(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ') +
+                                        " - output columns: [schema, table, type, column_count, row_count, block_count, block_size]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
         case ShowType::kShowViews: {
@@ -794,6 +858,9 @@ ExplainPhysicalPlan::Explain(const PhysicalShow* show_node,
             }
             show_str += "(" + std::to_string(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ') + " - output columns: [schema, view, column_count]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
         case ShowType::kShowColumn: {
@@ -813,6 +880,9 @@ ExplainPhysicalPlan::Explain(const PhysicalShow* show_node,
             String show_column_table_str = String(intent_size, ' ') + " - table/collection: ";
             show_column_table_str += show_node->object_name();
             result->emplace_back(MakeShared<String>(show_column_table_str));
+
+            String output_columns_str = String(intent_size, ' ') + " - output columns: [column_name, column_type, constraint]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
         default: {

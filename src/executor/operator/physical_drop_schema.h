@@ -11,7 +11,7 @@
 
 namespace infinity {
 
-class PhysicalDropSchema : public PhysicalOperator {
+class PhysicalDropSchema final : public PhysicalOperator {
 public:
     explicit
     PhysicalDropSchema(SharedPtr<String> schema_name,
@@ -29,6 +29,11 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
 
     inline SharedPtr<String>
     schema_name() const {

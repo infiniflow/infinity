@@ -48,4 +48,16 @@ PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
     }
 }
 
+SharedPtr<Vector<String>>
+PhysicalTableScan::GetOutputNames() const {
+    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+    SizeT column_count = column_names_.size();
+    result->reserve(column_count);
+    for(SizeT i = 0; i < column_count; ++ i) {
+        result->emplace_back(column_names_[i]);
+    }
+
+    return result;
+}
+
 }

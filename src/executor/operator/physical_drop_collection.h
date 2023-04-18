@@ -29,6 +29,11 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
+
     inline SharedPtr<String>
     schema_name() const {
         return schema_name_;

@@ -115,4 +115,16 @@ PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
     output_ = projection_table;
 }
 
+SharedPtr<Vector<String>>
+PhysicalProject::GetOutputNames() const {
+    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+    SizeT expression_count = expressions_.size();
+    result->reserve(expression_count);
+    for(SizeT i = 0; i < expression_count; ++ i) {
+        result->emplace_back(expressions_[i]->Name());
+    }
+
+    return result;
+}
+
 }

@@ -19,6 +19,9 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    SharedPtr<Vector<String>>
+    GetOutputNames() const final;
 };
 
 }

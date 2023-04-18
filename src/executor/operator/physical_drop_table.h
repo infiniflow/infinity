@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class PhysicalDropTable : public PhysicalOperator {
+class PhysicalDropTable final : public PhysicalOperator {
 public:
     explicit
     PhysicalDropTable(SharedPtr<String> schema_name,
@@ -28,6 +28,11 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
 
     inline SharedPtr<String>
     schema_name() const {

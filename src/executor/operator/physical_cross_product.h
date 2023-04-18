@@ -10,7 +10,7 @@
 
 namespace infinity {
 
-class PhysicalCrossProduct : public PhysicalOperator {
+class PhysicalCrossProduct final : public PhysicalOperator {
 public:
     explicit PhysicalCrossProduct(u64 id,
                                   SharedPtr<PhysicalOperator> left,
@@ -28,6 +28,9 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    SharedPtr<Vector<String>>
+    GetOutputNames() const final;
 
 private:
     SharedPtr<Table> left_table_{};

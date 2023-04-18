@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class PhysicalDelete : public PhysicalOperator {
+class PhysicalDelete final : public PhysicalOperator {
 public:
     explicit PhysicalDelete(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kDelete, nullptr, nullptr, id) {}
@@ -19,6 +19,12 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
+
 };
 
 }

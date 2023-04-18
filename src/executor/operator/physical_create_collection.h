@@ -11,7 +11,7 @@
 
 namespace infinity {
 
-class PhysicalCreateCollection : public PhysicalOperator {
+class PhysicalCreateCollection final : public PhysicalOperator {
 public:
     explicit
     PhysicalCreateCollection(SharedPtr<String> schema_name,
@@ -27,6 +27,11 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
 
     inline u64
     table_index() const {

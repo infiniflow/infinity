@@ -37,6 +37,9 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    SharedPtr<Vector<String>>
+    GetOutputNames() const final;
+
     inline String
     table_alias() const {
         return table_alias_;

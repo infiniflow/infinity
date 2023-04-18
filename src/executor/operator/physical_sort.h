@@ -29,6 +29,11 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return left_->GetOutputNames();
+    }
+
     void
     Sort(const SharedPtr<Table>& order_by_table,
          const Vector<OrderType>& order_by_types_);

@@ -11,7 +11,7 @@
 
 namespace infinity {
 
-class PhysicalCreateView : public PhysicalOperator {
+class PhysicalCreateView final : public PhysicalOperator {
 public:
     explicit
     PhysicalCreateView(u64 id,
@@ -31,6 +31,11 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
 
     inline const SharedPtr<CreateViewInfo>&
     bound_select_statement() const {

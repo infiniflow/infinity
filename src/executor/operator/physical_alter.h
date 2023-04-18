@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class PhysicalAlter : public PhysicalOperator {
+class PhysicalAlter final : public PhysicalOperator {
 public:
     explicit PhysicalAlter(u64 id) : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id) {}
     ~PhysicalAlter() override = default;
@@ -18,6 +18,11 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
 };
 
 }

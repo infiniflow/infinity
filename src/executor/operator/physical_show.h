@@ -35,6 +35,11 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
+
     inline ShowType
     scan_type() const {
         return scan_type_;

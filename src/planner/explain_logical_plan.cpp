@@ -964,6 +964,7 @@ ExplainLogicalPlan::Explain(const LogicalShow* show_node,
             String show_column_table_str = String(intent_size, ' ') + " - table/collection: ";
             show_column_table_str += show_node->object_name();
             result->emplace_back(MakeShared<String>(show_column_table_str));
+
             String output_columns_str = String(intent_size, ' ') + " - output columns: [column_name, column_type, constraint]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;

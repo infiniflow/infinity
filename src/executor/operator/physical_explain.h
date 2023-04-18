@@ -11,7 +11,7 @@
 
 namespace infinity {
 
-class PhysicalExplain : public PhysicalOperator {
+class PhysicalExplain final : public PhysicalOperator {
 public:
     explicit PhysicalExplain(u64 id,
                              ExplainType type,
@@ -29,6 +29,11 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
 
 private:
     ExplainType explain_type_{ExplainType::kPhysical};

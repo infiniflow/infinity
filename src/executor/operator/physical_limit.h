@@ -29,6 +29,11 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return left_->GetOutputNames();
+    }
+
     inline const SharedPtr<BaseExpression>&
     limit_expr() const {
         return limit_expr_;

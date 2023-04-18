@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class PhysicalDummyOperator : public PhysicalOperator {
+class PhysicalDummyOperator final : public PhysicalOperator {
 public:
     explicit PhysicalDummyOperator(uint64_t id)
         : PhysicalOperator(PhysicalOperatorType::kInvalid, nullptr, nullptr, id) {}
@@ -19,6 +19,12 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
+
 };
 
 }

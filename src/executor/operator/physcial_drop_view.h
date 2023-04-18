@@ -7,7 +7,7 @@
 #include "executor/physical_operator.h"
 
 namespace infinity {
-class PhysicalDropView : public PhysicalOperator {
+class PhysicalDropView final : public PhysicalOperator {
 public:
     explicit
     PhysicalDropView(SharedPtr<String> schema_name,
@@ -27,6 +27,11 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return MakeShared<Vector<String>>();
+    }
 
     inline SharedPtr<String>
     schema_name() const {

@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <utility>
+
+#include <utility>
+
 #include "executor/physical_operator.h"
 #include "expression/base_expression.h"
 #include "executor/expression/expression_executor.h"
@@ -17,8 +21,8 @@ public:
     PhysicalFilter(u64 id,
                    SharedPtr<PhysicalOperator> left,
                    SharedPtr<BaseExpression> condition)
-                   : PhysicalOperator(PhysicalOperatorType::kFilter, left, nullptr, id),
-                     condition_(condition)
+                   : PhysicalOperator(PhysicalOperatorType::kFilter, std::move(left), nullptr, id),
+                     condition_(std::move(condition))
                      {}
 
     ~PhysicalFilter() override = default;
@@ -28,6 +32,11 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
+
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return left_->GetOutputNames();
+    }
 
     inline const SharedPtr<BaseExpression>&
     condition() const {

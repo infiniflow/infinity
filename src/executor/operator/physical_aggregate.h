@@ -12,7 +12,7 @@
 
 namespace infinity {
 
-class PhysicalAggregate : public PhysicalOperator {
+class PhysicalAggregate final : public PhysicalOperator {
 public:
     explicit PhysicalAggregate(u64 id,
                                SharedPtr<PhysicalOperator> left,
@@ -57,6 +57,9 @@ public:
     AggregateTableIndex() const {
         return aggregate_index_;
     }
+
+    SharedPtr<Vector<String>>
+    GetOutputNames() const final;
 
 private:
     SharedPtr<Table> input_table_{};
