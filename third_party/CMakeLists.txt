@@ -21,6 +21,8 @@ add_library(
         ${TLSF_DIR}/tlsf.cpp
 )
 
+# Build roaring
+add_subdirectory(croaring)
 
 #add_library(libhv INTERFACE)
 #target_include_directories(libhv INTERFACE libhv/include)
