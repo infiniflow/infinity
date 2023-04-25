@@ -102,6 +102,12 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
+        index_src
+        CONFIGURE_DEPENDS
+        index/*.cpp
+        )
+
+file(GLOB_RECURSE
         parser_src
         CONFIGURE_DEPENDS
         parser/*.cpp
@@ -137,6 +143,7 @@ set(INFINITY_CORE_SOURCE
         ${planner_src}
         ${scheduler_src}
         ${storage_src}
+        ${index_src}
 )
 
 add_library(infinity_core STATIC ${INFINITY_CORE_SOURCE})
@@ -145,6 +152,7 @@ target_include_directories(infinity_core PUBLIC "/usr/local/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tlsf")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/croaring/include")
 
 add_executable(infinity_main
         ${infinity_main_src}
@@ -155,13 +163,14 @@ add_executable(infinity_console
         ${infinity_console_src}
         )
 target_include_directories(infinity_console PUBLIC "${CMAKE_SOURCE_DIR}/third_party/linenoise")
-
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 
 target_link_libraries(
         infinity_main
         infinity_core
         infinity_parser
         tlsf
+        roaring
 )
 
 target_link_libraries(
@@ -170,4 +179,5 @@ target_link_libraries(
         infinity_parser
         tlsf
         linenoise
+        roaring
 )
