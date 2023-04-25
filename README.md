@@ -1,8 +1,10 @@
-# infinity
-
 <div align="center">
-  <img width="300px" src="https://user-images.githubusercontent.com/93570324/234273798-a55dc1c5-a79f-4d96-be15-d098ab74d468.jpeg"/>
+  <img width="187" src="https://user-images.githubusercontent.com/93570324/234273798-a55dc1c5-a79f-4d96-be15-d098ab74d468.jpeg"/>
 </div>
+
+<p align="center">
+    <b>AI native database for the next generation of AI apps</b>
+</p>
 
 ## Build infinity from source
 ### Requirements
