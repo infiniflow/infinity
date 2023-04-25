@@ -1,9 +1,9 @@
 <div align="center">
-  <img width="187" src="https://user-images.githubusercontent.com/93570324/234273798-a55dc1c5-a79f-4d96-be15-d098ab74d468.jpeg"/>
+  <img width="187" src="https://user-images.githubusercontent.com/93570324/234292265-889228a8-7a68-4e2d-b891-f75262410af1.png"/>
 </div>
 
 <p align="center">
-    <b>AI native database for the next generation of AI apps</b>
+    <b>The AI-native database for next-generation AI apps</b>
 </p>
 
 ## Build infinity from source
