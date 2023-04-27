@@ -102,12 +102,6 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
-        index_src
-        CONFIGURE_DEPENDS
-        index/*.cpp
-        )
-
-file(GLOB_RECURSE
         parser_src
         CONFIGURE_DEPENDS
         parser/*.cpp
@@ -143,7 +137,6 @@ set(INFINITY_CORE_SOURCE
         ${planner_src}
         ${scheduler_src}
         ${storage_src}
-        ${index_src}
 )
 
 add_library(infinity_core STATIC ${INFINITY_CORE_SOURCE})
