@@ -560,14 +560,14 @@ ExplainPhysicalPlan::Explain(const PhysicalTableScan* table_scan_node,
 
     // Output columns
     String output_columns = String(intent_size, ' ') + " - output_columns: [";
-    SizeT column_count = table_scan_node->column_names().size();
+    SizeT column_count = table_scan_node->GetOutputNames()->size();
     if(column_count == 0) {
         PlannerError(fmt::format("No column in table: {}.", table_scan_node->TableIndex()));
     }
     for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
-        output_columns += table_scan_node->column_names()[idx] + ", ";
+        output_columns += table_scan_node->GetOutputNames()->at(idx) + ", ";
     }
-    output_columns += table_scan_node->column_names().back();
+    output_columns += table_scan_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 

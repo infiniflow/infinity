@@ -15,11 +15,11 @@ void
 PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
     // Generate the result table definition
     Vector<SharedPtr<ColumnDef>> column_defs;
-    size_t column_count = column_names_.size();
+    size_t column_count = column_names_->size();
     for(size_t idx = 0; idx < column_count; ++ idx) {
         // Use the column id to fetch column name and type
-        String& col_name_ref = column_names_[idx];
-        DataType& col_type_ref = column_types_[idx];
+        String& col_name_ref = column_names_->at(idx);
+        DataType& col_type_ref = column_types_->at(idx);
 
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
                                                              col_type_ref,
@@ -35,7 +35,7 @@ PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
 
     while(true) {
          SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
-         output_block->Init(column_types_);
+         output_block->Init(*column_types_);
          table_scan_func_ptr_->main_function_(
                  query_context,
                  table_scan_function_data_ptr_,
@@ -46,30 +46,6 @@ PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
             break;
         }
     }
-}
-
-SharedPtr<Vector<String>>
-PhysicalTableScan::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-    SizeT column_count = column_names_.size();
-    result->reserve(column_count);
-    for(SizeT i = 0; i < column_count; ++ i) {
-        result->emplace_back(column_names_[i]);
-    }
-
-    return result;
-}
-
-SharedPtr<Vector<DataType>>
-PhysicalTableScan::GetOutputTypes() const {
-    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
-    SizeT column_count = column_types_.size();
-    result->reserve(column_count);
-    for(SizeT i = 0; i < column_count; ++ i) {
-        result->emplace_back(column_types_[i]);
-    }
-
-    return result;
 }
 
 }

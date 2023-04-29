@@ -23,16 +23,16 @@ public:
     MakeBinding(BindingType binding_type,
                 const String& name,
                 u64 table_index,
-                const Vector<DataType>& column_types,
-                const Vector<String>& column_names);
+                SharedPtr<Vector<DataType>> column_types,
+                SharedPtr<Vector<String>> column_names);
 
     static SharedPtr<Binding>
     MakeBinding(BindingType binding_type,
                 const String& name,
                 u64 table_index,
                 SharedPtr<Table> table_ptr,
-                const Vector<DataType>& column_types,
-                const Vector<String>& column_names);
+                SharedPtr<Vector<DataType>> column_types,
+                SharedPtr<Vector<String>> column_names);
 
     // Binding type
     BindingType binding_type_{ BindingType::kInvalid };
@@ -52,10 +52,10 @@ public:
     SharedPtr<Table> table_ptr_{nullptr};
 
     // Column types of the binding
-    Vector<DataType> column_types_{};
+    SharedPtr<Vector<DataType>> column_types_{};
 
     // Column names of the binding
-    Vector<String> column_names_{};
+    SharedPtr<Vector<String>> column_names_{};
 
     // Column name -> column index mapping
     HashMap<String, i64> name2index_{};

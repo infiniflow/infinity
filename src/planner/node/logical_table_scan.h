@@ -21,17 +21,21 @@ public:
                      String table_alias,
                      u64 table_index,
                      Vector<SizeT> column_ids,
-                     Vector<String> column_names,
-                     Vector<DataType> column_types);
+                     SharedPtr<Vector<String>> column_names,
+                     SharedPtr<Vector<DataType>> column_types);
 
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>>
-    GetOutputNames() const final;
+    [[nodiscard]] inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return column_names_;
+    }
 
-    [[nodiscard]] SharedPtr<Vector<DataType>>
-    GetOutputTypes() const final;
+    [[nodiscard]] inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return column_types_;
+    }
 
     [[nodiscard]] SharedPtr<Table>
     table_ptr() const {
@@ -49,8 +53,9 @@ public:
     String table_alias_{};
     u64 table_index_{};
     Vector<SizeT> column_ids_{};
-    Vector<String> column_names_{};
-    Vector<DataType> column_types_{};
+
+    SharedPtr<Vector<String>> column_names_{};
+    SharedPtr<Vector<DataType>> column_types_{};
 
     SharedPtr<TableScanFunction> table_scan_func_ptr_{nullptr};
 private:

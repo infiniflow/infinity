@@ -3,6 +3,8 @@
 //
 
 #include "bind_context.h"
+
+#include <utility>
 #include "common/utility/infinity_assert.h"
 #include "expression/column_expression.h"
 #include "storage/table.h"
@@ -105,7 +107,7 @@ BindContext::GenerateTableIndex() {
 void
 BindContext::AddBinding(const SharedPtr<Binding>& binding) {
     binding_by_name_.emplace(binding->table_name_, binding);
-    for(auto& column_name: binding->column_names_) {
+    for(auto& column_name: *binding->column_names_) {
         auto iter = binding_names_by_column_.find(column_name);
         if(iter == binding_names_by_column_.end()) {
             binding_names_by_column_.emplace(column_name, Vector<String>());
@@ -119,9 +121,13 @@ BindContext::AddBinding(const SharedPtr<Binding>& binding) {
 void
 BindContext::AddSubqueryBinding(const String& name,
                                 u64 table_index,
-                                const Vector<DataType>& column_types,
-                                const Vector<String>& column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kSubquery, name, table_index, column_types, column_names);
+                                SharedPtr<Vector<DataType>> column_types,
+                                SharedPtr<Vector<String>> column_names) {
+    auto binding = Binding::MakeBinding(BindingType::kSubquery,
+                                        name,
+                                        table_index,
+                                        std::move(column_types),
+                                        std::move(column_names));
     AddBinding(binding);
     // Consider the subquery as the table
     table_names_.emplace_back(name);
@@ -132,9 +138,13 @@ BindContext::AddSubqueryBinding(const String& name,
 void
 BindContext::AddCTEBinding(const String& name,
                            u64 table_index,
-                           const Vector<DataType>& column_types,
-                           const Vector<String>& column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kCTE, name, table_index, column_types, column_names);
+                           SharedPtr<Vector<DataType>> column_types,
+                           SharedPtr<Vector<String>> column_names) {
+    auto binding = Binding::MakeBinding(BindingType::kCTE,
+                                        name,
+                                        table_index,
+                                        std::move(column_types),
+                                        std::move(column_names));
     AddBinding(binding);
     // Consider the CTE as the table
     table_names_.emplace_back(name);
@@ -145,9 +155,13 @@ BindContext::AddCTEBinding(const String& name,
 void
 BindContext::AddViewBinding(const String& name,
                             u64 table_index,
-                            const Vector<DataType>& column_types,
-                            const Vector<String>& column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kView, name, table_index, column_types, column_names);
+                            SharedPtr<Vector<DataType>> column_types,
+                            SharedPtr<Vector<String>> column_names) {
+    auto binding = Binding::MakeBinding(BindingType::kView,
+                                        name,
+                                        table_index,
+                                        std::move(column_types),
+                                        std::move(column_names));
     AddBinding(binding);
 }
 
@@ -155,14 +169,14 @@ void
 BindContext::AddTableBinding(const String& table_alias,
                              u64 table_index,
                              SharedPtr<Table> table_ptr,
-                             const Vector<DataType>& column_types,
-                             const Vector<String>& column_names) {
+                             SharedPtr<Vector<DataType>> column_types,
+                             SharedPtr<Vector<String>> column_names) {
     auto binding = Binding::MakeBinding(BindingType::kTable,
                                         table_alias,
                                         table_index,
                                         std::move(table_ptr),
-                                        column_types,
-                                        column_names);
+                                        std::move(column_types),
+                                        std::move(column_names));
     AddBinding(binding);
     table_names_.emplace_back(table_alias);
     table_name2table_index_[table_alias] = table_index;
@@ -262,7 +276,7 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
             if(binding->name2index_.contains(column_name_ref)) {
                 i64 column_id = binding->name2index_[column_name_ref];
                 bound_column_expr = ColumnExpression::Make(
-                        binding->column_types_[column_id],
+                        binding->column_types_->at(column_id),
                         binding_name,
                         binding->table_index_,
                         column_name_ref,
@@ -288,7 +302,7 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
                 // Find the table and column in the bind context.
                 i64 column_id = binding->name2index_[column_name_ref];
                 bound_column_expr = ColumnExpression::Make(
-                        binding->column_types_[column_id],
+                        binding->column_types_->at(column_id),
                         table_name_ref,
                         binding->table_index_,
                         column_name_ref,

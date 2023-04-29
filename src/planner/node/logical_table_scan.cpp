@@ -15,8 +15,8 @@ LogicalTableScan::LogicalTableScan(u64 node_id,
                                    String table_alias,
                                    u64 table_index,
                                    Vector<SizeT> column_ids,
-                                   Vector<String> column_names,
-                                   Vector<DataType> column_types)
+                                   SharedPtr<Vector<String>> column_names,
+                                   SharedPtr<Vector<DataType>> column_types)
     : LogicalNode(node_id, LogicalNodeType::kTableScan),
     table_ptr_(std::move(table_ptr)),
     table_scan_func_ptr_(std::move(table_scan_func)),
@@ -39,36 +39,10 @@ LogicalTableScan::LogicalTableScan(u64 node_id,
 [[nodiscard]] Vector<ColumnBinding>
 LogicalTableScan::GetColumnBindings() const {
     Vector<ColumnBinding> result;
-    SizeT column_count = column_names_.size();
+    SizeT column_count = column_names_->size();
     result.reserve(column_count);
     for(SizeT i = 0; i < column_count; ++ i) {
         result.emplace_back(table_index_, i);
-    }
-    return result;
-}
-
-
-SharedPtr<Vector<String>>
-LogicalTableScan::GetOutputNames() const {
-    SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-    SizeT column_count = column_names_.size();
-    result->reserve(column_count);
-    for(SizeT i = 0; i < column_count; ++ i) {
-        result->emplace_back(column_names_[i]);
-    }
-
-    return result;
-}
-
-
-SharedPtr<Vector<DataType>>
-LogicalTableScan::GetOutputTypes() const {
-
-    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
-    SizeT column_count = column_types_.size();
-    result->reserve(column_count);
-    for(SizeT i = 0; i < column_count; ++ i) {
-        result->emplace_back(column_types_[i]);
     }
     return result;
 }
@@ -84,9 +58,9 @@ LogicalTableScan::ToString(i64& space) {
     ss << String(space, ' ') << arrow_str << "TableScan: " << table_ptr_->TableName() << ", on: ";
     size_t column_count = table_ptr_->ColumnCount();
     for(size_t i = 0; i < column_count - 1; ++ i) {
-        ss << column_names_[i] << " ";
+        ss << column_names_->at(i) << " ";
     }
-    ss << column_names_.back();
+    ss << column_names_->back();
     space += arrow_str.size();
 
     return ss.str();

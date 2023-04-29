@@ -283,8 +283,8 @@ QueryBinder::BuildSubquery(SharedPtr<QueryContext>& query_context,
     // Add binding into bind context
     this->bind_context_ptr_->AddSubqueryBinding(binding_name,
                                                 subquery_table_index,
-                                                *bound_statement_ptr->types_ptr_,
-                                                *bound_statement_ptr->names_ptr_);
+                                                bound_statement_ptr->types_ptr_,
+                                                bound_statement_ptr->names_ptr_);
 
     // Use binding name as the subquery table reference name
     auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr,
@@ -325,8 +325,8 @@ QueryBinder::BuildCTE(SharedPtr<QueryContext>& query_context,
     // Add binding into bind context
     this->bind_context_ptr_->AddCTEBinding(name,
                                            cte_table_index,
-                                           *bound_statement_ptr->types_ptr_,
-                                           *bound_statement_ptr->names_ptr_);
+                                           bound_statement_ptr->types_ptr_,
+                                           bound_statement_ptr->names_ptr_);
 
     // Use CTE name as the subquery table reference name
     auto cte_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr,
@@ -356,17 +356,17 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
     SharedPtr<Table> table_ptr = std::static_pointer_cast<Table>(base_table_ptr);
 
     String alias = from_table->GetTableName();
-    Vector<DataType> types;
-    Vector<String> names;
+    SharedPtr<Vector<DataType>> types_ptr = MakeShared<Vector<DataType>>();
+    SharedPtr<Vector<String>> names_ptr = MakeShared<Vector<String>>();
     Vector<SizeT> columns;
 
     SizeT column_count = table_ptr->ColumnCount();
-    types.reserve(column_count);
-    names.reserve(column_count);
+    types_ptr->reserve(column_count);
+    names_ptr->reserve(column_count);
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        types.emplace_back(table_ptr->GetColumnTypeById(idx));
-        names.emplace_back(table_ptr->GetColumnNameById(idx));
+        types_ptr->emplace_back(table_ptr->GetColumnTypeById(idx));
+        names_ptr->emplace_back(table_ptr->GetColumnNameById(idx));
         columns.emplace_back(idx);
     }
 
@@ -378,11 +378,11 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
                                               function_data,
                                               alias,
                                               table_index,
-                                              names,
-                                              types);
+                                              names_ptr,
+                                              types_ptr);
 
     // Insert the table in the binding context
-    this->bind_context_ptr_->AddTableBinding(alias, table_index, table_ptr, types, names);
+    this->bind_context_ptr_->AddTableBinding(alias, table_index, table_ptr, types_ptr, names_ptr);
 
     return table_ref;
 }
@@ -417,8 +417,8 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
     // Add binding into bind context
     this->bind_context_ptr_->AddViewBinding(from_table->table_name_,
                                             view_index,
-                                            *view_ptr->column_types(),
-                                            *view_ptr->column_names());
+                                            view_ptr->column_types(),
+                                            view_ptr->column_names());
 
     // Use view name as the subquery table reference name
     auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr,
@@ -538,7 +538,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
         HashSet<String> left_binding_column_names;
         // TODO: Is there any way to get all_column_names size ? Collect all left binding columns numbers at very beginning?
         for(auto& left_binding_pair: result->left_bind_context_->binding_by_name_) {
-            for(auto& left_column_name: left_binding_pair.second->column_names_) {
+            for(auto& left_column_name: *left_binding_pair.second->column_names_) {
                 left_binding_column_names.emplace(left_column_name);
             }
         }
@@ -546,7 +546,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
         Vector<String> using_column_names;
         // TODO: column count of left binding tables and right binding tables is using_column_names size
         for(auto& right_binding_pair: result->right_bind_context_->binding_by_name_) {
-            for(auto& right_column_name: right_binding_pair.second->column_names_) {
+            for(auto& right_column_name: *right_binding_pair.second->column_names_) {
                 if(left_binding_column_names.contains(right_column_name)) {
                     using_column_names.emplace_back(right_column_name);
                 }
@@ -582,7 +582,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
                 auto& left_binding_name = left_column_binding_names[0];
                 auto& left_binding_ptr = result->left_bind_context_->binding_by_name_[left_binding_name];
                 auto left_column_index = left_binding_ptr->name2index_[column_name];
-                auto left_column_type = left_binding_ptr->column_types_[left_column_index];
+                auto left_column_type = left_binding_ptr->column_types_->at(left_column_index);
 
                 SharedPtr<ColumnExpression> left_column_expression_ptr =
                         MakeShared<ColumnExpression>(left_column_type,
@@ -603,7 +603,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
                 auto& right_binding_ptr = result->right_bind_context_->binding_by_name_[right_binding_name];
                 PlannerAssert(right_binding_ptr != nullptr, "Column: " + column_name + " doesn't exist in right table");
                 auto right_column_index = right_binding_ptr->name2index_[column_name];
-                auto right_column_type = right_binding_ptr->column_types_[right_column_index];
+                auto right_column_type = right_binding_ptr->column_types_->at(right_column_index);
 
                 SharedPtr<ColumnExpression> right_column_expression_ptr =
                         MakeShared<ColumnExpression>(right_column_type,
@@ -698,14 +698,14 @@ QueryBinder::GenerateColumns(const SharedPtr<Binding>& binding,
         }
         case BindingType::kSubquery:
         case BindingType::kCTE: {
-            SizeT column_count = binding->column_names_.size();
+            SizeT column_count = binding->column_names_->size();
 
             // Reserve more data in select list
             output_select_list.reserve(output_select_list.size() + column_count);
 
             // Build select list
             for(SizeT idx = 0; idx < column_count; ++ idx) {
-                String column_name = binding->column_names_[idx];
+                String column_name = binding->column_names_->at(idx);
                 auto* column_expr = new ColumnExpr();
                 column_expr->names_.emplace_back(table_name);
                 column_expr->names_.emplace_back(column_name);

@@ -265,24 +265,24 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
     const Vector<SharedPtr<ColumnExpression>>& correlated_columns = bind_context_ptr_->correlated_column_exprs_;
 
     // Get the correlated column and generate table scan
-    Vector<String> column_names;
-    Vector<DataType> column_types;
+    SharedPtr<Vector<String>> column_names = MakeShared<Vector<String>>();
+    SharedPtr<Vector<DataType>> column_types = MakeShared<Vector<DataType>>();
     Vector<SizeT> column_ids;
 
     SizeT column_count = correlated_columns.size();
-    column_names.reserve(column_count);
-    column_types.reserve(column_count);
+    column_names->reserve(column_count);
+    column_types->reserve(column_count);
     column_ids.reserve(column_count);
 
     SizeT table_index = correlated_columns[0]->binding().table_idx;
-    column_names.emplace_back(correlated_columns[0]->column_name());
-    column_types.emplace_back(correlated_columns[0]->Type());
+    column_names->emplace_back(correlated_columns[0]->column_name());
+    column_types->emplace_back(correlated_columns[0]->Type());
     column_ids.emplace_back(correlated_columns[0]->binding().column_idx);
     for(SizeT idx = 1; idx < column_count; ++ idx) {
         PlannerAssert(correlated_columns[idx]->binding().table_idx == table_index,
                       "Correlated column are from different table.");
-        column_names.emplace_back(correlated_columns[idx]->column_name());
-        column_types.emplace_back(correlated_columns[idx]->Type());
+        column_names->emplace_back(correlated_columns[idx]->column_name());
+        column_types->emplace_back(correlated_columns[idx]->Type());
         column_ids.emplace_back(correlated_columns[idx]->binding().column_idx);
     }
 
