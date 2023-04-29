@@ -1,5 +1,5 @@
 //
-// Created by jinhai on 23-4-25.
+// Created by jinhai on 23-4-28.
 //
 
 #pragma once
@@ -8,13 +8,13 @@
 
 namespace infinity {
 
-class PhysicalExchange final : public PhysicalOperator {
+class PhysicalSink final : public PhysicalOperator {
 public:
-    explicit PhysicalExchange(u64 id)
-            : PhysicalOperator(PhysicalOperatorType::kExchange, nullptr, nullptr,id)
+    explicit PhysicalSink(u64 id)
+    : PhysicalOperator(PhysicalOperatorType::kSink, nullptr, nullptr,id)
     {}
 
-    ~PhysicalExchange() override = default;
+    ~PhysicalSink() override = default;
 
     void
     Init() override;

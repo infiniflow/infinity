@@ -49,7 +49,7 @@ ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
             Explain((PhysicalNestedLoopJoin*)op, result, intent_size);
             break;
         }
-        case PhysicalOperatorType::kJoinSortMerge: {
+        case PhysicalOperatorType::kJoinMerge: {
             Explain((PhysicalSortMergeJoin*)op, result, intent_size);
             break;
         }
@@ -57,7 +57,7 @@ ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
             Explain((PhysicalIndexJoin*)op, result, intent_size);
             break;
         }
-        case PhysicalOperatorType::kProduct: {
+        case PhysicalOperatorType::kCrossProduct: {
             Explain((PhysicalCrossProduct*)op, result, intent_size);
             break;
         }

@@ -13,7 +13,8 @@ class QueryContext;
 
 class PhysicalPlanner {
 public:
-    explicit PhysicalPlanner(SharedPtr<QueryContext> query_context_ptr)
+    explicit
+    PhysicalPlanner(SharedPtr<QueryContext> query_context_ptr)
         : query_context_ptr_(std::move(query_context_ptr)) {}
 
     [[nodiscard]] SharedPtr<PhysicalOperator>

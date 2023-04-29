@@ -18,9 +18,9 @@ enum class PhysicalOperatorType: uint8_t {
     // Join
     kJoinHash,
     kJoinNestedLoop,
-    kJoinSortMerge,
+    kJoinMerge,
     kJoinIndex,
-    kProduct,
+    kCrossProduct,
 
     // Result modifier
     kLimit,
@@ -50,4 +50,7 @@ enum class PhysicalOperatorType: uint8_t {
     kExplain,
     kPreparedPlan,
     kShow,
+
+    kSink,
+    kExchange,
 };
