@@ -20,7 +20,8 @@ PhysicalCreateCollection::PhysicalCreateCollection(SharedPtr<String> schema_name
                                                    collection_name_(std::move(collection_name)),
                                                    conflict_type_(conflict_type),
                                                    table_index_(table_index)
-                                                   {}
+                                                   {
+}
 
 void
 PhysicalCreateCollection::Init() {

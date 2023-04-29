@@ -21,7 +21,6 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
       conflict_type_(conflict_type),
       table_index_(table_index),
       table_def_ptr_(std::move(table_def_ptr)) {
-
 }
 
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,

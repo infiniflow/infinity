@@ -40,6 +40,9 @@ public:
     SharedPtr<Vector<String>>
     GetOutputNames() const final;
 
+    SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final;
+
     inline String
     table_alias() const {
         return table_alias_;

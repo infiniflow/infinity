@@ -20,7 +20,8 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr, id),
           table_ptr_(std::move(table_ptr)),
           table_index_(table_index),
-          value_list_(std::move(value_list)) {}
+          value_list_(std::move(value_list)) {
+    }
     ~PhysicalInsert() override = default;
 
     void
@@ -28,11 +29,6 @@ public:
 
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
-
-    inline SharedPtr<Vector<String>>
-    GetOutputNames() const final {
-        return MakeShared<Vector<String>>();
-    }
 
     inline const SharedPtr<Table>&
     table() const {
@@ -44,10 +40,22 @@ public:
         return value_list_;
     }
 
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return output_names_;
+    }
+
+    inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return output_types_;
+    }
 private:
     SharedPtr<Table> table_ptr_{};
     Vector<SharedPtr<BaseExpression>> value_list_{};
     u64 table_index_{};
+
+    SharedPtr<Vector<String>> output_names_{};
+    SharedPtr<Vector<DataType>> output_types_{};
 };
 
 }

@@ -127,4 +127,16 @@ PhysicalProject::GetOutputNames() const {
     return result;
 }
 
+SharedPtr<Vector<DataType>>
+PhysicalProject::GetOutputTypes() const {
+    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
+    SizeT expression_count = expressions_.size();
+    result->reserve(expression_count);
+    for(SizeT i = 0; i < expression_count; ++ i) {
+        result->emplace_back(expressions_[i]->Type());
+    }
+
+    return result;
+}
+
 }

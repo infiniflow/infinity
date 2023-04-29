@@ -604,4 +604,19 @@ PhysicalAggregate::GetOutputNames() const {
     return result;
 }
 
+SharedPtr<Vector<DataType>>
+PhysicalAggregate::GetOutputTypes() const {
+    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
+    SizeT groups_count = groups_.size();
+    SizeT aggregates_count = aggregates_.size();
+    result->reserve(groups_count + aggregates_count);
+    for(SizeT i = 0; i < groups_count; ++ i) {
+        result->emplace_back(groups_[i]->Type());
+    }
+    for(SizeT i = 0; i < aggregates_count; ++ i) {
+        result->emplace_back(aggregates_[i]->Type());
+    }
+    return result;
+}
+
 }

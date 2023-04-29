@@ -248,12 +248,19 @@ FragmentBuilder::BuildAlter(const SharedPtr<PhysicalOperator>& phys_op) const {
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildCreateTable(const SharedPtr<PhysicalOperator>& phys_op) const {
     SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
+    if(phys_op->left() != nullptr) {
+        SharedPtr<PlanFragment> left_fragment_ptr = Build(phys_op);
+        fragment_ptr->AddLeft(left_fragment_ptr);
+    }
     fragment_ptr->AddOperator(phys_op);
+
     return fragment_ptr;
 }
 
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildCreateCollection(const SharedPtr<PhysicalOperator>& phys_op) const {
+    PlannerAssert(phys_op->left() == nullptr, "Null left child in create collection operator");
+    PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
     SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
     fragment_ptr->AddOperator(phys_op);
     return fragment_ptr;
@@ -261,6 +268,8 @@ FragmentBuilder::BuildCreateCollection(const SharedPtr<PhysicalOperator>& phys_o
 
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildCreateSchema(const SharedPtr<PhysicalOperator>& phys_op) const {
+    PlannerAssert(phys_op->left() == nullptr, "Null left child in create collection operator");
+    PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
     SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
     fragment_ptr->AddOperator(phys_op);
     return fragment_ptr;
@@ -268,6 +277,8 @@ FragmentBuilder::BuildCreateSchema(const SharedPtr<PhysicalOperator>& phys_op) c
 
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildCreateView(const SharedPtr<PhysicalOperator>& phys_op) const {
+    PlannerAssert(phys_op->left() == nullptr, "Null left child in create collection operator");
+    PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
     SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
     fragment_ptr->AddOperator(phys_op);
     return fragment_ptr;
@@ -275,6 +286,8 @@ FragmentBuilder::BuildCreateView(const SharedPtr<PhysicalOperator>& phys_op) con
 
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildDropTable(const SharedPtr<PhysicalOperator>& phys_op) const {
+    PlannerAssert(phys_op->left() == nullptr, "Null left child in create collection operator");
+    PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
     SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
     fragment_ptr->AddOperator(phys_op);
     return fragment_ptr;
@@ -282,6 +295,8 @@ FragmentBuilder::BuildDropTable(const SharedPtr<PhysicalOperator>& phys_op) cons
 
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildDropCollection(const SharedPtr<PhysicalOperator>& phys_op) const {
+    PlannerAssert(phys_op->left() == nullptr, "Null left child in create collection operator");
+    PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
     SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
     fragment_ptr->AddOperator(phys_op);
     return fragment_ptr;
@@ -289,6 +304,8 @@ FragmentBuilder::BuildDropCollection(const SharedPtr<PhysicalOperator>& phys_op)
 
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildDropSchema(const SharedPtr<PhysicalOperator>& phys_op) const {
+    PlannerAssert(phys_op->left() == nullptr, "Null left child in create collection operator");
+    PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
     SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
     fragment_ptr->AddOperator(phys_op);
     return fragment_ptr;
@@ -296,6 +313,8 @@ FragmentBuilder::BuildDropSchema(const SharedPtr<PhysicalOperator>& phys_op) con
 
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildDropView(const SharedPtr<PhysicalOperator>& phys_op) const {
+    PlannerAssert(phys_op->left() == nullptr, "Null left child in create collection operator");
+    PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
     SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
     fragment_ptr->AddOperator(phys_op);
     return fragment_ptr;

@@ -34,6 +34,11 @@ public:
         return left_->GetOutputNames();
     }
 
+    inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return left_->GetOutputTypes();
+    }
+
     void
     Sort(const SharedPtr<Table>& order_by_table,
          const Vector<OrderType>& order_by_types_);

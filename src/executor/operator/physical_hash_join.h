@@ -22,6 +22,9 @@ public:
 
     SharedPtr<Vector<String>>
     GetOutputNames() const final;
+
+    SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final;
 };
 
 }

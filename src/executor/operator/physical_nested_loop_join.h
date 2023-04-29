@@ -38,6 +38,9 @@ public:
     SharedPtr<Vector<String>>
     GetOutputNames() const final;
 
+    SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final;
+
     inline const Vector<SharedPtr<BaseExpression>>&
     conditions() const {
         return conditions_;

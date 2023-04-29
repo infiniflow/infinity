@@ -33,6 +33,9 @@ public:
     SharedPtr<Vector<String>>
     GetOutputNames() const final;
 
+    SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final;
+
     Vector<SharedPtr<BaseExpression>> expressions_{};
 
     inline u64

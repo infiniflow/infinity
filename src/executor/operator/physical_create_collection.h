@@ -30,7 +30,12 @@ public:
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
-        return MakeShared<Vector<String>>();
+        return output_names_;
+    }
+
+    inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return output_types_;
     }
 
     inline u64
@@ -59,6 +64,8 @@ private:
     ConflictType conflict_type_{ConflictType::kInvalid};
     u64 table_index_{};
 
+    SharedPtr<Vector<String>> output_names_{};
+    SharedPtr<Vector<DataType>> output_types_{};
 };
 
 }

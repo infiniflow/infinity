@@ -38,6 +38,11 @@ public:
         return left_->GetOutputNames();
     }
 
+    inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return left_->GetOutputTypes();
+    }
+
     inline const SharedPtr<BaseExpression>&
     condition() const {
         return condition_;

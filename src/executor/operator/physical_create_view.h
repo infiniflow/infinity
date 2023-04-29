@@ -19,8 +19,8 @@ public:
                        SharedPtr<Vector<DataType>> types_ptr,
                        SharedPtr<CreateViewInfo> create_view_info)
         : PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr, id),
-        names_ptr_(std::move(names_ptr)),
-        types_ptr_(std::move(types_ptr)),
+        output_names_(std::move(names_ptr)),
+        output_types_(std::move(types_ptr)),
         create_view_info_(std::move(create_view_info))
         {}
 
@@ -32,25 +32,20 @@ public:
     void
     Execute(SharedPtr<QueryContext>& query_context) override;
 
-    inline SharedPtr<Vector<String>>
-    GetOutputNames() const final {
-        return MakeShared<Vector<String>>();
-    }
-
     inline const SharedPtr<CreateViewInfo>&
     bound_select_statement() const {
         return create_view_info_;
     };
 
-    inline const SharedPtr<Vector<String>>&
-    names_ptr() const {
-        return names_ptr_;
-    };
+    inline SharedPtr<Vector<String>>
+    GetOutputNames() const final {
+        return output_names_;
+    }
 
-    inline const SharedPtr<Vector<DataType>>&
-    types_ptr() const {
-        return types_ptr_;
-    };
+    inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return output_types_;
+    }
 
     inline const SharedPtr<CreateViewInfo>&
     create_view_info() const {
@@ -60,8 +55,8 @@ public:
 private:
     SharedPtr<CreateViewInfo> create_view_info_{nullptr};
 
-    SharedPtr<Vector<String>> names_ptr_{};
-    SharedPtr<Vector<DataType>> types_ptr_{};
+    SharedPtr<Vector<String>> output_names_{};
+    SharedPtr<Vector<DataType>> output_types_{};
 };
 
 }

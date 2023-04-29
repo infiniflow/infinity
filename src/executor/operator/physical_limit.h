@@ -34,6 +34,11 @@ public:
         return left_->GetOutputNames();
     }
 
+    inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return left_->GetOutputTypes();
+    }
+
     inline const SharedPtr<BaseExpression>&
     limit_expr() const {
         return limit_expr_;

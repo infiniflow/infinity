@@ -35,6 +35,11 @@ public:
         return MakeShared<Vector<String>>();
     }
 
+    inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return MakeShared<Vector<DataType>>();
+    }
+
 private:
     ExplainType explain_type_{ExplainType::kPhysical};
     SharedPtr<Vector<SharedPtr<String>>> texts_{nullptr};

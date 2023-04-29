@@ -1012,15 +1012,15 @@ ExplainPhysicalPlan::Explain(const PhysicalCreateView* create_node,
 
     // Column definition
     {
-        SizeT column_count = create_node->names_ptr()->size();
+        SizeT column_count = create_node->GetOutputNames()->size();
         if(column_count == 0) {
             PlannerError("No columns in the table");
         }
         String columns_str = String(intent_size, ' ') + " - columns: [";
         for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
-            columns_str += create_node->names_ptr()->at(idx) + " " + create_node->types_ptr()->at(idx).ToString() + ", ";
+            columns_str += create_node->GetOutputNames()->at(idx) + " " + create_node->GetOutputTypes()->at(idx).ToString() + ", ";
         }
-        columns_str += create_node->names_ptr()->back() + " " + create_node->types_ptr()->back().ToString() + "]";
+        columns_str += create_node->GetOutputNames()->back() + " " + create_node->GetOutputTypes()->back().ToString() + "]";
         result->emplace_back(MakeShared<String>(columns_str));
     }
 

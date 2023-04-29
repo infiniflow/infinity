@@ -60,4 +60,16 @@ PhysicalTableScan::GetOutputNames() const {
     return result;
 }
 
+SharedPtr<Vector<DataType>>
+PhysicalTableScan::GetOutputTypes() const {
+    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
+    SizeT column_count = column_types_.size();
+    result->reserve(column_count);
+    for(SizeT i = 0; i < column_count; ++ i) {
+        result->emplace_back(column_types_[i]);
+    }
+
+    return result;
+}
+
 }

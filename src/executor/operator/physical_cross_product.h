@@ -32,6 +32,9 @@ public:
     SharedPtr<Vector<String>>
     GetOutputNames() const final;
 
+    SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final;
+
 private:
     SharedPtr<Table> left_table_{};
     SharedPtr<Table> right_table_{};

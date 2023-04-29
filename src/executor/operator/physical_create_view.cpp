@@ -16,8 +16,8 @@ PhysicalCreateView::Init() {
 void
 PhysicalCreateView::Execute(SharedPtr<QueryContext>& query_context) {
     SharedPtr<View> view_ptr = MakeShared<View>(create_view_info_,
-                                                names_ptr(),
-                                                types_ptr());
+                                                GetOutputNames(),
+                                                GetOutputTypes());
     Infinity::instance().catalog()->CreateView(create_view_info_->schema_name_,
                                                view_ptr,
                                                create_view_info_->conflict_type_);

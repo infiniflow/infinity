@@ -35,12 +35,16 @@ public:
 
     [[nodiscard]] inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
-        return MakeShared<Vector<String>>();
+        SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
+        result->emplace_back("OK");
+        return result;
     }
 
     [[nodiscard]] inline SharedPtr<Vector<DataType>>
     GetOutputTypes() const final {
-        return MakeShared<Vector<DataType>>();
+        SharedPtr<Vector<DataType>> result_type = MakeShared<Vector<DataType>>();
+        result_type->emplace_back(LogicalType::kInteger);
+        return result_type;
     }
 
     String

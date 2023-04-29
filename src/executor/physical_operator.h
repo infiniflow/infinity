@@ -68,6 +68,9 @@ public:
     virtual SharedPtr<Vector<String>>
     GetOutputNames() const = 0;
 
+    virtual SharedPtr<Vector<DataType>>
+    GetOutputTypes() const = 0;
+
 protected:
     u64 operator_id_;
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};

@@ -10,7 +10,9 @@ namespace infinity {
 
 class PhysicalTop : public PhysicalOperator {
 public:
-    explicit PhysicalTop(uint64_t id): PhysicalOperator(PhysicalOperatorType::kTop, nullptr, nullptr, id) {}
+    explicit
+    PhysicalTop(uint64_t id): PhysicalOperator(PhysicalOperatorType::kTop, nullptr, nullptr, id) {}
+
     ~PhysicalTop() override = default;
 
     void
@@ -22,6 +24,11 @@ public:
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
         return left_->GetOutputNames();
+    }
+
+    inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return left_->GetOutputTypes();
     }
 
 };

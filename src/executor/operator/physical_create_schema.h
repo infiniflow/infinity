@@ -19,7 +19,8 @@ public:
                         : PhysicalOperator(PhysicalOperatorType::kCreateSchema, nullptr, nullptr, id),
                           schema_name_(std::move(schema_name)),
                           conflict_type_(conflict_type)
-                        {}
+                        {
+    }
 
     ~PhysicalCreateSchema() override = default;
 
@@ -31,7 +32,12 @@ public:
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
-        return MakeShared<Vector<String>>();
+        return output_names_;
+    }
+
+    inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final {
+        return output_types_;
     }
 
     inline SharedPtr<String>
@@ -47,6 +53,9 @@ public:
 private:
     SharedPtr<String> schema_name_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
+
+    SharedPtr<Vector<String>> output_names_{};
+    SharedPtr<Vector<DataType>> output_types_{};
 };
 
 }

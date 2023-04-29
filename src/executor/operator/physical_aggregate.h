@@ -61,6 +61,8 @@ public:
     SharedPtr<Vector<String>>
     GetOutputNames() const final;
 
+    SharedPtr<Vector<DataType>>
+    GetOutputTypes() const final;
 private:
     SharedPtr<Table> input_table_{};
     u64 groupby_index_{};
