@@ -206,6 +206,8 @@ PhysicalPlanner::BuildCreateTable(const SharedPtr<LogicalNode> &logical_operator
     return MakeShared<PhysicalCreateTable>(
             logical_create_table->schema_name(),
             logical_create_table->table_definitions(),
+            logical_create_table->GetOutputNames(),
+            logical_create_table->GetOutputTypes(),
             logical_create_table->conflict_type(),
             logical_create_table->table_index(),
             logical_operator->node_id());
@@ -219,6 +221,8 @@ PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode> &logical_ope
             logical_create_collection->schema_name(),
             logical_create_collection->collection_name(),
             logical_create_collection->conflict_type(),
+            logical_create_collection->GetOutputNames(),
+            logical_create_collection->GetOutputTypes(),
             logical_create_collection->table_index(),
             logical_operator->node_id());
 }
@@ -230,6 +234,8 @@ PhysicalPlanner::BuildCreateSchema(const SharedPtr<LogicalNode> &logical_operato
     return MakeShared<PhysicalCreateSchema>(
             logical_create_schema->schema_name(),
             logical_create_schema->conflict_type(),
+            logical_create_schema->GetOutputNames(),
+            logical_create_schema->GetOutputTypes(),
             logical_create_schema->node_id());
 }
 
@@ -287,6 +293,8 @@ PhysicalPlanner::BuildDropView(const SharedPtr<LogicalNode> &logical_operator) c
     return MakeShared<PhysicalDropView>(logical_drop_view->schema_name(),
                                         logical_drop_view->view_name(),
                                         logical_drop_view->conflict_type(),
+                                        logical_drop_view->GetOutputNames(),
+                                        logical_drop_view->GetOutputTypes(),
                                         logical_drop_view->node_id());
 }
 
@@ -322,7 +330,9 @@ PhysicalPlanner::BuildExport(const SharedPtr<LogicalNode> &logical_operator) con
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildAlter(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalAlter>(logical_operator->node_id());
+    return MakeShared<PhysicalAlter>(logical_operator->GetOutputNames(),
+                                     logical_operator->GetOutputTypes(),
+                                     logical_operator->node_id());
 }
 
 SharedPtr<PhysicalOperator>

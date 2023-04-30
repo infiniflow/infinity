@@ -13,11 +13,15 @@ namespace infinity {
 
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          SharedPtr<TableDef> table_def_ptr,
+                                         SharedPtr<Vector<String>> output_names,
+                                         SharedPtr<Vector<DataType>> output_types,
                                          ConflictType conflict_type,
                                          u64 table_index,
                                          u64 id)
     : PhysicalOperator(PhysicalOperatorType::kCreateTable, nullptr, nullptr, id),
       schema_name_(std::move(schema_name)),
+      output_names_(std::move(output_names)),
+      output_types_(std::move(output_types)),
       conflict_type_(conflict_type),
       table_index_(table_index),
       table_def_ptr_(std::move(table_def_ptr)) {
@@ -25,11 +29,15 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
 
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          const SharedPtr<PhysicalOperator>& input,
+                                         SharedPtr<Vector<String>> output_names,
+                                         SharedPtr<Vector<DataType>> output_types,
                                          ConflictType conflict_type,
                                          u64 table_index,
                                          u64 id)
     : PhysicalOperator(PhysicalOperatorType::kCreateTable, input, nullptr, id),
       schema_name_(std::move(schema_name)),
+      output_names_(std::move(output_names)),
+      output_types_(std::move(output_types)),
       conflict_type_(conflict_type),
       table_index_(table_index) {
 

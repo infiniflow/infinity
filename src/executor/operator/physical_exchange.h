@@ -10,8 +10,12 @@ namespace infinity {
 
 class PhysicalExchange final : public PhysicalOperator {
 public:
-    explicit PhysicalExchange(u64 id)
-            : PhysicalOperator(PhysicalOperatorType::kExchange, nullptr, nullptr,id)
+    explicit PhysicalExchange(u64 id,
+                              SharedPtr<Vector<String>> names,
+                              SharedPtr<Vector<DataType>> types)
+            : PhysicalOperator(PhysicalOperatorType::kExchange, nullptr, nullptr,id),
+              output_names_(std::move(names)),
+              output_types_(std::move(types))
     {}
 
     ~PhysicalExchange() override = default;

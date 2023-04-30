@@ -15,11 +15,14 @@ public:
     explicit
     PhysicalCreateSchema(SharedPtr<String> schema_name,
                          ConflictType conflict_type,
+                         SharedPtr<Vector<String>> output_names,
+                         SharedPtr<Vector<DataType>> output_types,
                          u64 id )
                         : PhysicalOperator(PhysicalOperatorType::kCreateSchema, nullptr, nullptr, id),
                           schema_name_(std::move(schema_name)),
-                          conflict_type_(conflict_type)
-                        {
+                          conflict_type_(conflict_type),
+                          output_names_(std::move(output_names)),
+                          output_types_(std::move(output_types)) {
     }
 
     ~PhysicalCreateSchema() override = default;

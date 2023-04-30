@@ -10,6 +10,8 @@ namespace infinity {
 PhysicalCreateCollection::PhysicalCreateCollection(SharedPtr<String> schema_name,
                                                    SharedPtr<String> collection_name,
                                                    ConflictType conflict_type,
+                                                   SharedPtr<Vector<String>> output_names,
+                                                   SharedPtr<Vector<DataType>> output_types,
                                                    u64 table_index,
                                                    u64 id):
                                                    PhysicalOperator(PhysicalOperatorType::kCreateCollection,
@@ -18,6 +20,8 @@ PhysicalCreateCollection::PhysicalCreateCollection(SharedPtr<String> schema_name
                                                                     id),
                                                    schema_name_(std::move(schema_name)),
                                                    collection_name_(std::move(collection_name)),
+                                                   output_names_(std::move(output_names)),
+                                                   output_types_(std::move(output_types)),
                                                    conflict_type_(conflict_type),
                                                    table_index_(table_index)
                                                    {

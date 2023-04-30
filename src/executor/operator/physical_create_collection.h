@@ -17,6 +17,8 @@ public:
     PhysicalCreateCollection(SharedPtr<String> schema_name,
                              SharedPtr<String> collection_name,
                              ConflictType conflict_type,
+                             SharedPtr<Vector<String>> output_names,
+                             SharedPtr<Vector<DataType>> output_types,
                              u64 table_index,
                              u64 id);
 

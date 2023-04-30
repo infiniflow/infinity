@@ -44,6 +44,16 @@ public:
         left_ = right;
     }
 
+    [[nodiscard]] inline SharedPtr<Vector<String>>
+    GetOutputNames() const {
+        return sink_node_->GetOutputNames();
+    }
+
+    [[nodiscard]] inline SharedPtr<Vector<DataType>>
+    GetOutputTypes() const {
+        return sink_node_->GetOutputTypes();
+    }
+
 private:
     SharedPtr<PhysicalExchange> exchange_node_;
     SharedPtr<PhysicalSink> sink_node_;

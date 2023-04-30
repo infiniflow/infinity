@@ -8,11 +8,23 @@
 
 namespace infinity {
 
+enum class SinkType {
+    kStream,
+    kBatch,
+};
+
 class PhysicalSink final : public PhysicalOperator {
 public:
-    explicit PhysicalSink(u64 id)
-    : PhysicalOperator(PhysicalOperatorType::kSink, nullptr, nullptr,id)
-    {}
+    explicit PhysicalSink(u64 id,
+                          SinkType sink_type,
+                          SharedPtr<Vector<String>> names,
+                          SharedPtr<Vector<DataType>> types)
+            : PhysicalOperator(PhysicalOperatorType::kSink, nullptr, nullptr,id),
+            sink_type_(sink_type),
+            output_names_(std::move(names)),
+            output_types_(std::move(types)) {
+
+    }
 
     ~PhysicalSink() override = default;
 
@@ -35,7 +47,7 @@ public:
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<DataType>> output_types_{};
-
+    SinkType sink_type_{SinkType::kBatch};
 };
 
 }

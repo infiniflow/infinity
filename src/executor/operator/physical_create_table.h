@@ -16,6 +16,8 @@ public:
     explicit
     PhysicalCreateTable(SharedPtr<String> schema_name,
                         SharedPtr<TableDef> table_def_ptr,
+                        SharedPtr<Vector<String>> output_names,
+                        SharedPtr<Vector<DataType>> output_types,
                         ConflictType conflict_type,
                         u64 table_index,
                         uint64_t id);
@@ -23,6 +25,8 @@ public:
     explicit
     PhysicalCreateTable(SharedPtr<String> schema_name,
                         const SharedPtr<PhysicalOperator>& input,
+                        SharedPtr<Vector<String>> output_names,
+                        SharedPtr<Vector<DataType>> output_types,
                         ConflictType conflict_type,
                         u64 table_index,
                         uint64_t id);
