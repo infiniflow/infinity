@@ -200,7 +200,19 @@ FragmentBuilder::BuildProject(const SharedPtr<PhysicalOperator>& phys_op) const 
 
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildSort(const SharedPtr<PhysicalOperator>& phys_op) const {
-    NotImplementError("Sort");
+//    PlannerAssert(phys_op->left() != nullptr, "Null left child in sort operator");
+//    PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in sort operator");
+//    SharedPtr<PlanFragment> left_fragment_ptr = Build(phys_op->left());
+//    SharedPtr<PhysicalSink> last_sink_node = MakeShared<PhysicalSink>(query_context_ptr_->GetNextNodeID());
+//
+//    SharedPtr<PhysicalExchange> last_exchange_node = MakeShared<PhysicalExchange>(query_context_ptr_->GetNextNodeID());
+//
+//
+//
+    SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
+    fragment_ptr->AddOperator(phys_op);
+
+    return fragment_ptr;
 }
 
 SharedPtr<PlanFragment>
@@ -332,7 +344,11 @@ FragmentBuilder::BuildPreparePlan(const SharedPtr<PhysicalOperator>& phys_op) co
 
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildShow(const SharedPtr<PhysicalOperator>& phys_op) const {
-    NotImplementError("Show");
+    PlannerAssert(phys_op->left() == nullptr, "Null left child in create collection operator");
+    PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
+    SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
+    fragment_ptr->AddOperator(phys_op);
+    return fragment_ptr;
 }
 
 }

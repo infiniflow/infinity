@@ -193,6 +193,10 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
 //            result = MakeShared<PhysicalDummyOperator>(std::numeric_limits<uint64_t>::max());
         }
     }
+
+    if(logical_operator->node_id() > query_context_ptr_->max_node_id()) {
+        query_context_ptr_->set_max_node_id(logical_operator->node_id());
+    }
     // Initialize the physical plan node
     result->Init();
 

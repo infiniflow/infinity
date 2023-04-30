@@ -42,11 +42,26 @@ public:
         return transaction_; 
     }
 
-    const String& 
+    inline const String&
     schema_name() const { 
         return current_schema_; 
     }
-    
+
+    inline u64
+    max_node_id() const {
+        return current_max_node_id_;
+    }
+
+    inline void
+    set_max_node_id(u64 node_id) {
+        current_max_node_id_ = node_id;
+    }
+
+    inline u64
+    GetNextNodeID() {
+        return ++ current_max_node_id_;
+    }
+
 private:
     UniquePtr<TransactionContext>& transaction_;
     UniquePtr<QueryProfiler> query_metrics_;
@@ -63,6 +78,7 @@ private:
 
     u64 tenant_id_{0};
     u64 user_id_{0};
+    u64 current_max_node_id_{0};
 };
 
 }
