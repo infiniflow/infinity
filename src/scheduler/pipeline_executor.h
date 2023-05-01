@@ -1,18 +1,18 @@
 #pragma once
 
-#include "worker_directory.h"
+#include "worker_manager.h"
 #include "main/query_context.h"
 
-namespace infinity{
-class PipelineExecutor{
+namespace infinity {
+class PipelineExecutor {
 public:
-	PipelineExecutor(std::uint16_t max_cores);
+    PipelineExecutor(std::uint16_t max_cores);
 
-	~PipelineExecutor() noexcept;
+    ~PipelineExecutor() noexcept;
 
     void Run();
 
 private:
-	WorkerDirectory worker_directory_;
+    WorkerManager worker_manager_;
 };
 }

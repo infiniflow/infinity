@@ -1,12 +1,12 @@
 #pragma once
 
-namespace infinity{
+namespace infinity {
 
-class PipelineTask{
+class PipelineTask {
 public:
-	PipelineTask();
+    PipelineTask();
 
-	~PipelineTask() noexcept = default;
+    ~PipelineTask() noexcept = default;
 private:
 };
 

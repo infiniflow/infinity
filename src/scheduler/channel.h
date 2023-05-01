@@ -1,28 +1,28 @@
 #pragma once
 
 #include "pipeline_task.h"
+#include "common/utility/mpsc_queue.h"
 
 #include <cstdint>
-#include <queue>
 
-namespace infinity{
-class Channel{
+namespace infinity {
+class Channel {
 public:
-	Channel(const std::uint16_t worker_id);
+    Channel(const std::uint16_t worker_id);
 
-	~Channel() noexcept = default;
+    ~Channel() noexcept = default;
 
-	[[nodiscard]] std::uint16_t ID() const { 
-		return id_; 
-	}
+    [[nodiscard]] std::uint16_t ID() const {
+        return id_;
+    }
 
-	void Put(const PipelineTaskPtr task);
+    void Put(PipelineTaskPtr task);
 
-	PipelineTaskPtr Take();
+    PipelineTaskPtr Take();
 
 private:
-	const std::uint16_t id_;
+    const std::uint16_t id_;
 
-	std::deque<PipelineTaskPtr> queue_;
+    MPSCQueue<PipelineTaskPtr> queue_;
 };
 }
