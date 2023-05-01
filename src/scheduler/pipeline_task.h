@@ -6,7 +6,10 @@ class PipelineTask{
 public:
 	PipelineTask();
 
-	virtual ~PipelineTask();
+	~PipelineTask() noexcept = default;
 private:
-}
+};
+
+using PipelineTaskPtr = PipelineTask*;
+
 }

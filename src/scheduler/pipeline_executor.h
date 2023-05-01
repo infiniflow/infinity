@@ -1,9 +1,7 @@
 #pragma once
 
-#include "common/utility/topology.h"
-#include "worker.h"
-
-#include <array>
+#include "worker_directory.h"
+#include "main/query_context.h"
 
 namespace infinity{
 class PipelineExecutor{
@@ -15,10 +13,6 @@ public:
     void Run();
 
 private:
-	std::uint16_t max_cores_;
-
-	Topology cpu_topology_;
-
-	std::array<Worker *, Topology::MaxCores> workers_;
+	WorkerDirectory worker_directory_;
 };
 }

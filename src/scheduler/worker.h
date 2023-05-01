@@ -1,11 +1,13 @@
 #pragma once
 
+#include "channel.h"
+
 #include <cstdint>
 
 namespace infinity{
 class Worker{
 public:
-	Worker(
+	explicit Worker(
 		std::uint16_t id,
 		std::uint16_t cpu_id);
 
@@ -13,11 +15,19 @@ public:
 
 	void Execute();
 
+	[[nodiscard]] std::uint16_t WorkerID() const noexcept {
+		return id_;
+	}
+
 	[[nodiscard]] std::uint16_t CPUID() const noexcept { 
 		return cpu_id_; 
 	}
 private:
 	const std::uint16_t id_;
 	const std::uint16_t cpu_id_;
+
+	Channel channel_;
+
+	bool is_running_;
 };
 }
