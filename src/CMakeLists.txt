@@ -164,6 +164,7 @@ target_link_libraries(
         infinity_parser
         tlsf
         roaring
+        faiss
 )
 
 target_link_libraries(
