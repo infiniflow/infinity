@@ -48,6 +48,11 @@ public:
     }
 
     inline u64
+    query_id() const {
+        return query_id_;
+    }
+
+    inline u64
     max_node_id() const {
         return current_max_node_id_;
     }
@@ -76,6 +81,7 @@ private:
     String tenant_name_;
     String user_name_;
 
+    u64 query_id_{0};
     u64 tenant_id_{0};
     u64 user_id_{0};
     u64 current_max_node_id_{0};

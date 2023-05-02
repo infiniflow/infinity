@@ -22,6 +22,11 @@ public:
     [[nodiscard]] std::uint16_t CPUID() const noexcept {
         return cpu_id_;
     }
+
+    [[nodiscard]] Channel &GetChannel() noexcept { return channel_; }
+
+    [[nodiscard]] const Channel &GetChannel() const noexcept { return channel_; }
+
 private:
     const std::uint16_t id_;
     const std::uint16_t cpu_id_;
