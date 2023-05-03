@@ -48,6 +48,7 @@ benchmark_flat(bool l2) {
         index->add(nb, xb);
         profiler.End();
         std::cout << "Insert sift1M base data into index: " << profiler.ElapsedToString() << std::endl;
+        delete[] xb;
     }
 
     size_t number_of_queries;
@@ -118,6 +119,8 @@ benchmark_flat(bool l2) {
 
     {
         delete index;
+        delete[] ground_truth;
+        delete[] queries;
     }
 }
 
@@ -154,6 +157,7 @@ benchmark_ivfflat(bool l2) {
         index->train(nb, xb);
         profiler.End();
         std::cout << "Train sift1M learn data into quantizer: " << profiler.ElapsedToString() << std::endl;
+        delete[] xb;
     }
 
     {
@@ -168,6 +172,7 @@ benchmark_ivfflat(bool l2) {
         index->add(nb, xb);
         profiler.End();
         std::cout << "Insert sift1M base data into index: " << profiler.ElapsedToString() << std::endl;
+        delete[] xb;
     }
 
     size_t number_of_queries;
@@ -238,7 +243,14 @@ benchmark_ivfflat(bool l2) {
 
     {
         delete index;
+        delete[] ground_truth;
+        delete[] queries;
     }
+}
+
+void
+benchmark_hnsw(bool l2) {
+
 }
 
 auto main () -> int {

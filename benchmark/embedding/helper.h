@@ -17,3 +17,6 @@ fvecs_read(const char* fname, size_t* d_out, size_t* n_out);
 
 int*
 ivecs_read(const char* fname, size_t* d_out, size_t* n_out);
+
+size_t
+get_current_rss();

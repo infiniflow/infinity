@@ -44,3 +44,18 @@ int*
 ivecs_read(const char* fname, size_t* d_out, size_t* n_out) {
     return (int*)fvecs_read(fname, d_out, n_out);
 }
+
+size_t
+get_current_rss() {
+    // Only for linux, copy from hnswlib
+    long rss = 0L;
+    FILE *fp = NULL;
+    if ((fp = fopen("/proc/self/statm", "r")) == NULL)
+        return (size_t) 0L;      /* Can't open? */
+    if (fscanf(fp, "%*s%ld", &rss) != 1) {
+        fclose(fp);
+        return (size_t) 0L;      /* Can't read? */
+    }
+    fclose(fp);
+    return (size_t) rss * (size_t) sysconf(_SC_PAGESIZE);
+}

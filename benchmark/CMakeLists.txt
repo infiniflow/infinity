@@ -4,5 +4,4 @@ include_directories("${CMAKE_SOURCE_DIR}/third_party/nanobench/src/include")
 include_directories("${CMAKE_SOURCE_DIR}/src")
 
 add_subdirectory(function)
-add_subdirectory(faiss)
-add_subdirectory(hnsw)
+add_subdirectory(embedding)
