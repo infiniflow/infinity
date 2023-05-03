@@ -11,11 +11,33 @@
 #include "faiss/IndexFlat.h"
 #include "helper.h"
 #include "faiss/IndexIVFFlat.h"
+#include "faiss/index_io.h"
 
 static const char* sift1m_base = "/home/jinhai/Documents/data/sift1M/sift_base.fvecs";
 static const char* sift1m_train = "/home/jinhai/Documents/data/sift1M/sift_learn.fvecs";
 static const char* sift1m_query = "/home/jinhai/Documents/data/sift1M/sift_query.fvecs";
 static const char* sift1m_ground_truth = "/home/jinhai/Documents/data/sift1M/sift_groundtruth.ivecs";
+static const char* ivf_index_name = "ivf_index.bin";
+
+static void
+base_data_read() {
+
+}
+
+static void
+train_data_read() {
+
+}
+
+static void
+query_data_read() {
+
+}
+
+static void
+ground_truth_read() {
+
+}
 
 void
 benchmark_flat(bool l2) {
@@ -129,50 +151,60 @@ benchmark_ivfflat(bool l2) {
     int d = 128;
     size_t centroids_count = 4096; //
     faiss::IndexFlatL2 quantizer(d);
-    faiss::IndexIVFFlat* index = nullptr;
-    {
-        // Construct index
+    faiss::Index* index = nullptr;
 
-        infinity::BaseProfiler profiler;
-        profiler.Begin();
-        if(l2) {
-            index = new faiss::IndexIVFFlat(&quantizer, d, centroids_count, faiss::MetricType::METRIC_L2);
-        } else {
-            index = new faiss::IndexIVFFlat(&quantizer, d, centroids_count, faiss::MetricType::METRIC_INNER_PRODUCT);
+    std::ifstream f(ivf_index_name);
+    if(f.good()) {
+        // Found index file
+        std::cout << "Found index file ... " << std::endl;
+        index = faiss::read_index(ivf_index_name);
+    } else {
+        {
+            // Construct index
+            infinity::BaseProfiler profiler;
+            profiler.Begin();
+            if(l2) {
+                index = new faiss::IndexIVFFlat(&quantizer, d, centroids_count, faiss::MetricType::METRIC_L2);
+            } else {
+                index = new faiss::IndexIVFFlat(&quantizer, d, centroids_count, faiss::MetricType::METRIC_INNER_PRODUCT);
+            }
+
+            profiler.End();
+            std::cout << "Create Flat index: " << profiler.ElapsedToString() << std::endl;
         }
 
-        profiler.End();
-        std::cout << "Create Flat index: " << profiler.ElapsedToString() << std::endl;
-    }
+        // No index file
+        std::cout << "No index file found: constructing ... " << std::endl;
+        {
+            size_t nb, d2;
+            infinity::BaseProfiler profiler;
+            profiler.Begin();
+            float* xb = fvecs_read(sift1m_train, &d2, &nb);
+            profiler.End();
+            std::cout << "Load sift1M learn data: " << profiler.ElapsedToString() << std::endl;
 
-    {
-        size_t nb, d2;
-        infinity::BaseProfiler profiler;
-        profiler.Begin();
-        float* xb = fvecs_read(sift1m_train, &d2, &nb);
-        profiler.End();
-        std::cout << "Load sift1M learn data: " << profiler.ElapsedToString() << std::endl;
+            profiler.Begin();
+            index->train(nb, xb);
+            profiler.End();
+            std::cout << "Train sift1M learn data into quantizer: " << profiler.ElapsedToString() << std::endl;
+            delete[] xb;
+        }
 
-        profiler.Begin();
-        index->train(nb, xb);
-        profiler.End();
-        std::cout << "Train sift1M learn data into quantizer: " << profiler.ElapsedToString() << std::endl;
-        delete[] xb;
-    }
+        {
+            size_t nb, d2;
+            infinity::BaseProfiler profiler;
+            profiler.Begin();
+            float* xb = fvecs_read(sift1m_base, &d2, &nb);
+            profiler.End();
+            std::cout << "Load sift1M base data: " << profiler.ElapsedToString() << std::endl;
 
-    {
-        size_t nb, d2;
-        infinity::BaseProfiler profiler;
-        profiler.Begin();
-        float* xb = fvecs_read(sift1m_base, &d2, &nb);
-        profiler.End();
-        std::cout << "Load sift1M base data: " << profiler.ElapsedToString() << std::endl;
-
-        profiler.Begin();
-        index->add(nb, xb);
-        profiler.End();
-        std::cout << "Insert sift1M base data into index: " << profiler.ElapsedToString() << std::endl;
-        delete[] xb;
+            profiler.Begin();
+            index->add(nb, xb);
+            profiler.End();
+            std::cout << "Insert sift1M base data into index: " << profiler.ElapsedToString() << std::endl;
+            delete[] xb;
+        }
+        faiss::write_index(index, ivf_index_name);
     }
 
     size_t number_of_queries;
@@ -213,8 +245,10 @@ benchmark_ivfflat(bool l2) {
         faiss::idx_t* I = new faiss::idx_t[number_of_queries * top_k];
         float* D = new float[number_of_queries * top_k];
 
-        index->nprobe = 4; // Default value is 1;
-        index->search(number_of_queries, queries, top_k, D, I);
+        faiss::IndexIVFFlat* ivf_flat_index = (faiss::IndexIVFFlat*)index;
+
+        ivf_flat_index->nprobe = 4; // Default value is 1;
+        ivf_flat_index->search(number_of_queries, queries, top_k, D, I);
         profiler.End();
         std::cout << "Search: " << profiler.ElapsedToString() << std::endl;
 
@@ -249,7 +283,7 @@ benchmark_ivfflat(bool l2) {
 }
 
 void
-benchmark_hnsw(bool l2) {
+benchmark_ivf_single_cpu(bool l2) {
 
 }
 

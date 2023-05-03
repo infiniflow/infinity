@@ -14,6 +14,7 @@ static const char* sift1m_base = "/home/jinhai/Documents/data/sift1M/sift_base.f
 static const char* sift1m_train = "/home/jinhai/Documents/data/sift1M/sift_learn.fvecs";
 static const char* sift1m_query = "/home/jinhai/Documents/data/sift1M/sift_query.fvecs";
 static const char* sift1m_ground_truth = "/home/jinhai/Documents/data/sift1M/sift_groundtruth.ivecs";
+static const char* hnsw_index_l2_name = "hnsw_index_l2.bin";
 
 using namespace infinity;
 
@@ -35,12 +36,16 @@ auto main () -> int {
     assert(embedding_count == 10000000 || !"embedding size isn't 1000000");
     hnswlib::L2Space l2space(dimension);
     hnswlib::HierarchicalNSW<float>* hnsw_index = nullptr;
-    {
+
+    std::ifstream f(hnsw_index_l2_name);
+    if(f.good()) {
+        // Found index file
+        std::cout << "Found index file ... " << std::endl;
+        hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, hnsw_index_l2_name);
+    } else {
         SizeT max_elements = 10000000;        // create index
         hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, max_elements, M, ef_construction);
-    }
 
-    {
         infinity::BaseProfiler profiler;
         profiler.Begin();
         // insert data into index
@@ -55,6 +60,7 @@ auto main () -> int {
         profiler.End();
         std::cout << "Insert data cost: " << profiler.ElapsedToString()
                   << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        hnsw_index->saveIndex(hnsw_index_l2_name);
     }
 
     size_t number_of_queries;
@@ -64,7 +70,7 @@ auto main () -> int {
         infinity::BaseProfiler profiler;
         profiler.Begin();
         queries = fvecs_read(sift1m_query, &dim, &number_of_queries);
-        assert(d == dim || !"query does not have same dimension as train set");
+        assert(dimension == dim || !"query does not have same dimension as train set");
         profiler.End();
         std::cout << "Load sift1M query data: " << profiler.ElapsedToString() << std::endl;
     }
@@ -121,60 +127,5 @@ auto main () -> int {
         delete hnsw_index;
     }
 
-    return 0;
-#if 0
-    int dim = 16;               // Dimension of the elements
-    int max_elements = 10000;   // Maximum number of elements, should be known beforehand
-    int M = 16;                 // Tightly connected with internal dimensionality of the data
-    // strongly affects the memory consumption
-    int ef_construction = 200;  // Controls index search speed/build speed tradeoff
-
-    // Initing index
-    hnswlib::L2Space space(dim);
-    hnswlib::HierarchicalNSW<float>* alg_hnsw = new hnswlib::HierarchicalNSW<float>(&space, max_elements, M, ef_construction);
-
-    // Generate random data
-    std::mt19937 rng;
-    rng.seed(47);
-    std::uniform_real_distribution<> distrib_real;
-    float* data = new float[dim * max_elements];
-    for (int i = 0; i < dim * max_elements; i++) {
-        data[i] = distrib_real(rng);
-    }
-
-    // Add data to index
-    for (int i = 0; i < max_elements; i++) {
-        alg_hnsw->addPoint(data + i * dim, i);
-    }
-
-    // Query the elements for themselves and measure recall
-    float correct = 0;
-    for (int i = 0; i < max_elements; i++) {
-        std::priority_queue<std::pair<float, hnswlib::labeltype>> result = alg_hnsw->searchKnn(data + i * dim, 1);
-        hnswlib::labeltype label = result.top().second;
-        if (label == i) correct++;
-    }
-    float recall = correct / max_elements;
-    std::cout << "Recall: " << recall << "\n";
-
-    // Serialize index
-    std::string hnsw_path = "hnsw.bin";
-    alg_hnsw->saveIndex(hnsw_path);
-    delete alg_hnsw;
-
-    // Deserialize index and check recall
-    alg_hnsw = new hnswlib::HierarchicalNSW<float>(&space, hnsw_path);
-    correct = 0;
-    for (int i = 0; i < max_elements; i++) {
-        std::priority_queue<std::pair<float, hnswlib::labeltype>> result = alg_hnsw->searchKnn(data + i * dim, 1);
-        hnswlib::labeltype label = result.top().second;
-        if (label == i) correct++;
-    }
-    recall = (float)correct / max_elements;
-    std::cout << "Recall of deserialized index: " << recall << "\n";
-
-    delete[] data;
-    delete alg_hnsw;
-#endif
     return 0;
 }
