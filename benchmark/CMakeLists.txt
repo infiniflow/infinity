@@ -5,4 +5,4 @@ include_directories("${CMAKE_SOURCE_DIR}/src")
 
 add_subdirectory(function)
 add_subdirectory(faiss)
-add_subdirectory(hnswlib)
+add_subdirectory(hnsw)
