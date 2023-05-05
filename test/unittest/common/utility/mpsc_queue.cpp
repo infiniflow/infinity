@@ -19,14 +19,14 @@ TEST(TestMPSCQueue, EnqueueDequeueMultithreaded) {
     MPSCQueue<int> q;
     std::vector<std::thread> threads;
     for (int t = 0; t < 5; t++) {
-        threads.push_back(
-        std::thread([t, &q]() {
+        threads.emplace_back(
+        [t, &q]() {
             int start = t * 10000;
             int end = start + 10000;
             for (int i = start; i < end; i++) {
                 q.enqueue(i);
             }
-        }));
+        });
     }
 
     std::for_each(threads.begin(), threads.end(), [](std::thread& t) {
