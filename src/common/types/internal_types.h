@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <sstream>
+#include <thread>
 
 namespace infinity {
 
@@ -68,6 +69,8 @@ using ptr_t = char *;
 using const_ptr_t = const char *;
 using char_t = char;
 using SizeT = size_t;
+
+using Thread = std::thread;
 
 struct RowID {
     RowID(u32 blk, u32 off) : block(blk), offset(off) {}

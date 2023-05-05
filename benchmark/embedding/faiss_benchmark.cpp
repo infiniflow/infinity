@@ -4,6 +4,7 @@
 
 #define ANKERL_NANOBENCH_IMPLEMENT
 
+#include <thread>
 #include "nanobench.h"
 
 #include "common/types/internal_types.h"
@@ -13,6 +14,7 @@
 #include "helper.h"
 #include "faiss/IndexIVFFlat.h"
 #include "faiss/index_io.h"
+#include "scheduler.h"
 
 using namespace infinity;
 
@@ -340,8 +342,27 @@ benchmark_ivfflat(bool l2) {
     }
 }
 
+void
+scheduler_test() {
+    Scheduler scheduler;
+    i32 thread_count = std::thread::hardware_concurrency();
+    Vector<UniquePtr<DummyTask>> tasks;
+    tasks.reserve(thread_count);
+    for(SizeT idx = 0; idx < thread_count; ++ idx) {
+        tasks.emplace_back(std::move(MakeUnique<DummyTask>()));
+    }
+
+    scheduler.Init(thread_count);
+    for(SizeT idx = 0; idx < 3 * thread_count; ++ idx) {
+        SizeT worker_id = idx % thread_count;
+        scheduler.ScheduleTask(worker_id, tasks[worker_id].get());
+    }
+    scheduler.Uninit();
+}
+
 auto main () -> int {
-    benchmark_flat();
+//    benchmark_flat();
 //    benchmark_ivfflat(true);
+    scheduler_test();
     return 0;
 }

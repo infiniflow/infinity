@@ -5,6 +5,8 @@ file(GLOB_RECURSE
         faiss_benchmark.cpp
         helper.cpp
         helper.h
+        scheduler.cpp
+        scheduler.h
         )
 
 add_executable(faiss_benchmark
