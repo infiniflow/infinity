@@ -23,6 +23,89 @@ static const char* sift1m_ground_truth = "/home/jinhai/Documents/data/sift1M/sif
 static const char* ivf_index_name = "ivf_index.bin";
 static const char* flat_index_name = "flat_index.bin";
 
+void
+batch_run_on_cpu(faiss::Index* index, float* query_vectors, SizeT query_count, SizeT dimension, SizeT top_k, const int* ground_truth) {
+    infinity::BaseProfiler profiler;
+    profiler.Begin();
+    faiss::idx_t* I = new faiss::idx_t[query_count * top_k];
+    float* D = new float[query_count * top_k];
+
+    index->search(query_count, query_vectors, top_k, D, I);
+    profiler.End();
+    std::cout << "Search: " << profiler.ElapsedToString() << ", "
+              << get_current_rss() / 1000000 << " MB" << std::endl;
+
+    // evaluate result by hand.
+    int n_1 = 0, n_10 = 0, n_100 = 0;
+    for (int i = 0; i < query_count; i++) {
+        int gt_nn = ground_truth[i * top_k];
+        for (int j = 0; j < top_k; j++) {
+            if (I[i * top_k + j] == gt_nn) {
+                if (j < 1)
+                    n_1++;
+                if (j < 10)
+                    n_10++;
+                if (j < 100)
+                    n_100++;
+            }
+        }
+    }
+    printf("R@1 = %.4f\n", n_1 / float(query_count));
+    printf("R@10 = %.4f\n", n_10 / float(query_count));
+    printf("R@100 = %.4f\n", n_100 / float(query_count));
+
+    delete[] I;
+    delete[] D;
+}
+
+void
+single_run_on_cpu(faiss::Index* index, float* query_vectors, SizeT query_count, SizeT dimension, SizeT top_k, const int* ground_truth) {
+    std::cout << "Begin to search " << query_count << " query, memory: "
+              << get_current_rss() / 1000000 << " MB" << std::endl;
+
+    infinity::BaseProfiler profiler;
+    profiler.Begin();
+
+    faiss::idx_t* I = new faiss::idx_t[top_k];
+    float* D = new float[top_k];
+
+    // evaluate result by hand.
+    int n_1 = 0, n_10 = 0, n_100 = 0;
+    for(SizeT query_index = 0; query_index < query_count; ++  query_index) {
+        float* query_vector = &query_vectors[dimension * query_index];
+        index->search(1, query_vector, top_k, D, I);
+
+        int gt_nn = ground_truth[query_index * top_k];
+        for (int j = 0; j < top_k; j++) {
+            if (I[j] == gt_nn) {
+                if (j < 1)
+                    n_1++;
+                if (j < 10)
+                    n_10++;
+                if (j < 100)
+                    n_100++;
+            }
+        }
+
+        if (query_index % 100 == 0) {
+            std::cout << query_index << ", " << get_current_rss() / 1000000 << " MB, "
+                      << profiler.ElapsedToString() << std::endl;
+//            std::cout << n_1 << " " << n_10 << " " << n_100 << std::endl;
+        }
+    }
+
+    profiler.End();
+    std::cout << "Search: " << profiler.ElapsedToString() << ", "
+              << get_current_rss() / 1000000 << " MB" << std::endl;
+
+    printf("R@1 = %.4f\n", n_1 / float(query_count));
+    printf("R@10 = %.4f\n", n_10 / float(query_count));
+    printf("R@100 = %.4f\n", n_100 / float(query_count));
+
+    delete[] I;
+    delete[] D;
+}
+
 static float*
 float_vector_read(const char* fname, size_t* dimension, size_t* row_count, const char* comment) {
     infinity::BaseProfiler profiler;
@@ -111,40 +194,8 @@ benchmark_flat() {
         assert(query_vector_row_count == ground_truth_row_count || !"incorrect nb of ground truth entries");
     }
 
-    {
-        infinity::BaseProfiler profiler;
-        profiler.Begin();
-        faiss::idx_t* I = new faiss::idx_t[query_vector_row_count * top_k];
-        float* D = new float[query_vector_row_count * top_k];
-
-        index->search(query_vector_row_count, query_vectors, top_k, D, I);
-        profiler.End();
-        std::cout << "Search: " << profiler.ElapsedToString() << ", "
-                  << get_current_rss() / 1000000 << " MB" << std::endl;
-
-        // evaluate result by hand.
-        int n_1 = 0, n_10 = 0, n_100 = 0;
-        for (int i = 0; i < query_vector_row_count; i++) {
-            int gt_nn = ground_truth[i * top_k];
-            for (int j = 0; j < top_k; j++) {
-                if (I[i * top_k + j] == gt_nn) {
-                    if (j < 1)
-                        n_1++;
-                    if (j < 10)
-                        n_10++;
-                    if (j < 100)
-                        n_100++;
-                }
-            }
-        }
-        printf("R@1 = %.4f\n", n_1 / float(query_vector_row_count));
-        printf("R@10 = %.4f\n", n_10 / float(query_vector_row_count));
-        printf("R@100 = %.4f\n", n_100 / float(query_vector_row_count));
-
-        delete[] I;
-        delete[] D;
-    }
-
+    single_run_on_cpu(index, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+//    batch_run_on_cpu(index, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
     {
         delete[] query_vectors;
         delete[] ground_truth;
@@ -287,11 +338,6 @@ benchmark_ivfflat(bool l2) {
         delete[] ground_truth;
         delete[] queries;
     }
-}
-
-void
-benchmark_ivf_single_cpu(bool l2) {
-
 }
 
 auto main () -> int {
