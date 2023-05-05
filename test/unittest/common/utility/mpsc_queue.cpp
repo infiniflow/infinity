@@ -8,11 +8,11 @@ namespace infinity {
 
 TEST(TestMPSCQueue, EnqueueDequeue) {
     MPSCQueue<std::string> q;
-    std::string* s = new std::string("test");
-    q.push_back(s);
-    std::string* s2 = q.pop_front();
+    std::string s("test");
+    q.enqueue(s);
+    std::string s2;
+    q.dequeue(s2);
     ASSERT_EQ(s, s2);
-    delete s2;
 }
 
 TEST(TestMPSCQueue, EnqueueDequeueMultithreaded) {
@@ -21,10 +21,10 @@ TEST(TestMPSCQueue, EnqueueDequeueMultithreaded) {
     for (int t = 0; t < 5; t++) {
         threads.push_back(
         std::thread([t, &q]() {
-            int start = t * 1000;
-            int end = start + 1000;
+            int start = t * 10000;
+            int end = start + 10000;
             for (int i = start; i < end; i++) {
-                q.push_back(new int(i));
+                q.enqueue(i);
             }
         }));
     }
@@ -35,14 +35,14 @@ TEST(TestMPSCQueue, EnqueueDequeueMultithreaded) {
 
     std::set<int> elements;
 
-    int* s = nullptr;
-    while ((s = q.pop_front()) != nullptr) {
-        elements.insert(*s);
+    int s;
+    while (q.dequeue(s)) {
+        elements.insert(s);
     }
 
-    ASSERT_EQ(5000UL, elements.size());
+    ASSERT_EQ(50000UL, elements.size());
 
-    for (int i = 0; i < 5000; i++) {
+    for (int i = 0; i < 50000; i++) {
         ASSERT_NE(elements.end(), elements.find(i));
     }
 }
