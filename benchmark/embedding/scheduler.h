@@ -14,6 +14,7 @@ enum class TaskType {
     kTerminate,
     kDummy,
     kAnnFlat,
+    kAnnIVFFlat,
     kInvalid,
 };
 
