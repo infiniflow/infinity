@@ -107,25 +107,36 @@ single_run_on_cpu(faiss::Index* index, float* query_vectors, SizeT query_count, 
 struct AnnFlatTask : public Task {
     inline explicit
     AnnFlatTask(faiss::Index* index,
+                SizeT dimension,
                 SizeT query_count,
                 f32* query_vectors,
                 SizeT top_k,
                 i64*& result_id,
-                f32*& result_vector)
+                f32*& result_distance)
             : Task(TaskType::kAnnFlat),
               index_(index),
+              dimension_(dimension),
               query_count_(query_count),
               query_vectors_(query_vectors),
               top_k_(top_k),
               result_id_(result_id),
-              result_vector_(result_vector)
+              result_distance_(result_distance)
     {}
 
     void
     run(i64 worker_id) override {
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        index_->search(query_count_, query_vectors_, top_k_, result_vector_, result_id_);
+        for(SizeT idx = 0; idx < query_count_; ++ idx) {
+            f32* one_query_ptr = &query_vectors_[idx * dimension_];
+            i64* one_result_ids = &result_id_[idx * top_k_];
+            f32* one_result_distances = &result_distance_[idx * top_k_];
+            index_->search(1, one_query_ptr, top_k_, one_result_distances, one_result_ids);
+//            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
+        }
+
+//        index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
+
         profiler.End();
 //        std::cout << "Search: " << profiler.ElapsedToString() << ", "
 //                  << get_current_rss() / 1000000 << " MB" << std::endl;
@@ -135,11 +146,12 @@ struct AnnFlatTask : public Task {
 
 private:
     faiss::Index* index_{nullptr};
+    SizeT dimension_{0};
     SizeT query_count_{0};
     f32*  query_vectors_{nullptr};
     SizeT top_k_{0};
     i64*  result_id_{nullptr}; // I
-    f32*  result_vector_{nullptr}; // D
+    f32*  result_distance_{nullptr}; // D
 };
 
 void
@@ -149,7 +161,9 @@ scheduler_run_on_cpu(faiss::Index* index,
                      SizeT dimension,
                      SizeT top_k,
                      const i32* ground_truth) {
-    const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
+//    const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
+    const HashSet<i64> cpu_mask;
+//    total_query_count = 16;
 
     i64 cpu_count = std::thread::hardware_concurrency();
     HashSet<i64> cpu_set;
@@ -170,7 +184,7 @@ scheduler_run_on_cpu(faiss::Index* index,
     tasks.reserve(task_count);
 
     i64* total_result_ids = new faiss::idx_t[total_query_count * top_k];
-    f32* total_result_vectors = new float[total_query_count * top_k];
+    f32* total_result_distances = new float[total_query_count * top_k];
 
     for(SizeT idx = 0; idx < task_count; ++ idx) {
         SizeT query_count = base_task_size;
@@ -183,13 +197,14 @@ scheduler_run_on_cpu(faiss::Index* index,
 
 
         i64* result_ids = &total_result_ids[query_offset * top_k];
-        f32* result_vectors = &total_result_vectors[query_offset * top_k];
+        f32* result_distances = &total_result_distances[query_offset * top_k];
         tasks.emplace_back(MakeUnique<AnnFlatTask>(index,
+                                                   dimension,
                                                    query_count,
                                                    query_vectors,
                                                    top_k,
                                                    result_ids,
-                                                   result_vectors));
+                                                   result_distances));
         query_offset += query_count;
     }
 
@@ -205,8 +220,10 @@ scheduler_run_on_cpu(faiss::Index* index,
 
     int n_1 = 0, n_10 = 0, n_100 = 0;
     for (int i = 0; i < total_query_count; i++) {
+//        printf("==== %d ====\n", i);
         int gt_nn = ground_truth[i * top_k];
         for (int j = 0; j < top_k; j++) {
+//            printf("%ld == %d\n", total_result_ids[i * top_k + j], gt_nn);
             if (total_result_ids[i * top_k + j] == gt_nn) {
                 if (j < 1)
                     n_1++;
@@ -222,7 +239,7 @@ scheduler_run_on_cpu(faiss::Index* index,
     printf("R@100 = %.4f\n", n_100 / float(total_query_count));
 
     delete[] total_result_ids;
-    delete[] total_result_vectors;
+    delete[] total_result_distances;
 }
 
 static float*
