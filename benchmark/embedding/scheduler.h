@@ -8,6 +8,8 @@
 #include "common/types/internal_types.h"
 #include "blockingconcurrentqueue.h"
 
+#include <unistd.h>
+
 namespace infinity {
 
 enum class TaskType {
@@ -47,7 +49,7 @@ struct DummyTask final: public Task {
     void
     run(i64 worker_id) override {
         printf("Run dummy task by worker: %ld\n", worker_id);
-        usleep(1000 * 1000);
+        sleep(1);
     }
 };
 

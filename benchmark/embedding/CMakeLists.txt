@@ -21,6 +21,7 @@ target_link_libraries(
         faiss_benchmark
         faiss
         infinity_core
+        gfortran
 )
 
 add_executable(hnsw_benchmark
