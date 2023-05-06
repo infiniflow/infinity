@@ -46,7 +46,7 @@ batch_run_on_cpu(faiss::Index* index,
     switch(index_type) {
         case IndexType::kIVFFlat: {
             faiss::IndexIVFFlat* ivf_flat_index = (faiss::IndexIVFFlat*)index;
-            ivf_flat_index->nprobe = 4; // Default value is 1;
+            ivf_flat_index->nprobe = 32; // Default value is 1;
             break;
         }
         case IndexType::kHnsw: {
@@ -102,7 +102,7 @@ single_run_on_cpu(faiss::Index* index,
     switch(index_type) {
         case IndexType::kIVFFlat: {
             faiss::IndexIVFFlat* ivf_flat_index = (faiss::IndexIVFFlat*)index;
-            ivf_flat_index->nprobe = 4; // Default value is 1;
+            ivf_flat_index->nprobe = 32; // Default value is 1;
             break;
         }
         case IndexType::kHnsw: {
@@ -302,7 +302,7 @@ scheduler_run_on_cpu(faiss::Index* index,
 
             case IndexType::kIVFFlat: {
                 faiss::IndexIVFFlat* ivf_flat_index = (faiss::IndexIVFFlat*)index;
-                ivf_flat_index->nprobe = 4; // Default value is 1;
+                ivf_flat_index->nprobe = 32; // Default value is 1;
                 tasks.emplace_back(MakeUnique<AnnIVFFlatTask>(ivf_flat_index,
                                                               dimension,
                                                               query_count,
