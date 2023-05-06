@@ -5,6 +5,7 @@
 #define ANKERL_NANOBENCH_IMPLEMENT
 
 #include <thread>
+#include <cblas-openblas.h>
 #include "nanobench.h"
 
 #include "common/types/internal_types.h"
@@ -127,15 +128,15 @@ struct AnnFlatTask : public Task {
     run(i64 worker_id) override {
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        for(SizeT idx = 0; idx < query_count_; ++ idx) {
-            f32* one_query_ptr = &query_vectors_[idx * dimension_];
-            i64* one_result_ids = &result_id_[idx * top_k_];
-            f32* one_result_distances = &result_distance_[idx * top_k_];
-            index_->search(1, one_query_ptr, top_k_, one_result_distances, one_result_ids);
-//            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
-        }
+//        for(SizeT idx = 0; idx < query_count_; ++ idx) {
+//            f32* one_query_ptr = &query_vectors_[idx * dimension_];
+//            i64* one_result_ids = &result_id_[idx * top_k_];
+//            f32* one_result_distances = &result_distance_[idx * top_k_];
+//            index_->search(1, one_query_ptr, top_k_, one_result_distances, one_result_ids);
+////            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
+//        }
 
-//        index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
+        index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
 
         profiler.End();
 //        std::cout << "Search: " << profiler.ElapsedToString() << ", "
@@ -161,8 +162,9 @@ scheduler_run_on_cpu(faiss::Index* index,
                      SizeT dimension,
                      SizeT top_k,
                      const i32* ground_truth) {
-//    const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
-    const HashSet<i64> cpu_mask;
+    const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
+//    const HashSet<i64> cpu_mask{1, 3, 5, 7};
+//    const HashSet<i64> cpu_mask;
 //    total_query_count = 16;
 
     i64 cpu_count = std::thread::hardware_concurrency();
@@ -506,6 +508,7 @@ scheduler_test() {
 }
 
 auto main () -> int {
+    openblas_set_num_threads(1);
     benchmark_flat();
 //    benchmark_ivfflat(true);
 //    scheduler_test();
