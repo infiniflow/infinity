@@ -6,12 +6,14 @@
 
 #include "common/utility/mpsc_queue.h"
 #include "common/types/internal_types.h"
+#include "blockingconcurrentqueue.h"
 
 namespace infinity {
 
 enum class TaskType {
     kTerminate,
     kDummy,
+    kAnnFlat,
     kInvalid,
 };
 
@@ -56,10 +58,11 @@ struct TaskQueue {
 
     void
     Dequeue(Task*& task) {
-        queue_.dequeue(task);
+        queue_.wait_dequeue(task);
     }
 
-    MPSCQueue<Task*> queue_;
+    moodycamel::BlockingConcurrentQueue<Task*> queue_;
+//    MPSCQueue<Task*> queue_;
 };
 
 class Scheduler {
@@ -67,7 +70,7 @@ public:
     Scheduler() = default;
 
     void
-    Init(i32 thread_count);
+    Init(const HashSet<i64>& cpu_set);
 
     void
     Uninit();
@@ -78,10 +81,10 @@ public:
     static void
     ExecuteLoop(TaskQueue* task_queue, i64 worker_id);
 private:
-    i32 thread_count_{-1};
+    HashSet<i64> cpu_set_{};
 
-    Vector<UniquePtr<TaskQueue>> task_queues_{};
-    Vector<UniquePtr<Thread>> task_threads_{};
+    HashMap<i64, UniquePtr<TaskQueue>> task_queues_{};
+    HashMap<i64, UniquePtr<Thread>> task_threads_{};
 };
 
 }

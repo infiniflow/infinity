@@ -27,15 +27,10 @@ static const char* flat_index_name = "flat_index.bin";
 
 void
 batch_run_on_cpu(faiss::Index* index, float* query_vectors, SizeT query_count, SizeT dimension, SizeT top_k, const int* ground_truth) {
-    infinity::BaseProfiler profiler;
-    profiler.Begin();
     faiss::idx_t* I = new faiss::idx_t[query_count * top_k];
     float* D = new float[query_count * top_k];
 
     index->search(query_count, query_vectors, top_k, D, I);
-    profiler.End();
-    std::cout << "Search: " << profiler.ElapsedToString() << ", "
-              << get_current_rss() / 1000000 << " MB" << std::endl;
 
     // evaluate result by hand.
     int n_1 = 0, n_10 = 0, n_100 = 0;
@@ -106,6 +101,128 @@ single_run_on_cpu(faiss::Index* index, float* query_vectors, SizeT query_count, 
 
     delete[] I;
     delete[] D;
+}
+
+
+struct AnnFlatTask : public Task {
+    inline explicit
+    AnnFlatTask(faiss::Index* index,
+                SizeT query_count,
+                f32* query_vectors,
+                SizeT top_k,
+                i64*& result_id,
+                f32*& result_vector)
+            : Task(TaskType::kAnnFlat),
+              index_(index),
+              query_count_(query_count),
+              query_vectors_(query_vectors),
+              top_k_(top_k),
+              result_id_(result_id),
+              result_vector_(result_vector)
+    {}
+
+    void
+    run(i64 worker_id) override {
+        infinity::BaseProfiler profiler;
+        profiler.Begin();
+        index_->search(query_count_, query_vectors_, top_k_, result_vector_, result_id_);
+        profiler.End();
+//        std::cout << "Search: " << profiler.ElapsedToString() << ", "
+//                  << get_current_rss() / 1000000 << " MB" << std::endl;
+        printf("Run AnnFlat by worker: %ld, spend: %s\n", worker_id, profiler.ElapsedToString().c_str());
+//        usleep(1000 * 1000);
+    }
+
+private:
+    faiss::Index* index_{nullptr};
+    SizeT query_count_{0};
+    f32*  query_vectors_{nullptr};
+    SizeT top_k_{0};
+    i64*  result_id_{nullptr}; // I
+    f32*  result_vector_{nullptr}; // D
+};
+
+void
+scheduler_run_on_cpu(faiss::Index* index,
+                     float* total_query_vectors,
+                     SizeT total_query_count,
+                     SizeT dimension,
+                     SizeT top_k,
+                     const i32* ground_truth) {
+    const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
+
+    i64 cpu_count = std::thread::hardware_concurrency();
+    HashSet<i64> cpu_set;
+    for(i64 idx = 0; idx < cpu_count; ++ idx) {
+        if(!cpu_mask.contains(idx)) {
+            cpu_set.insert(idx);
+        }
+    }
+
+    SizeT task_count = cpu_set.size();
+    if(task_count == 0) {
+        assert(false || ! "No cpu available");
+    }
+    SizeT base_task_size = total_query_count / task_count;
+    SizeT reminder_size = total_query_count % task_count;
+    SizeT query_offset = 0;
+    Vector<UniquePtr<AnnFlatTask>> tasks;
+    tasks.reserve(task_count);
+
+    i64* total_result_ids = new faiss::idx_t[total_query_count * top_k];
+    f32* total_result_vectors = new float[total_query_count * top_k];
+
+    for(SizeT idx = 0; idx < task_count; ++ idx) {
+        SizeT query_count = base_task_size;
+        if(reminder_size > 0) {
+            ++ query_count;
+            -- reminder_size;
+        }
+
+        f32* query_vectors = &total_query_vectors[query_offset * dimension];
+
+
+        i64* result_ids = &total_result_ids[query_offset * top_k];
+        f32* result_vectors = &total_result_vectors[query_offset * top_k];
+        tasks.emplace_back(MakeUnique<AnnFlatTask>(index,
+                                                   query_count,
+                                                   query_vectors,
+                                                   top_k,
+                                                   result_ids,
+                                                   result_vectors));
+        query_offset += query_count;
+    }
+
+    Scheduler scheduler;
+    scheduler.Init(cpu_set);
+    i64 task_id{0};
+    for(i64 cpu_id: cpu_set) {
+        scheduler.ScheduleTask(cpu_id, tasks[task_id].get());
+        ++ task_id;
+    }
+
+    scheduler.Uninit();
+
+    int n_1 = 0, n_10 = 0, n_100 = 0;
+    for (int i = 0; i < total_query_count; i++) {
+        int gt_nn = ground_truth[i * top_k];
+        for (int j = 0; j < top_k; j++) {
+            if (total_result_ids[i * top_k + j] == gt_nn) {
+                if (j < 1)
+                    n_1++;
+                if (j < 10)
+                    n_10++;
+                if (j < 100)
+                    n_100++;
+            }
+        }
+    }
+    printf("R@1 = %.4f\n", n_1 / float(total_query_count));
+    printf("R@10 = %.4f\n", n_10 / float(total_query_count));
+    printf("R@100 = %.4f\n", n_100 / float(total_query_count));
+
+    delete[] total_result_ids;
+    delete[] total_result_vectors;
 }
 
 static float*
@@ -183,7 +300,7 @@ benchmark_flat() {
     float* query_vectors;
     {
         query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
-        assert(query_vector_dimension == base_vector_dimension || !"query does not have same dimension as base set");
+        assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
     }
 
     // Read ground truth
@@ -196,8 +313,15 @@ benchmark_flat() {
         assert(query_vector_row_count == ground_truth_row_count || !"incorrect nb of ground truth entries");
     }
 
-    single_run_on_cpu(index, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    infinity::BaseProfiler profiler;
+    profiler.Begin();
+
+//    single_run_on_cpu(index, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
 //    batch_run_on_cpu(index, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(index, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    profiler.End();
+    std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
+
     {
         delete[] query_vectors;
         delete[] ground_truth;
@@ -345,24 +469,28 @@ benchmark_ivfflat(bool l2) {
 void
 scheduler_test() {
     Scheduler scheduler;
-    i32 thread_count = std::thread::hardware_concurrency();
+    u32 thread_count = std::thread::hardware_concurrency();
     Vector<UniquePtr<DummyTask>> tasks;
     tasks.reserve(thread_count);
-    for(SizeT idx = 0; idx < thread_count; ++ idx) {
+    HashSet<i64> cpu_set;
+    for(i64 idx = 0; idx < thread_count; ++ idx) {
+        cpu_set.insert(idx);
         tasks.emplace_back(std::move(MakeUnique<DummyTask>()));
     }
 
-    scheduler.Init(thread_count);
-    for(SizeT idx = 0; idx < 3 * thread_count; ++ idx) {
-        SizeT worker_id = idx % thread_count;
-        scheduler.ScheduleTask(worker_id, tasks[worker_id].get());
+    scheduler.Init(cpu_set);
+    for(i64 idx = 0; idx < 5; ++ idx) {
+        for(i64 cpu_id: cpu_set) {
+            scheduler.ScheduleTask(cpu_id, tasks[cpu_id].get());
+        }
     }
+
     scheduler.Uninit();
 }
 
 auto main () -> int {
-//    benchmark_flat();
+    benchmark_flat();
 //    benchmark_ivfflat(true);
-    scheduler_test();
+//    scheduler_test();
     return 0;
 }
