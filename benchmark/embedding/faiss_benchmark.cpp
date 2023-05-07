@@ -15,13 +15,16 @@
 #include "helper.h"
 #include "faiss/IndexIVFFlat.h"
 #include "faiss/index_io.h"
+#include "hnswlib/hnswlib.h"
 #include "scheduler.h"
+#include "faiss/IndexScalarQuantizer.h"
 
 using namespace infinity;
 
 enum class IndexType {
     kFlat,
     kIVFFlat,
+    kIVFSQ8,
     kHnsw
 };
 
@@ -30,7 +33,9 @@ static const char* sift1m_train = "/home/jinhai/Documents/data/sift1M/sift_learn
 static const char* sift1m_query = "/home/jinhai/Documents/data/sift1M/sift_query.fvecs";
 static const char* sift1m_ground_truth = "/home/jinhai/Documents/data/sift1M/sift_groundtruth.ivecs";
 static const char* ivf_index_name = "ivf_index.bin";
+static const char* ivfsq8_index_name = "ivfsq8_index.bin";
 static const char* flat_index_name = "flat_index.bin";
+static const char* hnsw_index_l2_name = "hnsw_index_l2.bin";
 
 void
 batch_run_on_cpu(faiss::Index* index,
@@ -47,17 +52,18 @@ batch_run_on_cpu(faiss::Index* index,
         case IndexType::kIVFFlat: {
             faiss::IndexIVFFlat* ivf_flat_index = (faiss::IndexIVFFlat*)index;
             ivf_flat_index->nprobe = 32; // Default value is 1;
+            ivf_flat_index->search(query_count, query_vectors, top_k, D, I);
             break;
         }
         case IndexType::kHnsw: {
+            assert(false || !"HNSW index doesn't support batch search");
             break;
         }
         case IndexType::kFlat: {
+            index->search(query_count, query_vectors, top_k, D, I);
             break;
         }
     }
-
-    index->search(query_count, query_vectors, top_k, D, I);
 
     // evaluate result by hand.
     int n_1 = 0, n_10 = 0, n_100 = 0;
@@ -83,7 +89,7 @@ batch_run_on_cpu(faiss::Index* index,
 }
 
 void
-single_run_on_cpu(faiss::Index* index,
+single_run_on_cpu(void* index,
                   IndexType index_type,
                   float* query_vectors,
                   SizeT query_count,
@@ -99,25 +105,36 @@ single_run_on_cpu(faiss::Index* index,
     faiss::idx_t* I = new faiss::idx_t[top_k];
     float* D = new float[top_k];
 
-    switch(index_type) {
-        case IndexType::kIVFFlat: {
-            faiss::IndexIVFFlat* ivf_flat_index = (faiss::IndexIVFFlat*)index;
-            ivf_flat_index->nprobe = 32; // Default value is 1;
-            break;
-        }
-        case IndexType::kHnsw: {
-            break;
-        }
-        case IndexType::kFlat: {
-            break;
-        }
-    }
-
     // evaluate result by hand.
     int n_1 = 0, n_10 = 0, n_100 = 0;
     for(SizeT query_index = 0; query_index < query_count; ++  query_index) {
         float* query_vector = &query_vectors[dimension * query_index];
-        index->search(1, query_vector, top_k, D, I);
+
+        switch(index_type) {
+            case IndexType::kIVFFlat: {
+                faiss::IndexIVFFlat* ivf_flat_index = (faiss::IndexIVFFlat*)index;
+                ivf_flat_index->nprobe = 32; // Default value is 1;
+                ivf_flat_index->search(1, query_vector, top_k, D, I);
+                break;
+            }
+            case IndexType::kHnsw: {
+                SizeT ef_construction = 200;
+                hnswlib::HierarchicalNSW<float>* hnsw_index = (hnswlib::HierarchicalNSW<float>*)index;
+                hnsw_index->setEf(ef_construction);
+                std::priority_queue<std::pair<float, hnswlib::labeltype>> result
+                        = hnsw_index->searchKnn(query_vector, top_k);
+                for(SizeT idx = 0; idx < top_k; ++ idx) {
+                    I[idx] = result.top().second;
+                    result.pop();
+                }
+                break;
+            }
+            case IndexType::kFlat: {
+                faiss::IndexFlatL2* flat_index = (faiss::IndexFlatL2*)index;
+                flat_index->search(1, query_vector, top_k, D, I);
+                break;
+            }
+        }
 
         int gt_nn = ground_truth[query_index * top_k];
         for (int j = 0; j < top_k; j++) {
@@ -224,6 +241,56 @@ struct AnnIVFFlatTask : public Task {
     run(i64 worker_id) override {
         infinity::BaseProfiler profiler;
         profiler.Begin();
+//        for(SizeT idx = 0; idx < query_count_; ++ idx) {
+//            f32* one_query_ptr = &query_vectors_[idx * dimension_];
+//            i64* one_result_ids = &result_id_[idx * top_k_];
+//            f32* one_result_distances = &result_distance_[idx * top_k_];
+//            index_->search(1, one_query_ptr, top_k_, one_result_distances, one_result_ids);
+////            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
+//        }
+
+        index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
+
+        profiler.End();
+//        std::cout << "Search: " << profiler.ElapsedToString() << ", "
+//                  << get_current_rss() / 1000000 << " MB" << std::endl;
+//        printf("Run AnnIVFFlat by worker: %ld, spend: %s\n", worker_id, profiler.ElapsedToString().c_str());
+//        usleep(1000 * 1000);
+    }
+
+private:
+    faiss::Index* index_{nullptr};
+    SizeT dimension_{0};
+    SizeT query_count_{0};
+    f32*  query_vectors_{nullptr};
+    SizeT top_k_{0};
+    i64*  result_id_{nullptr}; // I
+    f32*  result_distance_{nullptr}; // D
+};
+
+struct AnnIVFSQ8Task : public Task {
+    inline explicit
+    AnnIVFSQ8Task(faiss::Index* index,
+                   SizeT dimension,
+                   SizeT query_count,
+                   f32* query_vectors,
+                   SizeT top_k,
+                   i64*& result_id,
+                   f32*& result_distance)
+            : Task(TaskType::kAnnIVFFlat),
+              index_(index),
+              dimension_(dimension),
+              query_count_(query_count),
+              query_vectors_(query_vectors),
+              top_k_(top_k),
+              result_id_(result_id),
+              result_distance_(result_distance)
+    {}
+
+    void
+    run(i64 worker_id) override {
+        infinity::BaseProfiler profiler;
+        profiler.Begin();
         for(SizeT idx = 0; idx < query_count_; ++ idx) {
             f32* one_query_ptr = &query_vectors_[idx * dimension_];
             i64* one_result_ids = &result_id_[idx * top_k_];
@@ -251,8 +318,63 @@ private:
     f32*  result_distance_{nullptr}; // D
 };
 
+struct AnnHNSWTask : public Task {
+    inline explicit
+    AnnHNSWTask(hnswlib::HierarchicalNSW<float>* index,
+                SizeT dimension,
+                SizeT query_count,
+                f32* query_vectors,
+                SizeT top_k,
+                i64*& result_id,
+                f32*& result_distance)
+            : Task(TaskType::kAnnIVFFlat),
+              index_(index),
+              dimension_(dimension),
+              query_count_(query_count),
+              query_vectors_(query_vectors),
+              top_k_(top_k),
+              result_id_(result_id),
+              result_distance_(result_distance)
+    {}
+
+    void
+    run(i64 worker_id) override {
+        infinity::BaseProfiler profiler;
+        profiler.Begin();
+        for(SizeT idx = 0; idx < query_count_; ++ idx) {
+            f32* one_query_ptr = &query_vectors_[idx * dimension_];
+            i64* one_result_ids = &result_id_[idx * top_k_];
+            f32* one_result_distances = &result_distance_[idx * top_k_];
+            std::priority_queue<std::pair<float, hnswlib::labeltype>> result =
+                    index_->searchKnn(one_query_ptr, top_k_);
+            for(SizeT k = 0; k < top_k_; ++ k) {
+                one_result_ids[k] = result.top().second;
+                result.pop();
+            }
+//            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
+        }
+
+//        index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
+
+        profiler.End();
+//        std::cout << "Search: " << profiler.ElapsedToString() << ", "
+//                  << get_current_rss() / 1000000 << " MB" << std::endl;
+//        printf("Run AnnIVFFlat by worker: %ld, spend: %s\n", worker_id, profiler.ElapsedToString().c_str());
+//        usleep(1000 * 1000);
+    }
+
+private:
+    hnswlib::HierarchicalNSW<float>* index_{nullptr};
+    SizeT dimension_{0};
+    SizeT query_count_{0};
+    f32*  query_vectors_{nullptr};
+    SizeT top_k_{0};
+    i64*  result_id_{nullptr}; // I
+    f32*  result_distance_{nullptr}; // D
+};
+
 void
-scheduler_run_on_cpu(faiss::Index* index,
+scheduler_run_on_cpu(void* index,
                      IndexType index_type,
                      float* total_query_vectors,
                      SizeT total_query_count,
@@ -262,6 +384,7 @@ scheduler_run_on_cpu(faiss::Index* index,
 //    const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
 //    const HashSet<i64> cpu_mask{1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15};
 //    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15};
+//    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 //    const HashSet<i64> cpu_mask{1, 3, 5, 7};
     const HashSet<i64> cpu_mask;
 //    total_query_count = 16;
@@ -312,11 +435,34 @@ scheduler_run_on_cpu(faiss::Index* index,
                                                               result_distances));
                 break;
             }
+            case IndexType::kIVFSQ8: {
+                faiss::IndexIVFScalarQuantizer* ivf_sq8_index = (faiss::IndexIVFScalarQuantizer*)index;
+                ivf_sq8_index->nprobe = 32; // Default value is 1;
+                tasks.emplace_back(MakeUnique<AnnIVFSQ8Task>(ivf_sq8_index,
+                                                              dimension,
+                                                              query_count,
+                                                              query_vectors,
+                                                              top_k,
+                                                              result_ids,
+                                                              result_distances));
+                break;
+            }
             case IndexType::kHnsw: {
+                SizeT ef_construction = 200;
+                hnswlib::HierarchicalNSW<float>* hnsw_index = (hnswlib::HierarchicalNSW<float>*)index;
+                hnsw_index->setEf(ef_construction);
+                tasks.emplace_back(MakeUnique<AnnHNSWTask>(hnsw_index,
+                                                           dimension,
+                                                           query_count,
+                                                           query_vectors,
+                                                           top_k,
+                                                           result_ids,
+                                                           result_distances));
                 break;
             }
             case IndexType::kFlat: {
-                tasks.emplace_back(MakeUnique<AnnFlatTask>(index,
+                faiss::IndexFlatL2* flat_index = (faiss::IndexFlatL2*)index;
+                tasks.emplace_back(MakeUnique<AnnFlatTask>(flat_index,
                                                            dimension,
                                                            query_count,
                                                            query_vectors,
@@ -392,6 +538,8 @@ integer_vector_read(const char* fname, size_t* dimension, size_t* row_count, con
 
 void
 benchmark_flat() {
+    std::cout << "Before query, current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
+
     faiss::Index* index;
     int dimension = 128;
     std::ifstream f(flat_index_name);
@@ -455,7 +603,8 @@ benchmark_flat() {
     infinity::BaseProfiler profiler;
     profiler.Begin();
 
-    std::cout << "Start to query: " << query_vector_row_count << " vectors" << std::endl;
+    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: "
+              << get_current_rss() / 1000000 << "MB" << std::endl;
 //    single_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
 //    batch_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
     scheduler_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
@@ -472,6 +621,8 @@ benchmark_flat() {
 
 void
 benchmark_ivfflat() {
+    std::cout << "Before query, current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
+
     int dimension = 128;
     size_t centroids_count = 4096;
     faiss::IndexFlatL2 quantizer(dimension);
@@ -553,7 +704,8 @@ benchmark_ivfflat() {
     infinity::BaseProfiler profiler;
     profiler.Begin();
 
-    std::cout << "Start to query: " << query_vector_row_count << " vectors" << std::endl;
+    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: "
+              << get_current_rss() / 1000000 << "MB" << std::endl;
 //    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
 //    single_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
     scheduler_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
@@ -566,6 +718,202 @@ benchmark_ivfflat() {
         delete index;
     }
     std::cout << "Memory: " << get_current_rss() / 1000000 << " MB" << std::endl;
+}
+
+void
+benchmark_ivfsq8() {
+    std::cout << "Before query, current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
+
+    int dimension = 128;
+    size_t centroids_count = 4096;
+    faiss::IndexFlatL2 quantizer(dimension);
+    faiss::Index* index = nullptr;
+
+    std::ifstream f(ivfsq8_index_name);
+    if(f.good()) {
+        // Found index file
+        std::cout << "Found index file ... " << std::endl;
+        index = faiss::read_index(ivfsq8_index_name);
+    } else {
+        {
+            // Construct index
+            infinity::BaseProfiler profiler;
+            profiler.Begin();
+            index = new faiss::IndexIVFScalarQuantizer(&quantizer,
+                                                       dimension,
+                                                       centroids_count,
+                                                       faiss::ScalarQuantizer::QuantizerType::QT_8bit,
+                                                       faiss::MetricType::METRIC_L2);
+            profiler.End();
+            std::cout << "Create IVF SQ8 index: " << profiler.ElapsedToString() << std::endl;
+        }
+
+        // Read train vector data
+        SizeT train_vector_row_count{0};
+        SizeT train_vector_dimension{0};
+        {
+            infinity::BaseProfiler profiler;
+            profiler.Begin();
+            float* train_vectors = float_vector_read(sift1m_train, &train_vector_dimension, &train_vector_row_count, "Train Vector");
+            profiler.End();
+
+            profiler.Begin();
+            index->train(train_vector_row_count, train_vectors);
+            profiler.End();
+            std::cout << "Train sift1M learn data into quantizer: " << profiler.ElapsedToString() << std::endl;
+            delete[] train_vectors;
+        }
+
+        // Read base vector data
+        SizeT base_vector_row_count{0};
+        SizeT base_vector_dimension{0};
+        float* base_vectors{nullptr};
+        {
+            base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count, "Base Vector");
+        }
+
+        {
+            // Build index
+            infinity::BaseProfiler profiler;
+            profiler.Begin();
+            index->add(base_vector_row_count, base_vectors);
+            profiler.End();
+            std::cout << "Insert Base Vector into index: " << profiler.ElapsedToString() << ", "
+                      << get_current_rss() / 1000000 << " MB" << std::endl;
+        }
+
+        delete[] base_vectors;
+
+        faiss::write_index(index, ivfsq8_index_name);
+    }
+
+    // Read query vector data
+    SizeT query_vector_row_count{0};
+    SizeT query_vector_dimension{0};
+    float* query_vectors;
+    {
+        query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
+        assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
+    }
+
+    // Read ground truth
+    SizeT top_k{0};                // number of results per query in the GT
+    i32*  ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    SizeT ground_truth_row_count{0};
+    {
+        // load ground-truth
+        ground_truth = ivecs_read(sift1m_ground_truth, &top_k, &ground_truth_row_count);
+        assert(query_vector_row_count == ground_truth_row_count || !"incorrect nb of ground truth entries");
+    }
+
+    infinity::BaseProfiler profiler;
+    profiler.Begin();
+
+    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: "
+              << get_current_rss() / 1000000 << "MB" << std::endl;
+//    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+//    single_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(index, IndexType::kIVFSQ8, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    profiler.End();
+    std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
+
+    {
+        delete[] query_vectors;
+        delete[] ground_truth;
+        delete index;
+    }
+    std::cout << "Memory: " << get_current_rss() / 1000000 << " MB" << std::endl;
+}
+
+void
+benchmark_hnsw() {
+    std::cout << "Before query, current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
+
+    SizeT dimension = 128;
+    SizeT M = 16;
+    SizeT ef_construction = 200;
+    assert(dimension == 128 || !"embedding dimension isn't 128");
+    assert(embedding_count == 10000000 || !"embedding size isn't 1000000");
+    hnswlib::L2Space l2space(dimension);
+    hnswlib::HierarchicalNSW<float>* hnsw_index = nullptr;
+
+    std::ifstream f(hnsw_index_l2_name);
+    if(f.good()) {
+        // Found index file
+        std::cout << "Found index file ... " << std::endl;
+        hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, hnsw_index_l2_name);
+    } else {
+        SizeT max_elements = 10000000;        // create index
+        hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, max_elements, M, ef_construction);
+
+        // Read base vector data
+        SizeT base_vector_row_count{0};
+        SizeT base_vector_dimension{0};
+        float *base_vectors{nullptr};
+        {
+            base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count,
+                                             "Base Vector");
+        }
+
+        {
+            // Insert data into index
+            infinity::BaseProfiler profiler;
+            profiler.Begin();
+            // insert data into index
+            for (SizeT idx = 0; idx < base_vector_row_count; ++idx) {
+                hnsw_index->addPoint(base_vectors + idx * dimension, idx);
+
+                if (idx % 100000 == 0) {
+                    std::cout << idx << ", " << get_current_rss() / 1000000 << " MB, "
+                              << profiler.ElapsedToString() << std::endl;
+                }
+            }
+            profiler.End();
+            std::cout << "Insert data cost: " << profiler.ElapsedToString()
+                      << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+            hnsw_index->saveIndex(hnsw_index_l2_name);
+        }
+        delete[] base_vectors;
+    }
+
+    // Read query vector data
+    SizeT query_vector_row_count{0};
+    SizeT query_vector_dimension{0};
+    float* query_vectors;
+    {
+        query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
+        assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
+    }
+
+    // Read ground truth
+    SizeT top_k{0};                // number of results per query in the GT
+    i32*  ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    SizeT ground_truth_row_count{0};
+    {
+        // load ground-truth
+        ground_truth = ivecs_read(sift1m_ground_truth, &top_k, &ground_truth_row_count);
+        assert(query_vector_row_count == ground_truth_row_count || !"incorrect nb of ground truth entries");
+    }
+
+    infinity::BaseProfiler profiler;
+    profiler.Begin();
+
+    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: "
+            << get_current_rss() / 1000000 << "MB" << std::endl;
+
+//    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+//    single_run_on_cpu(hnsw_index, IndexType::kHnsw, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(hnsw_index, IndexType::kHnsw, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    profiler.End();
+    std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
+
+    {
+        delete[] query_vectors;
+        delete[] ground_truth;
+        delete hnsw_index;
+    }
+    std::cout << "Memory: " << get_current_rss() / 1000000 << " MB" << std::endl;
+
 }
 
 void
@@ -593,7 +941,9 @@ scheduler_test() {
 auto main () -> int {
     openblas_set_num_threads(1);
 //    benchmark_flat();
-    benchmark_ivfflat();
+//    benchmark_ivfflat();
+//    benchmark_ivfsq8();
+    benchmark_hnsw();
 //    scheduler_test();
     return 0;
 }

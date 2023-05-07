@@ -99,6 +99,8 @@ auto main () -> int {
         // Query and get result;
         SizeT n_valid = 0;
         hnsw_index->setEf(ef_construction);
+        infinity::BaseProfiler profiler;
+        profiler.Begin();
         for (int i = 0; i < number_of_queries; i++) {
             std::priority_queue<std::pair<float, hnswlib::labeltype>> result
                 = hnsw_index->searchKnn(queries + i * dimension, top_k);
@@ -116,8 +118,8 @@ auto main () -> int {
                 result.pop();
             }
         }
-
-        printf("Recall = %.4f\n", n_valid / float(top_k * number_of_queries));
+        profiler.End();
+        printf("Recall = %.4f, Spend: %s\n", n_valid / float(top_k * number_of_queries), profiler.ElapsedToString().c_str());
     }
 
     {
