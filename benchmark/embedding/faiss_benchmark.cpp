@@ -487,24 +487,36 @@ scheduler_run_on_cpu(void* index,
     scheduler.Uninit();
 
     int n_1 = 0, n_10 = 0, n_100 = 0;
+    HashSet<i32> gt1, gt10, gt100;
     for (int i = 0; i < total_query_count; i++) {
-//        printf("==== %d ====\n", i);
-        int gt_nn = ground_truth[i * top_k];
+        for(int j = 0; j < top_k; ++ j) {
+            i32 gt_id = ground_truth[i * top_k + j];
+            if(j < 1) {
+                gt1.insert(gt_id);
+            }
+            if(j < 10) {
+                gt10.insert(gt_id);
+            }
+            if(j < 100) {
+                gt100.insert(gt_id);
+            }
+        }
         for (int j = 0; j < top_k; j++) {
-//            printf("%ld == %d\n", total_result_ids[i * top_k + j], gt_nn);
-            if (total_result_ids[i * top_k + j] == gt_nn) {
-                if (j < 1)
-                    n_1++;
-                if (j < 10)
-                    n_10++;
-                if (j < 100)
-                    n_100++;
+            i32 result_id = total_result_ids[i * top_k + j];
+            if(j < 1 && gt1.contains(result_id)) {
+                ++ n_1;
+            }
+            if(j < 10 && gt10.contains(result_id)) {
+                ++ n_10;
+            }
+            if(j < 100 && gt100.contains(result_id)) {
+                ++ n_100;
             }
         }
     }
     printf("R@1 = %.4f\n", n_1 / float(total_query_count));
-    printf("R@10 = %.4f\n", n_10 / float(total_query_count));
-    printf("R@100 = %.4f\n", n_100 / float(total_query_count));
+    printf("R@10 = %.4f\n", n_10 / float(total_query_count * 10));
+    printf("R@100 = %.4f\n", n_100 / float(total_query_count * 100));
 
     delete[] total_result_ids;
     delete[] total_result_distances;
@@ -942,8 +954,8 @@ auto main () -> int {
     openblas_set_num_threads(1);
 //    benchmark_flat();
 //    benchmark_ivfflat();
-//    benchmark_ivfsq8();
-    benchmark_hnsw();
+    benchmark_ivfsq8();
+//    benchmark_hnsw();
 //    scheduler_test();
     return 0;
 }
