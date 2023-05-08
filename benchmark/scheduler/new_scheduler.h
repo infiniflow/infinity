@@ -32,9 +32,11 @@ public:
     Uninit();
 
     static void
-    ScheduleTask(i64 worker_id, Task* task);
-
+    RunTask(Task* task);
 private:
+    static void
+    DispatchTask(i64 worker_id, Task* task);
+
     static void
     CoordinatorLoop(i64 cpu_id);
 
@@ -51,6 +53,9 @@ private:
 
     static UniquePtr<TaskQueue> input_queue;
     static UniquePtr<Thread> coordinator;
+
+    static Vector<i64> cpu_array;
+    static u64 current_cpu_id;
 };
 
 }
