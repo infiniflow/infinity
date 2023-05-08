@@ -2,20 +2,26 @@
 // Created by jinhai on 23-5-5.
 //
 
-#include "scheduler.h"
+#include "new_scheduler.h"
 #include "common/utility/threadutil.h"
 
 #include <iostream>
 
 namespace infinity {
 
+HashSet<i64> NewScheduler::cpu_set{};
+HashMap<i64, UniquePtr<TaskQueue>> NewScheduler::task_queues{};
+HashMap<i64, UniquePtr<Thread>> NewScheduler::workers{};
+UniquePtr<TaskQueue> NewScheduler::input_queue{};
+UniquePtr<Thread> NewScheduler::coordinator{};
+
 void
-Scheduler::CoordinatorLoop(Scheduler* scheduler_instance, i64 cpu_id) {
+NewScheduler::CoordinatorLoop(i64 cpu_id) {
     Task* input_task{nullptr};
     bool running{true};
-    printf("start coordinator on CPU: %ld", cpu_id);
+    printf("start coordinator on CPU: %ld\n", cpu_id);
     while(running) {
-        scheduler_instance->input_queue_->Dequeue(input_task);
+        NewScheduler::input_queue->Dequeue(input_task);
         if(input_task == nullptr) {
             printf("coordinator: null task\n");
             continue;
@@ -23,6 +29,7 @@ Scheduler::CoordinatorLoop(Scheduler* scheduler_instance, i64 cpu_id) {
 
         switch (input_task->type()) {
             case TaskType::kTerminate: {
+                printf("terminate coordinator on CPU: %ld\n", cpu_id);
                 running = false;
                 break;
             }
@@ -30,10 +37,10 @@ Scheduler::CoordinatorLoop(Scheduler* scheduler_instance, i64 cpu_id) {
                 DummyTask* dummy_task = (DummyTask*)input_task;
                 if(dummy_task->last_worker_id_ == -1) {
                     // Select an available cpu
-                    i64 available_cpu_id = scheduler_instance->GetAvailableCPU();
-                    scheduler_instance->ScheduleTask(available_cpu_id, dummy_task);
+                    i64 available_cpu_id = NewScheduler::GetAvailableCPU();
+                    NewScheduler::ScheduleTask(available_cpu_id, dummy_task);
                 } else {
-                    scheduler_instance->ScheduleTask(dummy_task->last_worker_id_, dummy_task);
+                    NewScheduler::ScheduleTask(dummy_task->last_worker_id_, dummy_task);
                 }
                 break;
             }
@@ -42,7 +49,7 @@ Scheduler::CoordinatorLoop(Scheduler* scheduler_instance, i64 cpu_id) {
                 // Construct pipeline task and schedule it.
                 if(dummy_task->last_worker_id_ == -1) {
                     // Select an available cpu
-                    i64 available_cpu_id = scheduler_instance->GetAvailableCPU();
+                    i64 available_cpu_id = NewScheduler::GetAvailableCPU();
                 } else {
                 }
                 break;
@@ -63,7 +70,7 @@ Scheduler::CoordinatorLoop(Scheduler* scheduler_instance, i64 cpu_id) {
 }
 
 void
-Scheduler::WorkerLoop(TaskQueue* task_queue, i64 worker_id) {
+NewScheduler::WorkerLoop(TaskQueue* task_queue, i64 worker_id) {
     Task* task{nullptr};
     bool running{true};
     printf("start worker on CPU: %ld\n", worker_id);
@@ -74,6 +81,7 @@ Scheduler::WorkerLoop(TaskQueue* task_queue, i64 worker_id) {
             continue;
         }
         if(task->type() == TaskType::kTerminate) {
+            printf("terminate worker on CPU: %ld\n", worker_id);
             running = false;
         } else {
             task->run(worker_id);
@@ -82,53 +90,50 @@ Scheduler::WorkerLoop(TaskQueue* task_queue, i64 worker_id) {
 }
 
 void
-Scheduler::Init(const HashSet<i64>& cpu_set) {
-    if(!cpu_set_.empty()) {
+NewScheduler::Init(const HashSet<i64>& input_cpu_set) {
+    if(!cpu_set.empty()) {
         std::cerr << "scheduler was initialized before" << std::endl;
         return ;
     }
-    cpu_set_ = cpu_set;
+    cpu_set = input_cpu_set;
 
     for(i64 cpu_id: cpu_set) {
-        UniquePtr<Thread> thread_ptr = MakeUnique<Thread>();
-        UniquePtr<std::atomic<bool>> running = MakeUnique<std::atomic<bool>>(true);
         UniquePtr<TaskQueue> task_queue = MakeUnique<TaskQueue>();
         UniquePtr<Thread> task_thread = MakeUnique<Thread>(WorkerLoop, task_queue.get(), cpu_id);
 
         // Pin the thread to specific cpu
         ThreadUtil::pin(*task_thread, cpu_id);
 
-        task_queues_.emplace(cpu_id, std::move(task_queue));
-        workers_.emplace(cpu_id, std::move(task_thread));
+        task_queues.emplace(cpu_id, std::move(task_queue));
+        workers.emplace(cpu_id, std::move(task_thread));
     }
 
     // Start coordinator
-    auto coordinator = MakeUnique<Thread>(CoordinatorLoop, this, 0);
+    input_queue = MakeUnique<TaskQueue>();
+    coordinator = MakeUnique<Thread>(CoordinatorLoop, 0);
     ThreadUtil::pin(*coordinator, 0);
 }
 
 i64
-Scheduler::GetAvailableCPU() {
+NewScheduler::GetAvailableCPU() {
     assert(false);
     return 0;
 }
 
 void
-Scheduler::Uninit() {
+NewScheduler::Uninit() {
     UniquePtr<TerminateTask> terminate_task = MakeUnique<TerminateTask>();
-    input_queue_->Enqueue(terminate_task.get());
-    coordinator_->join();
-    for(i64 cpu_id: cpu_set_) {
-        task_queues_[cpu_id]->Enqueue(terminate_task.get());
-        workers_[cpu_id]->join();
-        std::cout << "Stop worker: " << cpu_id << std::endl;
-
+    input_queue->Enqueue(terminate_task.get());
+    coordinator->join();
+    for(i64 cpu_id: cpu_set) {
+        task_queues[cpu_id]->Enqueue(terminate_task.get());
+        workers[cpu_id]->join();
     }
 }
 
 void
-Scheduler::ScheduleTask(i64 worker_id, Task* task) {
-    task_queues_[worker_id]->Enqueue(task);
+NewScheduler::ScheduleTask(i64 worker_id, Task* task) {
+    task_queues[worker_id]->Enqueue(task);
 }
 
 }

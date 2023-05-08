@@ -23,36 +23,34 @@ struct TaskQueue {
     moodycamel::BlockingConcurrentQueue<Task*> queue_;
 };
 
-class Scheduler {
+class NewScheduler {
 public:
-    Scheduler() = default;
-
-    void
+    static void
     Init(const HashSet<i64>& cpu_set);
 
-    void
+    static void
     Uninit();
 
-    void
+    static void
     ScheduleTask(i64 worker_id, Task* task);
 
 private:
     static void
-    CoordinatorLoop(Scheduler* scheduler_instance, i64 cpu_id);
+    CoordinatorLoop(i64 cpu_id);
 
     static void
     WorkerLoop(TaskQueue* task_queue, i64 worker_id);
 
-    i64
+    static i64
     GetAvailableCPU();
 private:
-    HashSet<i64> cpu_set_{};
+    static HashSet<i64> cpu_set;
 
-    HashMap<i64, UniquePtr<TaskQueue>> task_queues_{};
-    HashMap<i64, UniquePtr<Thread>> workers_{};
+    static HashMap<i64, UniquePtr<TaskQueue>> task_queues;
+    static HashMap<i64, UniquePtr<Thread>> workers;
 
-    UniquePtr<TaskQueue> input_queue_{};
-    UniquePtr<Thread> coordinator_{};
+    static UniquePtr<TaskQueue> input_queue;
+    static UniquePtr<Thread> coordinator;
 };
 
 }

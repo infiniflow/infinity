@@ -3,7 +3,7 @@
 //
 
 #include "common/types/internal_types.h"
-#include "embedding/scheduler.h"
+#include "new_scheduler.h"
 #include <iostream>
 
 using namespace infinity;
@@ -14,7 +14,7 @@ first(i64 id) {
 }
 
 void
-start_scheduler(Scheduler& scheduler) {
+start_scheduler(NewScheduler& scheduler) {
     //    const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
 //    const HashSet<i64> cpu_mask{1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15};
 //    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15};
@@ -35,14 +35,14 @@ start_scheduler(Scheduler& scheduler) {
 }
 
 void
-stop_scheduler(Scheduler& scheduler) {
+stop_scheduler(NewScheduler& scheduler) {
     scheduler.Uninit();
 }
 
 auto
 main () -> int {
 
-    Scheduler scheduler;
+    NewScheduler scheduler;
     start_scheduler(scheduler);
     stop_scheduler(scheduler);
 
