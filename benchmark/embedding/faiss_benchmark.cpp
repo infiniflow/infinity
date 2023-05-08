@@ -277,7 +277,7 @@ struct AnnIVFSQ8Task : public Task {
                    SizeT top_k,
                    i64*& result_id,
                    f32*& result_distance)
-            : Task(TaskType::kAnnIVFFlat),
+            : Task(TaskType::kAnnIVFSQ8),
               index_(index),
               dimension_(dimension),
               query_count_(query_count),
@@ -327,7 +327,7 @@ struct AnnHNSWTask : public Task {
                 SizeT top_k,
                 i64*& result_id,
                 f32*& result_distance)
-            : Task(TaskType::kAnnIVFFlat),
+            : Task(TaskType::kAnnHNSW),
               index_(index),
               dimension_(dimension),
               query_count_(query_count),
@@ -950,7 +950,8 @@ scheduler_test() {
     scheduler.Uninit();
 }
 
-auto main () -> int {
+auto
+main () -> int {
     openblas_set_num_threads(1);
 //    benchmark_flat();
 //    benchmark_ivfflat();
