@@ -5,6 +5,7 @@
 #include "common/types/internal_types.h"
 #include "new_scheduler.h"
 #include "fragment.h"
+#include "concurrentqueue.h"
 #include <iostream>
 
 using namespace infinity;
@@ -42,11 +43,18 @@ stop_scheduler() {
 }
 
 UniquePtr<Fragment>
-build_fragment(u64 id, const String& name) {
+build_fragment0(u64 id, const String& name) {
+    // sink->op2->op1->scan
+
     UniquePtr<Fragment> fragment = MakeUnique<Fragment>(id);
 
-    UniquePtr<Source> source = MakeUnique<Source>(name);
+    UniquePtr<Source> source = MakeUnique<Source>(name, SourceType::kScan);
     fragment->AddSource(std::move(source));
+
+    UniquePtr<Operator> op1 = MakeUnique<Operator>(name);
+    fragment->AddOperator(std::move(op1));
+    UniquePtr<Operator> op2 = MakeUnique<Operator>(name);
+    fragment->AddOperator(std::move(op2));
 
     UniquePtr<Sink> sink = MakeUnique<Sink>(name);
     fragment->AddSink(std::move(sink));
@@ -54,15 +62,90 @@ build_fragment(u64 id, const String& name) {
     return fragment;
 }
 
+UniquePtr<Fragment>
+build_fragment1(u64 id, const String& name) {
+    // sink->op2->op1->exchange
+    UniquePtr<Fragment> fragment = MakeUnique<Fragment>(id);
+
+    UniquePtr<Source> source = MakeUnique<Source>(name, SourceType::kExchange);
+    fragment->AddSource(std::move(source));
+
+    UniquePtr<Operator> op1 = MakeUnique<Operator>(name);
+    fragment->AddOperator(std::move(op1));
+    UniquePtr<Operator> op2 = MakeUnique<Operator>(name);
+    fragment->AddOperator(std::move(op2));
+
+    UniquePtr<Sink> sink = MakeUnique<Sink>(name);
+    fragment->AddSink(std::move(sink));
+
+    return fragment;
+}
+
+void test_concurrent_queue() {
+    ConcurrentQueue queue;
+    ThreadPool p(2);
+    DummyTask task1;
+    DummyTask task2;
+    queue.TryEnqueue(&task1);
+    p.push([](i64 cpu_id, ConcurrentQueue* queue) {
+        while(true) {
+            Task* task{nullptr};
+            if(queue->TryDequeue(task)) {
+                if(task->type() == TaskType::kTerminate) {
+                    printf("Terminated\n");
+                    break;
+                }
+                task->Run(cpu_id);
+            } else {
+                printf("trying\n");
+            }
+        }
+    }, &queue);
+    sleep(1);
+    queue.TryEnqueue(&task2);
+    TerminateTask task3;
+    queue.TryEnqueue(&task3);
+    p.stop(true);
+}
+
+void test_waitfree_queue() {
+    WaitFreeQueue queue;
+    ThreadPool p(2);
+    DummyTask task1;
+    DummyTask task2;
+    queue.TryEnqueue(&task1);
+    p.push([](i64 cpu_id, WaitFreeQueue* queue) {
+        while(true) {
+            Task* task{nullptr};
+            if(queue->TryDequeue(task)) {
+                if(task->type() == TaskType::kTerminate) {
+                    printf("Terminated\n");
+                    break;
+                }
+                task->Run(cpu_id);
+            } else {
+                printf("trying\n");
+            }
+        }
+    }, &queue);
+    sleep(1);
+    queue.TryEnqueue(&task2);
+    TerminateTask task3;
+    queue.TryEnqueue(&task3);
+    p.stop(true);
+}
+
 auto
 main () -> int {
-    u64 parallel_size = std::thread::hardware_concurrency();
+#if 0
+//    u64 parallel_size = std::thread::hardware_concurrency();
+    u64 parallel_size = 2;
 
     start_scheduler();
 
-    UniquePtr<Fragment> frag0 = build_fragment(0, "test");
+    UniquePtr<Fragment> frag0 = build_fragment0(0, "test");
 
-    SharedPtr<Task> root_task = frag0->BuildTaskFromFragment(parallel_size);
+    SharedPtr<Task> root_task = frag0->BuildTask(parallel_size);
 
     ThreadPool p(2);
     p.push(execute_task, root_task.get());
@@ -76,4 +159,8 @@ main () -> int {
     sleep(1);
     stop_scheduler();
     return 0;
+#else
+//    test_concurrent_queue();
+    test_waitfree_queue();
+#endif
 }

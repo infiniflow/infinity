@@ -4,24 +4,10 @@
 
 #pragma once
 
-#include "blockingconcurrentqueue.h"
-#include "task.h"
+#include "task_queue.h"
+
 
 namespace infinity {
-
-struct TaskQueue {
-    void
-    Enqueue(Task* task) {
-        queue_.enqueue(task);
-    }
-
-    void
-    Dequeue(Task*& task) {
-        queue_.wait_dequeue(task);
-    }
-
-    moodycamel::BlockingConcurrentQueue<Task*> queue_;
-};
 
 class NewScheduler {
 public:
@@ -41,17 +27,17 @@ private:
     CoordinatorLoop(i64 cpu_id);
 
     static void
-    WorkerLoop(TaskQueue* task_queue, i64 worker_id);
+    WorkerLoop(BlockingQueue* task_queue, i64 worker_id);
 
     static i64
     GetAvailableCPU();
 private:
     static HashSet<i64> cpu_set;
 
-    static HashMap<i64, UniquePtr<TaskQueue>> task_queues;
+    static HashMap<i64, UniquePtr<BlockingQueue>> task_queues;
     static HashMap<i64, UniquePtr<Thread>> workers;
 
-    static UniquePtr<TaskQueue> input_queue;
+    static UniquePtr<BlockingQueue> input_queue;
     static UniquePtr<Thread> coordinator;
 
     static Vector<i64> cpu_array;

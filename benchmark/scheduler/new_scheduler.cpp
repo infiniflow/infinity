@@ -4,15 +4,14 @@
 
 #include "new_scheduler.h"
 #include "common/utility/threadutil.h"
-
 #include <iostream>
 
 namespace infinity {
 
 HashSet<i64> NewScheduler::cpu_set{};
-HashMap<i64, UniquePtr<TaskQueue>> NewScheduler::task_queues{};
+HashMap<i64, UniquePtr<BlockingQueue>> NewScheduler::task_queues{};
 HashMap<i64, UniquePtr<Thread>> NewScheduler::workers{};
-UniquePtr<TaskQueue> NewScheduler::input_queue{};
+UniquePtr<BlockingQueue> NewScheduler::input_queue{};
 UniquePtr<Thread> NewScheduler::coordinator{};
 Vector<i64> NewScheduler::cpu_array{};
 u64 NewScheduler::current_cpu_id{};
@@ -62,8 +61,8 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
                 running = false;
                 break;
             }
-            case TaskType::kSource: {
-                printf("receive SOURCE type of task on CPU: %ld\n", cpu_id);
+            case TaskType::kExchange: {
+                printf("receive EXCHANGE type of task on CPU: %ld\n", cpu_id);
                 if(input_task->last_worker_id_ == -1) {
                     // Select an available cpu
                     NewScheduler::DispatchTask(current_cpu_id % cpu_array.size(), input_task);
@@ -92,7 +91,7 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
 }
 
 void
-NewScheduler::WorkerLoop(TaskQueue* task_queue, i64 worker_id) {
+NewScheduler::WorkerLoop(BlockingQueue* task_queue, i64 worker_id) {
     Task* task{nullptr};
     bool running{true};
     printf("start worker on CPU: %ld\n", worker_id);
@@ -110,9 +109,9 @@ NewScheduler::WorkerLoop(TaskQueue* task_queue, i64 worker_id) {
             }
             case TaskType::kDummy:
             case TaskType::kPipeline:
-            case TaskType::kSource:
+            case TaskType::kExchange:
             case TaskType::kSink: {
-                task->run(worker_id);
+                task->Run(worker_id);
                 break;
             }
             case TaskType::kInvalid: {
@@ -136,7 +135,7 @@ NewScheduler::Init(const HashSet<i64>& input_cpu_set) {
     for(i64 cpu_id: cpu_set) {
         cpu_array.emplace_back(cpu_id);
 
-        UniquePtr<TaskQueue> task_queue = MakeUnique<TaskQueue>();
+        UniquePtr<BlockingQueue> task_queue = MakeUnique<BlockingQueue>();
         UniquePtr<Thread> task_thread = MakeUnique<Thread>(WorkerLoop, task_queue.get(), cpu_id);
 
         // Pin the thread to specific cpu
@@ -147,7 +146,7 @@ NewScheduler::Init(const HashSet<i64>& input_cpu_set) {
     }
 
     // Start coordinator
-    input_queue = MakeUnique<TaskQueue>();
+    input_queue = MakeUnique<BlockingQueue>();
     coordinator = MakeUnique<Thread>(CoordinatorLoop, 0);
     ThreadUtil::pin(*coordinator, 0);
 }

@@ -56,6 +56,11 @@ public:
         output_buffer_ = buffer;
     }
 
+    [[nodiscard]] inline Buffer*
+    OutputPtr() const {
+        return output_buffer_;
+    }
+
 private:
     UniquePtr <String> op_name_;
     Buffer *input_buffer_{};
@@ -84,16 +89,26 @@ public:
         output_buffer_ = buffer;
     }
 
+    [[nodiscard]] inline Buffer*
+    OutputPtr() const {
+        return output_buffer_;
+    }
+
 private:
     UniquePtr <String> op_name_;
     Vector<Buffer *> input_buffers_{};
     Buffer *output_buffer_{};
 };
 
+enum class SourceType {
+    kScan, // each pipeline has its own source
+    kExchange,  // all pipelines share one source
+};
+
 class Source {
 public:
     explicit
-    Source(const String &name) : op_name_(MakeUnique<String>(name)) {}
+    Source(const String &name, SourceType source_type) : op_name_(MakeUnique<String>(name)), type_(source_type) {}
 
     inline void
     Run() {
@@ -113,10 +128,20 @@ public:
         input_buffer_ = buffer;
     }
 
+    SourceType
+    type() const {
+        return type_;
+    }
+
+    [[nodiscard]] inline Buffer*
+    OutputPtr() const {
+        return input_buffer_;
+    }
 private:
     UniquePtr <String> op_name_;
     Vector<Buffer **> output_buffer_ptrs_{};
     Buffer *input_buffer_{};
+    SourceType type_;
 };
 
 }

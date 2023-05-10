@@ -7,6 +7,7 @@ file(GLOB_RECURSE
         new_scheduler.h
         pipeline.cpp
         fragment.h
+        fragment.cpp
         )
 
 add_executable(scheduler_benchmark

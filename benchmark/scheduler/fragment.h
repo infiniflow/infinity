@@ -56,21 +56,11 @@ private:
 
 class Fragment {
 public:
-    inline SharedPtr<Task>
-    BuildTaskFromFragment(u64 parallel_size) {
-        assert(parallel_size > 0);
-        SharedPtr<Task> child_task = this->child_ != nullptr ?
-                                     this->child_->BuildTaskFromFragment(parallel_size) : nullptr;
-
-        assert(this->source_!= nullptr);
-        SharedPtr<SourceTask> source_task = MakeShared<SourceTask>(this->source_.get());
-        source_task->child_ = child_task;
-        return source_task;
-    }
-
-public:
     inline explicit
     Fragment(u64 id): id_(id) {}
+
+    UniquePtr<Task>
+    BuildTask(u64 parallel_size);
 
     inline void
     AddOperator(UniquePtr<Operator> op) {
