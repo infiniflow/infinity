@@ -12,7 +12,7 @@
 #include <cassert>
 
 namespace infinity {
-
+#if 0
 class Pipeline {
 public:
     inline explicit
@@ -53,13 +53,19 @@ private:
     u64 fragment_id_{};
     u64 pipeline_id_{};
 };
+#endif
+enum class FragmentType {
+    kParallel,
+    kSerial,
+    kInvalid
+};
 
 class Fragment {
 public:
     inline explicit
-    Fragment(u64 id): id_(id) {}
+    Fragment(u64 id, FragmentType type): id_(id), fragment_type_(type) {}
 
-    UniquePtr<Task>
+    Vector<SharedPtr<Task>>
     BuildTask(u64 parallel_size);
 
     inline void
@@ -83,6 +89,7 @@ public:
     }
 private:
     u64 id_{};
+    FragmentType fragment_type_{FragmentType::kInvalid};
     UniquePtr<Source> source_{};
     Vector<UniquePtr<Operator>> operators_{};
     UniquePtr<Sink> sink_{};

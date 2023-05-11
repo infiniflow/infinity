@@ -5,11 +5,10 @@
 #pragma once
 
 #include "blockingconcurrentqueue.h"
-#include "common/utility/mpsc_queue.h"
-#include "task.h"
 
 namespace infinity {
 
+class Task;
 struct BlockingQueue {
     void
     Enqueue(Task *task) {
@@ -22,34 +21,6 @@ struct BlockingQueue {
     }
 
     moodycamel::BlockingConcurrentQueue<Task *> queue_;
-};
-
-struct ConcurrentQueue {
-    bool
-    TryEnqueue(Task *task) {
-        return queue_.try_enqueue(task);
-    }
-
-    bool
-    TryDequeue(Task *&task) {
-        return queue_.try_dequeue(task);
-    }
-
-    moodycamel::ConcurrentQueue<Task *> queue_;
-};
-
-struct WaitFreeQueue {
-    void
-    TryEnqueue(Task *task) {
-        queue_.enqueue(task);
-    }
-
-    bool
-    TryDequeue(Task *&task) {
-        return queue_.dequeue(task);
-    }
-
-    MPSCQueue<Task *> queue_;
 };
 
 }

@@ -3,8 +3,10 @@ file(GLOB_RECURSE
         scheduler_benchmark_files
         CONFIGURE_DEPENDS
         scheduler_benchmark.cpp
-        new_scheduler.cpp
-        new_scheduler.h
+#        new_scheduler.cpp
+#        new_scheduler.h
+        task.cpp
+        task.h
         pipeline.cpp
         fragment.h
         fragment.cpp

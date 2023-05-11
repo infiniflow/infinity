@@ -1,8 +1,9 @@
 //
-// Created by jinhai on 23-5-5.
+// Created by jinhai on 23-5-11.
 //
 
-#include "new_scheduler.h"
+
+#include "task.h"
 #include "common/utility/threadutil.h"
 #include <iostream>
 
@@ -45,12 +46,15 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
                 break;
             }
             case TaskType::kPipeline: {
-                printf("receive PIPELINE type of task on CPU: %ld\n", cpu_id);
+                printf("coordinator receives PIPELINE TASK on CPU: %ld\n", cpu_id);
                 PipelineTask* pipeline_task = (PipelineTask*)input_task;
                 // Construct pipeline task and schedule it.
                 if(pipeline_task->last_worker_id_ == -1) {
                     // Select an available cpu
-                    NewScheduler::DispatchTask(current_cpu_id % cpu_array.size(), pipeline_task);
+                    current_cpu_id = current_cpu_id % cpu_array.size();
+//                    printf("Dispatched to CPU: %ld\n", cpu_array[current_cpu_id]);
+                    NewScheduler::DispatchTask(cpu_array[current_cpu_id], pipeline_task);
+                    ++ current_cpu_id;
                 } else {
                     NewScheduler::DispatchTask(pipeline_task->last_worker_id_, pipeline_task);
                 }
@@ -59,26 +63,6 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
             case TaskType::kInvalid: {
                 printf("receive invalid type of task, terminate coordinator on CPU: %ld\n", cpu_id);
                 running = false;
-                break;
-            }
-            case TaskType::kExchange: {
-                printf("receive EXCHANGE type of task on CPU: %ld\n", cpu_id);
-                if(input_task->last_worker_id_ == -1) {
-                    // Select an available cpu
-                    NewScheduler::DispatchTask(current_cpu_id % cpu_array.size(), input_task);
-                } else {
-                    NewScheduler::DispatchTask(input_task->last_worker_id_, input_task);
-                }
-                break;
-            }
-            case TaskType::kSink: {
-                printf("receive SINK type of task on CPU: %ld\n", cpu_id);
-                if(input_task->last_worker_id_ == -1) {
-                    // Select an available cpu
-                    NewScheduler::DispatchTask(current_cpu_id % cpu_array.size(), input_task);
-                } else {
-                    NewScheduler::DispatchTask(input_task->last_worker_id_, input_task);
-                }
                 break;
             }
         }
@@ -108,9 +92,7 @@ NewScheduler::WorkerLoop(BlockingQueue* task_queue, i64 worker_id) {
                 break;
             }
             case TaskType::kDummy:
-            case TaskType::kPipeline:
-            case TaskType::kExchange:
-            case TaskType::kSink: {
+            case TaskType::kPipeline: {
                 task->Run(worker_id);
                 break;
             }
@@ -175,6 +157,10 @@ NewScheduler::RunTask(Task* task) {
 
 void
 NewScheduler::DispatchTask(i64 worker_id, Task* task) {
+    if(!task_queues.contains(worker_id)) {
+        printf("Can't use this CPU: %ld\n", worker_id);
+        assert(false);
+    }
     task_queues[worker_id]->Enqueue(task);
 }
 

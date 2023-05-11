@@ -6,17 +6,56 @@
 
 #include "common/types/internal_types.h"
 #include "operator.h"
+#include "buffer_queue.h"
+#include "task_queue.h"
 #include <unistd.h>
 #include <cassert>
 
 namespace infinity {
 
+class Task;
+class NewScheduler {
+public:
+    static void
+    Init(const HashSet<i64>& cpu_set);
+
+    static void
+    Uninit();
+
+    static void
+    RunTask(Task* task);
+private:
+    static void
+    DispatchTask(i64 worker_id, Task* task);
+
+    static void
+    CoordinatorLoop(i64 cpu_id);
+
+    static void
+    WorkerLoop(BlockingQueue* task_queue, i64 worker_id);
+
+    static i64
+    GetAvailableCPU();
+private:
+    static HashSet<i64> cpu_set;
+
+    static HashMap<i64, UniquePtr<BlockingQueue>> task_queues;
+    static HashMap<i64, UniquePtr<Thread>> workers;
+
+    static UniquePtr<BlockingQueue> input_queue;
+    static UniquePtr<Thread> coordinator;
+
+    static Vector<i64> cpu_array;
+    static u64 current_cpu_id;
+};
+
+
+#define BUFFER_SIZE 128
+
 enum class TaskType {
     kTerminate,
     kDummy,
     kPipeline,
-    kExchange,
-    kSink,
     kInvalid,
 };
 
@@ -63,58 +102,86 @@ struct DummyTask final : public Task {
 
 struct PipelineTask final : public Task {
     inline explicit
-    PipelineTask(Source *source) : Task(TaskType::kPipeline), source_(source) {}
+    PipelineTask() : Task(TaskType::kPipeline) {}
+
+    inline void
+    Init() {
+
+    }
+
+    inline void
+    AddSink(Sink* sink) {
+        sink_ = sink;
+    }
+
+    inline void
+    AddSource(Source* source, bool input_queue) {
+        source_ = source;
+        if(input_queue) {
+            input_queue_ = MakeUnique<ConcurrentQueue>();
+        }
+    }
 
     inline void
     AddOperator(Operator* op) {
         operators_.emplace_back(op);
-        buffers_.emplace_back(128);
+        buffers_.emplace_back(MakeUnique<Buffer>(BUFFER_SIZE));
     }
 
     inline void
     Run(i64 worker_id) override {
         last_worker_id_ = worker_id;
         printf("Run pipeline task by worker: %ld\n", worker_id);
-        sleep(1);
-    }
 
-    inline void
-    SetChild(SharedPtr<Task> child) {
-        child_ = std::move(child);
-    }
+        // Read data from source buffer or input queue
+        if(input_queue_ == nullptr) {
+            String id_str = std::to_string(worker_id);
+            source_buffer_ = MakeShared<Buffer>(BUFFER_SIZE);
+            source_buffer_->Append(id_str.c_str());
+//            memcpy((void*)(source_buffer_.get()), id_str.c_str(), id_str.size());
+        } else {
+            printf("Get data from input queue\n");
+            input_queue_->TryDequeue(source_buffer_);
+        }
 
-    inline void
-    SetParent(Task* parent) {
-        parent_ = parent;
-    }
-private:
-    Vector<Operator*> operators_{};
-    Vector<Buffer> buffers_{};
+        // process the data one by one operator and push to next operator
+        SizeT op_count = operators_.size();
+        assert(op_count > 0);
+        operators_[0]->Run(source_buffer_.get(), buffers_[0].get());
+        for(SizeT idx = 1; idx < op_count; ++ idx) {
+            operators_[idx]->Run(buffers_[idx - 1].get(), buffers_[idx].get());
+        }
 
-    Source* source_;
-    Buffer source_buffer_{128};
+        // push the data into output queue
+        sink_->Run(buffers_.back().get(), output_queues_);
 
-    // If the child is exchange node, it will be shared by many pipeline task
-    SharedPtr<Task> child_{};
-    Task* parent_{};
-};
-
-struct ExchangeTask final : public Task {
-    inline explicit
-    ExchangeTask(Source* source_op) : Task(TaskType::kExchange), source_op_(source_op) {}
-
-    inline void
-    Run(i64 worker_id) override {
-        last_worker_id_ = worker_id;
-        printf("run source task by worker: %ld\n", worker_id);
-        source_op_->Run();
+        // put the parent task into scheduler
+        for(Task* parent: parents_) {
+            printf("Notify parent to run\n");
+            NewScheduler::RunTask(parent);
+        }
 //        sleep(1);
     }
 
-
     inline void
-    SetChild(UniquePtr<Task> child) {
-        child_ = std::move(child);
+    SetChildren(Vector<SharedPtr<Task>> children) {
+        children_ = std::move(children);
+        for(const SharedPtr<Task>& child: children_) {
+            PipelineTask* child_pipeline = (PipelineTask*)child.get();
+            child_pipeline->AddOutputQueue(input_queue_.get());
+            child_pipeline->AddParent(this);
+        }
+    }
+
+    [[nodiscard]] inline const Vector<SharedPtr<Task>>&
+    children() const {
+        return children_;
+    }
+
+private:
+    inline void
+    AddOutputQueue(ConcurrentQueue* queue) {
+        output_queues_.emplace_back(queue);
     }
 
     inline void
@@ -122,49 +189,19 @@ struct ExchangeTask final : public Task {
         parents_.emplace_back(parent);
     }
 private:
-    Source* source_op_{};
-    UniquePtr<Task> child_{};
+    Sink* sink_{};
+    Vector<ConcurrentQueue*> output_queues_;
+
+    Vector<Operator*> operators_{};
+    Vector<SharedPtr<Buffer>> buffers_{};
+
+    Source* source_{};
+    SharedPtr<Buffer> source_buffer_ = nullptr;
+    // Wait-free queue
+    UniquePtr<ConcurrentQueue> input_queue_{nullptr};
+
+    Vector<SharedPtr<Task>> children_{};
     Vector<Task*> parents_{};
-};
-
-struct SinkTask final : public Task {
-    inline explicit
-    SinkTask(Sink* sink_op) : Task(TaskType::kSink), sink_op_(sink_op) {}
-
-    inline void
-    Run(i64 worker_id) override {
-        last_worker_id_ = worker_id;
-        printf("Run sink task by worker: %ld\n", worker_id);
-        sleep(1);
-    }
-
-    inline void
-    AddChild(UniquePtr<Task> child, u64 child_index) {
-        if(child->type_ == TaskType::kPipeline) {
-            // Pipeline task
-            PipelineTask* pipeline_task = (PipelineTask*)(child.get());
-
-            // Set sink_op input buffer as the output of pipeline task.
-
-//            pipeline_task->SetOuputBuffer()
-//            sink_op_->AddInput(pipeline_task->GetOutputBufferPtr());
-        } else {
-            printf("Unexpected task type");
-            assert(false);
-        }
-        children_.emplace_back(std::move(child));
-    }
-
-    inline void
-    SetParent(Task* parent) {
-        parent_ = parent;
-    }
-
-private:
-    Sink* sink_op_{};
-
-    Vector<UniquePtr<Task>> children_{};
-    Task* parent_{};
 };
 
 }
