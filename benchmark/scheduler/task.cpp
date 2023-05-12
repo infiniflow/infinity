@@ -46,7 +46,7 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
                 break;
             }
             case TaskType::kPipeline: {
-                printf("coordinator receives PIPELINE TASK on CPU: %ld\n", cpu_id);
+//                printf("coordinator receives PIPELINE TASK on CPU: %ld\n", cpu_id);
                 PipelineTask* pipeline_task = (PipelineTask*)input_task;
                 // Construct pipeline task and schedule it.
                 if(pipeline_task->last_worker_id_ == -1) {

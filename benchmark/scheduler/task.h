@@ -135,7 +135,7 @@ struct PipelineTask final : public Task {
     inline void
     Run(i64 worker_id) override {
         last_worker_id_ = worker_id;
-        printf("Run pipeline task by worker: %ld\n", worker_id);
+//        printf("Run pipeline task by worker: %ld\n", worker_id);
 
         // Read data from source buffer or input queue
         if(input_queue_ == nullptr) {
@@ -144,7 +144,7 @@ struct PipelineTask final : public Task {
             source_buffer_->Append(id_str.c_str());
 //            memcpy((void*)(source_buffer_.get()), id_str.c_str(), id_str.size());
         } else {
-            printf("Get data from input queue\n");
+//            printf("Get data from input queue\n");
             input_queue_->TryDequeue(source_buffer_);
         }
 
@@ -161,12 +161,12 @@ struct PipelineTask final : public Task {
 
         // put the parent task into scheduler
         for(Task* parent: parents_) {
-            printf("Notify parent to run\n");
+//            printf("Notify parent to run\n");
             NewScheduler::RunTask(parent);
         }
 
         if(root_task_) {
-            printf("Notify result\n");
+//            printf("Notify result\n");
             std::unique_lock<std::mutex> lck(result_lk_);
             completed_ = true;
             result_cv_.notify_one();
@@ -195,7 +195,7 @@ struct PipelineTask final : public Task {
         result_cv_.wait(locker, [&]{
             return completed_;
         });
-        printf("Get result\n");
+//        printf("Get result\n");
     }
 
 private:

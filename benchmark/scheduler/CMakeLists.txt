@@ -18,6 +18,7 @@ add_executable(scheduler_benchmark
 
 target_include_directories(scheduler_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nanobench/src/include")
 target_include_directories(scheduler_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
+target_include_directories(scheduler_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 
 target_link_libraries(
         scheduler_benchmark
