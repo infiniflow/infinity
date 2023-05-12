@@ -15,6 +15,9 @@ execute_task(i64 id, Task* task) {
     printf("execute task by thread: %ld\n", id);
     if(task->type() == TaskType::kPipeline) {
         PipelineTask* root_task = (PipelineTask*)(task);
+        root_task->Init();
+
+
         std::queue<PipelineTask*> queue;
         queue.push(root_task);
         while(!queue.empty()) {
@@ -28,8 +31,9 @@ execute_task(i64 id, Task* task) {
                 queue.push((PipelineTask*)child_task.get());
             }
         }
-    }
 
+        root_task->GetResult();
+    }
 }
 
 void
@@ -181,21 +185,21 @@ auto
 main () -> int {
 
 //    u64 parallel_size = std::thread::hardware_concurrency();
-    u64 parallel_size = 2;
+    u64 parallel_size = 65536;
 
     start_scheduler();
 
-    ThreadPool pool(16);
+    ThreadPool pool(1);
 
 
-//    UniquePtr<Fragment> frag0 = build_fragment0(0, "test");
-    UniquePtr<Fragment> frag0 = build_fragment1(0, "test");
+    UniquePtr<Fragment> frag0 = build_fragment0(0, "test");
+//    UniquePtr<Fragment> frag0 = build_fragment1(0, "test");
     Vector<SharedPtr<Task>> root_tasks = frag0->BuildTask(parallel_size);
     SharedPtr<Buffer> source_buffer_ = MakeUnique<Buffer>(BUFFER_SIZE);
     for(const auto& task: root_tasks) {
         pool.push(execute_task, task.get());
     }
-    sleep(1);
+    sleep(10);
     stop_scheduler();
 
 #if 0

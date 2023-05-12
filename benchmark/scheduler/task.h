@@ -106,7 +106,11 @@ struct PipelineTask final : public Task {
 
     inline void
     Init() {
-
+        if(parents_.empty()) {
+            root_task_ = true;
+        } else {
+            root_task_ = false;
+        }
     }
 
     inline void
@@ -160,6 +164,13 @@ struct PipelineTask final : public Task {
             printf("Notify parent to run\n");
             NewScheduler::RunTask(parent);
         }
+
+        if(root_task_) {
+            printf("Notify result\n");
+            std::unique_lock<std::mutex> lck(result_lk_);
+            completed_ = true;
+            result_cv_.notify_one();
+        }
 //        sleep(1);
     }
 
@@ -176,6 +187,15 @@ struct PipelineTask final : public Task {
     [[nodiscard]] inline const Vector<SharedPtr<Task>>&
     children() const {
         return children_;
+    }
+
+    inline void
+    GetResult() {
+        std::unique_lock<std::mutex> locker(result_lk_);
+        result_cv_.wait(locker, [&]{
+            return completed_;
+        });
+        printf("Get result\n");
     }
 
 private:
@@ -202,6 +222,11 @@ private:
 
     Vector<SharedPtr<Task>> children_{};
     Vector<Task*> parents_{};
+
+    bool root_task_{false};
+    bool completed_{false};
+    std::mutex result_lk_;
+    std::condition_variable result_cv_;
 };
 
 }
