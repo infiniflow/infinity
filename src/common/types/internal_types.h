@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <list>
 #include <limits>
 #include <cstring>
 #include <set>
@@ -37,6 +38,9 @@ inline UniquePtr<T> MakeUnique(Args &&...args) {
 
 template<typename T>
 using Vector = std::vector<T>;
+
+template<typename T>
+using List = std::list<T>;
 
 template<typename T>
 using Set = std::set<T>;

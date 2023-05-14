@@ -142,8 +142,8 @@ build_fragment0(u64 id, const String& name) {
 
     UniquePtr<Operator> op1 = MakeUnique<Operator>(name);
     fragment->AddOperator(std::move(op1));
-    UniquePtr<Operator> op2 = MakeUnique<Operator>(name);
-    fragment->AddOperator(std::move(op2));
+//    UniquePtr<Operator> op2 = MakeUnique<Operator>(name);
+//    fragment->AddOperator(std::move(op2));
 
     UniquePtr<Sink> sink = MakeUnique<Sink>(name);
     fragment->AddSink(std::move(sink));
@@ -193,7 +193,8 @@ auto
 main () -> int {
 
 //    u64 parallel_size = std::thread::hardware_concurrency();
-    u64 parallel_size = 65536 * 50;
+//    u64 parallel_size = 65536;
+    u64 parallel_size = 65536;
 
     start_scheduler();
 

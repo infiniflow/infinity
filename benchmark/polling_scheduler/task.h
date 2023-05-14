@@ -8,6 +8,7 @@
 #include "operator.h"
 #include "buffer_queue.h"
 #include "task_queue.h"
+#include "poller_queue.h"
 #include <unistd.h>
 #include <cassert>
 
@@ -29,6 +30,9 @@ private:
     DispatchTask(i64 worker_id, Task* task);
 
     static void
+    PollerLoop(i64 cpu_id);
+
+    static void
     CoordinatorLoop(i64 cpu_id);
 
     static void
@@ -42,8 +46,11 @@ private:
     static HashMap<i64, UniquePtr<BlockingQueue>> task_queues;
     static HashMap<i64, UniquePtr<Thread>> workers;
 
-    static UniquePtr<BlockingQueue> input_queue;
+    static UniquePtr<BlockingQueue> ready_queue;
     static UniquePtr<Thread> coordinator;
+
+    static UniquePtr<PollerQueue> poller_queue;
+    static UniquePtr<Thread> poller;
 
     static Vector<i64> cpu_array;
     static u64 current_cpu_id;
@@ -59,6 +66,14 @@ enum class TaskType {
     kInvalid,
 };
 
+enum class TaskState {
+    kReady,
+    kFinished,
+    kCancelled,
+    kPending,
+    kRunning,
+};
+
 struct Task {
     inline explicit
     Task(TaskType type) : type_(type) {}
@@ -69,6 +84,11 @@ struct Task {
         last_worker_id_ = worker_id;
     }
 
+    inline void
+    set_state(TaskState state) {
+        state_.store(state);
+    }
+
     [[nodiscard]] inline TaskType
     type() const {
         return type_;
@@ -77,6 +97,7 @@ struct Task {
     TaskType type_{TaskType::kInvalid};
     i64 last_worker_id_{-1};
     bool ready_{false};
+    std::atomic<TaskState> state_{TaskState::kPending};
 };
 
 struct TerminateTask final : public Task {
@@ -138,15 +159,8 @@ struct PipelineTask final : public Task {
 //        printf("Run pipeline task by worker: %ld\n", worker_id);
 
         // Read data from source buffer or input queue
-        if(input_queue_ == nullptr) {
-            String id_str = std::to_string(worker_id);
-            source_buffer_ = MakeShared<Buffer>(BUFFER_SIZE);
-            source_buffer_->Append(id_str.c_str());
-//            memcpy((void*)(source_buffer_.get()), id_str.c_str(), id_str.size());
-        } else {
-//            printf("Get data from input queue\n");
-            input_queue_->TryDequeue(source_buffer_);
-        }
+        source_buffer_ = MakeShared<Buffer>(BUFFER_SIZE);
+        source_->Run(input_queue_.get(), nullptr, source_buffer_);
 
         // process the data one by one operator and push to next operator
         SizeT op_count = operators_.size();
@@ -162,10 +176,12 @@ struct PipelineTask final : public Task {
         // put the parent task into scheduler
         for(Task* parent: parents_) {
 //            printf("Notify parent to run\n");
-            NewScheduler::RunTask(parent);
+            parent->set_state(TaskState::kReady);
+//            NewScheduler::RunTask(parent);
         }
 
         if(root_task_) {
+//            wait_flag_.notify_one();
 //            printf("Notify result\n");
             std::unique_lock<std::mutex> lck(result_lk_);
             completed_ = true;
@@ -191,6 +207,7 @@ struct PipelineTask final : public Task {
 
     inline void
     GetResult() {
+//        wait_flag_.wait(true);
         std::unique_lock<std::mutex> locker(result_lk_);
         result_cv_.wait(locker, [&]{
             return completed_;
@@ -227,6 +244,7 @@ private:
     bool completed_{false};
     std::mutex result_lk_;
     std::condition_variable result_cv_;
+//    std::atomic_bool wait_flag_{false};
 };
 
 }
