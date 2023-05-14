@@ -25,8 +25,10 @@ public:
     static void
     RunTask(Task* task);
 private:
-    static void
-    DispatchTask(i64 worker_id, Task* task);
+    inline static void
+    DispatchTask(i64 worker_id, Task* task) {
+        task_queues[worker_id]->Enqueue(task);
+    }
 
     static void
     CoordinatorLoop(i64 cpu_id);

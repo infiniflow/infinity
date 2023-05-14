@@ -107,10 +107,10 @@ execute_task(i64 id, Task* task, i64 task_count) {
 
 void
 start_scheduler() {
-    //    const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
-//    const HashSet<i64> cpu_mask{1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15};
+//        const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
+    const HashSet<i64> cpu_mask{1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15};
 //    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15};
-    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+//    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 //    const HashSet<i64> cpu_mask{1, 3, 5, 7};
 //    const HashSet<i64> cpu_mask;
 //    total_query_count = 16;
@@ -194,7 +194,7 @@ main () -> int {
 
 //    u64 parallel_size = std::thread::hardware_concurrency();
 //    u64 parallel_size = 65536;
-    u64 parallel_size = 65536;
+    u64 parallel_size = 65536 * 50;
 
     start_scheduler();
 

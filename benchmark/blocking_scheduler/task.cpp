@@ -19,57 +19,59 @@ u64 NewScheduler::current_cpu_id{};
 
 void
 NewScheduler::CoordinatorLoop(i64 cpu_id) {
-    Task* input_task{nullptr};
+    Vector<Task*> input_tasks(50);
+//    Task* input_task{nullptr};
     bool running{true};
     printf("start coordinator on CPU: %ld\n", cpu_id);
     while(running) {
-        NewScheduler::input_queue->Dequeue(input_task);
-        if(input_task == nullptr) {
-            printf("coordinator: null task\n");
-            continue;
-        }
+        SizeT task_count = NewScheduler::input_queue->DequeueBulk(input_tasks.begin(), 50);
+//        if(task_count > 1) {
+//            printf("Get tasks count: %lu\n", task_count);
+//        }
+        for(SizeT idx = 0; idx < task_count; ++ idx) {
+            Task* input_task = input_tasks[idx];
+            if(__builtin_expect((input_task == nullptr), false)) {
+                printf("coordinator: null task\n");
+                continue;
+            }
 
-        switch (input_task->type()) {
-            case TaskType::kTerminate: {
-                printf("terminate coordinator on CPU: %ld\n", cpu_id);
-                running = false;
-                break;
-            }
-            case TaskType::kDummy: {
-                DummyTask* dummy_task = (DummyTask*)input_task;
-                if(dummy_task->last_worker_id_ == -1) {
-                    // Select an available cpu
-                    NewScheduler::DispatchTask(current_cpu_id % cpu_array.size(), dummy_task);
-                } else {
-                    NewScheduler::DispatchTask(dummy_task->last_worker_id_, dummy_task);
-                }
-                break;
-            }
-            case TaskType::kPipeline: {
+            switch (input_task->type()) {
+                case TaskType::kPipeline: {
 //                printf("coordinator receives PIPELINE TASK on CPU: %ld\n", cpu_id);
-                PipelineTask* pipeline_task = (PipelineTask*)input_task;
-                // Construct pipeline task and schedule it.
-                if(pipeline_task->last_worker_id_ == -1) {
-                    // Select an available cpu
-                    current_cpu_id = current_cpu_id % cpu_array.size();
+                    PipelineTask* pipeline_task = (PipelineTask*)input_task;
+                    // Construct pipeline task and schedule it.
+                    if(__builtin_expect((pipeline_task->last_worker_id_ == -1), true)) {
+                        // Select an available cpu
+                        current_cpu_id = current_cpu_id % cpu_array.size();
 //                    printf("Dispatched to CPU: %ld\n", cpu_array[current_cpu_id]);
-                    NewScheduler::DispatchTask(cpu_array[current_cpu_id], pipeline_task);
-                    ++ current_cpu_id;
-                } else {
-                    NewScheduler::DispatchTask(pipeline_task->last_worker_id_, pipeline_task);
+                        NewScheduler::DispatchTask(cpu_array[current_cpu_id], pipeline_task);
+                        ++ current_cpu_id;
+                    } else {
+                        NewScheduler::DispatchTask(pipeline_task->last_worker_id_, pipeline_task);
+                    }
+                    break;
                 }
-                break;
+                case TaskType::kTerminate: {
+                    printf("terminate coordinator on CPU: %ld\n", cpu_id);
+                    running = false;
+                    break;
+                }
+                case TaskType::kDummy: {
+                    DummyTask* dummy_task = (DummyTask*)input_task;
+                    if(dummy_task->last_worker_id_ == -1) {
+                        // Select an available cpu
+                        NewScheduler::DispatchTask(current_cpu_id % cpu_array.size(), dummy_task);
+                    } else {
+                        NewScheduler::DispatchTask(dummy_task->last_worker_id_, dummy_task);
+                    }
+                    break;
+                }
+                case TaskType::kInvalid: {
+                    printf("receive invalid type of task, terminate coordinator on CPU: %ld\n", cpu_id);
+                    running = false;
+                    break;
+                }
             }
-            case TaskType::kInvalid: {
-                printf("receive invalid type of task, terminate coordinator on CPU: %ld\n", cpu_id);
-                running = false;
-                break;
-            }
-        }
-        if(input_task->type() == TaskType::kTerminate) {
-            running = false;
-        } else {
-//            task->run(worker_id);
         }
     }
 }
@@ -155,13 +157,13 @@ NewScheduler::RunTask(Task* task) {
     input_queue->Enqueue(task);
 }
 
-void
-NewScheduler::DispatchTask(i64 worker_id, Task* task) {
-    if(!task_queues.contains(worker_id)) {
-        printf("Can't use this CPU: %ld\n", worker_id);
-        assert(false);
-    }
-    task_queues[worker_id]->Enqueue(task);
-}
+//void
+//NewScheduler::DispatchTask(i64 worker_id, Task* task) {
+////    if(!task_queues.contains(worker_id)) {
+////        printf("Can't use this CPU: %ld\n", worker_id);
+////        assert(false);
+////    }
+//    task_queues[worker_id]->Enqueue(task);
+//}
 
 }

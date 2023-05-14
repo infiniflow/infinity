@@ -15,6 +15,12 @@ struct BlockingQueue {
         queue_.enqueue(task);
     }
 
+    template<class It>
+    SizeT
+    DequeueBulk(It iter, SizeT count) {
+        return queue_.wait_dequeue_bulk(iter, count);
+    }
+
     void
     Dequeue(Task *&task) {
         queue_.wait_dequeue(task);
