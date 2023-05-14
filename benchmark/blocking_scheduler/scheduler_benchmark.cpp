@@ -106,13 +106,43 @@ execute_task(i64 id, Task* task, i64 task_count) {
 }
 
 void
+direct_execute_task(i64 id, Task* task, i64 task_count) {
+//    printf("execute task by thread: %ld\n", id);
+    if(task->type() == TaskType::kPipeline) {
+        PipelineTask* root_task = (PipelineTask*)(task);
+        root_task->Init();
+
+        std::queue<PipelineTask*> queue;
+        queue.push(root_task);
+        while(!queue.empty()) {
+            PipelineTask* task_node = queue.front();
+            queue.pop();
+            if(task_node->children().empty()) {
+                NewScheduler::DispatchTask(id % 16, task_node);
+//                NewScheduler::RunTask(task_node);
+                continue;
+            }
+            for(const auto& child_task: task_node->children()) {
+                queue.push((PipelineTask*)child_task.get());
+            }
+        }
+
+        root_task->GetResult();
+        ++ long_atomic;
+        if(long_atomic > task_count) {
+            printf("time cost: %ld ms\n", profiler.Elapsed() / 1000000);
+        }
+    }
+}
+
+void
 start_scheduler() {
 //        const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
-    const HashSet<i64> cpu_mask{1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15};
+//    const HashSet<i64> cpu_mask{1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15};
 //    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15};
 //    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 //    const HashSet<i64> cpu_mask{1, 3, 5, 7};
-//    const HashSet<i64> cpu_mask;
+    const HashSet<i64> cpu_mask;
 //    total_query_count = 16;
 
     i64 cpu_count = std::thread::hardware_concurrency();
@@ -198,7 +228,7 @@ main () -> int {
 
     start_scheduler();
 
-    ThreadPool pool(32);
+    ThreadPool pool(16);
 
     UniquePtr<Fragment> frag0 = build_fragment0(0, "test");
 //    UniquePtr<Fragment> frag0 = build_fragment1(0, "test");
@@ -207,7 +237,9 @@ main () -> int {
 
     profiler.Begin();
     for(const auto& task: root_tasks) {
-        pool.push(execute_task, task.get(), parallel_size - 1);
+//        pool.push(execute_task, task.get(), parallel_size - 1);
+        pool.push(direct_execute_task, task.get(), parallel_size - 1);
+
     }
     sleep(5);
     stop_scheduler();
