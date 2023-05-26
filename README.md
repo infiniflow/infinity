@@ -6,7 +6,7 @@
     <b>The AI-native database for next-generation AI apps</b>
 </p>
 
-## Build infinity from source
+## Build Infinity from source
 ### Requirements
 
 -   Operating system
@@ -38,7 +38,7 @@ $ cmake ..
 $ make
 ```
 
-### Step4 Startup infinity server
+### Step4 Start up Infinity server
 
 ```shell
 $ ./build/src/infinity_main
