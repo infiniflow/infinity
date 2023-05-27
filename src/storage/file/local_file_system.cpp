@@ -42,9 +42,10 @@ LocalFileSystem::OpenFile(const String& path, u8 flags, FileLockType lock_type) 
         if (flags & FileFlags::APPEND_FLAG) {
             file_flags |= O_APPEND;
         }
-
         if (flags & FileFlags::DIRECT_IO) {
+#if !defined(__APPLE__)
             file_flags |= O_DIRECT | O_SYNC;
+#endif
         }
     }
 
@@ -55,7 +56,7 @@ LocalFileSystem::OpenFile(const String& path, u8 flags, FileLockType lock_type) 
 
     if(lock_type != FileLockType::kNoLock) {
         struct flock file_lock{};
-        memset(&file_lock, 0, sizeof(flock));
+        memset(&file_lock, 0, sizeof(file_lock));
         if(lock_type == FileLockType::kReadLock) {
             file_lock.l_type = F_RDLCK;
         } else {
