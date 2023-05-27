@@ -10,11 +10,13 @@ namespace infinity {
 class Database {
 public:
     static inline SharedPtr<Database>
-    Make() {
-        return MakeShared<Database>();
-    }
+    Open(const String& dir_name);
 public:
     Database() = default;
+    ~Database();
+
+private:
+    i32 locker_fd_{};
 };
 
 }
