@@ -18,7 +18,7 @@ LocalFileHandler::~LocalFileHandler() {
 
 UniquePtr<FileHandler>
 LocalFileSystem::OpenFile(const String& path, u8 flags, FileLockType lock_type) {
-    i32 file_flags = 0;
+    i32 file_flags{O_RDWR};
     bool read_flag = flags & FileFlags::READ_FLAG;
     bool write_flag = flags & FileFlags::WRITE_FLAG;
     if(read_flag && write_flag) {
@@ -43,9 +43,7 @@ LocalFileSystem::OpenFile(const String& path, u8 flags, FileLockType lock_type) 
             file_flags |= O_APPEND;
         }
         if (flags & FileFlags::DIRECT_IO) {
-#if !defined(__APPLE__)
             file_flags |= O_DIRECT | O_SYNC;
-#endif
         }
     }
 
