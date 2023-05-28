@@ -4,8 +4,20 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <iostream>
 
 namespace infinity {
+namespace detail{
+template <typename T, typename U>
+T bit_cast(const U &u) {
+    T t;
+    uint8_t *t_ptr = reinterpret_cast<uint8_t *>(&t);
+    const uint8_t *u_ptr = reinterpret_cast<const uint8_t *>(&u);
+    for (size_t i = 0; i < sizeof(U); i++)
+        t_ptr[i] = u_ptr[i];
+    return t;
+}
+}
 
 struct float16_t {
     uint16_t raw;
@@ -17,8 +29,37 @@ struct float16_t {
         (*this) = f;
     }
 
+    float16_t operator+(float16_t h) const { return float16_t(float(*this) + float(h)); }
+    float16_t operator-(float16_t h) const { return float16_t(float(*this) - float(h)); }
+    float16_t operator*(float16_t h) const { return float16_t(float(*this) * float(h)); }
+    float16_t operator/(float16_t h) const { return float16_t(float(*this) / float(h)); }
+    float16_t operator-() const { return float16_t(-float(*this)); }
+
+    float16_t& operator+=(float16_t h) { return operator=(*this + h); }
+    float16_t& operator-=(float16_t h) { return operator=(*this - h); }
+    float16_t& operator*=(float16_t h) { return operator=(*this * h); }
+    float16_t& operator/=(float16_t h) { return operator=(*this / h); }
+
+    bool operator==(float16_t h) const { return float(*this) == float(h); }
+    bool operator!=(float16_t h) const { return float(*this) != float(h); }
+    bool operator<(float16_t h) const  { return float(*this) < float(h); }
+    bool operator>(float16_t h) const  { return float(*this) > float(h); }
+    bool operator<=(float16_t h) const { return float(*this) <= float(h); }
+    bool operator>=(float16_t h) const { return float(*this) >= float(h); }
+
+    friend std::ostream &operator<<(std::ostream &os, const float16_t &h) {
+        os << float(h);
+        return os;
+    }
+
     float16_t &operator=(float f) {
-        uint32_t i = bit_cast<uint32_t>(f);
+#if defined __F16C__
+        this->raw = (uint16_t) _mm_cvtsi128_si32(
+                _mm_cvtps_ph(_mm_set_ss(value), _MM_FROUND_CUR_DIRECTION))
+#elif defined __ARM_NEON
+        this->raw = memcpy_cast<uint16_t>((__fp16) value);
+#else        
+        uint32_t i = detail::bit_cast<uint32_t>(f);
         uint32_t s = i >> 31;
         uint32_t e = (i >> 23) & 0xFF;
         uint32_t m = i & 0x7FFFFF;
@@ -56,16 +97,22 @@ struct float16_t {
         } else {
             // Underflow.
             float ff = fabsf(f) + 0.5;
-            uint32_t ii = bit_cast<uint32_t>(ff);
+            uint32_t ii = detail::bit_cast<uint32_t>(ff);
             ee = 0;
             mm = ii & 0x7FF;
         }
 
         this->raw = (ss << 15) | (ee << 10) | mm;
+#endif
         return *this;
     }
 
-    operator float() {
+    operator float() const {
+#if defined __F16C__
+        return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128((int32_t)raw)));
+#elif defined __ARM_NEON
+        return (float) memcpy_cast<__fp16>(value);
+#else  
         uint32_t ss = raw >> 15;
         uint32_t ee = (raw >> 10) & 0x1F;
         uint32_t mm = raw & 0x3FF;
@@ -90,30 +137,14 @@ struct float16_t {
 
         uint32_t f = (s << 31) | (e << 23) | m;
 
-        return bit_cast<float>(f);
+        return detail::bit_cast<float>(f);
+#endif
     }
 
 
     float f() {
         return (float)(*this);
     }
-
-    float16_t &operator+=(float16_t a) {
-        (*this) = float(f() + a.f());
-        return *this;
-    }
-
-protected:
-    template <typename T, typename U>
-    T bit_cast(const U &u) {
-        T t;
-        uint8_t *t_ptr = reinterpret_cast<uint8_t *>(&t);
-        const uint8_t *u_ptr = reinterpret_cast<const uint8_t *>(&u);
-        for (size_t i = 0; i < sizeof(U); i++)
-            t_ptr[i] = u_ptr[i];
-        return t;
-    }
-
 };
 
 
