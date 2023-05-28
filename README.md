@@ -5,6 +5,10 @@
 <p align="center">
     <b>The AI-native database for next-generation AI apps</b>
 </p>
+## What is Infinity
+
+Infinity is an AI-native database that can be used with large language models (LLMs) to meet typical To B (business-to-business) applications such as internal enterprise search, specific industry search, internal AI assistants, and chatbots. 
+
 
 ## Build Infinity from source
 ### Requirements
