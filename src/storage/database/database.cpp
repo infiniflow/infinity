@@ -5,6 +5,8 @@
 #include "database.h"
 #include "database_helper.h"
 
+#include <unistd.h>
+
 namespace infinity {
 
 Database::~Database() {

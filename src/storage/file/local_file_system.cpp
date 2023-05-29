@@ -42,9 +42,11 @@ LocalFileSystem::OpenFile(const String& path, u8 flags, FileLockType lock_type) 
         if (flags & FileFlags::APPEND_FLAG) {
             file_flags |= O_APPEND;
         }
+#if defined(__linux__)
         if (flags & FileFlags::DIRECT_IO) {
             file_flags |= O_DIRECT | O_SYNC;
         }
+#endif
     }
 
     i32 fd = open(path.c_str(), file_flags, 0666);
