@@ -10,6 +10,17 @@
 
 Infinity is an AI-native database that can be used with large language models (LLMs) to meet typical To B (business-to-business) applications such as internal enterprise search, specific industry search, internal AI assistants, and chatbots. 
 
+## Key features
+
+- Mixed data type query
+
+- Multi-collection query
+
+- Multi-embedding query
+
+- Unified APIs
+
+- High concurrency query
 
 ## Build Infinity from source
 ### Requirements
