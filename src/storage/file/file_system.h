@@ -37,6 +37,7 @@ enum class FileSystemType {
     kPosix,
     kS3,
     kHDFS,
+    kNFS,
 };
 
 enum class FileLockType {
