@@ -79,6 +79,8 @@ using SizeT = size_t;
 
 using Thread = std::thread;
 
+using TxnTimeStamp = u64;
+
 struct RowID {
     RowID(u32 blk, u32 off) : block(blk), offset(off) {}
     u32 block {};
