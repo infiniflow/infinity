@@ -57,6 +57,12 @@ file(GLOB_RECURSE
         test_helper/*.cpp
         )
 
+file(GLOB_RECURSE
+        third_party_src
+        CONFIGURE_DEPENDS
+        third_party/*.cpp
+        )
+
 add_executable(test_main
         main.cpp
         ${bin_src}
@@ -68,6 +74,7 @@ add_executable(test_main
         ${storage_src}
         ${parser_test_src}
         ${test_helper_src}
+        ${third_party_src}
         )
 
 target_link_libraries(test_main
@@ -78,3 +85,5 @@ target_link_libraries(test_main
         infinity_core
         tlsf
         )
+
+target_include_directories(test_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")

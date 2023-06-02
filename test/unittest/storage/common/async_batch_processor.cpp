@@ -48,8 +48,8 @@ TEST_F(AsyncTaskProcessorTest, test1) {
     AsyncBatchProcessor processor(10 * 1024, 1024, OnPrepareTest, OnCommitTest);
     processor.Start();
     processor.Submit(MakeUnique<AsyncDummyTask>());
-//    processor.Submit(MakeUnique<AsyncDummyTask>());
-//    processor.Submit(MakeUnique<AsyncDummyTask>());
-//    processor.Submit(MakeUnique<AsyncDummyTask>());
+    processor.Submit(MakeUnique<AsyncDummyTask>());
+    processor.Submit(MakeUnique<AsyncDummyTask>());
+    processor.Submit(MakeUnique<AsyncDummyTask>());
     processor.Stop();
 }

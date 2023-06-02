@@ -108,6 +108,12 @@ file(GLOB_RECURSE
         parser/*.h
         )
 
+file(GLOB_RECURSE
+        third_party_src
+        CONFIGURE_DEPENDS
+        ../third_party/simdjson/*.cpp
+        ../third_party/simdjson/*.h)
+
 add_library(infinity_parser STATIC
             ${parser_src}
             ${BISON_PARSER_OUTPUTS}
@@ -138,6 +144,7 @@ set(INFINITY_CORE_SOURCE
         ${planner_src}
         ${scheduler_src}
         ${storage_src}
+        ${third_party_src}
 )
 
 add_library(infinity_core STATIC ${INFINITY_CORE_SOURCE})
@@ -149,6 +156,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/croaring/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
 
 add_executable(infinity_main
         ${infinity_main_src}
