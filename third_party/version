@@ -1,0 +1,10 @@
+croaring v0.8.1
+cxxopts v3.0.0
+googletest v1.12.1
+linenoise v1.0
+magic_enum v0.8.1
+nanobench v4.3.7
+spdlog v1.10.0
+simdjson v3.1.8
+tlsf v3.1.0
+
