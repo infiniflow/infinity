@@ -15,6 +15,7 @@
 #include <unordered_set>
 #include <sstream>
 #include <thread>
+#include <shared_mutex>
 #include "ctpl_stl.h"
 
 namespace infinity {
@@ -50,6 +51,8 @@ using HashMap = std::unordered_map<S, T>;
 
 template<typename S>
 using HashSet = std::unordered_set<S>;
+
+using RWMutex = std::shared_mutex;
 
 using ThreadPool = ctpl::thread_pool;
 

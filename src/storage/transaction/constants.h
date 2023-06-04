@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "common/utility/infinity_assert.h"
 #include "common/types/internal_types.h"
 
 namespace infinity {
@@ -19,7 +20,7 @@ enum class TxnState {
     kInvalid,
 };
 
-String
+inline String
 ToString(TxnState txn_state) {
     switch(txn_state) {
         case TxnState::kStarted: {

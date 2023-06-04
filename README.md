@@ -27,7 +27,7 @@ Infinity is an AI-native database that can be used with large language models (L
 
 -   Operating system: Ubuntu 22.04 or higher
 
--   GCC 11.3 or higher to support C++20
+-   GCC 11.3 or higher to support C++23
 
 -   CMake 3.10 or higher
 
