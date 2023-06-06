@@ -168,6 +168,8 @@ inline void ra_set_container_at_index(
     ra->typecodes[i] = typecode;
 }
 
+container_t *ra_get_container(roaring_array_t *ra, uint16_t x, uint8_t *typecode);
+
 /**
  * If needed, increase the capacity of the array so that it can fit k values
  * (at

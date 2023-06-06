@@ -481,6 +481,7 @@ static inline int32_t run_container_size_in_bytes(
 /**
  * Return true if the two containers have the same content.
  */
+ALLOW_UNALIGNED
 static inline bool run_container_equals(const run_container_t *container1,
                           const run_container_t *container2) {
     if (container1->n_runs != container2->n_runs) {
@@ -557,6 +558,9 @@ inline uint16_t run_container_maximum(const run_container_t *run) {
 
 /* Returns the number of values equal or smaller than x */
 int run_container_rank(const run_container_t *arr, uint16_t x);
+
+/* Returns the index of x, if not exsist return -1 */
+int run_container_get_index(const run_container_t *arr, uint16_t x);
 
 /* Returns the index of the first run containing a value at least as large as x, or -1 */
 inline int run_container_index_equalorlarger(const run_container_t *arr, uint16_t x) {

@@ -348,9 +348,9 @@ void roaring_bitmap_printf_describe(const roaring_bitmap_t *r) {
                get_full_container_name(ra->containers[i], ra->typecodes[i]),
                container_get_cardinality(ra->containers[i], ra->typecodes[i]));
         if (ra->typecodes[i] == SHARED_CONTAINER_TYPE) {
-            printf(
-                "(shared count = %" PRIu32 " )",
-                    CAST_shared(ra->containers[i])->counter);
+            printf("(shared count = %" PRIu32 " )",
+                   croaring_refcount_get(
+                       &(CAST_shared(ra->containers[i])->counter)));
         }
 
         if (i + 1 < ra->size) {
@@ -419,7 +419,7 @@ void roaring_bitmap_statistics(const roaring_bitmap_t *r,
                 break;
             default:
                 assert(false);
-                __builtin_unreachable();
+                roaring_unreachable;
         }
     }
 }
@@ -454,6 +454,7 @@ bool roaring_bitmap_overwrite(roaring_bitmap_t *dest,
 }
 
 void roaring_bitmap_free(const roaring_bitmap_t *r) {
+    if(r == NULL) { return; }
     if (!is_frozen(r)) {
       ra_clear((roaring_array_t*)&r->high_low_container);
     }
@@ -1558,7 +1559,7 @@ static bool loadfirstvalue(roaring_uint32_iterator_t *newit) {
                 wordindex++;  // advance
             }
             // here "word" is non-zero
-            newit->in_container_index = wordindex * 64 + __builtin_ctzll(word);
+            newit->in_container_index = wordindex * 64 + roaring_trailing_zeroes(word);
             newit->current_value = newit->highbits | newit->in_container_index;
             break; }
 
@@ -1591,7 +1592,7 @@ static bool loadlastvalue(roaring_uint32_iterator_t* newit) {
             while ((word = bitset_container->words[wordindex]) == 0)
                 --wordindex;
 
-            int num_leading_zeros = __builtin_clzll(word);
+            int num_leading_zeros = roaring_leading_zeroes(word);
             newit->in_container_index = (wordindex * 64) + (63 - num_leading_zeros);
             newit->current_value = newit->highbits | newit->in_container_index;
             break;
@@ -1650,7 +1651,7 @@ static bool loadfirstvalue_largeorequal(roaring_uint32_iterator_t *newit, uint32
             break; }
 
         default:
-            __builtin_unreachable();
+            roaring_unreachable;
     }
 
     return true;
@@ -1734,7 +1735,7 @@ bool roaring_advance_uint32_iterator(roaring_uint32_iterator_t *it) {
                 word = bc->words[wordindex];
             }
             if (word != 0) {
-                it->in_container_index = wordindex * 64 + __builtin_ctzll(word);
+                it->in_container_index = wordindex * 64 + roaring_trailing_zeroes(word);
                 it->current_value = it->highbits | it->in_container_index;
                 return (it->has_value = true);
             }
@@ -1771,7 +1772,7 @@ bool roaring_advance_uint32_iterator(roaring_uint32_iterator_t *it) {
         }
 
         default:
-            __builtin_unreachable();
+            roaring_unreachable;
     }
 
     // moving to next container
@@ -1803,7 +1804,7 @@ bool roaring_previous_uint32_iterator(roaring_uint32_iterator_t *it) {
             if (word == 0)
                 break;
 
-            int num_leading_zeros = __builtin_clzll(word);
+            int num_leading_zeros = roaring_leading_zeroes(word);
             it->in_container_index = (wordindex * 64) + (63 - num_leading_zeros);
             it->current_value = it->highbits | it->in_container_index;
             return (it->has_value = true);
@@ -1859,7 +1860,7 @@ uint32_t roaring_read_uint32_iterator(roaring_uint32_iterator_t *it, uint32_t* b
         word = bcont->words[wordindex] & (UINT64_MAX << (it->in_container_index % 64));
         do {
           while (word != 0 && ret < count) {
-            buf[0] = it->highbits | (wordindex * 64 + __builtin_ctzll(word));
+            buf[0] = it->highbits | (wordindex * 64 + roaring_trailing_zeroes(word));
             word = word & (word - 1);
             buf++;
             ret++;
@@ -1871,7 +1872,7 @@ uint32_t roaring_read_uint32_iterator(roaring_uint32_iterator_t *it, uint32_t* b
         } while (word != 0 && ret < count);
         it->has_value = (word != 0);
         if (it->has_value) {
-          it->in_container_index = wordindex * 64 + __builtin_ctzll(word);
+          it->in_container_index = wordindex * 64 + roaring_trailing_zeroes(word);
           it->current_value = it->highbits | it->in_container_index;
         }
         break;
@@ -2677,6 +2678,34 @@ uint64_t roaring_bitmap_rank(const roaring_bitmap_t *bm, uint32_t x) {
 }
 
 /**
+ * roaring_bitmap_get_index returns the index of x, if not exsist return -1.
+ */
+int64_t roaring_bitmap_get_index(const roaring_bitmap_t *bm, uint32_t x) {
+    int64_t index = 0;
+    const uint16_t xhigh = x >> 16;
+    int32_t high_idx = ra_get_index(&bm->high_low_container, xhigh);
+    if (high_idx < 0) return -1;
+
+    for (int i = 0; i < bm->high_low_container.size; i++) {
+        uint32_t key = bm->high_low_container.keys[i];
+        if (xhigh > key) {
+            index +=
+                container_get_cardinality(bm->high_low_container.containers[i],
+                                          bm->high_low_container.typecodes[i]);
+        } else if (xhigh == key) {
+            int32_t low_idx = container_get_index(
+                bm->high_low_container.containers[high_idx],
+                bm->high_low_container.typecodes[high_idx], x & 0xFFFF);
+            if (low_idx < 0) return -1;
+            return index + low_idx;
+        } else {
+            return -1;
+        }
+    }
+    return index;
+}
+
+/**
 * roaring_bitmap_smallest returns the smallest value in the set.
 * Returns UINT32_MAX if the set is empty.
 */
@@ -2789,7 +2818,6 @@ uint64_t roaring_bitmap_and_cardinality(const roaring_bitmap_t *x1,
               length2 = x2->high_low_container.size;
     uint64_t answer = 0;
     int pos1 = 0, pos2 = 0;
-
     while (pos1 < length1 && pos2 < length2) {
         const uint16_t s1 = ra_get_key_at_index(&x1->high_low_container, pos1);
         const uint16_t s2 = ra_get_key_at_index(&x2->high_low_container, pos2);
@@ -2879,8 +2907,7 @@ bool roaring_bitmap_contains_range(const roaring_bitmap_t *r, uint64_t range_sta
     }
     int32_t is = ra_get_index(&r->high_low_container, hb_rs);
     int32_t ie = ra_get_index(&r->high_low_container, hb_re);
-    ie = (ie < 0 ? -ie - 1 : ie);
-    if ((is < 0) || ((ie - is) != span) || ie >= hlc_sz) {
+    if ((ie < 0) || (is < 0) || ((ie - is) != span) || ie >= hlc_sz) {
        return false;
     }
     const uint32_t lb_rs = range_start & 0xFFFF;
@@ -2966,7 +2993,7 @@ size_t roaring_bitmap_frozen_size_in_bytes(const roaring_bitmap_t *rb) {
                 break;
             }
             default:
-                __builtin_unreachable();
+                roaring_unreachable;
         }
     }
     num_bytes += (2 + 2 + 1) * ra->size; // keys, counts, typecodes
@@ -3010,7 +3037,7 @@ void roaring_bitmap_frozen_serialize(const roaring_bitmap_t *rb, char *buf) {
                 break;
             }
             default:
-                __builtin_unreachable();
+                roaring_unreachable;
         }
     }
 
@@ -3056,7 +3083,7 @@ void roaring_bitmap_frozen_serialize(const roaring_bitmap_t *rb, char *buf) {
                 break;
             }
             default:
-                __builtin_unreachable();
+                roaring_unreachable;
         }
         memcpy(&count_zone[i], &count, 2);
     }
@@ -3192,6 +3219,204 @@ roaring_bitmap_frozen_view(const char *buf, size_t length) {
     }
 
     return rb;
+}
+
+ALLOW_UNALIGNED
+roaring_bitmap_t *roaring_bitmap_portable_deserialize_frozen(const char *buf) {
+    char *start_of_buf = (char *) buf;
+    uint32_t cookie;
+    int32_t num_containers;
+    uint16_t *descriptive_headers;
+    uint32_t *offset_headers = NULL;
+    const char *run_flag_bitset = NULL;
+    bool hasrun = false;
+
+    // deserialize cookie
+    memcpy(&cookie, buf, sizeof(uint32_t));
+    buf += sizeof(uint32_t);
+    if (cookie == SERIAL_COOKIE_NO_RUNCONTAINER) {
+        memcpy(&num_containers, buf, sizeof(int32_t));
+        buf += sizeof(int32_t);
+        descriptive_headers = (uint16_t *) buf;
+        buf += num_containers * 2 * sizeof(uint16_t);
+        offset_headers = (uint32_t *) buf;
+        buf += num_containers * sizeof(uint32_t);
+    } else if ((cookie & 0xFFFF) == SERIAL_COOKIE) {
+        num_containers = (cookie >> 16) + 1;
+        hasrun = true;
+        int32_t run_flag_bitset_size = (num_containers + 7) / 8;
+        run_flag_bitset = buf;
+        buf += run_flag_bitset_size;
+        descriptive_headers = (uint16_t *) buf;
+        buf += num_containers * 2 * sizeof(uint16_t);
+        if(num_containers >= NO_OFFSET_THRESHOLD) {
+            offset_headers = (uint32_t *) buf;
+            buf += num_containers * sizeof(uint32_t);
+        }
+    } else {
+        return NULL;
+    }
+
+    // calculate total size for allocation
+    int32_t num_bitset_containers = 0;
+    int32_t num_run_containers = 0;
+    int32_t num_array_containers = 0;
+
+    for (int32_t i = 0; i < num_containers; i++) {
+        uint16_t tmp;
+        memcpy(&tmp, descriptive_headers + 2*i+1, sizeof(tmp));
+        uint32_t cardinality = tmp + 1;
+        bool isbitmap = (cardinality > DEFAULT_MAX_SIZE);
+        bool isrun = false;
+        if(hasrun) {
+          if((run_flag_bitset[i / 8] & (1 << (i % 8))) != 0) {
+            isbitmap = false;
+            isrun = true;
+          }
+        }
+
+        if (isbitmap) {
+            num_bitset_containers++;
+        } else if (isrun) {
+            num_run_containers++;
+        } else {
+            num_array_containers++;
+        }
+    }
+
+    size_t alloc_size = 0;
+    alloc_size += sizeof(roaring_bitmap_t);
+    alloc_size += num_containers * sizeof(container_t*);
+    alloc_size += num_bitset_containers * sizeof(bitset_container_t);
+    alloc_size += num_run_containers * sizeof(run_container_t);
+    alloc_size += num_array_containers * sizeof(array_container_t);
+    alloc_size += num_containers * sizeof(uint16_t); // keys
+    alloc_size += num_containers * sizeof(uint8_t); // typecodes
+
+    // allocate bitmap and construct containers
+    char *arena = (char *)roaring_malloc(alloc_size);
+    if (arena == NULL) {
+        return NULL;
+    }
+
+    roaring_bitmap_t *rb = (roaring_bitmap_t *)
+            arena_alloc(&arena, sizeof(roaring_bitmap_t));
+    rb->high_low_container.flags = ROARING_FLAG_FROZEN;
+    rb->high_low_container.allocation_size = num_containers;
+    rb->high_low_container.size = num_containers;
+    rb->high_low_container.containers =
+        (container_t **)arena_alloc(&arena,
+                                    sizeof(container_t*) * num_containers);
+
+    uint16_t *keys = (uint16_t *)arena_alloc(&arena, num_containers * sizeof(uint16_t));
+    uint8_t *typecodes = (uint8_t *)arena_alloc(&arena, num_containers * sizeof(uint8_t));
+
+    rb->high_low_container.keys = keys;
+    rb->high_low_container.typecodes = typecodes;
+
+    for (int32_t i = 0; i < num_containers; i++) {
+        uint16_t tmp;
+        memcpy(&tmp, descriptive_headers + 2*i+1, sizeof(tmp));
+        int32_t cardinality = tmp + 1;
+        bool isbitmap = (cardinality > DEFAULT_MAX_SIZE);
+        bool isrun = false;
+        if(hasrun) {
+          if((run_flag_bitset[i / 8] & (1 << (i % 8))) != 0) {
+            isbitmap = false;
+            isrun = true;
+          }
+        }
+
+        keys[i] = descriptive_headers[2*i];
+
+        if (isbitmap) {
+            typecodes[i] = BITSET_CONTAINER_TYPE;
+            bitset_container_t *c = (bitset_container_t *)arena_alloc(&arena, sizeof(bitset_container_t));
+            c->cardinality = cardinality;
+            if(offset_headers != NULL) {
+                c->words = (uint64_t *) (start_of_buf + offset_headers[i]);
+            } else {
+                c->words = (uint64_t *) buf;
+                buf += BITSET_CONTAINER_SIZE_IN_WORDS * sizeof(uint64_t);
+            }
+            rb->high_low_container.containers[i] = c;
+        } else if (isrun) {
+            typecodes[i] = RUN_CONTAINER_TYPE;
+            run_container_t *c = (run_container_t *)arena_alloc(&arena, sizeof(run_container_t));
+            c->capacity = cardinality;
+            uint16_t n_runs;
+            if(offset_headers != NULL) {
+                memcpy(&n_runs, start_of_buf + offset_headers[i], sizeof(uint16_t));
+                c->n_runs = n_runs;
+                c->runs = (rle16_t *) (start_of_buf + offset_headers[i] + sizeof(uint16_t));
+            } else {
+                memcpy(&n_runs, buf, sizeof(uint16_t));
+                c->n_runs = n_runs;
+                buf += sizeof(uint16_t);
+                c->runs = (rle16_t *) buf;
+                buf += c->n_runs * sizeof(rle16_t);
+            }
+            rb->high_low_container.containers[i] = c;
+        } else {
+            typecodes[i] = ARRAY_CONTAINER_TYPE;
+            array_container_t *c = (array_container_t *)arena_alloc(&arena, sizeof(array_container_t));
+            c->cardinality = cardinality;
+            c->capacity = cardinality;
+            if(offset_headers != NULL) {
+                c->array = (uint16_t *) (start_of_buf + offset_headers[i]);
+            } else {
+                c->array = (uint16_t *) buf;
+                buf += cardinality * sizeof(uint16_t);
+            }
+            rb->high_low_container.containers[i] = c;
+        }
+    }
+
+    return rb;
+}
+
+bool roaring_bitmap_to_bitset(const roaring_bitmap_t *r, bitset_t * bitset) {
+    uint32_t max_value = roaring_bitmap_maximum(r);
+    size_t new_array_size = (size_t)(((uint64_t)max_value + 63)/64);
+    bool resize_ok = bitset_resize(bitset, new_array_size, true);
+    if(!resize_ok) { return false; }
+    const roaring_array_t *ra = &r->high_low_container;
+    for (int i = 0; i < ra->size; ++i) {
+        uint64_t* words = bitset->array + (ra->keys[i]<<10);
+        uint8_t type = ra->typecodes[i];
+        const container_t *c = ra->containers[i];
+        if(type == SHARED_CONTAINER_TYPE) {
+            c = container_unwrap_shared(c, &type);
+        }
+        switch (type) {
+          case BITSET_CONTAINER_TYPE:
+          {
+            size_t max_word_index = new_array_size - (ra->keys[i]<<10);
+            if(max_word_index > 1024) { max_word_index = 1024; }
+            const bitset_container_t *src = const_CAST_bitset(c);
+            memcpy(words, src->words, max_word_index * sizeof(uint64_t));
+          }
+          break;
+          case ARRAY_CONTAINER_TYPE:
+          {
+            const array_container_t *src = const_CAST_array(c);
+            bitset_set_list(words, src->array, src->cardinality);
+          }
+          break;
+          case RUN_CONTAINER_TYPE:
+          {
+            const run_container_t *src = const_CAST_run(c);
+            for (int32_t rlepos = 0; rlepos < src->n_runs; ++rlepos) {
+                rle16_t rle = src->runs[rlepos];
+                bitset_set_lenrange(words, rle.value, rle.length);
+            }
+          }
+          break;
+          default:
+          roaring_unreachable;
+        }
+    }
+    return true;
 }
 
 #ifdef __cplusplus

@@ -38,6 +38,15 @@
 #define CROARING_REGULAR_VISUAL_STUDIO 1
 #endif // __clang__
 #endif // _MSC_VER
+#ifndef CROARING_VISUAL_STUDIO
+#define CROARING_VISUAL_STUDIO 0
+#endif
+#ifndef CROARING_CLANG_VISUAL_STUDIO
+#define CROARING_CLANG_VISUAL_STUDIO 0
+#endif
+#ifndef CROARING_REGULAR_VISUAL_STUDIO
+#define CROARING_REGULAR_VISUAL_STUDIO 0
+#endif
 
 #if defined(_POSIX_C_SOURCE) && (_POSIX_C_SOURCE < 200809L)
 #undef _POSIX_C_SOURCE
@@ -61,17 +70,14 @@
 extern "C" {  // portability definitions are in global scope, not a namespace
 #endif
 
-#if CROARING_REGULAR_VISUAL_STUDIO && !defined(_WIN64) && !defined(CROARING_ACK_32BIT)
-#pragma message( \
-    "You appear to be attempting a 32-bit build under Visual Studio. We recommend a 64-bit build instead.")
-#endif
-
 #if defined(__SIZEOF_LONG_LONG__) && __SIZEOF_LONG_LONG__ != 8
 #error This code assumes  64-bit long longs (by use of the GCC intrinsics). Your system is not currently supported.
 #endif
 
 #if CROARING_REGULAR_VISUAL_STUDIO
+#ifndef __restrict__
 #define __restrict__ __restrict
+#endif // __restrict__
 #endif // CROARING_REGULAR_VISUAL_STUDIO
 
 
@@ -91,7 +97,7 @@ extern "C" {  // portability definitions are in global scope, not a namespace
 #undef CROARING_IS_X64
 #endif
 
-#ifdef CROARING_DISABLE_X64
+#ifdef ROARING_DISABLE_X64
 #undef CROARING_IS_X64
 #endif
 // we include the intrinsic header
@@ -101,7 +107,7 @@ extern "C" {  // portability definitions are in global scope, not a namespace
 
 
 
-#ifdef CROARING_CLANG_VISUAL_STUDIO
+#if CROARING_CLANG_VISUAL_STUDIO
 
 /**
  * You are not supposed, normally, to include these
@@ -126,6 +132,17 @@ extern "C" {  // portability definitions are in global scope, not a namespace
 #include <avxintrin.h>
 #include <avx2intrin.h>
 #include <wmmintrin.h>
+#if _MSC_VER >= 1920
+// Important: we need the AVX-512 headers:
+#include <avx512fintrin.h>
+#include <avx512dqintrin.h>
+#include <avx512cdintrin.h>
+#include <avx512bwintrin.h>
+#include <avx512vlintrin.h>
+#include <avx512vbmiintrin.h>
+#include <avx512vbmi2intrin.h>
+#include <avx512vpopcntdqintrin.h>
+#endif // _MSC_VER >= 1920
 // unfortunately, we may not get _blsr_u64, but, thankfully, clang
 // has it as a macro.
 #ifndef _blsr_u64
@@ -138,10 +155,10 @@ extern "C" {  // portability definitions are in global scope, not a namespace
 #endif // CROARING_REGULAR_VISUAL_STUDIO
 #endif // defined(__x86_64__) || defined(_M_X64)
 
-#if !defined(USENEON) && !defined(DISABLENEON) && defined(__ARM_NEON)
-#  define USENEON
+#if !defined(CROARING_USENEON) && !defined(DISABLENEON) && defined(__ARM_NEON)
+#  define CROARING_USENEON
 #endif
-#if defined(USENEON)
+#if defined(CROARING_USENEON)
 #  include <arm_neon.h>
 #endif
 
@@ -157,12 +174,13 @@ extern "C" {  // portability definitions are in global scope, not a namespace
 
 #ifndef __clang__  // if one compiles with MSVC *with* clang, then these
                    // intrinsics are defined!!!
+#define CROARING_INTRINSICS 1
 // sadly there is no way to check whether we are missing these intrinsics
 // specifically.
 
-/* wrappers for Visual Studio built-ins that look like gcc built-ins */
+/* wrappers for Visual Studio built-ins that look like gcc built-ins __builtin_ctzll */
 /* result might be undefined when input_num is zero */
-inline int __builtin_ctzll(unsigned long long input_num) {
+static inline int roaring_trailing_zeroes(unsigned long long input_num) {
     unsigned long index;
 #ifdef _WIN64  // highly recommended!!!
     _BitScanForward64(&index, input_num);
@@ -173,12 +191,13 @@ inline int __builtin_ctzll(unsigned long long input_num) {
         _BitScanForward(&index, (uint32_t)(input_num >> 32));
         index += 32;
     }
-#endif
+#endif // _WIN64
     return index;
 }
 
+/* wrappers for Visual Studio built-ins that look like gcc built-ins __builtin_clzll */
 /* result might be undefined when input_num is zero */
-inline int __builtin_clzll(unsigned long long input_num) {
+inline int roaring_leading_zeroes(unsigned long long input_num) {
     unsigned long index;
 #ifdef _WIN64  // highly recommended!!!
     _BitScanReverse64(&index, input_num);
@@ -189,28 +208,21 @@ inline int __builtin_clzll(unsigned long long input_num) {
     } else {
         _BitScanReverse(&index, (uint32_t)(input_num));
     }
-#endif
+#endif // _WIN64
     return 63 - index;
 }
 
-
-/* software implementation avoids POPCNT */
-/*static inline int __builtin_popcountll(unsigned long long input_num) {
-  const uint64_t m1 = 0x5555555555555555; //binary: 0101...
-  const uint64_t m2 = 0x3333333333333333; //binary: 00110011..
-  const uint64_t m4 = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
-  const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...
-
-  input_num -= (input_num >> 1) & m1;
-  input_num = (input_num & m2) + ((input_num >> 2) & m2);
-  input_num = (input_num + (input_num >> 4)) & m4;
-  return (input_num * h01) >> 56;
-}*/
-
 /* Use #define so this is effective even under /Ob0 (no inline) */
-#define __builtin_unreachable() __assume(0)
-#endif
+#define roaring_unreachable __assume(0)
+#endif // __clang__
 
+#endif // CROARING_REGULAR_VISUAL_STUDIO
+
+#ifndef CROARING_INTRINSICS
+#define CROARING_INTRINSICS 1
+#define roaring_unreachable __builtin_unreachable()
+static inline int roaring_trailing_zeroes(unsigned long long input_num) { return __builtin_ctzll(input_num); }
+static inline int roaring_leading_zeroes(unsigned long long input_num) { return __builtin_clzll(input_num); }
 #endif
 
 #if CROARING_REGULAR_VISUAL_STUDIO
@@ -230,11 +242,11 @@ inline int __builtin_clzll(unsigned long long input_num) {
 
 #define IS_BIG_ENDIAN (*(uint16_t *)"\0\xff" < 0x100)
 
-#ifdef USENEON
+#ifdef CROARING_USENEON
 // we can always compute the popcount fast.
 #elif (defined(_M_ARM) || defined(_M_ARM64)) && ((defined(_WIN64) || defined(_WIN32)) && defined(CROARING_REGULAR_VISUAL_STUDIO) && CROARING_REGULAR_VISUAL_STUDIO)
 // we will need this function:
-static inline int hammingbackup(uint64_t x) {
+static inline int roaring_hamming_backup(uint64_t x) {
   uint64_t c1 = UINT64_C(0x5555555555555555);
   uint64_t c2 = UINT64_C(0x3333333333333333);
   uint64_t c4 = UINT64_C(0x0F0F0F0F0F0F0F0F);
@@ -246,19 +258,19 @@ static inline int hammingbackup(uint64_t x) {
 #endif
 
 
-static inline int hamming(uint64_t x) {
+static inline int roaring_hamming(uint64_t x) {
 #if defined(_WIN64) && defined(CROARING_REGULAR_VISUAL_STUDIO) && CROARING_REGULAR_VISUAL_STUDIO
-#ifdef USENEON
+#ifdef CROARING_USENEON
    return vaddv_u8(vcnt_u8(vcreate_u8(input_num)));
 #elif defined(_M_ARM64)
-  return hammingbackup(x);
+  return roaring_hamming_backup(x);
   // (int) _CountOneBits64(x); is unavailable
 #else  // _M_ARM64
   return (int) __popcnt64(x);
 #endif // _M_ARM64
 #elif defined(_WIN32) && defined(CROARING_REGULAR_VISUAL_STUDIO) && CROARING_REGULAR_VISUAL_STUDIO
 #ifdef _M_ARM
-  return hammingbackup(x);
+  return roaring_hamming_backup(x);
   // _CountOneBits is unavailable
 #else // _M_ARM
     return (int) __popcnt(( unsigned int)x) + (int)  __popcnt(( unsigned int)(x>>32));
@@ -302,7 +314,7 @@ static inline int hamming(uint64_t x) {
 //
 
 // We are going to use runtime dispatch.
-#ifdef CROARING_IS_X64
+#if CROARING_IS_X64
 #ifdef __clang__
 // clang does not have GCC push pop
 // warning: clang attribute push can't be used within a namespace in clang up
@@ -327,15 +339,192 @@ static inline int hamming(uint64_t x) {
 #define CROARING_UNTARGET_REGION
 #endif
 
+
 #define CROARING_TARGET_AVX2 CROARING_TARGET_REGION("avx2,bmi,pclmul,lzcnt")
+#define CROARING_TARGET_AVX512 CROARING_TARGET_REGION("bmi2,avx512f,avx512dq,avx512bw,avx512vbmi2,avx512bitalg,avx512vpopcntdq")
+#define CROARING_UNTARGET_AVX2 CROARING_UNTARGET_REGION
+#define CROARING_UNTARGET_AVX512 CROARING_UNTARGET_REGION
 
 #ifdef __AVX2__
 // No need for runtime dispatching.
 // It is unnecessary and harmful to old clang to tag regions.
 #undef CROARING_TARGET_AVX2
 #define CROARING_TARGET_AVX2
-#undef CROARING_UNTARGET_REGION
-#define CROARING_UNTARGET_REGION
+#undef CROARING_UNTARGET_AVX2
+#define CROARING_UNTARGET_AVX2
+#endif
+
+#if defined(__AVX512F__) && defined(__AVX512DQ__) && defined(__AVX512BW__) && defined(__AVX512VBMI2__) && defined(__AVX512BITALG__) && defined(__AVX512VPOPCNTDQ__)
+// No need for runtime dispatching.
+// It is unnecessary and harmful to old clang to tag regions.
+#undef CROARING_TARGET_AVX512
+#define CROARING_TARGET_AVX512
+#undef CROARING_UNTARGET_AVX512
+#define CROARING_UNTARGET_AVX512
+#endif
+
+// Allow unaligned memory access
+#if defined(__GNUC__) || defined(__clang__)
+#define ALLOW_UNALIGNED __attribute__((no_sanitize("alignment")))
+#else
+#define ALLOW_UNALIGNED
+#endif
+
+#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__)
+ #define CROARING_IS_BIG_ENDIAN (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#elif defined(_WIN32)
+ #define CROARING_IS_BIG_ENDIAN 0
+ #else
+ #if defined(__APPLE__) || defined(__FreeBSD__) // defined __BYTE_ORDER__ && defined __ORDER_BIG_ENDIAN__
+ #include <machine/endian.h>
+ #elif defined(sun) || defined(__sun) // defined(__APPLE__) || defined(__FreeBSD__)
+ #include <sys/byteorder.h>
+ #else  // defined(__APPLE__) || defined(__FreeBSD__)
+
+ #ifdef __has_include
+ #if __has_include(<endian.h>)
+ #include <endian.h>
+ #endif //__has_include(<endian.h>)
+ #endif //__has_include
+
+ #endif // defined(__APPLE__) || defined(__FreeBSD__)
+
+
+ #ifndef !defined(__BYTE_ORDER__) || !defined(__ORDER_LITTLE_ENDIAN__)
+ #define CROARING_IS_BIG_ENDIAN 0
+ #endif
+
+ #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+ #define CROARING_IS_BIG_ENDIAN 0
+ #else // __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+ #define CROARING_IS_BIG_ENDIAN 1
+ #endif // __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#endif
+
+// Defines for the possible CROARING atomic implementations
+#define CROARING_ATOMIC_IMPL_NONE          1
+#define CROARING_ATOMIC_IMPL_CPP           2
+#define CROARING_ATOMIC_IMPL_C             3
+#define CROARING_ATOMIC_IMPL_C_WINDOWS     4
+
+// If the use has forced a specific implementation, use that, otherwise,
+// figure out the best implementation we can use.
+#if !defined(CROARING_ATOMIC_IMPL)
+  #if defined(__cplusplus) && __cplusplus >= 201103L
+    #ifdef __has_include
+      #if __has_include(<atomic>)
+        #define CROARING_ATOMIC_IMPL CROARING_ATOMIC_IMPL_CPP
+      #endif //__has_include(<atomic>)
+    #else
+      // We lack __has_include to check:
+      #define CROARING_ATOMIC_IMPL CROARING_ATOMIC_IMPL_CPP
+    #endif //__has_include
+  #elif __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_ATOMICS__)
+    #define CROARING_ATOMIC_IMPL CROARING_ATOMIC_IMPL_C
+  #elif CROARING_REGULAR_VISUAL_STUDIO
+    // https://www.technetworkhub.com/c11-atomics-in-visual-studio-2022-version-17/
+    #define CROARING_ATOMIC_IMPL CROARING_ATOMIC_IMPL_C_WINDOWS
+  #endif
+#endif // !defined(CROARING_ATOMIC_IMPL)
+
+#if !defined(CROARING_ATOMIC_IMPL)
+  #ifndef CROARING_SILENT_BUILD
+    #pragma message ( "No atomic implementation found, copy on write bitmaps will not be threadsafe" )
+  #endif // CROARING_SILENT_BUILD
+  #define CROARING_ATOMIC_IMPL CROARING_ATOMIC_IMPL_NONE
+#endif
+
+#if CROARING_ATOMIC_IMPL == CROARING_ATOMIC_IMPL_C
+#include <stdatomic.h>
+typedef _Atomic(uint32_t) croaring_refcount_t;
+
+static inline void croaring_refcount_inc(croaring_refcount_t *val) {
+    // Increasing the reference counter can always be done with
+    // memory_order_relaxed: New references to an object can only be formed from
+    // an existing reference, and passing an existing reference from one thread to
+    // another must already provide any required synchronization.
+    atomic_fetch_add_explicit(val, 1, memory_order_relaxed);
+}
+
+static inline bool croaring_refcount_dec(croaring_refcount_t *val) {
+    // It is important to enforce any possible access to the object in one thread
+    // (through an existing reference) to happen before deleting the object in a
+    // different thread. This is achieved by a "release" operation after dropping
+    // a reference (any access to the object through this reference must obviously
+    // happened before), and an "acquire" operation before deleting the object.
+    bool is_zero = atomic_fetch_sub_explicit(val, 1, memory_order_release) == 1;
+    if (is_zero) {
+        atomic_thread_fence(memory_order_acquire);
+    }
+    return is_zero;
+}
+
+static inline uint32_t croaring_refcount_get(croaring_refcount_t *val) {
+    return atomic_load_explicit(val, memory_order_relaxed);
+}
+#elif CROARING_ATOMIC_IMPL == CROARING_ATOMIC_IMPL_CPP
+#include <atomic>
+typedef std::atomic<uint32_t> croaring_refcount_t;
+
+static inline void croaring_refcount_inc(croaring_refcount_t *val) {
+    val->fetch_add(1, std::memory_order_relaxed);
+}
+
+static inline bool croaring_refcount_dec(croaring_refcount_t *val) {
+    // See above comments on the c11 atomic implementation for memory ordering
+    bool is_zero = val->fetch_sub(1, std::memory_order_release) == 1;
+    if (is_zero) {
+        std::atomic_thread_fence(std::memory_order_acquire);
+    }
+    return is_zero;
+}
+
+static inline uint32_t croaring_refcount_get(croaring_refcount_t *val) {
+    return val->load(std::memory_order_relaxed);
+}
+#elif CROARING_ATOMIC_IMPL == CROARING_ATOMIC_IMPL_C_WINDOWS
+#include <intrin.h>
+#pragma intrinsic(_InterlockedIncrement)
+#pragma intrinsic(_InterlockedDecrement)
+
+// _InterlockedIncrement and _InterlockedDecrement take a (signed) long, and
+// overflow is defined to wrap, so we can pretend it is a uint32_t for our case
+typedef volatile long croaring_refcount_t;
+
+static inline void croaring_refcount_inc(croaring_refcount_t *val) {
+    _InterlockedIncrement(val);
+}
+
+static inline bool croaring_refcount_dec(croaring_refcount_t *val) {
+    return _InterlockedDecrement(val) == 0;
+}
+
+static inline uint32_t croaring_refcount_get(croaring_refcount_t *val) {
+    // Per https://learn.microsoft.com/en-us/windows/win32/sync/interlocked-variable-access
+    // > Simple reads and writes to properly-aligned 32-bit variables are atomic
+    // > operations. In other words, you will not end up with only one portion
+    // > of the variable updated; all bits are updated in an atomic fashion.
+    return *val;
+}
+#elif CROARING_ATOMIC_IMPL == CROARING_ATOMIC_IMPL_NONE
+#include <assert.h>
+typedef uint32_t croaring_refcount_t;
+
+static inline void croaring_refcount_inc(croaring_refcount_t *val) {
+    *val += 1;
+}
+
+static inline bool croaring_refcount_dec(croaring_refcount_t *val) {
+    assert(*val > 0);
+    *val -= 1;
+    return val == 0;
+}
+
+static inline uint32_t croaring_refcount_get(croaring_refcount_t *val) {
+    return *val;
+}
+#else
+#error "Unknown atomic implementation"
 #endif
 
 

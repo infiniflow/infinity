@@ -206,7 +206,37 @@ bool array_array_container_inplace_union(
           return false;  // not a bitset
         } else {
           memmove(src_1->array + src_2->cardinality, src_1->array, src_1->cardinality * sizeof(uint16_t));
-          src_1->cardinality = (int32_t)union_uint16(src_1->array + src_2->cardinality, src_1->cardinality,
+          /*
+            Next line is safe:
+
+            We just need to focus on the reading and writing performed on array1. In `union_vector16`, both vectorized and scalar code still obey the basic rule: read from two inputs, do the union, and then write the output.
+
+            Let's say the length(cardinality) of input2 is L2:
+            ```
+                |<-  L2  ->|
+            array1: [output--- |input 1---|---]
+            array2: [input 2---]
+            ```
+            Let's define 3 __m128i pointers, `pos1` starts from `input1`, `pos2` starts from `input2`, these 2 point at the next byte to read, `out` starts from `output`, pointing at the next byte to overwrite.
+            ```
+            array1: [output--- |input 1---|---]
+                        ^          ^
+                    out        pos1
+            array2: [input 2---]
+                        ^
+                        pos2
+            ```
+            The union output always contains less or equal number of elements than all inputs added, so we have:
+            ```
+            out <= pos1 + pos2
+            ```
+            therefore:
+            ```
+            out <= pos1 + L2
+            ```
+            which means you will not overwrite data beyond pos1, so the data haven't read is safe, and we don't care the data already read.
+          */
+          src_1->cardinality = (int32_t)fast_union_uint16(src_1->array + src_2->cardinality, src_1->cardinality,
                                   src_2->array, src_2->cardinality, src_1->array);
           return false; // not a bitset
         }
@@ -242,6 +272,17 @@ bool array_array_container_lazy_union(
     container_t **dst
 ){
     int totalCardinality = src_1->cardinality + src_2->cardinality;
+    //
+    // We assume that operations involving bitset containers will be faster than
+    // operations involving solely array containers, except maybe when array containers
+    // are small. Indeed, for example, it is cheap to compute the union between an array and
+    // a bitset container, generally more so than between a large array and another array.
+    // So it is advantageous to favour bitset containers during the computation.
+    // Of course, if we convert array containers eagerly to bitset containers, we may later
+    // need to revert the bitset containers to array containerr to satisfy the Roaring format requirements,
+    // but such one-time conversions at the end may not be overly expensive. We arrived to this design
+    // based on extensive benchmarking.
+    //
     if (totalCardinality <= ARRAY_LAZY_LOWERBOUND) {
         *dst = array_container_create_given_capacity(totalCardinality);
         if (*dst != NULL) {
@@ -269,6 +310,17 @@ bool array_array_container_lazy_inplace_union(
 ){
     int totalCardinality = src_1->cardinality + src_2->cardinality;
     *dst = NULL;
+    //
+    // We assume that operations involving bitset containers will be faster than
+    // operations involving solely array containers, except maybe when array containers
+    // are small. Indeed, for example, it is cheap to compute the union between an array and
+    // a bitset container, generally more so than between a large array and another array.
+    // So it is advantageous to favour bitset containers during the computation.
+    // Of course, if we convert array containers eagerly to bitset containers, we may later
+    // need to revert the bitset containers to array containerr to satisfy the Roaring format requirements,
+    // but such one-time conversions at the end may not be overly expensive. We arrived to this design
+    // based on extensive benchmarking.
+    //
     if (totalCardinality <= ARRAY_LAZY_LOWERBOUND) {
         if(src_1->capacity < totalCardinality) {
           *dst = array_container_create_given_capacity(2  * totalCardinality); // be purposefully generous
@@ -280,7 +332,37 @@ bool array_array_container_lazy_inplace_union(
           return false;  // not a bitset
         } else {
           memmove(src_1->array + src_2->cardinality, src_1->array, src_1->cardinality * sizeof(uint16_t));
-          src_1->cardinality = (int32_t)union_uint16(src_1->array + src_2->cardinality, src_1->cardinality,
+          /*
+            Next line is safe:
+
+            We just need to focus on the reading and writing performed on array1. In `union_vector16`, both vectorized and scalar code still obey the basic rule: read from two inputs, do the union, and then write the output.
+
+            Let's say the length(cardinality) of input2 is L2:
+            ```
+                |<-  L2  ->|
+            array1: [output--- |input 1---|---]
+            array2: [input 2---]
+            ```
+            Let's define 3 __m128i pointers, `pos1` starts from `input1`, `pos2` starts from `input2`, these 2 point at the next byte to read, `out` starts from `output`, pointing at the next byte to overwrite.
+            ```
+            array1: [output--- |input 1---|---]
+                        ^          ^
+                    out        pos1
+            array2: [input 2---]
+                        ^
+                        pos2
+            ```
+            The union output always contains less or equal number of elements than all inputs added, so we have:
+            ```
+            out <= pos1 + pos2
+            ```
+            therefore:
+            ```
+            out <= pos1 + L2
+            ```
+            which means you will not overwrite data beyond pos1, so the data haven't read is safe, and we don't care the data already read.
+          */
+          src_1->cardinality = (int32_t)fast_union_uint16(src_1->array + src_2->cardinality, src_1->cardinality,
                                   src_2->array, src_2->cardinality, src_1->array);
           return false; // not a bitset
         }

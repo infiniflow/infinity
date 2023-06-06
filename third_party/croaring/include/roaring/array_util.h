@@ -6,6 +6,12 @@
 
 #include <roaring/portability.h>
 
+#if CROARING_IS_X64
+#ifndef CROARING_COMPILER_SUPPORTS_AVX512
+#error "CROARING_COMPILER_SUPPORTS_AVX512 needs to be defined."
+#endif // CROARING_COMPILER_SUPPORTS_AVX512
+#endif
+
 #ifdef __cplusplus
 extern "C" { namespace roaring { namespace internal {
 #endif
@@ -89,7 +95,7 @@ static inline int32_t advanceUntil(const uint16_t *array, int32_t pos,
 }
 
 /**
- * Returns number of elements which are less then $ikey.
+ * Returns number of elements which are less than ikey.
  * Array elements must be unique and sorted.
  */
 static inline int32_t count_less(const uint16_t *array, int32_t lenarray,
@@ -100,7 +106,7 @@ static inline int32_t count_less(const uint16_t *array, int32_t lenarray,
 }
 
 /**
- * Returns number of elements which are greater then $ikey.
+ * Returns number of elements which are greater than ikey.
  * Array elements must be unique and sorted.
  */
 static inline int32_t count_greater(const uint16_t *array, int32_t lenarray,
@@ -125,6 +131,19 @@ int32_t intersect_vector16(const uint16_t *__restrict__ A, size_t s_a,
                            const uint16_t *__restrict__ B, size_t s_b,
                            uint16_t *C);
 
+int32_t intersect_vector16_inplace(uint16_t *__restrict__ A, size_t s_a,
+                           const uint16_t *__restrict__ B, size_t s_b);
+
+/**
+ * Take an array container and write it out to a 32-bit array, using base
+ * as the offset.
+ */
+int array_container_to_uint32_array_vector16(void *vout, const uint16_t* array, size_t cardinality,
+                                    uint32_t base);
+#if CROARING_COMPILER_SUPPORTS_AVX512
+int avx512_array_container_to_uint32_array(void *vout, const uint16_t* array, size_t cardinality,
+                                    uint32_t base);
+#endif
 /**
  * Compute the cardinality of the intersection using SSE4 instructions
  */

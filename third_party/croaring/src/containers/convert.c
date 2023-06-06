@@ -5,6 +5,12 @@
 #include <roaring/containers/convert.h>
 #include <roaring/containers/perfparameters.h>
 
+#if CROARING_IS_X64
+#ifndef CROARING_COMPILER_SUPPORTS_AVX512
+#error "CROARING_COMPILER_SUPPORTS_AVX512 needs to be defined."
+#endif // CROARING_COMPILER_SUPPORTS_AVX512
+#endif
+
 #ifdef __cplusplus
 extern "C" { namespace roaring { namespace internal {
 #endif
@@ -48,11 +54,27 @@ array_container_t *array_container_from_bitset(const bitset_container_t *bits) {
     array_container_t *result =
         array_container_create_given_capacity(bits->cardinality);
     result->cardinality = bits->cardinality;
-    //  sse version ends up being slower here
-    // (bitset_extract_setbits_sse_uint16)
-    // because of the sparsity of the data
-    bitset_extract_setbits_uint16(bits->words, BITSET_CONTAINER_SIZE_IN_WORDS,
+#if CROARING_IS_X64
+#if CROARING_COMPILER_SUPPORTS_AVX512
+    if( croaring_hardware_support() & ROARING_SUPPORTS_AVX512 ) {
+        bitset_extract_setbits_avx512_uint16(bits->words, BITSET_CONTAINER_SIZE_IN_WORDS,
+                                  result->array, bits->cardinality , 0);
+    } else
+#endif
+    {
+        //  sse version ends up being slower here
+        // (bitset_extract_setbits_sse_uint16)
+        // because of the sparsity of the data
+        bitset_extract_setbits_uint16(bits->words, BITSET_CONTAINER_SIZE_IN_WORDS,
                                   result->array, 0);
+    }
+#else
+        // If the system is not x64, then we have no accelerated function.
+        bitset_extract_setbits_uint16(bits->words, BITSET_CONTAINER_SIZE_IN_WORDS,
+                                  result->array, 0);
+#endif
+
+
     return result;
 }
 
@@ -274,7 +296,7 @@ container_t *convert_run_optimize(
                 return answer;
             }
 
-            int local_run_start = __builtin_ctzll(cur_word);
+            int local_run_start = roaring_trailing_zeroes(cur_word);
             int run_start = local_run_start + 64 * long_ctr;
             uint64_t cur_word_with_1s = cur_word | (cur_word - 1);
 
@@ -290,7 +312,7 @@ container_t *convert_run_optimize(
                 *typecode_after = RUN_CONTAINER_TYPE;
                 return answer;
             }
-            int local_run_end = __builtin_ctzll(~cur_word_with_1s);
+            int local_run_end = roaring_trailing_zeroes(~cur_word_with_1s);
             run_end = local_run_end + long_ctr * 64;
             add_run(answer, run_start, run_end - 1);
             cur_word = cur_word_with_1s & (cur_word_with_1s + 1);
@@ -298,7 +320,7 @@ container_t *convert_run_optimize(
         return answer;
     } else {
         assert(false);
-        __builtin_unreachable();
+        roaring_unreachable;
         return NULL;
     }
 }

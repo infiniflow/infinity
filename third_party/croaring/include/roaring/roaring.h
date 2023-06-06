@@ -12,6 +12,7 @@
 #include <roaring/memory.h>
 #include <roaring/roaring_types.h>
 #include <roaring/roaring_version.h>
+#include <roaring/bitset/bitset.h>
 
 #ifdef __cplusplus
 extern "C" { namespace roaring { namespace api {
@@ -333,7 +334,7 @@ void roaring_bitmap_add_range_closed(roaring_bitmap_t *r,
  */
 static inline void roaring_bitmap_add_range(roaring_bitmap_t *r,
                                             uint64_t min, uint64_t max) {
-    if(max == min) return;
+    if(max <= min) return;
     roaring_bitmap_add_range_closed(r, (uint32_t)min, (uint32_t)(max - 1));
 }
 
@@ -353,7 +354,7 @@ void roaring_bitmap_remove_range_closed(roaring_bitmap_t *r,
  */
 static inline void roaring_bitmap_remove_range(roaring_bitmap_t *r,
                                                uint64_t min, uint64_t max) {
-    if(max == min) return;
+    if(max <= min) return;
     roaring_bitmap_remove_range_closed(r, (uint32_t)min, (uint32_t)(max - 1));
 }
 
@@ -435,6 +436,23 @@ void roaring_bitmap_clear(roaring_bitmap_t *r);
  */
 void roaring_bitmap_to_uint32_array(const roaring_bitmap_t *r, uint32_t *ans);
 
+/**
+ * Store the bitmap to a bitset. This can be useful for people
+ * who need the performance and simplicity of a standard bitset.
+ * We assume that the input bitset is originally empty (does not
+ * have any set bit).
+ *
+ *   bitset_t * out = bitset_create();
+ *   // if the bitset has content in it, call "bitset_clear(out)"
+ *   bool success = roaring_bitmap_to_bitset(mybitmap, out); 
+ *   // on failure, success will be false.
+ *   // You can then query the bitset:
+ *   bool is_present = bitset_get(out,  10011 );
+ *   // you must free the memory:
+ *   bitset_free(out);
+ *
+ */
+bool roaring_bitmap_to_bitset(const roaring_bitmap_t *r, bitset_t * bitset);
 
 /**
  * Convert the bitmap to a sorted array from `offset` by `limit`, output in `ans`.
@@ -479,6 +497,9 @@ size_t roaring_bitmap_shrink_to_fit(roaring_bitmap_t *r);
  * more space efficient than the portable form, e.g. when the data is sparse.
  *
  * Returns how many bytes written, should be `roaring_bitmap_size_in_bytes(r)`.
+ *
+ * This function is endian-sensitive. If you have a big-endian system (e.g., a mainframe IBM s390x),
+ * the data format is going to be big-endian and not compatible with little-endian systems.
  */
 size_t roaring_bitmap_serialize(const roaring_bitmap_t *r, char *buf);
 
@@ -486,7 +507,10 @@ size_t roaring_bitmap_serialize(const roaring_bitmap_t *r, char *buf);
  * Use with `roaring_bitmap_serialize()`.
  *
  * (See `roaring_bitmap_portable_deserialize()` if you want a format that's
- * compatible with Java and Go implementations)
+ * compatible with Java and Go implementations).
+ *
+ * This function is endian-sensitive. If you have a big-endian system (e.g., a mainframe IBM s390x),
+ * the data format is going to be big-endian and not compatible with little-endian systems.
  */
 roaring_bitmap_t *roaring_bitmap_deserialize(const void *buf);
 
@@ -506,6 +530,9 @@ size_t roaring_bitmap_size_in_bytes(const roaring_bitmap_t *r);
  *
  * This is meant to be compatible with the Java and Go versions:
  * https://github.com/RoaringBitmap/RoaringFormatSpec
+*
+ * This function is endian-sensitive. If you have a big-endian system (e.g., a mainframe IBM s390x),
+ * the data format is going to be big-endian and not compatible with little-endian systems.
  */
 roaring_bitmap_t *roaring_bitmap_portable_deserialize(const char *buf);
 
@@ -515,9 +542,42 @@ roaring_bitmap_t *roaring_bitmap_portable_deserialize(const char *buf);
  *
  * This is meant to be compatible with the Java and Go versions:
  * https://github.com/RoaringBitmap/RoaringFormatSpec
+ *
+ * The function itself is safe in the sense that it will not cause buffer overflows.
+ * However, for correct operations, it is assumed that the bitmap read was once
+ * serialized from a valid bitmap (i.e., it follows the format specification).
+ * If you provided an incorrect input (garbage), then the bitmap read may not be in
+ * a valid state and following operations may not lead to sensible results.
+ * In particular, the serialized array containers need to be in sorted order, and the
+ * run containers should be in sorted non-overlapping order. This is is guaranteed to
+ * happen when serializing an existing bitmap, but not for random inputs.
+ *
+ * This function is endian-sensitive. If you have a big-endian system (e.g., a mainframe IBM s390x),
+ * the data format is going to be big-endian and not compatible with little-endian systems.
  */
 roaring_bitmap_t *roaring_bitmap_portable_deserialize_safe(const char *buf,
                                                            size_t maxbytes);
+
+/**
+ * Read bitmap from a serialized buffer.
+ * In case of failure, NULL is returned.
+ *
+ * Bitmap returned by this function can be used in all readonly contexts.
+ * Bitmap must be freed as usual, by calling roaring_bitmap_free().
+ * Underlying buffer must not be freed or modified while it backs any bitmaps.
+ *
+ * The function is unsafe in the following ways:
+ * 1) It may execute unaligned memory accesses.
+ * 2) A buffer overflow may occur if buf does not point to a valid serialized
+ *    bitmap.
+ *
+ * This is meant to be compatible with the Java and Go versions:
+ * https://github.com/RoaringBitmap/RoaringFormatSpec
+ *
+ * This function is endian-sensitive. If you have a big-endian system (e.g., a mainframe IBM s390x),
+ * the data format is going to be big-endian and not compatible with little-endian systems.
+ */
+roaring_bitmap_t *roaring_bitmap_portable_deserialize_frozen(const char *buf);
 
 /**
  * Check how many bytes would be read (up to maxbytes) at this pointer if there
@@ -546,6 +606,9 @@ size_t roaring_bitmap_portable_size_in_bytes(const roaring_bitmap_t *r);
  *
  * This is meant to be compatible with the Java and Go versions:
  * https://github.com/RoaringBitmap/RoaringFormatSpec
+ *
+ * This function is endian-sensitive. If you have a big-endian system (e.g., a mainframe IBM s390x),
+ * the data format is going to be big-endian and not compatible with little-endian systems.
  */
 size_t roaring_bitmap_portable_serialize(const roaring_bitmap_t *r, char *buf);
 
@@ -576,6 +639,9 @@ size_t roaring_bitmap_frozen_size_in_bytes(const roaring_bitmap_t *r);
 /**
  * Serializes bitmap using frozen format.
  * Buffer size must be at least roaring_bitmap_frozen_size_in_bytes().
+ *
+ * This function is endian-sensitive. If you have a big-endian system (e.g., a mainframe IBM s390x),
+ * the data format is going to be big-endian and not compatible with little-endian systems.
  */
 void roaring_bitmap_frozen_serialize(const roaring_bitmap_t *r, char *buf);
 
@@ -589,6 +655,9 @@ void roaring_bitmap_frozen_serialize(const roaring_bitmap_t *r, char *buf);
  * Bitmap returned by this function can be used in all readonly contexts.
  * Bitmap must be freed as usual, by calling roaring_bitmap_free().
  * Underlying buffer must not be freed or modified while it backs any bitmaps.
+ *
+ * This function is endian-sensitive. If you have a big-endian system (e.g., a mainframe IBM s390x),
+ * the data format is going to be big-endian and not compatible with little-endian systems.
  */
 const roaring_bitmap_t *roaring_bitmap_frozen_view(const char *buf,
                                                    size_t length);
@@ -729,6 +798,15 @@ bool roaring_bitmap_select(const roaring_bitmap_t *r, uint32_t rank,
  * the smallest value.
  */
 uint64_t roaring_bitmap_rank(const roaring_bitmap_t *r, uint32_t x);
+
+/**
+ * Returns the index of x in the given roaring bitmap.
+ * If the roaring bitmap doesn't contain x , this function will return -1.
+ * The difference with rank function is that this function will return -1 when x
+ * is not the element of roaring bitmap, but the rank function will return a
+ * non-negative number.
+ */
+int64_t roaring_bitmap_get_index(const roaring_bitmap_t *r, uint32_t x);
 
 /**
  * Returns the smallest value in the set, or UINT32_MAX if the set is empty.

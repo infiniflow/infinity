@@ -16,7 +16,7 @@ bool array_container_equal_bitset(const array_container_t* container1,
         uint64_t w = container2->words[i];
         while (w != 0) {
             uint64_t t = w & (~w + 1);
-            uint16_t r = i * 64 + __builtin_ctzll(w);
+            uint16_t r = i * 64 + roaring_trailing_zeroes(w);
             if (pos >= container1->cardinality) {
                 return false;
             }

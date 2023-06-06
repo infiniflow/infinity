@@ -32,7 +32,7 @@ bool run_container_is_subset_array(const run_container_t* container1,
                                  container2->cardinality, start);
         stop_pos = advanceUntil(container2->array, stop_pos,
                                 container2->cardinality, stop);
-        if (start_pos == container2->cardinality) {
+        if (stop_pos == container2->cardinality) {
             return false;
         } else if (stop_pos - start_pos != stop - start ||
                    container2->array[start_pos] != start ||
@@ -108,7 +108,7 @@ bool bitset_container_is_subset_run(const bitset_container_t* container1,
             uint32_t start = container2->runs[i_run].value;
             uint32_t stop = start + container2->runs[i_run].length;
             uint64_t t = w & (~w + 1);
-            uint16_t r = i_bitset * 64 + __builtin_ctzll(w);
+            uint16_t r = i_bitset * 64 + roaring_trailing_zeroes(w);
             if (r < start) {
                 return false;
             } else if (r > stop) {

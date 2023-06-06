@@ -68,6 +68,7 @@ void array_container_free(array_container_t *array);
 array_container_t *array_container_clone(const array_container_t *src);
 
 /* Get the cardinality of `array'. */
+ALLOW_UNALIGNED
 static inline int array_container_cardinality(const array_container_t *array) {
     return array->cardinality;
 }
@@ -214,6 +215,7 @@ static inline int32_t array_container_size_in_bytes(
 /**
  * Return true if the two arrays have the same content.
  */
+ALLOW_UNALIGNED
 static inline bool array_container_equals(
     const array_container_t *container1,
     const array_container_t *container2) {
@@ -408,7 +410,18 @@ inline int array_container_rank(const array_container_t *arr, uint16_t x) {
     }
 }
 
-/* Returns the index of the first value equal or smaller than x, or -1 */
+/* Returns the index of x , if not exsist return -1 */
+inline int array_container_get_index(const array_container_t *arr, uint16_t x) {
+    const int32_t idx = binarySearch(arr->array, arr->cardinality, x);
+    const bool is_present = idx >= 0;
+    if (is_present) {
+        return idx;
+    } else {
+        return -1;
+    }
+}
+
+/* Returns the index of the first value equal or larger than x, or -1 */
 inline int array_container_index_equalorlarger(const array_container_t *arr, uint16_t x) {
     const int32_t idx = binarySearch(arr->array, arr->cardinality, x);
     const bool is_present = idx >= 0;

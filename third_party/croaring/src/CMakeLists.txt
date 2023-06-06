@@ -15,8 +15,10 @@ endif()
 
 MESSAGE( STATUS "ROARING_LIB_TYPE: " ${ROARING_LIB_TYPE})
 set(ROARING_SRC
+    isadetection.c
     array_util.c
     bitset_util.c
+    bitset.c
     containers/array.c
     containers/bitset.c
     containers/containers.c
@@ -38,34 +40,51 @@ if(ROARING_BUILD_C_AS_CPP)  # more checks and tools, e.g. <type_traits> analysis
   SET_SOURCE_FILES_PROPERTIES(${ROARING_SRC} PROPERTIES LANGUAGE CXX)
 endif()
 
-add_library(${ROARING_LIB_NAME} ${ROARING_LIB_TYPE} ${ROARING_SRC})
-target_include_directories(${ROARING_LIB_NAME}
+add_library(roaring ${ROARING_LIB_TYPE} ${ROARING_SRC})
+if(ROARING_DISABLE_AVX512)
+  target_compile_definitions(roaring PUBLIC CROARING_COMPILER_SUPPORTS_AVX512=0)
+endif(ROARING_DISABLE_AVX512)
+
+if(ROARING_DISABLE_AVX)
+  target_compile_definitions(roaring PUBLIC ROARING_DISABLE_AVX=1)
+endif(ROARING_DISABLE_AVX)
+
+if(ROARING_DISABLE_X64)
+  target_compile_definitions(roaring PUBLIC ROARING_DISABLE_X64=1)
+endif(ROARING_DISABLE_X64)
+
+if(ROARING_DISABLE_NEON)
+  target_compile_definitions(roaring PUBLIC DISABLENEON=1)
+endif(ROARING_DISABLE_NEON)
+
+
+target_include_directories(roaring
   PUBLIC
    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(${ROARING_LIB_NAME} PUBLIC roaring-headers)
-target_link_libraries(${ROARING_LIB_NAME} PUBLIC roaring-headers-cpp)
+target_link_libraries(roaring PUBLIC roaring-headers)
+target_link_libraries(roaring PUBLIC roaring-headers-cpp)
 #
-#install(TARGETS ${ROARING_LIB_NAME} DESTINATION lib)
+#install(TARGETS roaring DESTINATION lib)
 #
-install(TARGETS ${ROARING_LIB_NAME} 
-   EXPORT ${ROARING_LIB_NAME}-config
+install(TARGETS roaring 
+   EXPORT roaring-config
    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
    INCLUDES DESTINATION ${CMAKE_INSTALL_INCDIR}
 )
-install(EXPORT ${ROARING_LIB_NAME}-config
-   FILE ${ROARING_LIB_NAME}-config.cmake
-   NAMESPACE ${ROARING_LIB_NAME}::
-   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${ROARING_LIB_NAME}
+install(EXPORT roaring-config
+   FILE roaring-config.cmake
+   NAMESPACE roaring::
+   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/roaring
  )
 
 if(NOT MSVC)
 ## We output the library at the root of the current directory where cmake is invoked
 ## This is handy but Visual Studio will happily ignore us
-set_target_properties(${ROARING_LIB_NAME} PROPERTIES
+set_target_properties(roaring PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
   VERSION ${ROARING_LIB_VERSION}
   SOVERSION ${ROARING_LIB_SOVERSION})
@@ -77,6 +96,6 @@ if(MSVC AND (ROARING_LIB_TYPE STREQUAL "SHARED"))
     MESSAGE( STATUS "To build  a Windows DLL using Visual Studio, you may need cmake 3.4 or better." )
   endif()
   MESSAGE( STATUS "Building a Windows DLL using Visual Studio, exporting all symbols automatically." )
- set_target_properties(${ROARING_LIB_NAME}
+ set_target_properties(roaring
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS 1)
 endif()

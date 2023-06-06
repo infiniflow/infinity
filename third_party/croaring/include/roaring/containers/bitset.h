@@ -232,6 +232,7 @@ static inline bool bitset_container_contains_range(const bitset_container_t *bit
 }
 
 /* Get the number of bits set */
+ALLOW_UNALIGNED
 static inline int bitset_container_cardinality(
     const bitset_container_t *bitset) {
     return bitset->cardinality;
@@ -303,6 +304,12 @@ int bitset_container_union(const bitset_container_t *src_1,
 int bitset_container_union_justcard(const bitset_container_t *src_1,
                                     const bitset_container_t *src_2);
 
+/* Computes the union of bitsets `src_1' and `src_2' into `dst', but does
+ * not update the cardinality. Provided to optimize chained operations. */
+int bitset_container_union_nocard(const bitset_container_t *src_1,
+				  const bitset_container_t *src_2,
+				  bitset_container_t *dst);
+
 /* Computes the union of bitsets `src_1' and `src_2' into `dst', but does not
  * update the cardinality. Provided to optimize chained operations. */
 int bitset_container_or_nocard(const bitset_container_t *src_1,
@@ -330,6 +337,12 @@ int bitset_container_intersection(const bitset_container_t *src_1,
  * cardinality. Same as bitset_container_and_justcard. */
 int bitset_container_intersection_justcard(const bitset_container_t *src_1,
                                            const bitset_container_t *src_2);
+
+/* Computes the intersection of bitsets `src_1' and `src_2' into `dst', but does
+ * not update the cardinality. Provided to optimize chained operations. */
+int bitset_container_intersection_nocard(const bitset_container_t *src_1,
+					 const bitset_container_t *src_2,
+					 bitset_container_t *dst);
 
 /* Computes the intersection of bitsets `src_1' and `src_2' into `dst', but does
  * not update the cardinality. Provided to optimize chained operations. */
@@ -479,6 +492,9 @@ uint16_t bitset_container_maximum(const bitset_container_t *container);
 
 /* Returns the number of values equal or smaller than x */
 int bitset_container_rank(const bitset_container_t *container, uint16_t x);
+
+/* Returns the index of x , if not exsist return -1 */
+int bitset_container_get_index(const bitset_container_t *container, uint16_t x);
 
 /* Returns the index of the first value equal or larger than x, or -1 */
 int bitset_container_index_equalorlarger(const bitset_container_t *container, uint16_t x);
