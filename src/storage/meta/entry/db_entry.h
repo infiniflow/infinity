@@ -15,7 +15,7 @@ class DBEntry : public BaseEntry {
 public:
     explicit
     DBEntry(String db_name, u64 txn_id, TxnTimeStamp begin_ts)
-        : db_name_(std::move(db_name)) {
+        : BaseEntry(EntryType::kDatabase), db_name_(std::move(db_name)) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }

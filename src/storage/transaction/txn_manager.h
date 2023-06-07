@@ -15,8 +15,11 @@ public:
         : txn_id_(start_txn_id),
           catalog_(catalog) {}
 
-    UniquePtr<Txn>
+    Txn*
     CreateTxn();
+
+    Txn*
+    GetTxn(u64 txn_id);
 
 private:
     u64
@@ -26,6 +29,7 @@ private:
     NewCatalog* catalog_{};
     RWMutex rw_locker_{};
     u64 txn_id_{};
+    HashMap<u64, UniquePtr<Txn>> txn_map_{};
 };
 
 }

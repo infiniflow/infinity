@@ -11,10 +11,11 @@
 
 namespace infinity {
 
+class TxnManager;
 class Txn {
 public:
     explicit
-    Txn(NewCatalog* catalog, u32 txn_id) : catalog_(catalog), txn_id_(txn_id) {}
+    Txn(TxnManager* txn_mgr, NewCatalog* catalog, u32 txn_id) : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id) {}
 
     inline void
     BeginTxn(TxnTimeStamp begin_ts) {
@@ -23,12 +24,21 @@ public:
 
     inline void
     CommitTxn() {
-        // Generate a checkpoint
+        // Generate a checkpoint.
+    }
+
+    inline void
+    AbortTxn() {
+        // Abort a transaction.
     }
 
     DBEntry*
     CreateDatabase(const String& db_name) {
         DBEntry* new_db_entry = catalog_->CreateDatabase(db_name, this->txn_id_, this->begin_ts_);
+        if(new_db_entry == nullptr) {
+            aborted = true;
+            return nullptr;
+        }
         create_dbs_.emplace_back(new_db_entry);
         return new_db_entry;
     }
@@ -44,9 +54,12 @@ private:
     TxnTimeStamp commit_ts_{};
 
     u64 txn_id_{};
+    std::atomic_bool aborted{false};
 
     // Txn store
     Vector<DBEntry*> create_dbs_{};
+
+    TxnManager* txn_mgr_{};
 };
 
 }

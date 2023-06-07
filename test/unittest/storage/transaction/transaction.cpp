@@ -32,6 +32,7 @@ TEST_F(TransactionTest, test1) {
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
     NewCatalog new_catalog(std::move(dir), nullptr);
     TxnManager txn_mgr(&new_catalog);
-    UniquePtr<Txn> new_txn = txn_mgr.CreateTxn();
+    Txn* new_txn = txn_mgr.CreateTxn();
     new_txn->CreateDatabase("db1");
+    new_txn->CommitTxn();
 }

@@ -9,7 +9,16 @@
 
 namespace infinity {
 
+enum class EntryType {
+    kInvalid,
+    kDatabase,
+    kTable,
+};
+
 struct BaseEntry {
+    explicit
+    BaseEntry(EntryType entry_type) : entry_type_(entry_type) {}
+
     virtual
     ~BaseEntry() = default;
 
@@ -18,6 +27,8 @@ struct BaseEntry {
     TxnTimeStamp commit_ts_{UNCOMMIT_TS};
 
     bool deleted_{false};
+
+    EntryType entry_type_{EntryType::kInvalid};
 };
 
 }

@@ -24,7 +24,7 @@ private:
     String db_name_{};
 
     // Ordered by commit_ts from latest to oldest.
-    List<UniquePtr<DBEntry>> entry_list_{};
+    List<UniquePtr<BaseEntry>> entry_list_{};
 };
 
 }

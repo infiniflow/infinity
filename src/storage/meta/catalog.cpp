@@ -25,19 +25,20 @@ NewCatalog::CreateDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin
     // no db_meta
     if(db_meta == nullptr) {
         // Create new db meta
-        rw_lock_.lock();
         LOG_TRACE("Create new database");
         UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(db_name);
         db_meta = new_db_meta.get();
+
+        rw_lock_.lock();
         databases_[db_name] = std::move(new_db_meta);
         rw_lock_.unlock();
 
     }
 
     LOG_TRACE("Add new database entry");
-    db_meta->CreateNewEntry(txn_id, begin_ts);
+    DBEntry* res = db_meta->CreateNewEntry(txn_id, begin_ts);
 
-    return nullptr;
+    return res;
 }
 
 DBEntry*
