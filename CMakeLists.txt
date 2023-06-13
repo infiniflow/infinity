@@ -20,6 +20,21 @@ message(STATUS "Commit-id = ${GIT_COMMIT_ID}")
 
 set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 
+#include(cmake/jemalloc.cmake)
+#include(cmake/snappy.cmake)
+#include(cmake/lz4.cmake)
+#include(cmake/zlib.cmake)
+#include(cmake/zstd.cmake)
+#include(cmake/tbb.cmake)
+#include(cmake/rocksdb.cmake)
+
+#list(APPEND EXTERNAL_LIBS jemalloc)
+#list(APPEND EXTERNAL_LIBS snappy)
+#list(APPEND EXTERNAL_LIBS rocksdb_with_headers)
+#list(APPEND EXTERNAL_LIBS lz4)
+#list(APPEND EXTERNAL_LIBS zstd)
+#list(APPEND EXTERNAL_LIBS zlib_with_headers)
+
 set(CMAKE_CXX_STANDARD 23)
 
 ADD_DEFINITIONS(-D INFINITY_DEBUG)

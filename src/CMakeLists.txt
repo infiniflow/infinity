@@ -157,6 +157,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/leveldb/include")
 
 add_executable(infinity_main
         ${infinity_main_src}
@@ -175,6 +176,8 @@ target_link_libraries(
         tlsf
         roaring
         faiss
+        leveldb
+        ${EXTERNAL_LIBS}
 )
 
 target_link_libraries(
@@ -184,4 +187,6 @@ target_link_libraries(
         tlsf
         linenoise
         roaring
+        leveldb
+        ${EXTERNAL_LIBS}
 )

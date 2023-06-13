@@ -35,3 +35,6 @@ add_subdirectory(concurrentqueue)
 
 #add_library(libhv INTERFACE)
 #target_include_directories(libhv INTERFACE libhv/include)
+
+# Build leveldb
+add_subdirectory(leveldb)

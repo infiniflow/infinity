@@ -7,4 +7,6 @@ nanobench v4.3.7
 spdlog v1.10.0
 simdjson v3.1.8
 tlsf v3.1.0
+leveldb commit-id:068d5ee1a3ac40dabd00d211d5013af44be55bea
+
 
