@@ -114,10 +114,13 @@ public:
 
     Status Put(const std::string& key, std::shared_ptr<Roaring>& result);
 
+    Status ScanForBSI(u64 column_id, std::vector<std::shared_ptr<Roaring>>& results);
+
     Tx* Begin();
 
 private:
     leveldb::DB* db_;
+    leveldb::Options options_;
     std::string path_;
     std::unique_ptr<PostingCache> cache_;
     Codec codec_;
