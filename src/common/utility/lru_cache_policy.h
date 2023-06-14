@@ -11,14 +11,14 @@ namespace infinity {
 /// Value weight should not change after insertion.
 /// To work with the thread-safe implementation of this class use a class "CacheBase" with first parameter "LRU"
 /// and next parameters in the same order as in the constructor of the current class.
-template <typename TKey, typename TMapped, typename HashFunction = std::hash<TKey>>
-class LRUCachePolicy : public ICachePolicy<TKey, TMapped, HashFunction> {
+template <typename TKey, typename TMapped, typename HashFunction = std::hash<TKey>, typename WeightFunction = TrivialWeightFunction<TMapped>>
+class LRUCachePolicy : public ICachePolicy<TKey, TMapped, HashFunction, WeightFunction> {
 public:
     using Key = TKey;
     using Mapped = TMapped;
     using MappedPtr = std::shared_ptr<Mapped>;
 
-    using Base = ICachePolicy<TKey, TMapped, HashFunction>;
+    using Base = ICachePolicy<TKey, TMapped, HashFunction, WeightFunction>;
     /** Initialize LRUCachePolicy with max_size and max_elements_size.
       * max_elements_size == 0 means no elements size restrictions.
       */
@@ -26,11 +26,7 @@ public:
         : max_size(std::max(static_cast<size_t>(1), max_size_)), max_elements_size(max_elements_size_) {
     }
 
-    size_t weight(std::lock_guard<std::mutex> & /* cache_lock */) const override {
-        return current_size;
-    }
-
-    size_t Count(std::lock_guard<std::mutex> & /* cache_lock */) const override {
+    size_t Count() const override {
         return cells.size();
     }
 
@@ -88,7 +84,7 @@ public:
         }
 
         cell.value = mapped;
-        cell.size = cell.value ? cell.value : 0;
+        cell.size = cell.value ? weight_function(*cell.value) : 0;
         current_size += cell.size;
 
         removeOverflow();
@@ -114,6 +110,8 @@ protected:
     size_t current_size = 0;
     const size_t max_size;
     const size_t max_elements_size;
+
+    WeightFunction weight_function;
 
     void removeOverflow() {
         size_t queue_size = cells.size();

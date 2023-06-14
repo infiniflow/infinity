@@ -18,7 +18,7 @@ namespace infinity {
 /// (default policy evicts entries which are not used for a long time).
 /// Cache starts to evict entries when their total weight exceeds max_size.
 /// Value weight should not change after insertion.
-template <typename TKey, typename TMapped, typename HashFunction = std::hash<TKey>>
+template <typename TKey, typename TMapped, typename HashFunction = std::hash<TKey>, typename WeightFunction = TrivialWeightFunction<TMapped>>
 class CacheBase {
 public:
     using Key = TKey;
@@ -31,10 +31,10 @@ public:
         }
 
         if (cache_policy_name == "LRU") {
-            using LRUPolicy = LRUCachePolicy<TKey, TMapped, HashFunction>;
+            using LRUPolicy = LRUCachePolicy<TKey, TMapped, HashFunction, WeightFunction>;
             cache_policy = std::make_unique<LRUPolicy>(max_size, max_elements_size);
         } else {
-            throw std::exception("Undeclared cache policy name: " + cache_policy_name);
+            throw std::runtime_error("Undeclared cache policy name: " + cache_policy_name);
         }
     }
 
@@ -51,7 +51,7 @@ public:
 
     void Set(const Key & key, const MappedPtr & mapped) {
         std::lock_guard lock(mutex);
-        cache_policy->set(key, mapped);
+        cache_policy->Set(key, mapped);
     }
 
     /// If the value for the key is in the cache, returns it. If it is not, calls load_func() to
@@ -120,7 +120,7 @@ public:
         cache_policy->Reset();
     }
 
-    void remove(const Key & key) {
+    void Remove(const Key & key) {
         std::lock_guard lock(mutex);
         cache_policy->Remove(key);
     }
@@ -140,7 +140,7 @@ protected:
     mutable std::mutex mutex;
 
 private:
-    using CachePolicy = ICachePolicy<TKey, TMapped, HashFunction>;
+    using CachePolicy = ICachePolicy<TKey, TMapped, HashFunction, WeightFunction>;
 
     std::unique_ptr<CachePolicy> cache_policy;
 

@@ -1,20 +1,25 @@
 #pragma once
 
 #include "common/utility/cache_base.h"
+#include "tx.h"
+#include "codec.h"
 
 #include <leveldb/db.h>
 #include <leveldb/cache.h>
 #include <leveldb/write_batch.h>
 #include <leveldb/filter_policy.h>
-#include <roaring/roaring.h>
+#include <roaring/roaring.hh>
 
 #include <map>
 #include <string>
 #include <vector>
+#include <memory>
 #include <sstream>
 #include <iostream>
 
 namespace infinity {
+
+using Roaring = roaring::Roaring;
 
 class Status {
     enum Code {
@@ -85,22 +90,38 @@ public:
     }
 };
 
+struct RoaringWeightFunction{
+    size_t operator()(const Roaring & r) const {
+        return r.getSizeInBytes();
+    }
+};
 
-class PostingCache : public CacheBase<String, roaring_bitmap_t>{};
-
-class IndexKV {
+class PostingCache 
+: public CacheBase<String, Roaring, std::hash<String>, RoaringWeightFunction>{
 public:
-    IndexKV(const std::string& path):db_(NULL),path_(path) {
-    }
+    PostingCache(size_t max_size):CacheBase(max_size){}
+};
 
-    ~IndexKV() {
-        delete db_;
-    }
+class IndexDB {
+public:
+    IndexDB(const std::string& path);
+
+    ~IndexDB();
 
     Status Open();
+
+    Status Get(const std::string& key, std::shared_ptr<Roaring>& result);
+
+    Status Put(const std::string& key, std::shared_ptr<Roaring>& result);
+
+    Tx* Begin();
+
 private:
     leveldb::DB* db_;
     std::string path_;
+    std::unique_ptr<PostingCache> cache_;
+    Codec codec_;
     leveldb::WriteBatch batch_;
 };
+
 }
