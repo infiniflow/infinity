@@ -42,8 +42,36 @@ NewCatalog::CreateDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin
 }
 
 DBEntry*
-NewCatalog::DropDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts) {
-    return nullptr;
+NewCatalog::DropDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts) {
+    rw_lock_.lock_shared();
+
+    DBMeta* db_meta{nullptr};
+    if(databases_.find(db_name) != databases_.end()) {
+        db_meta = databases_[db_name].get();
+    }
+    rw_lock_.unlock_shared();
+    if(db_meta == nullptr) {
+        LOG_TRACE("Attempt to drop not existed database entry");
+        return nullptr;
+    }
+
+    LOG_TRACE("Drop a database entry");
+    DBEntry* res = db_meta->DeleteNewEntry(txn_id, begin_ts);
+
+    return res;
+}
+
+DBEntry*
+NewCatalog::GetDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts) {
+    rw_lock_.lock_shared();
+
+    DBMeta* db_meta{nullptr};
+    if(databases_.find(db_name) != databases_.end()) {
+        db_meta = databases_[db_name].get();
+    }
+    rw_lock_.unlock_shared();
+
+    return db_meta->GetEntry(txn_id, begin_ts);
 }
 
 

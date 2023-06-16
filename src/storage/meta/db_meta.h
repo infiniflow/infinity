@@ -19,6 +19,12 @@ public:
     DBEntry*
     CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts);
 
+    DBEntry*
+    DeleteNewEntry(u64 txn_id, TxnTimeStamp begin_ts);
+
+    DBEntry*
+    GetEntry(u64 txn_id, TxnTimeStamp begin_ts);
+
 private:
     RWMutex rw_locker_{};
     String db_name_{};

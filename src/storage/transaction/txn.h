@@ -40,6 +40,9 @@ public:
     DBEntry*
     DropDatabase(const String& db_name);
 
+    DBEntry*
+    GetDatabase(const String& db_name);
+
     inline u64
     TxnID() const {
         return txn_id_;

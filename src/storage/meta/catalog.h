@@ -25,11 +25,11 @@ public:
     DBEntry*
     DropDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts);
 
+    DBEntry*
+    GetDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts);
+
     Vector<DBEntry*>
     Databases(Txn* txn);
-
-    DBEntry*
-    GetDatabase(const String& name, Txn* txn);
 
 private:
     UniquePtr<String> dir_{nullptr};

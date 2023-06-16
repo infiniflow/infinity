@@ -33,14 +33,22 @@ TEST_F(TransactionTest, test1) {
     NewCatalog new_catalog(std::move(dir), nullptr);
     TxnManager txn_mgr(&new_catalog);
     Txn* new_txn = txn_mgr.CreateTxn();
-    DBEntry* res = nullptr;
-    EXPECT_ANY_THROW(res = new_txn->CreateDatabase("db1"));
-    EXPECT_EQ(res, nullptr);
+    DBEntry* db_entry = nullptr;
+    db_entry = new_txn->CreateDatabase("db1");
+    EXPECT_EQ(db_entry, nullptr);
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
-    res = new_txn->CreateDatabase("db1");
+    db_entry = new_txn->CreateDatabase("db1");
+    DBEntry* same_db_entry = new_txn->GetDatabase("db1");
+    EXPECT_EQ(db_entry, same_db_entry);
     new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
-    EXPECT_NE(res, nullptr);
-    EXPECT_EQ(res->Committed(), true);
+    EXPECT_NE(db_entry, nullptr);
+    EXPECT_EQ(db_entry->Committed(), true);
+
+    new_txn = txn_mgr.CreateTxn();
+    new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    same_db_entry = new_txn->GetDatabase("db1");
+    EXPECT_EQ(db_entry, same_db_entry);
+    new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 }
 
 TEST_F(TransactionTest, test2) {

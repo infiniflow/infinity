@@ -59,4 +59,85 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
     return res;
 }
 
+DBEntry*
+DBMeta::DeleteNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
+    DBEntry* res = nullptr;
+    std::unique_lock<RWMutex> rw_locker(rw_locker_);
+    if(entry_list_.empty()) {
+        LOG_ERROR("Empty db entry list.")
+        return nullptr;
+    }
+
+    BaseEntry* header_base_entry = entry_list_.front().get();
+    if(header_base_entry->entry_type_ != EntryType::kDatabase) {
+//            rw_locker_.unlock();
+        LOG_ERROR("No valid db entry.")
+        return nullptr;
+    }
+
+    DBEntry* header_db_entry = (DBEntry*)header_base_entry;
+    if(header_db_entry->commit_ts_ < UNCOMMIT_TS) {
+        // Committed
+        if(begin_ts > header_db_entry->commit_ts_) {
+            // No conflict
+            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts);
+            res = db_entry.get();
+            res->deleted_ = true;
+            entry_list_.emplace_front(std::move(db_entry));
+
+            return res;
+        } else {
+            // Write-Write conflict
+            LOG_ERROR("Write-write conflict: There is a committed database which is later than current transaction.")
+            return nullptr;
+        }
+    } else {
+        // Uncommitted, check if the same txn
+        if(txn_id == header_db_entry->txn_id_) {
+            // Same txn, remove the header db entry
+            res = header_db_entry;
+            entry_list_.erase(entry_list_.begin());
+
+            return res;
+        } else {
+            // Not same txn, issue WW conflict
+            LOG_ERROR("Write-write conflict: There is another uncommitted db entry.")
+            return nullptr;
+        }
+    }
+}
+
+DBEntry*
+DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
+//    DBEntry* res = nullptr;
+    std::shared_lock<RWMutex> r_locker(rw_locker_);
+    if(entry_list_.empty()) {
+        LOG_ERROR("Empty db entry list.")
+        return nullptr;
+    }
+
+
+    for(const auto& db_entry: entry_list_) {
+        if(db_entry->entry_type_ != EntryType::kDatabase) {
+            LOG_ERROR("No valid db entry.")
+            return nullptr;
+        }
+
+        if(db_entry->commit_ts_ < UNCOMMIT_TS) {
+            // committed
+            if(begin_ts > db_entry->commit_ts_) {
+                return (DBEntry*)(db_entry.get());
+            }
+        } else {
+            // not committed
+            if(txn_id == db_entry->txn_id_) {
+                // same txn
+                return (DBEntry*)(db_entry.get());
+            }
+        }
+    }
+    LOG_ERROR("No db entry found.")
+    return nullptr;
+}
+
 }

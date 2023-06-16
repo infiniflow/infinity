@@ -15,7 +15,6 @@ Txn::CreateDatabase(const String& db_name) {
     }
     DBEntry* new_db_entry = catalog_->CreateDatabase(db_name, this->txn_id_, this->begin_ts_);
     if(new_db_entry == nullptr) {
-        AbortTxn();
         return nullptr;
     }
     txn_dbs_.insert(new_db_entry);
@@ -28,13 +27,23 @@ Txn::DropDatabase(const String& db_name) {
         LOG_TRACE("Transaction isn't started.")
         return nullptr;
     }
-    DBEntry* drop_db_entry = catalog_->DropDatabase(db_name, this->txn_id_, this->begin_ts_);
-    if(drop_db_entry == nullptr) {
-        AbortTxn();
-        return nullptr;
+
+    DBEntry* dropped_db_entry = catalog_->DropDatabase(db_name, this->txn_id_, this->begin_ts_);
+
+    if(txn_dbs_.contains(dropped_db_entry)) {
+        txn_dbs_.emplace(dropped_db_entry);
     }
 
-    return nullptr;
+    return dropped_db_entry;
+}
+
+DBEntry*
+Txn::GetDatabase(const String& db_name) {
+    if(begin_ts_ == 0) {
+        LOG_TRACE("Transaction isn't started.")
+        return nullptr;
+    }
+    return catalog_->GetDatabase(db_name, this->txn_id_, this->begin_ts_);
 }
 
 void
