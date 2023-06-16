@@ -22,9 +22,19 @@ struct BaseEntry {
     virtual
     ~BaseEntry() = default;
 
+    inline void
+    Commit(TxnTimeStamp commit_ts) {
+        commit_ts_.store(commit_ts);
+    }
+
+    [[nodiscard]] inline bool
+    Committed() const {
+        return commit_ts_ != UNCOMMIT_TS;
+    }
+
     std::atomic_uint64_t txn_id_{0};
     TxnTimeStamp begin_ts_{0};
-    TxnTimeStamp commit_ts_{UNCOMMIT_TS};
+    std::atomic<TxnTimeStamp> commit_ts_{UNCOMMIT_TS};
 
     bool deleted_{false};
 

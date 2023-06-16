@@ -3,6 +3,7 @@
 //
 
 #include "db_meta.h"
+#include "main/logger.h"
 
 namespace infinity {
 
@@ -19,16 +20,18 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
 
         // Insert the new db entry
         UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts);
-        entry_list_.emplace_back(std::move(db_entry));
-
         res = db_entry.get();
+        entry_list_.emplace_front(std::move(db_entry));
+
 //        rw_locker_.unlock();
+        LOG_TRACE("New database entry is added.");
     } else {
         // Already have a db_entry, check if the db_entry is valid here.
         BaseEntry* header_base_entry = entry_list_.front().get();
         if(header_base_entry->entry_type_ != EntryType::kDatabase) {
 //            rw_locker_.unlock();
-            StorageError("Invalid entry type of meta data")
+            LOG_ERROR("Invalid entry type of meta data")
+            return nullptr;
         }
 
         DBEntry* header_db_entry = (DBEntry*)header_base_entry;
@@ -37,17 +40,19 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
             if(begin_ts > header_db_entry->commit_ts_) {
                 // No conflict
                 UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts);
-                entry_list_.emplace_back(std::move(db_entry));
                 res = db_entry.get();
+                entry_list_.emplace_front(std::move(db_entry));
             } else {
                 // Write-Write conflict
-                StorageError("Write-write conflict: There is a committed database which is later than current transaction.")
+                LOG_ERROR("Write-write conflict: There is a committed database which is later than current transaction.")
+                return nullptr;
             }
         } else {
             // TODO: To battle which txn can survive.
 //            rw_locker_.unlock();
             // Uncommitted, Write-Write conflict
-            StorageError("Write-write conflict: There is a uncommitted database.")
+            LOG_ERROR("Write-write conflict: There is a uncommitted database.")
+            return nullptr;
         }
     }
 

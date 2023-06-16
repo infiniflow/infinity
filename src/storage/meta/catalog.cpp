@@ -17,7 +17,7 @@ NewCatalog::CreateDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin
     rw_lock_.lock_shared();
 
     DBMeta* db_meta{nullptr};
-    if(databases_.find(db_name) == databases_.end()) {
+    if(databases_.find(db_name) != databases_.end()) {
         db_meta = databases_[db_name].get();
     }
     rw_lock_.unlock_shared();

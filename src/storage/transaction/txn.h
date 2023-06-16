@@ -22,26 +22,23 @@ public:
         begin_ts_ = begin_ts;
     }
 
-    inline void
-    CommitTxn() {
-        // Generate a checkpoint.
-    }
+    void
+    CommitTxn(TxnTimeStamp commit_ts);
 
     inline void
     AbortTxn() {
         // Abort a transaction.
+        aborted = true;
+
+        // For loop to remove the all prepared db
+
     }
 
     DBEntry*
-    CreateDatabase(const String& db_name) {
-        DBEntry* new_db_entry = catalog_->CreateDatabase(db_name, this->txn_id_, this->begin_ts_);
-        if(new_db_entry == nullptr) {
-            aborted = true;
-            return nullptr;
-        }
-        create_dbs_.emplace_back(new_db_entry);
-        return new_db_entry;
-    }
+    CreateDatabase(const String& db_name);
+
+    DBEntry*
+    DropDatabase(const String& db_name);
 
     inline u64
     TxnID() const {
@@ -57,7 +54,7 @@ private:
     std::atomic_bool aborted{false};
 
     // Txn store
-    Vector<DBEntry*> create_dbs_{};
+    Set<DBEntry*> txn_dbs_{};
 
     TxnManager* txn_mgr_{};
 };
