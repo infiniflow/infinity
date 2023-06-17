@@ -19,13 +19,13 @@ public:
     NewCatalog(UniquePtr<String> dir,
             UniquePtr<AsyncBatchProcessor> scheduler);
 
-    DBEntry*
+    EntryResult
     CreateDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts);
 
-    DBEntry*
+    EntryResult
     DropDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts);
 
-    DBEntry*
+    EntryResult
     GetDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts);
 
     Vector<DBEntry*>

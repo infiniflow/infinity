@@ -41,4 +41,9 @@ struct BaseEntry {
     EntryType entry_type_{EntryType::kInvalid};
 };
 
+struct EntryResult {
+    BaseEntry* entry_;
+    UniquePtr<String> err_;
+};
+
 }

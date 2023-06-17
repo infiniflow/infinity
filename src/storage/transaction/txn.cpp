@@ -7,41 +7,53 @@
 
 namespace infinity {
 
-DBEntry*
+EntryResult
 Txn::CreateDatabase(const String& db_name) {
     if(begin_ts_ == 0) {
         LOG_TRACE("Transaction isn't started.")
-        return nullptr;
+        return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
-    DBEntry* new_db_entry = catalog_->CreateDatabase(db_name, this->txn_id_, this->begin_ts_);
-    if(new_db_entry == nullptr) {
-        return nullptr;
+    EntryResult res = catalog_->CreateDatabase(db_name, this->txn_id_, this->begin_ts_);
+    if(res.entry_ == nullptr) {
+        return res;
     }
-    txn_dbs_.insert(new_db_entry);
-    return new_db_entry;
+
+    if(res.entry_->entry_type_ != EntryType::kDatabase) {
+        return {nullptr, MakeUnique<String>("Invalid database type")};
+    }
+
+    auto* db_entry = static_cast<DBEntry*>(res.entry_);
+    txn_dbs_.insert(db_entry);
+    return res;
 }
 
-DBEntry*
+EntryResult
 Txn::DropDatabase(const String& db_name) {
     if(begin_ts_ == 0) {
         LOG_TRACE("Transaction isn't started.")
-        return nullptr;
+        return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
 
-    DBEntry* dropped_db_entry = catalog_->DropDatabase(db_name, this->txn_id_, this->begin_ts_);
+    EntryResult res = catalog_->DropDatabase(db_name, this->txn_id_, this->begin_ts_);
+
+    if(res.entry_ == nullptr) {
+        return res;
+    }
+
+    DBEntry* dropped_db_entry = static_cast<DBEntry*>(res.entry_);
 
     if(txn_dbs_.contains(dropped_db_entry)) {
         txn_dbs_.emplace(dropped_db_entry);
     }
 
-    return dropped_db_entry;
+    return res;
 }
 
-DBEntry*
+EntryResult
 Txn::GetDatabase(const String& db_name) {
     if(begin_ts_ == 0) {
         LOG_TRACE("Transaction isn't started.")
-        return nullptr;
+        return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
     return catalog_->GetDatabase(db_name, this->txn_id_, this->begin_ts_);
 }

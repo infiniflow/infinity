@@ -16,13 +16,13 @@ public:
     explicit
     DBMeta(String name) : db_name_(std::move(name)) {}
 
-    DBEntry*
+    EntryResult
     CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts);
 
-    DBEntry*
+    EntryResult
     DeleteNewEntry(u64 txn_id, TxnTimeStamp begin_ts);
 
-    DBEntry*
+    EntryResult
     GetEntry(u64 txn_id, TxnTimeStamp begin_ts);
 
 private:

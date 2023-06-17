@@ -34,13 +34,13 @@ public:
 
     }
 
-    DBEntry*
+    EntryResult
     CreateDatabase(const String& db_name);
 
-    DBEntry*
+    EntryResult
     DropDatabase(const String& db_name);
 
-    DBEntry*
+    EntryResult
     GetDatabase(const String& db_name);
 
     inline u64

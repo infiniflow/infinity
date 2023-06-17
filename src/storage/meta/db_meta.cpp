@@ -7,7 +7,7 @@
 
 namespace infinity {
 
-DBEntry*
+EntryResult
 DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
     DBEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(rw_locker_);
@@ -30,8 +30,8 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
         BaseEntry* header_base_entry = entry_list_.front().get();
         if(header_base_entry->entry_type_ != EntryType::kDatabase) {
 //            rw_locker_.unlock();
-            LOG_ERROR("Invalid entry type of meta data")
-            return nullptr;
+            LOG_TRACE("Invalid entry type of meta data")
+            return {nullptr, MakeUnique<String>("Invalid entry type of meta data")};
         }
 
         DBEntry* header_db_entry = (DBEntry*)header_base_entry;
@@ -44,35 +44,35 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
                 entry_list_.emplace_front(std::move(db_entry));
             } else {
                 // Write-Write conflict
-                LOG_ERROR("Write-write conflict: There is a committed database which is later than current transaction.")
-                return nullptr;
+                LOG_TRACE("Write-write conflict: There is a committed database which is later than current transaction.")
+                return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
             }
         } else {
             // TODO: To battle which txn can survive.
 //            rw_locker_.unlock();
             // Uncommitted, Write-Write conflict
-            LOG_ERROR("Write-write conflict: There is a uncommitted database.")
-            return nullptr;
+            LOG_TRACE("Write-write conflict: There is a uncommitted database.")
+            return {nullptr, MakeUnique<String>("Write-write conflict: There is a uncommitted database.")};
         }
     }
 
-    return res;
+    return {res, nullptr};
 }
 
-DBEntry*
+EntryResult
 DBMeta::DeleteNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
     DBEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(rw_locker_);
     if(entry_list_.empty()) {
-        LOG_ERROR("Empty db entry list.")
-        return nullptr;
+        LOG_TRACE("Empty db entry list.")
+        return {nullptr, MakeUnique<String>("Empty db entry list.")};
     }
 
     BaseEntry* header_base_entry = entry_list_.front().get();
     if(header_base_entry->entry_type_ != EntryType::kDatabase) {
 //            rw_locker_.unlock();
-        LOG_ERROR("No valid db entry.")
-        return nullptr;
+        LOG_TRACE("No valid db entry.")
+        return {nullptr, MakeUnique<String>("No valid db entry.")};
     }
 
     DBEntry* header_db_entry = (DBEntry*)header_base_entry;
@@ -85,11 +85,11 @@ DBMeta::DeleteNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
             res->deleted_ = true;
             entry_list_.emplace_front(std::move(db_entry));
 
-            return res;
+            return {res, nullptr};
         } else {
             // Write-Write conflict
-            LOG_ERROR("Write-write conflict: There is a committed database which is later than current transaction.")
-            return nullptr;
+            LOG_TRACE("Write-write conflict: There is a committed database which is later than current transaction.");
+            return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
         }
     } else {
         // Uncommitted, check if the same txn
@@ -98,46 +98,46 @@ DBMeta::DeleteNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
             res = header_db_entry;
             entry_list_.erase(entry_list_.begin());
 
-            return res;
+            return {res, nullptr};
         } else {
             // Not same txn, issue WW conflict
-            LOG_ERROR("Write-write conflict: There is another uncommitted db entry.")
-            return nullptr;
+            LOG_TRACE("Write-write conflict: There is another uncommitted db entry.")
+            return {nullptr, MakeUnique<String>("Write-write conflict: There is another uncommitted db entry.")};
         }
     }
 }
 
-DBEntry*
+EntryResult
 DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
 //    DBEntry* res = nullptr;
     std::shared_lock<RWMutex> r_locker(rw_locker_);
     if(entry_list_.empty()) {
-        LOG_ERROR("Empty db entry list.")
-        return nullptr;
+        LOG_TRACE("Empty db entry list.")
+        return {nullptr, MakeUnique<String>("Empty db entry list.")};
     }
 
 
     for(const auto& db_entry: entry_list_) {
         if(db_entry->entry_type_ != EntryType::kDatabase) {
-            LOG_ERROR("No valid db entry.")
-            return nullptr;
+            LOG_TRACE("No valid db entry.")
+            return {nullptr, MakeUnique<String>("No valid db entry.")};
         }
 
         if(db_entry->commit_ts_ < UNCOMMIT_TS) {
             // committed
             if(begin_ts > db_entry->commit_ts_) {
-                return (DBEntry*)(db_entry.get());
+                return {db_entry.get(), nullptr};
             }
         } else {
             // not committed
             if(txn_id == db_entry->txn_id_) {
                 // same txn
-                return (DBEntry*)(db_entry.get());
+                return {db_entry.get(), nullptr};
             }
         }
     }
-    LOG_ERROR("No db entry found.")
-    return nullptr;
+    LOG_TRACE("No db entry found.")
+    return {nullptr, MakeUnique<String>("No db entry found.")};
 }
 
 }

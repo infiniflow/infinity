@@ -11,7 +11,7 @@ NewCatalog::NewCatalog(UniquePtr<String> dir, UniquePtr<AsyncBatchProcessor> sch
     : dir_(std::move(dir)), scheduler_(std::move(scheduler)) {
 }
 
-DBEntry*
+EntryResult
 NewCatalog::CreateDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts) {
     // Check if there is db_meta with the db_name
     rw_lock_.lock_shared();
@@ -36,12 +36,12 @@ NewCatalog::CreateDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin
     }
 
     LOG_TRACE("Add new database entry");
-    DBEntry* res = db_meta->CreateNewEntry(txn_id, begin_ts);
+    EntryResult res = db_meta->CreateNewEntry(txn_id, begin_ts);
 
     return res;
 }
 
-DBEntry*
+EntryResult
 NewCatalog::DropDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts) {
     rw_lock_.lock_shared();
 
@@ -52,16 +52,16 @@ NewCatalog::DropDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_t
     rw_lock_.unlock_shared();
     if(db_meta == nullptr) {
         LOG_TRACE("Attempt to drop not existed database entry");
-        return nullptr;
+        return {nullptr, MakeUnique<String>("Attempt to drop not existed database entry")};
     }
 
     LOG_TRACE("Drop a database entry");
-    DBEntry* res = db_meta->DeleteNewEntry(txn_id, begin_ts);
+    EntryResult res = db_meta->DeleteNewEntry(txn_id, begin_ts);
 
     return res;
 }
 
-DBEntry*
+EntryResult
 NewCatalog::GetDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts) {
     rw_lock_.lock_shared();
 
