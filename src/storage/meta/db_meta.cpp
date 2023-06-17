@@ -25,13 +25,15 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
 
 //        rw_locker_.unlock();
         LOG_TRACE("New database entry is added.");
+        return {res, nullptr};
     } else {
         // Already have a db_entry, check if the db_entry is valid here.
         BaseEntry* header_base_entry = entry_list_.front().get();
         if(header_base_entry->entry_type_ != EntryType::kDatabase) {
-//            rw_locker_.unlock();
-            LOG_TRACE("Invalid entry type of meta data")
-            return {nullptr, MakeUnique<String>("Invalid entry type of meta data")};
+            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts);
+            res = db_entry.get();
+            entry_list_.emplace_front(std::move(db_entry));
+            return {res, nullptr};
         }
 
         DBEntry* header_db_entry = (DBEntry*)header_base_entry;
@@ -42,6 +44,7 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
                 UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts);
                 res = db_entry.get();
                 entry_list_.emplace_front(std::move(db_entry));
+                return {res, nullptr};
             } else {
                 // Write-Write conflict
                 LOG_TRACE("Write-write conflict: There is a committed database which is later than current transaction.")
@@ -55,8 +58,6 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
             return {nullptr, MakeUnique<String>("Write-write conflict: There is a uncommitted database.")};
         }
     }
-
-    return {res, nullptr};
 }
 
 EntryResult
@@ -80,6 +81,11 @@ DBMeta::DeleteNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
         // Committed
         if(begin_ts > header_db_entry->commit_ts_) {
             // No conflict
+            if(header_db_entry->deleted_) {
+                LOG_TRACE("DB is dropped before.")
+                return {nullptr, MakeUnique<String>("DB is dropped before.")};
+            }
+
             UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts);
             res = db_entry.get();
             res->deleted_ = true;
@@ -126,7 +132,12 @@ DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
         if(db_entry->commit_ts_ < UNCOMMIT_TS) {
             // committed
             if(begin_ts > db_entry->commit_ts_) {
-                return {db_entry.get(), nullptr};
+                if(db_entry->deleted_) {
+                    LOG_TRACE("DB is dropped.")
+                    return {nullptr, MakeUnique<String>("DB is dropped.")};
+                } else {
+                    return {db_entry.get(), nullptr};
+                }
             }
         } else {
             // not committed

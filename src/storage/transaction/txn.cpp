@@ -44,6 +44,8 @@ Txn::DropDatabase(const String& db_name) {
 
     if(txn_dbs_.contains(dropped_db_entry)) {
         txn_dbs_.emplace(dropped_db_entry);
+    } else {
+        txn_dbs_.insert(dropped_db_entry);
     }
 
     return res;
