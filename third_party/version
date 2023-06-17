@@ -8,5 +8,5 @@ spdlog v1.10.0
 simdjson v3.1.8
 tlsf v3.1.0
 leveldb commit-id:068d5ee1a3ac40dabd00d211d5013af44be55bea
-
+fastpfor commit-id:773283d4a11fa2440a1b3b28fd77f775e86d7898
 

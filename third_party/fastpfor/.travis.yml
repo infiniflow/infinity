@@ -1,0 +1,6 @@
+language: cpp
+sudo: false
+compiler:
+  - clang
+
+script: cmake . && make && ./unit

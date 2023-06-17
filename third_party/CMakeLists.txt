@@ -38,3 +38,6 @@ add_subdirectory(concurrentqueue)
 
 # Build leveldb
 add_subdirectory(leveldb)
+
+# Build fastpfor
+add_subdirectory(fastpfor)
