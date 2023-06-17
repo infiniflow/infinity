@@ -17,22 +17,14 @@ public:
     explicit
     Txn(TxnManager* txn_mgr, NewCatalog* catalog, u32 txn_id) : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id) {}
 
-    inline void
-    BeginTxn(TxnTimeStamp begin_ts) {
-        begin_ts_ = begin_ts;
-    }
+    void
+    BeginTxn(TxnTimeStamp begin_ts);
 
     void
     CommitTxn(TxnTimeStamp commit_ts);
 
-    inline void
-    AbortTxn() {
-        // Abort a transaction.
-        aborted = true;
-
-        // For loop to remove the all prepared db
-
-    }
+    void
+    RollbackTxn(TxnTimeStamp abort_ts);
 
     EntryResult
     CreateDatabase(const String& db_name);
@@ -54,7 +46,10 @@ private:
     TxnTimeStamp commit_ts_{};
 
     u64 txn_id_{};
-    std::atomic_bool aborted{false};
+    std::atomic<TxnState> state_{TxnState::kNotStarted};
+
+    // Related database
+    Set<String> db_names_{};
 
     // Txn store
     Set<DBEntry*> txn_dbs_{};

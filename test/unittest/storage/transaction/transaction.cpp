@@ -112,3 +112,68 @@ TEST_F(TransactionTest, test2) {
     new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 }
 
+TEST_F(TransactionTest, test3) {
+    using namespace infinity;
+    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog);
+    Txn *new_txn1 = txn_mgr.CreateTxn();
+    Txn *new_txn2 = txn_mgr.CreateTxn();
+
+    EntryResult create1_res, create2_res, dropped_res, get_res;
+    new_txn1->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    new_txn2->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    create1_res = new_txn1->CreateDatabase("db1");
+    EXPECT_EQ(create1_res.entry_->Committed(), false);
+    EXPECT_NE(create1_res.entry_, nullptr);
+
+    create2_res = new_txn2->CreateDatabase("db1");
+    EXPECT_EQ(create2_res.entry_, nullptr);
+
+    new_txn1->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    new_txn2->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+}
+
+TEST_F(TransactionTest, test4) {
+    using namespace infinity;
+    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog);
+    Txn *new_txn1 = txn_mgr.CreateTxn();
+    Txn *new_txn2 = txn_mgr.CreateTxn();
+
+    EntryResult create1_res, create2_res, dropped_res, get_res;
+    new_txn2->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    new_txn1->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    create1_res = new_txn1->CreateDatabase("db1");
+    EXPECT_EQ(create1_res.entry_->Committed(), false);
+    EXPECT_NE(create1_res.entry_, nullptr);
+    new_txn1->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+
+    create2_res = new_txn2->CreateDatabase("db1");
+    EXPECT_EQ(create2_res.entry_, nullptr);
+
+    new_txn2->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+}
+
+TEST_F(TransactionTest, test5) {
+    using namespace infinity;
+    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog);
+    Txn* new_txn = txn_mgr.CreateTxn();
+    // Create db before txn start
+    EntryResult create_res, get_res;
+
+    // Start txn, create db, then get the db
+    new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    create_res = new_txn->CreateDatabase("db1");
+    new_txn->RollbackTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+
+    // New txn, get the db, after creation
+    new_txn = txn_mgr.CreateTxn();
+    new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    get_res = new_txn->GetDatabase("db1");
+    EXPECT_EQ(get_res.entry_, nullptr);
+    new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+}

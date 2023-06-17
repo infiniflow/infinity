@@ -20,7 +20,10 @@ public:
     CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts);
 
     EntryResult
-    DeleteNewEntry(u64 txn_id, TxnTimeStamp begin_ts);
+    DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts);
+
+    void
+    DeleteNewEntry(u64 txn_id);
 
     EntryResult
     GetEntry(u64 txn_id, TxnTimeStamp begin_ts);

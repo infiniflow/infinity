@@ -61,7 +61,7 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
 }
 
 EntryResult
-DBMeta::DeleteNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
+DBMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
     DBEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(rw_locker_);
     if(entry_list_.empty()) {
@@ -111,6 +111,21 @@ DBMeta::DeleteNewEntry(u64 txn_id, TxnTimeStamp begin_ts) {
             return {nullptr, MakeUnique<String>("Write-write conflict: There is another uncommitted db entry.")};
         }
     }
+}
+
+void
+DBMeta::DeleteNewEntry(u64 txn_id) {
+    std::unique_lock<RWMutex> rw_locker(rw_locker_);
+    if(entry_list_.empty()) {
+        LOG_TRACE("Empty db entry list.")
+        return ;
+    }
+
+    auto removed_iter = std::remove_if(entry_list_.begin(), entry_list_.end(), [&](UniquePtr<BaseEntry>& entry)->bool {
+        return entry->txn_id_ == txn_id;
+    });
+
+    entry_list_.erase(removed_iter, entry_list_.end());
 }
 
 EntryResult

@@ -28,6 +28,12 @@ public:
     EntryResult
     GetDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts);
 
+    void
+    RemoveDBEntry(const String& db_name, u64 txn_id);
+
+    void
+    RemoveTableEntry(const String& db_name, u64 txn_id);
+
     Vector<DBEntry*>
     Databases(Txn* txn);
 

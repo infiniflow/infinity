@@ -24,6 +24,7 @@ Txn::CreateDatabase(const String& db_name) {
 
     auto* db_entry = static_cast<DBEntry*>(res.entry_);
     txn_dbs_.insert(db_entry);
+    db_names_.insert(db_name);
     return res;
 }
 
@@ -43,9 +44,15 @@ Txn::DropDatabase(const String& db_name) {
     DBEntry* dropped_db_entry = static_cast<DBEntry*>(res.entry_);
 
     if(txn_dbs_.contains(dropped_db_entry)) {
-        txn_dbs_.emplace(dropped_db_entry);
+        txn_dbs_.erase(dropped_db_entry);
     } else {
         txn_dbs_.insert(dropped_db_entry);
+    }
+
+    if(db_names_.contains(db_name)) {
+        db_names_.erase(db_name);
+    } else {
+        db_names_.insert(db_name);
     }
 
     return res;
@@ -61,12 +68,43 @@ Txn::GetDatabase(const String& db_name) {
 }
 
 void
-Txn::CommitTxn(TxnTimeStamp commit_ts) {
-    // Generate a checkpoint.
-    commit_ts_ = commit_ts;
+Txn::BeginTxn(TxnTimeStamp begin_ts) {
+    TxnState expected_state = TxnState::kNotStarted;
+    if(state_.compare_exchange_strong(expected_state, TxnState::kStarted)) {
+        begin_ts_ = begin_ts;
+    } else {
+        StorageError("Transaction isn't in NOT_STARTED status.")
+    }
+}
 
-    for(auto* db_entry: txn_dbs_) {
-        db_entry->Commit(commit_ts);
+void
+Txn::CommitTxn(TxnTimeStamp commit_ts) {
+    TxnState expected_state = TxnState::kStarted;
+    if(state_.compare_exchange_strong(expected_state, TxnState::kCommitting)) {
+        commit_ts_ = commit_ts;
+        for(auto* db_entry: txn_dbs_) {
+            db_entry->Commit(commit_ts);
+        }
+
+        state_ = TxnState::kCommitted;
+    } else {
+        StorageError("Transaction isn't in STARTED state.")
+    }
+}
+
+void
+Txn::RollbackTxn(TxnTimeStamp abort_ts) {
+    TxnState expected_state = TxnState::kStarted;
+    if(state_.compare_exchange_strong(expected_state, TxnState::kRollbacking)) {
+        commit_ts_ = abort_ts;
+
+        for(const auto& db_name: db_names_) {
+            catalog_->RemoveDBEntry(db_name, this->txn_id_);
+        }
+
+        state_ = TxnState::kRollbacked;
+    } else {
+        StorageError("Transaction isn't in STARTED state.")
     }
 }
 

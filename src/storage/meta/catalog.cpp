@@ -56,7 +56,7 @@ NewCatalog::DropDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_t
     }
 
     LOG_TRACE("Drop a database entry");
-    EntryResult res = db_meta->DeleteNewEntry(txn_id, begin_ts);
+    EntryResult res = db_meta->DropNewEntry(txn_id, begin_ts);
 
     return res;
 }
@@ -74,7 +74,17 @@ NewCatalog::GetDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts
     return db_meta->GetEntry(txn_id, begin_ts);
 }
 
+void
+NewCatalog::RemoveDBEntry(const String& db_name, u64 txn_id) {
+    rw_lock_.lock_shared();
 
+    DBMeta* db_meta{nullptr};
+    if(databases_.find(db_name) != databases_.end()) {
+        db_meta = databases_[db_name].get();
+    }
+    rw_lock_.unlock_shared();
+
+    db_meta->DeleteNewEntry(txn_id);
 }
 
-
+}
