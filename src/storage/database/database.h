@@ -5,7 +5,7 @@
 #pragma once
 
 #include "common/types/internal_types.h"
-#include "storage/file/file_system.h"
+#include "storage/io/file_system.h"
 
 namespace infinity {
 class Database {

@@ -5,7 +5,7 @@
 #include "database.h"
 #include "database_helper.h"
 #include "common/utility/infinity_assert.h"
-#include "storage/file/local_file_system.h"
+#include "storage/io/local_file_system.h"
 
 #include <unistd.h>
 

@@ -25,6 +25,24 @@ public:
     UniquePtr<FileHandler> file_handler_{};
 
 public:
+    void 
+    WriteByte(const u8 b);
+
+    void 
+    WriteShort(const i16 i);
+
+    void
+    WriteInt(const i32 i);
+
+    void
+    WriteVInt(const i32 i);
+
+    void
+    WriteLong(const i64 i);
+
+    void
+    WriteVLong(const i64 i);
+
     void
     Write(const char_t* buffer, SizeT bytes_count);
 

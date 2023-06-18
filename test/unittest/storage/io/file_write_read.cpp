@@ -4,10 +4,10 @@
 
 #include <gtest/gtest.h>
 #include "base_test.h"
-#include "storage/file/file_system.h"
-#include "storage/file/local_file_system.h"
-#include "storage/file/file_reader.h"
-#include "storage/file/file_writer.h"
+#include "storage/io/file_system.h"
+#include "storage/io/local_file_system.h"
+#include "storage/io/file_reader.h"
+#include "storage/io/file_writer.h"
 
 #include "main/profiler/base_profiler.h"
 #include "main/logger.h"
