@@ -8,6 +8,7 @@
 
 #include "common/types/internal_types.h"
 #include "storage/meta/entry/db_entry.h"
+#include "storage/transaction/txn_context.h"
 
 namespace infinity {
 
@@ -17,13 +18,13 @@ public:
     DBMeta(String name) : db_name_(std::move(name)) {}
 
     EntryResult
-    CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts);
+    CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
 
     EntryResult
-    DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts);
+    DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
 
     void
-    DeleteNewEntry(u64 txn_id);
+    DeleteNewEntry(u64 txn_id, TxnContext* txn_context);
 
     EntryResult
     GetEntry(u64 txn_id, TxnTimeStamp begin_ts);

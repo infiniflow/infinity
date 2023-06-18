@@ -14,8 +14,8 @@ namespace infinity {
 class DBEntry : public BaseEntry {
 public:
     explicit
-    DBEntry(String db_name, u64 txn_id, TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kDatabase), db_name_(std::move(db_name)) {
+    DBEntry(String db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context)
+        : BaseEntry(EntryType::kDatabase, txn_context), db_name_(std::move(db_name)) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }

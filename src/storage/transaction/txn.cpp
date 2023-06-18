@@ -4,16 +4,31 @@
 
 #include "txn.h"
 #include "main/logger.h"
+#include "common/utility/infinity_assert.h"
+#include "common/utility/defer_op.h"
 
 namespace infinity {
 
 EntryResult
 Txn::CreateDatabase(const String& db_name) {
-    if(begin_ts_ == 0) {
+
+    TxnTimeStamp begin_ts;
+    TxnState txn_state;
+    {
+        txn_context_.RLock();
+        DeferFn defer_fn([&]() {
+            txn_context_.RUnLock();
+        });
+        begin_ts = txn_context_.begin_ts_;
+        txn_state = txn_context_.state_;
+    }
+
+    if(txn_state != TxnState::kStarted) {
         LOG_TRACE("Transaction isn't started.")
         return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
-    EntryResult res = catalog_->CreateDatabase(db_name, this->txn_id_, this->begin_ts_);
+
+    EntryResult res = catalog_->CreateDatabase(db_name, this->txn_id_, begin_ts, &txn_context_);
     if(res.entry_ == nullptr) {
         return res;
     }
@@ -30,12 +45,24 @@ Txn::CreateDatabase(const String& db_name) {
 
 EntryResult
 Txn::DropDatabase(const String& db_name) {
-    if(begin_ts_ == 0) {
+
+    TxnTimeStamp begin_ts;
+    TxnState txn_state;
+    {
+        txn_context_.RLock();
+        DeferFn defer_fn([&]() {
+            txn_context_.RUnLock();
+        });
+        begin_ts = txn_context_.begin_ts_;
+        txn_state = txn_context_.state_;
+    }
+
+    if(txn_state != TxnState::kStarted) {
         LOG_TRACE("Transaction isn't started.")
         return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
 
-    EntryResult res = catalog_->DropDatabase(db_name, this->txn_id_, this->begin_ts_);
+    EntryResult res = catalog_->DropDatabase(db_name, txn_id_, begin_ts, &txn_context_);
 
     if(res.entry_ == nullptr) {
         return res;
@@ -60,51 +87,98 @@ Txn::DropDatabase(const String& db_name) {
 
 EntryResult
 Txn::GetDatabase(const String& db_name) {
-    if(begin_ts_ == 0) {
-        LOG_TRACE("Transaction isn't started.")
-        return {nullptr, MakeUnique<String>("Transaction isn't started.")};
+    TxnTimeStamp begin_ts;
+    TxnState txn_state;
+    {
+        txn_context_.RLock();
+        DeferFn defer_fn([&]() {
+            txn_context_.RUnLock();
+        });
+        begin_ts = txn_context_.begin_ts_;
+        txn_state = txn_context_.state_;
     }
-    return catalog_->GetDatabase(db_name, this->txn_id_, this->begin_ts_);
+
+    if(txn_state != TxnState::kStarted) {
+        StorageError("Transaction isn't in STARTED status.")
+    }
+
+    return catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
 }
 
 void
 Txn::BeginTxn(TxnTimeStamp begin_ts) {
-    TxnState expected_state = TxnState::kNotStarted;
-    if(state_.compare_exchange_strong(expected_state, TxnState::kStarted)) {
-        begin_ts_ = begin_ts;
-    } else {
+    txn_context_.Lock();
+    DeferFn defer_fn([&]() {
+        txn_context_.UnLock();
+    });
+
+    if(txn_context_.state_ != TxnState::kNotStarted) {
         StorageError("Transaction isn't in NOT_STARTED status.")
     }
+    txn_context_.begin_ts_ = begin_ts;
+    txn_context_.state_ = TxnState::kStarted;
 }
 
 void
 Txn::CommitTxn(TxnTimeStamp commit_ts) {
-    TxnState expected_state = TxnState::kStarted;
-    if(state_.compare_exchange_strong(expected_state, TxnState::kCommitting)) {
-        commit_ts_ = commit_ts;
-        for(auto* db_entry: txn_dbs_) {
-            db_entry->Commit(commit_ts);
+    {
+        txn_context_.Lock();
+        DeferFn defer_fn([&]() {
+            txn_context_.UnLock();
+        });
+        if(txn_context_.state_ != TxnState::kStarted) {
+            StorageError("Transaction isn't in STARTED status.")
         }
+        txn_context_.state_ = TxnState::kCommitting;
+    }
 
-        state_ = TxnState::kCommitted;
-    } else {
-        StorageError("Transaction isn't in STARTED state.")
+    for(auto* db_entry: txn_dbs_) {
+        db_entry->Commit(commit_ts);
+    }
+
+    {
+        txn_context_.Lock();
+        DeferFn defer_fn([&]() {
+            txn_context_.UnLock();
+        });
+        if(txn_context_.state_ != TxnState::kCommitting) {
+            StorageError("Transaction isn't in COMMITTING status.")
+        }
+        txn_context_.state_ = TxnState::kCommitted;
     }
 }
 
 void
 Txn::RollbackTxn(TxnTimeStamp abort_ts) {
-    TxnState expected_state = TxnState::kStarted;
-    if(state_.compare_exchange_strong(expected_state, TxnState::kRollbacking)) {
-        commit_ts_ = abort_ts;
 
-        for(const auto& db_name: db_names_) {
-            catalog_->RemoveDBEntry(db_name, this->txn_id_);
+    {
+        txn_context_.Lock();
+        DeferFn defer_fn([&]() {
+            txn_context_.UnLock();
+        });
+        if(txn_context_.state_ == TxnState::kStarted) {
+            txn_context_.state_ = TxnState::kRollbacking;
+        } else if(txn_context_.state_ == TxnState::kRollbacking) {
+            ;
+        } else {
+            StorageError("Transaction isn't in STARTED or ROLLBACKING status.")
         }
+    }
 
-        state_ = TxnState::kRollbacked;
-    } else {
-        StorageError("Transaction isn't in STARTED state.")
+
+    for(const auto& db_name: db_names_) {
+        catalog_->RemoveDBEntry(db_name, this->txn_id_, &txn_context_);
+    }
+
+    {
+        txn_context_.Lock();
+        DeferFn defer_fn([&]() {
+            txn_context_.UnLock();
+        });
+        if(txn_context_.state_ != TxnState::kRollbacking) {
+            StorageError("Transaction isn't in ROLLBACKING status.")
+        }
+        txn_context_.state_ = TxnState::kRollbacked;
     }
 }
 

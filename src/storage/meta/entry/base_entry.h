@@ -6,6 +6,7 @@
 
 #include "common/types/internal_types.h"
 #include "storage/transaction/constants.h"
+#include "storage/transaction/txn_context.h"
 
 namespace infinity {
 
@@ -17,7 +18,7 @@ enum class EntryType {
 
 struct BaseEntry {
     explicit
-    BaseEntry(EntryType entry_type) : entry_type_(entry_type) {}
+    BaseEntry(EntryType entry_type, TxnContext* txn_context) : entry_type_(entry_type), txn_context_(txn_context) {}
 
     virtual
     ~BaseEntry() = default;
@@ -32,6 +33,7 @@ struct BaseEntry {
         return commit_ts_ != UNCOMMIT_TS;
     }
 
+    TxnContext *txn_context_;
     std::atomic_uint64_t txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     std::atomic<TxnTimeStamp> commit_ts_{UNCOMMIT_TS};

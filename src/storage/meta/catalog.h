@@ -9,6 +9,7 @@
 #include "storage/common/async_batch_processor.h"
 #include "storage/meta/entry/db_entry.h"
 #include "db_meta.h"
+#include "storage/transaction/txn_context.h"
 //#include "storage/transaction/txn.h"
 
 namespace infinity {
@@ -20,19 +21,19 @@ public:
             UniquePtr<AsyncBatchProcessor> scheduler);
 
     EntryResult
-    CreateDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts);
+    CreateDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
 
     EntryResult
-    DropDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts);
+    DropDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
 
     EntryResult
     GetDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts);
 
     void
-    RemoveDBEntry(const String& db_name, u64 txn_id);
+    RemoveDBEntry(const String& db_name, u64 txn_id, TxnContext* txn_context);
 
     void
-    RemoveTableEntry(const String& db_name, u64 txn_id);
+    RemoveTableEntry(const String& db_name, u64 txn_id, TxnContext* txn_context);
 
     Vector<DBEntry*>
     Databases(Txn* txn);

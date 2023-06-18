@@ -12,7 +12,7 @@ NewCatalog::NewCatalog(UniquePtr<String> dir, UniquePtr<AsyncBatchProcessor> sch
 }
 
 EntryResult
-NewCatalog::CreateDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts) {
+NewCatalog::CreateDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context) {
     // Check if there is db_meta with the db_name
     rw_lock_.lock_shared();
 
@@ -36,13 +36,13 @@ NewCatalog::CreateDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin
     }
 
     LOG_TRACE("Add new database entry");
-    EntryResult res = db_meta->CreateNewEntry(txn_id, begin_ts);
+    EntryResult res = db_meta->CreateNewEntry(txn_id, begin_ts, txn_context);
 
     return res;
 }
 
 EntryResult
-NewCatalog::DropDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts) {
+NewCatalog::DropDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context) {
     rw_lock_.lock_shared();
 
     DBMeta* db_meta{nullptr};
@@ -56,7 +56,7 @@ NewCatalog::DropDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_t
     }
 
     LOG_TRACE("Drop a database entry");
-    EntryResult res = db_meta->DropNewEntry(txn_id, begin_ts);
+    EntryResult res = db_meta->DropNewEntry(txn_id, begin_ts, txn_context);
 
     return res;
 }
@@ -75,7 +75,7 @@ NewCatalog::GetDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts
 }
 
 void
-NewCatalog::RemoveDBEntry(const String& db_name, u64 txn_id) {
+NewCatalog::RemoveDBEntry(const String& db_name, u64 txn_id, TxnContext* txn_context) {
     rw_lock_.lock_shared();
 
     DBMeta* db_meta{nullptr};
@@ -84,7 +84,7 @@ NewCatalog::RemoveDBEntry(const String& db_name, u64 txn_id) {
     }
     rw_lock_.unlock_shared();
 
-    db_meta->DeleteNewEntry(txn_id);
+    db_meta->DeleteNewEntry(txn_id, txn_context);
 }
 
 }

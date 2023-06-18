@@ -8,6 +8,7 @@
 #include "storage/meta/entry/db_entry.h"
 #include "storage/meta/catalog.h"
 #include "txn_manager.h"
+#include "txn_context.h"
 
 namespace infinity {
 
@@ -42,11 +43,8 @@ public:
 
 private:
     NewCatalog* catalog_{};
-    TxnTimeStamp begin_ts_{};
-    TxnTimeStamp commit_ts_{};
-
     u64 txn_id_{};
-    std::atomic<TxnState> state_{TxnState::kNotStarted};
+    TxnContext txn_context_;
 
     // Related database
     Set<String> db_names_{};
