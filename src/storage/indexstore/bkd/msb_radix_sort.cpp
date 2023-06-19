@@ -1,4 +1,5 @@
 #include "msb_radix_sort.h"
+#include "bkd_writer.h"
 #include "common/utility/infinity_assert.h"
 
 #include <utility>
@@ -7,8 +8,120 @@
 
 namespace infinity {
 
-MSBRadixSorter::MSBRadixSorter(int max_length)
-    : common_prefix_(std::vector<int>(std::min(24, max_length))), max_length_(max_length) {
+MSBRadixSorter::MSBRadixSorter(
+    BKDWriter* writer,
+    PointWriter* point_writer,
+    int dim,
+    int max_length)
+    :writer_(writer),
+     point_writer_(point_writer),
+     common_prefix_(std::vector<int>(std::min(24, max_length))),
+     dim_(dim),
+     max_length_(max_length) {
+    pivot_ = std::make_shared<BytesRefBuilder>();
+}
+
+int MSBRadixSorter::ByteAt(int i, int k) {
+    assert(k >= 0);
+    if (k < writer_->bytes_per_dim_) {
+        // dim bytes
+        int block = i / point_writer_->values_per_block_;
+        int index = i % point_writer_->values_per_block_;
+        return point_writer_->blocks_[block][index * writer_->packed_bytes_length_ +
+                                             dim_ * writer_->bytes_per_dim_ + k] & 0xff;
+    } else {
+        // doc id
+        int s = 3 - (k - writer_->bytes_per_dim_);
+        return (static_cast<int>(static_cast<unsigned int>(point_writer_->doc_IDs_[i]) >>
+                                 (s * 8))) & 0xff;
+    }
+    if (k < writer_->bytes_per_dim_) {
+        int32_t block = i / point_writer_->values_per_block_;
+        int32_t index = i % point_writer_->values_per_block_;
+        return point_writer_->blocks_[block][index * writer_->packed_bytes_length_ + dim_ * writer_->bytes_per_dim_ + k] & 0xff;
+    } else {
+        int32_t s = 3 - (k - writer_->bytes_per_dim_);
+        return (static_cast<int>(static_cast<unsigned int>(point_writer_->doc_IDs_[i]) >> (s * 8))) & 0xff;
+    }
+}
+
+void MSBRadixSorter::Swap(int i, int j) {
+    int32_t doc_id = point_writer_->doc_IDs_[i];
+    point_writer_->doc_IDs_[i] = point_writer_->doc_IDs_[j];
+    point_writer_->doc_IDs_[j] = doc_id;
+
+    if (!writer_->single_value_per_doc_) {
+        if (writer_->long_ords_) {
+            int64_t ord = point_writer_->ords_long_[j];
+            point_writer_->ords_long_[i] = point_writer_->ords_long_[j];
+            point_writer_->ords_long_[j] = ord;
+        } else {
+            int32_t ord = point_writer_->ords_[i];
+            point_writer_->ords_[i] = point_writer_->ords_[j];
+            point_writer_->ords_[j] = ord;
+        }
+    }
+
+    int indexI = (i % point_writer_->values_per_block_) * writer_->packed_bytes_length_;
+    int indexJ = (j % point_writer_->values_per_block_) * writer_->packed_bytes_length_;
+
+    if (writer_->packed_bytes_length_ == 4) {
+        auto *value1 = reinterpret_cast<uint32_t*>(point_writer_->blocks_[i / point_writer_->values_per_block_].data() + indexI);
+        auto *value2 = reinterpret_cast<uint32_t*>(point_writer_->blocks_[j / point_writer_->values_per_block_].data() + indexJ);
+        uint32_t tmp = *value1;
+        *value1 = *value2;
+        *value2 = tmp;
+    }  else {
+        auto& blockI = point_writer_->blocks_[i / point_writer_->values_per_block_];
+        auto& blockJ = point_writer_->blocks_[j / point_writer_->values_per_block_];
+        std::copy(blockI.begin() + indexI,
+                  blockI.begin() + indexI + writer_->packed_bytes_length_,
+                  writer_->scratch1_.begin());
+        std::copy(blockJ.begin() + indexJ,
+                  blockJ.begin() + indexJ + writer_->packed_bytes_length_,
+                  blockI.begin() + indexI);
+        std::copy(writer_->scratch1_.begin(),
+                  writer_->scratch1_.begin() + writer_->packed_bytes_length_,
+                  blockJ.begin() + indexJ);
+    }
+}
+
+int MSBRadixSorter::Compare(int i, int j) {
+    for (int o = k_; o < max_length_; ++o) {
+        int b1 = ByteAt(i, o);
+        int b2 = ByteAt(j, o);
+        if (b1 != b2) {
+            return b1 - b2;
+        } else if (b1 == -1) {
+            break;
+        }
+    }
+    return 0;
+}
+
+void MSBRadixSorter::SetPivot(int i) {
+    pivot_->SetLength(0);
+    for (int o = k_; o < max_length_; ++o) {
+        int b = ByteAt(i, o);
+        if (b == -1) {
+            break;
+        }
+        pivot_->Append(static_cast<char>(b));
+    }
+}
+
+int MSBRadixSorter::ComparePivot(int j) {
+    for (int o = 0; o < pivot_->Length(); ++o) {
+        int b1 = pivot_->ByteAt(o) & 0xff;
+        int b2 = ByteAt(j, k_ + o);
+        if (b1 != b2) {
+            return b1 - b2;
+        }
+    }
+    if (k_ + pivot_->Length() == max_length_) {
+        return 0;
+    }
+    return -1 - ByteAt(j, k_ + pivot_->Length());
 }
 
 void MSBRadixSorter::Sort(int from, int to) {
@@ -18,11 +131,52 @@ void MSBRadixSorter::Sort(int from, int to) {
 
 void MSBRadixSorter::Sort(int from, int to, int k, int l) {
     if (to - from <= LENGTH_THRESHOLD || l >= LEVEL_THRESHOLD) {
+        k_ = k;
+        QuickSort(from, to, k);
     } else {
         RadixSort(from, to, k, l);
     }
 }
 
+void MSBRadixSorter::QuickSort(int from, int to, int max_depth) {
+    --max_depth;
+    int mid = static_cast<int>(static_cast<unsigned int>((from + to)) >> 1);
+
+    if (Compare(from, mid) > 0) {
+        Swap(from, mid);
+    }
+
+    if (Compare(mid, to - 1) > 0) {
+        Swap(mid, to - 1);
+        if (Compare(from, mid) > 0) {
+            Swap(from, mid);
+        }
+    }
+
+    int left = from + 1;
+    int right = to - 2;
+
+    SetPivot(mid);
+    for (;;) {
+        while (ComparePivot(right) < 0) {
+            --right;
+        }
+
+        while (left < right && ComparePivot(left) >= 0) {
+            ++left;
+        }
+
+        if (left < right) {
+            Swap(left, right);
+            --right;
+        } else {
+            break;
+        }
+    }
+
+    QuickSort(from, left + 1, max_depth);
+    QuickSort(left + 1, to, max_depth);
+}
 
 void MSBRadixSorter::RadixSort(int from, int to, int k, int l) {
     std::vector<int> histogram = histograms_[l];
@@ -149,7 +303,7 @@ void MSBRadixSorter::Reorder(int from, int to, std::vector<int> &start,
         for (int h1 = start[i]; h1 < limit; h1 = start[i]) {
             const int b = GetBucket(from + h1, k);
             const int h2 = start[b]++;
-            swap(from + h1, from + h2);
+            Swap(from + h1, from + h2);
         }
     }
 }

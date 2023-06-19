@@ -1,10 +1,15 @@
 #pragma once
 
-#include <vector>
+#include "bytesref.h"
 
+#include <vector>
+#include <memory>
 
 namespace infinity {
-//MSB Radix sort from lucene
+class BKDWriter;
+class PointWriter;
+
+//MSB Radix sort from lucene 7.5
 class MSBRadixSorter {
     // after that many levels of recursion we fall back to quicksort anyway
     // this is used as a protection against the fact that radix sort performs
@@ -17,25 +22,48 @@ private:
     // buckets below this size will be sorted with quicksort
     static constexpr int LENGTH_THRESHOLD = 100;
 
+    BKDWriter * writer_;
+
+    PointWriter * point_writer_;
+
     // store one histogram per recursion level
     std::vector<std::vector<int>> histograms_ =
                                    std::vector<std::vector<int>>(LEVEL_THRESHOLD);
     std::vector<int> end_offsets_ = std::vector<int>(HISTOGRAM_SIZE);
+
     std::vector<int> common_prefix_;
 
     const int max_length_;
 
-protected:
-    explicit MSBRadixSorter(int maxLength);
+    const int dim_;
 
-    virtual int ByteAt(int i, int k) = 0;
-    virtual void swap(int i, int j) = 0;
+    int k_ = 0;
+
+    std::shared_ptr<BytesRefBuilder> pivot_;
+public:
+    explicit MSBRadixSorter(
+        BKDWriter* writer,
+        PointWriter* point_writer,
+        int dim,
+        int max_length);
+
 public:
     void Sort(int from, int to);
 
 private:
+    int ByteAt(int i, int k);
+
+    void Swap(int i, int j);
+
     void Sort(int from, int to, int k, int l);
 
+    int Compare(int i, int j);
+
+    void SetPivot(int i);
+
+    int ComparePivot(int j);
+
+    void QuickSort(int from, int to, int max_depth);
 
     void RadixSort(int from, int to, int k, int l);
 

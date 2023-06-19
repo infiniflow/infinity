@@ -1,11 +1,14 @@
 #pragma once
 
+#include "bit_set.h"
+
 #include <memory>
 #include <vector>
 
 namespace infinity {
+class PointWriter;
 typedef std::vector<std::vector<uint8_t>> ByteArrayList;
-//BKD Tree from Lucene
+//BKD Tree from Lucene 7.5
 class PointReader {
 public:
     PointReader(ByteArrayList *blocks,
@@ -26,6 +29,7 @@ public:
     }
 
     const std::vector<uint8_t> &PackedValue();
+
     uint8_t* PackedValueRaw();
 
     int32_t Docid() {
@@ -41,6 +45,15 @@ public:
             return ords_[cur_read_];
         }
     }
+
+    void MarkOrds(int64_t count, const std::shared_ptr<BitSet> &ord_bitset);
+
+    int64_t Split(
+        int64_t count,
+        const std::shared_ptr<BitSet> &right_tree,
+        const std::shared_ptr<PointWriter> &left,
+        const std::shared_ptr<PointWriter> &right,
+        bool do_clear_bits);
 
 public:
     bool single_value_per_doc_;

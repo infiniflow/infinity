@@ -1,16 +1,16 @@
 #pragma once
 
 #include "point_reader.h"
+#include "bytesref.h"
 
 #include <memory>
 #include <cstdint>
 #include <vector>
-#include <cstdint>
 #include <algorithm>
 #include <cassert>
 
 namespace infinity {
-//BKD Tree from Lucene
+//BKD Tree from Lucene 7.5
 class PointWriter {
 public:
     std::vector<int32_t> doc_IDs_;
@@ -24,7 +24,7 @@ public:
     const int32_t values_per_block_;
     const bool single_value_per_doc_;
     ByteArrayList blocks_;
-public:  
+public:
     PointWriter(
         int32_t init_size,
         int32_t max_size,
@@ -35,6 +35,8 @@ public:
     ~PointWriter();
 
     void ReadPackedValue(int32_t index, std::vector<uint8_t> &bytes);
+
+    void GetPackedValueSlice(int32_t index, BytesRef& result);
 
     void WritePackedValue(int32_t index, std::shared_ptr<std::vector<uint8_t>> &bytes) {
         WritePackedValue(index, *bytes);
@@ -61,9 +63,5 @@ public:
     void Destroy();
 
     std::string ToString();
-private:
-    int Mismatch(std::vector<uint8_t> &a, int aFromIndex, int aToIndex,
-                 std::vector<uint8_t> &b, int bFromIndex, int bToIndex);
-
 };
 }

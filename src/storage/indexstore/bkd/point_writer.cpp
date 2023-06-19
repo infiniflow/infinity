@@ -1,5 +1,5 @@
 #include "point_writer.h"
-#include "common/utility/infinity_assert.h"
+#include "bkd_util.h"
 
 #include <cstring>
 
@@ -27,23 +27,6 @@ PointWriter::PointWriter(
     }
 }
 
-int PointWriter::Mismatch(std::vector<uint8_t> &a, int aFromIndex, int aToIndex,
-                          std::vector<uint8_t> &b, int bFromIndex, int bToIndex) {
-    StorageAssert(aFromIndex > aToIndex, "index bound error");
-    StorageAssert(aFromIndex < 0 || aToIndex > a.size(), "index bound error");
-    StorageAssert(bFromIndex > bToIndex, "index bound error");
-    StorageAssert(bFromIndex < 0 || bToIndex > b.size(), "index bound error");
-    int aLen = aToIndex - aFromIndex;
-    int bLen = bToIndex - bFromIndex;
-    int len = std::min(aLen, bLen);
-    for (int i = 0; i < len; i++) {
-        if (a[i + aFromIndex] != b[i + bFromIndex]) {
-            return i;
-        }
-    }
-    return aLen == bLen ? -1 : len;
-}
-
 std::vector<int> PointWriter::ComputeCardinality(int from, int to, int num_dims, int bytes_per_dim, std::vector<int32_t> &common_prefix_lengths) {
     std::vector<int> leafCardinality(1,1);
     for (int i = from + 1; i < to; i++) {
@@ -54,8 +37,8 @@ std::vector<int> PointWriter::ComputeCardinality(int from, int to, int num_dims,
             int32_t blockIndex1 = i % values_per_block_;
             int32_t block2 = (i - 1) / values_per_block_;
             int32_t blockIndex2 = (i - 1) % values_per_block_;
-            if (Mismatch(blocks_[block1], blockIndex1 * packed_bytes_length_ + start, blockIndex1 * packed_bytes_length_ + end,
-                         blocks_[block2], blockIndex2 * packed_bytes_length_ + start, blockIndex2 * packed_bytes_length_ + end) != -1) {
+            if (BKDUtil::Mismatch(blocks_[block1], blockIndex1 * packed_bytes_length_ + start, blockIndex1 * packed_bytes_length_ + end,
+                                  blocks_[block2], blockIndex2 * packed_bytes_length_ + start, blockIndex2 * packed_bytes_length_ + end) != -1) {
                 leafCardinality.push_back(1);
                 break;
             } else {
@@ -72,6 +55,14 @@ void PointWriter::ReadPackedValue(int32_t index, std::vector<uint8_t> &bytes) {
     int32_t blockIndex = index % values_per_block_;
     auto start = blocks_.at(block).begin() + blockIndex * packed_bytes_length_;
     std::copy(start, start + packed_bytes_length_, bytes.begin());
+}
+
+void PointWriter::GetPackedValueSlice(int32_t index, BytesRef& result) {
+    uint32_t block = index / values_per_block_;
+    int blockIndex = index % values_per_block_;
+    result.bytes_ = blocks_.at(block);
+    result.offset_ = blockIndex * packed_bytes_length_;
+    assert(result.length == static_cast<int32_t>(packed_bytes_length_));
 }
 
 void PointWriter::WritePackedValue(int32_t index, const uint8_t *bytes, uint32_t length) {
