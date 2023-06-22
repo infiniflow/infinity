@@ -62,7 +62,7 @@ void PointWriter::GetPackedValueSlice(int32_t index, BytesRef& result) {
     int blockIndex = index % values_per_block_;
     result.bytes_ = blocks_.at(block);
     result.offset_ = blockIndex * packed_bytes_length_;
-    assert(result.length == static_cast<int32_t>(packed_bytes_length_));
+    assert(result.length_ == static_cast<int32_t>(packed_bytes_length_));
 }
 
 void PointWriter::WritePackedValue(int32_t index, const uint8_t *bytes, uint32_t length) {
