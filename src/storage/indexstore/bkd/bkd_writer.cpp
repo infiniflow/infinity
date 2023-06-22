@@ -107,10 +107,6 @@ void BKDWriter::VerifyParams(
 }
 
 
-void BKDWriter::CheckMaxLeafNodeCount(int32_t num_leaves) const {
-    StorageAssert((1 + bytes_per_dim_) * (int64_t) num_leaves <= MAX_ARRAY_LENGTH, "too many nodes; increase max_points_in_leaf_node");
-}
-
 void BKDWriter::Add(
     const uint8_t *packed_value,
     uint32_t value_len,
@@ -206,7 +202,6 @@ int64_t BKDWriter::Finish(
         inner_node_count *= 2;
     }
     auto num_leaves = (int32_t) inner_node_count;
-    CheckMaxLeafNodeCount(num_leaves);
     // Indexed by node_id, but first (root) node_id is 1.  We do 1+ because the lead byte at each recursion says which dim we split on.
     std::vector<uint8_t> split_packed_values(num_leaves * (1 + bytes_per_dim_));
     std::vector<int64_t> leaf_block_fps(num_leaves);
@@ -717,6 +712,7 @@ void BKDWriter::SortPointWriter(
     sorter->Sort(0, point_count);
 }
 
+// Pull a partition back into heap once the point count is low enough while recursing.
 std::shared_ptr<BKDWriter::PathSlice> BKDWriter::SwitchToHeap(
     const std::shared_ptr<PathSlice> &source,
     const std::vector<std::shared_ptr<PointReader>> &to_close_heroically) {
@@ -733,7 +729,8 @@ std::shared_ptr<BKDWriter::PathSlice> BKDWriter::SwitchToHeap(
     return std::make_shared<PathSlice>(writer, 0, count);
 }
 
-
+// The array of PathSlice describe the cell we have currently recursed to
+// This method is used when we are merging previously written segments, in the num_dims > 1 case
 void BKDWriter::Build(
     int32_t nodeID,
     int32_t leaf_node_offset,
@@ -747,7 +744,10 @@ void BKDWriter::Build(
     std::vector<int64_t> &leaf_block_fps,
     const std::vector<std::shared_ptr<PointReader>> &to_close_heroically) {
     if (nodeID >= leaf_node_offset) {
-
+        // Leaf node: write block
+        // We can write the block in any order so by default we write it sorted by
+        // the dimension that has the least number of unique bytes at
+        // common_prefix_lengths[dim], which makes compression more efficient
         int32_t sorted_dim = 0;
         int32_t sorted_dim_cardinality = std::numeric_limits<int32_t>::max();
 
@@ -769,8 +769,11 @@ void BKDWriter::Build(
 
             std::shared_ptr<PointWriter> heap_source = std::dynamic_pointer_cast<PointWriter>(source->writer_);
 
+            // Find common prefix by comparing first and last values, already sorted
+            // in this dimension:
             heap_source->ReadPackedValue(source->start_, scratch1_);
             heap_source->ReadPackedValue(source->start_ + source->count_ - 1, scratch2_);
+
             int32_t offset = dim * bytes_per_dim_;
             common_prefix_lengths_[dim] = BKDUtil::Mismatch(scratch1_, offset, offset + bytes_per_dim_, scratch2_, offset, offset + bytes_per_dim_);
 
@@ -779,48 +782,16 @@ void BKDWriter::Build(
             sorted_dim = dim;
         }
 
-        std::shared_ptr<PathSlice> data_dim_path_slice = nullptr;
+        std::shared_ptr<PathSlice> source = slices[sorted_dim];
 
-        if (num_data_dims_ != num_index_dims_) {
-            std::shared_ptr<PointWriter> heap_source = std::dynamic_pointer_cast<PointWriter>(slices[0]->writer_);
-            auto from = (int32_t) slices[0]->start_;
-            int32_t to = from + (int32_t) slices[0]->count_;
-            std::fill(common_prefix_lengths_.begin() + num_index_dims_,
-                      common_prefix_lengths_.begin() + num_index_dims_ + num_data_dims_,
-                      bytes_per_dim_);
-            heap_source->ReadPackedValue(from, scratch1_);
-            for (int32_t i = from + 1; i < to; ++i) {
-                heap_source->ReadPackedValue(i, scratch2_);
-                for (int32_t dim = num_index_dims_; dim < num_data_dims_; dim++) {
-                    int32_t offset = dim * bytes_per_dim_;
-                    int32_t dimension_prefix_length = common_prefix_lengths_[dim];
-                    common_prefix_lengths_[dim] = BKDUtil::Mismatch(scratch1_, offset, offset + dimension_prefix_length,
-                                                  scratch2_, offset, offset + dimension_prefix_length);
-                    if (common_prefix_lengths_[dim] == -1) {
-                        common_prefix_lengths_[dim] = dimension_prefix_length;
-                    }
-                }
-            }
-            if (common_prefix_lengths_[sorted_dim] == bytes_per_dim_) {
-                for (int32_t dim = num_index_dims_; dim < num_data_dims_; ++dim) {
-                    if (common_prefix_lengths_[dim] != bytes_per_dim_) {
-                        sorted_dim = dim;
-                        data_dim_path_slice = SwitchToHeap(slices[0], to_close_heroically);
-                        std::shared_ptr<PointWriter> heap_writer = std::dynamic_pointer_cast<PointWriter>(data_dim_path_slice->writer_);
-                        SortPointWriter(heap_writer, (int32_t) data_dim_path_slice->count_, sorted_dim);
-                        break;
-                    }
-                }
-            }
-        }
-
-        std::shared_ptr<PathSlice> source = (data_dim_path_slice != nullptr) ? data_dim_path_slice : slices[sorted_dim];
-
+        // We ensured that max_points_sort_in_heap was >= max_points_in_leaf_node, so we
+        // better be in heap at this point:
         std::shared_ptr<PointWriter> heap_source = std::dynamic_pointer_cast<PointWriter>(source->writer_);
         auto from = (int32_t) slices[0]->start_;
         int32_t to = from + (int32_t) slices[0]->count_;
         auto leaf_cardinality = heap_source->ComputeCardinality(from, to, num_data_dims_, bytes_per_dim_, common_prefix_lengths_);
 
+        // Save the block file pointer:
         leaf_block_fps[nodeID - leaf_node_offset] = out->TotalWrittenBytes();
         int32_t count = source->count_;
         scratch_bytes_ref2.length_ = packed_bytes_length_;
@@ -839,12 +810,13 @@ void BKDWriter::Build(
         }
 
         WriteCommonPrefixes(out, common_prefix_lengths_, scratch1_);
-
+        // Write the full values:
         WriteLeafBlockPackedValues(out, common_prefix_lengths_, count, sorted_dim, packed_values, prefix_len_sum, low_cardinal);
     } else {
+        // Inner node: partition/recurse
         int32_t split_dim;
         if (num_index_dims_ > 1) {
-            //TODO
+            split_dim = Split(min_packed_value, max_packed_value, parent_splits);
         } else {
             split_dim = 0;
         }
@@ -858,6 +830,7 @@ void BKDWriter::Build(
 
         assert(nodeID < (int32_t) split_packed_values.size());
 
+        // How many points will be in the left tree:
         int64_t right_count = source->count_ / 2;
         int64_t left_count = source->count_ - right_count;
 
@@ -875,6 +848,8 @@ void BKDWriter::Build(
         split_packed_values[address] = (uint8_t) split_dim;
         std::copy(split_value, split_value + bytes_per_dim_, split_packed_values.begin() + address + 1);
 
+        // Partition all PathSlice that are not the split dim into sorted left and
+        // right sets, so we can recurse:
         std::vector<std::shared_ptr<PathSlice>> left_slices(num_index_dims_);
         std::vector<std::shared_ptr<PathSlice>> right_slices(num_index_dims_);
 
@@ -890,13 +865,17 @@ void BKDWriter::Build(
                 continue;
             }
             if (dim == split_dim) {
+                // No need to partition on this dim since it's a simple slice of the
+                // incoming already sorted slice, and we will re-use its shared reader
+                // when visiting it as we recurse:                
                 left_slices[dim] = std::make_shared<PathSlice>(source->writer_, source->start_, left_count);
                 right_slices[dim] = std::make_shared<PathSlice>(source->writer_, source->start_ + left_count, right_count);
                 std::copy(split_value, split_value + bytes_per_dim_, min_split_packed_value.begin() + dim * bytes_per_dim_);
                 std::copy(split_value, split_value + bytes_per_dim_, max_split_packed_value.begin() + dim * bytes_per_dim_);
                 continue;
             }
-
+            // Not inside the try because we don't want to close this one now, so that
+            // after recursion is done, we will have done a single full sweep of the file:
             std::shared_ptr<PointReader> reader = slices[dim]->writer_->GetPointReader(slices[dim]->start_, slices[dim]->count_, to_close_heroically);
             std::string desc = "left" + std::to_string(dim);
             std::shared_ptr<PointWriter> left_point_writer = GetPointWriter(left_count, desc);
@@ -915,6 +894,7 @@ void BKDWriter::Build(
         }
 
         parent_splits[split_dim]++;
+        // Recurse on left tree:
         Build(2 * nodeID, leaf_node_offset, left_slices,
               ord_bitset, out,
               min_packed_value, max_split_packed_value, parent_splits,
@@ -924,7 +904,7 @@ void BKDWriter::Build(
                 left_slices[dim]->writer_->Destroy();
             }
         }
-
+        // Recurse on right tree:
         Build(2 * nodeID + 1, leaf_node_offset, right_slices,
               ord_bitset, out,
               min_split_packed_value, max_packed_value, parent_splits,

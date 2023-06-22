@@ -33,18 +33,25 @@ public:
     static const int VERSION_SELECTIVE_INDEXING = 6;
     static const int VERSION_CURRENT = VERSION_SELECTIVE_INDEXING;
 
+    // How many bytes each docs takes in the fixed-width offline format
     int32_t bytes_per_doc_;
 
+    // How many dimensions we are storing at the leaf (data) nodes
     int32_t num_data_dims_;
 
+    // How many dimensions we are indexing in the internal nodes
     int32_t num_index_dims_;
 
+    // How many bytes each value in each dimension take
     int32_t bytes_per_dim_;
 
+    // num_data_dims_ * bytes_per_dim_
     int32_t packed_bytes_length_;
 
+    // num_index_dims_ * bytes_per_dim_
     int32_t packed_index_bytes_length_;
 
+    // not used, copied from lucene, which is useful when OfflinePointWriter is necessary
     double max_mb_sort_in_heap_;
 
     int32_t max_depth_;
@@ -52,16 +59,21 @@ public:
     int32_t max_points_in_leaf_node_;
 
     int32_t max_points_sort_in_heap_;
+
     // Minimum per-dim values, packed
     std::vector<uint8_t> min_packed_value_;
+
     // Maximum per-dim values, packed
     std::vector<uint8_t> max_packed_value_;
 
     int64_t point_count_ = 0;
+
     // true if we have so many values that we must write ords using long
     bool long_ords_;
+
     // An upper bound on how many points the caller will add (includes deletions)
     int64_t total_point_count_;
+
     // True if every document has at most one value.
     bool single_value_per_doc_;
 
@@ -81,6 +93,7 @@ public:
 
     std::shared_ptr<PointWriter> point_writer_;
 
+    // Sliced reference to points
     class PathSlice {
     public:
         PathSlice(
@@ -143,8 +156,6 @@ private:
         int32_t max_points_in_leaf_node,
         double max_points_sort_in_heap,
         int64_t total_point_count);
-
-    void CheckMaxLeafNodeCount(int32_t num_leaves) const;
 
     void WriteLeafBlockDocs(
         FileWriter *out,

@@ -10,9 +10,14 @@
 #include <cassert>
 
 namespace infinity {
-//BKD Tree from Lucene 7.5
+// BKD Tree from Lucene 7.x
+// We suppose within each segment, the points to be indexed could be
+// contained within heap memory, as a result, we only use single class
+// of PointWriter/PointReader, instead of HeapPointWriter/HeapPointReader
+// and OfflinePointWriter/OfflinePointReader in the Lucene implementation
 class PointWriter {
 public:
+    // 
     std::vector<int32_t> doc_IDs_;
     std::vector<int64_t> ords_long_;
     std::vector<int32_t> ords_;
@@ -56,7 +61,7 @@ public:
 
     std::shared_ptr<PointReader> GetPointReader(int64_t start, int64_t length);
 
-    std::shared_ptr<PointReader> GetPointReader(int64_t start, int64_t length, const std::vector<std::shared_ptr<PointReader>> &toCloseHeroically);
+    std::shared_ptr<PointReader> GetPointReader(int64_t start, int64_t length, const std::vector<std::shared_ptr<PointReader>> &to_close_heroically);
 
     void Close();
 

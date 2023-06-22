@@ -180,9 +180,10 @@ std::shared_ptr<PointReader> PointWriter::GetPointReader(int64_t start, int64_t 
 }
 
 std::shared_ptr<PointReader> PointWriter::GetPointReader(int64_t start, int64_t length,
-        const std::vector<std::shared_ptr<PointReader>> &toCloseHeroically) {
-    return std::make_shared<PointReader>(&blocks_, values_per_block_, packed_bytes_length_, ords_, ords_long_, &doc_IDs_,
-                                         (int32_t) start, next_write_, single_value_per_doc_);
+        const std::vector<std::shared_ptr<PointReader>> &to_close_heroically) {
+    return std::make_shared<PointReader>(&blocks_, values_per_block_, packed_bytes_length_, 
+                                        ords_, ords_long_, &doc_IDs_, (int32_t) start, 
+                                        next_write_, single_value_per_doc_);
 }
 
 void PointWriter::Close() {

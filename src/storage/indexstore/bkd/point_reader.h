@@ -8,7 +8,11 @@
 namespace infinity {
 class PointWriter;
 typedef std::vector<std::vector<uint8_t>> ByteArrayList;
-//BKD Tree from Lucene 7.5
+// BKD Tree from Lucene 7.x
+// We suppose within each segment, the points to be indexed could be
+// contained within heap memory, as a result, we only use single class
+// of PointWriter/PointReader, instead of HeapPointWriter/HeapPointReader
+// and OfflinePointWriter/OfflinePointReader in the Lucene implementation
 class PointReader {
 public:
     PointReader(ByteArrayList *blocks,
@@ -35,7 +39,7 @@ public:
     int32_t Docid() {
         return (*doc_ids_)[cur_read_];
     }
-
+    // Point ordinal
     int64_t Ord() {
         if (single_value_per_doc_) {
             return (*doc_ids_)[cur_read_];
@@ -48,6 +52,7 @@ public:
 
     void MarkOrds(int64_t count, const std::shared_ptr<BitSet> &ord_bitset);
 
+    // Splits this reader into left and right partitions
     int64_t Split(
         int64_t count,
         const std::shared_ptr<BitSet> &right_tree,

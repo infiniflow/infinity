@@ -24,11 +24,32 @@ public:
     UniquePtr<FileHandler> file_handler_{};
 
 public:
+    u8 
+    ReadByte();
+
+    i16 
+    ReadShort();
+
+    i32
+    ReadInt();
+
+    i32
+    ReadVInt();
+
+    i64
+    ReadLong();
+
+    i64
+    ReadVLong();
+
     void
     Read(char_t* buffer, SizeT read_size);
 
     bool
     Finished() const;
+
+    i64
+    GetFilePointer() const;
 };
 
 }
