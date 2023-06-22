@@ -71,6 +71,9 @@ public:
     virtual i64
     Write(FileHandler& file_handler, void* data, u64 nbytes) = 0;
 
+    virtual void
+    Seek(FileHandler& file_handler, i64 pos) = 0;
+
     virtual i64
     GetFileSize(FileHandler& file_handler) = 0;
 

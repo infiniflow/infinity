@@ -35,7 +35,7 @@ public:
 
     std::shared_ptr<std::vector<uint8_t>> packed_index_;
 
-    std::shared_ptr<FileReader> clone_index_input;
+    std::shared_ptr<FileReader> clone_index_input_;
 
     int32_t bytes_per_index_entry_{};
 

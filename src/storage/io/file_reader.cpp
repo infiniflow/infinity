@@ -13,8 +13,8 @@ FileReader::FileReader(FileSystem& fs, const String& path, SizeT buffer_size)
     path_(path),
     buffer_size_(buffer_size),
     data_(MakeUnique<char_t[]>(buffer_size)),
-    offset_(0),
-    total_read_(0) {
+    buffer_offset_(0),
+    buffer_start_(0) {
     file_handler_ = fs_.OpenFile(path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     file_size_ = fs_.GetFileSize(*file_handler_);
 }
@@ -22,14 +22,14 @@ FileReader::FileReader(FileSystem& fs, const String& path, SizeT buffer_size)
 
 u8 
 FileReader::ReadByte() {
-    if (offset_ >= buffer_size_) {
+    if (buffer_offset_ >= buffer_size_) {
         already_read_size_ = fs_.Read(*file_handler_, data_.get(), buffer_size_);
         if(already_read_size_ == 0)
             StorageError(fmt::format("No enough data from file: {}", file_handler_->path_.string()));
-        offset_ = 0;
-        total_read_ += already_read_size_;
+        buffer_offset_ = 0;
+        buffer_start_ += already_read_size_;
     }
-    return data_[offset_++];
+    return data_[buffer_offset_++];
 }
 
 i16
@@ -79,17 +79,17 @@ FileReader::Read(char_t* buffer, SizeT read_size) {
     char_t* start_pos = buffer;
     while(true) {
         i64 byte_count1 = end_pos - buffer;
-        i64 byte_count2 = already_read_size_ - offset_;
+        i64 byte_count2 = already_read_size_ - buffer_offset_;
         i64 to_read = std::min(byte_count1, byte_count2);
         if(to_read > 0) {
-            memcpy(buffer, data_.get() + offset_, to_read);
-            offset_ += to_read;
+            memcpy(buffer, data_.get() + buffer_offset_, to_read);
+            buffer_offset_ += to_read;
             start_pos += to_read;
         }
         if(start_pos < end_pos) {
-            StorageAssert(offset_ == already_read_size_, "Error file read size");
-            total_read_ += already_read_size_;
-            offset_ = 0;
+            StorageAssert(buffer_offset_ == already_read_size_, "Error file read size");
+            buffer_start_ += already_read_size_;
+            buffer_offset_ = 0;
             already_read_size_ = fs_.Read(*file_handler_, data_.get(), buffer_size_);
             if(already_read_size_ == 0) {
                 StorageError(fmt::format("No enough data from file: {}", file_handler_->path_.string()));
@@ -102,12 +102,24 @@ FileReader::Read(char_t* buffer, SizeT read_size) {
 
 bool
 FileReader::Finished() const {
-    return total_read_ + offset_ == file_size_;
+    return buffer_start_ + buffer_offset_ == file_size_;
 }
 
 i64
 FileReader::GetFilePointer() const {
-    return total_read_ + offset_;
+    return buffer_start_ + buffer_offset_;
+}
+
+void 
+FileReader::Seek(const i64 pos) {
+    if(pos >= buffer_start_ && pos < (buffer_start_ + buffer_size_)) {
+        buffer_offset_ = pos - buffer_start_;
+    } else {
+        buffer_start_ = pos;
+        buffer_offset_ = 0;
+        already_read_size_ = 0;
+        fs_.Seek(*file_handler_, pos);
+    }
 }
 
 }

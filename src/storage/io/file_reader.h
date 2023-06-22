@@ -16,9 +16,9 @@ public:
     FileSystem& fs_;
     String path_;
     UniquePtr<char_t[]> data_;
-    i64 offset_{};
+    i64 buffer_offset_{};
     i64 already_read_size_{};
-    SizeT total_read_{};
+    SizeT buffer_start_{};
     SizeT buffer_size_{};
     SizeT file_size_{};
     UniquePtr<FileHandler> file_handler_{};
@@ -50,6 +50,9 @@ public:
 
     i64
     GetFilePointer() const;
+
+    void 
+    Seek(const i64 pos);    
 };
 
 }

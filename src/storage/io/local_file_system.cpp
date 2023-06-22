@@ -92,6 +92,15 @@ LocalFileSystem::Write(FileHandler& file_handler, void* data, u64 nbytes) {
     return write_count;
 }
 
+void
+LocalFileSystem::Seek(FileHandler& file_handler, i64 pos) {
+    i32 fd = ((LocalFileHandler&)file_handler).fd_;
+    if (0 != lseek(fd, pos, SEEK_SET)) {
+        StorageError(fmt::format("Can't seek file: {}: {}: {}", file_handler.path_.string(), pos, strerror(errno)));
+    }
+}
+
+
 i64
 LocalFileSystem::GetFileSize(FileHandler& file_handler) {
     i32 fd = ((LocalFileHandler&)file_handler).fd_;

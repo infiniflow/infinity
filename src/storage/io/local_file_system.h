@@ -31,6 +31,9 @@ public:
     i64
     Write(FileHandler& file_handler, void* data, u64 nbytes) final;
 
+    void
+    Seek(FileHandler& file_handler, i64 pos) final;
+
     i64
     GetFileSize(FileHandler& file_handler) final;
 
