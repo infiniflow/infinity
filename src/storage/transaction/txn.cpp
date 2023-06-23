@@ -105,6 +105,97 @@ Txn::GetDatabase(const String& db_name) {
     return catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
 }
 
+
+EntryResult
+Txn::CreateTable(const String& db_name, UniquePtr<TableDesc> table_desc) {
+    TxnTimeStamp begin_ts;
+    TxnState txn_state;
+    {
+        txn_context_.RLock();
+        DeferFn defer_fn([&]() {
+            txn_context_.RUnLock();
+        });
+        begin_ts = txn_context_.begin_ts_;
+        txn_state = txn_context_.state_;
+    }
+
+    if(txn_state != TxnState::kStarted) {
+        StorageError("Transaction isn't in STARTED status.")
+    }
+
+    EntryResult db_entry_result =  catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
+
+    GetDatabase(db_name);
+    if(db_entry_result.entry_ == nullptr) {
+        // Error
+        return db_entry_result;
+    }
+
+    DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
+
+    return db_entry->CreateTable(std::move(table_desc), txn_id_, begin_ts, &txn_context_);
+}
+
+EntryResult
+Txn::DropTableByName(const String& db_name, const String& table_name) {
+    TxnTimeStamp begin_ts;
+    TxnState txn_state;
+    {
+        txn_context_.RLock();
+        DeferFn defer_fn([&]() {
+            txn_context_.RUnLock();
+        });
+        begin_ts = txn_context_.begin_ts_;
+        txn_state = txn_context_.state_;
+    }
+
+    if(txn_state != TxnState::kStarted) {
+        StorageError("Transaction isn't in STARTED status.")
+    }
+
+    EntryResult db_entry_result =  catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
+
+    GetDatabase(db_name);
+    if(db_entry_result.entry_ == nullptr) {
+        // Error
+        return db_entry_result;
+    }
+
+    DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
+
+    return db_entry->DropTable(table_name, txn_id_, begin_ts, &txn_context_);
+}
+
+EntryResult
+Txn::GetTableByName(const String& db_name, const String& table_name) {
+    TxnTimeStamp begin_ts;
+    TxnState txn_state;
+    {
+        txn_context_.RLock();
+        DeferFn defer_fn([&]() {
+            txn_context_.RUnLock();
+        });
+        begin_ts = txn_context_.begin_ts_;
+        txn_state = txn_context_.state_;
+    }
+
+    if(txn_state != TxnState::kStarted) {
+        StorageError("Transaction isn't in STARTED status.")
+    }
+
+    EntryResult db_entry_result =  catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
+
+    GetDatabase(db_name);
+    if(db_entry_result.entry_ == nullptr) {
+        // Error
+        return db_entry_result;
+    }
+
+    DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
+
+    return db_entry->GetTable(table_name, txn_id_, begin_ts);
+}
+
 void
 Txn::BeginTxn(TxnTimeStamp begin_ts) {
     txn_context_.Lock();

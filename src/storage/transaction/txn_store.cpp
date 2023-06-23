@@ -3,3 +3,13 @@
 //
 
 #include "txn_store.h"
+#include "common/utility/infinity_assert.h"
+
+namespace infinity {
+
+void
+TxnTableStore::Append(const SharedPtr<DataBlock> &input_block) {
+    NotImplementError("TxnTableStore::Append")
+}
+
+}

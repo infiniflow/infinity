@@ -11,7 +11,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-class TransactionTest : public BaseTest {
+class DBTxnTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
@@ -27,7 +27,7 @@ class TransactionTest : public BaseTest {
     }
 };
 
-TEST_F(TransactionTest, test1) {
+TEST_F(DBTxnTest, test1) {
     using namespace infinity;
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
     NewCatalog new_catalog(std::move(dir), nullptr);
@@ -95,7 +95,7 @@ TEST_F(TransactionTest, test1) {
     new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 }
 
-TEST_F(TransactionTest, test2) {
+TEST_F(DBTxnTest, test2) {
     using namespace infinity;
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
     NewCatalog new_catalog(std::move(dir), nullptr);
@@ -156,7 +156,7 @@ TEST_F(TransactionTest, test2) {
 //           |            |               |                   |                      |           |
 //       TXN1 Begin       |      TXN1 Create db1              |                  TXN1 Commit     |
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)            TXN2 Commit
-TEST_F(TransactionTest, test3) {
+TEST_F(DBTxnTest, test3) {
     using namespace infinity;
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
     NewCatalog new_catalog(std::move(dir), nullptr);
@@ -195,7 +195,7 @@ TEST_F(TransactionTest, test3) {
 //           |            |               |                   |                      |           |
 //       TXN2 Begin       |      TXN2 Create db1              |                      |      TXN2 Commit
 //                    TXN1 Begin                    TXN1 Create db1(WW-Conflict)  TXN1 Commit
-TEST_F(TransactionTest, test4) {
+TEST_F(DBTxnTest, test4) {
     using namespace infinity;
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
     NewCatalog new_catalog(std::move(dir), nullptr);
@@ -227,7 +227,7 @@ TEST_F(TransactionTest, test4) {
     new_txn2->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 }
 
-TEST_F(TransactionTest, test5) {
+TEST_F(DBTxnTest, test5) {
     using namespace infinity;
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
     NewCatalog new_catalog(std::move(dir), nullptr);
@@ -264,7 +264,7 @@ TEST_F(TransactionTest, test5) {
 //           |            |               |                   |                      |           |                |
 //       TXN1 Begin       |      TXN1 Create db1              |                  TXN1 Rollback   |                |
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
-TEST_F(TransactionTest, test6) {
+TEST_F(DBTxnTest, test6) {
     using namespace infinity;
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
     NewCatalog new_catalog(std::move(dir), nullptr);
@@ -320,7 +320,7 @@ TEST_F(TransactionTest, test6) {
 //           |            |               |                   |                      |           |       |         |
 //       TXN1 Begin       |      TXN1 Create db1              |                  TXN1 Drop db1   |   TXN1 Commit   |
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
-TEST_F(TransactionTest, test7) {
+TEST_F(DBTxnTest, test7) {
     using namespace infinity;
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
     NewCatalog new_catalog(std::move(dir), nullptr);

@@ -15,7 +15,7 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_contex
 //    rw_locker_.lock();
     if(entry_list_.empty()) {
         // Insert a dummy entry.
-        UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kInvalid, nullptr);
+        UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy, nullptr);
         dummy_entry->deleted_ = true;
         entry_list_.emplace_back(std::move(dummy_entry));
 
@@ -30,7 +30,7 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_contex
     } else {
         // Already have a db_entry, check if the db_entry is valid here.
         BaseEntry* header_base_entry = entry_list_.front().get();
-        if(header_base_entry->entry_type_ != EntryType::kDatabase) {
+        if(header_base_entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts, txn_context);
             res = db_entry.get();
             entry_list_.emplace_front(std::move(db_entry));
@@ -52,49 +52,25 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_contex
                 return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
             }
         } else {
-            // TODO: To battle which txn can survive.
-            {
-                header_db_entry->txn_context_->Lock();
-                DeferFn defer_fn([&]() {
-                    header_db_entry->txn_context_->UnLock();
-                });
+            header_db_entry->txn_context_->Lock();
+            DeferFn defer_fn([&]() {
+                header_db_entry->txn_context_->UnLock();
+            });
 
-                switch(header_db_entry->txn_context_->state_) {
-                    case TxnState::kStarted: {
-                        // Started
-                        if(header_db_entry->txn_id_ < txn_id) {
-                            // header db entry txn is earlier than current txn
-                            LOG_TRACE("Write-write conflict: There is a uncommitted database which is older than current transaction.")
-                            return {nullptr, MakeUnique<String>("Write-write conflict: There is a uncommitted database which is older than current transaction.")};
-                        } else if (header_db_entry->txn_id_ > txn_id){
-                            // Current txn is older
+            switch(header_db_entry->txn_context_->state_) {
+                case TxnState::kStarted: {
+                    // Started
+                    if(header_db_entry->txn_id_ < txn_id) {
+                        // header db entry txn is earlier than current txn
+                        LOG_TRACE("Write-write conflict: There is a uncommitted database which is older than current transaction.")
+                        return {nullptr, MakeUnique<String>("Write-write conflict: There is a uncommitted database which is older than current transaction.")};
+                    } else if (header_db_entry->txn_id_ > txn_id){
+                        // Current txn is older
 
-                            // Rollback header db entry txn
-                            header_db_entry->txn_context_->state_ = TxnState::kRollbacking;
+                        // Rollback header db entry txn
+                        header_db_entry->txn_context_->state_ = TxnState::kRollbacking;
 
-                            // Erase header db entry
-                            entry_list_.erase(entry_list_.begin());
-
-                            // Append new one
-                            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts, txn_context);
-                            res = db_entry.get();
-                            entry_list_.emplace_front(std::move(db_entry));
-                            return {res, nullptr};
-                        } else {
-                            // Same txn
-                            LOG_TRACE("Create a duplicated name database.")
-                            return {nullptr, MakeUnique<String>("Create a duplicated name database.")};
-                        }
-                    }
-                    case TxnState::kCommitting:
-                    case TxnState::kCommitted: {
-                        // Committing / Committed, report WW conflict and rollback current txn
-                        LOG_TRACE("Write-write conflict: There is a committing/committed database which is later than current transaction.")
-                        return {nullptr, MakeUnique<String>("Write-write conflict: There is a committing/committed database which is later than current transaction.")};
-                    }
-                    case TxnState::kRollbacking:
-                    case TxnState::kRollbacked: {
-                        // Remove the header entry
+                        // Erase header db entry
                         entry_list_.erase(entry_list_.begin());
 
                         // Append new one
@@ -102,11 +78,32 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_contex
                         res = db_entry.get();
                         entry_list_.emplace_front(std::move(db_entry));
                         return {res, nullptr};
+                    } else {
+                        // Same txn
+                        LOG_TRACE("Create a duplicated name database.")
+                        return {nullptr, MakeUnique<String>("Create a duplicated name database.")};
                     }
-                    default: {
-                        LOG_TRACE("Invalid db entry txn state")
-                        return {nullptr, MakeUnique<String>("Invalid db entry txn state.")};
-                    }
+                }
+                case TxnState::kCommitting:
+                case TxnState::kCommitted: {
+                    // Committing / Committed, report WW conflict and rollback current txn
+                    LOG_TRACE("Write-write conflict: There is a committing/committed database which is later than current transaction.")
+                    return {nullptr, MakeUnique<String>("Write-write conflict: There is a committing/committed database which is later than current transaction.")};
+                }
+                case TxnState::kRollbacking:
+                case TxnState::kRollbacked: {
+                    // Remove the header entry
+                    entry_list_.erase(entry_list_.begin());
+
+                    // Append new one
+                    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts, txn_context);
+                    res = db_entry.get();
+                    entry_list_.emplace_front(std::move(db_entry));
+                    return {res, nullptr};
+                }
+                default: {
+                    LOG_TRACE("Invalid db entry txn state")
+                    return {nullptr, MakeUnique<String>("Invalid db entry txn state.")};
                 }
             }
         }
@@ -123,7 +120,7 @@ DBMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context)
     }
 
     BaseEntry* header_base_entry = entry_list_.front().get();
-    if(header_base_entry->entry_type_ != EntryType::kDatabase) {
+    if(header_base_entry->entry_type_ == EntryType::kDummy) {
 //            rw_locker_.unlock();
         LOG_TRACE("No valid db entry.")
         return {nullptr, MakeUnique<String>("No valid db entry.")};
@@ -183,7 +180,6 @@ DBMeta::DeleteNewEntry(u64 txn_id, TxnContext* txn_context) {
 
 EntryResult
 DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
-//    DBEntry* res = nullptr;
     std::shared_lock<RWMutex> r_locker(rw_locker_);
     if(entry_list_.empty()) {
         LOG_TRACE("Empty db entry list.")
@@ -192,7 +188,7 @@ DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
 
 
     for(const auto& db_entry: entry_list_) {
-        if(db_entry->entry_type_ != EntryType::kDatabase) {
+        if(db_entry->entry_type_ == EntryType::kDummy) {
             LOG_TRACE("No valid db entry.")
             return {nullptr, MakeUnique<String>("No valid db entry.")};
         }

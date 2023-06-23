@@ -32,9 +32,6 @@ public:
     void
     RemoveDBEntry(const String& db_name, u64 txn_id, TxnContext* txn_context);
 
-    void
-    RemoveTableEntry(const String& db_name, u64 txn_id, TxnContext* txn_context);
-
     Vector<DBEntry*>
     Databases(Txn* txn);
 
@@ -42,7 +39,7 @@ private:
     UniquePtr<String> dir_{nullptr};
     UniquePtr<AsyncBatchProcessor> scheduler_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
-    RWMutex rw_lock_;
+    RWMutex rw_locker_;
 };
 
 }

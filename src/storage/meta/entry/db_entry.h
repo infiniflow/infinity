@@ -8,6 +8,9 @@
 
 #include "base_entry.h"
 #include "common/types/internal_types.h"
+#include "table_entry.h"
+#include "storage/meta/table_desc.h"
+#include "storage/meta/table_meta.h"
 
 namespace infinity {
 
@@ -20,9 +23,25 @@ public:
         txn_id_ = txn_id;
     }
 
+    EntryResult
+    CreateTable(UniquePtr<TableDesc> table_desc,
+                u64 txn_id,
+                TxnTimeStamp begin_ts,
+                TxnContext* txn_context);
+
+    EntryResult
+    DropTable(const String& table_name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
+
+    EntryResult
+    GetTable(const String& table_name, u64 txn_id, TxnTimeStamp begin_ts);
+
+    void
+    RemoveTableEntry(const String& table_name, u64 txn_id, TxnContext* txn_context);
+
 private:
     RWMutex rw_locker_{};
     String db_name_{};
+    HashMap<String, UniquePtr<TableMeta>> tables_{};
 };
 
 }

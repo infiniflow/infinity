@@ -9,8 +9,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/column_def.h"
-
 class ColumnDefTest : public BaseTest {
     void
     SetUp() override {

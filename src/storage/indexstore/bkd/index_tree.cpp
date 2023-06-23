@@ -48,7 +48,7 @@ int32_t IndexTree::GetNodeId() {
 }
 
 std::vector<uint8_t>&IndexTree::GetSplitPackedValue() {
-    assert(is_leaf_node() == false);
+    assert(IsLeafNode() == false);
     assert(!split_packed_value_stack_[level_].empty());
     return split_packed_value_stack_[level_];
 }

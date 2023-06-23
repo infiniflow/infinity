@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "planner/logical_node.h"
-#include "storage/table_definition.h"
 
 namespace infinity {
 

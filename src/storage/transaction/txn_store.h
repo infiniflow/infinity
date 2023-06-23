@@ -4,17 +4,24 @@
 
 #pragma once
 
+#include <utility>
+
 #include "storage/meta/entry/db_entry.h"
+#include "storage/data_block.h"
 
 namespace infinity {
 
-class TxnStore {
+class TxnTableStore {
 public:
     explicit
-    TxnStore();
+    TxnTableStore(String table_name) : table_name_(std::move(table_name)) {}
 
-    SharedPtr<DBEntry>
-    CreateDatabase(const String& name);
+    void
+    Append(const SharedPtr<DataBlock>& input_block);
+
+    Vector<SharedPtr<DataBlock>> blocks_;
+
+    String table_name_{};
 };
 
 }

@@ -9,6 +9,9 @@
 #include "storage/meta/catalog.h"
 #include "txn_manager.h"
 #include "txn_context.h"
+#include "storage/meta/table_desc.h"
+#include "storage/meta/entry/table_entry.h"
+#include "txn_store.h"
 
 namespace infinity {
 
@@ -36,6 +39,18 @@ public:
     EntryResult
     GetDatabase(const String& db_name);
 
+    EntryResult
+    CreateTable(const String& db_name, UniquePtr<TableDesc> table_desc);
+
+    EntryResult
+    DropTableByName(const String& db_name, const String& table_name);
+
+    EntryResult
+    GetTableByName(const String& db_name, const String& table_name);
+
+    void
+    Append(const String& db_name, const String& table_name, SharedPtr<DataBlock> input_block);
+
     inline u64
     TxnID() const {
         return txn_id_;
@@ -48,9 +63,14 @@ private:
 
     // Related database
     Set<String> db_names_{};
+    Set<String> table_names_{};
 
     // Txn store
     Set<DBEntry*> txn_dbs_{};
+    Set<TableEntry*> txn_tables_{};
+
+    HashMap<String, UniquePtr<TxnTableStore>> txn_tables_store_{};
+
 
     TxnManager* txn_mgr_{};
 };

@@ -11,7 +11,7 @@
 namespace infinity {
 
 enum class EntryType {
-    kInvalid,
+    kDummy,
     kDatabase,
     kTable,
 };
@@ -40,7 +40,7 @@ struct BaseEntry {
 
     bool deleted_{false};
 
-    EntryType entry_type_{EntryType::kInvalid};
+    EntryType entry_type_{EntryType::kDummy};
 };
 
 struct EntryResult {
