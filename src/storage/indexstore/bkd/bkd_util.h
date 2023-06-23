@@ -1,6 +1,7 @@
 #pragma once
 
 #include "storage/io/file_writer.h"
+#include "storage/io/file_reader.h"
 
 #include <cstdint>
 #include <vector>
@@ -46,6 +47,8 @@ public:
         int32_t count,
         FileWriter *out);
 
-
+    static int32_t ReadBitmap(
+        FileReader *in, 
+        roaring::Roaring &r);
 };
 }

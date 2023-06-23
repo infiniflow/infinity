@@ -12,6 +12,7 @@ class FileReader {
 public:
     explicit
     FileReader(FileSystem& fs, const String& path, SizeT buffer_size);
+    FileReader(const FileReader& other);
 
     FileSystem& fs_;
     String path_;
@@ -52,7 +53,9 @@ public:
     GetFilePointer() const;
 
     void 
-    Seek(const i64 pos);    
+    Seek(const i64 pos);
+
+    FileReader* Clone();
 };
 
 }

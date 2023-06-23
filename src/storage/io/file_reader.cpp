@@ -19,6 +19,13 @@ FileReader::FileReader(FileSystem& fs, const String& path, SizeT buffer_size)
     file_size_ = fs_.GetFileSize(*file_handler_);
 }
 
+FileReader::FileReader(const FileReader&other)
+    :fs_(other.fs_),
+    path_(other.path_),
+    buffer_size_(other.buffer_size_),
+    data_(MakeUnique<char_t[]>(buffer_size_)){
+
+}
 
 u8 
 FileReader::ReadByte() {
@@ -122,4 +129,8 @@ FileReader::Seek(const i64 pos) {
     }
 }
 
+FileReader*
+FileReader::Clone(){
+    return new FileReader(*this);
+}
 }

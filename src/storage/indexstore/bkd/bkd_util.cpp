@@ -130,4 +130,14 @@ void BKDUtil::WriteDocIdsBitmap(
     delete[] bitmap;
 }
 
+int32_t BKDUtil::ReadBitmap(
+    FileReader *in, 
+    roaring::Roaring &r) {
+    auto size = in->ReadVInt();
+    char buf[size];
+    in->Read(buf, size);
+    r = roaring::Roaring::read(buf, false);
+    return r.cardinality();
+}
+
 }
