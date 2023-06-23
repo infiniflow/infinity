@@ -5,8 +5,8 @@
 #pragma once
 
 #include "common/types/internal_types.h"
-#include "storage/transaction/constants.h"
-#include "storage/transaction/txn_context.h"
+#include "storage/txn/constants.h"
+#include "storage/txn/txn_context.h"
 
 namespace infinity {
 

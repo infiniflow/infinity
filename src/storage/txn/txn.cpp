@@ -133,7 +133,20 @@ Txn::CreateTable(const String& db_name, UniquePtr<TableDesc> table_desc) {
 
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
 
-    return db_entry->CreateTable(std::move(table_desc), txn_id_, begin_ts, &txn_context_);
+    const String& table_name = table_desc->table_name_;
+    EntryResult res = db_entry->CreateTable(std::move(table_desc), txn_id_, begin_ts, &txn_context_);
+    if(res.entry_ == nullptr) {
+        return res;
+    }
+
+    if(res.entry_->entry_type_ != EntryType::kTable) {
+        return {nullptr, MakeUnique<String>("Invalid database type")};
+    }
+
+    auto* table_entry = static_cast<TableEntry*>(res.entry_);
+    txn_tables_.insert(table_entry);
+    table_names_.insert(table_name);
+    return res;
 }
 
 EntryResult
@@ -163,7 +176,27 @@ Txn::DropTableByName(const String& db_name, const String& table_name) {
 
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
 
-    return db_entry->DropTable(table_name, txn_id_, begin_ts, &txn_context_);
+    EntryResult res = db_entry->DropTable(table_name, txn_id_, begin_ts, &txn_context_);
+
+    if(res.entry_ == nullptr) {
+        return res;
+    }
+
+    TableEntry* dropped_table_entry = static_cast<TableEntry*>(res.entry_);
+
+    if(txn_tables_.contains(dropped_table_entry)) {
+        txn_tables_.erase(dropped_table_entry);
+    } else {
+        txn_tables_.insert(dropped_table_entry);
+    }
+
+    if(table_names_.contains(table_name)) {
+        table_names_.erase(table_name);
+    } else {
+        table_names_.insert(table_name);
+    }
+
+    return res;
 }
 
 EntryResult
@@ -225,6 +258,10 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
 
     for(auto* db_entry: txn_dbs_) {
         db_entry->Commit(commit_ts);
+    }
+
+    for(auto* table_entry: txn_tables_) {
+        table_entry->Commit(commit_ts);
     }
 
     {

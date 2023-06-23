@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 #include "base_test.h"
 #include "storage/data_block.h"
-#include "storage/transaction/txn_manager.h"
+#include "storage/txn/txn_manager.h"
 #include "main/profiler/base_profiler.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
@@ -101,7 +101,7 @@ TEST_F(DBTxnTest, test2) {
     NewCatalog new_catalog(std::move(dir), nullptr);
     TxnManager txn_mgr(&new_catalog);
 
-    EntryResult create1_res, create2_res, dropped_res, get_res;
+    EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
 
     // Txn1: Create, OK
     Txn* new_txn = txn_mgr.CreateTxn();
@@ -149,6 +149,23 @@ TEST_F(DBTxnTest, test2) {
     EXPECT_EQ(get_res.entry_, create1_res.entry_);
 
     // Txn2: Commit, OK
+    new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+
+    // Txn3: Create, OK
+    new_txn = txn_mgr.CreateTxn();
+
+    // Txn3: Begin, OK
+    new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+
+    // Txn3: Get db1, OK
+    get_res = new_txn->GetDatabase("db1");
+    EXPECT_NE(get_res.entry_, nullptr);
+
+    // Txn3: Create db1, NOT OK
+    create3_res = new_txn->CreateDatabase("db1");
+    EXPECT_EQ(create3_res.entry_, nullptr);
+
+    // Txn3: Commit, OK
     new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 }
 

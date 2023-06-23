@@ -8,7 +8,7 @@
 
 #include "common/types/internal_types.h"
 #include "storage/meta/entry/db_entry.h"
-#include "storage/transaction/txn_context.h"
+#include "storage/txn/txn_context.h"
 
 namespace infinity {
 

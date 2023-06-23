@@ -54,15 +54,21 @@ TableMeta::CreateNewEntry(u64 txn_id,
         if(header_table_entry->commit_ts_ < UNCOMMIT_TS) {
             // Committed
             if(begin_ts > header_table_entry->commit_ts_) {
-                // No conflict
-                UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(std::move(table_desc),
-                                                                           root_db,
-                                                                           txn_id,
-                                                                           begin_ts,
-                                                                           txn_context);
-                res = table_entry.get();
-                entry_list_.emplace_front(std::move(table_entry));
-                return {res, nullptr};
+                if(header_table_entry->deleted_) {
+                    // No conflict
+                    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(std::move(table_desc),
+                                                                               root_db,
+                                                                               txn_id,
+                                                                               begin_ts,
+                                                                               txn_context);
+                    res = table_entry.get();
+                    entry_list_.emplace_front(std::move(table_entry));
+                    return {res, nullptr};
+                } else {
+                    // Duplicated table
+                    LOG_TRACE("Duplicated table name {}.", table_name)
+                    return {nullptr, MakeUnique<String>("Duplicated table.")};
+                }
             } else {
                 // Write-Write conflict
                 LOG_TRACE("Write-write conflict: There is a committed table: {} which is later than current transaction.",

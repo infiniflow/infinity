@@ -9,8 +9,8 @@
 #include "storage/common/async_batch_processor.h"
 #include "storage/meta/entry/db_entry.h"
 #include "db_meta.h"
-#include "storage/transaction/txn_context.h"
-//#include "storage/transaction/txn.h"
+#include "storage/txn/txn_context.h"
+//#include "storage/txn/txn.h"
 
 namespace infinity {
 

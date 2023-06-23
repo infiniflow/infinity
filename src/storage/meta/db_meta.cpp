@@ -41,11 +41,17 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_contex
         if(header_db_entry->commit_ts_ < UNCOMMIT_TS) {
             // Committed
             if(begin_ts > header_db_entry->commit_ts_) {
-                // No conflict
-                UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts, txn_context);
-                res = db_entry.get();
-                entry_list_.emplace_front(std::move(db_entry));
-                return {res, nullptr};
+                if(header_db_entry->deleted_) {
+                    // No conflict
+                    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts, txn_context);
+                    res = db_entry.get();
+                    entry_list_.emplace_front(std::move(db_entry));
+                    return {res, nullptr};
+                } else {
+                    // Duplicated database
+                    LOG_TRACE("Duplicated database name {}.", db_name_)
+                    return {nullptr, MakeUnique<String>("Duplicated database.")};
+                }
             } else {
                 // Write-Write conflict
                 LOG_TRACE("Write-write conflict: There is a committed database which is later than current transaction.")
