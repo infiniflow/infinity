@@ -146,6 +146,16 @@ public:
         std::vector<uint8_t> &scratch_packed_value, 
         FileReader *in) const;
 
+    void AddAll(
+        const std::shared_ptr<IntersectState> &state);
 
+    void VisitDocValues(
+        std::vector<int32_t> &common_prefix_lengths,
+        std::vector<uint8_t> &scratch_data_packed_value,
+        const std::vector<uint8_t> &scratch_min_index_packed_value,
+        const std::vector<uint8_t> &scratch_max_index_packed_value,
+        FileReader *in,
+        int32_t count,
+        BKDReader *visitor);
 };
 }

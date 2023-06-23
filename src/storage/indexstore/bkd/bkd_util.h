@@ -8,7 +8,7 @@
 #include <roaring/roaring.hh>
 
 namespace infinity {
-
+class BKDVisitor;
 class BKDUtil {
 public:
     static int Mismatch(
@@ -48,7 +48,13 @@ public:
         FileWriter *out);
 
     static int32_t ReadBitmap(
-        FileReader *in, 
+        FileReader *in,
+        int64_t block_fp, 
         roaring::Roaring &r);
+
+    static void ReadBitmap(
+        FileReader *in,
+        int64_t block_fp,
+        BKDVisitor *visitor);
 };
 }

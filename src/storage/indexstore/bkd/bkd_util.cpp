@@ -1,4 +1,5 @@
 #include "bkd_util.h"
+#include "bkd_reader.h"
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {
@@ -132,7 +133,9 @@ void BKDUtil::WriteDocIdsBitmap(
 
 int32_t BKDUtil::ReadBitmap(
     FileReader *in, 
+    int64_t block_fp, 
     roaring::Roaring &r) {
+    in->Seek(block_fp);
     auto size = in->ReadVInt();
     char buf[size];
     in->Read(buf, size);
@@ -140,4 +143,15 @@ int32_t BKDUtil::ReadBitmap(
     return r.cardinality();
 }
 
+void BKDUtil::ReadBitmap(
+    FileReader *in,
+    int64_t block_fp,
+    BKDVisitor *visitor){
+    in->Seek(block_fp);
+    auto size = in->ReadVInt();
+    char buf[size];
+    in->Read(buf, size);
+    roaring::Roaring r = roaring::Roaring::read(buf, false);
+    visitor->Visit(r);
+}
 }

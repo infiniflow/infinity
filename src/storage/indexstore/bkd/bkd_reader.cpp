@@ -128,7 +128,9 @@ void BKDVisitor::Visit(int doc_id) {
     hits_->add(doc_id);
 }
 
-void BKDVisitor::Visit(roaring::Roaring* doc_id, std::vector<uint8_t>& packed_value) {
+void BKDVisitor::Visit(
+    roaring::Roaring* doc_id, 
+    std::vector<uint8_t>& packed_value) {
     if (!Matches(packed_value.data())) {
         return;
     }
@@ -238,9 +240,10 @@ void BKDReader::Intersect(
 
     if (r == Relation::CELL_OUTSIDE_QUERY) {
     } else if (r == Relation::CELL_INSIDE_QUERY) {
+        AddAll(s);
     } else if (s->index_->IsLeafNode()) {
         if (s->index_->NodeExists()) {
-            int32_t count = BKDUtil::ReadBitmap(s->in_.get(), *(s->visitor_->hits_));
+            int32_t count = BKDUtil::ReadBitmap(s->in_.get(), s->index_->GetLeafBlockFP(), *(s->visitor_->hits_));
         }
     } else {
         int32_t split_dim = s->index_->GetSplitDim();
@@ -250,16 +253,16 @@ void BKDReader::Intersect(
         std::vector<uint8_t> &split_packed_value = s->index_->GetSplitPackedValue();
         std::shared_ptr<BytesRef> split_dim_value = s->index_->GetSplitDimValue();
         assert(split_dim_value->length_ == bytes_per_dim_);
-        assert(BKDUtil::CompareUnsigned(cell_min_packed,
+        assert(BKDUtil::CompareUnsigned(cell_min_packed.data(),
                                         split_dim * bytes_per_dim_,
                                         split_dim * bytes_per_dim_ + bytes_per_dim_,
-                                        (split_dim_value->bytes_),
-                                        split_dim_value->bytes_,
+                                        split_dim_value->bytes_.data(),
+                                        split_dim_value->offset_,
                                         split_dim_value->offset_ + bytes_per_dim_) <= 0);
-        assert(BKDUtil::CompareUnsigned(cell_max_packed,
+        assert(BKDUtil::CompareUnsigned(cell_max_packed.data(),
                                         split_dim * bytes_per_dim_,
                                         split_dim * bytes_per_dim_ + bytes_per_dim_,
-                                        (split_dim_value->bytes_),
+                                        split_dim_value->bytes_.data(),
                                         split_dim_value->offset_,
                                         split_dim_value->offset_ + bytes_per_dim_) >= 0);
 
@@ -301,5 +304,42 @@ void BKDReader::ReadCommonPrefixes(
         }
     }
 }
+
+void BKDReader::AddAll(
+    const std::shared_ptr<IntersectState> &state) {
+
+    if (state->index_->IsLeafNode()) {
+        if (state->index_->NodeExists()) {
+            BKDUtil::ReadBitmap(state->in_.get(), state->index_->GetLeafBlockFP(), state->visitor_);
+        }
+    } else {
+        state->index_->PushLeft();
+        AddAll(state);
+        state->index_->Pop();
+
+        state->index_->PushRight();
+        AddAll(state);
+        state->index_->Pop();
+    }
+}
+
+void BKDReader::VisitDocValues(
+    std::vector<int32_t> &common_prefix_lengths,
+    std::vector<uint8_t> &scratch_data_packed_value,
+    const std::vector<uint8_t> &scratch_min_index_packed_value,
+    const std::vector<uint8_t> &scratch_max_index_packed_value,
+    FileReader *in,
+    int32_t count,
+    BKDReader *visitor){
+    ReadCommonPrefixes(common_prefix_lengths, scratch_data_packed_value, in);
+    if(num_index_dims_ != 1){
+        for (int32_t dim = 0; dim < num_index_dims_; dim++) {
+            int32_t prefix = common_prefix_lengths[dim];
+            in->Read((char*)min_packed_value_.data() + (dim * bytes_per_dim_ + prefix), bytes_per_dim_ - prefix);
+            in->Read((char*)max_packed_value_.data() + (dim * bytes_per_dim_ + prefix), bytes_per_dim_ - prefix);
+        }
+    }
+}
+
 
 }
