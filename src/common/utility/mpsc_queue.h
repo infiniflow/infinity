@@ -32,7 +32,7 @@
 
 namespace infinity{
 
-#define PAGE_SIZE 4096
+#define QUEUE_PAGE_SIZE 4096
 #define CACHE_LINE_SIZE 64
 #define NODE_SIZE 1620
 static inline void * align_malloc(size_t align, size_t size) {
@@ -98,13 +98,13 @@ private:
 public:
     MPSCQueue(unsigned int size) :
         buffer_size_(NODE_SIZE), tail_of_queue_(NULL), tail_(0) {
-        void* buffer = align_malloc(PAGE_SIZE, sizeof(BufferList));
+        void* buffer = align_malloc(QUEUE_PAGE_SIZE, sizeof(BufferList));
         head_of_queue_ = new(buffer)BufferList(buffer_size_);
         tail_of_queue_ = head_of_queue_;
     }
     MPSCQueue() :
         buffer_size_(NODE_SIZE), tail_of_queue_(NULL), tail_(0) {
-        void* buffer = align_malloc(PAGE_SIZE, sizeof(BufferList));
+        void* buffer = align_malloc(QUEUE_PAGE_SIZE, sizeof(BufferList));
         head_of_queue_ = new(buffer)BufferList(buffer_size_);
         tail_of_queue_ = head_of_queue_;
     }
@@ -264,7 +264,7 @@ public:
                 n->data_ = data;
                 n->is_set_.store(1, std::memory_order_relaxed);// need this to signal the thread that the data is ready
                 if (index == 1 && !go_back) { // allocating a new buffer and adding it to the queue
-                    void* buffer = align_malloc(PAGE_SIZE, sizeof(BufferList));
+                    void* buffer = align_malloc(QUEUE_PAGE_SIZE, sizeof(BufferList));
                     BufferList* newArr =new(buffer)BufferList(buffer_size_, temp_tail->position_in_queue_ + 1, temp_tail);
                     BufferList* Nullptr = NULL;
 
@@ -280,7 +280,7 @@ public:
                 BufferList* next_ = (temp_tail->next_).load(std::memory_order_acquire);
                 if (next_ == NULL) { // we do not have a next_ buffer - so we can try to allocate a new one
 
-                    void* buffer = align_malloc(PAGE_SIZE, sizeof(BufferList));
+                    void* buffer = align_malloc(QUEUE_PAGE_SIZE, sizeof(BufferList));
                     BufferList* newArr = new(buffer)BufferList(buffer_size_, temp_tail->position_in_queue_ + 1, temp_tail);
                     BufferList* Nullptr = NULL;
 

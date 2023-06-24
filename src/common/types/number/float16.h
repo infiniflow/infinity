@@ -6,6 +6,15 @@
 #include <limits>
 #include <iostream>
 
+#if defined(__ARM_NEON)
+#include <arm_neon.h>
+#endif
+
+#if defined(__F16C__)
+#include <x86intrin.h> 
+#endif
+
+
 namespace infinity {
 namespace detail {
 template <typename T, typename U>
@@ -85,9 +94,9 @@ struct float16_t {
     float16_t &operator=(float f) {
 #if defined __F16C__
         this->raw = (uint16_t) _mm_cvtsi128_si32(
-                        _mm_cvtps_ph(_mm_set_ss(value), _MM_FROUND_CUR_DIRECTION))
+                        _mm_cvtps_ph(_mm_set_ss(f), _MM_FROUND_CUR_DIRECTION));
 #elif defined __ARM_NEON
-        this->raw = memcpy_cast<uint16_t>((__fp16) value);
+        this->raw = memcpy_cast<uint16_t>((__fp16) f);
 #else
         uint32_t i = detail::bit_cast<uint32_t>(f);
         uint32_t s = i >> 31;
@@ -141,7 +150,7 @@ struct float16_t {
 #if defined __F16C__
         return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128((int32_t)raw)));
 #elif defined __ARM_NEON
-        return (float) memcpy_cast<__fp16>(value);
+        return (float) memcpy_cast<__fp16>(raw);
 #else
         uint32_t ss = raw >> 15;
         uint32_t ee = (raw >> 10) & 0x1F;

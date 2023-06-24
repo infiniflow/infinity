@@ -20,6 +20,17 @@ message(STATUS "Commit-id = ${GIT_COMMIT_ID}")
 
 set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 
+if(NOT CMAKE_BUILD_TYPE)
+  if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    set(default_build_type "RelWithDebInfo")
+  else()
+    set(default_build_type "Debug")
+  endif()
+  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE STRING
+    "Default BUILD_TYPE is ${default_build_type}" FORCE)
+endif()
+add_definitions(-march=native)
+
 #include(cmake/jemalloc.cmake)
 #include(cmake/snappy.cmake)
 #include(cmake/lz4.cmake)
