@@ -108,8 +108,19 @@ TableMeta::CreateNewEntry(u64 txn_id,
                         return {res, nullptr};
                     } else {
                         // Same txn
-                        LOG_TRACE("Create a duplicated table {}.", table_name)
-                        return {nullptr, MakeUnique<String>("Create a duplicated name table.")};
+                        if(header_table_entry->deleted_) {
+                            UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(std::move(table_desc),
+                                                                                       root_db,
+                                                                                       txn_id,
+                                                                                       begin_ts,
+                                                                                       txn_context);
+                            res = table_entry.get();
+                            entry_list_.emplace_front(std::move(table_entry));
+                            return {res, nullptr};
+                        } else {
+                            LOG_TRACE("Create a duplicated table {}.", table_name)
+                            return {nullptr, MakeUnique<String>("Create a duplicated name table.")};
+                        }
                     }
                 }
                 case TxnState::kCommitting:

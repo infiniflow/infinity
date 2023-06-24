@@ -86,8 +86,15 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_contex
                         return {res, nullptr};
                     } else {
                         // Same txn
-                        LOG_TRACE("Create a duplicated name database.")
-                        return {nullptr, MakeUnique<String>("Create a duplicated name database.")};
+                        if(header_db_entry->deleted_) {
+                            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_name_, txn_id, begin_ts, txn_context);
+                            res = db_entry.get();
+                            entry_list_.emplace_front(std::move(db_entry));
+                            return {res, nullptr};
+                        } else {
+                            LOG_TRACE("Create a duplicated name database.")
+                            return {nullptr, MakeUnique<String>("Create a duplicated name database.")};
+                        }
                     }
                 }
                 case TxnState::kCommitting:
