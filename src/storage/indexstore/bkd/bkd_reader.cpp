@@ -7,12 +7,12 @@
 
 #include <cassert>
 
-namespace infinity{
+namespace infinity {
 
 BKDVisitor::BKDVisitor(
-    roaring::Roaring* hits, 
+    roaring::Roaring* hits,
     BKDQueryType query_type)
-    : hits_(hits), num_hits_(0), query_type_(query_type){
+    : hits_(hits), num_hits_(0), query_type_(query_type) {
 }
 
 void BKDVisitor::SetReader(BKDReader* reader) {
@@ -46,7 +46,7 @@ Relation BKDVisitor::Compare(
                         min_packed.data(), offset, offset + reader_->bytes_per_dim_,
                         (const uint8_t*)query_max_.c_str(), offset,
                         offset + reader_->bytes_per_dim_) > 0 ||
-                BKDUtil::CompareUnsigned(
+                    BKDUtil::CompareUnsigned(
                         max_packed.data(), offset, offset + reader_->bytes_per_dim_,
                         (const uint8_t*)query_min_.c_str(), offset,
                         offset + reader_->bytes_per_dim_) < 0) {
@@ -54,24 +54,24 @@ Relation BKDVisitor::Compare(
             }
         }
         if (query_type_ == BKDQueryType::LESS_THAN ||
-            query_type_ == BKDQueryType::GREATER_THAN) {
+                query_type_ == BKDQueryType::GREATER_THAN) {
             crosses |= BKDUtil::CompareUnsigned(
-                               min_packed.data(), offset, offset + reader_->bytes_per_dim_,
-                               (const uint8_t*)query_min_.c_str(), offset,
-                               offset + reader_->bytes_per_dim_) <= 0 ||
+                           min_packed.data(), offset, offset + reader_->bytes_per_dim_,
+                           (const uint8_t*)query_min_.c_str(), offset,
+                           offset + reader_->bytes_per_dim_) <= 0 ||
                        BKDUtil::CompareUnsigned(
-                               max_packed.data(), offset, offset + reader_->bytes_per_dim_,
-                               (const uint8_t*)query_max_.c_str(), offset,
-                               offset + reader_->bytes_per_dim_) >= 0;
+                           max_packed.data(), offset, offset + reader_->bytes_per_dim_,
+                           (const uint8_t*)query_max_.c_str(), offset,
+                           offset + reader_->bytes_per_dim_) >= 0;
         } else {
             crosses |= BKDUtil::CompareUnsigned(
-                               min_packed.data(), offset, offset + reader_->bytes_per_dim_,
-                               (const uint8_t*)query_min_.c_str(), offset,
-                               offset + reader_->bytes_per_dim_) < 0 ||
+                           min_packed.data(), offset, offset + reader_->bytes_per_dim_,
+                           (const uint8_t*)query_min_.c_str(), offset,
+                           offset + reader_->bytes_per_dim_) < 0 ||
                        BKDUtil::CompareUnsigned(
-                               max_packed.data(), offset, offset + reader_->bytes_per_dim_,
-                               (const uint8_t*)query_max_.c_str(), offset,
-                               offset + reader_->bytes_per_dim_) > 0;
+                           max_packed.data(), offset, offset + reader_->bytes_per_dim_,
+                           (const uint8_t*)query_max_.c_str(), offset,
+                           offset + reader_->bytes_per_dim_) > 0;
         }
     }
     if (crosses) {
@@ -129,7 +129,7 @@ void BKDVisitor::Visit(int doc_id) {
 }
 
 void BKDVisitor::Visit(
-    roaring::Roaring* doc_id, 
+    roaring::Roaring* doc_id,
     std::vector<uint8_t>& packed_value) {
     if (!Matches(packed_value.data())) {
         return;
@@ -148,6 +148,7 @@ IntersectState::IntersectState(
     in_ = std::shared_ptr<FileReader>(in);
     visitor_ = visitor;
     common_prefix_lengths_ = std::vector<int32_t>(num_dims);
+    doc_ids_ = std::make_unique<roaring::Roaring>();
     scratch_doc_ids_ = std::vector<int32_t>(max_points_in_leaf_node);
     scratch_data_packed_value_ = std::vector<uint8_t>(packed_bytes_length);
     scratch_min_index_packed_value_ = std::vector<uint8_t>(packed_index_bytes_length);
@@ -159,7 +160,7 @@ BKDReader::BKDReader(FileReader *in) {
     in_ = std::unique_ptr<FileReader>(in);
 }
 
-std::shared_ptr<IntersectState> 
+std::shared_ptr<IntersectState>
 BKDReader::GetIntersectState(BKDVisitor *visitor) {
     // because we will reuse BKDReader, we need to seek to packed tree index offset every time.
     clone_index_input_->Seek(meta_offset_);
@@ -210,12 +211,13 @@ void BKDReader::ReadIndex(FileReader* index_in) {
     index_in->Read((char*)max_packed_value_.data(), packed_index_bytes_length_);
 
     for (int32_t dim = 0; dim < num_index_dims_; dim++) {
-        if (BKDUtil::CompareUnsigned(min_packed_value_.data(), dim * bytes_per_dim_,
-                                          dim * bytes_per_dim_ + bytes_per_dim_,
-                                          max_packed_value_.data(),
-                                          dim * bytes_per_dim_,
-                                          dim * bytes_per_dim_ + bytes_per_dim_) > 0) {
-        	throw StorageException("min_packed_value > max_packed_value for dim=" + std::to_string(dim));
+        if (BKDUtil::CompareUnsigned(min_packed_value_.data(),
+                                     dim * bytes_per_dim_,
+                                     dim * bytes_per_dim_ + bytes_per_dim_,
+                                     max_packed_value_.data(),
+                                     dim * bytes_per_dim_,
+                                     dim * bytes_per_dim_ + bytes_per_dim_) > 0) {
+            throw StorageException("min_packed_value > max_packed_value for dim=" + std::to_string(dim));
         }
     }
 
@@ -232,20 +234,36 @@ void BKDReader::ReadIndex(FileReader* index_in) {
     split_packed_values_.clear();
 }
 
+void BKDReader::Intersect(BKDVisitor* visitor) {
+    Intersect(GetIntersectState(visitor), min_packed_value_, max_packed_value_);
+}
+
 void BKDReader::Intersect(
-    const std::shared_ptr<IntersectState> &s, 
-    std::vector<uint8_t> &cell_min_packed, 
+    const std::shared_ptr<IntersectState> &s,
+    std::vector<uint8_t> &cell_min_packed,
     std::vector<uint8_t> &cell_max_packed) {
     Relation r = s->visitor_->Compare(cell_min_packed, cell_max_packed);
 
     if (r == Relation::CELL_OUTSIDE_QUERY) {
+        // This cell is fully outside of the query shape: stop recursing
     } else if (r == Relation::CELL_INSIDE_QUERY) {
+        // This cell is fully inside of the query shape: recursively add all points
+        // in this cell without filtering
         AddAll(s);
     } else if (s->index_->IsLeafNode()) {
         if (s->index_->NodeExists()) {
-            int32_t count = BKDUtil::ReadBitmap(s->in_.get(), s->index_->GetLeafBlockFP(), *(s->visitor_->hits_));
+            int32_t count = BKDUtil::ReadBitmap(s->in_.get(), s->index_->GetLeafBlockFP(), *(s->doc_ids_));
+            VisitDocValues(s->common_prefix_lengths_,
+                           s->scratch_data_packed_value_,
+                           s->scratch_min_index_packed_value_,
+                           s->scratch_max_index_packed_value_,
+                           s->in_.get(),
+                           s->doc_ids_.get(),
+                           count,
+                           s->visitor_);
         }
     } else {
+        // Non-leaf node: recurse on the split left and right nodes
         int32_t split_dim = s->index_->GetSplitDim();
         assert(split_dim >= 0);
         assert(split_dim < num_index_dims_);
@@ -253,18 +271,18 @@ void BKDReader::Intersect(
         std::vector<uint8_t> &split_packed_value = s->index_->GetSplitPackedValue();
         std::shared_ptr<BytesRef> split_dim_value = s->index_->GetSplitDimValue();
         assert(split_dim_value->length_ == bytes_per_dim_);
-        assert(BKDUtil::CompareUnsigned(cell_min_packed.data(),
-                                        split_dim * bytes_per_dim_,
-                                        split_dim * bytes_per_dim_ + bytes_per_dim_,
-                                        split_dim_value->bytes_.data(),
-                                        split_dim_value->offset_,
-                                        split_dim_value->offset_ + bytes_per_dim_) <= 0);
-        assert(BKDUtil::CompareUnsigned(cell_max_packed.data(),
-                                        split_dim * bytes_per_dim_,
-                                        split_dim * bytes_per_dim_ + bytes_per_dim_,
-                                        split_dim_value->bytes_.data(),
-                                        split_dim_value->offset_,
-                                        split_dim_value->offset_ + bytes_per_dim_) >= 0);
+        StorageAssert((BKDUtil::CompareUnsigned(cell_min_packed.data(),
+                                                split_dim * bytes_per_dim_,
+                                                split_dim * bytes_per_dim_ + bytes_per_dim_,
+                                                split_dim_value->bytes_.data(),
+                                                split_dim_value->offset_,
+                                                split_dim_value->offset_ + bytes_per_dim_) <= 0),"make sure cell_min <= split_dim_value <= cell_max");
+        StorageAssert((BKDUtil::CompareUnsigned(cell_max_packed.data(),
+                                                split_dim * bytes_per_dim_,
+                                                split_dim * bytes_per_dim_ + bytes_per_dim_,
+                                                split_dim_value->bytes_.data(),
+                                                split_dim_value->offset_,
+                                                split_dim_value->offset_ + bytes_per_dim_) >= 0),"make sure cell_min <= split_dim_value <= cell_max");
 
         std::copy(cell_max_packed.begin(),
                   cell_max_packed.begin() + packed_index_bytes_length_,
@@ -293,8 +311,8 @@ void BKDReader::Intersect(
 }
 
 void BKDReader::ReadCommonPrefixes(
-    std::vector<int32_t> &common_prefix_lengths, 
-    std::vector<uint8_t> &scratch_packed_value, 
+    std::vector<int32_t> &common_prefix_lengths,
+    std::vector<uint8_t> &scratch_packed_value,
     FileReader *in) const {
     for (int32_t dim = 0; dim < num_data_dims_; dim++) {
         int32_t prefix = in->ReadVInt();
@@ -329,16 +347,55 @@ void BKDReader::VisitDocValues(
     const std::vector<uint8_t> &scratch_min_index_packed_value,
     const std::vector<uint8_t> &scratch_max_index_packed_value,
     FileReader *in,
+    roaring::Roaring *doc_ids,
     int32_t count,
-    BKDReader *visitor){
+    BKDVisitor *visitor) {
     ReadCommonPrefixes(common_prefix_lengths, scratch_data_packed_value, in);
-    if(num_index_dims_ != 1){
+    if(num_index_dims_ != 1) {
+        std::vector<uint8_t> min_packed_value = scratch_min_index_packed_value;
+        std::copy(scratch_data_packed_value.begin(),
+                  scratch_data_packed_value.begin() + packed_index_bytes_length_,
+                  min_packed_value.begin());
+
+        std::vector<uint8_t> max_packed_value = scratch_max_index_packed_value;
+        std::copy(min_packed_value.begin(),
+                  min_packed_value.begin() + packed_index_bytes_length_,
+                  max_packed_value.begin());
+
         for (int32_t dim = 0; dim < num_index_dims_; dim++) {
             int32_t prefix = common_prefix_lengths[dim];
             in->Read((char*)min_packed_value_.data() + (dim * bytes_per_dim_ + prefix), bytes_per_dim_ - prefix);
             in->Read((char*)max_packed_value_.data() + (dim * bytes_per_dim_ + prefix), bytes_per_dim_ - prefix);
         }
+
+        Relation r = visitor->Compare(min_packed_value, max_packed_value);
+        if (r == Relation::CELL_OUTSIDE_QUERY) {
+            return;
+        }
+        if (r == Relation::CELL_INSIDE_QUERY) {
+            for (int32_t i = 0; i < count; ++i) {
+                visitor->Visit(*doc_ids);
+            }
+            return;
+        }
     }
+    auto compressedDim = static_cast<int8_t>(in->ReadByte());
+    auto compressed_dim = static_cast<int32_t>((compressedDim));
+    if (compressed_dim < -2 || compressed_dim >= num_data_dims_) {
+        throw StorageException("Got compressedDim=" + std::to_string(compressed_dim));
+    }
+    if (compressed_dim == -1) {
+        // visit raw doc values
+        
+    } else {
+        // visit compressed doc values
+        if(compressed_dim == -2) {
+
+        } else {
+
+        }
+    }
+
 }
 
 

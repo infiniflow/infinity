@@ -224,10 +224,10 @@ private:
 
     void WriteLeafBlockPackedValuesRange(
         FileWriter *out,
-        std::vector<int32_t> &commonPrefixLengths,
+        std::vector<int32_t> &common_prefix_lengths,
         int32_t start,
         int32_t end,
-        const IntFunction<BytesRef *> &packedValues) const;
+        const IntFunction<BytesRef *> &packed_values) const;
 
     void WriteLowCardinalityLeafBlockPackedValues(
         FileWriter *out,

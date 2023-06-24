@@ -66,6 +66,7 @@ struct IntersectState {
         const std::shared_ptr<IndexTree> &index_visitor);
 
     std::shared_ptr<FileReader> in_;
+    std::unique_ptr<roaring::Roaring> doc_ids_;
     std::vector<int32_t> scratch_doc_ids_;
     std::vector<uint8_t> scratch_data_packed_value_;
     std::vector<uint8_t> scratch_min_index_packed_value_;
@@ -136,6 +137,8 @@ public:
 
     int ReadMeta(FileReader* meta_in);
 
+    void Intersect(BKDVisitor* visitor);
+
     void Intersect(
         const std::shared_ptr<IntersectState> &s, 
         std::vector<uint8_t> &cell_min_packed, 
@@ -155,7 +158,8 @@ public:
         const std::vector<uint8_t> &scratch_min_index_packed_value,
         const std::vector<uint8_t> &scratch_max_index_packed_value,
         FileReader *in,
+        roaring::Roaring *doc_ids,
         int32_t count,
-        BKDReader *visitor);
+        BKDVisitor *visitor);
 };
 }

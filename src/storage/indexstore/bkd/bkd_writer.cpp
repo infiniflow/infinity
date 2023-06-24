@@ -478,15 +478,15 @@ int32_t BKDWriter::RunLen(
 
 void BKDWriter::WriteLeafBlockPackedValuesRange(
     FileWriter *out,
-    std::vector<int32_t> &commonPrefixLengths,
+    std::vector<int32_t> &common_prefix_lengths,
     int32_t start,
     int32_t end,
-    const IntFunction<BytesRef *> &packedValues) const {
+    const IntFunction<BytesRef *> &packed_values) const {
     for (int32_t i = start; i < end; i++) {
-        BytesRef *ref = packedValues(i);
+        BytesRef *ref = packed_values(i);
         assert(ref->length_ == packed_bytes_length_);
         for (int32_t dim = 0; dim < num_data_dims_; dim++) {
-            int32_t prefix = commonPrefixLengths[dim];
+            int32_t prefix = common_prefix_lengths[dim];
             out->Write((char*)ref->bytes_.data() + (ref->offset_ + dim * bytes_per_dim_ + prefix), bytes_per_dim_ - prefix);
         }
     }
@@ -556,6 +556,7 @@ void BKDWriter::WriteLeafBlockPackedValues(
     int32_t prefix_len_sum,
     bool low_cardinality) {
     if (prefix_len_sum == packed_bytes_length_) {
+        // all values in this block are equal
         out->WriteByte(int8_t(-1));
     } else {
         int32_t compressed_byte_offset = sorted_dim * bytes_per_dim_ + common_prefix_lengths[sorted_dim];
