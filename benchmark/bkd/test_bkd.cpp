@@ -53,6 +53,9 @@ int main(){
     }
     int64_t index_fp = bkd_writer->Finish(&data_writer, &index_writer);
     bkd_writer->MetaFinish(&meta_writer, index_fp, 0);
-	return 0;
+    data_writer.Sync();
+    index_writer.Sync();
+    meta_writer.Sync();
+    return 0;
 }
 

@@ -277,11 +277,12 @@ int64_t BKDWriter::GetLeftMostLeafBlockFP(
 int32_t BKDWriter::AppendBlock(
     const std::shared_ptr<WriteBuffer>& write_buffer,
     ByteArrayList &blocks) {
-    std::vector<uint8_t> bytes = std::vector<uint8_t>(write_buffer->Count());
-    write_buffer->WriteTo(reinterpret_cast<char*>(bytes.data()), write_buffer->Count());
+    size_t size = write_buffer->Count();
+    std::vector<uint8_t> bytes = std::vector<uint8_t>(size);
+    size_t return_size = write_buffer->WriteTo(reinterpret_cast<char*>(bytes.data()), size);
     write_buffer->Reset();
     blocks.emplace_back(bytes);
-    return write_buffer->Count();
+    return size;
 }
 
 int32_t BKDWriter::RecursePackIndex(
@@ -392,6 +393,8 @@ BKDWriter::PackIndex(
     std::vector<int64_t> &leaf_block_fps,
     std::vector<uint8_t> &split_packed_values) const {
     int32_t num_leaves = leaf_block_fps.size();
+    // Possibly rotate the leaf block fps, if the index not fully balanced binarytree.  
+    // In this case the leaf nodes may straddle the two bottom levels of the binary tree:
     if (num_index_dims_ == 1 && num_leaves > 1) {
         int32_t level_count = 2;
         while (true) {

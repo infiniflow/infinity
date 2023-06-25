@@ -149,7 +149,8 @@ public:
     } 
 
     void Reset() {
-    	ResetWorkingBuffer();
+        ResetWorkingBuffer();
+        bytes_ = 0;
     }
 
 private:
