@@ -11,9 +11,9 @@ int BKDUtil::Mismatch(
     std::vector<uint8_t> &b,
     int bFromIndex,
     int bToIndex) {
-    StorageAssert(aFromIndex < aToIndex, "index bound error");
+    StorageAssert(aFromIndex <= aToIndex, "index bound error");
     StorageAssert(aFromIndex >= 0 && aToIndex <= a.size(), "index bound error");
-    StorageAssert(bFromIndex < bToIndex, "index bound error");
+    StorageAssert(bFromIndex <= bToIndex, "index bound error");
     StorageAssert(bFromIndex >= 0 && bToIndex <= b.size(), "index bound error");
     int aLen = aToIndex - aFromIndex;
     int bLen = bToIndex - bFromIndex;

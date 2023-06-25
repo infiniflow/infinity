@@ -23,6 +23,8 @@ target_link_libraries(
         faiss
         infinity_core
         gfortran
+        leveldb
+        roaring
 )
 
 add_executable(hnsw_benchmark
@@ -38,4 +40,6 @@ target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(
         hnsw_benchmark
         infinity_core
+        leveldb
+        roaring
 )

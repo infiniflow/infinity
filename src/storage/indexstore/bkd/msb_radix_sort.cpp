@@ -4,6 +4,7 @@
 
 #include <utility>
 #include <algorithm>
+#include <math.h>
 #include <cassert>
 
 namespace infinity {
@@ -124,6 +125,78 @@ int MSBRadixSorter::ComparePivot(int j) {
     return -1 - ByteAt(j, k_ + pivot_->Length());
 }
 
+
+void MSBRadixSorter::BinarySort(int from, int to) { 
+    BinarySort(from, to, from + 1); 
+}
+
+void MSBRadixSorter::BinarySort(int from, int to, int i) {
+    for (; i < to; ++i) {
+        SetPivot(i);
+        int l = from;
+        int h = i - 1;
+        while (l <= h) {
+            int mid =
+                    static_cast<int>(static_cast<unsigned int>((l + h)) >> 1);
+            int cmp = ComparePivot(mid);
+            if (cmp < 0) {
+                h = mid - 1;
+            } else {
+                l = mid + 1;
+            }
+        }
+        for (int j = i; j > l; --j) {
+            Swap(j - 1, j);
+        }
+    }
+}
+
+void MSBRadixSorter::HeapSort(int from, int to) {
+    if (to - from <= 1) {
+        return;
+    }
+    Heapify(from, to);
+    for (int end = to - 1; end > from; --end) {
+        Swap(from, end);
+        SiftDown(from, from, end);
+    }
+}
+
+void MSBRadixSorter::Heapify(int from, int to) {
+    for (int i = HeapParent(from, to - 1); i >= from; --i) {
+        SiftDown(i, from, to);
+    }
+}
+
+void MSBRadixSorter::SiftDown(int i, int from, int to) {
+    for (int leftChild = HeapChild(from, i); leftChild < to;
+         leftChild = HeapChild(from, i)) {
+        int rightChild = leftChild + 1;
+        if (Compare(i, leftChild) < 0) {
+            if (rightChild < to && Compare(leftChild, rightChild) < 0) {
+                Swap(i, rightChild);
+                i = rightChild;
+            } else {
+                Swap(i, leftChild);
+                i = leftChild;
+            }
+        } else if (rightChild < to && Compare(i, rightChild) < 0) {
+            Swap(i, rightChild);
+            i = rightChild;
+        } else {
+            break;
+        }
+    }
+}
+
+int MSBRadixSorter::HeapParent(int from, int i) {
+    return (static_cast<int>(static_cast<unsigned int>((i - 1 - from)) >> 1)) +
+           from;
+}
+
+int MSBRadixSorter::HeapChild(int from, int i) { return ((i - from) << 1) + 1 + from; }
+
+
 void MSBRadixSorter::Sort(int from, int to) {
     StorageAssert(from < to, "'to' must be >= 'from'");
     Sort(from, to, 0, 0);
@@ -132,14 +205,21 @@ void MSBRadixSorter::Sort(int from, int to) {
 void MSBRadixSorter::Sort(int from, int to, int k, int l) {
     if (to - from <= LENGTH_THRESHOLD || l >= LEVEL_THRESHOLD) {
         k_ = k;
-        QuickSort(from, to, k);
+        QuickSort(from, to, 2 * log2(to - from));
     } else {
         RadixSort(from, to, k, l);
     }
 }
 
 void MSBRadixSorter::QuickSort(int from, int to, int max_depth) {
-    --max_depth;
+    if (to - from < BINARY_SORT_THRESHOLD) {
+        BinarySort(from, to);
+        return;
+    } else if (--max_depth < 0) {
+        HeapSort(from, to);
+        return;
+    }
+
     int mid = static_cast<int>(static_cast<unsigned int>((from + to)) >> 1);
 
     if (Compare(from, mid) > 0) {

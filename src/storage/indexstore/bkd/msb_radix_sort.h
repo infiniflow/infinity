@@ -22,6 +22,8 @@ private:
     // buckets below this size will be sorted with quicksort
     static constexpr int LENGTH_THRESHOLD = 100;
 
+    static constexpr int BINARY_SORT_THRESHOLD = 20;
+
     BKDWriter * writer_;
 
     PointWriter * point_writer_;
@@ -54,6 +56,20 @@ private:
     int ByteAt(int i, int k);
 
     void Swap(int i, int j);
+
+    void BinarySort(int from, int to);
+
+    void BinarySort(int from, int to, int i);
+
+    void HeapSort(int from, int to);
+
+    void Heapify(int from, int to);
+
+    void SiftDown(int i, int from, int to);
+
+    int HeapParent(int from, int i);
+
+    int HeapChild(int from, int i);
 
     void Sort(int from, int to, int k, int l);
 

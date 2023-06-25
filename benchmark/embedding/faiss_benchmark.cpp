@@ -5,7 +5,7 @@
 #define ANKERL_NANOBENCH_IMPLEMENT
 
 #include <thread>
-#include <cblas.h>
+#include <openblas/cblas.h>
 #include "nanobench.h"
 
 #include "common/types/internal_types.h"

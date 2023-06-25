@@ -33,7 +33,7 @@ private:
     const std::shared_ptr<BytesRef> ref_;
 
 public:
-    BytesRefBuilder() = default;
+    BytesRefBuilder() : ref_(std::make_shared<BytesRef>()) {}
 
     std::vector<uint8_t> Bytes() {
         return ref_->bytes_;
