@@ -125,7 +125,7 @@ int MSBRadixSorter::ComparePivot(int j) {
 }
 
 void MSBRadixSorter::Sort(int from, int to) {
-    StorageAssert(to < from, "'to' must be >= 'from'");
+    StorageAssert(from < to, "'to' must be >= 'from'");
     Sort(from, to, 0, 0);
 }
 

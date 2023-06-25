@@ -6,6 +6,7 @@
 #include "common/utility/infinity_assert.h"
 
 #include <cassert>
+#include <cmath>
 
 namespace infinity {
 
@@ -179,6 +180,9 @@ BKDReader::GetIntersectState(BKDVisitor *visitor) {
                                             index);
 }
 
+int32_t BKDReader::GetTreeDepth() const {
+    return floor(log2(num_leaves_)) + 2;
+}
 
 int BKDReader::ReadMeta(FileReader* meta_in) {
     type_ = meta_in->ReadInt();
@@ -386,7 +390,7 @@ void BKDReader::VisitDocValues(
     }
     if (compressed_dim == -1) {
         // visit raw doc values
-        
+
     } else {
         // visit compressed doc values
         if(compressed_dim == -2) {

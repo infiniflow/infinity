@@ -114,7 +114,7 @@ public:
     BKDWriter(int32_t max_doc,
               int32_t num_data_dims,
               int32_t num_index_dims,
-              int32_t bytesPerDim,
+              int32_t bytes_per_dim,
               int32_t max_points_in_leaf_node,
               double max_points_sort_in_heap,
               int64_t total_point_count,

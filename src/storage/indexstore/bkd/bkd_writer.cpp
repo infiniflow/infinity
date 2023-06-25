@@ -4,7 +4,7 @@
 #include "common/utility/infinity_assert.h"
 
 #include <numeric>
-
+#include <iostream>
 namespace infinity {
 
 BKDWriter::BKDWriter(
@@ -731,7 +731,8 @@ std::shared_ptr<BKDWriter::PathSlice> BKDWriter::SwitchToHeap(
 }
 
 // The array of PathSlice describe the cell we have currently recursed to
-// This method is used when we are merging previously written segments, in the num_dims > 1 case
+// Recursively reorders the provided reader and writes the bkd-tree on the fly; this method is used
+// when we are writing a new segment
 void BKDWriter::Build(
     int32_t nodeID,
     int32_t leaf_node_offset,
@@ -746,9 +747,6 @@ void BKDWriter::Build(
     const std::vector<std::shared_ptr<PointReader>> &to_close_heroically) {
     if (nodeID >= leaf_node_offset) {
         // Leaf node: write block
-        // We can write the block in any order so by default we write it sorted by
-        // the dimension that has the least number of unique bytes at
-        // common_prefix_lengths[dim], which makes compression more efficient
         int32_t sorted_dim = 0;
         int32_t sorted_dim_cardinality = std::numeric_limits<int32_t>::max();
 
