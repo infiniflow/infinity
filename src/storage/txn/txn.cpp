@@ -124,8 +124,6 @@ Txn::CreateTable(const String& db_name, UniquePtr<TableDesc> table_desc) {
     }
 
     EntryResult db_entry_result =  catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
-
-    GetDatabase(db_name);
     if(db_entry_result.entry_ == nullptr) {
         // Error
         return db_entry_result;
@@ -167,8 +165,6 @@ Txn::DropTableByName(const String& db_name, const String& table_name) {
     }
 
     EntryResult db_entry_result =  catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
-
-    GetDatabase(db_name);
     if(db_entry_result.entry_ == nullptr) {
         // Error
         return db_entry_result;
@@ -217,8 +213,6 @@ Txn::GetTableByName(const String& db_name, const String& table_name) {
     }
 
     EntryResult db_entry_result =  catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
-
-    GetDatabase(db_name);
     if(db_entry_result.entry_ == nullptr) {
         // Error
         return db_entry_result;
@@ -293,6 +287,11 @@ Txn::RollbackTxn(TxnTimeStamp abort_ts) {
         }
     }
 
+    for(const auto& base_entry: txn_tables_) {
+        TableEntry* table_entry = (TableEntry*)(base_entry);
+        DBEntry* db_entry = (DBEntry*)table_entry->GetDBEntry();
+        db_entry->RemoveTableEntry(table_entry->GetTableDesc()->table_name_, txn_id_, &txn_context_);
+    }
 
     for(const auto& db_name: db_names_) {
         catalog_->RemoveDBEntry(db_name, this->txn_id_, &txn_context_);

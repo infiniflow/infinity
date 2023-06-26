@@ -21,6 +21,16 @@ public:
         txn_id_ = txn_id;
     }
 
+    inline void*
+    GetDBEntry() const {
+        return db_entry_;
+    }
+
+    inline TableDesc*
+    GetTableDesc() const {
+        return table_desc_.get();
+    }
+
 private:
     RWMutex rw_locker_{};
     UniquePtr<TableDesc> table_desc_{};
