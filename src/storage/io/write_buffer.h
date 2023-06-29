@@ -4,7 +4,7 @@
 #include "common/utility/infinity_assert.h"
 
 #include <forward_list>
-
+#include <iostream>
 namespace infinity{
 
 #define DEFAULT_BUFFER_SIZE 1024ULL
@@ -151,6 +151,9 @@ public:
     void Reset() {
         ResetWorkingBuffer();
         bytes_ = 0;
+        if(!chunk_list_.empty())
+            chunk_tail_ = chunk_list_.begin();
+        Set(chunk_tail_->Begin(), chunk_tail_->Size());
     }
 
 private:

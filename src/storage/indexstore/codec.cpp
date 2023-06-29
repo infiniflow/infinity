@@ -53,5 +53,50 @@ void Codec::RemoveBuffer(Slice& key, char* buffer, uint32_t size) {
     key.remove_prefix(size);
 }
 
+void Codec::AddInt(std::string& buf, u32 value) {
+    u8 working[sizeof(value)];
+    memcpy(working, &value, sizeof(value));
+    buf.append(buf, sizeof(working));
+}
+
+void Codec::AddVInt(std::string& buf, u32 value) {
+    u8 working[5];
+    u8* ptr = EncodeVInt(working, value);
+    buf.append(buf, ptr - working);
+}
+
+void Codec::AddLong(std::string& buf, u64 value) {
+    u8 working[sizeof(value)];
+    memcpy(working, &value, sizeof(value));
+    buf.append(buf, sizeof(working));
+}
+
+void Codec::AddVLong(std::string& buf, u64 value) {
+    u8 working[16];
+    u8* ptr = EncodeVLong(working, value);
+    buf.append(buf, ptr - working);
+}
+
+u32 DecodeInt(const uint8_t *ptr) {
+    u32 result;
+    memcpy(&result, ptr, sizeof(result));
+    return result;
+}
+
+const u8 *GetVIntPtr(const u8 *p, u32* value) {
+    u32 result = 0;
+    for (u32 shift = 0; shift <= 28; shift += 7) {
+        u32 byte = *p;
+        p++;
+        if (byte & 128) {
+            result |= ((byte & 127) << shift);
+        } else {
+            result |= (byte << shift);
+            *value = result;
+            return p;
+        }
+    }
+    return nullptr;
+}
 }
 

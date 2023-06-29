@@ -46,7 +46,7 @@ Status IndexDB::Get(const std::string& key, std::shared_ptr<Roaring>& result){
             cache_->Set(key,result);
             return Status::OK();
         }
-        return Status::NotFound();        
+        return Status::NotFound(key);        
     }
 }
 
@@ -60,7 +60,7 @@ Status IndexDB::Put(const std::string&key, std::shared_ptr<Roaring>& data){
         return Status::OK();
     }
     std::cerr << s.ToString() << std::endl;
-    return Status::NotFound();
+    return Status::NotFound(key);
 }
 
 Status IndexDB::ScanForBSI(
