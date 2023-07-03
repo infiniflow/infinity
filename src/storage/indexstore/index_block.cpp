@@ -16,7 +16,6 @@ inline const uint8_t *SliceDecode(const uint8_t *encoded_ptr, Slice& retptr) {
     return data_start + len;
 }
 
-
 IndexBlockBuilder::IndexBlockBuilder(bool is_leaf)
     :is_leaf_(is_leaf) {}
 

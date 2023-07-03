@@ -98,5 +98,22 @@ const u8 *GetVIntPtr(const u8 *p, u32* value) {
     }
     return nullptr;
 }
+
+const u8 *GetVIntPtr(const u8 *p, u64* value) {
+    u64 result = 0;
+    for (u32 shift = 0; shift <= 63; shift += 7) {
+        u64 byte = *p;
+        p++;
+        if (byte & 128) {
+            result |= ((byte & 127) << shift);
+        } else {
+            result |= (byte << shift);
+            *value = result;
+            return p;
+        }
+    }
+    return nullptr;
+}
+
 }
 

@@ -74,6 +74,8 @@ public:
 
     static const u8 *GetVIntPtr(const u8 *p, u32* value);
 
+    static const u8 *GetVLongPtr(const u8 *p, u64* value);
+
 private:
     void AppendFixed8(std::string& key, uint8_t i);
 
