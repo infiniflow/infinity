@@ -122,6 +122,9 @@ public:
     AppendWith(const ColumnVector &other);
 
     void
+    AppendWith(const ColumnVector &other, SizeT from, SizeT count);
+
+    void
     ShallowCopy(const ColumnVector &other);
 
     // Enlarge the column vector capacity.

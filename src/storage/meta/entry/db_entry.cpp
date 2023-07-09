@@ -7,11 +7,11 @@
 namespace infinity {
 
 EntryResult
-DBEntry::CreateTable(UniquePtr<TableDesc> table_desc,
+DBEntry::CreateTable(UniquePtr<TableDef> table_def,
                      u64 txn_id,
                      TxnTimeStamp begin_ts,
                      TxnContext *txn_context) {
-    const String& table_name = table_desc->table_name_;
+    const String& table_name = table_def->table_name();
 
     // Check if there is table_meta with the table_name
     rw_locker_.lock_shared();
@@ -36,7 +36,7 @@ DBEntry::CreateTable(UniquePtr<TableDesc> table_desc,
     }
 
     LOG_TRACE("Add new database entry for: {}", table_name);
-    EntryResult res = table_meta->CreateNewEntry(txn_id, begin_ts, txn_context, std::move(table_desc), this);
+    EntryResult res = table_meta->CreateNewEntry(txn_id, begin_ts, txn_context, std::move(table_def), this);
 
     return res;
 }

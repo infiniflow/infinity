@@ -9,7 +9,6 @@
 #include "base_entry.h"
 #include "common/types/internal_types.h"
 #include "table_entry.h"
-#include "storage/meta/table_desc.h"
 #include "storage/meta/table_meta.h"
 
 namespace infinity {
@@ -24,7 +23,7 @@ public:
     }
 
     EntryResult
-    CreateTable(UniquePtr<TableDesc> table_desc,
+    CreateTable(UniquePtr<TableDef> table_def,
                 u64 txn_id,
                 TxnTimeStamp begin_ts,
                 TxnContext* txn_context);

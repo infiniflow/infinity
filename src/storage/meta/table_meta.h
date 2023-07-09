@@ -9,7 +9,7 @@
 #include "common/types/internal_types.h"
 #include "storage/meta/entry/base_entry.h"
 #include "storage/txn/txn_context.h"
-#include "table_desc.h"
+#include "storage/table_def.h"
 
 namespace infinity {
 
@@ -22,7 +22,7 @@ public:
     CreateNewEntry(u64 txn_id,
                    TxnTimeStamp begin_ts,
                    TxnContext* txn_context,
-                   UniquePtr<TableDesc> table_desc,
+                   UniquePtr<TableDef> table_def,
                    void* db_entry);
 
     EntryResult

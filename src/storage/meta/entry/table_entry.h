@@ -8,15 +8,15 @@
 
 #include "db_entry.h"
 #include "common/types/internal_types.h"
-#include "storage/meta/table_desc.h"
+#include "storage/table_def.h"
 
 namespace infinity {
 
 class TableEntry : public BaseEntry {
 public:
     explicit
-    TableEntry(UniquePtr<TableDesc> table_desc, void* db_entry, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context)
-            : BaseEntry(EntryType::kTable, txn_context), table_desc_(std::move(table_desc)), db_entry_(db_entry) {
+    TableEntry(UniquePtr<TableDef> table_def, void* db_entry, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context)
+            : BaseEntry(EntryType::kTable, txn_context), table_def_(std::move(table_def)), db_entry_(db_entry) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }
@@ -26,14 +26,14 @@ public:
         return db_entry_;
     }
 
-    inline TableDesc*
+    inline TableDef*
     GetTableDesc() const {
-        return table_desc_.get();
+        return table_def_.get();
     }
 
 private:
     RWMutex rw_locker_{};
-    UniquePtr<TableDesc> table_desc_{};
+    UniquePtr<TableDef> table_def_{};
     void* db_entry_{};
 };
 

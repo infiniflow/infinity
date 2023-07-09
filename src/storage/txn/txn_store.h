@@ -14,14 +14,20 @@ namespace infinity {
 class TxnTableStore {
 public:
     explicit
-    TxnTableStore(String table_name) : table_name_(std::move(table_name)) {}
+    TxnTableStore(String table_name, TableDef* table_def) : table_name_(std::move(table_name)) {}
 
-    void
+    UniquePtr<String>
     Append(const SharedPtr<DataBlock>& input_block);
+
+    UniquePtr<String>
+    Delete(const Vector<RowID>& row_ids);
 
     Vector<SharedPtr<DataBlock>> blocks_;
 
+    SizeT current_block_id_{0};
+
     String table_name_{};
+    TableDef* table_def_{};
 };
 
 }

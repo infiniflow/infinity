@@ -9,6 +9,83 @@
 
 namespace infinity {
 
+UniquePtr<String>
+Txn::GetTableEntry(const String& db_name, const String& table_name, TableEntry*& table_entry) {
+    if(db_name_.empty()) {
+        db_name_ = db_name;
+    } else {
+        if(db_name_ != db_name) {
+            String err_msg = fmt::format("Attempt to insert data into another database and table {}/{}", db_name, table_name);
+            LOG_ERROR(err_msg);
+            return MakeUnique<String>(err_msg);
+        }
+    }
+
+    auto table_iter = txn_table_entries_.find(table_name);
+    if(table_iter == txn_table_entries_.end()) {
+        // not found the table in cached entries
+        EntryResult entry_result = this->GetTableByName(db_name, table_name);
+        if(entry_result.entry_ == nullptr) {
+            return std::move(entry_result.err_);
+        }
+
+        table_entry = (TableEntry*)entry_result.entry_;
+        txn_table_entries_[table_name] = table_entry;
+    } else {
+        table_entry = (TableEntry*)table_iter->second;
+    }
+
+    return nullptr;
+}
+
+UniquePtr<String>
+Txn::Append(const String& db_name, const String& table_name, const SharedPtr<DataBlock>& input_block) {
+    TableEntry* table_entry{nullptr};
+    UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
+    if(err_msg != nullptr) {
+        return err_msg;
+    }
+
+    TxnTableStore* table_store {nullptr};
+    if(txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry->GetTableDesc());
+    }
+    table_store = txn_tables_store_[table_name].get();
+
+    return table_store->Append(input_block);
+}
+
+UniquePtr<String>
+Txn::Delete(const String& db_name, const String& table_name, const Vector<RowID>& row_ids) {
+    return nullptr;
+}
+
+UniquePtr<String>
+Txn::GetTableScanState(const String& db_name, const String& table_name, TableEntry*& table_entry) {
+    return nullptr;
+}
+
+UniquePtr<String>
+Txn::InitializeScan(const String& db_name, const String& table_name, const Vector<ColumnID>& column_ids) {
+    TableEntry* table_entry{nullptr};
+    UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
+    if(err_msg != nullptr) {
+        return err_msg;
+    }
+
+    return nullptr;
+}
+
+UniquePtr<String>
+Txn::Scan(const String& db_name, const String& table_name, SharedPtr<DataBlock>& output_block) {
+    return nullptr;
+}
+
+UniquePtr<String>
+Txn::CompleteScan(const String& db_name, const String& table_name) {
+    return nullptr;
+}
+
 EntryResult
 Txn::CreateDatabase(const String& db_name) {
 
@@ -107,7 +184,7 @@ Txn::GetDatabase(const String& db_name) {
 
 
 EntryResult
-Txn::CreateTable(const String& db_name, UniquePtr<TableDesc> table_desc) {
+Txn::CreateTable(const String& db_name, UniquePtr<TableDef> table_def) {
     TxnTimeStamp begin_ts;
     TxnState txn_state;
     {
@@ -131,8 +208,8 @@ Txn::CreateTable(const String& db_name, UniquePtr<TableDesc> table_desc) {
 
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
 
-    const String& table_name = table_desc->table_name_;
-    EntryResult res = db_entry->CreateTable(std::move(table_desc), txn_id_, begin_ts, &txn_context_);
+    const String& table_name = table_def->table_name();
+    EntryResult res = db_entry->CreateTable(std::move(table_def), txn_id_, begin_ts, &txn_context_);
     if(res.entry_ == nullptr) {
         return res;
     }
@@ -290,7 +367,7 @@ Txn::RollbackTxn(TxnTimeStamp abort_ts) {
     for(const auto& base_entry: txn_tables_) {
         TableEntry* table_entry = (TableEntry*)(base_entry);
         DBEntry* db_entry = (DBEntry*)table_entry->GetDBEntry();
-        db_entry->RemoveTableEntry(table_entry->GetTableDesc()->table_name_, txn_id_, &txn_context_);
+        db_entry->RemoveTableEntry(table_entry->GetTableDesc()->table_name(), txn_id_, &txn_context_);
     }
 
     for(const auto& db_name: db_names_) {

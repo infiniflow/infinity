@@ -68,6 +68,9 @@ public:
     void
     AppendWith(const SharedPtr<DataBlock>& other);
 
+    void
+    AppendWith(const SharedPtr<DataBlock>& other, SizeT from, SizeT count);
+
 public:
     [[nodiscard]] inline SizeT
     column_count() const {

@@ -14,6 +14,7 @@ enum class EntryType {
     kDummy,
     kDatabase,
     kTable,
+    kBlock,
 };
 
 struct BaseEntry {

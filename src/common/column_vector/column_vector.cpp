@@ -1404,19 +1404,27 @@ ColumnVector::AppendByPtr(const ptr_t value_ptr) {
 
 void
 ColumnVector::AppendWith(const ColumnVector &other) {
+    return AppendWith(other, 0, other.Size());
+}
+
+void
+ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
+    if(count == 0) {
+        return;
+    }
+
     StorageAssert(this->data_type_ == other.data_type_,
                   fmt::format("Attempt to append column vector{} to column vector{}",
                               other.data_type().ToString(),
                               this->data_type().ToString()));
-    StorageAssert(this->tail_index_ + other.tail_index_ < this->capacity_,
+
+    StorageAssert(this->tail_index_ + count < this->capacity_,
                   fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.",
-                              other.tail_index_,
+                              count,
                               this->tail_index_,
                               this->capacity_));
 
-    SizeT count = other.tail_index_;
     switch(data_type_.type()) {
-
         case kBoolean: {
             auto* src_ptr = (BooleanT*)(other.data_ptr_);
             BooleanT* dst_ptr = &((BooleanT*)(data_ptr_))[this->tail_index_];

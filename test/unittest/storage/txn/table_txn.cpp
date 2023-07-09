@@ -29,9 +29,9 @@ class TableTxnTest : public BaseTest {
 
 using namespace infinity;
 
-UniquePtr<TableDesc>
+UniquePtr<TableDef>
 MockTableDesc() {
-    return MakeUnique<TableDesc>("tbl1", Vector<SharedPtr<ColumnDef>>());
+    return MakeUnique<TableDef>("tbl1", Vector<SharedPtr<ColumnDef>>());
 }
 
 TEST_F(TableTxnTest, test1) {

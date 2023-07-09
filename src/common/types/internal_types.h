@@ -75,6 +75,8 @@ using idx_t = u64;
 using f32 = float;
 using f64 = double;
 
+using au64 = std::atomic_uint64_t;
+
 using ptr_t = char *;
 using const_ptr_t = const char *;
 using char_t = char;
@@ -89,5 +91,7 @@ struct RowID {
     u32 block {};
     u32 offset {};
 };
+
+using ColumnID = u32;
 
 }

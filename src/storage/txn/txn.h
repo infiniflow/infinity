@@ -9,9 +9,9 @@
 #include "storage/meta/catalog.h"
 #include "txn_manager.h"
 #include "txn_context.h"
-#include "storage/meta/table_desc.h"
 #include "storage/meta/entry/table_entry.h"
 #include "txn_store.h"
+#include "table_scan_state.h"
 
 namespace infinity {
 
@@ -40,7 +40,7 @@ public:
     GetDatabase(const String& db_name);
 
     EntryResult
-    CreateTable(const String& db_name, UniquePtr<TableDesc> table_desc);
+    CreateTable(const String& db_name, UniquePtr<TableDef> table_def);
 
     EntryResult
     DropTableByName(const String& db_name, const String& table_name);
@@ -48,13 +48,32 @@ public:
     EntryResult
     GetTableByName(const String& db_name, const String& table_name);
 
-    void
-    Append(const String& db_name, const String& table_name, SharedPtr<DataBlock> input_block);
+    UniquePtr<String>
+    Append(const String& db_name, const String& table_name, const SharedPtr<DataBlock>& input_block);
+
+    UniquePtr<String>
+    Delete(const String& db_name, const String& table_name, const Vector<RowID>& row_ids);
+
+    UniquePtr<String>
+    InitializeScan(const String& db_name, const String& table_name, const Vector<ColumnID>& column_ids);
+
+    UniquePtr<String>
+    Scan(const String& db_name, const String& table_name, SharedPtr<DataBlock>& output_block);
+
+    UniquePtr<String>
+    CompleteScan(const String& db_name, const String& table_name);
 
     inline u64
     TxnID() const {
         return txn_id_;
     }
+
+private:
+    UniquePtr<String>
+    GetTableEntry(const String& db_name, const String& table_name, TableEntry*& table_entry);
+
+    UniquePtr<String>
+    GetTableScanState(const String& db_name, const String& table_name, TableEntry*& table_entry);
 
 private:
     NewCatalog* catalog_{};
@@ -69,8 +88,13 @@ private:
     Set<DBEntry*> txn_dbs_{};
     Set<TableEntry*> txn_tables_{};
 
+    // Only one db can be handled in one transaction.
+    HashMap<String, BaseEntry*> txn_table_entries_{};
     HashMap<String, UniquePtr<TxnTableStore>> txn_tables_store_{};
+    HashMap<String, UniquePtr<TableScanState>> txn_tables_scan_state_{};
 
+    // Handled database
+    String db_name_;
 
     TxnManager* txn_mgr_{};
 };
