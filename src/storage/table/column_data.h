@@ -14,7 +14,8 @@ namespace infinity {
 class ColumnData {
 public:
     explicit
-    ColumnData(String file_path, BufferManager* buffer_mgr) : file_path_(std::move(file_path)), buffer_mgr_(buffer_mgr) {}
+    ColumnData(String dir, u64 column_id, BufferManager* buffer_mgr)
+        : dir_(std::move(dir)), column_id_(column_id), buffer_mgr_(buffer_mgr) {}
 
     ~ColumnData();
 
@@ -25,11 +26,12 @@ public:
     // index
     // object handle
     ObjectHandle
-    Get();
+    GetColumnData();
 
 private:
-    String file_path_{};
-    SizeT file_size_{};
+    String dir_{};
+    u64 column_id_{};
+
     BufferHandle* buffer_handle_{};
     BufferManager* buffer_mgr_{};
 };
