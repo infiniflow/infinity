@@ -18,9 +18,7 @@
 #else
 #include <linux/falloc.h>
 #include <linux/fiemap.h>
-#include <linux/fs.h>
 #include <linux/ioctl.h>
-#include <linux/kernel.h>
 #include <linux/magic.h>
 #include <linux/types.h>
 #include <sys/ioctl.h>
