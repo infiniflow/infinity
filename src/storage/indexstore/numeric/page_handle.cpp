@@ -7,7 +7,7 @@ PageHandle::PageHandle() {
     data_ = PageMemoryAllocator::Allocate( 1);
     SetPageId(PhysicalPageId());
     UnsetAllFlags();
-    ClearFixCount();
+    ClearPinCount();
 }
 
 PageHandle::~PageHandle() {}
@@ -16,7 +16,7 @@ void PageHandle::Initialize(const PhysicalPageId page_id) {
     SetPageId(page_id);
     UnsetAllFlags();
     SetValid();
-    ClearFixCount();
+    ClearPinCount();
 }
 
 Page PageHandle::GetPage() const {
@@ -79,18 +79,18 @@ void PageHandle::UnsetAllFlags() {
     flags_ = 0;
 }
 
-size_t PageHandle::IncFixCount() {
-    return ++fix_count_;
+size_t PageHandle::IncPinCount() {
+    return ++pin_count_;
 }
-size_t PageHandle::DecFixCount() {
-    if (fix_count_ == 0) return 0;  // Don't decrement below 0.
-    return --fix_count_;
+size_t PageHandle::DecPinCount() {
+    if (pin_count_ == 0) return 0;
+    return --pin_count_;
 }
-size_t PageHandle::GetFixCount() const {
-    return fix_count_;
+size_t PageHandle::GetPinCount() const {
+    return pin_count_;
 }
-size_t PageHandle::ClearFixCount() {
-    return fix_count_ = 0;
+size_t PageHandle::ClearPinCount() {
+    return pin_count_ = 0;
 }
 
 }

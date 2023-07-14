@@ -112,7 +112,9 @@ file(GLOB_RECURSE
         third_party_src
         CONFIGURE_DEPENDS
         ../third_party/simdjson/*.cpp
-        ../third_party/simdjson/*.h)
+        ../third_party/simdjson/*.h
+        ../third_party/tlx/*.cpp
+        )
 
 add_library(infinity_parser STATIC
             ${parser_src}
@@ -148,6 +150,7 @@ set(INFINITY_CORE_SOURCE
 )
 
 add_library(infinity_core STATIC ${INFINITY_CORE_SOURCE})
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(infinity_core PUBLIC "/usr/local/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tlsf")

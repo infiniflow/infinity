@@ -12,7 +12,25 @@ PageManager::PageManager(std::filesystem::path db_path)
 }
 
 PageManager::~PageManager(){
+    PageHandle* handle;
+    while ((handle = page_cache_->Evict()) != nullptr) {
+        if (!handle->IsValid()) delete handle;
+    }
+    FlushDirty(true);
+}
 
+void PageManager::FlushDirty(bool require_delete) {
+    std::unique_lock<RWMutex> w_locker(map_mutex_);
+    for (auto& it : buffer_map_) {
+        auto handle = it.second;
+        if (handle->IsDirty()) {
+            handle->Lock(false);
+            FlushPage(handle);
+            handle->UnsetDirty();
+            handle->Unlock();
+        }
+        if (require_delete) delete handle;
+    }
 }
 
 PageHandle& PageManager::Pin(
@@ -21,8 +39,11 @@ PageHandle& PageManager::Pin(
     PageHandle* handle = nullptr;
     {
         std::shared_lock<RWMutex> r_locker(map_mutex_);
-        if(buffer_map_.find(page_id) != buffer_map_.end()){
+        HashMap<PhysicalPageId, PageHandle*>::iterator iter = buffer_map_.find(page_id);
+        if(iter != buffer_map_.end()){
             // Page is already loaded in buffer pool
+            handle = iter->second;
+            if (handle->IncPinCount() == 1) page_cache_->Delete(handle);
         }
     }
     // If not, we need to load from disk
@@ -40,7 +61,7 @@ PageHandle& PageManager::Pin(
     }
 
     handle->Initialize(page_id);
-    handle->IncFixCount();
+    handle->IncPinCount();
     LoadPage(handle);
     {
         std::unique_lock<RWMutex> w_locker(map_mutex_);
@@ -52,7 +73,9 @@ PageHandle& PageManager::Pin(
 }
 
 void PageManager::UnPin(PageHandle& handle ,const bool is_dirty){
-
+    if (is_dirty) handle.SetDirty();
+    if (handle.DecPinCount() == 0) page_cache_->Insert(&handle);
+    handle.Unlock();
 }
 
 void PageManager::FlushPage(PageHandle* handle) {
@@ -61,8 +84,13 @@ void PageManager::FlushPage(PageHandle* handle) {
 }
 
 void PageManager::LoadPage(PageHandle* handle) {
-  Status s = page_io_->ReadPage(handle->GetPageId(), handle->GetData());
-  if (!s.ok()) throw std::runtime_error("Tried to read from unallocated page.");
+    Status s = page_io_->ReadPage(handle->GetPageId(), handle->GetData());
+    if (!s.ok()) throw std::runtime_error("Tried to read from unallocated page.");
+}
+
+bool PageManager::Contains(const PhysicalPageId page_id) {
+    std::shared_lock<RWMutex> r_locker(map_mutex_);
+    return buffer_map_.find(page_id) != buffer_map_.end();
 }
 
 }

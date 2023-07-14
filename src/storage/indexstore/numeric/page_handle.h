@@ -44,13 +44,12 @@ public:
     void UnsetValid();
     bool IsValid() const;
 
-    // Unset all flags of the current frame.
     void UnsetAllFlags();
 
-    size_t IncFixCount();
-    size_t DecFixCount();
-    size_t GetFixCount() const;
-    size_t ClearFixCount();
+    size_t IncPinCount();
+    size_t DecPinCount();
+    size_t GetPinCount() const;
+    size_t ClearPinCount();
 
 private:
     void SetFlags(const uint8_t flags) {
@@ -66,11 +65,9 @@ private:
 
     RWMutex rw_locker_{};
 
-    // Flags for dirtiness and eviction management.
     std::atomic<uint8_t> flags_;
 
-    // A count of how many threads have the current frame as fixed.
-    std::atomic<size_t> fix_count_;
+    std::atomic<size_t> pin_count_;
 };
 
 }

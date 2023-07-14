@@ -25,6 +25,11 @@ public:
 
     void UnPin(PageHandle& handle, const bool is_dirty);
 
+    bool Contains(const PhysicalPageId page_id);
+
+    PageIO* GetPageIO() const { return page_io_.get(); }
+
+    void FlushDirty(bool require_delete = false);
 private:
     void FlushPage(PageHandle* handle);
 

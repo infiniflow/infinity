@@ -9,6 +9,62 @@
 namespace infinity {
 using Slice = leveldb::Slice;
 
+
+template <class T>
+static T LoadUnaligned(const void* p) {
+    T x;
+    memcpy(&x, p, sizeof(T));
+    return x;
+}
+
+// Extracts an 8-byte order-preserving prefix of a given key. Little endian is assumed
+template <class Slice>
+static uint64_t ExtractHead(const Slice& key) {
+    switch (key.size()) {
+    case 0:
+        return 0;
+    case 1:
+        return static_cast<uint64_t>(key.data()[0]) << 56;
+    case 2:
+        return static_cast<uint64_t>(
+                   __builtin_bswap16(LoadUnaligned<uint16_t>(key.data())))
+               << 48;
+    case 3:
+        return (static_cast<uint64_t>(
+                    __builtin_bswap16(LoadUnaligned<uint16_t>(key.data())))
+                << 48) |
+               (static_cast<uint64_t>(key.data()[2]) << 40);
+    case 4:
+        return static_cast<uint64_t>(
+                   __builtin_bswap32(LoadUnaligned<uint32_t>(key.data())))
+               << 32;
+
+    case 5:
+        return (static_cast<uint64_t>(
+                    __builtin_bswap32(LoadUnaligned<uint32_t>(key.data())))
+                << 32) |
+               (static_cast<uint64_t>(key.data()[4]) << 24);
+
+    case 6:
+        return (static_cast<uint64_t>(
+                    __builtin_bswap32(LoadUnaligned<uint32_t>(key.data())))
+                << 32) |
+               (static_cast<uint64_t>(
+                    __builtin_bswap16(LoadUnaligned<uint16_t>(key.data() + 4)))
+                << 16);
+    case 7:
+        return (static_cast<uint64_t>(
+                    __builtin_bswap32(LoadUnaligned<uint32_t>(key.data())))
+                << 32) |
+               (static_cast<uint64_t>(
+                    __builtin_bswap16(LoadUnaligned<uint16_t>(key.data() + 4)))
+                << 16) |
+               (static_cast<uint64_t>(key.data()[6]) << 8);
+    default:
+        return __builtin_bswap64(LoadUnaligned<uint64_t>(key.data()));
+    }
+}
+
 // Order-preserving binary encoding for a particular type so that
 // the values could be compared by memcpy their encoded bytes.
 // Big-endian not supported right now
@@ -17,14 +73,14 @@ typedef void (*EncodeFunc)(const void* value, std::string& buf);
 
 class KeyEncoder {
 public:
-	template<typename KeyEncoderTraits>
-	KeyEncoder(KeyEncoderTraits traits);
+    template<typename KeyEncoderTraits>
+    KeyEncoder(KeyEncoderTraits traits);
 
-	void Encode(const void* value, std::string& buf) const {
-		encode_func_(value, buf);
-	}
+    void Encode(const void* value, std::string& buf) const {
+        encode_func_(value, buf);
+    }
 private:
-	EncodeFunc encode_func_;
+    EncodeFunc encode_func_;
 };
 
 extern const KeyEncoder* GetKeyEncoder(LogicalType type);
