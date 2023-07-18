@@ -28,12 +28,17 @@ public:
     ObjectHandle
     GetColumnData();
 
+    ObjectHandle
+    GetExtraColumnData(u64 extra_block_id);
+
 private:
     String dir_{};
     u64 column_id_{};
+    u64 max_extra_block_{}; // Used in dynamic data type column
 
     BufferHandle* buffer_handle_{};
     BufferManager* buffer_mgr_{};
+    Vector<BufferHandle*> extra_buffer_handles_{};
 };
 
 }

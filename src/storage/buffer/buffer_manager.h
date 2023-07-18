@@ -9,22 +9,26 @@
 #include "common/types/internal_types.h"
 #include "main/stats/global_resource_usage.h"
 #include "concurrentqueue.h"
+#include "common/types/data_type.h"
 
 namespace infinity {
 
 enum class BufferType {
     kTempFile,
     kFile,
+    kExtraBlock,
     kInvalid,
 };
 
-class TempFileBufferHandle {
-
+enum class BufferStatus {
+    kLoaded,
+    kUnloaded,
+    kFreed,
+    kSpilled,
 };
 
-class FileBufferHandle {
-
-};
+using BufferReadFN = void(*)(const String& path, DataType data_type);
+using BufferWriteFN = void(*)(const String& path, DataType data_type);
 
 class BufferHandle {
 public:
@@ -39,8 +43,8 @@ public:
     }
 
     inline void
-    SetPath(String path) {
-        path_ = std::move(path);
+    SetName(String name) {
+        name_ = std::move(name);
     }
 
     ptr_t
@@ -57,15 +61,21 @@ public:
     void
     FreeData();
 
+    void
+    SpillTempFile();
+
     [[nodiscard]] inline u64
     GetID() const {
         return id_;
     }
 
     [[nodiscard]] const String&
-    GetPath() const {
-        return path_;
+    GetName() const {
+        return name_;
     }
+
+    void
+    UpdateToFileType();
 
 public:
     RWMutex rw_locker_{};
@@ -73,11 +83,19 @@ public:
     UniquePtr<char[]> data_{nullptr};
     SizeT buffer_size_{0};
     void *buffer_mgr_{};
-    au64 reference_count_{1};
+    u64 reference_count_{0};
     BufferType buffer_type_{BufferType::kInvalid};
+    BufferStatus status_{BufferStatus::kFreed};
 
-    String path_{};
+    String name_{};
     u64 id_{};
+
+    // file descriptor
+    int fd_{};
+
+    // function to read and write the file.
+    BufferReadFN reader_{};
+    BufferWriteFN writer_{};
 };
 
 enum class ObjectType {
@@ -105,11 +123,14 @@ private:
 class BufferManager {
 public:
     explicit
-    BufferManager(SizeT mem_limit, String temp_dir)
-            : mem_limit_(mem_limit), temp_dir_(std::move(temp_dir)) {}
+    BufferManager(SizeT mem_limit, String base_dir, String temp_dir)
+            : mem_limit_(mem_limit), base_dir_(std::move(base_dir)), temp_dir_(std::move(temp_dir)) {}
 
     BufferHandle*
-    GetBufferHandle(const String &object_id, BufferType buffer_type);
+    GetBufferHandle(const String &object_name, BufferType buffer_type);
+
+    BufferHandle*
+    AllocateBufferHandle(const String& object_name, SizeT buffer_size);
 
     inline void
     PushGCQueue(BufferHandle* buffer_handle) {
@@ -119,6 +140,16 @@ public:
     UniquePtr<String>
     Free(SizeT need_memory_size);
 
+    inline const String&
+    BaseDir() const {
+        return base_dir_;
+    }
+
+    inline const String&
+    TempDir() const {
+        return temp_dir_;
+    }
+
     au64 mem_limit_{};
     au64 current_memory_size_{};
 
@@ -127,6 +158,7 @@ private:
 
     u64 next_buffer_id_{1};
 
+    String base_dir_;
     String temp_dir_;
     HashMap<String, BufferHandle> buffer_map_;
 
