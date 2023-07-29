@@ -10,51 +10,53 @@ namespace infinity {
 
 void
 AsyncBatchProcessor::Start() {
-
     prepare_worker_ = MakeUnique<Thread>(&AsyncBatchProcessor::PrepareLoop, this);
     commit_worker_ = MakeUnique<Thread>(&AsyncBatchProcessor::CommitLoop, this);
 }
 
 void
 AsyncBatchProcessor::Stop() {
-    prepare_queue_->Enqueue(MakeUnique<AsyncTerminateTask>());
+    SharedPtr<AsyncTerminateTask> terminate_task = MakeUnique<AsyncTerminateTask>();
+    prepare_queue_->Enqueue(terminate_task);
     prepare_worker_->join();
     commit_worker_->join();
 }
 
 void
-AsyncBatchProcessor::Submit(UniquePtr<AsyncTask> async_task) {
+AsyncBatchProcessor::Submit(SharedPtr<AsyncTask> async_task) {
     LOG_TRACE("Submit task: " + async_task->ToString());
     prepare_queue_->Enqueue(std::move(async_task));
 }
 
 void
 AsyncBatchProcessor::PrepareLoop() {
-    List<UniquePtr<AsyncTask>> local_task_list{};
-    List<UniquePtr<AsyncTask>> new_task_list{};
+    List<SharedPtr<AsyncTask>> local_task_list{};
+    List<SharedPtr<AsyncTask>> new_task_list{};
     bool running{true};
+
+    SharedPtr<AsyncTerminateTask> terminate_task = MakeUnique<AsyncTerminateTask>();
     LOG_TRACE("Start prepare loop");
     while(running) {
         local_task_list.clear();
         new_task_list.clear();
         prepare_queue_->DequeueBulk(local_task_list);
         while(!local_task_list.empty()) {
-            auto task = std::move(local_task_list.front());
+            auto task = local_task_list.front();
             local_task_list.pop_front();
             if(task->IsTerminated()) {
                 running = false;
                 break;
             }
-            new_task_list.emplace_back(std::move(task));
+            new_task_list.emplace_back(task);
         }
         LOG_TRACE("Prepare loop: {}", new_task_list.size());
         if(!new_task_list.empty()) {
-            // new_task_list isn't empty, prepare the task into a batch task
-            UniquePtr<AsyncTask> batch_task = on_prepare_(new_task_list);
-            commit_queue_->Enqueue(std::move(batch_task));
+            // new_task_list isn't empty, prepare the tasks into a batch task
+            SharedPtr<AsyncTask> batch_task = on_prepare_(new_task_list);
+            commit_queue_->Enqueue(batch_task);
         }
         if(!running) {
-            commit_queue_->Enqueue(MakeUnique<AsyncTerminateTask>());
+            commit_queue_->Enqueue(terminate_task);
         }
     }
     LOG_TRACE("Stop prepare loop");
@@ -62,22 +64,20 @@ AsyncBatchProcessor::PrepareLoop() {
 
 void
 AsyncBatchProcessor::CommitLoop() {
-    List<UniquePtr<AsyncTask>> local_task_list{};
+    List<SharedPtr<AsyncTask>> local_task_list{};
     bool running{true};
     LOG_TRACE("Start commit loop");
     while(running) {
         local_task_list.clear();
         commit_queue_->DequeueBulk(local_task_list);
-        auto task_iter = local_task_list.begin();
         LOG_TRACE("Commit loop: {}", local_task_list.size());
-        while(task_iter != local_task_list.end()) {
-            if(task_iter->get()->IsTerminated()) {
+        for(auto& task_ptr: local_task_list) {
+            if(task_ptr->IsTerminated()) {
                 running = false;
                 break;
             }
             // Commit the task
-            on_commit_(*task_iter);
-            ++ task_iter;
+            on_commit_(task_ptr);
         }
     }
     LOG_TRACE("Stop commit loop");

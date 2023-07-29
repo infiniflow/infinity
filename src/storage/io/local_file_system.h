@@ -34,7 +34,7 @@ public:
     void
     Seek(FileHandler& file_handler, i64 pos) final;
 
-    i64
+    SizeT
     GetFileSize(FileHandler& file_handler) final;
 
     void
@@ -42,6 +42,9 @@ public:
 
     void
     SyncFile(FileHandler& file_handler) final;
+
+    void
+    Close(FileHandler& file_handler) final;
 
     // Directory related methods
     bool

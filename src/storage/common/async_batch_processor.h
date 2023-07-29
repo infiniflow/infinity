@@ -15,8 +15,8 @@ public:
     explicit
     AsyncBatchProcessor(SizeT prepare_queue_size,
                         SizeT commit_queue_size,
-                        std::function<UniquePtr<AsyncTask>(List<UniquePtr<AsyncTask>>&)> on_prepare,
-                        std::function<void(UniquePtr<AsyncTask>&)> on_commit)
+                        std::function<SharedPtr<AsyncTask>(List<SharedPtr<AsyncTask>>&)> on_prepare,
+                        std::function<void(const SharedPtr<AsyncTask>&)> on_commit)
                         : on_prepare_(std::move(on_prepare)), on_commit_(std::move(on_commit)) {
         prepare_queue_ = MakeUnique<BatchBlockingQueue>(prepare_queue_size);
         commit_queue_ = MakeUnique<BatchBlockingQueue>(commit_queue_size);
@@ -31,7 +31,7 @@ public:
     Stop();
 
     void
-    Submit(UniquePtr<AsyncTask>);
+    Submit(SharedPtr<AsyncTask>);
 
 private:
     void
@@ -47,8 +47,8 @@ private:
     UniquePtr<Thread> commit_worker_{};
     UniquePtr<BatchBlockingQueue> commit_queue_{};
 
-    std::function<UniquePtr<AsyncTask>(List<UniquePtr<AsyncTask>>&)> on_prepare_{};
-    std::function<void(UniquePtr<AsyncTask>&)> on_commit_{};
+    std::function<SharedPtr<AsyncTask>(List<SharedPtr<AsyncTask>>&)> on_prepare_{};
+    std::function<void(const SharedPtr<AsyncTask>&)> on_commit_{};
 };
 
 }

@@ -72,6 +72,14 @@ LocalFileSystem::OpenFile(const String& path, u8 flags, FileLockType lock_type) 
     return MakeUnique<LocalFileHandler>(*this, path, fd);
 }
 
+void
+LocalFileSystem::Close(FileHandler& file_handler) {
+    i32 fd = ((LocalFileHandler&)file_handler).fd_;
+    if(close(fd) != 0) {
+        StorageError(fmt::format("Can't close file: {}, {}", file_handler.path_.string(), strerror(errno)));
+    }
+}
+
 i64
 LocalFileSystem::Read(FileHandler& file_handler, void* data, u64 nbytes) {
     i32 fd = ((LocalFileHandler&)file_handler).fd_;
@@ -101,7 +109,7 @@ LocalFileSystem::Seek(FileHandler& file_handler, i64 pos) {
 }
 
 
-i64
+SizeT
 LocalFileSystem::GetFileSize(FileHandler& file_handler) {
     i32 fd = ((LocalFileHandler&)file_handler).fd_;
     struct stat s{};
@@ -150,7 +158,7 @@ void
 LocalFileSystem::CreateDirectory(const String& path) {
     std::error_code error_code;
     std::filesystem::path p{path};
-    bool is_success = std::filesystem::create_directory(p, error_code);
+    bool is_success = std::filesystem::create_directories(p, error_code);
     if(error_code.value() == 0) {
         if(!is_success) {
             StorageError(fmt::format("Can't create directory: {}, {}", path, strerror(errno)));

@@ -21,6 +21,11 @@ FileHandler::Sync() {
     return file_system_.SyncFile(*this);
 }
 
+void
+FileHandler::Close() {
+    return file_system_.Close(*this);
+}
+
 }
 
 

@@ -17,6 +17,12 @@ public:
     ToString() final {
         return "Async Dummy Task";
     }
+
+    void
+    Prepare() final {}
+
+    void
+    Commit() final {};
 private:
 
 };

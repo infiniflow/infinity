@@ -13,6 +13,7 @@ public:
     explicit
     FileWriter(FileSystem& fs, const String& path, SizeT buffer_size, u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG)
     : fs_(fs), path_(path), buffer_size_(buffer_size), data_(MakeUnique<char_t[]>(buffer_size)), offset_(0), total_written_(0) {
+        // Fixme: This function might throw exception
         file_handler_ = fs.OpenFile(path, file_flags, FileLockType::kWriteLock);
     }
 

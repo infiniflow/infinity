@@ -17,7 +17,7 @@ public:
     }
 
     void
-    Enqueue(UniquePtr<AsyncTask> task_ptr) {
+    Enqueue(SharedPtr<AsyncTask> task_ptr) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
         queue_.push_back(std::move(task_ptr));
@@ -25,7 +25,7 @@ public:
     }
 
     void
-    DequeueBulk(List<UniquePtr<AsyncTask>>& output_queue) {
+    DequeueBulk(List<SharedPtr<AsyncTask>>& output_queue) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
         output_queue.splice(output_queue.end(), queue_);
@@ -48,7 +48,7 @@ protected:
     mutable std::mutex queue_mutex_{};
     std::condition_variable full_cv_{};
     std::condition_variable empty_cv_{};
-    List<UniquePtr<AsyncTask>> queue_{};
+    List<SharedPtr<AsyncTask>> queue_{};
     SizeT capacity_{1024};
 };
 

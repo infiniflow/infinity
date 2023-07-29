@@ -28,6 +28,9 @@ public:
     void
     Sync();
 
+    void
+    Close();
+
 public:
     FileSystem& file_system_;
     std::filesystem::path path_;
@@ -74,7 +77,7 @@ public:
     virtual void
     Seek(FileHandler& file_handler, i64 pos) = 0;
 
-    virtual i64
+    virtual SizeT
     GetFileSize(FileHandler& file_handler) = 0;
 
     virtual void
@@ -82,6 +85,9 @@ public:
 
     virtual void
     SyncFile(FileHandler& file_handler) = 0;
+
+    virtual void
+    Close(FileHandler& file_handler) = 0;
 
     // Directory related methods
     virtual bool

@@ -8,6 +8,7 @@
 
 #include "common/types/internal_types.h"
 #include "storage/buffer/buffer_manager.h"
+#include "storage/buffer/object_handle.h"
 
 namespace infinity {
 

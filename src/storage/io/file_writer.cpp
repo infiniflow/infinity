@@ -48,8 +48,8 @@ void
 FileWriter::WriteVLong(const i64 vi) {
     u64 i = vi;
     while ((i & ~0x7F) != 0) {
-      WriteByte((u8)((i & 0x7f) | 0x80));
-      i >>= 7;
+        WriteByte((u8)((i & 0x7f) | 0x80));
+        i >>= 7;
     }
     WriteByte((u8)i);
 }

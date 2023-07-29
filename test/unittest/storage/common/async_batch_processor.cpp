@@ -10,6 +10,7 @@
 #include "main/infinity.h"
 #include "storage/common/async_batch_processor.h"
 #include "storage/common/async_dummy_task.h"
+#include "storage/common/commit_task.h"
 #include "storage/common/async_terminate_task.h"
 
 class AsyncTaskProcessorTest : public BaseTest {
@@ -30,26 +31,42 @@ class AsyncTaskProcessorTest : public BaseTest {
 
 using namespace infinity;
 
-UniquePtr<AsyncTask>
-OnPrepareTest(List<UniquePtr<AsyncTask>>& async_tasks) {
+SharedPtr<AsyncTask>
+OnPrepareTest(List<SharedPtr<AsyncTask>>& async_tasks) {
+    SharedPtr<CommitTask> commit_task = MakeShared<CommitTask>(async_tasks.size());
     for(const auto& async_task: async_tasks) {
+        async_task->Prepare();
         LOG_TRACE("OnPrepare: " + async_task->ToString());
+        commit_task->Append(async_task.get());
     }
-    return MakeUnique<AsyncDummyTask>();
+    return commit_task;
 }
 
 void
-OnCommitTest(UniquePtr<AsyncTask>& async_task) {
-    LOG_TRACE("OnCommit: " + async_task->ToString());
+OnCommitTest(const SharedPtr<AsyncTask>& commit_task) {
+//    async_task->Notify();
+    commit_task->Commit();
+    LOG_TRACE("OnCommit: " + commit_task->ToString());
 }
 
 TEST_F(AsyncTaskProcessorTest, test1) {
     using namespace infinity;
     AsyncBatchProcessor processor(10 * 1024, 1024, OnPrepareTest, OnCommitTest);
     processor.Start();
-    processor.Submit(MakeUnique<AsyncDummyTask>());
-    processor.Submit(MakeUnique<AsyncDummyTask>());
-    processor.Submit(MakeUnique<AsyncDummyTask>());
-    processor.Submit(MakeUnique<AsyncDummyTask>());
+
+    SharedPtr<AsyncDummyTask> dummy_task1 = MakeShared<AsyncDummyTask>();
+    SharedPtr<AsyncDummyTask> dummy_task2 = MakeShared<AsyncDummyTask>();
+    SharedPtr<AsyncDummyTask> dummy_task3 = MakeShared<AsyncDummyTask>();
+    SharedPtr<AsyncDummyTask> dummy_task4 = MakeShared<AsyncDummyTask>();
+    processor.Submit(dummy_task1);
+    processor.Submit(dummy_task2);
+    processor.Submit(dummy_task3);
+    processor.Submit(dummy_task4);
+
+    dummy_task1->Wait();
+    dummy_task2->Wait();
+    dummy_task3->Wait();
+    dummy_task4->Wait();
+
     processor.Stop();
 }

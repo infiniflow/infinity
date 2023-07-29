@@ -17,6 +17,12 @@ public:
     ToString() final {
         return "Async Terminate Task";
     }
+
+    void
+    Prepare() final {}
+
+    void
+    Commit() final {}
 private:
 
 };

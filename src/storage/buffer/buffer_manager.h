@@ -10,121 +10,19 @@
 #include "main/stats/global_resource_usage.h"
 #include "concurrentqueue.h"
 #include "common/types/data_type.h"
+#include "storage/common/async_batch_processor.h"
+#include "buffer_handle.h"
+
 
 namespace infinity {
-
-enum class BufferType {
-    kTempFile,
-    kFile,
-    kExtraBlock,
-    kInvalid,
-};
-
-enum class BufferStatus {
-    kLoaded,
-    kUnloaded,
-    kFreed,
-    kSpilled,
-};
-
-using BufferReadFN = void(*)(const String& path, DataType data_type);
-using BufferWriteFN = void(*)(const String& path, DataType data_type);
-
-class BufferHandle {
-public:
-    explicit
-    BufferHandle(void* buffer_mgr) : buffer_mgr_(buffer_mgr) {}
-
-    ~BufferHandle() = default;
-
-    inline void
-    SetID(u64 id) {
-        id_ = id;
-    }
-
-    inline void
-    SetName(String name) {
-        name_ = std::move(name);
-    }
-
-    ptr_t
-    LoadData();
-
-    void
-    UnloadData();
-
-    [[nodiscard]] inline bool
-    IsFree() const {
-        return data_ == nullptr;
-    }
-
-    void
-    FreeData();
-
-    void
-    SpillTempFile();
-
-    [[nodiscard]] inline u64
-    GetID() const {
-        return id_;
-    }
-
-    [[nodiscard]] const String&
-    GetName() const {
-        return name_;
-    }
-
-    void
-    UpdateToFileType();
-
-public:
-    RWMutex rw_locker_{};
-
-    UniquePtr<char[]> data_{nullptr};
-    SizeT buffer_size_{0};
-    void *buffer_mgr_{};
-    u64 reference_count_{0};
-    BufferType buffer_type_{BufferType::kInvalid};
-    BufferStatus status_{BufferStatus::kFreed};
-
-    String name_{};
-    u64 id_{};
-
-    // file descriptor
-    int fd_{};
-
-    // function to read and write the file.
-    BufferReadFN reader_{};
-    BufferWriteFN writer_{};
-};
-
-enum class ObjectType {
-    kColumnBlockData,
-};
-
-class ObjectHandle {
-public:
-    explicit
-    ObjectHandle(BufferHandle *buffer_handle)
-            : buffer_handle_(buffer_handle) {}
-
-    ~ObjectHandle() {
-        buffer_handle_->UnloadData();
-    }
-
-    [[nodiscard]] ptr_t
-    GetData();
-
-private:
-    BufferHandle *buffer_handle_{};
-    ptr_t ptr_{};
-};
 
 class BufferManager {
 public:
     explicit
-    BufferManager(SizeT mem_limit, String base_dir, String temp_dir)
-            : mem_limit_(mem_limit), base_dir_(std::move(base_dir)), temp_dir_(std::move(temp_dir)) {}
+    BufferManager(SizeT mem_limit, String base_dir, String temp_dir);
+
+    void
+    Init();
 
     BufferHandle*
     GetBufferHandle(const String &object_name, BufferType buffer_type);
@@ -152,6 +50,8 @@ public:
 
     au64 mem_limit_{};
     au64 current_memory_size_{};
+
+    UniquePtr<AsyncBatchProcessor> reader_{}, writer_{};
 
 private:
     RWMutex rw_locker_{};
