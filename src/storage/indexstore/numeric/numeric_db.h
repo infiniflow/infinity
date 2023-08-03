@@ -1,7 +1,5 @@
 #pragma once
 
-#include "page_manager.h"
-#include "key_page_map.h"
 #include <leveldb/status.h>
 #include <leveldb/slice.h>
 #include <roaring/roaring.hh>
@@ -11,13 +9,13 @@
 #include <filesystem>
 #include <string>
 
-namespace infinity{
+namespace infinity {
 
 using Status = leveldb::Status;
 using Slice = leveldb::Slice;
 using Roaring = roaring::Roaring;
 
-class NumericDB{
+class NumericDB {
 public:
     NumericDB(std::filesystem::path db_path);
     ~NumericDB();
@@ -34,8 +32,5 @@ private:
 
     const std::filesystem::path db_path_;
 
-    std::shared_ptr<PageManager> page_mgr_;
-
-    std::shared_ptr<KeyPageMap> key_page_map_;
 };
 }

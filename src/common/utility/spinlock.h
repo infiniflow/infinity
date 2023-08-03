@@ -7,38 +7,47 @@
 namespace infinity {
 
 //Simple spinlock for mutual exclusion.
-class Spinlock {
+class SpinLock {
 public:
-    constexpr Spinlock() noexcept = default;
-    ~Spinlock() = default;
+    explicit SpinLock(std::int32_t count = 1024) noexcept
+        : spin_count_(count), locked_(false) {
+    }
+
+    bool try_lock() noexcept {
+        return !locked_.exchange(true, std::memory_order_acquire);
+    }
 
     void lock() noexcept {
-        while (true) {
-            while (flag_.load(std::memory_order_relaxed)) {
-                Builtin::pause();
-            }
-
-            if (try_lock()) {
-                return;
+        auto counter = spin_count_;
+        while (!try_lock()) {
+            while (locked_.load(std::memory_order_relaxed)) {
+                if (counter-- <= 0) {
+                    std::this_thread::yield();
+                    counter = spin_count_;
+                }
             }
         }
     }
 
-    //return true, when successfully locked.
-    bool try_lock() noexcept {
-        bool expected = false;
-        return flag_.compare_exchange_weak(expected, true, std::memory_order_acquire);
-    }
-
     void unlock() noexcept {
-        flag_.store(false, std::memory_order_acquire);
-    }
-
-    [[nodiscard]] bool is_locked() const noexcept {
-        return flag_.load(std::memory_order_relaxed);
+        locked_.store(false, std::memory_order_release);
     }
 
 private:
-    std::atomic_bool flag_{false};
+    std::int32_t spin_count_;
+    std::atomic<bool> locked_;
+};
+
+class ScopedSpinLock {
+public:
+    explicit ScopedSpinLock(SpinLock &lock) : lock_(lock) { lock_.lock(); }
+
+    ~ScopedSpinLock() { lock_.unlock(); }
+
+private:
+    ScopedSpinLock(const ScopedSpinLock &) = delete;
+    ScopedSpinLock &operator=(const ScopedSpinLock &) = delete;    
+
+    SpinLock &lock_;
 };
 } // namespace infinity

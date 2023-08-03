@@ -4,9 +4,13 @@
 #include <mutex>
 #include <vector>
 #include <filesystem>
+#include <iostream>
+#include <leveldb/status.h>
 
-#include "page.h"
+#include "main/logger.h"
 #include "common/utility/env.h"
+#include "common/utility/infinity_assert.h"
+#include "common/utility/spinlock.h"
 
 namespace infinity {
 
@@ -21,73 +25,52 @@ using Status = leveldb::Status;
     }                                                                        \
   } while (0)
 
-class File {
-    // The number of pages by which to grow a file when needed.
-    const size_t kGrowthPages = 256;
+class Page;
 
+class File {
 public:
-    File(const std::filesystem::path& name, size_t initial_num_pages);
+    File(const std::filesystem::path& name);
 
     ~File() {
         close(fd_);
     }
 
-    Status ReadPage(size_t offset, void* data) const {
-        if (offset >= next_page_allocation_offset_) {
-            return Status::InvalidArgument("Tried to read from unallocated page.");
-        }
-        CHECK_ERROR(pread(fd_, data, Page::kSize, offset));
-        return Status::OK();
-    }
+    void Create();
 
-    Status WritePage(size_t offset, const void* data) const {
-        if (offset >= next_page_allocation_offset_) {
-            return Status::InvalidArgument("Tried to write to unallocated page.");
-        }
-        CHECK_ERROR(pwrite(fd_, data, Page::kSize, offset));
-        return Status::OK();
-    }
-    void Sync() const {
+    void Open(bool read_only);
+
+    void Read(uint64_t addr, void *buffer, size_t len);
+
+    void Write(size_t addr, void* buffer, size_t len);
+
+    void Flush() {
         CHECK_ERROR(fsync(fd_));
     }
 
-    size_t AllocatePage() {
-        size_t allocated_offset = next_page_allocation_offset_;
-        next_page_allocation_offset_ += Page::kSize;
+    void Seek(uint64_t offset, int whence) const;
 
-        ExpandToIfNeeded(allocated_offset);
-        return allocated_offset;
-    }
+    uint64_t Tell() const;
 
+    uint64_t FileSize() const;
+
+    void Truncate(uint64_t newsize);
+
+    uint64_t Alloc(size_t requested_length);
+
+    void AllocPage(Page *page);
+
+    void FreePage(Page *page);
+
+    void ReadPage(Page *page, uint64_t address);
+
+    void ReclaimSpace();
 private:
-    void ExpandToIfNeeded(size_t offset);
-
+    std::string filename_;
     int fd_;
     size_t file_size_;
-    const size_t growth_bytes_;
-    size_t next_page_allocation_offset_;
+    size_t excess_at_end_;
+    SpinLock mutex_;
 };
 
-class PageIO {
-public:
-    PageIO(std::filesystem::path db_path);
-
-    Status ReadPage(const PhysicalPageId physical_page_id, void* data);
-
-    Status WritePage(const PhysicalPageId physical_page_id, void* data);
-
-    PhysicalPageId AllocatePage();
-
-    size_t GetNumPages() const {
-        return total_pages_;
-    }
-
-private:
-    std::unique_ptr<File> file_;
-
-    size_t total_pages_;
-
-    std::mutex page_allocation_mutex_;
-};
 
 }

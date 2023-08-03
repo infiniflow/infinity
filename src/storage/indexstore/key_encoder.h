@@ -9,9 +9,25 @@
 namespace infinity {
 using Slice = leveldb::Slice;
 
+template <typename T>
+concept NotString = !std::is_same_v<std::decay_t<T>, std::string>;
+
+template <typename T>
+requires NotString<T> inline static size_t AppendToBuf(char* buf, const T& t, size_t start) {
+    memcpy((void*)&buf[start], &t, sizeof(T));
+    start += sizeof(T);
+    return start;
+}
+
+template <typename T>
+requires NotString<T> inline static size_t LoadFromBuf(const char* buf, T& t, size_t start) {
+    memcpy(&t, &buf[start], sizeof(T));
+    start += sizeof(T);
+    return start;
+}
 
 template <class T>
-static T LoadUnaligned(const void* p) {
+requires NotString<T> inline static T LoadFromBuf(const void* p) {
     T x;
     memcpy(&x, p, sizeof(T));
     return x;
@@ -27,41 +43,41 @@ static uint64_t ExtractHead(const Slice& key) {
         return static_cast<uint64_t>(key.data()[0]) << 56;
     case 2:
         return static_cast<uint64_t>(
-                   __builtin_bswap16(LoadUnaligned<uint16_t>(key.data())))
+                   __builtin_bswap16(LoadFromBuf<uint16_t>(key.data())))
                << 48;
     case 3:
         return (static_cast<uint64_t>(
-                    __builtin_bswap16(LoadUnaligned<uint16_t>(key.data())))
+                    __builtin_bswap16(LoadFromBuf<uint16_t>(key.data())))
                 << 48) |
                (static_cast<uint64_t>(key.data()[2]) << 40);
     case 4:
         return static_cast<uint64_t>(
-                   __builtin_bswap32(LoadUnaligned<uint32_t>(key.data())))
+                   __builtin_bswap32(LoadFromBuf<uint32_t>(key.data())))
                << 32;
 
     case 5:
         return (static_cast<uint64_t>(
-                    __builtin_bswap32(LoadUnaligned<uint32_t>(key.data())))
+                    __builtin_bswap32(LoadFromBuf<uint32_t>(key.data())))
                 << 32) |
                (static_cast<uint64_t>(key.data()[4]) << 24);
 
     case 6:
         return (static_cast<uint64_t>(
-                    __builtin_bswap32(LoadUnaligned<uint32_t>(key.data())))
+                    __builtin_bswap32(LoadFromBuf<uint32_t>(key.data())))
                 << 32) |
                (static_cast<uint64_t>(
-                    __builtin_bswap16(LoadUnaligned<uint16_t>(key.data() + 4)))
+                    __builtin_bswap16(LoadFromBuf<uint16_t>(key.data() + 4)))
                 << 16);
     case 7:
         return (static_cast<uint64_t>(
-                    __builtin_bswap32(LoadUnaligned<uint32_t>(key.data())))
+                    __builtin_bswap32(LoadFromBuf<uint32_t>(key.data())))
                 << 32) |
                (static_cast<uint64_t>(
-                    __builtin_bswap16(LoadUnaligned<uint16_t>(key.data() + 4)))
+                    __builtin_bswap16(LoadFromBuf<uint16_t>(key.data() + 4)))
                 << 16) |
                (static_cast<uint64_t>(key.data()[6]) << 8);
     default:
-        return __builtin_bswap64(LoadUnaligned<uint64_t>(key.data()));
+        return __builtin_bswap64(LoadFromBuf<uint64_t>(key.data()));
     }
 }
 
