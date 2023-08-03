@@ -95,7 +95,7 @@ struct PodRecordList : BaseRecordList {
     // Updates the record of a key
     void SetRecord(int slot, int, btree_record_t *record,
                    uint32_t flags, uint32_t * = 0) {
-        assert(record->size == sizeof(T));
+        assert(record->size_ == sizeof(T));
         range_data_[slot] = *(T *)record->data_;
     }
 

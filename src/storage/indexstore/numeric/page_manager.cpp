@@ -34,7 +34,7 @@ PageManager::Initialize(uint64_t pageid) {
     state_->last_blob_page_id_ = *(uint64_t *)page->Payload();
 
     while (1) {
-        assert(page->type() == Page::kTypePageManager);
+        assert(page->Type() == Page::kTypePageManager);
         uint8_t *p = page->Payload();
         // skip state_->last_blob_page_id?
         if (page == state_->state_page_)
@@ -309,7 +309,7 @@ PageManager::Del(Context *context, Page *page, size_t page_count) {
 
     state_->needs_flush_ = true;
     state_->freelist_.Put(page->Address(), page_count);
-    assert(page->Address() % state_->config.page_size_bytes == 0);
+    assert(page->Address() % Page::kSize == 0);
 
     if (page->NodeProxy()) {
         delete page->NodeProxy();

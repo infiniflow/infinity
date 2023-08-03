@@ -80,7 +80,7 @@ SSEThreshold<double>() {
 template<typename T>
 int
 FindSimd(size_t node_count, T *data, const btree_key_t *hkey) {
-    assert(hkey->size == sizeof(T));
+    assert(hkey->size_ == sizeof(T));
     T key = *(T *)hkey->data_;
 
     // Run a binary search, but fall back to linear search as soon as

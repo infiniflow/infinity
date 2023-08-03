@@ -174,7 +174,7 @@ struct PodKeyList : BaseKeyList {
     BtreeNode::InsertResult Insert(size_t node_count, const btree_key_t *key, uint32_t flags, Cmp &, int slot) {
         if (node_count > (size_t)slot)
             ::memmove(&data_[slot + 1], &data_[slot], sizeof(T) * (node_count - slot));
-        assert(key->size == sizeof(T));
+        assert(key->size_ == sizeof(T));
         data_[slot] = *(T *)key->data_;
         return BtreeNode::InsertResult(0, slot);
     }
