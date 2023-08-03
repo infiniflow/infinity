@@ -15,7 +15,12 @@ namespace infinity {
 class DBMeta {
 public:
     explicit
-    DBMeta(String name) : db_name_(std::move(name)) {}
+    DBMeta(const UniquePtr<String>& base_dir,
+           String name,
+           void* buffer_mgr)
+           : db_name_(std::move(name)), buffer_mgr_(buffer_mgr) {
+        dir_ = MakeShared<String>(*base_dir + '/' + db_name_);
+    }
 
     EntryResult
     CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
@@ -32,6 +37,8 @@ public:
 private:
     RWMutex rw_locker_{};
     String db_name_{};
+    SharedPtr<String> dir_{};
+    void* buffer_mgr_{};
 
     // Ordered by commit_ts from latest to oldest.
     List<UniquePtr<BaseEntry>> entry_list_{};

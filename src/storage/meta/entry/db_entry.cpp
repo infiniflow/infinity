@@ -7,12 +7,13 @@
 namespace infinity {
 
 EntryResult
-DBEntry::CreateTable(UniquePtr<TableDef> table_def,
+DBEntry::CreateTable(const SharedPtr<TableDef>& table_def,
                      u64 txn_id,
                      TxnTimeStamp begin_ts,
                      TxnContext *txn_context) {
     const String& table_name = table_def->table_name();
 
+    SharedPtr<String> table_dir = MakeShared<String>(*dir_ + '/' + table_name);
     // Check if there is table_meta with the table_name
     rw_locker_.lock_shared();
 
@@ -26,7 +27,7 @@ DBEntry::CreateTable(UniquePtr<TableDef> table_def,
     if(table_meta == nullptr) {
         // Create new db meta
         LOG_TRACE("Create new table: {}", table_name);
-        UniquePtr<TableMeta> new_table_meta = MakeUnique<TableMeta>(table_name);
+        UniquePtr<TableMeta> new_table_meta = MakeUnique<TableMeta>(table_name, buffer_mgr_);
         table_meta = new_table_meta.get();
 
         rw_locker_.lock();
@@ -35,8 +36,8 @@ DBEntry::CreateTable(UniquePtr<TableDef> table_def,
 
     }
 
-    LOG_TRACE("Add new database entry for: {}", table_name);
-    EntryResult res = table_meta->CreateNewEntry(txn_id, begin_ts, txn_context, std::move(table_def), this);
+    LOG_TRACE("Add new database entry for: {} in {}", table_name, *table_dir);
+    EntryResult res = table_meta->CreateNewEntry(table_dir, txn_id, begin_ts, txn_context, table_def, this);
 
     return res;
 }

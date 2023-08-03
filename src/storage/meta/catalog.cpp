@@ -7,8 +7,8 @@
 
 namespace infinity {
 
-NewCatalog::NewCatalog(UniquePtr<String> dir, UniquePtr<AsyncBatchProcessor> scheduler)
-    : dir_(std::move(dir)), scheduler_(std::move(scheduler)) {
+NewCatalog::NewCatalog(UniquePtr<String> dir, void* buffer_mgr, UniquePtr<AsyncBatchProcessor> scheduler)
+    : dir_(std::move(dir)), buffer_mgr_(buffer_mgr), scheduler_(std::move(scheduler)) {
 }
 
 EntryResult
@@ -26,7 +26,7 @@ NewCatalog::CreateDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin
     if(db_meta == nullptr) {
         // Create new db meta
         LOG_TRACE("Create new database {}", db_name);
-        UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(db_name);
+        UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(dir_, db_name, buffer_mgr_);
         db_meta = new_db_meta.get();
 
         rw_locker_.lock();

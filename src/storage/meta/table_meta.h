@@ -16,13 +16,14 @@ namespace infinity {
 class TableMeta {
 public:
     explicit
-    TableMeta(String name) : table_name_(std::move(name)) {}
+    TableMeta(String name, void* buffer_mgr) : table_name_(std::move(name)), buffer_mgr_(buffer_mgr) {}
 
     EntryResult
-    CreateNewEntry(u64 txn_id,
+    CreateNewEntry(const SharedPtr<String>& dir,
+                   u64 txn_id,
                    TxnTimeStamp begin_ts,
                    TxnContext* txn_context,
-                   UniquePtr<TableDef> table_def,
+                   const SharedPtr<TableDef>& table_def,
                    void* db_entry);
 
     EntryResult
@@ -37,6 +38,8 @@ public:
 private:
     RWMutex rw_locker_{};
     String table_name_{};
+    SharedPtr<String> dir_{};
+    void* buffer_mgr_{};
 
     // Ordered by commit_ts from latest to oldest.
     List<UniquePtr<BaseEntry>> entry_list_{};

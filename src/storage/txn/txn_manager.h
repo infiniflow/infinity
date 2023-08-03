@@ -21,6 +21,16 @@ public:
     Txn*
     GetTxn(u64 txn_id);
 
+    inline void
+    Lock() {
+        rw_locker_.lock();
+    }
+
+    inline void
+    UnLock() {
+        rw_locker_.unlock();
+    }
+
 private:
     u64
     GetNewTxnID();

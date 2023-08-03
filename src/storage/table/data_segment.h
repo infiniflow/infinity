@@ -6,6 +6,7 @@
 
 #include "data_access_state.h"
 #include "column_data.h"
+#include "parser/statement/extra/create_table_info.h"
 
 namespace infinity {
 
@@ -18,22 +19,31 @@ struct DataChunk {
 
 };
 
+enum class DataSegmentStatus {
+    kOpen,
+    kClosed,
+    kFlushing,
+};
+
 struct BlockVersion {
     explicit
     BlockVersion(SizeT capacity) : created_(capacity), deleted_(capacity), txn_ptr_(capacity) {
     }
     Vector<au64> created_{};
     Vector<au64> deleted_{};
-    Vector<void*> txn_ptr_{};
+    Vector<aptr> txn_ptr_{};
 };
 
 class DataSegment {
 public:
     explicit
-    DataSegment(u64 segment_id, SizeT segment_capacity = DEFAULT_SEGMENT_CAPACITY)
-        : segment_id_(segment_id), segment_capacity_(segment_capacity) {}
+    DataSegment(u64 segment_id, SizeT segment_row = DEFAULT_SEGMENT_ROW)
+        : segment_id_(segment_id), row_capacity_(segment_row), block_verions_(segment_row) {}
 
-    UniquePtr<String>
+    void
+    Init(const Vector<SharedPtr<ColumnDef>>& column_defs, const SharedPtr<String>& dir, void* buffer_mgr);
+
+    void
     Append(void* txn_ptr, AppendState& append_state);
 
     UniquePtr<String>
@@ -54,6 +64,12 @@ public:
     UniquePtr<String>
     CommitDelete(void* txn_ptr, const Vector<RowID>& row_ids);
 
+    bool
+    PrepareFlush();
+
+    UniquePtr<String>
+    Flush();
+
     [[nodiscard]] inline SizeT
     AvailableCapacity() const {
         return row_capacity_ - current_row_;
@@ -72,15 +88,16 @@ public:
 private:
     RWMutex rw_locker_{};
 
-    SizeT start_row_{};
-    SizeT segment_capacity_{};
+    SharedPtr<String> dir_{};
+//    SizeT segment_capacity_{};
     SizeT row_capacity_{};
     SizeT current_row_{};
     u64 segment_id_{};
+    std::atomic<DataSegmentStatus> status_{DataSegmentStatus::kOpen};
 
-    Vector<SharedPtr<ColumnData>> column_vectors;
+    Vector<SharedPtr<ColumnData>> columns_;
 
-    Vector<BlockVersion> block_verions_{};
+    BlockVersion block_verions_;
 };
 
 }

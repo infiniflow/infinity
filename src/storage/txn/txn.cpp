@@ -48,7 +48,7 @@ Txn::Append(const String& db_name, const String& table_name, const SharedPtr<Dat
 
     TxnTableStore* table_store {nullptr};
     if(txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry->GetTableDesc());
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
     }
     table_store = txn_tables_store_[table_name].get();
 
@@ -184,7 +184,7 @@ Txn::GetDatabase(const String& db_name) {
 
 
 EntryResult
-Txn::CreateTable(const String& db_name, UniquePtr<TableDef> table_def) {
+Txn::CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def) {
     TxnTimeStamp begin_ts;
     TxnState txn_state;
     {
@@ -209,7 +209,7 @@ Txn::CreateTable(const String& db_name, UniquePtr<TableDef> table_def) {
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
 
     const String& table_name = table_def->table_name();
-    EntryResult res = db_entry->CreateTable(std::move(table_def), txn_id_, begin_ts, &txn_context_);
+    EntryResult res = db_entry->CreateTable(table_def, txn_id_, begin_ts, &txn_context_);
     if(res.entry_ == nullptr) {
         return res;
     }
@@ -327,12 +327,30 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
         txn_context_.state_ = TxnState::kCommitting;
     }
 
-    for(auto* db_entry: txn_dbs_) {
-        db_entry->Commit(commit_ts);
-    }
+    {
+        txn_mgr_->Lock();
+        DeferFn defer_fn([&]() {
+            txn_mgr_->UnLock();
+        });
 
-    for(auto* table_entry: txn_tables_) {
-        table_entry->Commit(commit_ts);
+        // Commit databases in catalog
+        for(auto* db_entry: txn_dbs_) {
+            db_entry->Commit(commit_ts);
+        }
+
+        // Commit tables in catalog
+        for(auto* table_entry: txn_tables_) {
+            table_entry->Commit(commit_ts);
+        }
+
+        // Commit txn local data into table
+        for(const auto& name_table_pair: txn_tables_store_) {
+            TxnTableStore* table_local_store = name_table_pair.second.get();
+            auto res = table_local_store->Commit();
+            if(res != nullptr) {
+                LOG_ERROR("Txn commit error on table: {}", table_local_store->table_name_);
+            }
+        }
     }
 
     {

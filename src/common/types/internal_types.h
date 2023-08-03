@@ -76,6 +76,7 @@ using f32 = float;
 using f64 = double;
 
 using au64 = std::atomic_uint64_t;
+using aptr = std::atomic_uintptr_t;
 
 using ptr_t = char *;
 using const_ptr_t = const char *;

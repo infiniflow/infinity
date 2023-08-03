@@ -18,7 +18,8 @@ class Txn;
 class NewCatalog {
 public:
     NewCatalog(UniquePtr<String> dir,
-            UniquePtr<AsyncBatchProcessor> scheduler);
+               void* buffer_mgr,
+               UniquePtr<AsyncBatchProcessor> scheduler);
 
     EntryResult
     CreateDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
@@ -37,6 +38,7 @@ public:
 
 private:
     UniquePtr<String> dir_{nullptr};
+    void* buffer_mgr_{};
     UniquePtr<AsyncBatchProcessor> scheduler_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
     RWMutex rw_locker_;

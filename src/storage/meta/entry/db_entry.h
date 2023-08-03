@@ -16,14 +16,19 @@ namespace infinity {
 class DBEntry : public BaseEntry {
 public:
     explicit
-    DBEntry(String db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context)
-        : BaseEntry(EntryType::kDatabase, txn_context), db_name_(std::move(db_name)) {
+    DBEntry(const SharedPtr<String>& dir,
+            String db_name, u64 txn_id,
+            TxnTimeStamp begin_ts,
+            TxnContext* txn_context,
+            void* buffer_mgr)
+        : BaseEntry(EntryType::kDatabase, txn_context), db_name_(std::move(db_name)), buffer_mgr_(buffer_mgr) {
+        dir_ = MakeShared<String>(*dir + '/' + std::to_string(txn_id));
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }
 
     EntryResult
-    CreateTable(UniquePtr<TableDef> table_def,
+    CreateTable(const SharedPtr<TableDef>& table_def,
                 u64 txn_id,
                 TxnTimeStamp begin_ts,
                 TxnContext* txn_context);
@@ -39,7 +44,9 @@ public:
 
 private:
     RWMutex rw_locker_{};
+    SharedPtr<String> dir_{};
     String db_name_{};
+    void* buffer_mgr_{};
     HashMap<String, UniquePtr<TableMeta>> tables_{};
 };
 

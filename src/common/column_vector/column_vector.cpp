@@ -1385,8 +1385,10 @@ ColumnVector::AppendValue(const Value& value) {
         StorageAssert(tail_index_ < 1,
                       fmt::format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
     }
-    StorageAssert(tail_index_ < capacity_,
-                  fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
+
+    if(tail_index_ >= capacity_) {
+        StorageError(fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
+    }
     SetValue(tail_index_ ++, value);
 }
 
@@ -1418,7 +1420,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
                               other.data_type().ToString(),
                               this->data_type().ToString()));
 
-    StorageAssert(this->tail_index_ + count < this->capacity_,
+    StorageAssert(this->tail_index_ + count <= this->capacity_,
                   fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.",
                               count,
                               this->tail_index_,

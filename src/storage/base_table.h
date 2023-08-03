@@ -55,8 +55,8 @@ public:
         return table_name_;
     }
 
-    String schema_name_{};
-    String table_name_{};
+    const String schema_name_{};
+    const String table_name_{};
 };
 
 }

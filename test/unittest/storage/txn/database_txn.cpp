@@ -29,8 +29,13 @@ class DBTxnTest : public BaseTest {
 
 TEST_F(DBTxnTest, test1) {
     using namespace infinity;
+    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
+    String temp_path = "/tmp/infinity/_tmp";
+    String base_path = "/tmp/infinity/data";
+    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
     TxnManager txn_mgr(&new_catalog);
 
     // Txn1: Create
@@ -97,8 +102,13 @@ TEST_F(DBTxnTest, test1) {
 
 TEST_F(DBTxnTest, test20) {
     using namespace infinity;
+    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
+    String temp_path = "/tmp/infinity/_tmp";
+    String base_path = "/tmp/infinity/data";
+    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
     TxnManager txn_mgr(&new_catalog);
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
@@ -161,8 +171,13 @@ TEST_F(DBTxnTest, test20) {
 
 TEST_F(DBTxnTest, test2) {
     using namespace infinity;
+    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
+    String temp_path = "/tmp/infinity/_tmp";
+    String base_path = "/tmp/infinity/data";
+    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
     TxnManager txn_mgr(&new_catalog);
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
@@ -239,8 +254,13 @@ TEST_F(DBTxnTest, test2) {
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)            TXN2 Commit
 TEST_F(DBTxnTest, test3) {
     using namespace infinity;
+    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
+    String temp_path = "/tmp/infinity/_tmp";
+    String base_path = "/tmp/infinity/data";
+    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
     TxnManager txn_mgr(&new_catalog);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();
@@ -278,8 +298,13 @@ TEST_F(DBTxnTest, test3) {
 //                    TXN1 Begin                    TXN1 Create db1(WW-Conflict)  TXN1 Commit
 TEST_F(DBTxnTest, test4) {
     using namespace infinity;
+    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
+    String temp_path = "/tmp/infinity/_tmp";
+    String base_path = "/tmp/infinity/data";
+    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
     TxnManager txn_mgr(&new_catalog);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();
@@ -310,8 +335,13 @@ TEST_F(DBTxnTest, test4) {
 
 TEST_F(DBTxnTest, test5) {
     using namespace infinity;
+    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
+    String temp_path = "/tmp/infinity/_tmp";
+    String base_path = "/tmp/infinity/data";
+    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
     TxnManager txn_mgr(&new_catalog);
 
     // Txn1: Create, OK
@@ -347,8 +377,13 @@ TEST_F(DBTxnTest, test5) {
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
 TEST_F(DBTxnTest, test6) {
     using namespace infinity;
+    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
+    String temp_path = "/tmp/infinity/_tmp";
+    String base_path = "/tmp/infinity/data";
+    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
     TxnManager txn_mgr(&new_catalog);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();
@@ -403,8 +438,13 @@ TEST_F(DBTxnTest, test6) {
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
 TEST_F(DBTxnTest, test7) {
     using namespace infinity;
+    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
+    String temp_path = "/tmp/infinity/_tmp";
+    String base_path = "/tmp/infinity/data";
+    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
     TxnManager txn_mgr(&new_catalog);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();

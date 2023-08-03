@@ -40,7 +40,7 @@ public:
     GetDatabase(const String& db_name);
 
     EntryResult
-    CreateTable(const String& db_name, UniquePtr<TableDef> table_def);
+    CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def);
 
     EntryResult
     DropTableByName(const String& db_name, const String& table_name);

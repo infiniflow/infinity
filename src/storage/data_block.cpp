@@ -157,7 +157,7 @@ DataBlock::AppendWith(const SharedPtr<DataBlock>& other) {
                                  this->column_count()));
     }
     if(this->row_count_ + other->row_count_ > this->capacity_) {
-        StorageError(fmt::format("Attempt append block with row count {} into block with row count{}, "
+        StorageError(fmt::format("Attempt append block with row count {} into block with row count {}, "
                                  "which exceeds the capacity {}",
                                  other->row_count(),
                                  this->row_count(),

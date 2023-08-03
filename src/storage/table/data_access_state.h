@@ -20,12 +20,21 @@ struct AppendRange {
 };
 
 struct AppendState {
+    explicit
+    AppendState(const Vector<SharedPtr<DataBlock>>& blocks) : blocks_(blocks), current_count_(0) {
+        for(const auto& block: blocks) {
+            total_count_ += block->row_count();
+        }
+    }
 
-    DataBlock* data_block_;
-    SizeT total_count_;
-    SizeT current_count_;
+    const Vector<SharedPtr<DataBlock>>& blocks_{};
+    SizeT total_count_{};
+    SizeT current_count_{};
 
-    Vector<AppendRange> append_ranges_;
+    SizeT current_block_{};
+    SizeT current_block_offset_{};
+
+    Vector<AppendRange> append_ranges_{};
 
     [[nodiscard]] inline bool
     Finished() const {

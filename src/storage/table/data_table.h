@@ -13,19 +13,19 @@ namespace infinity {
 class DataTable : public BaseTable {
 public:
     static inline SharedPtr<DataTable>
-    Make(SharedPtr<TableDef> table_def_ptr) {
-        return MakeShared<DataTable>(std::move(table_def_ptr));
+    Make(const SharedPtr<String>& dir, SharedPtr<TableDef> table_def_ptr, void* buffer_mgr) {
+        return MakeShared<DataTable>(dir, std::move(table_def_ptr), buffer_mgr);
     }
 
 public:
     explicit
-    DataTable(SharedPtr<TableDef> table_def_ptr)
+    DataTable(const SharedPtr<String>& dir, SharedPtr<TableDef> table_def_ptr, void* buffer_mgr)
         : BaseTable(BaseTableType::kTable, table_def_ptr->schema_name(), table_def_ptr->table_name()),
-        definition_ptr_(std::move(table_def_ptr)), row_count_(0)
+        dir_(dir), definition_ptr_(std::move(table_def_ptr)), row_count_(0), buffer_mgr_(buffer_mgr)
     {}
 
     UniquePtr<String>
-    Append(void* txn_ptr, AppendState& append_state);
+    Append(void* txn_ptr, void* txn_store);
 
     UniquePtr<String>
     Delete(void* txn_ptr, DeleteState& delete_state);
@@ -67,11 +67,13 @@ private:
 private:
     RWMutex rw_locker_{};
 
+    const SharedPtr<String>& dir_{};
     SharedPtr<TableDef> definition_ptr_;
     SizeT row_count_{0};
     HashMap<u64, SharedPtr<DataSegment>> segments_{};
     DataSegment* unsealed_segment_{};
     au64 next_segment_id_{};
+    void* buffer_mgr_{};
 };
 
 }

@@ -52,7 +52,7 @@ TEST_F(BufferMgrTest, test1) {
 
     EXPECT_FALSE(buf_handle->IsFree());
 
-    EXPECT_EQ(buffer_mgr.current_memory_size_, 256);
+    EXPECT_EQ(buffer_mgr.current_memory_size_, 32768);
     EXPECT_EQ(buffer_mgr.Free(memory_limit - 1), nullptr);
     EXPECT_EQ(buffer_mgr.current_memory_size_, 0);
 
@@ -61,7 +61,7 @@ TEST_F(BufferMgrTest, test1) {
     ptr_t data_ptr3 = buf_handle->LoadData();
     EXPECT_NE(data_ptr3, nullptr);
     buf_handle->UnloadData();
-    EXPECT_EQ(buffer_mgr.current_memory_size_, 256);
+    EXPECT_EQ(buffer_mgr.current_memory_size_, 32768);
 
     // temp buffer
     String tmp_buf_name = "t1.col.tmp";
@@ -76,7 +76,7 @@ TEST_F(BufferMgrTest, test1) {
     ptr_t tmp1_ptr = tmp_buf1->LoadData();
     EXPECT_EQ(tmp_ptr, tmp1_ptr);
 
-    EXPECT_EQ(buffer_mgr.current_memory_size_, 1024 + 256);
+    EXPECT_EQ(buffer_mgr.current_memory_size_, 33792);
     EXPECT_NE(buffer_mgr.Free(memory_limit - 1), nullptr);
     EXPECT_EQ(buffer_mgr.current_memory_size_, 1024);
 
