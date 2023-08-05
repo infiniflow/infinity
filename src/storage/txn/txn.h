@@ -11,11 +11,24 @@
 #include "txn_context.h"
 #include "storage/meta/entry/table_entry.h"
 #include "txn_store.h"
-#include "table_scan_state.h"
+#include "storage/table/meta_state.h"
 
 namespace infinity {
 
 class TxnManager;
+
+struct GetParam {
+    const String& db_name_{};
+    const String& table_name_{};
+    const Vector<ColumnID>& column_ids_{};
+};
+
+struct ScanParam {
+    const String& db_name_{};
+    const String& table_name_{};
+    const Vector<ColumnID>& column_ids_{};
+};
+
 class Txn {
 public:
     explicit
@@ -54,11 +67,32 @@ public:
     UniquePtr<String>
     Delete(const String& db_name, const String& table_name, const Vector<RowID>& row_ids);
 
-    UniquePtr<String>
+    UniquePtr<MetaTableState>
+    GetTableMeta(const String& db_name, const String& table_name, const Vector<ColumnID>& columns);
+
+    SharedPtr<GetState>
+    InitializeGet(GetParam);
+
+    void
+    TableGet();
+
+    void
+    IndexGet();
+
+    SharedPtr<ScanState>
     InitializeScan(const String& db_name, const String& table_name, const Vector<ColumnID>& column_ids);
 
-    UniquePtr<String>
-    Scan(const String& db_name, const String& table_name, SharedPtr<DataBlock>& output_block);
+    void
+    Scan(ScanState* scan_state, SharedPtr<DataBlock>& output_block);
+
+    void
+    TableScan(ScanState* scan_state, SharedPtr<DataBlock>& output_block);
+
+    void
+    IndexScan(ScanState* scan_state, SharedPtr<DataBlock>& output_block);
+
+    void
+    AnnScan(ScanState* scan_state, SharedPtr<DataBlock>& output_block);
 
     UniquePtr<String>
     CompleteScan(const String& db_name, const String& table_name);
@@ -68,12 +102,14 @@ public:
         return txn_id_;
     }
 
+    inline TxnTimeStamp
+    CommitTS() const {
+        return txn_context_.commit_ts_;
+    }
+
 private:
     UniquePtr<String>
     GetTableEntry(const String& db_name, const String& table_name, TableEntry*& table_entry);
-
-    UniquePtr<String>
-    GetTableScanState(const String& db_name, const String& table_name, TableEntry*& table_entry);
 
 private:
     NewCatalog* catalog_{};
@@ -91,7 +127,6 @@ private:
     // Only one db can be handled in one transaction.
     HashMap<String, BaseEntry*> txn_table_entries_{};
     HashMap<String, UniquePtr<TxnTableStore>> txn_tables_store_{};
-    HashMap<String, UniquePtr<TableScanState>> txn_tables_scan_state_{};
 
     // Handled database
     String db_name_;

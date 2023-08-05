@@ -18,7 +18,7 @@ TableMeta::CreateNewEntry(const SharedPtr<String>& dir,
     TableEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(rw_locker_);
     const String& table_name = table_def->table_name();
-    dir_ = MakeShared<String>(*dir + '/' + std::to_string(txn_id));
+    dir_ = MakeShared<String>(*dir + "/txn_" + std::to_string(txn_id));
 
     if(entry_list_.empty()) {
         // Insert a dummy entry.

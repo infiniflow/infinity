@@ -60,12 +60,43 @@ TxnTableStore::Delete(const Vector<RowID>& row_ids) {
     NotImplementError("TxnTableStore::Delete")
 }
 
-UniquePtr<String>
-TxnTableStore::Commit() {
-    LOG_TRACE("Transaction local storage table: {}, Start to commit", this->table_name_);
+void
+TxnTableStore::Scan(SharedPtr<DataBlock>& output_block) {
+
+}
+
+void
+TxnTableStore::Rollback() {
+    if(append_state_ != nullptr) {
+        // Rollback the data already been appended.
+        table_entry_->GetDataTable()->RollbackAppend(txn_, this);
+        LOG_TRACE("Rollback prepare appended data in table: {}", table_entry_->GetTableDesc()->table_name());
+    }
+
+    blocks_.clear();
+}
+
+void
+TxnTableStore::PrepareCommit() {
+    // Init append state
+    append_state_ = MakeUnique<AppendState>(this->blocks_);
+
+    // Start to append
+    LOG_TRACE("Transaction local storage table: {}, Start to prepare commit", this->table_name_);
     table_entry_->GetDataTable()->Append(txn_, this);
-    LOG_TRACE("Transaction local storage table: {}, Committed", this->table_name_);
-    return nullptr;
+    LOG_TRACE("Transaction local storage table: {}, Complete commit preparing", this->table_name_);
+}
+
+void
+TxnTableStore::Commit() {
+
+    table_entry_->GetDataTable()->CommitAppend(txn_, append_state_.get());
+
+//    for(const auto& range: append_state_->append_ranges_) {
+//        LOG_TRACE("Commit, segment: {}, start: {}, count: {}", range.segment_id_, range.start_pos_, range.row_count_);
+//    }
+    LOG_ERROR("Not implements the txn table store commit, table {}", this->table_name_);
+    LOG_ERROR("Not implement to flush the new appended data segment")
 }
 
 }

@@ -24,7 +24,7 @@ public:
         dir_(dir), definition_ptr_(std::move(table_def_ptr)), row_count_(0), buffer_mgr_(buffer_mgr)
     {}
 
-    UniquePtr<String>
+    void
     Append(void* txn_ptr, void* txn_store);
 
     UniquePtr<String>
@@ -36,11 +36,11 @@ public:
     UniquePtr<String>
     Scan(void* txn_ptr, ScanState scan_state);
 
-    UniquePtr<String>
-    CommitAppend(void* txn_ptr, AppendState& append_state);
+    void
+    CommitAppend(void* txn_ptr, const AppendState* append_state_ptr);
 
-    UniquePtr<String>
-    RollbackAppend(void* txn_ptr, AppendState& append_state);
+    void
+    RollbackAppend(void* txn_ptr, void* txn_store);
 
     UniquePtr<String>
     CommitDelete(void* txn_ptr, DeleteState& append_state);
@@ -56,13 +56,22 @@ public:
         return next_segment_id_ ++;
     }
 
+    inline u64
+    GetMaxSegmentID() const {
+        return next_segment_id_;
+    }
+
+    inline DataSegment*
+    GetSegmentByID(u64 id) {
+        return segments_[id].get();
+    }
+
 private:
 
     static inline void
     AddAppendState(AppendState& append_state, DataSegment* segment_ptr) {
         append_state.append_ranges_.emplace_back(segment_ptr->SegmentID(), 0, segment_ptr->RowCount());
     }
-
 
 private:
     RWMutex rw_locker_{};

@@ -23,8 +23,8 @@ ColumnData::GetColumnData() {
         buffer_handle_ = buffer_mgr_->GetBufferHandle(*dir_, BufferType::kFile);
     }
 
-    ptr_t ptr = buffer_handle_->LoadData();
-    return ObjectHandle((BufferHandle*)ptr);
+//    ptr_t ptr = buffer_handle_->LoadData();
+    return ObjectHandle(buffer_handle_);
 }
 
 ObjectHandle

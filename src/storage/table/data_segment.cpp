@@ -24,7 +24,7 @@ DataSegment::Init(const Vector<SharedPtr<ColumnDef>>& column_defs,
 }
 
 void
-DataSegment::Append(void* ptr, AppendState& append_state) {
+DataSegment::Append(void* ptr, AppendState* append_state_ptr) {
     if(status_ != DataSegmentStatus::kOpen) {
         StorageError("Attempt to append data into Non-Open status data segment");
     }
@@ -34,17 +34,25 @@ DataSegment::Append(void* ptr, AppendState& append_state) {
         rw_locker_.unlock();
     });
 
-    if(AvailableCapacity() >= append_state.total_count_) {
+    if(AvailableCapacity() >= append_state_ptr->total_count_) {
         // All appended data will be inserted into this segment;
-        SizeT block_count = append_state.blocks_.size();
+        SizeT block_count = append_state_ptr->blocks_.size();
         SizeT column_count = columns_.size();
-        while(append_state.current_block_ < block_count) {
 
-            const SharedPtr<DataBlock>& input_block = append_state.blocks_[append_state.current_block_];
+        while(append_state_ptr->current_block_ < block_count) {
+
+            const SharedPtr<DataBlock>& input_block = append_state_ptr->blocks_[append_state_ptr->current_block_];
+
+            u64 range_segment_id = this->segment_id_;
+            u64 range_segment_start_pos = current_row_;
+            u64 range_segment_row_count = input_block->row_count();
+            append_state_ptr->append_ranges_.emplace_back(range_segment_id,
+                                                          range_segment_start_pos,
+                                                          range_segment_row_count);
 
             for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
                 columns_[column_id]->Append(input_block->column_vectors[column_id],
-                                            append_state.current_block_offset_,
+                                            append_state_ptr->current_block_offset_,
                                             current_row_,
                                             input_block->row_count());
                 LOG_TRACE("Column: {} is appended with {} rows", column_id, input_block->row_count())
@@ -54,23 +62,30 @@ DataSegment::Append(void* ptr, AppendState& append_state) {
                 block_verions_.txn_ptr_[i] = (u64)ptr;
             }
 
-            ++ append_state.current_block_;
-            append_state.current_block_offset_ = 0;
+            ++ append_state_ptr->current_block_;
+            append_state_ptr->current_block_offset_ = 0;
             current_row_ += input_block->row_count();
         }
 
-        append_state.current_count_ = append_state.total_count_;
+        append_state_ptr->current_count_ = append_state_ptr->total_count_;
     } else {
-        SizeT block_count = append_state.blocks_.size();
+        SizeT block_count = append_state_ptr->blocks_.size();
         SizeT column_count = columns_.size();
-        while(append_state.current_block_ < block_count) {
+        while(append_state_ptr->current_block_ < block_count) {
 
-            const SharedPtr<DataBlock>& input_block = append_state.blocks_[append_state.current_block_];
+            const SharedPtr<DataBlock>& input_block = append_state_ptr->blocks_[append_state_ptr->current_block_];
+
+            u64 range_segment_id = this->segment_id_;
+            u64 range_segment_start_pos = current_row_;
+            u64 range_segment_row_count = input_block->row_count();
+            append_state_ptr->append_ranges_.emplace_back(range_segment_id,
+                                                          range_segment_start_pos,
+                                                          range_segment_row_count);
 
             if(current_row_ + input_block->row_count() <= row_capacity_) {
                 for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
                     columns_[column_id]->Append(input_block->column_vectors[column_id],
-                                                append_state.current_block_offset_,
+                                                append_state_ptr->current_block_offset_,
                                                 current_row_,
                                                 input_block->row_count());
 
@@ -81,8 +96,8 @@ DataSegment::Append(void* ptr, AppendState& append_state) {
                     block_verions_.txn_ptr_[i] = (u64)ptr;
                 }
 
-                ++ append_state.current_block_;
-                append_state.current_block_offset_ = 0;
+                ++ append_state_ptr->current_block_;
+                append_state_ptr->current_block_offset_ = 0;
                 current_row_ += input_block->row_count();
             } else {
 
@@ -90,7 +105,7 @@ DataSegment::Append(void* ptr, AppendState& append_state) {
 
                 for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
                     columns_[column_id]->Append(input_block->column_vectors[column_id],
-                                                append_state.current_block_offset_,
+                                                append_state_ptr->current_block_offset_,
                                                 current_row_,
                                                 to_copy_rows);
 
@@ -102,12 +117,12 @@ DataSegment::Append(void* ptr, AppendState& append_state) {
                 }
 
                 current_row_ += to_copy_rows;
-                append_state.current_block_offset_ += to_copy_rows;
+                append_state_ptr->current_block_offset_ += to_copy_rows;
 
                 break;
             }
         }
-        append_state.current_count_ += row_capacity_;
+        append_state_ptr->current_count_ += row_capacity_;
     }
 }
 
@@ -126,13 +141,17 @@ DataSegment::Scan(void* txn_ptr, ScanState scan_state) {
 
 }
 
-UniquePtr<String>
-DataSegment::CommitAppend(void* txn_ptr, u32 block_id, u32 block_offset, u32 row_count) {
-
+void
+DataSegment::CommitAppend(void* ptr, u64 start_pos, u64 row_count) {
+    Txn* txn_ptr = (Txn*)ptr;
+    u64 end_pos = start_pos + row_count;
+    for(SizeT i = start_pos; i < end_pos; ++ i) {
+        block_verions_.created_[i] = txn_ptr->CommitTS();
+    }
 }
 
 UniquePtr<String>
-DataSegment::RevertAppend(void* txn_ptr, u32 block_id, u32 block_offset, u32 row_count) {
+DataSegment::RevertAppend(void* ptr, u64 start_pos, u64 row_count) {
 
 }
 

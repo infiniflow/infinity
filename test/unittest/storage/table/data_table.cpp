@@ -147,44 +147,213 @@ TEST_F(DataTableTest, test2) {
     // Txn1: Commit, OK
     new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-    // Txn2: Create, OK
-    new_txn = txn_mgr.CreateTxn();
+    {
+        // Txn2: Create, OK
+        new_txn = txn_mgr.CreateTxn();
 
-    // Txn2: Begin, OK
-    new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        // Txn2: Begin, OK
+        new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-    // Txn2: Get db1, OK
-    get_res = new_txn->GetTableByName("db1", "tbl1");
-    EXPECT_NE(get_res.entry_, nullptr);
+        // Txn2: Get db1, OK
+        get_res = new_txn->GetTableByName("db1", "tbl1");
+        EXPECT_NE(get_res.entry_, nullptr);
 
-    // Prepare the input data block
-    Vector<DataType> column_types;
-    column_types.emplace_back(LogicalType::kTinyInt);
-    column_types.emplace_back(LogicalType::kBigInt);
-    column_types.emplace_back(LogicalType::kDouble);
+        // Prepare the input data block
+        Vector<DataType> column_types;
+        column_types.emplace_back(LogicalType::kTinyInt);
+        column_types.emplace_back(LogicalType::kBigInt);
+        column_types.emplace_back(LogicalType::kDouble);
 
-    SharedPtr<DataBlock> input_block = MakeShared<DataBlock>();
+        SharedPtr<DataBlock> input_block = MakeShared<DataBlock>();
 
-    SizeT row_count = DEFAULT_VECTOR_SIZE * 2;
-    input_block->Init(column_types, row_count);
+        SizeT row_count = DEFAULT_VECTOR_SIZE * 2;
+        input_block->Init(column_types, row_count);
 
-    for(SizeT i = 0; i < row_count; ++ i) {
-        input_block->AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
+        for (SizeT i = 0; i < row_count; ++i) {
+            input_block->AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
+        }
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            input_block->AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
+        }
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            input_block->AppendValue(2, Value::MakeDouble(static_cast<f64>(i)));
+        }
+
+        input_block->Finalize();
+        EXPECT_EQ(input_block->Finalized(), true);
+
+        new_txn->Append("db1", "tbl1", input_block);
+
+        // Txn2: Commit, OK
+        new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
     }
 
-    for(SizeT i = 0; i < row_count; ++ i) {
-        input_block->AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
+    {
+        // Txn2: Create, OK
+        new_txn = txn_mgr.CreateTxn();
+
+        // Txn2: Begin, OK
+        new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+
+        {
+            // Get column 0 and column 2 from global storage;
+            Vector<ColumnID> column_ids{0, 2};
+
+            UniquePtr<MetaTableState> read_table_meta = new_txn->GetTableMeta("db1", "tbl1", column_ids);
+            EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
+            EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
+            for (const auto &segment_pair: read_table_meta->segment_map_) {
+                EXPECT_EQ(segment_pair.first, 0);
+                EXPECT_NE(segment_pair.second.data_segment_, nullptr);
+                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
+                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
+                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
+                ColumnData *column0 = segment_pair.second.column_data_map_.at(0).column_data_;
+                ColumnData *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
+
+                SizeT row_count = segment_pair.second.data_segment_->RowCount();
+                ObjectHandle col0_obj = column0->GetColumnData();
+                i8 *col0_ptr = (i8 *) (col0_obj.GetData());
+                for (SizeT row = 0; row < row_count; ++row) {
+//                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                    EXPECT_EQ(col0_ptr[row], (i8) (row));
+                }
+
+                ObjectHandle col2_obj = column2->GetColumnData();
+                f64 *col2_ptr = (f64 *) (col2_obj.GetData());
+                for (SizeT row = 0; row < row_count; ++row) {
+                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
+                }
+            }
+        }
+
+        // Append more data into local storage
+        {
+            // Prepare the input data block
+            Vector<DataType> column_types;
+            column_types.emplace_back(LogicalType::kTinyInt);
+            column_types.emplace_back(LogicalType::kBigInt);
+            column_types.emplace_back(LogicalType::kDouble);
+
+            SharedPtr<DataBlock> input_block = MakeShared<DataBlock>();
+
+            SizeT row_count = DEFAULT_VECTOR_SIZE;
+            input_block->Init(column_types, row_count);
+
+            for (SizeT i = 0; i < row_count; ++i) {
+                input_block->AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
+            }
+
+            for (SizeT i = 0; i < row_count; ++i) {
+                input_block->AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
+            }
+
+            for (SizeT i = 0; i < row_count; ++i) {
+                input_block->AppendValue(2, Value::MakeDouble(static_cast<f64>(i)));
+            }
+
+            input_block->Finalize();
+            EXPECT_EQ(input_block->Finalized(), true);
+
+            new_txn->Append("db1", "tbl1", input_block);
+        }
+
+        {
+            // Get column 0 and column 2 from local and global storage;
+            Vector<ColumnID> column_ids{0, 2};
+
+            UniquePtr<MetaTableState> read_table_meta = new_txn->GetTableMeta("db1", "tbl1", column_ids);
+            EXPECT_EQ(read_table_meta->local_blocks_.size(), 1);
+            for(const auto& local_block_state: read_table_meta->local_blocks_) {
+                EXPECT_NE(local_block_state.data_block_, nullptr);
+                SizeT row_count = local_block_state.data_block_->row_count();
+                EXPECT_EQ(row_count, 8192);
+                EXPECT_EQ(local_block_state.column_vector_map_.size(), 2);
+
+                ColumnVector* column0 = local_block_state.column_vector_map_.at(0).column_vector_;
+                i8* col0_ptr = (i8*)(column0->data_ptr_);
+                ColumnVector* column2 = local_block_state.column_vector_map_.at(2).column_vector_;
+                f64* col2_ptr = (f64*)(column2->data_ptr_);
+                for(SizeT row = 0; row < row_count; ++ row) {
+                    EXPECT_EQ(col0_ptr[row], (i8)row);
+                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
+                }
+            }
+
+            EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
+            for(const auto& segment_pair: read_table_meta->segment_map_) {
+                EXPECT_EQ(segment_pair.first, 0);
+                EXPECT_NE(segment_pair.second.data_segment_, nullptr);
+                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
+                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
+                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
+                ColumnData* column0 = segment_pair.second.column_data_map_.at(0).column_data_;
+                ColumnData* column2 = segment_pair.second.column_data_map_.at(2).column_data_;
+
+                SizeT row_count = segment_pair.second.data_segment_->RowCount();
+                ObjectHandle col0_obj = column0->GetColumnData();
+                i8* col0_ptr = (i8*)(col0_obj.GetData());
+                for(SizeT row = 0; row < row_count; ++ row) {
+//                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                    EXPECT_EQ(col0_ptr[row], (i8)(row));
+                }
+
+                ObjectHandle col2_obj = column2->GetColumnData();
+                f64* col2_ptr = (f64*)(col2_obj.GetData());
+                for(SizeT row = 0; row < row_count; ++ row) {
+                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
+                }
+            }
+        }
+
+        {
+            // Txn2: Rollback, OK
+            new_txn->RollbackTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        }
     }
 
-    for(SizeT i = 0; i < row_count; ++ i) {
-        input_block->AppendValue(2, Value::MakeDouble(static_cast<f64>(i)));
+    {
+        // Txn3: Create, OK
+        new_txn = txn_mgr.CreateTxn();
+
+        // Txn3: Begin, OK
+        new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+
+        {
+            // Get column 0 and column 2 from global storage;
+            Vector<ColumnID> column_ids{0, 2};
+
+            UniquePtr<MetaTableState> read_table_meta = new_txn->GetTableMeta("db1", "tbl1", column_ids);
+            EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
+            EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
+            for (const auto &segment_pair: read_table_meta->segment_map_) {
+                EXPECT_EQ(segment_pair.first, 0);
+                EXPECT_NE(segment_pair.second.data_segment_, nullptr);
+                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
+                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
+                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
+                ColumnData *column0 = segment_pair.second.column_data_map_.at(0).column_data_;
+                ColumnData *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
+
+                SizeT row_count = segment_pair.second.data_segment_->RowCount();
+                ObjectHandle col0_obj = column0->GetColumnData();
+                i8 *col0_ptr = (i8 *) (col0_obj.GetData());
+                for (SizeT row = 0; row < row_count; ++row) {
+//                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                    EXPECT_EQ(col0_ptr[row], (i8) (row));
+                }
+
+                ObjectHandle col2_obj = column2->GetColumnData();
+                f64 *col2_ptr = (f64 *) (col2_obj.GetData());
+                for (SizeT row = 0; row < row_count; ++row) {
+                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
+                }
+            }
+        }
+
+        // Txn3: Commit, OK
+        new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
     }
-
-    input_block->Finalize();
-    EXPECT_EQ(input_block->Finalized(), true);
-
-    new_txn->Append("db1", "tbl1", input_block);
-
-    // Txn2: Commit, OK
-    new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 }

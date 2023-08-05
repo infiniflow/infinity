@@ -6,8 +6,8 @@
 
 #include <utility>
 
-#include "storage/meta/entry/db_entry.h"
 #include "storage/data_block.h"
+#include "storage/table/data_access_state.h"
 #include "storage/meta/entry/table_entry.h"
 
 namespace infinity {
@@ -24,10 +24,21 @@ public:
     UniquePtr<String>
     Delete(const Vector<RowID>& row_ids);
 
-    UniquePtr<String>
+    void
+    Scan(SharedPtr<DataBlock>& output_block);
+
+    void
+    Rollback();
+
+    void
+    PrepareCommit();
+
+    void
     Commit();
 
-    Vector<SharedPtr<DataBlock>> blocks_;
+public:
+    Vector<SharedPtr<DataBlock>> blocks_{};
+    UniquePtr<AppendState> append_state_{};
 
     SizeT current_block_id_{0};
 

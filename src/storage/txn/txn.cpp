@@ -60,25 +60,117 @@ Txn::Delete(const String& db_name, const String& table_name, const Vector<RowID>
     return nullptr;
 }
 
-UniquePtr<String>
-Txn::GetTableScanState(const String& db_name, const String& table_name, TableEntry*& table_entry) {
-    return nullptr;
-}
+UniquePtr<MetaTableState>
+Txn::GetTableMeta(const String& db_name, const String& table_name, const Vector<ColumnID>& columns) {
+    UniquePtr<MetaTableState> meta_table_state = MakeUnique<MetaTableState>();
+    auto txn_table_iter = txn_tables_store_.find(table_name);
+    if(txn_table_iter != txn_tables_store_.end()) {
+        Vector<SharedPtr<DataBlock>>& blocks = txn_table_iter->second->blocks_;
+        meta_table_state->local_blocks_.reserve(blocks.size());
+        for(const auto& data_block: blocks) {
+            MetaDataBlockState data_block_state;
+            data_block_state.data_block_ = data_block.get();
+            for(const auto& column_id: columns) {
+                MetaColumnVectorState column_vector_state;
+                column_vector_state.column_vector_ = data_block->column_vectors[column_id].get();
+                data_block_state.column_vector_map_[column_id] = column_vector_state;
+            }
+            meta_table_state->local_blocks_.emplace_back(data_block_state);
+        }
+    }
 
-UniquePtr<String>
-Txn::InitializeScan(const String& db_name, const String& table_name, const Vector<ColumnID>& column_ids) {
     TableEntry* table_entry{nullptr};
     UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
     if(err_msg != nullptr) {
-        return err_msg;
+        StorageError(*err_msg);
     }
 
+    u64 max_segment_id = table_entry->GetDataTable()->GetMaxSegmentID();
+    for(u64 segment_id = 0; segment_id < max_segment_id; ++ segment_id) {
+        DataSegment* segment_ptr = table_entry->GetDataTable()->GetSegmentByID(segment_id);
+
+        MetaSegmentState segment_state;
+        segment_state.data_segment_ = segment_ptr;
+        for(const auto& column_id: columns) {
+            MetaColumnDataState column_data_state;
+            column_data_state.column_data_ = segment_ptr->GetColumnDataByID(column_id);
+            segment_state.column_data_map_[column_id] = column_data_state;
+        }
+        meta_table_state->segment_map_[segment_id] = segment_state;
+    }
+
+    return meta_table_state;
+}
+
+SharedPtr<GetState>
+Txn::InitializeGet(GetParam) {
     return nullptr;
 }
 
-UniquePtr<String>
-Txn::Scan(const String& db_name, const String& table_name, SharedPtr<DataBlock>& output_block) {
-    return nullptr;
+void
+Txn::TableGet() {
+
+}
+
+void
+Txn::IndexGet() {
+
+}
+
+SharedPtr<ScanState>
+Txn::InitializeScan(const String& db_name, const String& table_name, const Vector<ColumnID>& column_ids) {
+
+    SharedPtr<ScanState> scan_state{};
+    auto txn_table_iter = txn_tables_store_.find(table_name);
+    if(txn_table_iter != txn_tables_store_.end()) {
+        scan_state->txn_table_store_ = txn_table_iter->second.get();
+        scan_state->table_entry_ = (void*)(txn_table_iter->second->table_entry_);
+        scan_state->scan_location_ = ScanLocation::kLocal;
+    } else {
+        TableEntry* table_entry{nullptr};
+        UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
+        if(err_msg != nullptr) {
+            StorageError(*err_msg);
+        }
+        scan_state->table_entry_ = (void*)table_entry;
+        scan_state->scan_location_ = ScanLocation::kGlobal;
+    }
+    scan_state->columns_ = column_ids;
+
+    return scan_state;
+}
+
+void
+Txn::Scan(ScanState* scan_state, SharedPtr<DataBlock>& output_block) {
+
+    if(scan_state->scan_location_ == ScanLocation::kLocal) {
+        // Scan local storage
+        TxnTableStore* local_table_store = (TxnTableStore* )scan_state->txn_table_store_;
+        if(scan_state->filter_ptr_ == nullptr) {
+            // No filter
+//            if(scan_state->)
+        } else {
+            // With filter
+        }
+//        local_table_store->blocks_
+    }
+
+    // Scan global storage
+}
+
+void
+Txn::TableScan(ScanState* scan_state, SharedPtr<DataBlock>& output_block) {
+    NotImplementError("Not implemented")
+}
+
+void
+Txn::IndexScan(ScanState* scan_state, SharedPtr<DataBlock>& output_block) {
+    NotImplementError("Not implemented")
+}
+
+void
+Txn::AnnScan(ScanState* scan_state, SharedPtr<DataBlock>& output_block) {
+    NotImplementError("Not implemented")
 }
 
 UniquePtr<String>
@@ -333,23 +425,10 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
             txn_mgr_->UnLock();
         });
 
-        // Commit databases in catalog
-        for(auto* db_entry: txn_dbs_) {
-            db_entry->Commit(commit_ts);
-        }
-
-        // Commit tables in catalog
-        for(auto* table_entry: txn_tables_) {
-            table_entry->Commit(commit_ts);
-        }
-
-        // Commit txn local data into table
+        // prepare to commit txn local data into table
         for(const auto& name_table_pair: txn_tables_store_) {
             TxnTableStore* table_local_store = name_table_pair.second.get();
-            auto res = table_local_store->Commit();
-            if(res != nullptr) {
-                LOG_ERROR("Txn commit error on table: {}", table_local_store->table_name_);
-            }
+            table_local_store->PrepareCommit();
         }
     }
 
@@ -363,6 +442,25 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
         }
         txn_context_.state_ = TxnState::kCommitted;
     }
+
+    // Commit databases in catalog
+    for(auto* db_entry: txn_dbs_) {
+        db_entry->Commit(commit_ts);
+    }
+
+    // Commit tables in catalog
+    for(auto* table_entry: txn_tables_) {
+        table_entry->Commit(commit_ts);
+    }
+
+    // Commit the prepared data
+    for(const auto& name_table_pair: txn_tables_store_) {
+        TxnTableStore* table_local_store = name_table_pair.second.get();
+        table_local_store->Commit();
+    }
+
+    // Flush to disk
+    // Reset the LSN of WAL
 }
 
 void
@@ -390,6 +488,12 @@ Txn::RollbackTxn(TxnTimeStamp abort_ts) {
 
     for(const auto& db_name: db_names_) {
         catalog_->RemoveDBEntry(db_name, this->txn_id_, &txn_context_);
+    }
+
+    // Rollback the prepared data
+    for(const auto& name_table_pair: txn_tables_store_) {
+        TxnTableStore* table_local_store = name_table_pair.second.get();
+        table_local_store->Rollback();
     }
 
     {

@@ -22,7 +22,7 @@ public:
             TxnContext* txn_context,
             void* buffer_mgr)
         : BaseEntry(EntryType::kDatabase, txn_context), db_name_(std::move(db_name)), buffer_mgr_(buffer_mgr) {
-        dir_ = MakeShared<String>(*dir + '/' + std::to_string(txn_id));
+        dir_ = MakeShared<String>(*dir + "/txn_" + std::to_string(txn_id));
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }

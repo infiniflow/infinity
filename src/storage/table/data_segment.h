@@ -44,7 +44,7 @@ public:
     Init(const Vector<SharedPtr<ColumnDef>>& column_defs, const SharedPtr<String>& dir, void* buffer_mgr);
 
     void
-    Append(void* txn_ptr, AppendState& append_state);
+    Append(void* txn_ptr, AppendState* append_state);
 
     UniquePtr<String>
     Delete(void* txn_ptr, DeleteState& delete_state);
@@ -55,11 +55,11 @@ public:
     UniquePtr<String>
     Scan(void* txn_ptr, ScanState scan_state);
 
-    UniquePtr<String>
-    CommitAppend(void* txn_ptr, u32 block_id, u32 block_offset, u32 row_count);
+    void
+    CommitAppend(void* txn_ptr, u64 start_pos, u64 row_count);
 
     UniquePtr<String>
-    RevertAppend(void* txn_ptr, u32 block_id, u32 block_offset, u32 row_count);
+    RevertAppend(void* ptr, u64 start_pos, u64 row_count);
 
     UniquePtr<String>
     CommitDelete(void* txn_ptr, const Vector<RowID>& row_ids);
@@ -83,6 +83,11 @@ public:
     [[nodiscard]] inline SizeT
     RowCount() const {
         return current_row_;
+    }
+
+    inline ColumnData*
+    GetColumnDataByID(u64 column_id) {
+        return columns_[column_id].get();
     }
 
 private:

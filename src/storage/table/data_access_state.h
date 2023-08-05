@@ -50,14 +50,45 @@ struct DeleteState {
     HashMap<u64, Vector<u64>> rows_;
 };
 
+
+struct GetState {
+
+};
+
+enum class ScanStateType {
+    kTableScan,
+    kIndexScan,
+    kAnnScan,
+};
+
+enum class ScanLocation {
+    kLocal,
+    kGlobal,
+};
+
 struct ScanState {
-    RowID current_pos_;
+    void* txn_table_store_{};
+    void* table_entry_{};
+    ScanLocation scan_location_{ScanLocation::kLocal};
+
+    // For local
+    u64 current_block_id_{};
+    u64 current_row_in_block_{};
+
+    // For global
+    u64 current_segment_id_{};
+    u64 current_row_in_segment_{};
 
     // TableFilter
+    void* filter_ptr_;
+
+    // Ann query embeddings
+    ColumnVector* column_vector_ptr_;
 
     // ScanType: table scan/index scan/ann scan
 
-    // Projection expressions
+    // input columns
+    Vector<ColumnID> columns_;
 };
 
 }
