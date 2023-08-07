@@ -305,7 +305,7 @@ MergePage(BtreeUpdateAction &state, Page *page, Page *sibling) {
     return page;
 }
 
-/* collapse the root node; returns the new root */
+// collapse the root node; returns the new root
 static inline Page *
 CollapseRoot(BtreeUpdateAction &state, Page *RootPage) {
     BtreeNodeProxy *node = state.btree_->GetNodeFromPage(RootPage);
@@ -617,5 +617,241 @@ int BtreeIndex::Insert(Context *context, btree_key_t *key_, btree_record_t *reco
     int st = bia.Run();
     return 0;
 }
+
+
+
+struct BtreeEraseAction : public BtreeUpdateAction {
+    BtreeEraseAction(BtreeIndex *btree, Context *context,
+                     btree_key_t *key, int duplicate_index, uint32_t /* flags (not used) */)
+        : BtreeUpdateAction(btree, context, duplicate_index),
+          key_(key) {
+    }
+
+    int Run() {
+        // traverse the tree to the leaf, splitting/merging nodes as required
+        Page *parent;
+        Page *page = TraverseTree(context_, key_, &parent);
+        BtreeNodeProxy *node = btree_->GetNodeFromPage(page);
+
+        // we have reached the leaf; search the leaf for the key
+        int slot = node->Find(key_);
+        if (slot < 0) {
+            return -1;
+        }
+
+        // remove the key from the leaf
+        return RemoveEntry(page, parent, slot);
+    }
+
+    int RemoveEntry(Page *page, Page *parent, int slot) {
+        BtreeNodeProxy *node = btree_->GetNodeFromPage(page);
+
+        assert(slot >= 0);
+        assert(slot < (int)node->Length());
+
+        // delete the record, but only on leaf nodes! internal nodes don't have
+        // records; they point to pages instead, and we do not want to delete
+        // those.
+        bool has_duplicates_left = false;
+        if (node->IsLeaf()) {
+            // only delete a duplicate?
+            if (duplicate_index_ > 0)
+                node->EraseRecord(slot, duplicate_index_ - 1, false,
+                                   &has_duplicates_left);
+            else
+                node->EraseRecord(slot, 0, true, 0);
+        }
+
+        page->SetDirty(true);
+
+        if (has_duplicates_left)
+            return 0;
+
+        // We've reached the leaf; it's still possible that we have to
+        // split the page, therefore this case has to be handled
+        try {
+            node->Erase(slot);
+        } catch (Exception &ex) {
+            // Split the page in the middle. This will invalidate the |node| pointer
+            // and the |slot| of the key, therefore restart the whole operation
+            SplitPage(page, parent, key_);
+            return Run();
+        }
+
+        return 0;
+    }
+
+    // the key that is retrieved
+    btree_key_t *key_;
+};
+
+int
+BtreeIndex::Erase(Context *context, btree_key_t *key, int duplicate_index, uint32_t flags) {
+    BtreeEraseAction bea(this, context, key, duplicate_index, flags);
+    return bea.Run();
+}
+
+struct BtreeFindAction {
+    BtreeFindAction(BtreeIndex *btree, Context *context,
+                    btree_key_t *key, ByteArray *key_arena,
+                    btree_record_t *record, ByteArray *record_arena,
+                    uint32_t flags)
+        : btree_(btree), context_(context), key_(key),
+          record_(record), flags_(flags), key_arena_(key_arena),
+          record_arena_(record_arena) {
+    }
+
+    int Run() {
+        Page *page = 0;
+        int slot = -1;
+        BtreeNodeProxy *node = 0;
+        uint32_t is_approx_match = 0;
+
+        if (slot == -1) {
+            /* load the root page */
+            page = btree_->RootPage(context_);
+
+            /* now traverse the root to the leaf nodes till we find a leaf */
+            node = btree_->GetNodeFromPage(page);
+            while (!node->IsLeaf()) {
+                page = btree_->LowerBound(context_, page, key_, PageManager::kReadOnly, 0);
+                if (unlikely(!page)) {
+                    return -1;
+                }
+
+                node = btree_->GetNodeFromPage(page);
+            }
+
+            /* check the leaf page for the key (shortcut w/o approx. matching) */
+            if (flags_ == 0) {
+                slot = node->Find(key_);
+                if (unlikely(slot == -1)) {
+                    return -1;
+                }
+
+                goto return_result;
+            }
+
+            /* check the leaf page for the key (long path w/ approx. matching),
+             * then fall through */
+            slot = Find(context_, page, key_, flags_, &is_approx_match);
+        }
+
+        if (unlikely(slot == -1)) {
+            // find the left sibling
+            if (node->LeftSibling() > 0) {
+                page = btree_->state_.page_manager_->Fetch(context_, node->LeftSibling(), PageManager::kReadOnly);
+                node = btree_->GetNodeFromPage(page);
+                slot = node->Length() - 1;
+                is_approx_match = BtreeKey::kLower;
+            }
+        } else if (unlikely(slot >= (int)node->Length())) {
+            // find the right sibling
+            if (node->RightSibling() > 0) {
+                page = btree_->state_.page_manager_->Fetch(context_, node->RightSibling(),PageManager::kReadOnly);
+                node = btree_->GetNodeFromPage(page);
+                slot = 0;
+                is_approx_match = BtreeKey::kGreater;
+            } else
+                slot = -1;
+        }
+
+        if (unlikely(slot < 0)) {
+            return -1;
+        }
+
+        assert(node->IsLeaf());
+
+return_result:
+
+        // approx. match: patch the key flags
+        key_->flags_ = is_approx_match;
+
+        // no need to load the key if we have an exact match
+        if (key_ && is_approx_match )
+            node->Key(slot, key_arena_, key_);
+
+        if (likely(record_ != 0))
+            node->Record(slot, record_arena_, record_, flags_);
+
+        return 0;
+    }
+
+    // Searches a leaf node for a key.
+    //
+    // !!!
+    // only works with leaf nodes!!
+    //
+    // Returns the index of the key, or -1 if the key was not found, or
+    // another negative status code value when an unexpected error occurred.
+    int Find(Context *context, Page *page, btree_key_t *key, uint32_t flags, uint32_t *is_approx_match) {
+        *is_approx_match = 0;
+
+        BtreeNodeProxy *node = btree_->GetNodeFromPage(page);
+        if (unlikely(node->Length() == 0))
+            return -1;
+
+        int cmp;
+        int slot = node->LowerBound(key, 0, &cmp);
+
+        if (cmp == 0)
+            return slot;
+
+        // approx. matching: smaller key is required
+        /*
+        if (ISSET(flags, UPS_FIND_LT_MATCH)) {
+            if (cmp == 0 && ISSET(flags, UPS_FIND_GT_MATCH)) {
+                *is_approx_match = BtreeKey::kLower;
+                return slot + 1;
+            }
+
+            if (slot < 0 && ISSET(flags, UPS_FIND_GT_MATCH)) {
+                *is_approx_match = BtreeKey::kGreater;
+                return 0;
+            }
+            *is_approx_match = BtreeKey::kLower;
+            return cmp <= 0 ? slot - 1 : slot;
+        }
+
+        // approx. matching: greater key is required
+        if (ISSET(flags, UPS_FIND_GT_MATCH)) {
+            *is_approx_match = BtreeKey::kGreater;
+            return slot + 1;
+        }*/
+
+        return cmp ? -1 : slot;
+    }
+
+    // the current btree
+    BtreeIndex *btree_;
+
+    // The caller's Context
+    Context *context_;
+
+    // the key that is retrieved
+    btree_key_t *key_;
+
+    // the record that is retrieved
+    btree_record_t *record_;
+
+    // flags of ups_db_find()
+    uint32_t flags_;
+
+    // allocator for the key data
+    ByteArray *key_arena_;
+
+    // allocator for the record data
+    ByteArray *record_arena_;
+};
+
+int
+BtreeIndex::Find(Context *context, btree_key_t *key,
+                 ByteArray *key_arena, btree_record_t *record,
+                 ByteArray *record_arena, uint32_t flags) {
+    BtreeFindAction bfa(this, context, key, key_arena, record, record_arena, flags);
+    return bfa.Run();
+}
+
+
 
 }

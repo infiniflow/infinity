@@ -228,7 +228,7 @@ public:
 
     Page* Alloc(Context *context, uint32_t page_type, uint32_t flags = 0);
 
-    Page* Fetch(Context *context, uint32_t page_type, uint32_t flags = 0);
+    Page* Fetch(Context *context, uint32_t address, uint32_t flags = 0);
 
     void Del(Context *context, Page *page, size_t page_count = 1);
 

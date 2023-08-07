@@ -152,6 +152,10 @@ public:
 
     int Insert(Context *context, btree_key_t *key_, btree_record_t *record_, uint32_t flags_);
 
+    int Erase(Context *context, btree_key_t *key, int duplicate_index, uint32_t flags);
+
+    int Find(Context *context, btree_key_t *key, ByteArray *key_arena, btree_record_t *record, ByteArray *record_arena, uint32_t flags);
+
 public:
     BtreeIndexState state_;
 };

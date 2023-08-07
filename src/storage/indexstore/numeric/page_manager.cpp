@@ -146,9 +146,9 @@ done:
 }
 
 Page*
-PageManager::Fetch(Context *context, uint32_t page_type, uint32_t flags) {
+PageManager::Fetch(Context *context, uint32_t address, uint32_t flags) {
     ScopedSpinLock lock(state_->mutex_);
-    return FetchUnlocked(context, page_type, flags);
+    return FetchUnlocked(context, address, flags);
 }
 
 Page *
