@@ -11,16 +11,17 @@ ColumnData::~ColumnData() {
 }
 
 void
-ColumnData::Init(const ColumnDef* column_def, SizeT row_capacity) {
+ColumnData::Init(const SharedPtr<ColumnDef>& column_def, SizeT row_capacity) {
+    column_def_ = column_def;
     row_capacity_ = row_capacity;
-    buffer_handle_ = buffer_mgr_->AllocateBufferHandle(*dir_, column_def->column_type_.Size() * row_capacity_);
+    buffer_handle_ = buffer_mgr_->AllocateBufferHandle(*base_dir_, *file_name_, column_def->column_type_.Size() * row_capacity_);
 }
 
 ObjectHandle
 ColumnData::GetColumnData() {
     if(buffer_handle_ == nullptr) {
         // Get buffer handle from buffer manager
-        buffer_handle_ = buffer_mgr_->GetBufferHandle(*dir_, BufferType::kFile);
+        buffer_handle_ = buffer_mgr_->GetBufferHandle(*base_dir_, *file_name_, BufferType::kFile);
     }
 
 //    ptr_t ptr = buffer_handle_->LoadData();
@@ -32,10 +33,10 @@ ColumnData::GetExtraColumnData(u64 extra_block_id) {
     BufferHandle* extra_buffer = extra_buffer_handles_[extra_block_id];
     if(extra_buffer == nullptr) {
         // Construct file path
-        String file_path = *dir_ + '.' + std::to_string(extra_block_id);
+        String file_path = *file_name_ + '.' + std::to_string(extra_block_id);
 
         // Get buffer handle from buffer manager
-        buffer_handle_ = buffer_mgr_->GetBufferHandle(file_path, BufferType::kExtraBlock);
+        buffer_handle_ = buffer_mgr_->GetBufferHandle(*base_dir_, file_path, BufferType::kExtraBlock);
     }
 
     ptr_t ptr = buffer_handle_->LoadData();
@@ -97,8 +98,56 @@ ColumnData::Append(const SharedPtr<ColumnVector>& column_vector,
 }
 
 void
-ColumnData::Flush() {
+ColumnData::Flush(SizeT row_count) {
+    SizeT buffer_size{0};
+    switch(column_def_->type().type()) {
+        case kBoolean:
+        case kTinyInt:
+        case kSmallInt:
+        case kInteger:
+        case kBigInt:
+        case kHugeInt:
+        case kDecimal:
+        case kFloat:
+        case kDouble:
+        case kDate:
+        case kTime:
+        case kDateTime:
+        case kTimestamp:
+        case kInterval:
+        case kPoint:
+        case kLine:
+        case kLineSeg:
+        case kBox:
+        case kCircle:
+        case kBitmap:
+        case kUuid:
+        case kEmbedding: {
+            buffer_size = row_count * column_def_->type().Size();
+            break;
+        }
 
+        case kVarchar:
+        case kArray:
+        case kTuple:
+        case kPath:
+        case kPolygon:
+        case kBlob:
+        case kMixed:
+        case kNull: {
+            LOG_ERROR("{} isn't supported", column_def_->type().ToString())
+            NotImplementError("Not supported now in append data in column")
+        }
+        case kMissing:
+        case kInvalid: {
+            LOG_ERROR("Invalid data type {}", column_def_->type().ToString())
+            StorageError("Invalid data type")
+        }
+    }
+
+    buffer_handle_->WriteFile(buffer_size);
+    buffer_handle_->SyncFile();
+    buffer_handle_->CloseFile();
 }
 
 void

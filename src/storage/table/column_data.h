@@ -18,14 +18,14 @@ class ColumnData {
 public:
     explicit
     ColumnData(const SharedPtr<String>& base_dir, u64 column_id, BufferManager* buffer_mgr)
-        : column_id_(column_id), buffer_mgr_(buffer_mgr) {
-        dir_ = MakeShared<String>(*base_dir + "_col" + std::to_string(column_id));
+        : column_id_(column_id), buffer_mgr_(buffer_mgr), base_dir_(base_dir) {
+        file_name_ = MakeShared<String>("col" + std::to_string(column_id));
     }
 
     ~ColumnData();
 
     void
-    Init(const ColumnDef* column_def, SizeT row_capacity);
+    Init(const SharedPtr<ColumnDef>& column_def, SizeT row_capacity);
 
     // location and file name
     // file type
@@ -46,7 +46,7 @@ public:
            SizeT rows);
 
     void
-    Flush();
+    Flush(SizeT row_count);
 
 private:
     static inline void
@@ -61,7 +61,10 @@ private:
     CopyFromVariable();
 
 private:
-    SharedPtr<String> dir_{};
+    SharedPtr<ColumnDef> column_def_{};
+
+    const SharedPtr<String> base_dir_{};
+    SharedPtr<String> file_name_{};
     u64 column_id_{};
     u64 max_extra_block_{}; // Used in dynamic data type column
     SizeT start_row_{};

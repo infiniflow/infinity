@@ -63,10 +63,19 @@ DataTable::Scan(void* txn_ptr, ScanState scan_state) {
 
 void
 DataTable::CommitAppend(void* txn_ptr, const AppendState* append_state_ptr) {
+
+    HashSet<u64> new_segments;
     for(const auto& range: append_state_ptr->append_ranges_) {
         LOG_TRACE("Commit, segment: {}, start: {}, count: {}", range.segment_id_, range.start_pos_, range.row_count_);
         DataSegment* segment_ptr = segments_[range.segment_id_].get();
         segment_ptr->CommitAppend(txn_ptr, range.start_pos_, range.row_count_);
+        new_segments.insert(range.segment_id_);
+    }
+
+    // FIXME: now all commit will trigger flush
+    for(u64 segment_id: new_segments) {
+        segments_[segment_id]->PrepareFlush();
+        segments_[segment_id]->Flush();
     }
 }
 

@@ -36,7 +36,8 @@ BufferManager::Init() {
 }
 
 BufferHandle*
-BufferManager::GetBufferHandle(const String& object_name, BufferType buffer_type) {
+BufferManager::GetBufferHandle(const String& dir, const String& file_name, BufferType buffer_type) {
+    String object_name = dir + '/' + file_name;
     {
         std::shared_lock<RWMutex> r_locker(rw_locker_);
         if(buffer_map_.find(object_name) != buffer_map_.end()) {
@@ -54,8 +55,8 @@ BufferManager::GetBufferHandle(const String& object_name, BufferType buffer_type
             std::unique_lock<RWMutex> w_locker(rw_locker_);
             auto iter = buffer_map_.emplace(object_name, this);
             iter.first->second.id_ = next_buffer_id_ ++;
-            iter.first->second.name_ = object_name;
-            iter.first->second.path_ = this->base_dir_ + '/' + object_name;
+            iter.first->second.path_ = this->base_dir_ + '/' + dir;
+            iter.first->second.file_name_ = this->base_dir_ + '/' + object_name;
             iter.first->second.buffer_type_ = buffer_type;
 
             return &(iter.first->second);
@@ -65,8 +66,8 @@ BufferManager::GetBufferHandle(const String& object_name, BufferType buffer_type
             std::unique_lock<RWMutex> w_locker(rw_locker_);
             auto iter = buffer_map_.emplace(object_name, this);
             iter.first->second.id_ = next_buffer_id_ ++;
-            iter.first->second.name_ = object_name;
-            iter.first->second.path_ = this->base_dir_ + '/' + object_name;
+            iter.first->second.path_ = this->base_dir_ + '/' + dir;
+            iter.first->second.file_name_ = this->base_dir_ + '/' + object_name;
             iter.first->second.buffer_type_ = buffer_type;
 
             return &(iter.first->second);
@@ -80,12 +81,14 @@ BufferManager::GetBufferHandle(const String& object_name, BufferType buffer_type
 }
 
 BufferHandle*
-BufferManager::AllocateBufferHandle(const String& object_name, SizeT buffer_size) {
+BufferManager::AllocateBufferHandle(const String& dir, const String& file_name, SizeT buffer_size) {
+    String object_name = dir + '/' + file_name;
+
     std::unique_lock<RWMutex> w_locker(rw_locker_);
     auto iter = buffer_map_.emplace(object_name, this);
     iter.first->second.id_ = next_buffer_id_ ++;
-    iter.first->second.name_ = object_name;
-    iter.first->second.path_ = this->base_dir_ + '/' + object_name;
+    iter.first->second.path_ = this->base_dir_ + '/' + dir;
+    iter.first->second.file_name_ = this->base_dir_ + '/' + object_name;
     iter.first->second.buffer_type_ = BufferType::kTempFile;
     iter.first->second.status_ = BufferStatus::kFreed;
 

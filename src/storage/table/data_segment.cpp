@@ -17,7 +17,7 @@ DataSegment::Init(const Vector<SharedPtr<ColumnDef>>& column_defs,
     SizeT column_count = column_defs.size();
     for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
         columns_.emplace_back(MakeShared<ColumnData>(dir_, column_id, (BufferManager*)buffer_mgr));
-        columns_.back()->Init(column_defs[column_id].get(), row_capacity_);
+        columns_.back()->Init(column_defs[column_id], row_capacity_);
     }
 
     status_ = DataSegmentStatus::kOpen;
@@ -137,7 +137,7 @@ DataSegment::InitScan(void* txn_ptr, ScanState& scan_state) {
 }
 
 UniquePtr<String>
-DataSegment::Scan(void* txn_ptr, ScanState scan_state) {
+DataSegment::Scan(void* txn_ptr, ScanState* scan_state) {
 
 }
 
@@ -168,14 +168,20 @@ DataSegment::PrepareFlush() {
 
 UniquePtr<String>
 DataSegment::Flush() {
-    for(const auto& column_data: columns_) {
-        column_data->Flush();
+    LOG_TRACE("DataSegment: {} is being flushed", this->segment_id_);
+    for(SizeT column_id = 0; const auto& column_data: columns_) {
+        column_data->Flush(current_row_);
+        LOG_TRACE("ColumnData: {} is flushed", column_id);
+        ++ column_id;
     }
 
     DataSegmentStatus expected = DataSegmentStatus::kFlushing;
     if(!status_.compare_exchange_strong(expected, DataSegmentStatus::kClosed, std::memory_order_seq_cst)) {
         return MakeUnique<String>("Data segment is expected as flushing status");
     }
+    LOG_TRACE("DataSegment: {} is being flushed", this->segment_id_);
+
+    return nullptr;
 }
 
 }

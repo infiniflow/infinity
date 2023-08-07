@@ -12,7 +12,6 @@ namespace infinity {
 
 struct ColumnChunk {
     String data_location_;
-
 };
 
 struct DataChunk {
@@ -53,7 +52,7 @@ public:
     InitScan(void* txn_ptr, ScanState& scan_state);
 
     UniquePtr<String>
-    Scan(void* txn_ptr, ScanState scan_state);
+    Scan(void* txn_ptr, ScanState* scan_state);
 
     void
     CommitAppend(void* txn_ptr, u64 start_pos, u64 row_count);
@@ -106,7 +105,3 @@ private:
 };
 
 }
-
-
-
-

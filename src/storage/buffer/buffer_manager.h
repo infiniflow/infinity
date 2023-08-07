@@ -25,10 +25,10 @@ public:
     Init();
 
     BufferHandle*
-    GetBufferHandle(const String &object_name, BufferType buffer_type);
+    GetBufferHandle(const String& dir, const String &object_name, BufferType buffer_type);
 
     BufferHandle*
-    AllocateBufferHandle(const String& object_name, SizeT buffer_size);
+    AllocateBufferHandle(const String& dir, const String& object_name, SizeT buffer_size);
 
     inline void
     PushGCQueue(BufferHandle* buffer_handle) {

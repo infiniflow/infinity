@@ -17,6 +17,8 @@ class DataTableTest : public BaseTest {
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
         infinity::Infinity::instance().Init();
+
+        system("rm -rf /tmp/infinity/data/table");
     }
 
     void
@@ -87,7 +89,8 @@ TEST_F(DataTableTest, test2) {
     String base_path = "/tmp/infinity/data";
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
-    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity/table");
+//    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity/table");
+    UniquePtr<String> dir = MakeUnique<String>("table");
     NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
     TxnManager txn_mgr(&new_catalog);
 

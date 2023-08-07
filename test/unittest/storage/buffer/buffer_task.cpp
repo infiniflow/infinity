@@ -47,9 +47,9 @@ TEST_F(BufferTaskProcessorTest, test1) {
 
         // file: /tmp/infinity/data/c1.col
         String obj_id1 = "c1.col";
-        BufferHandle *buf_handle1 = buffer_mgr.AllocateBufferHandle(obj_id1, elem_count * sizeof(i64));
+        BufferHandle *buf_handle1 = buffer_mgr.AllocateBufferHandle(temp_path, obj_id1, elem_count * sizeof(i64));
         EXPECT_EQ(buf_handle1->GetID(), 1);
-        EXPECT_EQ(buf_handle1->GetName(), obj_id1);
+        EXPECT_EQ(buf_handle1->GetFilename(), obj_id1);
 
         ptr_t buf_ptr1 = buf_handle1->LoadData();
         for (i64 i = 0; i < elem_count; ++i) {
@@ -59,9 +59,9 @@ TEST_F(BufferTaskProcessorTest, test1) {
 
         // file: /tmp/infinity/data/c2.col
         String obj_id2 = "c2.col";
-        BufferHandle *buf_handle2 = buffer_mgr.AllocateBufferHandle(obj_id2, elem_count * sizeof(i32));
+        BufferHandle *buf_handle2 = buffer_mgr.AllocateBufferHandle(base_path, obj_id2, elem_count * sizeof(i32));
         EXPECT_EQ(buf_handle2->GetID(), 2);
-        EXPECT_EQ(buf_handle2->GetName(), obj_id2);
+        EXPECT_EQ(buf_handle2->GetFilename(), obj_id2);
 
         ptr_t buf_ptr2 = buf_handle2->LoadData();
         for (i32 i = 0; i < elem_count; ++i) {
@@ -94,9 +94,9 @@ TEST_F(BufferTaskProcessorTest, test1) {
         constexpr SizeT elem_count = 4096;
 
         String obj_id1 = "c1.col";
-        BufferHandle* buf_handle1 = buffer_mgr.GetBufferHandle(obj_id1, BufferType::kFile);
+        BufferHandle* buf_handle1 = buffer_mgr.GetBufferHandle(base_path, obj_id1, BufferType::kFile);
         EXPECT_EQ(buf_handle1->GetID(), 1);
-        EXPECT_EQ(buf_handle1->GetName(), obj_id1);
+        EXPECT_EQ(buf_handle1->GetFilename(), obj_id1);
 
         ptr_t data_ptr = buf_handle1->LoadData();
         EXPECT_NE(data_ptr, nullptr);
@@ -108,9 +108,9 @@ TEST_F(BufferTaskProcessorTest, test1) {
         // file: /tmp/infinity/data/c2.col
 
         String obj_id2 = "c2.col";
-        BufferHandle* buf_handle2 = buffer_mgr.GetBufferHandle(obj_id2, BufferType::kFile);
+        BufferHandle* buf_handle2 = buffer_mgr.GetBufferHandle(base_path, obj_id2, BufferType::kFile);
         EXPECT_EQ(buf_handle2->GetID(), 2);
-        EXPECT_EQ(buf_handle2->GetName(), obj_id2);
+        EXPECT_EQ(buf_handle2->GetFilename(), obj_id2);
 
         ptr_t data_ptr2 = buf_handle2->LoadData();
         EXPECT_NE(data_ptr2, nullptr);

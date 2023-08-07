@@ -41,11 +41,6 @@ public:
         id_ = id;
     }
 
-    inline void
-    SetName(String name) {
-        name_ = std::move(name);
-    }
-
     ptr_t
     LoadData();
 
@@ -69,8 +64,8 @@ public:
     }
 
     [[nodiscard]] const String&
-    GetName() const {
-        return name_;
+    GetFilename() const {
+        return file_name_;
     }
 
     void
@@ -103,7 +98,7 @@ public:
     BufferType buffer_type_{BufferType::kInvalid};
     BufferStatus status_{BufferStatus::kFreed};
 
-    String name_{};
+    String file_name_{};
     String path_{};
     u64 id_{};
 
