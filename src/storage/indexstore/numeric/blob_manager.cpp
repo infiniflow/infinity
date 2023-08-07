@@ -1,3 +1,4 @@
+// Modified based on upscaledb by Christoph Rupp (chris@crupp.de)
 #include "blob_manager.h"
 #include "common/utility/infinity_assert.h"
 

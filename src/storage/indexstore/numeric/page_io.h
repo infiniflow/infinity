@@ -1,3 +1,4 @@
+// Modified based on upscaledb by Christoph Rupp (chris@crupp.de)
 #pragma once
 
 #include <memory>
@@ -45,6 +46,10 @@ public:
 
     void Flush() {
         CHECK_ERROR(fsync(fd_));
+    }
+
+    bool IsOpen() const {
+      return fd_ != -1;
     }
 
     void Seek(uint64_t offset, int whence) const;

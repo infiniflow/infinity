@@ -1,3 +1,4 @@
+// Modified based on upscaledb by Christoph Rupp (chris@crupp.de)
 #pragma once
 
 #ifdef __SSE__

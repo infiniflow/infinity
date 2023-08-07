@@ -1,3 +1,4 @@
+// Modified based on upscaledb by Christoph Rupp (chris@crupp.de)
 #include "changeset.h"
 
 #include <vector>

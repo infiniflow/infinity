@@ -1,3 +1,4 @@
+// Modified based on upscaledb by Christoph Rupp (chris@crupp.de)
 #include "btree_index.h"
 #include "btree_index_factory.h"
 #include "common/utility/builtin.h"
