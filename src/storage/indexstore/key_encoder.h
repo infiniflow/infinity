@@ -86,17 +86,23 @@ static uint64_t ExtractHead(const Slice& key) {
 // Big-endian not supported right now
 
 typedef void (*EncodeFunc)(const void* value, std::string& buf);
+typedef u32 (*SizeFunc)();
 
 class KeyEncoder {
 public:
     template<typename KeyEncoderTraits>
     KeyEncoder(KeyEncoderTraits traits);
 
+    u32 Size() const {
+        return size_func_();
+    }
+
     void Encode(const void* value, std::string& buf) const {
         encode_func_(value, buf);
     }
 private:
     EncodeFunc encode_func_;
+    SizeFunc size_func_;
 };
 
 extern const KeyEncoder* GetKeyEncoder(LogicalType type);
@@ -130,6 +136,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kBoolean> {
 public:
+    static u32 Size() {
+        return sizeof(bool);
+    }
+
     static void Encode(const void* value, std::string& buf) {
         bool val;
         memcpy(&val, value, sizeof(bool));
@@ -140,6 +150,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kTinyInt> {
 public:
+    static u32 Size() {
+        return sizeof(i16);
+    }
+
     static void Encode(const void* value, std::string& buf) {
         i16 val;
         memcpy(&val, value, sizeof(i16));
@@ -150,6 +164,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kInteger> {
 public:
+    static u32 Size() {
+        return sizeof(i32);
+    }
+
     static void Encode(const void* value, std::string& buf) {
         i32 val;
         memcpy(&val, value, sizeof(i32));
@@ -160,6 +178,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kBigInt> {
 public:
+    static u32 Size() {
+        return sizeof(i64);
+    }
+
     static void Encode(const void* value, std::string& buf) {
         i64 val;
         memcpy(&val, value, sizeof(i64));
@@ -170,6 +192,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kHugeInt> {
 public:
+    static u32 Size() {
+        return sizeof(HugeInt);
+    }
+
     static void Encode(const void* value, std::string& buf) {
         HugeInt val;
         memcpy(&val, value, sizeof(HugeInt));
@@ -180,6 +206,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kDecimal> {
 public:
+    static u32 Size() {
+        return sizeof(DecimalType);
+    }
+
     static void Encode(const void* value, std::string& buf) {
         DecimalType decimal_val;
         memcpy(&decimal_val, value, sizeof(DecimalType));
@@ -190,6 +220,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kDate> {
 public:
+    static u32 Size() {
+        return sizeof(DateType);
+    }
+
     static void Encode(const void* value, std::string& buf) {
         DateType val;
         memcpy(&val, value, sizeof(DateType));
@@ -200,6 +234,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kTime> {
 public:
+    static u32 Size() {
+        return sizeof(TimeType);
+    }
+
     static void Encode(const void* value, std::string& buf) {
         TimeType val;
         memcpy(&val, value, sizeof(TimeType));
@@ -210,6 +248,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kDateTime> {
 public:
+    static u32 Size() {
+        return sizeof(DateTimeType);
+    }
+
     static void Encode(const void* value, std::string& buf) {
         DateTimeType val;
         memcpy(&val, value, sizeof(DateTimeType));
@@ -220,6 +262,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kTimestamp> {
 public:
+    static u32 Size() {
+        return sizeof(TimestampType);
+    }
+
     static void Encode(const void* value, std::string& buf) {
         TimestampType val;
         memcpy(&val, value, sizeof(TimestampType));
@@ -230,6 +276,10 @@ public:
 template<>
 class KeyEncoderTraits<LogicalType::kVarchar> {
 public:
+    static u32 Size() {
+        return -1;
+    }
+
     static void Encode(const void* value, std::string& buf) {
         auto slice = reinterpret_cast<const Slice*>(value);
         buf.append(slice->data(), slice->size());

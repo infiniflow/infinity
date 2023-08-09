@@ -15,10 +15,25 @@ BtreeIndex::RootPage(Context *context) {
 }
 
 void
-BtreeIndex::Create(Context *context, BtreeHeader *btree_header) {
-    LogicalType key_type = kInteger;
+BtreeIndex::Create(Context *context, BtreeHeader *btree_header, LogicalType key_type) {
     LogicalType value_type = kInteger;
     state_.btree_header_ = btree_header;
+    state_.leaf_traits_.reset(BtreeIndexFactory::Create(key_type, value_type, true));
+    state_.internal_traits_.reset(BtreeIndexFactory::Create(key_type, value_type, false));
+
+    /* allocate a new root page */
+    SetRootPage(state_.page_manager_->Alloc(context, Page::kTypeBroot, PageManager::kClearWithZero));
+
+    /* initialize the root page */
+    BtreeNode *node = BtreeNode::FromPage(state_.root_page_);
+    node->SetFlags(BtreeNode::kLeafNode);
+}
+
+void
+BtreeIndex::Open(Context *context, BtreeHeader *btree_header) {
+    LogicalType value_type = kInteger;
+    state_.btree_header_ = btree_header;
+    LogicalType key_type = (LogicalType)(btree_header->key_type_);
     state_.leaf_traits_.reset(BtreeIndexFactory::Create(key_type, value_type, true));
     state_.internal_traits_.reset(BtreeIndexFactory::Create(key_type, value_type, false));
 

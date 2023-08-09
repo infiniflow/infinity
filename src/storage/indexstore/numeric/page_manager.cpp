@@ -158,7 +158,7 @@ PageManager::FetchUnlocked(Context *context, uint64_t address, uint32_t flags) {
     Page *page;
 
     if (address == 0)
-        page = state_->header_->header_page_;
+        page = state_->header_->header_page_.get();
     else if (state_->state_page_ && address == state_->state_page_->Address())
         page = state_->state_page_;
     else
@@ -286,7 +286,7 @@ void PageManager::MaybeStoreState(Context *context, bool force) {
             state_->header_->SetPageManagerBlobid(new_blobid);
             // don't bother to lock the header page
             state_->header_->header_page_->SetDirty(true);
-            context->changeset_.Put(state_->header_->header_page_);
+            context->changeset_.Put(state_->header_->header_page_.get());
         }
     }
 }
@@ -465,4 +465,10 @@ PageManager::AllocMultipleBlobPages(Context *context, size_t num_pages) {
     MaybeStoreState(context, false);
     return page;
 }
+
+void
+PageManager::Close(Context *context) {
+
+}
+
 }

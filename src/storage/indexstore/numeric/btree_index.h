@@ -17,26 +17,6 @@ struct BtreeHeader {
         memset(this, 0, sizeof(*this));
     }
 
-    // Returns the record compression
-    uint8_t RecordCompression() const {
-        return (compression_ >> 4);
-    }
-
-    // Sets the record compression
-    void SetRecordCompression(int algorithm) {
-        compression_ |= algorithm << 4;
-    }
-
-    // Returns the key compression
-    uint8_t KeyCompression() const {
-        return (compression_ & 0xf);
-    }
-
-    // Sets the key compression
-    void SetKeyCompression(int algorithm) {
-        compression_ |= algorithm & 0xf;
-    }
-
     // address of the root-page
     uint64_t root_address_;
 
@@ -46,26 +26,18 @@ struct BtreeHeader {
     // The name of the database
     uint16_t dbname_;
 
-    // key size used in the pages
-    uint16_t key_size_;
-
     // key type
     uint16_t key_type_;
 
-    // for storing key and record compression algorithm */
-    uint8_t compression_;
+    // key size used in the pages
+    uint16_t key_size_;
 
-    // reserved
-    uint8_t reserved1_;
+    // the record type
+    uint16_t record_type_;
 
     // the record size
     uint32_t record_size_;
 
-    // hash of the custom compare function
-    uint32_t compare_hash_;
-
-    // the record type
-    uint16_t record_type_;
 } __attribute__ ((packed));
 
 struct BtreeIndexTraits {
@@ -123,7 +95,9 @@ public:
         state_.root_page_ = root_page;
     }
 
-    void Create(Context *context, BtreeHeader *btree_header);
+    void Create(Context *context, BtreeHeader *btree_header, LogicalType key_type);
+
+    void Open(Context *context, BtreeHeader *btree_header);
 
     // Iterates over the whole index and calls |visitor| on every node
     void VisitNodes(Context *context, BtreeVisitor &visitor, bool visit_internal_nodes);

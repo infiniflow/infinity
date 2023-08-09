@@ -5,7 +5,8 @@
 namespace infinity {
 template <typename KeyEncoderTraits>
 KeyEncoder::KeyEncoder(KeyEncoderTraits traits)
-    : encode_func_(traits.Encode){}
+    : encode_func_(traits.Encode)
+    , size_func_(traits.Size){}
 
 struct FastHash {
     template <typename T>

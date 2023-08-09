@@ -5,6 +5,13 @@
 
 namespace infinity {
 
+#define BTREE_VERSION_MAJ     1
+#define BTREE_VERSION_MIN     1
+#define BTREE_VERSION_REV     1
+#define BTREE_FILE_VERSION    1
+#define BTREE_MAX_DATABASES         1024*4
+
+
 /** Operation completed successfully */
 #define BTREE_SUCCESS                     (  0)
 /** Invalid record size */
@@ -201,6 +208,16 @@ struct ArrayView {
 
     // The number of elements in the array
     size_t size_;
+};
+
+struct LsnManager {
+    LsnManager() : current_(1) {}
+
+    uint64_t Next() {
+        return current_++;
+    }
+
+    uint64_t current_;
 };
 
 }

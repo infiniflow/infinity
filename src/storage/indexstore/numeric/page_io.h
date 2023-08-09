@@ -36,9 +36,13 @@ public:
         close(fd_);
     }
 
+    void Close() {
+        close(fd_);
+    }
+
     void Create();
 
-    void Open(bool read_only);
+    void Open(bool read_only = false);
 
     void Read(uint64_t addr, void *buffer, size_t len);
 
@@ -49,7 +53,7 @@ public:
     }
 
     bool IsOpen() const {
-      return fd_ != -1;
+        return fd_ != -1;
     }
 
     void Seek(uint64_t offset, int whence) const;

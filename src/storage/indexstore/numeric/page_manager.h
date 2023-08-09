@@ -24,20 +24,14 @@ typedef struct {
     // version_ information - major, minor, rev, file
     uint8_t version_[4];
 
-    // reserved
-    uint64_t reserved1_;
-
     // size of the page
     uint32_t page_size_;
 
     // maximum number of databases in this environment
     uint16_t max_databases_;
 
-    // for storing journal compression algorithm
-    uint8_t journal_compression_;
-
     // reserved
-    uint8_t reserved2_;
+    uint16_t reserved_;
 
     // blob id of the PageManager's state
     uint64_t page_manager_blobid_;
@@ -115,23 +109,13 @@ struct EnvHeader {
         Header()->page_manager_blobid_ = blobid;
     }
 
-    // Returns the Journal compression configuration
-    int JournalCompression() {
-        return Header()->journal_compression_ >> 4;
-    }
-
-    // Sets the Journal compression configuration
-    void SetJournalCompression(int algorithm) {
-        Header()->journal_compression_ = algorithm << 4;
-    }
-
     // Returns a pointer to the Header data
     EnvironmentHeader *Header() {
         return (EnvironmentHeader *)(header_page_->Payload());
     }
 
     // The Header page of the Environment
-    Page *header_page_;
+    std::unique_ptr<Page> header_page_;
 };
 
 struct PageManagerState {
@@ -244,6 +228,8 @@ public:
     void PurgeCache(Context *context);
 
     Page * AllocMultipleBlobPages(Context *context, size_t num_pages);
+
+    void Close(Context *context);
 private:
     Page* AllocUnlocked(Context *context, uint32_t page_type, uint32_t flags);
 
