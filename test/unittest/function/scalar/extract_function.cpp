@@ -47,8 +47,8 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
 
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kDate);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -59,7 +59,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("extract_year(Date)->BigInt", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -84,7 +84,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
             EXPECT_EQ(v.value_.date.ToString(), ss.str());
         }
 
-        DataType result_type(LogicalType::kBigInt);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
@@ -104,8 +104,8 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
 
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kDate);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -116,7 +116,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("extract_month(Date)->BigInt", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -133,7 +133,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         }
         data_block.Finalize();
 
-        DataType result_type(LogicalType::kBigInt);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
@@ -153,8 +153,8 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
 
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kDate);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -165,7 +165,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("extract_day(Date)->BigInt", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -182,7 +182,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         }
         data_block.Finalize();
 
-        DataType result_type(LogicalType::kBigInt);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);

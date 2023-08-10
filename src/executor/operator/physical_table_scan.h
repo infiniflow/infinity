@@ -17,7 +17,7 @@ public:
                                String table_alias,
                                u64 table_index,
                                SharedPtr<Vector<String>> column_names,
-                               SharedPtr<Vector<DataType>> column_types,
+                               SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                SharedPtr<TableScanFunction> table_scan_function_ptr,
                                SharedPtr<TableScanFunctionData> table_scan_function_data_ptr)
         : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr,id),
@@ -42,7 +42,7 @@ public:
         return column_names_;
     }
 
-    SharedPtr<Vector<DataType>>
+    SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
         return column_types_;
     }
@@ -66,7 +66,7 @@ private:
     String table_alias_{};
     u64 table_index_{};
     SharedPtr<Vector<String>> column_names_{};
-    SharedPtr<Vector<DataType>> column_types_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
     SharedPtr<TableScanFunction> table_scan_func_ptr_{nullptr};
     SharedPtr<TableScanFunctionData> table_scan_function_data_ptr_{};
 };

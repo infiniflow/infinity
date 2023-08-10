@@ -100,12 +100,12 @@ PhysicalLimit::GetLimitOutput(const SharedPtr<Table>& input_table, i64 limit, i6
 
     // Copy from input table to output table
     SizeT column_count = input_table->ColumnCount();
-    Vector<DataType> types;
+    Vector<SharedPtr<DataType>> types;
     types.reserve(column_count);
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType col_type = input_table->GetColumnTypeById(idx);
+        SharedPtr<DataType> col_type = input_table->GetColumnTypeById(idx);
         types.emplace_back(col_type);
 
         String col_name = input_table->GetColumnNameById(idx);

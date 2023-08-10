@@ -18,7 +18,7 @@ public:
         SizeT column_count = order_by_table_->ColumnCount();
         for(SizeT col_id = 0; col_id < column_count; ++ col_id) {
 
-            DataType type = order_by_table_->GetColumnTypeById(col_id);
+            SharedPtr<DataType> type = order_by_table_->GetColumnTypeById(col_id);
             OrderType order_type = order_by_types_[col_id];
 
             const SharedPtr<DataBlock>& left_block = order_by_table_->GetDataBlockById(left.block);
@@ -26,7 +26,7 @@ public:
             const SharedPtr<DataBlock>& right_block = order_by_table_->GetDataBlockById(right.block);
             const SharedPtr<ColumnVector>& right_column = right_block->column_vectors[col_id];
 
-            switch(type.type()) {
+            switch(type->type()) {
                 case kBoolean: {
                     BooleanT left_value = ((BooleanT*)(left_column->data()))[left.offset];
                     BooleanT right_value = ((BooleanT*)(right_column->data()))[right.offset];
@@ -187,7 +187,7 @@ PhysicalSort::Execute(SharedPtr<QueryContext>& query_context) {
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType col_type = input_table_->GetColumnTypeById(idx);
+        SharedPtr<DataType> col_type = input_table_->GetColumnTypeById(idx);
         String col_name = input_table_->GetColumnNameById(idx);
 
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
@@ -213,7 +213,7 @@ PhysicalSort::GetOrderTable() const {
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType col_type = this->expressions_[idx]->Type();
+        SharedPtr<DataType> col_type = MakeShared<DataType>(this->expressions_[idx]->Type());
         String col_name = this->expressions_[idx]->Name();
 
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
@@ -250,12 +250,12 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
                              const SharedPtr<Vector<RowID>>& rowid_vector) {
     // output table definition is same as input
     SizeT column_count = input_table->ColumnCount();
-    Vector<DataType> types;
+    Vector<SharedPtr<DataType>> types;
     types.reserve(column_count);
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType col_type = input_table->GetColumnTypeById(idx);
+        SharedPtr<DataType> col_type = input_table->GetColumnTypeById(idx);
         types.emplace_back(col_type);
 
         String col_name = input_table->GetColumnNameById(idx);
@@ -285,7 +285,7 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
             u32 input_offset = row_id.offset;
 
             for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
-                switch(types[column_id].type()) {
+                switch(types[column_id]->type()) {
                     case LogicalType::kBoolean: {
                         ((BooleanT *)(output_column_vectors[column_id]->data()))[block_row_idx]
                             = ((BooleanT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];

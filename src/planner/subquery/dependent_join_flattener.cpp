@@ -266,7 +266,7 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
 
     // Get the correlated column and generate table scan
     SharedPtr<Vector<String>> column_names = MakeShared<Vector<String>>();
-    SharedPtr<Vector<DataType>> column_types = MakeShared<Vector<DataType>>();
+    SharedPtr<Vector<SharedPtr<DataType>>> column_types = MakeShared<Vector<SharedPtr<DataType>>>();
     Vector<SizeT> column_ids;
 
     SizeT column_count = correlated_columns.size();
@@ -276,13 +276,13 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
 
     SizeT table_index = correlated_columns[0]->binding().table_idx;
     column_names->emplace_back(correlated_columns[0]->column_name());
-    column_types->emplace_back(correlated_columns[0]->Type());
+    column_types->emplace_back(MakeShared<DataType>(correlated_columns[0]->Type()));
     column_ids.emplace_back(correlated_columns[0]->binding().column_idx);
     for(SizeT idx = 1; idx < column_count; ++ idx) {
         PlannerAssert(correlated_columns[idx]->binding().table_idx == table_index,
                       "Correlated column are from different table.");
         column_names->emplace_back(correlated_columns[idx]->column_name());
-        column_types->emplace_back(correlated_columns[idx]->Type());
+        column_types->emplace_back(MakeShared<DataType>(correlated_columns[idx]->Type()));
         column_ids.emplace_back(correlated_columns[idx]->binding().column_idx);
     }
 

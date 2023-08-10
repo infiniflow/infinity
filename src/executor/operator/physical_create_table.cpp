@@ -14,7 +14,7 @@ namespace infinity {
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          SharedPtr<TableDef> table_def_ptr,
                                          SharedPtr<Vector<String>> output_names,
-                                         SharedPtr<Vector<DataType>> output_types,
+                                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                          ConflictType conflict_type,
                                          u64 table_index,
                                          u64 id)
@@ -30,7 +30,7 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          const SharedPtr<PhysicalOperator>& input,
                                          SharedPtr<Vector<String>> output_names,
-                                         SharedPtr<Vector<DataType>> output_types,
+                                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                          ConflictType conflict_type,
                                          u64 table_index,
                                          u64 id)
@@ -56,7 +56,7 @@ PhysicalCreateTable::Execute(SharedPtr<QueryContext>& query_context) {
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+            MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
     };
 
     SharedPtr<TableDef> result_table_def_ptr

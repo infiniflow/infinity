@@ -25,9 +25,9 @@ public:
         return MakeShared<Vector<String>>();
     }
 
-    [[nodiscard]] inline SharedPtr<Vector<DataType>>
+    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
-        return MakeShared<Vector<DataType>>();
+        return MakeShared<Vector<SharedPtr<DataType>>>();
     }
 
     String

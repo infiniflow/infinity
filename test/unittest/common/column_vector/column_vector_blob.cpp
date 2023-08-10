@@ -30,11 +30,11 @@ class ColumnVectorBlobTest : public BaseTest {
 TEST_F(ColumnVectorBlobTest, flat_blob) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBlob);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBlob)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -136,7 +136,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(MakeShared<DataType>(DataType(LogicalType::kDecimal))), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -199,12 +199,12 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBlob);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBlob)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -272,7 +272,7 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBlob)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -316,7 +316,7 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBlob);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -379,7 +379,7 @@ TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
 TEST_F(ColumnVectorBlobTest, blob_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBlob);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

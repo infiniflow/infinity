@@ -37,11 +37,11 @@ TEST_F(TableTest, test1) {
     SizeT block_count = 3;
     SizeT row_count = DEFAULT_VECTOR_SIZE;
     Vector<SharedPtr<ColumnDef>> columns;
-    Vector<DataType> column_types;
+    Vector<SharedPtr<DataType>> column_types;
     columns.reserve(column_count);
     column_types.reserve(column_count);
 
-    DataType col_type = DataType(LogicalType::kBoolean);
+    SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kBoolean);
     column_types.emplace_back(col_type);
     String col_name = "col1";
     auto col_def = MakeShared<ColumnDef>(0,
@@ -51,7 +51,7 @@ TEST_F(TableTest, test1) {
 
     columns.emplace_back(col_def);
 
-    col_type = DataType(LogicalType::kBigInt);
+    col_type = MakeShared<DataType>(LogicalType::kBigInt);
     column_types.emplace_back(col_type);
     col_name = "col2";
     col_def = MakeShared<ColumnDef>(1,
@@ -84,14 +84,14 @@ TEST_F(TableTest, test1) {
     for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
         // Check Column1 data
         SharedPtr<ColumnVector> column1 = order_by_table->GetDataBlockById(block_id)->column_vectors[0];
-        EXPECT_EQ(column1->data_type().type(), LogicalType::kBoolean);
+        EXPECT_EQ(column1->data_type()->type(), LogicalType::kBoolean);
         for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
             EXPECT_EQ(((BooleanT *)column1->data())[row_id], row_id % 2 == 0);
         }
 
         // Check Column2 data
         SharedPtr<ColumnVector> column2 = order_by_table->GetDataBlockById(block_id)->column_vectors[1];
-        EXPECT_EQ(column2->data_type().type(), LogicalType::kBigInt);
+        EXPECT_EQ(column2->data_type()->type(), LogicalType::kBigInt);
         for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
             EXPECT_EQ(((BigIntT *)column2->data())[row_id], row_id);
         }

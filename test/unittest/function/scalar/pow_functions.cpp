@@ -46,15 +46,15 @@ TEST_F(PowFunctionsTest, mul_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kFloat);
-        DataType result_type(LogicalType::kFloat);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
-                                                                                "t1",
-                                                                                1,
-                                                                                "c1",
-                                                                                0,
-                                                                                0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kFloat);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
+                                                                                 "t1",
+                                                                                 1,
+                                                                                 "c1",
+                                                                                 0,
+                                                                                 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                  "t1",
                                                                                  1,
                                                                                  "c2",
@@ -67,7 +67,7 @@ TEST_F(PowFunctionsTest, mul_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("POW(Float, Float)->Float", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 
@@ -105,15 +105,15 @@ TEST_F(PowFunctionsTest, mul_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kDouble);
-        DataType result_type(LogicalType::kDouble);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kDouble);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                  "t1",
                                                                                  1,
                                                                                  "c1",
                                                                                  0,
                                                                                  0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                  "t1",
                                                                                  1,
                                                                                  "c2",
@@ -126,7 +126,7 @@ TEST_F(PowFunctionsTest, mul_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("POW(Double, Double)->Double", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 

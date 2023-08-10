@@ -19,7 +19,7 @@ PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
     for(size_t idx = 0; idx < column_count; ++ idx) {
         // Use the column id to fetch column name and type
         String& col_name_ref = column_names_->at(idx);
-        DataType& col_type_ref = column_types_->at(idx);
+        SharedPtr<DataType> col_type_ref = column_types_->at(idx);
 
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
                                                              col_type_ref,

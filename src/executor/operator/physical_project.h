@@ -33,7 +33,7 @@ public:
     SharedPtr<Vector<String>>
     GetOutputNames() const final;
 
-    SharedPtr<Vector<DataType>>
+    SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final;
 
     Vector<SharedPtr<BaseExpression>> expressions_{};

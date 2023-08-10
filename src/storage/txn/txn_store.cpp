@@ -16,10 +16,10 @@ TxnTableStore::Append(const SharedPtr<DataBlock>& input_block) {
         return MakeUnique<String>(err_msg);
     }
 
-    Vector<DataType> column_types;
+    Vector<SharedPtr<DataType>> column_types;
     for(SizeT col_id = 0; col_id < column_count; ++ col_id) {
         column_types.emplace_back(table_entry_->GetTableDesc()->columns()[col_id]->type());
-        if(column_types.back() != input_block->column_vectors[col_id]->data_type()) {
+        if(*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
             String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
             LOG_ERROR(err_msg);
             return MakeUnique<String>(err_msg);

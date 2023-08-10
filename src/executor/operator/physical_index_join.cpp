@@ -34,11 +34,11 @@ PhysicalIndexJoin::GetOutputNames() const {
     return result;
 }
 
-SharedPtr<Vector<DataType>>
+SharedPtr<Vector<SharedPtr<DataType>>>
 PhysicalIndexJoin::GetOutputTypes() const {
-    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
-    SharedPtr<Vector<DataType>> left_output_types = left_->GetOutputTypes();
-    SharedPtr<Vector<DataType>> right_output_types = right_->GetOutputTypes();
+    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
+    SharedPtr<Vector<SharedPtr<DataType>>> left_output_types = left_->GetOutputTypes();
+    SharedPtr<Vector<SharedPtr<DataType>>> right_output_types = right_->GetOutputTypes();
 
     result->reserve(left_output_types->size() + right_output_types->size());
     for(auto& left_type: *left_output_types) {

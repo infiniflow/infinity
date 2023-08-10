@@ -64,7 +64,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     EXPECT_STREQ("+(BigInt, BigInt)->BigInt", func.ToString().c_str());
 
     // Initialize result column vector
-    ColumnVector result(func.return_type());
+    ColumnVector result(MakeShared<DataType>(func.return_type()));
     result.Initialize();
 
     SharedPtr<FunctionExpression> func_expr = MakeShared<FunctionExpression>(func, exprs);
@@ -75,8 +75,9 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
     ExpressionEvaluator expr_evaluator;
 
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0,
-                                                         DataType(LogicalType::kBigInt),
+                                                         data_type,
                                                          "c1",
                                                          HashSet<ConstraintType>());
     SharedPtr<TableDef> table_def = TableDef::Make("t1", {col_def});
@@ -84,12 +85,12 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
     {
         SharedPtr<DataBlock> data_block = DataBlock::Make();
-        DataType data_type(LogicalType::kBigInt);
+
         data_block->Init({data_type});
         Vector<SharedPtr<DataBlock>> input_blocks;
         input_blocks.emplace_back(data_block);
 
-        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
+        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(MakeShared<DataType>(func_expr->Type()));
 
         output_column_vector->Initialize();
         Vector<SharedPtr<ColumnVector>> blocks_column;
@@ -105,7 +106,6 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
     {
         SharedPtr<DataBlock> data_block = DataBlock::Make();
-        DataType data_type(LogicalType::kBigInt);
         data_block->Init({data_type});
 
         SharedPtr<ColumnVector> column_ptr = MakeShared<ColumnVector>(data_type);
@@ -125,7 +125,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
         Vector<SharedPtr<DataBlock>> input_blocks;
         input_blocks.emplace_back(data_block);
 
-        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
+        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(MakeShared<DataType>(func_expr->Type()));
         output_column_vector->Initialize();
 
         Vector<SharedPtr<ColumnVector>> blocks_column;
@@ -175,7 +175,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     EXPECT_STREQ("-(BigInt, BigInt)->BigInt", func.ToString().c_str());
 
     // Initialize result column vector
-    ColumnVector result(func.return_type());
+    ColumnVector result(MakeShared<DataType>(func.return_type()));
     result.Initialize();
 
     SharedPtr<FunctionExpression> func_expr = MakeShared<FunctionExpression>(func, exprs);
@@ -187,7 +187,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     ExpressionEvaluator expr_evaluator;
 
     SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0,
-                                                         DataType(LogicalType::kBigInt),
+                                                         MakeShared<DataType>(DataType(LogicalType::kBigInt)),
                                                          "c1",
                                                          HashSet<ConstraintType>());
     SharedPtr<TableDef> table_def = TableDef::Make("t1", {col_def});
@@ -195,13 +195,13 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
 
     {
         SharedPtr<DataBlock> data_block = DataBlock::Make();
-        DataType data_type(LogicalType::kBigInt);
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
         data_block->Init({data_type});
 
         Vector<SharedPtr<DataBlock>> input_blocks;
         input_blocks.emplace_back(data_block);
 
-        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
+        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(MakeShared<DataType>(func_expr->Type()));
         output_column_vector->Initialize();
 
         Vector<SharedPtr<ColumnVector>> blocks_column;
@@ -217,7 +217,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
 
     {
         SharedPtr<DataBlock> data_block = DataBlock::Make();
-        DataType data_type(LogicalType::kBigInt);
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
         data_block->Init({data_type});
 
         SharedPtr<ColumnVector> column_ptr = MakeShared<ColumnVector>(data_type);
@@ -237,7 +237,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
             EXPECT_EQ(value.value_.big_int, i64(i));
         }
 
-        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(func_expr->Type());
+        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(MakeShared<DataType>(func_expr->Type()));
         output_column_vector->Initialize();
 
         Vector<SharedPtr<ColumnVector>> blocks_column;

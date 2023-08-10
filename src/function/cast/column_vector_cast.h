@@ -130,7 +130,7 @@ struct ColumnVectorCast {
 template <class SourceType, class TargetType, class Operator>
 static bool
 GenericTryCastColumnVector(const SharedPtr<ColumnVector>&source, SharedPtr<ColumnVector>&result, size_t count, CastParameters &parameters) {
-    ColumnVectorCastData input(parameters.strict, result, source->data_type_, result->data_type_);
+    ColumnVectorCastData input(parameters.strict, result, *source->data_type_, *result->data_type_);
     UnaryOperator::Execute<SourceType, TargetType, Operator>(source, result, count, &input, true);
     return input.all_converted_;
 }

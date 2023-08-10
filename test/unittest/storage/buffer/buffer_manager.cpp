@@ -38,9 +38,9 @@ TEST_F(BufferMgrTest, test1) {
 
     // file: /tmp/infinity/data/c1.col
     String obj_id = "c1.col";
-    BufferHandle* buf_handle = buffer_mgr.GetBufferHandle(base_path, obj_id, BufferType::kFile);
+    BufferHandle* buf_handle = buffer_mgr.GetBufferHandle("", obj_id, BufferType::kFile);
     EXPECT_EQ(buf_handle->GetID(), 1);
-    EXPECT_EQ(buf_handle->GetFilename(), obj_id);
+    EXPECT_EQ(buf_handle->GetFilename(), "/tmp/infinity/data/c1.col");
 
     ptr_t data_ptr = buf_handle->LoadData();
     EXPECT_NE(data_ptr, nullptr);
@@ -65,13 +65,13 @@ TEST_F(BufferMgrTest, test1) {
 
     // temp buffer
     String tmp_buf_name = "t1.col.tmp";
-    BufferHandle* tmp_buf = buffer_mgr.AllocateBufferHandle(temp_path, tmp_buf_name, 1024);
+    BufferHandle* tmp_buf = buffer_mgr.AllocateBufferHandle("", tmp_buf_name, 1024);
     EXPECT_EQ(tmp_buf->GetID(), 2);
-    EXPECT_EQ(tmp_buf->GetFilename(), tmp_buf_name);
+    EXPECT_EQ(tmp_buf->GetFilename(), "/tmp/infinity/_tmp/t1.col.tmp");
     ptr_t tmp_ptr = tmp_buf->LoadData();
     EXPECT_NE(tmp_ptr, nullptr);
 
-    BufferHandle* tmp_buf1 = buffer_mgr.GetBufferHandle(temp_path, tmp_buf_name, BufferType::kTempFile);
+    BufferHandle* tmp_buf1 = buffer_mgr.GetBufferHandle("", tmp_buf_name, BufferType::kTempFile);
     EXPECT_EQ(tmp_buf, tmp_buf1);
     ptr_t tmp1_ptr = tmp_buf1->LoadData();
     EXPECT_EQ(tmp_ptr, tmp1_ptr);

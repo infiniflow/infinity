@@ -46,14 +46,17 @@ PhysicalShow::Execute(SharedPtr<QueryContext>& query_context) {
 void
 PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
     // Define output table schema
+    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "schema", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "table", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(2, DataType(LogicalType::kVarchar), "type", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(3, DataType(LogicalType::kBigInt), "column_count", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(4, DataType(LogicalType::kBigInt), "row_count", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(5, DataType(LogicalType::kBigInt), "block_count", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(6, DataType(LogicalType::kBigInt), "block_size", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(0, varchar_type, "schema", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, varchar_type, "table", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(2, varchar_type, "type", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(3, bigint_type, "column_count", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(4, bigint_type, "row_count", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(5, bigint_type, "block_count", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(6, bigint_type, "block_size", HashSet<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = MakeShared<TableDef>("Tables", column_defs);
@@ -65,14 +68,14 @@ PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
 
     // Prepare the output data block
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<DataType> column_types {
-            DataType(LogicalType::kVarchar),
-            DataType(LogicalType::kVarchar),
-            DataType(LogicalType::kVarchar),
-            DataType(LogicalType::kBigInt),
-            DataType(LogicalType::kBigInt),
-            DataType(LogicalType::kBigInt),
-            DataType(LogicalType::kBigInt)
+    Vector<SharedPtr<DataType>> column_types {
+            varchar_type,
+            varchar_type,
+            varchar_type,
+            bigint_type,
+            bigint_type,
+            bigint_type,
+            bigint_type
     };
 
     output_block_ptr->Init(column_types);
@@ -201,11 +204,14 @@ PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
 
 void
 PhysicalShow::ExecuteShowViews(SharedPtr<QueryContext>& query_context) {
+    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
     // Define output table schema
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "schema", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "view", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(3, DataType(LogicalType::kBigInt), "column_count", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(0, varchar_type, "schema", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, varchar_type, "view", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(3, bigint_type, "column_count", HashSet<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
@@ -217,10 +223,10 @@ PhysicalShow::ExecuteShowViews(SharedPtr<QueryContext>& query_context) {
 
     // Prepare the output data block
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<DataType> column_types {
-            DataType(LogicalType::kVarchar),
-            DataType(LogicalType::kVarchar),
-            DataType(LogicalType::kBigInt),
+    Vector<SharedPtr<DataType>> column_types {
+            varchar_type,
+            varchar_type,
+            bigint_type,
     };
 
     output_block_ptr->Init(column_types);
@@ -295,20 +301,22 @@ PhysicalShow::ExecuteShowColumns(SharedPtr<QueryContext>& query_context) {
 void
 PhysicalShow::ExecuteShowTableDetail(SharedPtr<QueryContext>& query_context,
                                      const SharedPtr<Table>& table_ptr) {
+    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column_name", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column_type", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(3, DataType(LogicalType::kVarchar), "constraint", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(3, varchar_type, "constraint", HashSet<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<DataType> column_types {
-            DataType(LogicalType::kVarchar),
-            DataType(LogicalType::kVarchar),
-            DataType(LogicalType::kVarchar),
+    Vector<SharedPtr<DataType>> column_types {
+            varchar_type,
+            varchar_type,
+            varchar_type,
     };
 
     output_block_ptr->Init(column_types);
@@ -327,7 +335,7 @@ PhysicalShow::ExecuteShowTableDetail(SharedPtr<QueryContext>& query_context,
         ++ column_id;
         {
             // Append column type to the second column
-            String column_type = column->type().ToString();
+            String column_type = column->type()->ToString();
             Value value = Value::MakeVarchar(column_type);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -354,20 +362,22 @@ PhysicalShow::ExecuteShowTableDetail(SharedPtr<QueryContext>& query_context,
 void
 PhysicalShow::ExecuteShowCollectionDetail(SharedPtr<QueryContext>& query_context,
                                           const SharedPtr<Collection>& collection_ptr) {
+    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column_name", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column_type", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(3, DataType(LogicalType::kVarchar), "constraint", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(3, varchar_type, "constraint", HashSet<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<DataType> column_types {
-            DataType(LogicalType::kVarchar),
-            DataType(LogicalType::kVarchar),
-            DataType(LogicalType::kVarchar),
+    Vector<SharedPtr<DataType>> column_types {
+            varchar_type,
+            varchar_type,
+            varchar_type,
     };
 
     output_block_ptr->Init(column_types);
@@ -414,18 +424,19 @@ PhysicalShow::ExecuteShowCollectionDetail(SharedPtr<QueryContext>& query_context
 void
 PhysicalShow::ExecuteShowViewDetail(SharedPtr<QueryContext>& query_context,
                                     const SharedPtr<View>& view_ptr) {
+    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), "column_name", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(1, DataType(LogicalType::kVarchar), "column_type", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<DataType> column_types {
-            DataType(LogicalType::kVarchar),
-            DataType(LogicalType::kVarchar),
+    Vector<SharedPtr<DataType>> column_types {
+            varchar_type,
+            varchar_type,
     };
 
     output_block_ptr->Init(column_types);
@@ -443,7 +454,7 @@ PhysicalShow::ExecuteShowViewDetail(SharedPtr<QueryContext>& query_context,
         ++ column_id;
         {
             // Append column type to the second column
-            String column_type = view_ptr->column_types()->at(idx).ToString();
+            String column_type = view_ptr->column_types()->at(idx)->ToString();
             Value value = Value::MakeVarchar(column_type);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

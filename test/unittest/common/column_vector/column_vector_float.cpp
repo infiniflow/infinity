@@ -29,11 +29,11 @@ class ColumnVectorFloatTest : public BaseTest {
 TEST_F(ColumnVectorFloatTest, flat_float) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kFloat);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kFloat)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -111,7 +111,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
 //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kFloat)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -156,12 +156,12 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kFloat);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kFloat)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -209,7 +209,7 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBoolean)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -243,7 +243,7 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
 TEST_F(ColumnVectorFloatTest, float_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kFloat);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -278,7 +278,7 @@ TEST_F(ColumnVectorFloatTest, float_column_vector_select) {
 TEST_F(ColumnVectorFloatTest, float_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kFloat);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -312,11 +312,11 @@ TEST_F(ColumnVectorFloatTest, float_column_slice_init) {
 TEST_F(ColumnVectorFloatTest, flat_double) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDouble);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDouble)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -386,7 +386,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDouble)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -431,12 +431,12 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDouble);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDouble)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -484,7 +484,7 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDouble)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -518,7 +518,7 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
 TEST_F(ColumnVectorFloatTest, double_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDouble);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -553,7 +553,7 @@ TEST_F(ColumnVectorFloatTest, double_column_vector_select) {
 TEST_F(ColumnVectorFloatTest, double_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDouble);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

@@ -89,7 +89,7 @@ public:
         return definition_ptr_->columns()[idx]->name();
     }
 
-    [[nodiscard]] DataType
+    [[nodiscard]] SharedPtr<DataType>
     GetColumnTypeById(SizeT idx) const {
         return definition_ptr_->columns()[idx]->type();
     }

@@ -45,7 +45,7 @@ public:
 class ColumnDef : public TableElement {
 public:
     ColumnDef(i64 id,
-              DataType column_type,
+              SharedPtr<DataType> column_type,
               String column_name,
               HashSet<ConstraintType> constraints)
               : TableElement(TableElementType::kColumn),
@@ -55,8 +55,8 @@ public:
               constraints_(std::move(constraints))
     {}
 
-    ColumnDef(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr)
-            : TableElement(TableElementType::kColumn), column_type_(logical_type, std::move(type_info_ptr)) {}
+    ColumnDef(LogicalType logical_type, const SharedPtr<TypeInfo>& type_info_ptr)
+            : TableElement(TableElementType::kColumn), column_type_(MakeShared<DataType>(logical_type, std::move(type_info_ptr))) {}
 
     inline
     ~ColumnDef() override = default;
@@ -72,14 +72,14 @@ public:
         return id_;
     }
 
-    inline DataType&
+    inline SharedPtr<DataType>&
     type() {
         return column_type_;
     }
 
 public:
     i64 id_{-1};
-    DataType column_type_;
+    SharedPtr<DataType> column_type_;
     String name_{};
     HashSet<ConstraintType> constraints_{};
 };

@@ -39,7 +39,7 @@ DataBlock::Init(const SharedPtr<DataBlock>& input, SizeT start_idx, SizeT end_id
 }
 
 void
-DataBlock::Init(const Vector<DataType> &types, SizeT capacity) {
+DataBlock::Init(const Vector<SharedPtr<DataType>>& types, SizeT capacity) {
     StorageAssert(!initialized, "Data block was initialized before.");
     StorageAssert(!types.empty(), "Empty data types collection.")
     column_count_ = types.size();

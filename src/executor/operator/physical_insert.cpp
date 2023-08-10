@@ -62,14 +62,14 @@ PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
     expr_states.reserve(column_count);
 
     // Prepare the output block
-    Vector<DataType> output_types;
+    Vector<SharedPtr<DataType>> output_types;
     output_types.reserve(column_count);
 
     for(auto& expr: value_list_) {
         // expression state
         expr_states.emplace_back(ExpressionState::CreateState(expr));
         // for output block
-        output_types.emplace_back(expr->Type());
+        output_types.emplace_back(MakeShared<DataType>(expr->Type()));
     }
 
     SharedPtr<DataBlock> output_block = DataBlock::Make();

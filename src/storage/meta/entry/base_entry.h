@@ -14,6 +14,9 @@ enum class EntryType {
     kDummy,
     kDatabase,
     kTable,
+    kColumn,
+    kSegment,
+    kColumnData,
     kBlock,
 };
 

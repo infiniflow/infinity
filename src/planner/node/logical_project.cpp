@@ -30,13 +30,13 @@ LogicalProject::GetOutputNames() const {
     return result;
 }
 
-SharedPtr<Vector<DataType>>
+SharedPtr<Vector<SharedPtr<DataType>>>
 LogicalProject::GetOutputTypes() const {
-    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
+    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
     SizeT column_count = expressions_.size();
     result->reserve(column_count);
     for(SizeT i = 0; i < column_count; ++ i) {
-        result->emplace_back(expressions_[i]->Type());
+        result->emplace_back(MakeShared<DataType>(expressions_[i]->Type()));
     }
     return result;
 }

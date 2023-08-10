@@ -12,10 +12,10 @@ namespace infinity {
 void
 ColumnVector::Initialize(const ColumnVector& other, const Selection& input_select) {
     StorageAssert(!initialized, "Column vector is already initialized.")
-    StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
+    StorageAssert(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.")
 
     vector_type_ = other.vector_type_;
-    data_type_size_ = data_type_.Size();
+    data_type_size_ = data_type_->Size();
 
     if(vector_type_ == ColumnVectorType::kConstant) {
         // If the vector is constant, all elements are the same, so the select is meaningless.
@@ -28,7 +28,7 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
 
 
     VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
-    switch(data_type_.type()) {
+    switch(data_type_->type()) {
         case LogicalType::kBlob:
         case LogicalType::kBitmap:
         case LogicalType::kPolygon:
@@ -75,7 +75,7 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
         tail_index_ = input_select.Size();
 
         // Copy data from other column vector to here according to the select
-        switch(data_type_.type()) {
+        switch(data_type_->type()) {
             case kBoolean: {
                 CopyFrom<BooleanT>(other.data(), this->data(), tail_index_, input_select);
                 break;
@@ -213,7 +213,7 @@ ColumnVector::Initialize(const ColumnVector& other, SizeT start_idx, SizeT end_i
 void
 ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
     StorageAssert(!initialized, "Column vector is already initialized.")
-    StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
+    StorageAssert(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.")
     StorageAssert(vector_type != ColumnVectorType::kInvalid, "Attempt to initialize column vector to invalid type.")
     // TODO: No check on capacity value.
 
@@ -221,9 +221,9 @@ ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
     capacity_ = capacity;
 
     tail_index_ = 0;
-    data_type_size_ = data_type_.Size();
+    data_type_size_ = data_type_->Size();
     VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
-    switch(data_type_.type()) {
+    switch(data_type_->type()) {
         case LogicalType::kBlob:
         case LogicalType::kBitmap:
         case LogicalType::kPolygon:
@@ -269,17 +269,17 @@ ColumnVector::Initialize(ColumnVectorType vector_type,
                          SizeT end_idx) {
 
     StorageAssert(!initialized, "Column vector was already initialized.")
-    StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
+    StorageAssert(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.")
     StorageAssert(end_idx > start_idx, "End index should larger than start index.")
 
     vector_type_ = vector_type;
     capacity_ = end_idx - start_idx;
 
     tail_index_ = 0;
-    data_type_size_ = data_type_.Size();
+    data_type_size_ = data_type_->Size();
 
     VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
-    switch(data_type_.type()) {
+    switch(data_type_->type()) {
         case LogicalType::kBlob:
         case LogicalType::kBitmap:
         case LogicalType::kPolygon:
@@ -325,7 +325,7 @@ ColumnVector::Initialize(ColumnVectorType vector_type,
     } else {
         tail_index_ = capacity_;
         // Copy data from other column vector to here according to the range
-        switch(data_type_.type()) {
+        switch(data_type_->type()) {
             case kBoolean: {
                 CopyFrom<BooleanT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
                 break;
@@ -458,7 +458,7 @@ ColumnVector::Initialize(ColumnVectorType vector_type,
 void
 ColumnVector::CopyRow(const ColumnVector& other, SizeT dst_idx, SizeT src_idx) {
     StorageAssert(initialized, "Column vector isn't initialized.")
-    StorageAssert(data_type_.type() != LogicalType::kInvalid, "Data type isn't assigned.")
+    StorageAssert(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.")
     StorageAssert(data_type_ == other.data_type_, "Data type is mismatched.")
     if(vector_type_ == ColumnVectorType::kConstant) {
         StorageAssert(dst_idx == 0, "Attempting to access non-zero position of constant vector");
@@ -472,7 +472,7 @@ ColumnVector::CopyRow(const ColumnVector& other, SizeT dst_idx, SizeT src_idx) {
     }
 
     StorageAssert(src_idx < other.tail_index_, "Attempting to access invalid position of source column vector");
-    switch(data_type_.type()) {
+    switch(data_type_->type()) {
         case kBoolean: {
             CopyRowFrom<BooleanT>(other.data(), src_idx, this->data(), dst_idx);
             break;
@@ -605,7 +605,7 @@ String
 ColumnVector::ToString() const {
     StorageAssert(initialized, "Column vector isn't initialized.")
     std::stringstream ss;
-    switch(data_type_.type()) {
+    switch(data_type_->type()) {
         case kBoolean: {
             for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
                 ss << (((BooleanT *) data_ptr_)[row_index] ? "true" : "false") << std::endl;
@@ -790,7 +790,7 @@ ColumnVector::ToString(SizeT row_index) const {
         return "null";
     }
 
-    switch(data_type_.type()) {
+    switch(data_type_->type()) {
         case kBoolean: {
             return ((BooleanT *) data_ptr_)[row_index] ? "true": "false";
         }
@@ -899,10 +899,10 @@ ColumnVector::GetValue(SizeT index) const {
 
     // Not valid, make a same data type with null indicator
     if(!(this->nulls_ptr_->IsTrue(index))) {
-        return Value::MakeValue(this->data_type_);
+        return Value::MakeValue(*this->data_type_);
     }
 
-    switch(data_type_.type()) {
+    switch(data_type_->type()) {
 
         case kBoolean: {
             return Value::MakeBool(((BooleanT *) data_ptr_)[index]);
@@ -929,7 +929,7 @@ ColumnVector::GetValue(SizeT index) const {
             return Value::MakeDouble(((DoubleT *) data_ptr_)[index]);
         }
         case kDecimal: {
-            return Value::MakeDecimal(((DecimalT *) data_ptr_)[index], data_type_.type_info());
+            return Value::MakeDecimal(((DecimalT *) data_ptr_)[index], data_type_->type_info());
         }
         case kVarchar: {
             return Value::MakeVarchar(((VarcharT *) data_ptr_)[index]);
@@ -986,8 +986,8 @@ ColumnVector::GetValue(SizeT index) const {
             return Value::MakeBlob(((BlobT *) data_ptr_)[index]);
         }
         case kEmbedding: {
-            ptr_t ptr = data_ptr_ + index * data_type_.Size();
-            return Value::MakeEmbedding(ptr, data_type_.type_info());
+            ptr_t ptr = data_ptr_ + index * data_type_->Size();
+            return Value::MakeEmbedding(ptr, data_type_->type_info());
         }
         case kMixed: {
             return Value::MakeMixedData(((MixedT *) data_ptr_)[index]);
@@ -1009,10 +1009,10 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
 
     // TODO: Check if the value type is same as column vector type
     // TODO: if not, try to cast
-    TypeAssert(value.type() == data_type_, "Attempt to store a different type value into column vector.");
+    TypeAssert(value.type() == *data_type_, "Attempt to store a different type value into column vector.");
 
     // TODO: Check if the value is null, then set the column vector validity.
-    switch(data_type_.type()) {
+    switch(data_type_->type()) {
 
         case kBoolean: {
             ((BooleanT*)data_ptr_)[index] = value.GetValue<BooleanT>();
@@ -1169,8 +1169,8 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         case kEmbedding: {
-            ptr_t ptr = data_ptr_ + index * data_type_.Size();
-            memcpy(ptr, value.value_.embedding.ptr, data_type_.Size());
+            ptr_t ptr = data_ptr_ + index * data_type_->Size();
+            memcpy(ptr, value.value_.embedding.ptr, data_type_->Size());
             break;
         }
         case kMixed: {
@@ -1201,7 +1201,7 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
 
     // We assume the value_ptr point to the same type data.
 
-    switch(data_type_.type()) {
+    switch(data_type_->type()) {
 
         case kBoolean: {
             ((BooleanT*)data_ptr_)[index] = *(BooleanT*)(value_ptr);
@@ -1363,8 +1363,8 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
         }
         case kEmbedding: {
             auto* embedding_ptr = (EmbeddingT*)(value_ptr);
-            ptr_t ptr = data_ptr_ + index * data_type_.Size();
-            memcpy(ptr, embedding_ptr->ptr, data_type_.Size());
+            ptr_t ptr = data_ptr_ + index * data_type_->Size();
+            memcpy(ptr, embedding_ptr->ptr, data_type_->Size());
             break;
         }
         case kMixed: {
@@ -1415,10 +1415,10 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         return;
     }
 
-    StorageAssert(this->data_type_ == other.data_type_,
+    StorageAssert(*this->data_type_ == *other.data_type_,
                   fmt::format("Attempt to append column vector{} to column vector{}",
-                              other.data_type().ToString(),
-                              this->data_type().ToString()));
+                              other.data_type()->ToString(),
+                              this->data_type()->ToString()));
 
     StorageAssert(this->tail_index_ + count <= this->capacity_,
                   fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.",
@@ -1426,7 +1426,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
                               this->tail_index_,
                               this->capacity_));
 
-    switch(data_type_.type()) {
+    switch(data_type_->type()) {
         case kBoolean: {
             auto* src_ptr = (BooleanT*)(other.data_ptr_);
             BooleanT* dst_ptr = &((BooleanT*)(data_ptr_))[this->tail_index_];
@@ -1693,11 +1693,11 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         }
         case kEmbedding: {
             auto* base_src_ptr = (EmbeddingT*)(other.data_ptr_);
-            ptr_t base_dst_ptr = data_ptr_ + this->tail_index_ * data_type_.Size();
+            ptr_t base_dst_ptr = data_ptr_ + this->tail_index_ * data_type_->Size();
             for(SizeT idx = 0; idx < count; ++ idx) {
-                ptr_t src_ptr = base_src_ptr->ptr + idx * data_type_.Size();
-                ptr_t dst_ptr = base_dst_ptr + idx * data_type_.Size();
-                memcpy(dst_ptr, src_ptr, data_type_.Size());
+                ptr_t src_ptr = base_src_ptr->ptr + idx * data_type_->Size();
+                ptr_t dst_ptr = base_dst_ptr + idx * data_type_->Size();
+                memcpy(dst_ptr, src_ptr, data_type_->Size());
             }
             break;
         }
@@ -1719,8 +1719,8 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
 
 void
 ColumnVector::ShallowCopy(const ColumnVector &other) {
-    if(this->data_type_ != other.data_type_) {
-        StorageError("Attempt to shallow copy: " + other.data_type_.ToString() + " column vector to: " + this->data_type_.ToString());
+    if(*this->data_type_ != *other.data_type_) {
+        StorageError("Attempt to shallow copy: " + other.data_type_->ToString() + " column vector to: " + this->data_type_->ToString());
     }
     if(this->buffer_ != other.buffer_) {
         this->buffer_ = other.buffer_;
@@ -1762,7 +1762,7 @@ ColumnVector::Reset() {
 
     // 4. For trivial data type, the VectorBuffer will not be reset.
     // But for non-trivial data type, the heap memory manage need to be reset
-    if(data_type_.type() == LogicalType::kMixed) {
+    if(data_type_->type() == LogicalType::kMixed) {
         // Current solution:
         // Tuple/Array/Long String will use heap memory which isn't managed by ColumnVector.
         // This part of memory should managed by ColumnVector, but it isn't now.

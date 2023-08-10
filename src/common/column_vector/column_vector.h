@@ -33,14 +33,14 @@ enum class ColumnVectorType : i8 {
 struct ColumnVector {
 public:
     static inline SharedPtr<ColumnVector>
-    Make(DataType data_type) {
+    Make(SharedPtr<DataType> data_type) {
         return MakeShared<ColumnVector>(std::move(data_type));
     }
 
 public:
     ColumnVectorType vector_type_ {ColumnVectorType::kInvalid};
 
-    DataType data_type_;
+    SharedPtr<DataType> data_type_;
 
     SizeT data_type_size_{0};
 
@@ -62,7 +62,7 @@ public:
 public:
     // Construct a column vector without initialization;
     explicit
-    ColumnVector(DataType data_type)
+    ColumnVector(SharedPtr<DataType> data_type)
             : data_type_(std::move(data_type)), vector_type_(ColumnVectorType::kInvalid) {
         GlobalResourceUsage::IncrObjectCount();
     }
@@ -142,8 +142,8 @@ public:
         this->Initialize(vector_type, DEFAULT_VECTOR_SIZE);
     }
 
-    void
-    SetDataType(const DataType& data_type) {
+    inline void
+    SetDataType(const SharedPtr<DataType>& data_type) {
         TypeAssert(!initialized, "Column Vector is initialized")
         data_type_ = data_type;
     }
@@ -180,7 +180,7 @@ public:
         return vector_type_;
     }
 
-    [[nodiscard]] const inline DataType&
+    [[nodiscard]] const inline SharedPtr<DataType>&
     data_type() const {
         return data_type_;
     }

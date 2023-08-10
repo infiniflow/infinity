@@ -242,7 +242,9 @@ DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
                 }
             }
         } else {
-            // not committed
+            // Only committed txn is visible. Committing txn isn't visble.
+
+            // not committed, but the same txn is also visible
             if(txn_id == db_entry->txn_id_) {
                 // same txn
                 return {db_entry.get(), nullptr};

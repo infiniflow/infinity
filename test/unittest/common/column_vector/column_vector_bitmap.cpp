@@ -30,12 +30,12 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBitmap);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBitmap)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -134,7 +134,7 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBitmap)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -196,12 +196,12 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBitmap);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBitmap)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -267,7 +267,7 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBitmap)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -310,7 +310,7 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBitmap);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -370,7 +370,7 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
 TEST_F(ColumnVectorBitmapTest, bitmap_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBitmap);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

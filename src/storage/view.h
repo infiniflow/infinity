@@ -22,7 +22,7 @@ public:
     explicit
     View(SharedPtr<CreateViewInfo> create_view_info,
          SharedPtr<Vector<String>> column_names,
-         SharedPtr<Vector<DataType>> column_types)
+         SharedPtr<Vector<SharedPtr<DataType>>> column_types)
          : create_view_info_(std::move(create_view_info)),
          column_names_(std::move(column_names)),
          column_types_(std::move(column_types))
@@ -48,7 +48,7 @@ public:
         return column_names_;
     };
 
-    [[nodiscard]] inline const SharedPtr<Vector<DataType>>&
+    [[nodiscard]] inline const SharedPtr<Vector<SharedPtr<DataType>>>&
     column_types() const {
         return column_types_;
     };
@@ -56,7 +56,7 @@ public:
 private:
     SharedPtr<CreateViewInfo> create_view_info_{};
     SharedPtr<Vector<String>> column_names_{};
-    SharedPtr<Vector<DataType>> column_types_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
 };
 }
 

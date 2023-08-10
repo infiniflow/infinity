@@ -356,7 +356,7 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
     SharedPtr<Table> table_ptr = std::static_pointer_cast<Table>(base_table_ptr);
 
     String alias = from_table->GetTableName();
-    SharedPtr<Vector<DataType>> types_ptr = MakeShared<Vector<DataType>>();
+    SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
     SharedPtr<Vector<String>> names_ptr = MakeShared<Vector<String>>();
     Vector<SizeT> columns;
 
@@ -585,7 +585,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
                 auto left_column_type = left_binding_ptr->column_types_->at(left_column_index);
 
                 SharedPtr<ColumnExpression> left_column_expression_ptr =
-                        MakeShared<ColumnExpression>(left_column_type,
+                        MakeShared<ColumnExpression>(*left_column_type,
                                                      left_binding_ptr->table_name_,
                                                      left_binding_ptr->table_index_,
                                                      column_name,
@@ -606,7 +606,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
                 auto right_column_type = right_binding_ptr->column_types_->at(right_column_index);
 
                 SharedPtr<ColumnExpression> right_column_expression_ptr =
-                        MakeShared<ColumnExpression>(right_column_type,
+                        MakeShared<ColumnExpression>(*right_column_type,
                                                      right_binding_ptr->table_name_,
                                                      right_binding_ptr->table_index_,
                                                      column_name,
@@ -794,7 +794,7 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
     bound_select_statement->names_ptr_ = MakeShared<Vector<String>>();
     bound_select_statement->names_ptr_->reserve(column_count);
 
-    bound_select_statement->types_ptr_ = MakeShared<Vector<DataType>>();
+    bound_select_statement->types_ptr_ = MakeShared<Vector<SharedPtr<DataType>>>();
     bound_select_statement->types_ptr_->reserve(column_count);
     bind_context_ptr_->project_exprs_.reserve(column_count);
     bound_select_statement->projection_expressions_.reserve(column_count);
@@ -814,7 +814,7 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
         bound_select_statement->projection_expressions_.emplace_back(bound_expr);
 
         bound_select_statement->names_ptr_->emplace_back(expr_name);
-        bound_select_statement->types_ptr_->emplace_back(bound_expr->Type());
+        bound_select_statement->types_ptr_->emplace_back(MakeShared<DataType>(bound_expr->Type()));
     }
 
     if(!bound_select_statement->having_expressions_.empty() ||

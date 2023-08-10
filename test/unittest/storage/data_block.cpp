@@ -35,59 +35,59 @@ TEST_F(DataBlockTest, test1) {
 
 
     DataBlock data_block;
-    std::vector<DataType> column_types;
+    Vector<SharedPtr<DataType>> column_types;
     // Bool * 1
-    column_types.emplace_back(LogicalType::kBoolean);
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
 
     // Integer * 5
-    column_types.emplace_back(LogicalType::kTinyInt);
-    column_types.emplace_back(LogicalType::kSmallInt);
-    column_types.emplace_back(LogicalType::kInteger);
-    column_types.emplace_back(LogicalType::kBigInt);
-    column_types.emplace_back(LogicalType::kHugeInt);
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kSmallInt));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kInteger));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kHugeInt));
 
     // Float * 2
-    column_types.emplace_back(LogicalType::kFloat);
-    column_types.emplace_back(LogicalType::kDouble);
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kFloat));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDouble));
 
     // Decimal * 1
-    column_types.emplace_back(LogicalType::kDecimal, DecimalInfo::Make(38, 2));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDecimal, DecimalInfo::Make(38, 2)));
 
     // Varchar * 1
-    column_types.emplace_back(LogicalType::kVarchar);
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kVarchar));
 
     // Date and Time * 6
-    column_types.emplace_back(LogicalType::kDate);
-    column_types.emplace_back(LogicalType::kTime);
-    column_types.emplace_back(LogicalType::kDateTime);
-    column_types.emplace_back(LogicalType::kTimestamp);
-    column_types.emplace_back(LogicalType::kInterval);
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDate));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTime));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDateTime));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTimestamp));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kInterval));
 
     // Nested types * 2
-    column_types.emplace_back(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt)));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt))));
 
     // TODO: how to handle Tuple type?
     // column_types.emplace_back(LogicalType::kTuple);
 
     // Geography * 7
-    column_types.emplace_back(LogicalType::kPoint);
-    column_types.emplace_back(LogicalType::kLine);
-    column_types.emplace_back(LogicalType::kLineSeg);
-    column_types.emplace_back(LogicalType::kBox);
-    column_types.emplace_back(LogicalType::kPath);
-    column_types.emplace_back(LogicalType::kPolygon);
-    column_types.emplace_back(LogicalType::kCircle);
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPoint));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kLine));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kLineSeg));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBox));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPath));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPolygon));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kCircle));
 
     // Other * 4
-    column_types.emplace_back(LogicalType::kBitmap);
-    column_types.emplace_back(LogicalType::kUuid);
-    column_types.emplace_back(LogicalType::kBlob);
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBitmap));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kUuid));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBlob));
 
     // 32 dimension * float vector
-    column_types.emplace_back(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
 
     // Heterogeneous type * 1
-    column_types.emplace_back(LogicalType::kMixed);
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kMixed));
 
     SizeT row_count = DEFAULT_VECTOR_SIZE;
 
@@ -136,8 +136,8 @@ TEST_F(DataBlockTest, test2) {
     using namespace infinity;
 
     DataBlock data_block;
-    std::vector<DataType> column_types;
-    column_types.emplace_back(LogicalType::kBoolean);
+    Vector<SharedPtr<DataType>> column_types;
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
 
     SizeT row_count = DEFAULT_VECTOR_SIZE;
 
@@ -173,8 +173,8 @@ TEST_F(DataBlockTest, test3) {
     profiler.Begin();
 
     DataBlock data_block;
-    std::vector<DataType> column_types;
-    column_types.emplace_back(LogicalType::kTinyInt);
+    Vector<SharedPtr<DataType>> column_types;
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
 
     SizeT row_count = DEFAULT_VECTOR_SIZE;
 

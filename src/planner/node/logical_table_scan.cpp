@@ -16,7 +16,7 @@ LogicalTableScan::LogicalTableScan(u64 node_id,
                                    u64 table_index,
                                    Vector<SizeT> column_ids,
                                    SharedPtr<Vector<String>> column_names,
-                                   SharedPtr<Vector<DataType>> column_types)
+                                   SharedPtr<Vector<SharedPtr<DataType>>> column_types)
     : LogicalNode(node_id, LogicalNodeType::kTableScan),
     table_ptr_(std::move(table_ptr)),
     table_scan_func_ptr_(std::move(table_scan_func)),

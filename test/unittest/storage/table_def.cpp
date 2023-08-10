@@ -38,7 +38,7 @@ TEST_F(TableDefTest, test1) {
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
         auto column_def_ptr = MakeShared<ColumnDef>(column_id ++,
-                                                    DataType(LogicalType::kTinyInt),
+                                                    MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
                                                     "c1",
                                                     constraints);
         columns.emplace_back(column_def_ptr);
@@ -48,7 +48,7 @@ TEST_F(TableDefTest, test1) {
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
         auto column_def_ptr = MakeShared<ColumnDef>(column_id ++,
-                                                    DataType(LogicalType::kVarchar),
+                                                    MakeShared<DataType>(DataType(LogicalType::kVarchar)),
                                                     "c2",
                                                     constraints);
         columns.emplace_back(column_def_ptr);

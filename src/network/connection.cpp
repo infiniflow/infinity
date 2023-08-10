@@ -134,12 +134,12 @@ Connection::SendTableDescription(const SharedPtr<Table>& result_table) {
     pg_handler_->SendDescriptionHeader(column_name_length_sum, column_count);
 
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType column_type = result_table->GetColumnTypeById(idx);
+        SharedPtr<DataType> column_type = result_table->GetColumnTypeById(idx);
 
         u32 object_id = 0;
         i16 object_width = 0;
 
-        switch(column_type.type()) {
+        switch(column_type->type()) {
             case LogicalType::kBoolean: {
                 object_id = 16;
                 object_width = 1;

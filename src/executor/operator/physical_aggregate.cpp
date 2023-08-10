@@ -39,7 +39,7 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
 
     for(i64 idx = 0; auto& expr: groups_) {
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
-                                                             expr->Type(),
+                                                             MakeShared<DataType>(expr->Type()),
                                                              expr->Name(),
                                                              HashSet<ConstraintType>());
         groupby_columns.emplace_back(col_def);
@@ -73,7 +73,7 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
         Vector<SharedPtr<ColumnDef>> columns;
         columns.reserve(column_count);
         for(SizeT idx = 0; idx < column_count; ++ idx) {
-            DataType col_type = input_table_->GetColumnTypeById(idx);
+            SharedPtr<DataType> col_type = input_table_->GetColumnTypeById(idx);
             String col_name = input_table_->GetColumnNameById(idx);
 
             SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
@@ -100,22 +100,23 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
         expr_states.reserve(aggregates_.size());
 
         // Prepare the output block
-        Vector<DataType> output_types;
+        Vector<SharedPtr<DataType>> output_types;
         output_types.reserve(aggregates_count);
 
         for(i64 idx = 0; auto& expr: aggregates_) {
             // expression state
             expr_states.emplace_back(ExpressionState::CreateState(expr));
+            SharedPtr<DataType> data_type = MakeShared<DataType>(expr->Type());
 
             // column definition
             SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
-                                                                 expr->Type(),
+                                                                 data_type,
                                                                  expr->Name(),
                                                                  HashSet<ConstraintType>());
             aggregate_columns.emplace_back(col_def);
 
             // for output block
-            output_types.emplace_back(expr->Type());
+            output_types.emplace_back(data_type);
 
             ++ idx;
         }
@@ -166,13 +167,14 @@ PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, Shared
     SizeT column_count = input_table->ColumnCount();
 
     // 1. Get output table column types.
-    Vector<DataType> types;
+    Vector<SharedPtr<DataType>> types;
     types.reserve(column_count);
     for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
-        DataType input_type = input_table->GetColumnTypeById(column_id);
-        DataType output_type = grouped_input_table->GetColumnTypeById(column_id);
-        ExecutorAssert(input_type == output_type,
-                       "Column type doesn't matched: " + input_type.ToString() + " and " + output_type.ToString());
+        SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
+        SharedPtr<DataType> output_type = grouped_input_table->GetColumnTypeById(column_id);
+        if(*input_type != *output_type) {
+            ExecutorError("Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
+        }
         types.emplace_back(input_type);
     }
 
@@ -199,7 +201,7 @@ PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, Shared
 
                 // Forloop each column
                 for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
-                    switch (types[column_id].type()) {
+                    switch (types[column_id]->type()) {
                         case LogicalType::kBoolean: {
                             ((BooleanT *) (output_datablock->column_vectors[column_id]->data()))[output_row_idx]
                                     = ((BooleanT *) (input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
@@ -302,13 +304,13 @@ void
 PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, SharedPtr<Table>& output_table) {
 
     SizeT column_count = input_table->ColumnCount();
-    Vector<DataType> types;
+    Vector<SharedPtr<DataType>> types;
     types.reserve(column_count);
     for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
-        DataType input_type = input_table->GetColumnTypeById(column_id);
-        DataType output_type = output_table->GetColumnTypeById(column_id);
-        ExecutorAssert(input_type == output_type,
-                       "Column type doesn't matched: " + input_type.ToString() + " and " + output_type.ToString());
+        SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
+        SharedPtr<DataType> output_type = output_table->GetColumnTypeById(column_id);
+        ExecutorAssert(*input_type == *output_type,
+                       "Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
         types.emplace_back(input_type);
     }
 
@@ -327,7 +329,7 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
 
         // Only the first position of the column vector has value.
         for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
-            switch (types[column_id].type()) {
+            switch (types[column_id]->type()) {
                 case LogicalType::kBoolean: {
                     ((BooleanT *) (output_datablock->column_vectors[column_id]->data()))[block_row_idx]
                             = ((BooleanT *) (input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
@@ -541,7 +543,7 @@ PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
     expr_states.reserve(aggregates_.size());
 
     // Prepare the output block
-    Vector<DataType> output_types;
+    Vector<SharedPtr<DataType>> output_types;
     output_types.reserve(aggregates_count);
 
     SizeT input_data_block_count = input_table_->DataBlockCount();
@@ -549,15 +551,17 @@ PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
         // expression state
         expr_states.emplace_back(ExpressionState::CreateState(expr, input_data_block_count));
 
+        SharedPtr<DataType> output_type = MakeShared<DataType>(expr->Type());
+
         // column definition
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
-                                                             expr->Type(),
+                                                             output_type,
                                                              expr->Name(),
                                                              HashSet<ConstraintType>());
         aggregate_columns.emplace_back(col_def);
 
         // for output block
-        output_types.emplace_back(expr->Type());
+        output_types.emplace_back(output_type);
 
         ++idx;
     }
@@ -604,17 +608,17 @@ PhysicalAggregate::GetOutputNames() const {
     return result;
 }
 
-SharedPtr<Vector<DataType>>
+SharedPtr<Vector<SharedPtr<DataType>>>
 PhysicalAggregate::GetOutputTypes() const {
-    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
+    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
     SizeT groups_count = groups_.size();
     SizeT aggregates_count = aggregates_.size();
     result->reserve(groups_count + aggregates_count);
     for(SizeT i = 0; i < groups_count; ++ i) {
-        result->emplace_back(groups_[i]->Type());
+        result->emplace_back(MakeShared<DataType>(groups_[i]->Type()));
     }
     for(SizeT i = 0; i < aggregates_count; ++ i) {
-        result->emplace_back(aggregates_[i]->Type());
+        result->emplace_back(MakeShared<DataType>(aggregates_[i]->Type()));
     }
     return result;
 }

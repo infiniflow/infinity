@@ -167,7 +167,7 @@ TEST_F(DoubleCastTest, double_cast0) {
         VarcharT target;
         String src_str, tgt_str;
 
-        DataType data_type(LogicalType::kVarchar);
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
 
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
@@ -237,7 +237,7 @@ TEST_F(DoubleCastTest, double_cast0) {
 TEST_F(DoubleCastTest, double_cast1) {
     using namespace infinity;
 
-    DataType source_type(LogicalType::kDouble);
+    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kDouble);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
@@ -253,8 +253,8 @@ TEST_F(DoubleCastTest, double_cast1) {
 
     // cast double column vector to tiny int column vector
     {
-        DataType target_type(LogicalType::kTinyInt);
-        auto double2tiny_ptr = BindFloatCast<DoubleT>(source_type, target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kTinyInt);
+        auto double2tiny_ptr = BindFloatCast<DoubleT>(*source_type, *target_type);
         EXPECT_NE(double2tiny_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
@@ -278,8 +278,8 @@ TEST_F(DoubleCastTest, double_cast1) {
 
     // cast double column vector to small integer column vector
     {
-        DataType target_type(LogicalType::kSmallInt);
-        auto double2small_ptr = BindFloatCast<DoubleT>(source_type, target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kSmallInt);
+        auto double2small_ptr = BindFloatCast<DoubleT>(*source_type, *target_type);
         EXPECT_NE(double2small_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
@@ -298,8 +298,8 @@ TEST_F(DoubleCastTest, double_cast1) {
 
     // cast double column vector to integer column vector
     {
-        DataType target_type(LogicalType::kInteger);
-        auto double2integer_ptr = BindFloatCast<DoubleT>(source_type, target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kInteger);
+        auto double2integer_ptr = BindFloatCast<DoubleT>(*source_type, *target_type);
         EXPECT_NE(double2integer_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
@@ -318,8 +318,8 @@ TEST_F(DoubleCastTest, double_cast1) {
 
     // cast double column vector to big int column vector
     {
-        DataType target_type(LogicalType::kBigInt);
-        auto double2bigint_ptr = BindFloatCast<DoubleT>(source_type, target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kBigInt);
+        auto double2bigint_ptr = BindFloatCast<DoubleT>(*source_type, *target_type);
         EXPECT_NE(double2bigint_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
@@ -338,8 +338,8 @@ TEST_F(DoubleCastTest, double_cast1) {
 
     // TODO: cast double column vector to huge int column vector
     {
-        DataType target_type(LogicalType::kHugeInt);
-        auto double2hugeint_ptr = BindFloatCast<DoubleT>(source_type, target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kHugeInt);
+        auto double2hugeint_ptr = BindFloatCast<DoubleT>(*source_type, *target_type);
         EXPECT_NE(double2hugeint_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
@@ -353,8 +353,8 @@ TEST_F(DoubleCastTest, double_cast1) {
 
     // cast double column vector to float column vector
     {
-        DataType target_type(LogicalType::kFloat);
-        auto double2float_ptr = BindFloatCast<DoubleT>(source_type, target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kFloat);
+        auto double2float_ptr = BindFloatCast<DoubleT>(*source_type, *target_type);
         EXPECT_NE(double2float_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
@@ -373,8 +373,8 @@ TEST_F(DoubleCastTest, double_cast1) {
 
     // cast double column vector to Varchar vector
     {
-        DataType target_type(LogicalType::kVarchar);
-        auto double2varchar_ptr = BindFloatCast<DoubleT>(source_type, target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kVarchar);
+        auto double2varchar_ptr = BindFloatCast<DoubleT>(*source_type, *target_type);
         EXPECT_NE(double2varchar_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);

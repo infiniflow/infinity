@@ -35,9 +35,9 @@ public:
         return MakeShared<Vector<String>>();
     }
 
-    inline SharedPtr<Vector<DataType>>
+    inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
-        return MakeShared<Vector<DataType>>();
+        return MakeShared<Vector<SharedPtr<DataType>>>();
     }
 
 private:

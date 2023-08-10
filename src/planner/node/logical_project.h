@@ -24,7 +24,7 @@ public:
     [[nodiscard]] SharedPtr<Vector<String>>
     GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<DataType>>
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final;
 
     String

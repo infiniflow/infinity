@@ -12,7 +12,7 @@ class PhysicalExchange final : public PhysicalOperator {
 public:
     explicit PhysicalExchange(u64 id,
                               SharedPtr<Vector<String>> names,
-                              SharedPtr<Vector<DataType>> types)
+                              SharedPtr<Vector<SharedPtr<DataType>>> types)
             : PhysicalOperator(PhysicalOperatorType::kExchange, nullptr, nullptr,id),
               output_names_(std::move(names)),
               output_types_(std::move(types))
@@ -31,14 +31,14 @@ public:
         return output_names_;
     }
 
-    inline SharedPtr<Vector<DataType>>
+    inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
         return output_types_;
     }
 
 private:
     SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<DataType>> output_types_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
 };
 

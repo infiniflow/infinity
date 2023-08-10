@@ -49,7 +49,7 @@ public:
         return sink_node_->GetOutputNames();
     }
 
-    [[nodiscard]] inline SharedPtr<Vector<DataType>>
+    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const {
         return sink_node_->GetOutputTypes();
     }

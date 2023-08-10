@@ -37,7 +37,7 @@ ExpressionState::CreateState(const SharedPtr<AggregateExpression>& agg_expr, Siz
     result->AddChild(agg_expr->arguments()[0], block_count);
 
     // Aggregate function will only have one output value.
-    SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(agg_expr->Type());
+    SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(MakeShared<DataType>(agg_expr->Type()));
     column->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
     result->column_vectors_.emplace_back(column);
 //    result->output_data_block_.Init({agg_expr->Type()});
@@ -58,7 +58,7 @@ ExpressionState::CreateState(const SharedPtr<CaseExpression>& case_expr, SizeT b
 
     result->column_vectors_.reserve(block_count);
     for(SizeT idx = 0; idx < block_count; ++ idx) {
-        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(case_expr->Type());
+        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(MakeShared<DataType>(case_expr->Type()));
         column->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
         result->column_vectors_.emplace_back(column);
     }
@@ -82,7 +82,7 @@ ExpressionState::CreateState(const SharedPtr<CastExpression>& cast_expr, SizeT b
 
     result->column_vectors_.reserve(block_count);
     for(SizeT idx = 0; idx < block_count; ++ idx) {
-        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(cast_expr->Type());
+        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(MakeShared<DataType>(cast_expr->Type()));
         column->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
         result->column_vectors_.emplace_back(column);
     }
@@ -93,11 +93,12 @@ ExpressionState::CreateState(const SharedPtr<CastExpression>& cast_expr, SizeT b
 SharedPtr<ExpressionState>
 ExpressionState::CreateState(const SharedPtr<ReferenceExpression>& column_expr, SizeT block_count) {
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
-    SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(column_expr->Type());
+    SharedPtr<DataType> column_data_type = MakeShared<DataType>(column_expr->Type());
+    SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(column_data_type);
 
     result->column_vectors_.reserve(block_count);
     for(SizeT idx = 0; idx < block_count; ++ idx) {
-        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(column_expr->Type());
+        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(column_data_type);
         column->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
         result->column_vectors_.emplace_back(column);
     }
@@ -108,6 +109,7 @@ ExpressionState::CreateState(const SharedPtr<ReferenceExpression>& column_expr, 
 SharedPtr<ExpressionState>
 ExpressionState::CreateState(const SharedPtr<FunctionExpression>& function_expr, SizeT block_count) {
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
+    SharedPtr<DataType> function_expr_data_type = MakeShared<DataType>(function_expr->Type());
 
     for(auto& arg : function_expr->arguments()) {
         result->AddChild(arg, block_count);
@@ -126,7 +128,7 @@ ExpressionState::CreateState(const SharedPtr<FunctionExpression>& function_expr,
 
     result->column_vectors_.reserve(block_count);
     for(SizeT idx = 0; idx < block_count; ++ idx) {
-        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(function_expr->Type());
+        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(function_expr_data_type);
         column->Initialize(result_column_vector_type[idx], DEFAULT_VECTOR_SIZE);
         result->column_vectors_.emplace_back(column);
     }
@@ -138,10 +140,11 @@ ExpressionState::CreateState(const SharedPtr<FunctionExpression>& function_expr,
 SharedPtr<ExpressionState>
 ExpressionState::CreateState(const SharedPtr<ValueExpression>& value_expr, SizeT block_count) {
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
+    SharedPtr<DataType> value_data_type = MakeShared<DataType>(value_expr->Type());
 
     result->column_vectors_.reserve(block_count);
     for(SizeT idx = 0; idx < block_count; ++ idx) {
-        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(value_expr->Type());
+        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(value_data_type);
         column->Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         value_expr->AppendToChunk(column);
         result->column_vectors_.emplace_back(column);
@@ -153,6 +156,8 @@ ExpressionState::CreateState(const SharedPtr<ValueExpression>& value_expr, SizeT
 SharedPtr<ExpressionState>
 ExpressionState::CreateState(const SharedPtr<InExpression>& in_expr, SizeT block_count) {
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
+    SharedPtr<DataType> in_expr_data_type = MakeShared<DataType>(in_expr->Type());
+
     result->AddChild(in_expr->left_operand(), block_count);
 
     for(auto& argument_expr: in_expr->arguments()) {
@@ -168,7 +173,7 @@ ExpressionState::CreateState(const SharedPtr<InExpression>& in_expr, SizeT block
 
     result->column_vectors_.reserve(block_count);
     for(SizeT idx = 0; idx < block_count; ++ idx) {
-        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(in_expr->Type());
+        SharedPtr<ColumnVector> column = MakeShared<ColumnVector>(in_expr_data_type);
         column->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
         result->column_vectors_.emplace_back(column);
     }

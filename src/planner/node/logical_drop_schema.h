@@ -30,10 +30,10 @@ public:
         return result;
     }
 
-    [[nodiscard]] inline SharedPtr<Vector<DataType>>
+    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
-        SharedPtr<Vector<DataType>> result_type = MakeShared<Vector<DataType>>();
-        result_type->emplace_back(LogicalType::kInteger);
+        SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
+        result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
         return result_type;
     }
 

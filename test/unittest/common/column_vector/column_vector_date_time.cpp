@@ -29,11 +29,11 @@ class ColumnVectorDateTimeTest : public BaseTest {
 TEST_F(ColumnVectorDateTimeTest, flat_date) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDate);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDate)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -107,7 +107,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -152,12 +152,12 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDate);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDate)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -206,7 +206,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDate)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -241,7 +241,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDate);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -277,7 +277,7 @@ TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDate);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -312,11 +312,11 @@ TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
 TEST_F(ColumnVectorDateTimeTest, flat_time) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTime);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTime)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -390,7 +390,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -435,12 +435,12 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTime);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTime)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -489,7 +489,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTime)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -524,7 +524,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTime);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -560,7 +560,7 @@ TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, time_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTime);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -595,11 +595,11 @@ TEST_F(ColumnVectorDateTimeTest, time_column_slice_init) {
 TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDateTime);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDateTime)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -675,7 +675,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -722,12 +722,12 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDateTime);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDateTime)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -778,7 +778,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDateTime)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -814,7 +814,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDateTime);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -852,7 +852,7 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kDateTime);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -889,11 +889,11 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
 TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTimestamp);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestamp)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -969,7 +969,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1016,12 +1016,12 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTimestamp);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestamp)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1072,7 +1072,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTimestamp)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1108,7 +1108,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTimestamp);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1146,7 +1146,7 @@ TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTimestamp);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1183,11 +1183,11 @@ TEST_F(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
 TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kInterval);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInterval)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1262,7 +1262,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1309,12 +1309,12 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kInterval);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInterval)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1364,7 +1364,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInterval)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1400,7 +1400,7 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kInterval);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1437,7 +1437,7 @@ TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, interval_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kInterval);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

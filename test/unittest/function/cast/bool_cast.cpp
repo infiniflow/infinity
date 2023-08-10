@@ -54,7 +54,7 @@ TEST_F(BoolCastTest, bool_cast0) {
 TEST_F(BoolCastTest, bool_cast1) {
     using namespace infinity;
 
-    DataType bool_type(LogicalType::kBoolean);
+    SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
 
     SharedPtr<ColumnVector> col_bool = MakeShared<ColumnVector>(bool_type);
     col_bool->Initialize();
@@ -72,8 +72,8 @@ TEST_F(BoolCastTest, bool_cast1) {
 
     // cast bool column vector to varchar column vector
     {
-        DataType varchar_type(LogicalType::kVarchar);
-        auto bool2varchar_ptr = BindBoolCast(bool_type, varchar_type);
+        SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+        auto bool2varchar_ptr = BindBoolCast(*bool_type, *varchar_type);
         EXPECT_NE(bool2varchar_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(varchar_type);

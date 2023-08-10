@@ -55,9 +55,9 @@ ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression>& expr,
     Vector<SharedPtr<ColumnVector>>& child_output = child_state->OutputColumnVectors();
     Execute(child_expr, child_state, child_output);
 
-    ExecutorAssert(expr->aggregate_function_.argument_type_ == child_output[0]->data_type(),
+    ExecutorAssert(expr->aggregate_function_.argument_type_ == *child_output[0]->data_type(),
                    "Argument type isn't matched with the child expression output");
-    ExecutorAssert(expr->aggregate_function_.return_type_ == output_column_vector[0]->data_type(),
+    ExecutorAssert(expr->aggregate_function_.return_type_ == *output_column_vector[0]->data_type(),
                    "Return type isn't matched");
 
     // 1. Initialize the aggregate state.

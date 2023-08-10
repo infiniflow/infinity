@@ -43,8 +43,8 @@ TEST_F(MaxFunctionTest, max_func) {
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     SharedPtr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
     {
-        DataType data_type(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -54,7 +54,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(Boolean)->Boolean", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -76,8 +76,8 @@ TEST_F(MaxFunctionTest, max_func) {
     }
 
     {
-        DataType data_type(LogicalType::kTinyInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -87,7 +87,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(TinyInt)->TinyInt", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -110,8 +110,8 @@ TEST_F(MaxFunctionTest, max_func) {
     }
 
     {
-        DataType data_type(LogicalType::kSmallInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -121,7 +121,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(SmallInt)->SmallInt", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -151,8 +151,8 @@ TEST_F(MaxFunctionTest, max_func) {
     }
 
     {
-        DataType data_type(LogicalType::kInteger);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -162,7 +162,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(Integer)->Integer", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -184,8 +184,8 @@ TEST_F(MaxFunctionTest, max_func) {
     }
 
     {
-        DataType data_type(LogicalType::kBigInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -195,7 +195,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(BigInt)->BigInt", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -217,8 +217,8 @@ TEST_F(MaxFunctionTest, max_func) {
     }
 
     {
-        DataType data_type(LogicalType::kFloat);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -228,7 +228,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(Float)->Float", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -250,8 +250,8 @@ TEST_F(MaxFunctionTest, max_func) {
     }
 
     {
-        DataType data_type(LogicalType::kDouble);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -261,7 +261,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(Double)->Double", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -283,8 +283,8 @@ TEST_F(MaxFunctionTest, max_func) {
     }
 
     {
-        DataType data_type(LogicalType::kHugeInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -294,7 +294,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(HugeInt)->HugeInt", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;

@@ -45,7 +45,7 @@ ExpressionSelector::Select(const SharedPtr<BaseExpression>& expr,
                            SharedPtr<ExpressionState>& state,
                            SizeT count,
                            SharedPtr<Selection>& output_true_select) {
-    SharedPtr<ColumnVector> bool_column = MakeShared<ColumnVector>(DataType(LogicalType::kBoolean));
+    SharedPtr<ColumnVector> bool_column = MakeShared<ColumnVector>(MakeShared<DataType>(LogicalType::kBoolean));
     bool_column->Initialize();
     Vector<SharedPtr<ColumnVector>> outputs;
     outputs.emplace_back(bool_column);

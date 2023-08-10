@@ -121,7 +121,7 @@ BindContext::AddBinding(const SharedPtr<Binding>& binding) {
 void
 BindContext::AddSubqueryBinding(const String& name,
                                 u64 table_index,
-                                SharedPtr<Vector<DataType>> column_types,
+                                SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                 SharedPtr<Vector<String>> column_names) {
     auto binding = Binding::MakeBinding(BindingType::kSubquery,
                                         name,
@@ -138,7 +138,7 @@ BindContext::AddSubqueryBinding(const String& name,
 void
 BindContext::AddCTEBinding(const String& name,
                            u64 table_index,
-                           SharedPtr<Vector<DataType>> column_types,
+                           SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                            SharedPtr<Vector<String>> column_names) {
     auto binding = Binding::MakeBinding(BindingType::kCTE,
                                         name,
@@ -155,7 +155,7 @@ BindContext::AddCTEBinding(const String& name,
 void
 BindContext::AddViewBinding(const String& name,
                             u64 table_index,
-                            SharedPtr<Vector<DataType>> column_types,
+                            SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                             SharedPtr<Vector<String>> column_names) {
     auto binding = Binding::MakeBinding(BindingType::kView,
                                         name,
@@ -169,7 +169,7 @@ void
 BindContext::AddTableBinding(const String& table_alias,
                              u64 table_index,
                              SharedPtr<Table> table_ptr,
-                             SharedPtr<Vector<DataType>> column_types,
+                             SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                              SharedPtr<Vector<String>> column_names) {
     auto binding = Binding::MakeBinding(BindingType::kTable,
                                         table_alias,
@@ -276,7 +276,7 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
             if(binding->name2index_.contains(column_name_ref)) {
                 i64 column_id = binding->name2index_[column_name_ref];
                 bound_column_expr = ColumnExpression::Make(
-                        binding->column_types_->at(column_id),
+                        *binding->column_types_->at(column_id),
                         binding_name,
                         binding->table_index_,
                         column_name_ref,
@@ -302,7 +302,7 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
                 // Find the table and column in the bind context.
                 i64 column_id = binding->name2index_[column_name_ref];
                 bound_column_expr = ColumnExpression::Make(
-                        binding->column_types_->at(column_id),
+                        *binding->column_types_->at(column_id),
                         table_name_ref,
                         binding->table_index_,
                         column_name_ref,

@@ -9,7 +9,7 @@
 
 namespace infinity {
 
-class ColumnBlockEntry : public BaseEntry {
+class ColumnDataEntry : public BaseEntry {
 
 };
 

@@ -43,7 +43,7 @@ TEST_F(PointCastTest, point_cast0) {
         VarcharT target;
 
 
-        DataType data_type(LogicalType::kVarchar);
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
@@ -62,7 +62,7 @@ TEST_F(PointCastTest, point_cast1) {
         EXPECT_THROW(BindGeographyCast<PointT>(source_type, target_type), TypeException);
     }
 
-    DataType source_type(LogicalType::kPoint);
+    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kPoint);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
@@ -78,8 +78,8 @@ TEST_F(PointCastTest, point_cast1) {
     }
     // cast point column vector to varchar column vector
     {
-        DataType target_type(LogicalType::kVarchar);
-        auto source2target_ptr = BindGeographyCast<PointT>(source_type, target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kVarchar);
+        auto source2target_ptr = BindGeographyCast<PointT>(*source_type, *target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);

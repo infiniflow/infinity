@@ -29,11 +29,11 @@ class ColumnVectorIntegerTest : public BaseTest {
 TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTinyInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -112,11 +112,11 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
 
     // ====
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
-//    column_vector.SetDataType(DataType(LogicalType::kTinyInt));
+//    column_vector.SetDataType(data_type);
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
 //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -152,12 +152,12 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTinyInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -205,7 +205,7 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kTinyInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -239,7 +239,7 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
 TEST_F(ColumnVectorIntegerTest, tinyint_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTinyInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -273,7 +273,7 @@ TEST_F(ColumnVectorIntegerTest, tinyint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, tinyint_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kTinyInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -307,11 +307,11 @@ TEST_F(ColumnVectorIntegerTest, tinyint_column_slice_init) {
 TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kSmallInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kSmallInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -385,11 +385,11 @@ TEST_F(ColumnVectorIntegerTest, flat_smallint) {
 
     // ====
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
-//    column_vector.SetDataType(DataType(LogicalType::kSmallInt));
+//    column_vector.SetDataType(data_type);
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
 //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kSmallInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -425,12 +425,12 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kSmallInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kSmallInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -478,7 +478,7 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kSmallInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -512,7 +512,7 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
 TEST_F(ColumnVectorIntegerTest, smallint_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kSmallInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -546,7 +546,7 @@ TEST_F(ColumnVectorIntegerTest, smallint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, smallint_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kSmallInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -580,11 +580,11 @@ TEST_F(ColumnVectorIntegerTest, smallint_column_slice_init) {
 TEST_F(ColumnVectorIntegerTest, flat_int) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kInteger);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInteger)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -658,11 +658,11 @@ TEST_F(ColumnVectorIntegerTest, flat_int) {
 
     // ====
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
-//    column_vector.SetDataType(DataType(LogicalType::kInteger));
+//    column_vector.SetDataType(data_type);
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
 //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInteger)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -698,12 +698,12 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kInteger);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInteger)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -751,7 +751,7 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kInteger)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -785,7 +785,7 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
 TEST_F(ColumnVectorIntegerTest, integer_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kInteger);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -819,7 +819,7 @@ TEST_F(ColumnVectorIntegerTest, integer_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, integer_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kInteger);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -853,11 +853,11 @@ TEST_F(ColumnVectorIntegerTest, integer_column_slice_init) {
 TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBigInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBigInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -931,11 +931,11 @@ TEST_F(ColumnVectorIntegerTest, flat_bigint) {
 
     // ====
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
-//    column_vector.SetDataType(DataType(LogicalType::kBigInt));
+//    column_vector.SetDataType(data_type);
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
 //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBigInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -971,12 +971,12 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBigInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBigInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1024,7 +1024,7 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBigInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1058,7 +1058,7 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
 TEST_F(ColumnVectorIntegerTest, bigint_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBigInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1092,7 +1092,7 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, bigint_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBigInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1126,11 +1126,11 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_slice_init) {
 TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kHugeInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kHugeInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1206,11 +1206,11 @@ TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
 //
     // ====
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
-//    column_vector.SetDataType(DataType(LogicalType::kHugeInt));
+//    column_vector.SetDataType(data_type);
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
 //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kHugeInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1246,12 +1246,12 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kHugeInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kHugeInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1300,7 +1300,7 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kHugeInt)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1335,7 +1335,7 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
 TEST_F(ColumnVectorIntegerTest, hugeint_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kHugeInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -1372,7 +1372,7 @@ TEST_F(ColumnVectorIntegerTest, hugeint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, hugeint_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kHugeInt);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

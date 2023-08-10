@@ -35,22 +35,23 @@ PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
     expr_states.reserve(expression_count);
 
     // Prepare the output block
-    Vector<DataType> output_types;
+    Vector<SharedPtr<DataType>> output_types;
     output_types.reserve(expression_count);
 
     for(i64 idx = 0; auto& expr: expressions_) {
         // expression state
         expr_states.emplace_back(ExpressionState::CreateState(expr));
+        SharedPtr<DataType> data_type = MakeShared<DataType>(expr->Type());
 
         // column definition
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
-                                                             expr->Type(),
+                                                             data_type,
                                                              expr->Name(),
                                                              HashSet<ConstraintType>());
         projection_columns.emplace_back(col_def);
 
         // for output block
-        output_types.emplace_back(expr->Type());
+        output_types.emplace_back(data_type);
 
         ++ idx;
     }
@@ -127,13 +128,13 @@ PhysicalProject::GetOutputNames() const {
     return result;
 }
 
-SharedPtr<Vector<DataType>>
+SharedPtr<Vector<SharedPtr<DataType>>>
 PhysicalProject::GetOutputTypes() const {
-    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
+    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
     SizeT expression_count = expressions_.size();
     result->reserve(expression_count);
     for(SizeT i = 0; i < expression_count; ++ i) {
-        result->emplace_back(expressions_[i]->Type());
+        result->emplace_back(MakeShared<DataType>(expressions_[i]->Type()));
     }
 
     return result;

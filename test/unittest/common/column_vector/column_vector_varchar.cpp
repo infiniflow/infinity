@@ -30,11 +30,11 @@ class ColumnVectorVarcharTest : public BaseTest {
 TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kVarchar);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -135,7 +135,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -200,12 +200,12 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     using namespace infinity;
 
     
-    DataType data_type(LogicalType::kVarchar);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -272,7 +272,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -316,7 +316,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
     using namespace infinity;
 
     
-    DataType data_type(LogicalType::kVarchar);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -374,7 +374,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
     using namespace infinity;
 
     
-    DataType data_type(LogicalType::kVarchar);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -432,11 +432,11 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     using namespace infinity;
 
     
-    DataType data_type(LogicalType::kVarchar);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -539,7 +539,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -605,12 +605,12 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     using namespace infinity;
 
     
-    DataType data_type(LogicalType::kVarchar);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -677,7 +677,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -721,11 +721,11 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     using namespace infinity;
 
     
-    DataType data_type(LogicalType::kVarchar);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kVarchar)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -835,7 +835,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);

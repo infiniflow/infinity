@@ -59,7 +59,7 @@ TEST_F(DateTimeCastTest, datetime_cast0) {
         VarcharT target;
 
 
-        DataType data_type(LogicalType::kVarchar);
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
@@ -77,7 +77,7 @@ TEST_F(DateTimeCastTest, datetime_cast1) {
         EXPECT_THROW(BindDateTimeCast(target_type), TypeException);
     }
 
-    DataType source_type(LogicalType::kDateTime);
+    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kDateTime);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
@@ -94,8 +94,8 @@ TEST_F(DateTimeCastTest, datetime_cast1) {
 
     // cast datetime column vector to date column vector
     {
-        DataType target_type(LogicalType::kDate);
-        auto source2target_ptr = BindDateTimeCast(target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kDate);
+        auto source2target_ptr = BindDateTimeCast(*target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
@@ -106,8 +106,8 @@ TEST_F(DateTimeCastTest, datetime_cast1) {
     }
     // cast datetime column vector to time column vector
     {
-        DataType target_type(LogicalType::kTime);
-        auto source2target_ptr = BindDateTimeCast(target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kTime);
+        auto source2target_ptr = BindDateTimeCast(*target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
@@ -118,8 +118,8 @@ TEST_F(DateTimeCastTest, datetime_cast1) {
     }
     // cast datetime column vector to timestamp column vector
     {
-        DataType target_type(LogicalType::kTimestamp);
-        auto source2target_ptr = BindDateTimeCast(target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kTimestamp);
+        auto source2target_ptr = BindDateTimeCast(*target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);
@@ -131,8 +131,8 @@ TEST_F(DateTimeCastTest, datetime_cast1) {
 
     // cast datetime column vector to varchar column vector
     {
-        DataType target_type(LogicalType::kVarchar);
-        auto source2target_ptr = BindDateTimeCast(target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kVarchar);
+        auto source2target_ptr = BindDateTimeCast(*target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target = MakeShared<ColumnVector>(target_type);

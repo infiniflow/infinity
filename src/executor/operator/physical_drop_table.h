@@ -34,7 +34,7 @@ public:
         return output_names_;
     }
 
-    inline SharedPtr<Vector<DataType>>
+    inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
         return output_types_;
     }
@@ -60,7 +60,7 @@ private:
     ConflictType conflict_type_{ConflictType::kInvalid};
 
     SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<DataType>> output_types_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 };
 
 }

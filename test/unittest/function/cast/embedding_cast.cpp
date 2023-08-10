@@ -77,7 +77,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     }
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-    DataType source_type(LogicalType::kEmbedding, embedding_info);
+    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
     ColumnVector col_source(source_type);
     col_source.Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
@@ -109,8 +109,8 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
 
     // cast uuid column vector to varchar column vector
     {
-        DataType target_type(LogicalType::kVarchar);
-        auto source2target_ptr = BindEmbeddingCast(target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kVarchar);
+        auto source2target_ptr = BindEmbeddingCast(*target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
         ColumnVector col_target(target_type);

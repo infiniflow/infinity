@@ -46,15 +46,15 @@ TEST_F(OrFunctionsTest, or_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kBoolean);
-        DataType result_type(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type,
-                                                                                "t1",
-                                                                                1,
-                                                                                "c1",
-                                                                                0,
-                                                                                0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
+                                                                                 "t1",
+                                                                                 1,
+                                                                                 "c1",
+                                                                                 0,
+                                                                                 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                  "t1",
                                                                                  1,
                                                                                  "c2",
@@ -67,7 +67,7 @@ TEST_F(OrFunctionsTest, or_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("OR(Boolean, Boolean)->Boolean", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
         column_types.emplace_back(data_type);
 

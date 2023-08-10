@@ -30,7 +30,7 @@ public:
     Init(const SharedPtr<DataBlock>& input, SizeT start_idx, SizeT end_idx);
 
     void
-    Init(const Vector<DataType>& types, SizeT capacity = DEFAULT_VECTOR_SIZE);
+    Init(const Vector<SharedPtr<DataType>>& types, SizeT capacity = DEFAULT_VECTOR_SIZE);
 
     void
     Init(const Vector<SharedPtr<ColumnVector>>& column_vectors);

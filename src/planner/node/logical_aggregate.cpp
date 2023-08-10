@@ -36,17 +36,17 @@ LogicalAggregate::GetOutputNames() const {
     return result;
 }
 
-SharedPtr<Vector<DataType>>
+SharedPtr<Vector<SharedPtr<DataType>>>
 LogicalAggregate::GetOutputTypes() const {
-    SharedPtr<Vector<DataType>> result = MakeShared<Vector<DataType>>();
+    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
     SizeT groups_count = groups_.size();
     SizeT aggregates_count = aggregates_.size();
     result->reserve(groups_count + aggregates_count);
     for(SizeT i = 0; i < groups_count; ++ i) {
-        result->emplace_back(groups_[i]->Type());
+        result->emplace_back(MakeShared<DataType>(groups_[i]->Type()));
     }
     for(SizeT i = 0; i < aggregates_count; ++ i) {
-        result->emplace_back(aggregates_[i]->Type());
+        result->emplace_back(MakeShared<DataType>(aggregates_[i]->Type()));
     }
     return result;
 }

@@ -49,8 +49,8 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
 
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type0(LogicalType::kVarchar);
-        SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(data_type0,
+        SharedPtr<DataType> data_type0 = MakeShared<DataType>(LogicalType::kVarchar);
+        SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(*data_type0,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -69,17 +69,17 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("substring(Varchar, BigInt, BigInt)->Varchar", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type0);
-        column_types.emplace_back(pos_value_expr->Type());
-        column_types.emplace_back(len_value_expr->Type());
+        column_types.emplace_back(MakeShared<DataType>(pos_value_expr->Type()));
+        column_types.emplace_back(MakeShared<DataType>(len_value_expr->Type()));
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         SharedPtr<ColumnVector> col0 = ColumnVector::Make(data_type0);
         col0->Initialize(ColumnVectorType::kFlat);
 
-        DataType bigint_type(LogicalType::kBigInt);
+        SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
         SharedPtr<ColumnVector> col1 = ColumnVector::Make(bigint_type);
         col1->Initialize(ColumnVectorType::kConstant);
         pos_value_expr->AppendToChunk(col1);
@@ -106,7 +106,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
 
         DataBlock data_block;
         data_block.Init({col0, col1, col2});
-        DataType result_type(LogicalType::kVarchar);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
@@ -128,8 +128,8 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
 
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type0(LogicalType::kVarchar);
-        SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(data_type0,
+        SharedPtr<DataType> data_type0 = MakeShared<DataType>(LogicalType::kVarchar);
+        SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(*data_type0,
                                                                                  "t1",
                                                                                  1,
                                                                                  "c1",
@@ -148,17 +148,17 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("substring(Varchar, BigInt, BigInt)->Varchar", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type0);
-        column_types.emplace_back(pos_value_expr->Type());
-        column_types.emplace_back(len_value_expr->Type());
+        column_types.emplace_back(MakeShared<DataType>(pos_value_expr->Type()));
+        column_types.emplace_back(MakeShared<DataType>(len_value_expr->Type()));
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         SharedPtr<ColumnVector> col0 = ColumnVector::Make(data_type0);
         col0->Initialize(ColumnVectorType::kFlat);
 
-        DataType bigint_type(LogicalType::kBigInt);
+        SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
         SharedPtr<ColumnVector> col1 = ColumnVector::Make(bigint_type);
         col1->Initialize(ColumnVectorType::kConstant);
         pos_value_expr->AppendToChunk(col1);
@@ -185,7 +185,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
 
         DataBlock data_block;
         data_block.Init({col0, col1, col2});
-        DataType result_type(LogicalType::kVarchar);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);

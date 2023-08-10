@@ -130,8 +130,8 @@ NumericDB::Create(SharedPtr<TableDef> table_def) {
     const Vector<SharedPtr<ColumnDef>>& colum_defs = table_def->columns();
     Context context;
     for(size_t i = 0 ;  i < colum_defs.size() ;  ++i) {
-        DataType column_type = colum_defs[i]->type();
-        if(column_type.IsNumeric()) {
+        SharedPtr<DataType> column_type = colum_defs[i]->type();
+        if(column_type->IsNumeric()) {
             std::shared_ptr<BtreeIndex> db(new BtreeIndex);
             uint32_t dbname = colum_defs[i]->id();
             size_t dbi = 0;
@@ -145,10 +145,10 @@ NumericDB::Create(SharedPtr<TableDef> table_def) {
             if (unlikely(dbi == header_->MaxDatabases())) {
                 throw StorageException(fmt::format("max databases limit reached: {}", colum_defs[i]->name()));
             }
-            AsBtreeHeader(header_.get(), dbi)->key_type_ = column_type.type();
-            AsBtreeHeader(header_.get(), dbi)->key_size_ = GetKeyEncoder(column_type.type())->Size() + sizeof(uint32_t);
+            AsBtreeHeader(header_.get(), dbi)->key_type_ = column_type->type();
+            AsBtreeHeader(header_.get(), dbi)->key_size_ = GetKeyEncoder(column_type->type())->Size() + sizeof(uint32_t);
             AsBtreeHeader(header_.get(), dbi)->record_size_ = 0;
-            db->Create(&context, AsBtreeHeader(header_.get(), dbi), column_type.type());
+            db->Create(&context, AsBtreeHeader(header_.get(), dbi), column_type->type());
             btree_indices_[dbname] = db;
             context.changeset_.Flush(lsn_manager_.Next());
         }
@@ -163,8 +163,8 @@ NumericDB::Open(SharedPtr<TableDef> table_def) {
     const Vector<SharedPtr<ColumnDef>>& colum_defs = table_def->columns();
     Context context;
     for(size_t i = 0 ;  i < colum_defs.size() ;  ++i) {
-        DataType column_type = colum_defs[i]->type();
-        if(column_type.IsNumeric()) {
+        SharedPtr<DataType> column_type = colum_defs[i]->type();
+        if(column_type->IsNumeric()) {
             std::shared_ptr<BtreeIndex> db(new BtreeIndex);
             uint32_t dbname = colum_defs[i]->id();
             size_t dbi = 0;

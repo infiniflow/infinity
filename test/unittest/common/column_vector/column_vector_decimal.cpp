@@ -31,11 +31,11 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     using namespace infinity;
 
     auto decimal_info = DecimalInfo::Make(38, 38);
-    DataType data_type(LogicalType::kDecimal, decimal_info);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -108,7 +108,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -155,12 +155,12 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
     using namespace infinity;
 
     auto decimal_info = DecimalInfo::Make(38, 38);
-    DataType data_type(LogicalType::kDecimal, decimal_info);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -209,7 +209,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kDecimal)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -245,7 +245,7 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_vector_select) {
     using namespace infinity;
 
     auto decimal_info = DecimalInfo::Make(38, 38);
-    DataType data_type(LogicalType::kDecimal, decimal_info);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -282,7 +282,7 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_slice_init) {
     using namespace infinity;
 
     auto decimal_info = DecimalInfo::Make(38, 38);
-    DataType data_type(LogicalType::kDecimal, decimal_info);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

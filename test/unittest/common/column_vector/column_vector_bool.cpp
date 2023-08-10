@@ -29,11 +29,11 @@ class ColumnVectorBoolTest : public BaseTest {
 TEST_F(ColumnVectorBoolTest, flat_boolean) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBoolean);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBoolean)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -112,11 +112,11 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
 
     // ====
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
-//    column_vector.SetDataType(DataType(LogicalType::kBoolean));
+//    column_vector.SetDataType(data_type);
 //    EXPECT_THROW(column_vector.Initialize(), TypeException);
 //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBoolean)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -161,12 +161,12 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
 
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBoolean);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBoolean)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -214,7 +214,7 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(DataType(LogicalType::kBoolean)), TypeException);
+    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -248,7 +248,7 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
 TEST_F(ColumnVectorBoolTest, bool_column_vector_select) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBoolean);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -282,7 +282,7 @@ TEST_F(ColumnVectorBoolTest, bool_column_vector_select) {
 TEST_F(ColumnVectorBoolTest, bool_column_slice_init) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBoolean);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

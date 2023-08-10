@@ -11,7 +11,7 @@ SharedPtr<Binding>
 Binding::MakeBinding(BindingType binding_type,
                      const String& name,
                      u64 table_index,
-                     SharedPtr<Vector<DataType>> column_types,
+                     SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                      SharedPtr<Vector<String>> column_names) {
     SharedPtr<Binding> binding = MakeShared<Binding>();
     binding->binding_type_ = binding_type;
@@ -34,7 +34,7 @@ Binding::MakeBinding(BindingType binding_type,
                      const String& binding_alias,
                      u64 table_index,
                      SharedPtr<Table> table_ptr,
-                     SharedPtr<Vector<DataType>> column_types,
+                     SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                      SharedPtr<Vector<String>> column_names) {
     auto binding = MakeBinding(binding_type,
                                binding_alias,

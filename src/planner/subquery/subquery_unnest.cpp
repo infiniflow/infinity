@@ -331,7 +331,7 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             auto dependent_join = dependent_join_flattener.PushDependentJoin(subquery_plan);
             const Vector<ColumnBinding>& subplan_column_bindings = dependent_join->GetColumnBindings();
             const SharedPtr<Vector<String>>& subplan_column_names = dependent_join->GetOutputNames();
-            const SharedPtr<Vector<DataType>>& subplan_column_types = dependent_join->GetOutputTypes();
+            const SharedPtr<Vector<SharedPtr<DataType>>>& subplan_column_types = dependent_join->GetOutputTypes();
 
             // Generate inner join
             Vector<SharedPtr<BaseExpression>> join_conditions;
@@ -345,17 +345,17 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             // IN comparison
             Vector<SharedPtr<BaseExpression>> in_arguments;
 
-            SharedPtr<ColumnExpression> subquery_output_column = ColumnExpression::Make(subplan_column_types->at(0),
+            SharedPtr<ColumnExpression> subquery_output_column = ColumnExpression::Make(*subplan_column_types->at(0),
                                                                                         "",
                                                                                         subplan_column_bindings[0].table_idx,
                                                                                         subplan_column_names->at(0),
                                                                                         subplan_column_bindings[0].column_idx,
                                                                                         0);
 
-            if(expr_ptr->left_->Type() == subplan_column_types->at(0)) {
+            if(expr_ptr->left_->Type() == *subplan_column_types->at(0)) {
                 in_arguments.emplace_back(subquery_output_column);
             } else {
-                BoundCastFunc cast = CastFunction::GetBoundFunc(subplan_column_types->at(0), expr_ptr->left_->Type());
+                BoundCastFunc cast = CastFunction::GetBoundFunc(*subplan_column_types->at(0), expr_ptr->left_->Type());
                 SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast,
                                                                                  subquery_output_column,
                                                                                  expr_ptr->left_->Type());

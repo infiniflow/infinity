@@ -23,7 +23,7 @@ public:
     MakeBinding(BindingType binding_type,
                 const String& name,
                 u64 table_index,
-                SharedPtr<Vector<DataType>> column_types,
+                SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                 SharedPtr<Vector<String>> column_names);
 
     static SharedPtr<Binding>
@@ -31,7 +31,7 @@ public:
                 const String& name,
                 u64 table_index,
                 SharedPtr<Table> table_ptr,
-                SharedPtr<Vector<DataType>> column_types,
+                SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                 SharedPtr<Vector<String>> column_names);
 
     // Binding type
@@ -52,7 +52,7 @@ public:
     SharedPtr<Table> table_ptr_{nullptr};
 
     // Column types of the binding
-    SharedPtr<Vector<DataType>> column_types_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
 
     // Column names of the binding
     SharedPtr<Vector<String>> column_names_{};

@@ -19,7 +19,7 @@ PhysicalDropCollection::Execute(SharedPtr<QueryContext>& query_context) {
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+            MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
     };
 
     SharedPtr<TableDef> result_table_def_ptr

@@ -36,7 +36,7 @@ class ExpressionExecutorSelectTest : public BaseTest {
 TEST_F(ExpressionExecutorSelectTest, test1) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBoolean);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -70,7 +70,7 @@ TEST_F(ExpressionExecutorSelectTest, test1) {
 TEST_F(ExpressionExecutorSelectTest, test2) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBoolean);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
@@ -104,7 +104,7 @@ TEST_F(ExpressionExecutorSelectTest, test2) {
 TEST_F(ExpressionExecutorSelectTest, test3) {
     using namespace infinity;
 
-    DataType data_type(LogicalType::kBoolean);
+    SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 

@@ -15,8 +15,7 @@ void
 PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
     String title;
 
-    DataType data_type(LogicalType::kVarchar);
-    auto column_vector_ptr = ColumnVector::Make(data_type);
+    auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
 
     auto output_data_block = DataBlock::Make();
 
@@ -85,7 +84,7 @@ PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
     }
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, DataType(LogicalType::kVarchar), title, HashSet<ConstraintType>())
+            MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kVarchar), title, HashSet<ConstraintType>())
     };
 
     SharedPtr<TableDef> result_table_def_ptr

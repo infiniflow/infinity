@@ -17,7 +17,7 @@ public:
     static inline SharedPtr<LogicalCreateView>
     Make(u64 node_id,
          const SharedPtr<Vector<String>>& names_ptr,
-         const SharedPtr<Vector<DataType>>& types_ptr,
+         const SharedPtr<Vector<SharedPtr<DataType>>>& types_ptr,
          const SharedPtr<CreateViewInfo>& create_view_info) {
         return MakeShared<LogicalCreateView>(node_id,
                                              names_ptr,
@@ -28,7 +28,7 @@ public:
 public:
     LogicalCreateView(u64 node_id,
                       SharedPtr<Vector<String>> names_ptr,
-                      SharedPtr<Vector<DataType>> types_ptr,
+                      SharedPtr<Vector<SharedPtr<DataType>>> types_ptr,
                       SharedPtr<CreateViewInfo> create_view_info)
             : LogicalNode(node_id, LogicalNodeType::kCreateView),
               names_ptr_(std::move(names_ptr)),
@@ -48,10 +48,10 @@ public:
         return result;
     }
 
-    [[nodiscard]] inline SharedPtr<Vector<DataType>>
+    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
-        SharedPtr<Vector<DataType>> result_type = MakeShared<Vector<DataType>>();
-        result_type->emplace_back(LogicalType::kInteger);
+        SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
+        result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
         return result_type;
     }
 
@@ -68,7 +68,7 @@ public:
         return names_ptr_;
     };
 
-    [[nodiscard]] inline const SharedPtr<Vector<DataType>>&
+    [[nodiscard]] inline const SharedPtr<Vector<SharedPtr<DataType>>>&
     types_ptr() const {
         return types_ptr_;
     }
@@ -80,7 +80,7 @@ public:
 
 private:
     SharedPtr<Vector<String>> names_ptr_{};
-    SharedPtr<Vector<DataType>> types_ptr_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> types_ptr_{};
     SharedPtr<CreateViewInfo> create_view_info_{nullptr};
 };
 

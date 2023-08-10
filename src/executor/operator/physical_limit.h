@@ -34,7 +34,7 @@ public:
         return left_->GetOutputNames();
     }
 
-    inline SharedPtr<Vector<DataType>>
+    inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
         return left_->GetOutputTypes();
     }

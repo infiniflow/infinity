@@ -22,7 +22,7 @@ ExpressionExecutor::Select(SharedPtr<Table>& input_table, SharedPtr<Table>& outp
     ExecutorAssert(expression_count == 1, "Only need one expressions during expression selection");
 
     // Output data block column types
-    Vector<DataType> output_types;
+    Vector<SharedPtr<DataType>> output_types;
     SizeT column_count = output_table->ColumnCount();
     output_types.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
@@ -76,7 +76,7 @@ ExpressionExecutor::Select(const SharedPtr<BaseExpression>& expr,
                            SharedPtr<ExpressionState>& state,
                            SizeT count,
                            SharedPtr<Selection>& output_true_select) {
-    SharedPtr<ColumnVector> bool_column = MakeShared<ColumnVector>(DataType(LogicalType::kBoolean));
+    SharedPtr<ColumnVector> bool_column = MakeShared<ColumnVector>(MakeShared<DataType>(LogicalType::kBoolean));
     bool_column->Initialize();
 
     Execute(expr, state, bool_column, count);
@@ -146,11 +146,11 @@ ExpressionExecutor::Execute(const SharedPtr<Table> &input_table, SharedPtr<Table
 //    table_map_.emplace(input_table->TableName(), input_table);
 
     // Output data block column types
-    Vector<DataType> output_types;
+    Vector<SharedPtr<DataType>> output_types;
     output_types.reserve(expression_count);
 
     for(SizeT idx = 0; idx < expression_count; ++ idx) {
-        output_types.emplace_back(expressions[idx]->Type());
+        output_types.emplace_back(MakeShared<DataType>(expressions[idx]->Type()));
     }
 
     SizeT input_data_block_count = input_table->DataBlockCount();

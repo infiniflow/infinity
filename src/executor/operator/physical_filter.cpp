@@ -38,7 +38,7 @@ PhysicalFilter::Execute(SharedPtr<QueryContext>& query_context) {
     SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
 
     // Output data block column types
-    Vector<DataType> output_types;
+    Vector<SharedPtr<DataType>> output_types;
     SizeT column_count = input_table_->ColumnCount();
     output_types.reserve(column_count);
 
@@ -46,7 +46,7 @@ PhysicalFilter::Execute(SharedPtr<QueryContext>& query_context) {
     columns.reserve(column_count);
 
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        DataType column_type = input_table_->GetColumnTypeById(idx);
+        SharedPtr<DataType> column_type = input_table_->GetColumnTypeById(idx);
         String column_name = input_table_->GetColumnNameById(idx);
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
                                                              column_type,

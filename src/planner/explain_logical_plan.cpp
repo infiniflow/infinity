@@ -297,9 +297,9 @@ ExplainLogicalPlan::Explain(const LogicalCreateView* create_node,
         }
         String columns_str = String(intent_size, ' ') + " - columns: [";
         for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
-            columns_str += create_node->names_ptr()->at(idx) + " " + create_node->types_ptr()->at(idx).ToString() + ", ";
+            columns_str += create_node->names_ptr()->at(idx) + " " + create_node->types_ptr()->at(idx)->ToString() + ", ";
         }
-        columns_str += create_node->names_ptr()->back() + " " + create_node->types_ptr()->back().ToString() + "]";
+        columns_str += create_node->names_ptr()->back() + " " + create_node->types_ptr()->back()->ToString() + "]";
         result->emplace_back(MakeShared<String>(columns_str));
     }
 

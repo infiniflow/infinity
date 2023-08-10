@@ -22,7 +22,7 @@ public:
                      u64 table_index,
                      Vector<SizeT> column_ids,
                      SharedPtr<Vector<String>> column_names,
-                     SharedPtr<Vector<DataType>> column_types);
+                     SharedPtr<Vector<SharedPtr<DataType>>> column_types);
 
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final;
@@ -32,7 +32,7 @@ public:
         return column_names_;
     }
 
-    [[nodiscard]] inline SharedPtr<Vector<DataType>>
+    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
         return column_types_;
     }
@@ -55,7 +55,7 @@ public:
     Vector<SizeT> column_ids_{};
 
     SharedPtr<Vector<String>> column_names_{};
-    SharedPtr<Vector<DataType>> column_types_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
 
     SharedPtr<TableScanFunction> table_scan_func_ptr_{nullptr};
 private:

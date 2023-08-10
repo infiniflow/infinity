@@ -14,7 +14,7 @@ void
 ColumnData::Init(const SharedPtr<ColumnDef>& column_def, SizeT row_capacity) {
     column_def_ = column_def;
     row_capacity_ = row_capacity;
-    buffer_handle_ = buffer_mgr_->AllocateBufferHandle(*base_dir_, *file_name_, column_def->column_type_.Size() * row_capacity_);
+    buffer_handle_ = buffer_mgr_->AllocateBufferHandle(*base_dir_, *file_name_, column_def->column_type_->Size() * row_capacity_);
 }
 
 ObjectHandle
@@ -49,7 +49,7 @@ ColumnData::Append(const SharedPtr<ColumnVector>& column_vector,
                    SizeT column_start_offset,
                    SizeT rows) {
     ptr_t ptr = buffer_handle_->LoadData();
-    switch(column_vector->data_type().type()) {
+    switch(column_vector->data_type()->type()) {
         case kBoolean:
         case kTinyInt:
         case kSmallInt:
@@ -86,12 +86,12 @@ ColumnData::Append(const SharedPtr<ColumnVector>& column_vector,
         case kBlob:
         case kMixed:
         case kNull: {
-            LOG_ERROR("{} isn't supported", column_vector->data_type().ToString())
+            LOG_ERROR("{} isn't supported", column_vector->data_type()->ToString())
             NotImplementError("Not supported now in append data in column")
         }
         case kMissing:
         case kInvalid: {
-            LOG_ERROR("Invalid data type {}", column_vector->data_type().ToString())
+            LOG_ERROR("Invalid data type {}", column_vector->data_type()->ToString())
             StorageError("Invalid data type")
         }
     }
@@ -100,7 +100,7 @@ ColumnData::Append(const SharedPtr<ColumnVector>& column_vector,
 void
 ColumnData::Flush(SizeT row_count) {
     SizeT buffer_size{0};
-    switch(column_def_->type().type()) {
+    switch(column_def_->type()->type()) {
         case kBoolean:
         case kTinyInt:
         case kSmallInt:
@@ -123,7 +123,7 @@ ColumnData::Flush(SizeT row_count) {
         case kBitmap:
         case kUuid:
         case kEmbedding: {
-            buffer_size = row_count * column_def_->type().Size();
+            buffer_size = row_count * column_def_->type()->Size();
             break;
         }
 
@@ -135,12 +135,12 @@ ColumnData::Flush(SizeT row_count) {
         case kBlob:
         case kMixed:
         case kNull: {
-            LOG_ERROR("{} isn't supported", column_def_->type().ToString())
+            LOG_ERROR("{} isn't supported", column_def_->type()->ToString())
             NotImplementError("Not supported now in append data in column")
         }
         case kMissing:
         case kInvalid: {
-            LOG_ERROR("Invalid data type {}", column_def_->type().ToString())
+            LOG_ERROR("Invalid data type {}", column_def_->type()->ToString())
             StorageError("Invalid data type")
         }
     }

@@ -179,26 +179,26 @@ public:
     void
     AddSubqueryBinding(const String& name,
                        u64 table_index,
-                       SharedPtr<Vector<DataType>> column_types,
+                       SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                        SharedPtr<Vector<String>> column_names);
 
     void
     AddCTEBinding(const String& name,
                   u64 table_index,
-                  SharedPtr<Vector<DataType>> column_types,
+                  SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                   SharedPtr<Vector<String>> column_names);
 
     void
     AddViewBinding(const String& name,
                    u64 table_index,
-                   SharedPtr<Vector<DataType>> column_types,
+                   SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                    SharedPtr<Vector<String>> column_names);
 
     void
     AddTableBinding(const String& name,
                     u64 table_index,
                     SharedPtr<Table> table_ptr,
-                    SharedPtr<Vector<DataType>> column_types,
+                    SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                     SharedPtr<Vector<String>> column_names);
 
     // Merge input bind context into this bind context

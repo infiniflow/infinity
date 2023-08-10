@@ -43,7 +43,7 @@ TEST_F(TimeCastTest, date_cast0) {
         VarcharT target;
 
 
-        DataType data_type(LogicalType::kVarchar);
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar = MakeShared<ColumnVector>(data_type);
         col_varchar->Initialize();
 
@@ -61,7 +61,7 @@ TEST_F(TimeCastTest, date_cast1) {
         EXPECT_THROW(BindTimeCast(target_type), TypeException);
     }
 
-    DataType source_type(LogicalType::kTime);
+    SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kTime);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
@@ -76,8 +76,8 @@ TEST_F(TimeCastTest, date_cast1) {
     }
     // cast time column vector to varchar column vector
     {
-        DataType target_type(LogicalType::kVarchar);
-        auto source2target_ptr = BindTimeCast(target_type);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kVarchar);
+        auto source2target_ptr = BindTimeCast(*target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
         SharedPtr<ColumnVector> col_target(MakeShared<ColumnVector>(target_type));

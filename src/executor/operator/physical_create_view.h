@@ -16,7 +16,7 @@ public:
     explicit
     PhysicalCreateView(u64 id,
                        SharedPtr<Vector<String>> names_ptr,
-                       SharedPtr<Vector<DataType>> types_ptr,
+                       SharedPtr<Vector<SharedPtr<DataType>>> types_ptr,
                        SharedPtr<CreateViewInfo> create_view_info)
         : PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr, id),
         output_names_(std::move(names_ptr)),
@@ -42,7 +42,7 @@ public:
         return output_names_;
     }
 
-    inline SharedPtr<Vector<DataType>>
+    inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
         return output_types_;
     }
@@ -56,7 +56,7 @@ private:
     SharedPtr<CreateViewInfo> create_view_info_{nullptr};
 
     SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<DataType>> output_types_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 };
 
 }

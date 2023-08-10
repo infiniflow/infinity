@@ -46,8 +46,8 @@ TEST_F(AbsFunctionsTest, abs_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kTinyInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -58,7 +58,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(TinyInt)->TinyInt", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -97,8 +97,8 @@ TEST_F(AbsFunctionsTest, abs_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kSmallInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -109,7 +109,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(SmallInt)->SmallInt", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -144,8 +144,8 @@ TEST_F(AbsFunctionsTest, abs_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kInteger);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -156,7 +156,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(Integer)->Integer", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -191,8 +191,8 @@ TEST_F(AbsFunctionsTest, abs_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kBigInt);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -203,7 +203,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(BigInt)->BigInt", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -238,8 +238,8 @@ TEST_F(AbsFunctionsTest, abs_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kFloat);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -250,7 +250,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(Float)->Float", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -291,8 +291,8 @@ TEST_F(AbsFunctionsTest, abs_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kDouble);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type,
+        SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                 "t1",
                                                                                 1,
                                                                                 "c1",
@@ -303,7 +303,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("ABS(Double)->Double", func.ToString().c_str());
 
-        Vector<DataType> column_types;
+        Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;

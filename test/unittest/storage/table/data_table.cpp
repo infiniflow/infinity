@@ -19,6 +19,7 @@ class DataTableTest : public BaseTest {
         infinity::Infinity::instance().Init();
 
         system("rm -rf /tmp/infinity/data/table");
+        system("rm -rf /tmp/infinity/_tmp");
     }
 
     void
@@ -51,7 +52,7 @@ TEST_F(DataTableTest, test1) {
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        DataType(LogicalType::kTinyInt),
+                                                        MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
                                                         "tiny_int_col",
                                                         constraints);
             columns.emplace_back(column_def_ptr);
@@ -61,7 +62,7 @@ TEST_F(DataTableTest, test1) {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
             auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        DataType(LogicalType::kBigInt),
+                                                        MakeShared<DataType>(DataType(LogicalType::kBigInt)),
                                                         "big_int_col",
                                                         constraints);
             columns.emplace_back(column_def_ptr);
@@ -117,7 +118,7 @@ TEST_F(DataTableTest, test2) {
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        DataType(LogicalType::kTinyInt),
+                                                        MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
                                                         "tiny_int_col",
                                                         constraints);
             columns.emplace_back(column_def_ptr);
@@ -127,7 +128,7 @@ TEST_F(DataTableTest, test2) {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
             auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        DataType(LogicalType::kBigInt),
+                                                        MakeShared<DataType>(DataType(LogicalType::kBigInt)),
                                                         "big_int_col",
                                                         constraints);
             columns.emplace_back(column_def_ptr);
@@ -136,7 +137,7 @@ TEST_F(DataTableTest, test2) {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        DataType(LogicalType::kDouble),
+                                                        MakeShared<DataType>(DataType(LogicalType::kDouble)),
                                                         "double_col",
                                                         constraints);
             columns.emplace_back(column_def_ptr);
@@ -162,10 +163,10 @@ TEST_F(DataTableTest, test2) {
         EXPECT_NE(get_res.entry_, nullptr);
 
         // Prepare the input data block
-        Vector<DataType> column_types;
-        column_types.emplace_back(LogicalType::kTinyInt);
-        column_types.emplace_back(LogicalType::kBigInt);
-        column_types.emplace_back(LogicalType::kDouble);
+        Vector<SharedPtr<DataType>> column_types;
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kDouble));
 
         SharedPtr<DataBlock> input_block = MakeShared<DataBlock>();
 
@@ -235,10 +236,10 @@ TEST_F(DataTableTest, test2) {
         // Append more data into local storage
         {
             // Prepare the input data block
-            Vector<DataType> column_types;
-            column_types.emplace_back(LogicalType::kTinyInt);
-            column_types.emplace_back(LogicalType::kBigInt);
-            column_types.emplace_back(LogicalType::kDouble);
+            Vector<SharedPtr<DataType>> column_types;
+            column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
+            column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
+            column_types.emplace_back(MakeShared<DataType>(LogicalType::kDouble));
 
             SharedPtr<DataBlock> input_block = MakeShared<DataBlock>();
 

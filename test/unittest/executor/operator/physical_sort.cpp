@@ -41,11 +41,11 @@ TEST_F(PhysicalSortTest, test1) {
     SizeT block_count = 3;
     SizeT row_count = DEFAULT_VECTOR_SIZE;
     Vector<SharedPtr<ColumnDef>> columns;
-    Vector<DataType> column_types;
+    Vector<SharedPtr<DataType>> column_types;
     columns.reserve(column_count);
     column_types.reserve(column_count);
 
-    DataType col_type = DataType(LogicalType::kBoolean);
+    SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kBoolean);
     column_types.emplace_back(col_type);
     String col_name = "col1";
     SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0,
@@ -54,7 +54,7 @@ TEST_F(PhysicalSortTest, test1) {
                                                          HashSet<ConstraintType>());
     columns.emplace_back(col_def);
 
-    col_type = DataType(LogicalType::kBigInt);
+    col_type = MakeShared<DataType>(LogicalType::kBigInt);
     column_types.emplace_back(col_type);
     col_name = "col2";
     col_def = MakeShared<ColumnDef>(1,

@@ -153,17 +153,17 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
         for(const auto& column_name : *statement->columns_) {
             // Get table index from the inserted value column name;
             SizeT table_column_id = table_ptr->GetColumnIdByName(column_name);
-            DataType table_column_type = table_ptr->GetColumnTypeById(table_column_id);
+            SharedPtr<DataType> table_column_type = table_ptr->GetColumnTypeById(table_column_id);
             DataType value_type = value_list[column_idx]->Type();
-            if(value_type == table_column_type) {
+            if(value_type == *table_column_type) {
                 rewrite_value_list[table_column_id] = value_list[column_idx];
             } else {
-                if(LogicalInsert::NeedCastInInsert(value_type, table_column_type)) {
+                if(LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
                     // If the inserted value type mismatches with table column type, cast the inserted value type to correct one.
-                    BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, table_column_type);
+                    BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
                     SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast,
                                                                                      value_list[column_idx],
-                                                                                     table_column_type);
+                                                                                     *table_column_type);
                     rewrite_value_list[table_column_id] = cast_expr;
                 } else {
                     // LogicalType are same and type info is also OK.
@@ -186,16 +186,16 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
         Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
         for(SizeT column_idx = 0; column_idx < table_column_count; ++ column_idx) {
-            DataType table_column_type = table_ptr->GetColumnTypeById(column_idx);
+            SharedPtr<DataType> table_column_type = table_ptr->GetColumnTypeById(column_idx);
             DataType value_type = value_list[column_idx]->Type();
-            if(table_column_type == value_type) {
+            if(*table_column_type == value_type) {
                 rewrite_value_list[column_idx] = value_list[column_idx];
             } else {
-                if(LogicalInsert::NeedCastInInsert(value_type, table_column_type)) {
-                    BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, table_column_type);
+                if(LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
+                    BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
                     SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast,
                                                                                      value_list[column_idx],
-                                                                                     table_column_type);
+                                                                                     *table_column_type);
                     rewrite_value_list[column_idx] = cast_expr;
                 } else {
                     // LogicalType are same and type info is also OK.
