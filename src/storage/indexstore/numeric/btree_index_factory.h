@@ -34,7 +34,7 @@ struct BtreeIndexTraitsImpl : public BtreeIndexTraits {
                       Compare >())
 
 #define PAX_INTERNAL_NUMERIC(type) \
-            PAX_INTERNAL_NODE(PodKeyList<type>, NumericCompare<type> )
+            PAX_INTERNAL_NODE(PodKeyWithPayLoadList<type>, NumericCompare<type> )
 
 
 #define LEAF_NODE_IMPL(Impl, KeyList, Compare) \
@@ -70,7 +70,7 @@ struct BtreeIndexTraitsImpl : public BtreeIndexTraits {
             }                                                                   \
         }
 #define PAX_LEAF_NUMERIC(type) \
-        LEAF_NODE_IMPL(PaxNodeImpl, PodKeyList<type>, NumericCompare<type> )
+        LEAF_NODE_IMPL(PaxNodeImpl, PodKeyWithPayLoadList<type>, NumericCompare<type> )
 
 struct BtreeIndexFactory {
     static BtreeIndexTraits *Create(LogicalType key_type, LogicalType value_type, bool is_leaf) {

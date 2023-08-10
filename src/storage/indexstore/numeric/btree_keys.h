@@ -213,4 +213,161 @@ struct PodKeyList : BaseKeyList {
     T *data_;
 };
 
+
+template<typename T>
+struct PodKeyWithPayLoadList : BaseKeyList {
+    struct KeyWithPayLoad{
+        T key_;
+        uint32_t row_id_;
+    }__attribute__ ((packed));
+
+    enum {
+        // A flag whether this KeyList has sequential data
+        kHasSequentialData = 1,
+
+        // A flag whether this KeyList supports the scan() call
+        kSupportsBlockScans = 1,
+
+        // This KeyList has a custom find() implementation
+        kCustomFind = 1,
+
+        // This KeyList has a custom find_lower_bound() implementation
+        kCustomFindLowerBound = 1,
+    };
+
+    // Constructor
+    PodKeyWithPayLoadList(BtreeNode *node)
+        : BaseKeyList(node), data_(0) {
+    }
+
+    // Creates a new PodKeyList starting at |ptr|, total size is
+    // |range_size_| (in bytes)
+    void Create(uint8_t *ptr, size_t range_size) {
+        data_ = (KeyWithPayLoad *)ptr;
+        range_size_ = range_size;
+    }
+
+    // Opens an existing PodKeyList starting at |ptr|
+    void Open(uint8_t *ptr, size_t range_size, size_t) {
+        data_ = (KeyWithPayLoad *)ptr;
+        range_size_ = range_size;
+    }
+
+    // Returns the required size for the current set of keys
+    size_t RequiredRangeSize(size_t node_count) const {
+        return node_count * sizeof(KeyWithPayLoad);
+    }
+
+    // Returns the actual key size including overhead
+    size_t FullKeySize(const btree_key_t * = 0) const {
+        return sizeof(KeyWithPayLoad);
+    }
+
+    // Finds a key
+    template<typename Cmp>
+    int Find(size_t node_count, const btree_key_t *hkey, Cmp &) {
+        KeyWithPayLoad key = *(KeyWithPayLoad *)hkey->data_;
+        KeyWithPayLoad *result = std::lower_bound(&data_[0],&data_[node_count], key, 
+                     [](const KeyWithPayLoad& a, const KeyWithPayLoad& b){return a.key_ < b.key_;} );
+
+        if (unlikely(result == &data_[node_count] || result->key_ != key.key_))
+            return -1;
+        return result - &data_[0];
+    }
+
+    // Performs a lower-bound search for a key
+    template<typename Cmp>
+    int LowerBound(size_t node_count, const btree_key_t *hkey, Cmp &, int *pcmp) {
+        KeyWithPayLoad key = *(KeyWithPayLoad *)hkey->data_;
+        KeyWithPayLoad *result = std::lower_bound(&data_[0],&data_[node_count], key, 
+                     [](const KeyWithPayLoad& a, const KeyWithPayLoad& b){return a.key_ < b.key_;} );
+        if (unlikely(result == &data_[node_count])) {
+            if (key.key_ > data_[node_count - 1].key_) {
+                *pcmp = +1;
+                return node_count - 1;
+            }
+            if (key.key_ < data_[0].key_) {
+                *pcmp = -1;
+                return 0;
+            }
+            throw StorageException("shouldn't be here");
+        }
+
+        if (key.key_ > result->key_) {
+            *pcmp = +1;
+            return result - &data_[0];
+        }
+
+        if (key.key_ < result->key_) {
+            *pcmp = +1;
+            return (result - 1) - &data_[0];
+        }
+
+        *pcmp = 0;
+        return result - &data_[0];
+    }
+
+    // Copies a key into |dest|
+    void Key(int slot, ByteArray *arena, btree_key_t *dest,
+             bool deep_copy = true) const {
+        dest->size_ = sizeof(KeyWithPayLoad);
+        if (deep_copy == false) {
+            dest->data_ = &data_[slot];
+            return;
+        }
+
+        arena->resize(dest->size_);
+        dest->data_ = arena->data();
+
+        *(KeyWithPayLoad *)dest->data_ = data_[slot];
+    }
+
+    // Erases a whole slot by shifting all larger keys to the "left"
+    void Erase(size_t node_count, int slot) {
+        if (slot < (int)node_count - 1)
+            ::memmove(&data_[slot], &data_[slot + 1], sizeof(KeyWithPayLoad) * (node_count - slot - 1));
+    }
+
+    // Inserts a key
+    template<typename Cmp>
+    BtreeNode::InsertResult Insert(size_t node_count, const btree_key_t *key, uint32_t flags, Cmp &, int slot) {
+        if (node_count > (size_t)slot)
+            ::memmove(&data_[slot + 1], &data_[slot], sizeof(KeyWithPayLoad) * (node_count - slot));
+        assert(key->size_ == sizeof(T));
+        data_[slot] = *(KeyWithPayLoad *)key->data_;
+        return BtreeNode::InsertResult(0, slot);
+    }
+
+    // Copies |count| key from this[sstart] to dest[dstart]
+    void CopyTo(int sstart, size_t node_count, PodKeyWithPayLoadList<T> &dest,
+                size_t other_count, int dstart) {
+        ::memcpy(&dest.data_[dstart], &data_[sstart], sizeof(KeyWithPayLoad) * (node_count - sstart));
+    }
+
+    // Returns true if the |key| no longer fits into the node
+    bool RequiresSplit(size_t node_count, const btree_key_t *key) const {
+        return (node_count + 1) * sizeof(KeyWithPayLoad) >= range_size_;
+    }
+
+    // Change the range size; just copy the data from one place to the other
+    void ChangeRangeSize(size_t node_count, uint8_t *new_data_ptr,
+                         size_t new_range_size, size_t capacity_hint) {
+        ::memmove(new_data_ptr, data_, node_count * sizeof(KeyWithPayLoad));
+        data_ = (KeyWithPayLoad *)new_data_ptr;
+        range_size_ = new_range_size;
+    }
+
+    // Returns the key size
+    size_t KeySize(int) const {
+        return sizeof(KeyWithPayLoad);
+    }
+
+    // Returns a pointer to the key's data
+    uint8_t *KeyData(int slot) const {
+        return (uint8_t *)&data_[slot];
+    }
+
+    // The actual array of T's
+    KeyWithPayLoad *data_;
+};
 }
