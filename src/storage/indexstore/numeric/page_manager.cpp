@@ -6,8 +6,82 @@
 #include "common/utility/spinlock.h"
 
 namespace infinity {
-PageManagerState::PageManagerState() {
 
+enum class TaskType {
+    kTerminate,
+    kFlush,
+};
+
+struct FlushTask {
+    FlushTask(TaskType type) : type_(type) {}
+
+    inline TaskType type() const {
+        return type_;
+    }
+
+    void Run() {
+        for (std::vector<uint64_t>::iterator it = page_ids_.begin(); it != page_ids_.end(); it++) {
+            // skip page if it's already in use
+            Page *page = page_manager_->TryLockPurgeCandidate(*it);
+            if (!page) continue;
+            assert(page->Mutex().try_lock() == false);
+
+            // flush page if it's dirty
+            if (page->IsDirty()) {
+                try {
+                    page->Flush();
+                }
+                catch (Exception &) {
+                    // ignore page, fall through
+                }
+            }
+            page->Mutex().unlock();
+        }
+    }
+
+    TaskType type_;
+
+    PageManager *page_manager_;
+
+    std::vector<uint64_t> page_ids_;
+};
+
+Worker::Worker() {
+    task_queue_ = MakeUnique<FlushTaskQueue>();
+    task_thread_ = MakeUnique<Thread>(WorkerLoop, task_queue_.get());
+}
+
+Worker::~Worker() {
+    SharedPtr<FlushTask> terminate_task = MakeShared<FlushTask>(TaskType::kTerminate);
+    task_queue_->Enqueue(terminate_task);
+    task_thread_->join();
+}
+
+void 
+Worker::WorkerLoop(FlushTaskQueue* task_queue) {
+    SharedPtr<FlushTask> task{nullptr};
+    bool running{true};
+    while(running) {
+        task_queue->Dequeue(task);
+        if(task == nullptr) {
+            continue;
+        }
+        switch(task->type()) {
+            case TaskType::kTerminate: {
+                running = false;
+                break;
+            }
+            case TaskType::kFlush: {
+                task->Run();
+                break;
+            }
+        }
+    }
+}
+
+PageManagerState::PageManagerState() {
+    in_progress_ = false;
+    worker_ = MakeUnique<Worker>();
 }
 
 PageManagerState::~PageManagerState() {
@@ -15,7 +89,6 @@ PageManagerState::~PageManagerState() {
 }
 
 PageManager::PageManager() {
-
 }
 
 void
@@ -124,7 +197,7 @@ done:
     /* write to disk (if necessary) */
     if (NOTSET(flags, PageManager::kDisableStoreState)
             && NOTSET(flags, PageManager::kReadOnly))
-        //maybe_store_state(state_, context, false);
+        MaybeStoreState(context, false);
 
         switch (page_type) {
         case Page::kTypeBindex:
@@ -392,20 +465,22 @@ void
 PageManager::PurgeCache(Context *context) {
     ScopedSpinLock lock(state_->mutex_);
 
+    if ( (state_->in_progress_ == true) || !state_->cache_.IsCacheFull())
+        return;
 
-    //if (unlikely(!state_->message))
-    //  state_->message = new AsyncFlushMessage(this, state_->device, 0);
-
-    //state_->message->page_ids.clear();
+    state_->page_ids_.clear();
     state_->garbage_.clear();
 
-    //state_->cache_.PurgeCandidates(state_->message->page_ids, state_->garbage_, state_->last_blob_page_);
+    state_->cache_.PurgeCandidates(state_->page_ids_, state_->garbage_, state_->last_blob_page_);
 
     // don't bother if there are only few pages
-    //if (state_->message->page_ids.size() > 10) {
-    //  state_->message->in_progress = true;
-    //  run_async(boost::bind(&async_flush_pages, state_->message));
-    //}
+    if (state_->page_ids_.size() > 10) {
+        SharedPtr<FlushTask> flush_task = MakeShared<FlushTask>(TaskType::kFlush);
+        flush_task->page_manager_ = this;
+        flush_task->page_ids_ = state_->page_ids_;
+        state_->worker_->task_queue_->Enqueue(flush_task);
+        state_->in_progress_ = true;
+    }
 
     for (std::vector<Page *>::iterator it = state_->garbage_.begin();
             it != state_->garbage_.end();
@@ -416,6 +491,44 @@ PageManager::PurgeCache(Context *context) {
             page->Mutex().unlock();
             delete page;
         }
+    }
+}
+
+struct FlushAllPagesVisitor {
+    FlushAllPagesVisitor(PageManagerState* state)
+        : state_(state) {
+    }
+
+    bool operator()(Page *page) {
+        if (page->IsDirty())
+            state_->page_ids_.push_back(page->Address());
+        return false;
+    }
+
+    PageManagerState* state_;
+};
+
+void
+PageManager::FlushAllPages() {
+    FlushAllPagesVisitor visitor(state_.get());
+    {
+        ScopedSpinLock lock(state_->mutex_);
+
+        state_->cache_.PurgeIf(visitor);
+
+        if (state_->header_->header_page_->IsDirty())
+            state_->page_ids_.push_back(0);
+
+        if (state_->state_page_ && state_->state_page_->IsDirty())
+            state_->page_ids_.push_back(state_->state_page_->Address());
+    }
+
+    if (state_->page_ids_.size() > 0) {
+        SharedPtr<FlushTask> flush_task = MakeShared<FlushTask>(TaskType::kFlush);
+        flush_task->page_manager_ = this;
+        flush_task->page_ids_ = state_->page_ids_;
+        state_->worker_->task_queue_->Enqueue(flush_task);
+        state_->in_progress_ = true;
     }
 }
 
@@ -469,6 +582,28 @@ PageManager::AllocMultipleBlobPages(Context *context, size_t num_pages) {
 void
 PageManager::Close(Context *context) {
 
+}
+
+Page *
+PageManager::TryLockPurgeCandidate(uint64_t address) {
+    Page *page = 0;
+
+    // try to lock the PageManager; if this fails then return immediately
+    ScopedTryLock lock(state_->mutex_);;
+    if (!lock.is_locked())
+        return 0;
+
+    if (address == 0)
+        page = state_->header_->header_page_.get();
+    else if (state_->state_page_ && address == state_->state_page_->Address())
+        page = state_->state_page_;
+    else
+        page = state_->cache_.Get(address);
+
+    if (!page || !page->Mutex().try_lock())
+        return 0;
+
+    return page;
 }
 
 }

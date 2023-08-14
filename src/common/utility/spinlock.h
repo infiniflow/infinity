@@ -50,4 +50,23 @@ private:
 
     SpinLock &lock_;
 };
+
+struct ScopedTryLock {
+    ScopedTryLock(SpinLock &lock) : lock_(lock) {
+        locked_ = lock_.try_lock();
+    }
+
+    ~ScopedTryLock() {
+        if (locked_)
+            lock_.unlock();
+    }
+
+    bool is_locked() const {
+        return locked_;
+    }
+
+    bool locked_;
+    SpinLock &lock_;
+};
+
 } // namespace infinity

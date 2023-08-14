@@ -5,12 +5,16 @@
 #include "freelist.h"
 #include "cache.h"
 #include "context.h"
+#include "common/types/internal_types.h"
+
+#include <blockingconcurrentqueue.h>
 
 #include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <thread>
 #include <string>
 #include <vector>
 
@@ -118,6 +122,30 @@ struct EnvHeader {
     std::unique_ptr<Page> header_page_;
 };
 
+class FlushTask;
+struct FlushTaskQueue {
+    void Enqueue(SharedPtr<FlushTask>task) {
+        queue_.enqueue(task);
+    }
+
+    void Dequeue(SharedPtr<FlushTask>&task) {
+        queue_.wait_dequeue(task);
+    }
+
+    moodycamel::BlockingConcurrentQueue<SharedPtr<FlushTask>> queue_;
+};
+
+struct Worker{
+    Worker();
+
+    ~Worker();
+
+    static void WorkerLoop(FlushTaskQueue* task_queue);
+
+    UniquePtr<FlushTaskQueue> task_queue_;
+    UniquePtr<Thread> task_thread_;
+};
+
 struct PageManagerState {
     // constructor
     PageManagerState();
@@ -173,15 +201,15 @@ struct PageManagerState {
     // tracks number of cache misses
     uint64_t cache_misses_;
 
-    // For sending information to the worker thread; cached to avoid memory
-    // allocations
-    //AsyncFlushMessage *message;
-
     // For collecting unused pages; cached to avoid memory allocations
     std::vector<Page *> garbage_;
 
     // The worker thread which flushes dirty pages
-    //ScopedPtr<WorkerPool> worker;
+    UniquePtr<Worker> worker_;
+
+    std::atomic<bool> in_progress_;
+    // page ids used by worker
+    std::vector<uint64_t> page_ids_;
 };
 
 
@@ -227,7 +255,11 @@ public:
 
     void PurgeCache(Context *context);
 
+    void FlushAllPages();
+
     Page * AllocMultipleBlobPages(Context *context, size_t num_pages);
+
+    Page * TryLockPurgeCandidate(uint64_t address);
 
     void Close(Context *context);
 private:

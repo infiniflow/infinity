@@ -187,12 +187,18 @@ NumericDB::Open(SharedPtr<TableDef> table_def) {
 Status NumericDB::Put(const uint32_t column_id, const Slice& key, const Slice& value) {
     std::shared_ptr<BtreeIndex> db = btree_indices_[column_id];
     if(!db.get()) throw StorageException(fmt::format("database not found, column: {}", column_id));
+    Context context;
+    page_manager_->PurgeCache(&context);
+
+
     return Status::OK();
 }
 
 Status NumericDB::Get(const uint32_t column_id, const Slice& key, std::string& value) {
     std::shared_ptr<BtreeIndex> db = btree_indices_[column_id];
     if(!db.get()) throw StorageException(fmt::format("database not found, column: {}", column_id));
+    Context context;
+    page_manager_->PurgeCache(&context);
 
     return Status::OK();
 }
@@ -204,6 +210,8 @@ Status NumericDB::GetRange(
     std::unique_ptr<Roaring>& filter) {
     std::shared_ptr<BtreeIndex> db = btree_indices_[column_id];
     if(!db.get()) throw StorageException(fmt::format("database not found, column: {}", column_id));
+    Context context;
+    page_manager_->PurgeCache(&context);
 
     return Status::OK();
 }
@@ -211,6 +219,8 @@ Status NumericDB::GetRange(
 Status NumericDB::Delete(const uint32_t column_id, const Slice& key) {
     std::shared_ptr<BtreeIndex> db = btree_indices_[column_id];
     if(!db.get()) throw StorageException(fmt::format("database not found, column: {}", column_id));
+    Context context;
+    page_manager_->PurgeCache(&context);
 
     return Status::OK();
 }
