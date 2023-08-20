@@ -85,15 +85,15 @@ Txn::GetTableMeta(const String& db_name, const String& table_name, const Vector<
         StorageError(*err_msg);
     }
 
-    u64 max_segment_id = table_entry->GetDataTable()->GetMaxSegmentID();
+    u64 max_segment_id =  TableEntry::GetMaxSegmentID(table_entry);
     for(u64 segment_id = 0; segment_id < max_segment_id; ++ segment_id) {
-        DataSegment* segment_ptr = table_entry->GetDataTable()->GetSegmentByID(segment_id);
+        SegmentEntry* segment_entry_ptr = TableEntry::GetSegmentByID(table_entry, segment_id);
 
         MetaSegmentState segment_state;
-        segment_state.data_segment_ = segment_ptr;
+        segment_state.segment_entry_ = segment_entry_ptr;
         for(const auto& column_id: columns) {
             MetaColumnDataState column_data_state;
-            column_data_state.column_data_ = segment_ptr->GetColumnDataByID(column_id);
+            column_data_state.column_data_ = SegmentEntry::GetColumnDataByID(segment_entry_ptr, column_id);
             segment_state.column_data_map_[column_id] = column_data_state;
         }
         meta_table_state->segment_map_[segment_id] = segment_state;
@@ -178,6 +178,11 @@ Txn::CompleteScan(const String& db_name, const String& table_name) {
     return nullptr;
 }
 
+BufferManager*
+Txn::GetBufferMgr() const {
+    this->txn_mgr_->GetBufferMgr();
+}
+
 EntryResult
 Txn::CreateDatabase(const String& db_name) {
 
@@ -197,7 +202,7 @@ Txn::CreateDatabase(const String& db_name) {
         return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
 
-    EntryResult res = catalog_->CreateDatabase(db_name, this->txn_id_, begin_ts, &txn_context_);
+    EntryResult res = NewCatalog::CreateDatabase(catalog_, db_name, this->txn_id_, begin_ts, &txn_context_);
     if(res.entry_ == nullptr) {
         return res;
     }
@@ -231,7 +236,7 @@ Txn::DropDatabase(const String& db_name) {
         return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
 
-    EntryResult res = catalog_->DropDatabase(db_name, txn_id_, begin_ts, &txn_context_);
+    EntryResult res = NewCatalog::DropDatabase(catalog_, db_name, txn_id_, begin_ts, &txn_context_);
 
     if(res.entry_ == nullptr) {
         return res;
@@ -271,7 +276,7 @@ Txn::GetDatabase(const String& db_name) {
         StorageError("Transaction isn't in STARTED status.")
     }
 
-    return catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
+    return NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
 }
 
 
@@ -292,7 +297,7 @@ Txn::CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def) {
         StorageError("Transaction isn't in STARTED status.")
     }
 
-    EntryResult db_entry_result =  catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
+    EntryResult db_entry_result =  NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
     if(db_entry_result.entry_ == nullptr) {
         // Error
         return db_entry_result;
@@ -301,7 +306,7 @@ Txn::CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def) {
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
 
     const String& table_name = table_def->table_name();
-    EntryResult res = db_entry->CreateTable(table_def, txn_id_, begin_ts, &txn_context_);
+    EntryResult res = DBEntry::CreateTable(db_entry, table_def, txn_id_, begin_ts, &txn_context_);
     if(res.entry_ == nullptr) {
         return res;
     }
@@ -333,7 +338,7 @@ Txn::DropTableByName(const String& db_name, const String& table_name) {
         StorageError("Transaction isn't in STARTED status.")
     }
 
-    EntryResult db_entry_result =  catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
+    EntryResult db_entry_result = NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
     if(db_entry_result.entry_ == nullptr) {
         // Error
         return db_entry_result;
@@ -341,7 +346,7 @@ Txn::DropTableByName(const String& db_name, const String& table_name) {
 
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
 
-    EntryResult res = db_entry->DropTable(table_name, txn_id_, begin_ts, &txn_context_);
+    EntryResult res = DBEntry::DropTable(db_entry, table_name, txn_id_, begin_ts, &txn_context_);
 
     if(res.entry_ == nullptr) {
         return res;
@@ -381,7 +386,7 @@ Txn::GetTableByName(const String& db_name, const String& table_name) {
         StorageError("Transaction isn't in STARTED status.")
     }
 
-    EntryResult db_entry_result =  catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
+    EntryResult db_entry_result = NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
     if(db_entry_result.entry_ == nullptr) {
         // Error
         return db_entry_result;
@@ -389,7 +394,7 @@ Txn::GetTableByName(const String& db_name, const String& table_name) {
 
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
 
-    return db_entry->GetTable(table_name, txn_id_, begin_ts);
+    return DBEntry::GetTable(db_entry, table_name, txn_id_, begin_ts);
 }
 
 void
@@ -482,12 +487,13 @@ Txn::RollbackTxn(TxnTimeStamp abort_ts) {
 
     for(const auto& base_entry: txn_tables_) {
         TableEntry* table_entry = (TableEntry*)(base_entry);
-        DBEntry* db_entry = (DBEntry*)table_entry->GetDBEntry();
-        db_entry->RemoveTableEntry(table_entry->GetTableDesc()->table_name(), txn_id_, &txn_context_);
+        TableMeta* table_meta = TableEntry::GetTableMeta(table_entry);
+        DBEntry* db_entry = TableEntry::GetDBEntry(table_entry);
+        DBEntry::RemoveTableEntry(db_entry, table_meta->table_name_, txn_id_, &txn_context_);
     }
 
     for(const auto& db_name: db_names_) {
-        catalog_->RemoveDBEntry(db_name, this->txn_id_, &txn_context_);
+        NewCatalog::RemoveDBEntry(catalog_, db_name, this->txn_id_, &txn_context_);
     }
 
     // Rollback the prepared data

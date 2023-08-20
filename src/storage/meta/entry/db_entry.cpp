@@ -7,87 +7,124 @@
 namespace infinity {
 
 EntryResult
-DBEntry::CreateTable(const SharedPtr<TableDef>& table_def,
+DBEntry::CreateTable(DBEntry* db_entry,
+                     const SharedPtr<TableDef>& table_def,
                      u64 txn_id,
                      TxnTimeStamp begin_ts,
-                     TxnContext *txn_context) {
+                     TxnContext* txn_context) {
     const String& table_name = table_def->table_name();
 
-    SharedPtr<String> table_dir = MakeShared<String>(*dir_ + '/' + table_name);
     // Check if there is table_meta with the table_name
-    rw_locker_.lock_shared();
+    db_entry->rw_locker_.lock_shared();
 
     TableMeta* table_meta{nullptr};
-    if(tables_.find(table_name) != tables_.end()) {
-        table_meta = tables_[table_name].get();
+    if(db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
+        table_meta = db_entry->tables_[table_name].get();
     }
-    rw_locker_.unlock_shared();
+    db_entry->rw_locker_.unlock_shared();
 
     // no table_meta
     if(table_meta == nullptr) {
         // Create new db meta
         LOG_TRACE("Create new table: {}", table_name);
-        UniquePtr<TableMeta> new_table_meta = MakeUnique<TableMeta>(table_name, buffer_mgr_);
+        SharedPtr<String> db_entry_dir = MakeShared<String>((*db_entry->base_dir_) + "/txn_" + std::to_string(txn_id));
+        UniquePtr<TableMeta> new_table_meta = MakeUnique<TableMeta>(db_entry_dir, table_name, db_entry);
         table_meta = new_table_meta.get();
 
-        rw_locker_.lock();
-        tables_[table_name] = std::move(new_table_meta);
-        rw_locker_.unlock();
+        db_entry->rw_locker_.lock();
+        db_entry->tables_[table_name] = std::move(new_table_meta);
+        db_entry->rw_locker_.unlock();
 
+        LOG_TRACE("Add new database entry for: {} in new table meta: {} ", table_name, *db_entry->base_dir_);
+        EntryResult res = TableMeta::CreateNewEntry(table_meta,
+                                                    txn_id,
+                                                    begin_ts,
+                                                    txn_context,
+                                                    table_def);
+        return res;
+    } else {
+        LOG_TRACE("Add new database entry for: {} in existed table meta: {}", table_name, *db_entry->base_dir_);
+        EntryResult res = TableMeta::CreateNewEntry(table_meta,
+                                                    txn_id,
+                                                    begin_ts,
+                                                    txn_context,
+                                                    table_def);
+        return res;
     }
-
-    LOG_TRACE("Add new database entry for: {} in {}", table_name, *table_dir);
-    EntryResult res = table_meta->CreateNewEntry(table_dir, txn_id, begin_ts, txn_context, table_def, this);
-
-    return res;
 }
 
 EntryResult
-DBEntry::DropTable(const String& table_name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context) {
-    rw_locker_.lock_shared();
+DBEntry::DropTable(DBEntry* db_entry,
+                   const String& table_name,
+                   u64 txn_id,
+                   TxnTimeStamp begin_ts,
+                   TxnContext* txn_context) {
+    db_entry->rw_locker_.lock_shared();
 
     TableMeta* table_meta{nullptr};
-    if(tables_.find(table_name) != tables_.end()) {
-        table_meta = tables_[table_name].get();
+    if(db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
+        table_meta = db_entry->tables_[table_name].get();
     }
-    rw_locker_.unlock_shared();
+    db_entry->rw_locker_.unlock_shared();
     if(table_meta == nullptr) {
         LOG_TRACE("Attempt to drop not existed table entry {}", table_name);
         return {nullptr, MakeUnique<String>("Attempt to drop not existed table entry")};
     }
 
     LOG_TRACE("Drop a table entry {}", table_name);
-    EntryResult res = table_meta->DropNewEntry(txn_id, begin_ts, txn_context, table_name, this);
+    EntryResult res = TableMeta::DropNewEntry(table_meta,
+                                              txn_id,
+                                              begin_ts,
+                                              txn_context,
+                                              table_name);
 
     return res;
 }
 
+
 EntryResult
-DBEntry::GetTable(const String& table_name, u64 txn_id, TxnTimeStamp begin_ts) {
-    rw_locker_.lock_shared();
+DBEntry::GetTable(DBEntry* db_entry,
+                  const String& table_name,
+                  u64 txn_id,
+                  TxnTimeStamp begin_ts) {
+    db_entry->rw_locker_.lock_shared();
 
     TableMeta* table_meta{nullptr};
-    if(tables_.find(table_name) != tables_.end()) {
-        table_meta = tables_[table_name].get();
+    if(db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
+        table_meta = db_entry->tables_[table_name].get();
     }
-    rw_locker_.unlock_shared();
+    db_entry->rw_locker_.unlock_shared();
 
     LOG_TRACE("Get a table entry {}", table_name);
-    return table_meta->GetEntry(txn_id, begin_ts);
+    return TableMeta::GetEntry(table_meta, txn_id, begin_ts);
 }
 
+
 void
-DBEntry::RemoveTableEntry(const String& table_name, u64 txn_id, TxnContext* txn_context) {
-    rw_locker_.lock_shared();
+DBEntry::RemoveTableEntry(DBEntry* db_entry,
+                          const String& table_name,
+                          u64 txn_id,
+                          TxnContext* txn_context) {
+    db_entry->rw_locker_.lock_shared();
 
     TableMeta* table_meta{nullptr};
-    if(tables_.find(table_name) != tables_.end()) {
-        table_meta = tables_[table_name].get();
+    if(db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
+        table_meta = db_entry->tables_[table_name].get();
     }
-    rw_locker_.unlock_shared();
+    db_entry->rw_locker_.unlock_shared();
 
-    LOG_TRACE("Remove a table entry {}", table_name);
-    table_meta->DeleteNewEntry(txn_id, txn_context);
+    LOG_TRACE("Remove a table entry: {}", table_name);
+    TableMeta::DeleteNewEntry(table_meta, txn_id, txn_context);
+}
+
+SharedPtr<String>
+DBEntry::ToString(DBEntry* db_entry) {
+    std::shared_lock<RWMutex> r_locker(db_entry->rw_locker_);
+    SharedPtr<String> res = MakeShared<String>(fmt::format("DBEntry, base dir: {}, txn id: {}, table count: ",
+                                                           *db_entry->base_dir_,
+                                                           db_entry->txn_id_,
+                                                           db_entry->tables_.size()));
+    return res;
 }
 
 }

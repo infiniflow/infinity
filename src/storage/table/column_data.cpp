@@ -2,6 +2,8 @@
 // Created by jinhai on 23-7-2.
 //
 
+#if 0
+
 #include "column_data.h"
 
 namespace infinity {
@@ -156,3 +158,5 @@ ColumnData::CopyFromVariable() {
 }
 
 }
+
+#endif

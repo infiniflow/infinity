@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "storage/data_block.h"
-#include "storage/table/data_access_state.h"
+#include "src/storage/meta/entry/data_access_state.h"
 #include "storage/meta/entry/table_entry.h"
 
 namespace infinity {

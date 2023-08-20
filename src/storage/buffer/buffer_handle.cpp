@@ -42,7 +42,14 @@ BufferHandle::LoadData() {
                 }
                 if(buffer_type_ == BufferType::kTempFile) {
                     // Restore the data from disk
-                    LOG_TRACE("Read data from spilled file from: {}", file_name_);
+                    String file_path;
+                    if(current_dir_ == nullptr or current_dir_->empty()) {
+                        file_path = *base_dir_ + '/' + *file_name_;
+                    } else {
+                        file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                    }
+
+                    LOG_TRACE("Read data from spilled file from: {}", file_path);
                     // Rename the temp file on disk into _temp_filename
                     data_ = MakeUnique<char[]>(buffer_size_);
                     reference_count_ = 1;
@@ -72,7 +79,15 @@ BufferHandle::LoadData() {
                             LOG_ERROR(*err_msg);
                             return nullptr;
                         }
-                        LOG_TRACE("Allocate buffer with name: {} and size {}", file_name_, buffer_size_);
+
+                        String file_path;
+                        if(current_dir_ == nullptr or current_dir_->empty()) {
+                            file_path = *base_dir_ + '/' + *file_name_;
+                        } else {
+                            file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                        }
+
+                        LOG_TRACE("Allocate buffer with name: {} and size {}", file_path, buffer_size_);
                         data_ = MakeUnique<char[]>(buffer_size_);
                         reference_count_ = 1;
                         res = data_.get();
@@ -81,7 +96,15 @@ BufferHandle::LoadData() {
                     case BufferType::kFile: {
                         {
                             LocalFileSystem fs;
-                            file_handler_ = fs.OpenFile(file_name_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+
+                            String file_path;
+                            if(current_dir_ == nullptr or current_dir_->empty()) {
+                                file_path = *base_dir_ + '/' + *file_name_;
+                            } else {
+                                file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                            }
+
+                            file_handler_ = fs.OpenFile(file_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
                             DeferFn defer_fn([&]() {
                                 file_handler_->Close();
                                 file_handler_ = nullptr;
@@ -109,7 +132,7 @@ BufferHandle::LoadData() {
                                 StorageError(fmt::format("Incorrect buffer length field size: {}", sizeof(buffer_size_)));
                             }
 
-                            LOG_TRACE("Read file: {} which size: {}", file_name_, buffer_size_);
+                            LOG_TRACE("Read file: {} which size: {}", file_path, buffer_size_);
                             // Need buffer size space
                             UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
                             if (err_msg != nullptr) {
@@ -154,7 +177,14 @@ BufferHandle::LoadData() {
                             return nullptr;
                         }
 
-                        LOG_TRACE("Read extra block: {}", file_name_);
+                        String file_path;
+                        if(current_dir_ == nullptr or current_dir_->empty()) {
+                            file_path = *base_dir_ + '/' + *file_name_;
+                        } else {
+                            file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                        }
+
+                        LOG_TRACE("Read extra block: {}", file_path);
                         data_ = MakeUnique<char[]>(buffer_size_);
                         reference_count_ = 1;
                         res = data_.get();
@@ -200,7 +230,14 @@ BufferHandle::FreeData() {
 
         BufferManager* buffer_mgr = (BufferManager*) buffer_mgr_;
         if(buffer_type_ == BufferType::kTempFile) {
-            LOG_TRACE("Spill current buffer into {}", file_name_);
+            String file_path;
+            if(current_dir_ == nullptr or current_dir_->empty()) {
+                file_path = *base_dir_ + '/' + *file_name_;
+            } else {
+                file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+            }
+
+            LOG_TRACE("Spill current buffer into {}", file_path);
             status_ = BufferStatus::kSpilled;
         } else {
             status_ = BufferStatus::kFreed;
@@ -229,7 +266,14 @@ BufferHandle::SetSealing() {
             }
             if(buffer_type_ == BufferType::kTempFile) {
                 // Restore the data from disk
-                LOG_TRACE("Read data from spilled file from: {}", file_name_);
+                String file_path;
+                if(current_dir_ == nullptr or current_dir_->empty()) {
+                    file_path = *base_dir_ + '/' + *file_name_;
+                } else {
+                    file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                }
+
+                LOG_TRACE("Read data from spilled file from: {}", file_path);
                 // Rename the temp file on disk into _temp_filename
                 data_ = MakeUnique<char[]>(buffer_size_);
                 reference_count_ = 1;
@@ -268,6 +312,21 @@ BufferHandle::SetSealing() {
     return nullptr;
 }
 
+String
+BufferHandle::GetFilename() const {
+    SharedPtr<String> root_dir{};
+    if(buffer_type_ == BufferType::kTempFile) {
+        root_dir = temp_dir_;
+    } else {
+        root_dir = base_dir_;
+    }
+    if(current_dir_ == nullptr or current_dir_->empty()) {
+        return *root_dir + '/' + *file_name_;
+    } else {
+        return *root_dir + '/' + *current_dir_ + '/' + *file_name_;
+    }
+}
+
 void
 BufferHandle::UpdateToFileType() {
     std::unique_lock<RWMutex> w_locker(rw_locker_);
@@ -287,7 +346,15 @@ BufferHandle::ReadFile() {
     // - data buffer
     // - footer: checksum
     LocalFileSystem fs;
-    file_handler_ = fs.OpenFile(file_name_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+
+    String file_path;
+    if(current_dir_ == nullptr or current_dir_->empty()) {
+        file_path = *base_dir_ + '/' + *file_name_;
+    } else {
+        file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+    }
+
+    file_handler_ = fs.OpenFile(file_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     DeferFn defer_fn([&]() {
         file_handler_->Close();
         file_handler_ = nullptr;
@@ -355,17 +422,28 @@ BufferHandle::WriteFile(SizeT buffer_length) {
     // - data buffer
     // - footer: checksum
     LocalFileSystem fs;
-    if(!fs.Exists(path_)) {
-        fs.CreateDirectory(path_);
+
+    String to_write_path;
+    if(current_dir_ == nullptr or current_dir_->empty()) {
+        to_write_path = *base_dir_;
+
+    } else {
+        to_write_path = *base_dir_ + '/' + *current_dir_;
+    }
+    String to_write_file = to_write_path + '/' + *file_name_;
+
+
+    if(!fs.Exists(to_write_path)) {
+        fs.CreateDirectory(to_write_path);
     }
 
-    if(fs.Exists(file_name_)) {
-        String err_msg = fmt::format("File {} was already been created before.", file_name_);
+    if(fs.Exists(to_write_file)) {
+        String err_msg = fmt::format("File {} was already been created before.", to_write_file);
         LOG_ERROR(err_msg);
         StorageError(err_msg);
     }
 
-    file_handler_ = fs.OpenFile(file_name_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+    file_handler_ = fs.OpenFile(to_write_file, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
 
     bool prepare_success = false;
     DeferFn defer_fn([&]() {

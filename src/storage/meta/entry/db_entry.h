@@ -16,37 +16,51 @@ namespace infinity {
 class DBEntry : public BaseEntry {
 public:
     explicit
-    DBEntry(const SharedPtr<String>& dir,
-            String db_name, u64 txn_id,
+    DBEntry(const SharedPtr<String>& base_dir,
+            String db_name,
+            u64 txn_id,
             TxnTimeStamp begin_ts,
-            TxnContext* txn_context,
-            void* buffer_mgr)
-        : BaseEntry(EntryType::kDatabase, txn_context), db_name_(std::move(db_name)), buffer_mgr_(buffer_mgr) {
-        dir_ = MakeShared<String>(*dir + "/txn_" + std::to_string(txn_id));
+            TxnContext* txn_context)
+        : BaseEntry(EntryType::kDatabase, txn_context), base_dir_(base_dir), db_name_(std::move(db_name)) {
+        // current_dir_ = MakeShared<String>(*base_dir + "/txn_" + std::to_string(txn_id));
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }
 
-    EntryResult
-    CreateTable(const SharedPtr<TableDef>& table_def,
+public:
+    static EntryResult
+    CreateTable(DBEntry* db_entry,
+                const SharedPtr<TableDef>& table_def,
                 u64 txn_id,
                 TxnTimeStamp begin_ts,
                 TxnContext* txn_context);
 
-    EntryResult
-    DropTable(const String& table_name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
+    static EntryResult
+    DropTable(DBEntry* db_entry,
+              const String& table_name,
+              u64 txn_id,
+              TxnTimeStamp begin_ts,
+              TxnContext* txn_context);
 
-    EntryResult
-    GetTable(const String& table_name, u64 txn_id, TxnTimeStamp begin_ts);
+    static EntryResult
+    GetTable(DBEntry* db_entry,
+             const String& table_name,
+             u64 txn_id,
+             TxnTimeStamp begin_ts);
 
-    void
-    RemoveTableEntry(const String& table_name, u64 txn_id, TxnContext* txn_context);
+    static void
+    RemoveTableEntry(DBEntry* db_entry,
+                     const String& table_name,
+                     u64 txn_id,
+                     TxnContext* txn_context);
 
-private:
+    static SharedPtr<String>
+    ToString(DBEntry* db_entry);
+
+public:
     RWMutex rw_locker_{};
-    SharedPtr<String> dir_{};
+    SharedPtr<String> base_dir_{};
     String db_name_{};
-    void* buffer_mgr_{};
     HashMap<String, UniquePtr<TableMeta>> tables_{};
 };
 

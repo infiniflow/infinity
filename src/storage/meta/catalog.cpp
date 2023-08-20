@@ -7,86 +7,108 @@
 
 namespace infinity {
 
-NewCatalog::NewCatalog(UniquePtr<String> dir, void* buffer_mgr, UniquePtr<AsyncBatchProcessor> scheduler)
-    : dir_(std::move(dir)), buffer_mgr_(buffer_mgr), scheduler_(std::move(scheduler)) {
+NewCatalog::NewCatalog(SharedPtr<String> dir, UniquePtr<AsyncBatchProcessor> scheduler)
+    : current_dir_(std::move(dir)), scheduler_(std::move(scheduler)) {
 }
 
 EntryResult
-NewCatalog::CreateDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context) {
+NewCatalog::CreateDatabase(NewCatalog* catalog,
+                           const String& db_name,
+                           u64 txn_id,
+                           TxnTimeStamp begin_ts,
+                           TxnContext* txn_context) {
+
     // Check if there is db_meta with the db_name
-    rw_locker_.lock_shared();
+    catalog->rw_locker_.lock_shared();
 
     DBMeta* db_meta{nullptr};
-    if(databases_.find(db_name) != databases_.end()) {
-        db_meta = databases_[db_name].get();
+    if(catalog->databases_.find(db_name) != catalog->databases_.end()) {
+        db_meta = catalog->databases_[db_name].get();
     }
-    rw_locker_.unlock_shared();
+    catalog->rw_locker_.unlock_shared();
 
     // no db_meta
     if(db_meta == nullptr) {
         // Create new db meta
-        LOG_TRACE("Create new database {}", db_name);
-        UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(dir_, db_name, buffer_mgr_);
+        LOG_TRACE("Create new database: {}", db_name);
+        UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(catalog->current_dir_, db_name);
         db_meta = new_db_meta.get();
 
-        rw_locker_.lock();
-        databases_[db_name] = std::move(new_db_meta);
-        rw_locker_.unlock();
+        catalog->rw_locker_.lock();
+        catalog->databases_[db_name] = std::move(new_db_meta);
+        catalog->rw_locker_.unlock();
 
     }
 
-    LOG_TRACE("Add new database entry {}", db_name);
-    EntryResult res = db_meta->CreateNewEntry(txn_id, begin_ts, txn_context);
+    LOG_TRACE("Add new database entry: {}", db_name);
+    EntryResult res = DBMeta::CreateNewEntry(db_meta, txn_id, begin_ts, txn_context);
 
     return res;
 }
 
 EntryResult
-NewCatalog::DropDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context) {
-    rw_locker_.lock_shared();
+NewCatalog::DropDatabase(NewCatalog* catalog,
+                         const String& db_name,
+                         u64 txn_id,
+                         TxnTimeStamp begin_ts,
+                         TxnContext* txn_context) {
+
+    catalog->rw_locker_.lock_shared();
 
     DBMeta* db_meta{nullptr};
-    if(databases_.find(db_name) != databases_.end()) {
-        db_meta = databases_[db_name].get();
+    if(catalog->databases_.find(db_name) != catalog->databases_.end()) {
+        db_meta = catalog->databases_[db_name].get();
     }
-    rw_locker_.unlock_shared();
+    catalog->rw_locker_.unlock_shared();
     if(db_meta == nullptr) {
         LOG_TRACE("Attempt to drop not existed database entry {}", db_name);
         return {nullptr, MakeUnique<String>("Attempt to drop not existed database entry")};
     }
 
     LOG_TRACE("Drop a database entry {}", db_name);
-    EntryResult res = db_meta->DropNewEntry(txn_id, begin_ts, txn_context);
+    EntryResult res = DBMeta::DropNewEntry(db_meta, txn_id, begin_ts, txn_context);
 
     return res;
+
 }
 
 EntryResult
-NewCatalog::GetDatabase(const String& db_name, u64 txn_id, TxnTimeStamp begin_ts) {
-    rw_locker_.lock_shared();
+NewCatalog::GetDatabase(NewCatalog* catalog,
+                        const String& db_name,
+                        u64 txn_id,
+                        TxnTimeStamp begin_ts) {
+    catalog->rw_locker_.lock_shared();
 
     DBMeta* db_meta{nullptr};
-    if(databases_.find(db_name) != databases_.end()) {
-        db_meta = databases_[db_name].get();
+    if(catalog->databases_.find(db_name) != catalog->databases_.end()) {
+        db_meta = catalog->databases_[db_name].get();
     }
-    rw_locker_.unlock_shared();
+    catalog->rw_locker_.unlock_shared();
 
     LOG_TRACE("Get a database entry {}", db_name);
-    return db_meta->GetEntry(txn_id, begin_ts);
+    return DBMeta::GetEntry(db_meta, txn_id, begin_ts);
 }
 
 void
-NewCatalog::RemoveDBEntry(const String& db_name, u64 txn_id, TxnContext* txn_context) {
-    rw_locker_.lock_shared();
+NewCatalog::RemoveDBEntry(NewCatalog* catalog,
+                          const String& db_name,
+                          u64 txn_id,
+                          TxnContext* txn_context) {
+    catalog->rw_locker_.lock_shared();
 
     DBMeta* db_meta{nullptr};
-    if(databases_.find(db_name) != databases_.end()) {
-        db_meta = databases_[db_name].get();
+    if(catalog->databases_.find(db_name) != catalog->databases_.end()) {
+        db_meta = catalog->databases_[db_name].get();
     }
-    rw_locker_.unlock_shared();
+    catalog->rw_locker_.unlock_shared();
 
     LOG_TRACE("Remove a database entry {}", db_name);
-    db_meta->DeleteNewEntry(txn_id, txn_context);
+    DBMeta::DeleteNewEntry(db_meta, txn_id, txn_context);
+}
+
+Vector<DBEntry*>
+NewCatalog::Databases(NewCatalog* catalog, Txn* txn) {
+    NotImplementError("NewCatalog::Databases isn't implemented.")
 }
 
 }

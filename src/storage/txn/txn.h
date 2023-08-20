@@ -16,6 +16,7 @@
 namespace infinity {
 
 class TxnManager;
+class BufferManager;
 
 struct GetParam {
     const String& db_name_{};
@@ -96,6 +97,9 @@ public:
 
     UniquePtr<String>
     CompleteScan(const String& db_name, const String& table_name);
+
+    BufferManager*
+    GetBufferMgr() const;
 
     inline u64
     TxnID() const {

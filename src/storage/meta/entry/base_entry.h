@@ -27,6 +27,18 @@ struct BaseEntry {
     virtual
     ~BaseEntry() = default;
 
+    static inline void
+    Commit(BaseEntry* base_entry, TxnTimeStamp commit_ts) {
+        base_entry->commit_ts_.store(commit_ts);
+    }
+
+    static inline bool
+    Committed(BaseEntry* base_entry) {
+        return base_entry->commit_ts_ != UNCOMMIT_TS;
+    }
+
+public:
+    // Reserved
     inline void
     Commit(TxnTimeStamp commit_ts) {
         commit_ts_.store(commit_ts);
@@ -37,6 +49,7 @@ struct BaseEntry {
         return commit_ts_ != UNCOMMIT_TS;
     }
 
+public:
     TxnContext *txn_context_;
     std::atomic_uint64_t txn_id_{0};
     TxnTimeStamp begin_ts_{0};

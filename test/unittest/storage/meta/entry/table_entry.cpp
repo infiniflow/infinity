@@ -1,6 +1,7 @@
 //
-// Created by jinhai on 23-7-30.
+// Created by jinhai on 23-8-19.
 //
+
 
 #include <gtest/gtest.h>
 #include "base_test.h"
@@ -12,7 +13,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-class DataTableTest : public BaseTest {
+class TableEntryTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
@@ -32,9 +33,7 @@ class DataTableTest : public BaseTest {
 };
 
 
-TEST_F(DataTableTest, test1) {
-#if 0
-
+TEST_F(TableEntryTest, test1) {
     using namespace infinity;
 
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
@@ -79,14 +78,17 @@ TEST_F(DataTableTest, test1) {
         LOG_TRACE("\n{}", table_def->ToString());
     }
 
-    SharedPtr<TableEntry> table_entry = MakeShared<TableEntry>(table_dir, table_def, nullptr, 0, 0, nullptr);
+    SharedPtr<TableEntry> table_entry = MakeShared<TableEntry>(table_dir,
+                                                               table_def->table_name(),
+                                                               table_def->columns(),
+                                                               nullptr,
+                                                               0,
+                                                               0,
+                                                               nullptr);
 
-    SharedPtr<DataTable> data_table = DataTable::Make(table_dir, table_def, &buffer_mgr);
-    EXPECT_EQ(data_table->table_name(), "t1");
-    EXPECT_EQ(data_table->schema_name(), "default");
 }
 
-TEST_F(DataTableTest, test2) {
+TEST_F(TableEntryTest, test2) {
     using namespace infinity;
 
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
@@ -96,8 +98,8 @@ TEST_F(DataTableTest, test2) {
 
 //    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity/table");
     UniquePtr<String> dir = MakeUnique<String>("table");
-    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
-    TxnManager txn_mgr(&new_catalog);
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
     EntryResult create1_res, table1_res, get_res;
 
@@ -214,22 +216,22 @@ TEST_F(DataTableTest, test2) {
             EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
             for (const auto &segment_pair: read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
-                EXPECT_NE(segment_pair.second.data_segment_, nullptr);
+                EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
                 EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
                 EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
                 EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-                ColumnData *column0 = segment_pair.second.column_data_map_.at(0).column_data_;
-                ColumnData *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
+                ColumnDataEntry *column0 = segment_pair.second.column_data_map_.at(0).column_data_;
+                ColumnDataEntry *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
-                SizeT row_count = segment_pair.second.data_segment_->RowCount();
-                ObjectHandle col0_obj = column0->GetColumnData();
+                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
+                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, &buffer_mgr);
                 i8 *col0_ptr = (i8 *) (col0_obj.GetData());
                 for (SizeT row = 0; row < row_count; ++row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                     EXPECT_EQ(col0_ptr[row], (i8) (row));
                 }
 
-                ObjectHandle col2_obj = column2->GetColumnData();
+                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, &buffer_mgr);
                 f64 *col2_ptr = (f64 *) (col2_obj.GetData());
                 for (SizeT row = 0; row < row_count; ++row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
@@ -293,22 +295,22 @@ TEST_F(DataTableTest, test2) {
             EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
             for(const auto& segment_pair: read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
-                EXPECT_NE(segment_pair.second.data_segment_, nullptr);
+                EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
                 EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
                 EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
                 EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-                ColumnData* column0 = segment_pair.second.column_data_map_.at(0).column_data_;
-                ColumnData* column2 = segment_pair.second.column_data_map_.at(2).column_data_;
+                ColumnDataEntry* column0 = segment_pair.second.column_data_map_.at(0).column_data_;
+                ColumnDataEntry* column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
-                SizeT row_count = segment_pair.second.data_segment_->RowCount();
-                ObjectHandle col0_obj = column0->GetColumnData();
+                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
+                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, &buffer_mgr);
                 i8* col0_ptr = (i8*)(col0_obj.GetData());
                 for(SizeT row = 0; row < row_count; ++ row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                     EXPECT_EQ(col0_ptr[row], (i8)(row));
                 }
 
-                ObjectHandle col2_obj = column2->GetColumnData();
+                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, &buffer_mgr);
                 f64* col2_ptr = (f64*)(col2_obj.GetData());
                 for(SizeT row = 0; row < row_count; ++ row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
@@ -338,22 +340,22 @@ TEST_F(DataTableTest, test2) {
             EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
             for (const auto &segment_pair: read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
-                EXPECT_NE(segment_pair.second.data_segment_, nullptr);
+                EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
                 EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
                 EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
                 EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-                ColumnData *column0 = segment_pair.second.column_data_map_.at(0).column_data_;
-                ColumnData *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
+                ColumnDataEntry *column0 = segment_pair.second.column_data_map_.at(0).column_data_;
+                ColumnDataEntry *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
-                SizeT row_count = segment_pair.second.data_segment_->RowCount();
-                ObjectHandle col0_obj = column0->GetColumnData();
+                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
+                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, &buffer_mgr);
                 i8 *col0_ptr = (i8 *) (col0_obj.GetData());
                 for (SizeT row = 0; row < row_count; ++row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                     EXPECT_EQ(col0_ptr[row], (i8) (row));
                 }
 
-                ObjectHandle col2_obj = column2->GetColumnData();
+                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, &buffer_mgr);
                 f64 *col2_ptr = (f64 *) (col2_obj.GetData());
                 for (SizeT row = 0; row < row_count; ++row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
@@ -364,6 +366,4 @@ TEST_F(DataTableTest, test2) {
         // Txn3: Commit, OK
         new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
     }
-
-#endif
 }

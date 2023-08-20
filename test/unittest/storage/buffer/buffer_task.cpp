@@ -20,6 +20,7 @@ class BufferTaskProcessorTest : public BaseTest {
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
         infinity::Infinity::instance().Init();
+        system("rm -rf /tmp/infinity");
     }
 
     void
@@ -37,8 +38,8 @@ TEST_F(BufferTaskProcessorTest, test1) {
     using namespace infinity;
 
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    String temp_path = "/tmp/infinity/_tmp";
-    String base_path = "/tmp/infinity/data";
+    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
+    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
     {
         BufferManager buffer_mgr(memory_limit, base_path, temp_path);
         buffer_mgr.Init();
@@ -46,8 +47,8 @@ TEST_F(BufferTaskProcessorTest, test1) {
         constexpr SizeT elem_count = 4096;
 
         // file: /tmp/infinity/data/c1.col
-        String obj_id1 = "c1.col";
-        BufferHandle *buf_handle1 = buffer_mgr.AllocateBufferHandle("", obj_id1, elem_count * sizeof(i64));
+        SharedPtr<String> obj_id1 = MakeShared<String>("c1.col");
+        BufferHandle *buf_handle1 = buffer_mgr.AllocateBufferHandle(nullptr, obj_id1, elem_count * sizeof(i64));
         EXPECT_EQ(buf_handle1->GetID(), 1);
         EXPECT_EQ(buf_handle1->GetFilename(), "/tmp/infinity/_tmp/c1.col");
 
@@ -58,8 +59,8 @@ TEST_F(BufferTaskProcessorTest, test1) {
         SharedPtr<BufferWriteTask> write_task1 = MakeShared<BufferWriteTask>(buf_handle1);
 
         // file: /tmp/infinity/data/c2.col
-        String obj_id2 = "c2.col";
-        BufferHandle *buf_handle2 = buffer_mgr.AllocateBufferHandle("", obj_id2, elem_count * sizeof(i32));
+        SharedPtr<String> obj_id2 = MakeShared<String>("c2.col");
+        BufferHandle *buf_handle2 = buffer_mgr.AllocateBufferHandle(nullptr, obj_id2, elem_count * sizeof(i32));
         EXPECT_EQ(buf_handle2->GetID(), 2);
         EXPECT_EQ(buf_handle2->GetFilename(), "/tmp/infinity/_tmp/c2.col");
 
@@ -93,8 +94,8 @@ TEST_F(BufferTaskProcessorTest, test1) {
         // file: /tmp/infinity/data/c1.col
         constexpr SizeT elem_count = 4096;
 
-        String obj_id1 = "c1.col";
-        BufferHandle* buf_handle1 = buffer_mgr.GetBufferHandle("", obj_id1, BufferType::kFile);
+        SharedPtr<String> obj_id1 = MakeShared<String>("c1.col");
+        BufferHandle* buf_handle1 = buffer_mgr.GetBufferHandle(nullptr, obj_id1, BufferType::kFile);
         EXPECT_EQ(buf_handle1->GetID(), 1);
         EXPECT_EQ(buf_handle1->GetFilename(), "/tmp/infinity/data/c1.col");
 
@@ -107,8 +108,8 @@ TEST_F(BufferTaskProcessorTest, test1) {
 
         // file: /tmp/infinity/data/c2.col
 
-        String obj_id2 = "c2.col";
-        BufferHandle* buf_handle2 = buffer_mgr.GetBufferHandle("", obj_id2, BufferType::kFile);
+        SharedPtr<String> obj_id2 = MakeShared<String>("c2.col");
+        BufferHandle* buf_handle2 = buffer_mgr.GetBufferHandle(nullptr, obj_id2, BufferType::kFile);
         EXPECT_EQ(buf_handle2->GetID(), 2);
         EXPECT_EQ(buf_handle2->GetFilename(), "/tmp/infinity/data/c2.col");
 

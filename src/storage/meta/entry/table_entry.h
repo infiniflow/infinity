@@ -10,52 +10,102 @@
 #include "common/types/internal_types.h"
 #include "storage/table_def.h"
 #include "storage/table/data_table.h"
+#include "segment_entry.h"
 
 namespace infinity {
 
-class TableEntry : public BaseEntry {
+class DBEntry;
+class TableMeta;
+class BufferManager;
+
+struct TableEntry : public BaseEntry {
 public:
     explicit
-    TableEntry(const SharedPtr<String>& dir,
-                SharedPtr<TableDef> table_def,
-                void* db_entry,
-                u64 txn_id,
-                TxnTimeStamp begin_ts,
-                TxnContext* txn_context,
-                void* buffer_mgr)
+    TableEntry(const SharedPtr<String>& base_dir,
+               String table_name,
+               const Vector<SharedPtr<ColumnDef>>& columns,
+               void* table_meta,
+               u64 txn_id,
+               TxnTimeStamp begin_ts,
+               TxnContext* txn_context)
             : BaseEntry(EntryType::kTable, txn_context),
-            dir_(dir), table_def_(std::move(table_def)), db_entry_(db_entry), buffer_mgr_(buffer_mgr) {
+              base_dir_(base_dir), table_name_(std::move(table_name)), columns_(columns), table_meta_(table_meta) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
-        if(table_def_ == nullptr) {
-            data_table_ = nullptr;
-        } else {
-            data_table_ = DataTable::Make(dir_, table_def_, buffer_mgr_);
-        }
     }
 
-    inline void*
-    GetDBEntry() const {
-        return db_entry_;
+public:
+    static void
+    Append(TableEntry* table_entry, void* txn_ptr, void* txn_store, BufferManager* buffer_mgr);
+
+    static UniquePtr<String>
+    Delete(TableEntry* table_entry, void* txn_ptr, DeleteState& delete_state, BufferManager* buffer_mgr);
+
+    static UniquePtr<String>
+    InitScan(TableEntry* table_entry, void* txn_ptr, ScanState& scan_state, BufferManager* buffer_mgr);
+
+    static UniquePtr<String>
+    Scan(TableEntry* table_entry, void* txn_ptr, ScanState scan_state, BufferManager* buffer_mgr);
+
+    static void
+    CommitAppend(TableEntry* table_entry, void* txn_ptr, const AppendState* append_state_ptr, BufferManager* buffer_mgr);
+
+    static void
+    RollbackAppend(TableEntry* table_entry, void* txn_ptr, void* txn_store);
+
+    static UniquePtr<String>
+    CommitDelete(TableEntry* table_entry, void* txn_ptr, DeleteState& append_state, BufferManager* buffer_mgr);
+
+    static UniquePtr<String>
+    RollbackDelete(TableEntry* table_entry, void* txn_ptr, DeleteState& append_state, BufferManager* buffer_mgr);
+
+    static UniquePtr<String>
+    ImportAppendSegment(TableEntry* table_entry,
+                        void* txn_ptr, SharedPtr<SegmentEntry> segment,
+                        AppendState& append_state,
+                        BufferManager* buffer_mgr);
+
+    static inline u64
+    GetNextSegmentID(TableEntry* table_entry) {
+        return table_entry->next_segment_id_ ++;
     }
 
-    inline TableDef*
-    GetTableDesc() const {
-        return table_def_.get();
+    static inline u64
+    GetMaxSegmentID(const TableEntry* table_entry) {
+        return table_entry->next_segment_id_;
     }
 
-    inline DataTable*
-    GetDataTable() const {
-        return data_table_.get();
+    static inline SegmentEntry*
+    GetSegmentByID(TableEntry* table_entry, u64 id) {
+        return table_entry->segments_[id].get();
     }
 
-private:
-    const SharedPtr<String>& dir_{};
+    static DBEntry*
+    GetDBEntry(const TableEntry* table_entry);
+
+    inline static TableMeta*
+    GetTableMeta(const TableEntry* table_entry) {
+        return (TableMeta*)table_entry->table_meta_;
+    }
+
+public:
     RWMutex rw_locker_{};
-    SharedPtr<TableDef> table_def_{};
-    void* db_entry_{};
-    SharedPtr<DataTable> data_table_{};
-    void* buffer_mgr_{};
+
+    SharedPtr<String> base_dir_{};
+
+    String table_name_{};
+    Vector<SharedPtr<ColumnDef>> columns_{};
+
+    void* table_meta_{};
+
+    // from data table
+    SizeT row_count_{};
+    HashMap<u64, SharedPtr<SegmentEntry>> segments_{};
+    SegmentEntry* unsealed_segment_{};
+    au64 next_segment_id_{};
+
+    // Reserved
+//    SharedPtr<DataTable> data_table_{};
 };
 
 }

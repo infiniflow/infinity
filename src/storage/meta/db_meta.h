@@ -12,33 +12,36 @@
 
 namespace infinity {
 
-class DBMeta {
+struct DBMeta {
 public:
     explicit
-    DBMeta(const UniquePtr<String>& base_dir,
-           String name,
-           void* buffer_mgr)
-           : db_name_(std::move(name)), buffer_mgr_(buffer_mgr) {
-        dir_ = MakeShared<String>(*base_dir + '/' + db_name_);
+    DBMeta(const SharedPtr<String>& base_dir,
+           String name)
+           : db_name_(std::move(name)), base_dir_(base_dir) {
     }
 
-    EntryResult
-    CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
+public:
 
-    EntryResult
-    DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
+    // Reserved
+    static EntryResult
+    CreateNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
 
-    void
-    DeleteNewEntry(u64 txn_id, TxnContext* txn_context);
+    static EntryResult
+    DropNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
 
-    EntryResult
-    GetEntry(u64 txn_id, TxnTimeStamp begin_ts);
+    static void
+    DeleteNewEntry(DBMeta* db_meta, u64 txn_id, TxnContext* txn_context);
 
-private:
+    static EntryResult
+    GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts);
+
+    static SharedPtr<String>
+    ToString(DBMeta* db_meta);
+
+public:
     RWMutex rw_locker_{};
     String db_name_{};
-    SharedPtr<String> dir_{};
-    void* buffer_mgr_{};
+    SharedPtr<String> base_dir_{};
 
     // Ordered by commit_ts from latest to oldest.
     List<UniquePtr<BaseEntry>> entry_list_{};

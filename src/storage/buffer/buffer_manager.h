@@ -19,16 +19,16 @@ namespace infinity {
 class BufferManager {
 public:
     explicit
-    BufferManager(SizeT mem_limit, String base_dir, String temp_dir);
+    BufferManager(SizeT mem_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir);
 
     void
     Init();
 
     BufferHandle*
-    GetBufferHandle(const String& dir, const String &object_name, BufferType buffer_type);
+    GetBufferHandle(const SharedPtr<String>& file_dir, const SharedPtr<String> &filename, BufferType buffer_type);
 
     BufferHandle*
-    AllocateBufferHandle(const String& dir, const String& object_name, SizeT buffer_size);
+    AllocateBufferHandle(const SharedPtr<String>& file_dir, const SharedPtr<String>& filename, SizeT buffer_size);
 
     inline void
     PushGCQueue(BufferHandle* buffer_handle) {
@@ -38,12 +38,12 @@ public:
     UniquePtr<String>
     Free(SizeT need_memory_size);
 
-    inline const String&
+    inline const SharedPtr<String>&
     BaseDir() const {
         return base_dir_;
     }
 
-    inline const String&
+    inline const SharedPtr<String>&
     TempDir() const {
         return temp_dir_;
     }
@@ -58,8 +58,8 @@ private:
 
     u64 next_buffer_id_{1};
 
-    String base_dir_;
-    String temp_dir_;
+    SharedPtr<String> base_dir_;
+    SharedPtr<String> temp_dir_;
     HashMap<String, BufferHandle> buffer_map_;
 
     moodycamel::ConcurrentQueue<BufferHandle *> queue_{};

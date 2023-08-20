@@ -11,7 +11,7 @@
 
 namespace infinity {
 
-BufferManager::BufferManager(SizeT mem_limit, String base_dir, String temp_dir)
+BufferManager::BufferManager(SizeT mem_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir)
 : mem_limit_(mem_limit), base_dir_(std::move(base_dir)), temp_dir_(std::move(temp_dir)) {}
 
 void
@@ -27,46 +27,47 @@ BufferManager::Init() {
                                               BufferIO::OnCommit);
 
     LocalFileSystem fs;
-    if(!fs.Exists(base_dir_)) {
-        fs.CreateDirectory(base_dir_);
+    if(!fs.Exists(*base_dir_)) {
+        fs.CreateDirectory(*base_dir_);
     }
-    if(!fs.Exists(temp_dir_)) {
-        fs.CreateDirectory(temp_dir_);
+    if(!fs.Exists(*temp_dir_)) {
+        fs.CreateDirectory(*temp_dir_);
     }
 }
 
 BufferHandle*
-BufferManager::GetBufferHandle(const String& dir, const String& file_name, BufferType buffer_type) {
-    String object_name;
-    if(dir.empty()) {
-        object_name = file_name;
+BufferManager::GetBufferHandle(const SharedPtr<String>& file_dir,
+                               const SharedPtr<String>& filename,
+                               BufferType buffer_type) {
+    SharedPtr<String> full_name{};
+    if(file_dir == nullptr or file_dir->empty()) {
+        full_name = filename;
     } else {
-        object_name = dir + '/' + file_name;
+        full_name = MakeShared<String>(*file_dir + '/' + *filename);
     }
 
     {
         std::shared_lock<RWMutex> r_locker(rw_locker_);
-        if(buffer_map_.find(object_name) != buffer_map_.end()) {
-            return &buffer_map_.at(object_name);
+        if(buffer_map_.find(*full_name) != buffer_map_.end()) {
+            return &buffer_map_.at(*full_name);
         }
     }
 
     switch (buffer_type) {
         case BufferType::kTempFile: {
             LOG_ERROR("Temp file meta data should be stored in buffer manager")
+            NotImplementError("Not implemented here")
             break;
         }
         case BufferType::kFile: {
             LOG_TRACE("Read file, Generate Buffer Handle");
             std::unique_lock<RWMutex> w_locker(rw_locker_);
-            auto iter = buffer_map_.emplace(object_name, this);
+            auto iter = buffer_map_.emplace(*full_name, this);
             iter.first->second.id_ = next_buffer_id_ ++;
-            if(dir.empty()) {
-                iter.first->second.path_ = this->base_dir_;
-            } else {
-                iter.first->second.path_ = this->base_dir_ + '/' + dir;
-            }
-            iter.first->second.file_name_ = iter.first->second.path_ + '/' + file_name;
+            iter.first->second.base_dir_ = this->base_dir_;
+            iter.first->second.temp_dir_ = this->temp_dir_;
+            iter.first->second.current_dir_ = file_dir;
+            iter.first->second.file_name_ = filename;
             iter.first->second.buffer_type_ = buffer_type;
 
             return &(iter.first->second);
@@ -74,14 +75,11 @@ BufferManager::GetBufferHandle(const String& dir, const String& file_name, Buffe
         case BufferType::kExtraBlock: {
             LOG_TRACE("Read extra block, Generate Buffer Handle");
             std::unique_lock<RWMutex> w_locker(rw_locker_);
-            auto iter = buffer_map_.emplace(object_name, this);
-            iter.first->second.id_ = next_buffer_id_ ++;
-            if(dir.empty()) {
-                iter.first->second.path_ = this->base_dir_;
-            } else {
-                iter.first->second.path_ = this->base_dir_ + '/' + dir;
-            }
-            iter.first->second.file_name_ = iter.first->second.path_ + '/' + file_name;
+            auto iter = buffer_map_.emplace(*full_name, this);
+            iter.first->second.base_dir_ = this->base_dir_;
+            iter.first->second.temp_dir_ = this->temp_dir_;
+            iter.first->second.current_dir_ = file_dir;
+            iter.first->second.file_name_ = filename;
             iter.first->second.buffer_type_ = buffer_type;
 
             return &(iter.first->second);
@@ -95,22 +93,23 @@ BufferManager::GetBufferHandle(const String& dir, const String& file_name, Buffe
 }
 
 BufferHandle*
-BufferManager::AllocateBufferHandle(const String& dir, const String& file_name, SizeT buffer_size) {
-    String object_name;
-    if(dir.empty()) {
-        object_name = file_name;
+BufferManager::AllocateBufferHandle(const SharedPtr<String>& file_dir,
+                                    const SharedPtr<String>& filename,
+                                    SizeT buffer_size) {
+    SharedPtr<String> full_name{};
+    if(file_dir == nullptr or file_dir->empty()) {
+        full_name = filename;
     } else {
-        object_name = dir + '/' + file_name;
+        full_name = MakeShared<String>(*file_dir + '/' + *filename);
     }
+
     std::unique_lock<RWMutex> w_locker(rw_locker_);
-    auto iter = buffer_map_.emplace(object_name, this);
+    auto iter = buffer_map_.emplace(*full_name, this);
     iter.first->second.id_ = next_buffer_id_ ++;
-    if(dir.empty()) {
-        iter.first->second.path_ = this->temp_dir_;
-    } else {
-        iter.first->second.path_ = this->temp_dir_ + '/' + dir;
-    }
-    iter.first->second.file_name_ = iter.first->second.path_ + '/' + file_name;
+    iter.first->second.base_dir_ = this->base_dir_;
+    iter.first->second.temp_dir_ = this->temp_dir_;
+    iter.first->second.current_dir_ = file_dir;
+    iter.first->second.file_name_ = filename;
     iter.first->second.buffer_type_ = BufferType::kTempFile;
     iter.first->second.status_ = BufferStatus::kFreed;
 

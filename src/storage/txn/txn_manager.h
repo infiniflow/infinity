@@ -8,12 +8,16 @@
 
 namespace infinity {
 
+class BufferManager;
+
 class TxnManager {
 public:
     explicit
-    TxnManager(NewCatalog* catalog, u64 start_txn_id = 0)
-        : txn_id_(start_txn_id),
-          catalog_(catalog) {}
+    TxnManager(NewCatalog* catalog, BufferManager* buffer_mgr, u64 start_txn_id = 0)
+        : catalog_(catalog),
+        buffer_mgr_(buffer_mgr),
+        txn_id_(start_txn_id)
+        {}
 
     Txn*
     CreateTxn();
@@ -31,6 +35,11 @@ public:
         rw_locker_.unlock();
     }
 
+    BufferManager*
+    GetBufferMgr() const {
+        return buffer_mgr_;
+    }
+
 private:
     u64
     GetNewTxnID();
@@ -39,6 +48,7 @@ private:
     NewCatalog* catalog_{};
     RWMutex rw_locker_{};
     u64 txn_id_{};
+    BufferManager* buffer_mgr_{};
     HashMap<u64, UniquePtr<Txn>> txn_map_{};
 };
 

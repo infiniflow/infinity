@@ -63,14 +63,18 @@ public:
         return id_;
     }
 
-    [[nodiscard]] const String&
-    GetFilename() const {
-        return file_name_;
-    }
+    String
+    GetFilename() const;
 
     void
     UpdateToFileType();
 
+
+    void
+    Spill();
+
+    void
+    RestoreFromSpill();
 
     // File read and write
     void
@@ -98,8 +102,10 @@ public:
     BufferType buffer_type_{BufferType::kInvalid};
     BufferStatus status_{BufferStatus::kFreed};
 
-    String file_name_{};
-    String path_{};
+    SharedPtr<String> base_dir_{}; // ex. /tmp/infinity/data
+    SharedPtr<String> temp_dir_{}; // ex. /tmp/infinity/_tmp
+    SharedPtr<String> current_dir_{}; // ex. table/segment0
+    SharedPtr<String> file_name_{}; // ex. 0.col
     u64 id_{};
 
     // file descriptor

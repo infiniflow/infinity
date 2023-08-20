@@ -11,7 +11,7 @@
 namespace infinity {
 
 struct MetaColumnDataState {
-    ColumnData* column_data_{};
+    ColumnDataEntry* column_data_{};
 };
 
 struct MetaColumnVectorState {
@@ -24,7 +24,7 @@ struct MetaDataBlockState {
 };
 
 struct MetaSegmentState {
-    DataSegment* data_segment_{};
+    SegmentEntry* segment_entry_{};
     HashMap<u64, MetaColumnDataState> column_data_map_{};
 };
 

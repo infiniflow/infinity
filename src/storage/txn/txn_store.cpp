@@ -4,12 +4,13 @@
 
 #include "txn_store.h"
 #include "common/utility/infinity_assert.h"
+#include "txn.h"
 
 namespace infinity {
 
 UniquePtr<String>
 TxnTableStore::Append(const SharedPtr<DataBlock>& input_block) {
-    SizeT column_count = table_entry_->GetTableDesc()->column_count();
+    SizeT column_count = table_entry_->columns_.size();
     if(input_block->column_count() != column_count) {
         String err_msg = fmt::format("Attempt to insert different column count data block into transaction table store");
         LOG_ERROR(err_msg);
@@ -18,7 +19,7 @@ TxnTableStore::Append(const SharedPtr<DataBlock>& input_block) {
 
     Vector<SharedPtr<DataType>> column_types;
     for(SizeT col_id = 0; col_id < column_count; ++ col_id) {
-        column_types.emplace_back(table_entry_->GetTableDesc()->columns()[col_id]->type());
+        column_types.emplace_back(table_entry_->columns_[col_id]->type());
         if(*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
             String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
             LOG_ERROR(err_msg);
@@ -69,8 +70,9 @@ void
 TxnTableStore::Rollback() {
     if(append_state_ != nullptr) {
         // Rollback the data already been appended.
-        table_entry_->GetDataTable()->RollbackAppend(txn_, this);
-        LOG_TRACE("Rollback prepare appended data in table: {}", table_entry_->GetTableDesc()->table_name());
+        TableEntry::RollbackAppend(table_entry_, txn_, this);
+        TableMeta* table_meta = (TableMeta*)TableEntry::GetTableMeta(table_entry_);
+        LOG_TRACE("Rollback prepare appended data in table: {}", table_meta->table_name_);
     }
 
     blocks_.clear();
@@ -83,15 +85,15 @@ TxnTableStore::PrepareCommit() {
 
     // Start to append
     LOG_TRACE("Transaction local storage table: {}, Start to prepare commit", this->table_name_);
-    table_entry_->GetDataTable()->Append(txn_, this);
+    Txn* txn_ptr = (Txn*)txn_;
+    TableEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
     LOG_TRACE("Transaction local storage table: {}, Complete commit preparing", this->table_name_);
 }
 
 void
 TxnTableStore::Commit() {
-
-    table_entry_->GetDataTable()->CommitAppend(txn_, append_state_.get());
-
+    Txn* txn_ptr = (Txn*)txn_;
+    TableEntry::CommitAppend(table_entry_, txn_, append_state_.get(), txn_ptr->GetBufferMgr());
 //    for(const auto& range: append_state_->append_ranges_) {
 //        LOG_TRACE("Commit, segment: {}, start: {}, count: {}", range.segment_id_, range.start_pos_, range.row_count_);
 //    }

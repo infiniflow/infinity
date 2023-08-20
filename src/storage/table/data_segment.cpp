@@ -2,6 +2,9 @@
 // Created by jinhai on 23-7-1.
 //
 
+
+#if 0
+
 #include "data_segment.h"
 #include "common/utility/defer_op.h"
 #include "storage/txn/txn.h"
@@ -24,7 +27,7 @@ DataSegment::Init(const Vector<SharedPtr<ColumnDef>>& column_defs,
 }
 
 void
-DataSegment::Append(void* ptr, AppendState* append_state_ptr) {
+DataSegment::Append(void* txn_ptr, AppendState* append_state_ptr) {
     if(status_ != DataSegmentStatus::kOpen) {
         StorageError("Attempt to append data into Non-Open status data segment");
     }
@@ -59,7 +62,7 @@ DataSegment::Append(void* ptr, AppendState* append_state_ptr) {
             }
 
             for(SizeT i = 0; i < input_block->row_count(); ++ i) {
-                block_verions_.txn_ptr_[i] = (u64)ptr;
+                block_verions_.txn_ptr_[i] = (u64)txn_ptr;
             }
 
             ++ append_state_ptr->current_block_;
@@ -93,7 +96,7 @@ DataSegment::Append(void* ptr, AppendState* append_state_ptr) {
                 }
 
                 for(SizeT i = 0; i < input_block->row_count(); ++ i) {
-                    block_verions_.txn_ptr_[i] = (u64)ptr;
+                    block_verions_.txn_ptr_[i] = (u64)txn_ptr;
                 }
 
                 ++ append_state_ptr->current_block_;
@@ -113,7 +116,7 @@ DataSegment::Append(void* ptr, AppendState* append_state_ptr) {
                 }
 
                 for(SizeT i = 0; i < to_copy_rows; ++ i) {
-                    block_verions_.txn_ptr_[i] = (u64)ptr;
+                    block_verions_.txn_ptr_[i] = (u64)txn_ptr;
                 }
 
                 current_row_ += to_copy_rows;
@@ -185,3 +188,5 @@ DataSegment::Flush() {
 }
 
 }
+
+#endif

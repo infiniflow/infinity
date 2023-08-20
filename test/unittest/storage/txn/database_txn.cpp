@@ -30,13 +30,13 @@ class DBTxnTest : public BaseTest {
 TEST_F(DBTxnTest, test1) {
     using namespace infinity;
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    String temp_path = "/tmp/infinity/_tmp";
-    String base_path = "/tmp/infinity/data";
+    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
+    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
-    TxnManager txn_mgr(&new_catalog);
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
     // Txn1: Create
     Txn* new_txn = txn_mgr.CreateTxn();
@@ -103,13 +103,13 @@ TEST_F(DBTxnTest, test1) {
 TEST_F(DBTxnTest, test20) {
     using namespace infinity;
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    String temp_path = "/tmp/infinity/_tmp";
-    String base_path = "/tmp/infinity/data";
+    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
+    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
-    TxnManager txn_mgr(&new_catalog);
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
 
@@ -172,13 +172,13 @@ TEST_F(DBTxnTest, test20) {
 TEST_F(DBTxnTest, test2) {
     using namespace infinity;
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    String temp_path = "/tmp/infinity/_tmp";
-    String base_path = "/tmp/infinity/data";
+    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
+    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
-    TxnManager txn_mgr(&new_catalog);
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
 
@@ -255,13 +255,13 @@ TEST_F(DBTxnTest, test2) {
 TEST_F(DBTxnTest, test3) {
     using namespace infinity;
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    String temp_path = "/tmp/infinity/_tmp";
-    String base_path = "/tmp/infinity/data";
+    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
+    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
-    TxnManager txn_mgr(&new_catalog);
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();
 
@@ -299,13 +299,13 @@ TEST_F(DBTxnTest, test3) {
 TEST_F(DBTxnTest, test4) {
     using namespace infinity;
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    String temp_path = "/tmp/infinity/_tmp";
-    String base_path = "/tmp/infinity/data";
+    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
+    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
-    TxnManager txn_mgr(&new_catalog);
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();
     // Txn2: Create, OK
@@ -336,13 +336,13 @@ TEST_F(DBTxnTest, test4) {
 TEST_F(DBTxnTest, test5) {
     using namespace infinity;
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    String temp_path = "/tmp/infinity/_tmp";
-    String base_path = "/tmp/infinity/data";
+    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
+    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
-    TxnManager txn_mgr(&new_catalog);
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
     // Txn1: Create, OK
     Txn* new_txn = txn_mgr.CreateTxn();
@@ -378,13 +378,13 @@ TEST_F(DBTxnTest, test5) {
 TEST_F(DBTxnTest, test6) {
     using namespace infinity;
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    String temp_path = "/tmp/infinity/_tmp";
-    String base_path = "/tmp/infinity/data";
+    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
+    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
-    TxnManager txn_mgr(&new_catalog);
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();
 
@@ -439,13 +439,13 @@ TEST_F(DBTxnTest, test6) {
 TEST_F(DBTxnTest, test7) {
     using namespace infinity;
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    String temp_path = "/tmp/infinity/_tmp";
-    String base_path = "/tmp/infinity/data";
+    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
+    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), &buffer_mgr, nullptr);
-    TxnManager txn_mgr(&new_catalog);
+    NewCatalog new_catalog(std::move(dir), nullptr);
+    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();
 

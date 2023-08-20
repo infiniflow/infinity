@@ -15,30 +15,43 @@
 namespace infinity {
 
 class Txn;
-class NewCatalog {
+struct NewCatalog {
 public:
-    NewCatalog(UniquePtr<String> dir,
-               void* buffer_mgr,
+    NewCatalog(SharedPtr<String> dir,
                UniquePtr<AsyncBatchProcessor> scheduler);
 
-    EntryResult
-    CreateDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
+public:
+    static EntryResult
+    CreateDatabase(NewCatalog* catalog,
+                   const String& db_name,
+                   u64 txn_id,
+                   TxnTimeStamp begin_ts,
+                   TxnContext* txn_context);
 
-    EntryResult
-    DropDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
+    static EntryResult
+    DropDatabase(NewCatalog* catalog,
+                 const String& db_name,
+                 u64 txn_id,
+                 TxnTimeStamp begin_ts,
+                 TxnContext* txn_context);
 
-    EntryResult
-    GetDatabase(const String& name, u64 txn_id, TxnTimeStamp begin_ts);
+    static EntryResult
+    GetDatabase(NewCatalog* catalog,
+                const String& db_name,
+                u64 txn_id,
+                TxnTimeStamp begin_ts);
 
-    void
-    RemoveDBEntry(const String& db_name, u64 txn_id, TxnContext* txn_context);
+    static void
+    RemoveDBEntry(NewCatalog* catalog,
+                  const String& db_name,
+                  u64 txn_id,
+                  TxnContext* txn_context);
 
-    Vector<DBEntry*>
-    Databases(Txn* txn);
+    static Vector<DBEntry*>
+    Databases(NewCatalog* catalog, Txn* txn);
 
-private:
-    UniquePtr<String> dir_{nullptr};
-    void* buffer_mgr_{};
+public:
+    SharedPtr<String> current_dir_{nullptr};
     UniquePtr<AsyncBatchProcessor> scheduler_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
     RWMutex rw_locker_;

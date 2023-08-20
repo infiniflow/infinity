@@ -9,31 +9,41 @@
 namespace infinity {
 
 EntryResult
-DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context) {
+DBMeta::CreateNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context) {
     DBEntry* res = nullptr;
-    std::unique_lock<RWMutex> rw_locker(rw_locker_);
+    std::unique_lock<RWMutex> rw_locker(db_meta->rw_locker_);
+
+    SharedPtr<String> meta_dir = MakeShared<String>(*db_meta->base_dir_ + '/' + db_meta->db_name_);
 //    rw_locker_.lock();
-    if(entry_list_.empty()) {
+    if(db_meta->entry_list_.empty()) {
         // Insert a dummy entry.
         UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy, nullptr);
         dummy_entry->deleted_ = true;
-        entry_list_.emplace_back(std::move(dummy_entry));
+        db_meta->entry_list_.emplace_back(std::move(dummy_entry));
 
         // Insert the new db entry
-        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(dir_, db_name_, txn_id, begin_ts, txn_context, buffer_mgr_);
+        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+                                                          db_meta->db_name_,
+                                                          txn_id,
+                                                          begin_ts,
+                                                          txn_context);
         res = db_entry.get();
-        entry_list_.emplace_front(std::move(db_entry));
+        db_meta->entry_list_.emplace_front(std::move(db_entry));
 
 //        rw_locker_.unlock();
         LOG_TRACE("New database entry is added.");
         return {res, nullptr};
     } else {
         // Already have a db_entry, check if the db_entry is valid here.
-        BaseEntry* header_base_entry = entry_list_.front().get();
+        BaseEntry* header_base_entry = db_meta->entry_list_.front().get();
         if(header_base_entry->entry_type_ == EntryType::kDummy) {
-            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(dir_, db_name_, txn_id, begin_ts, txn_context, buffer_mgr_);
+            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+                                                              db_meta->db_name_,
+                                                              txn_id,
+                                                              begin_ts,
+                                                              txn_context);
             res = db_entry.get();
-            entry_list_.emplace_front(std::move(db_entry));
+            db_meta->entry_list_.emplace_front(std::move(db_entry));
             return {res, nullptr};
         }
 
@@ -43,18 +53,17 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_contex
             if(begin_ts > header_db_entry->commit_ts_) {
                 if(header_db_entry->deleted_) {
                     // No conflict
-                    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(dir_,
-                                                                      db_name_,
+                    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+                                                                      db_meta->db_name_,
                                                                       txn_id,
                                                                       begin_ts,
-                                                                      txn_context,
-                                                                      buffer_mgr_);
+                                                                      txn_context);
                     res = db_entry.get();
-                    entry_list_.emplace_front(std::move(db_entry));
+                    db_meta->entry_list_.emplace_front(std::move(db_entry));
                     return {res, nullptr};
                 } else {
                     // Duplicated database
-                    LOG_TRACE("Duplicated database name {}.", db_name_)
+                    LOG_TRACE("Duplicated database name: {}.", db_meta->db_name_)
                     return {nullptr, MakeUnique<String>("Duplicated database.")};
                 }
             } else {
@@ -82,29 +91,27 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_contex
                         header_db_entry->txn_context_->state_ = TxnState::kRollbacking;
 
                         // Erase header db entry
-                        entry_list_.erase(entry_list_.begin());
+                        db_meta->entry_list_.erase(db_meta->entry_list_.begin());
 
                         // Append new one
-                        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(dir_,
-                                                                          db_name_,
+                        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+                                                                          db_meta->db_name_,
                                                                           txn_id,
                                                                           begin_ts,
-                                                                          txn_context,
-                                                                          buffer_mgr_);
+                                                                          txn_context);
                         res = db_entry.get();
-                        entry_list_.emplace_front(std::move(db_entry));
+                        db_meta->entry_list_.emplace_front(std::move(db_entry));
                         return {res, nullptr};
                     } else {
                         // Same txn
                         if(header_db_entry->deleted_) {
-                            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(dir_,
-                                                                              db_name_,
+                            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+                                                                              db_meta->db_name_,
                                                                               txn_id,
                                                                               begin_ts,
-                                                                              txn_context,
-                                                                              buffer_mgr_);
+                                                                              txn_context);
                             res = db_entry.get();
-                            entry_list_.emplace_front(std::move(db_entry));
+                            db_meta->entry_list_.emplace_front(std::move(db_entry));
                             return {res, nullptr};
                         } else {
                             LOG_TRACE("Create a duplicated name database.")
@@ -121,17 +128,16 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_contex
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
                     // Remove the header entry
-                    entry_list_.erase(entry_list_.begin());
+                    db_meta->entry_list_.erase(db_meta->entry_list_.begin());
 
                     // Append new one
-                    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(dir_,
-                                                                      db_name_,
+                    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+                                                                      db_meta->db_name_,
                                                                       txn_id,
                                                                       begin_ts,
-                                                                      txn_context,
-                                                                      buffer_mgr_);
+                                                                      txn_context);
                     res = db_entry.get();
-                    entry_list_.emplace_front(std::move(db_entry));
+                    db_meta->entry_list_.emplace_front(std::move(db_entry));
                     return {res, nullptr};
                 }
                 default: {
@@ -144,15 +150,15 @@ DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_contex
 }
 
 EntryResult
-DBMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context) {
+DBMeta::DropNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context) {
     DBEntry* res = nullptr;
-    std::unique_lock<RWMutex> rw_locker(rw_locker_);
-    if(entry_list_.empty()) {
+    std::unique_lock<RWMutex> rw_locker(db_meta->rw_locker_);
+    if(db_meta->entry_list_.empty()) {
         LOG_TRACE("Empty db entry list.")
         return {nullptr, MakeUnique<String>("Empty db entry list.")};
     }
 
-    BaseEntry* header_base_entry = entry_list_.front().get();
+    BaseEntry* header_base_entry = db_meta->entry_list_.front().get();
     if(header_base_entry->entry_type_ == EntryType::kDummy) {
 //            rw_locker_.unlock();
         LOG_TRACE("No valid db entry.")
@@ -169,15 +175,14 @@ DBMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context)
                 return {nullptr, MakeUnique<String>("DB is dropped before.")};
             }
 
-            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(dir_,
-                                                              db_name_,
+            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->base_dir_,
+                                                              db_meta->db_name_,
                                                               txn_id,
                                                               begin_ts,
-                                                              txn_context,
-                                                              buffer_mgr_);
+                                                              txn_context);
             res = db_entry.get();
             res->deleted_ = true;
-            entry_list_.emplace_front(std::move(db_entry));
+            db_meta->entry_list_.emplace_front(std::move(db_entry));
 
             return {res, nullptr};
         } else {
@@ -190,7 +195,7 @@ DBMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context)
         if(txn_id == header_db_entry->txn_id_) {
             // Same txn, remove the header db entry
             res = header_db_entry;
-            entry_list_.erase(entry_list_.begin());
+            db_meta->entry_list_.erase(db_meta->entry_list_.begin());
 
             return {res, nullptr};
         } else {
@@ -202,30 +207,32 @@ DBMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context)
 }
 
 void
-DBMeta::DeleteNewEntry(u64 txn_id, TxnContext* txn_context) {
-    std::unique_lock<RWMutex> rw_locker(rw_locker_);
-    if(entry_list_.empty()) {
+DBMeta::DeleteNewEntry(DBMeta* db_meta, u64 txn_id, TxnContext* txn_context) {
+    std::unique_lock<RWMutex> rw_locker(db_meta->rw_locker_);
+    if(db_meta->entry_list_.empty()) {
         LOG_TRACE("Empty db entry list.")
         return ;
     }
 
-    auto removed_iter = std::remove_if(entry_list_.begin(), entry_list_.end(), [&](UniquePtr<BaseEntry>& entry)->bool {
+    auto removed_iter = std::remove_if(db_meta->entry_list_.begin(),
+                                       db_meta->entry_list_.end(),
+                                       [&](UniquePtr<BaseEntry>& entry)->bool {
         return entry->txn_id_ == txn_id;
     });
 
-    entry_list_.erase(removed_iter, entry_list_.end());
+    db_meta->entry_list_.erase(removed_iter, db_meta->entry_list_.end());
 }
 
 EntryResult
-DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
-    std::shared_lock<RWMutex> r_locker(rw_locker_);
-    if(entry_list_.empty()) {
+DBMeta::GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts) {
+    std::shared_lock<RWMutex> r_locker(db_meta->rw_locker_);
+    if(db_meta->entry_list_.empty()) {
         LOG_TRACE("Empty db entry list.")
         return {nullptr, MakeUnique<String>("Empty db entry list.")};
     }
 
 
-    for(const auto& db_entry: entry_list_) {
+    for(const auto& db_entry: db_meta->entry_list_) {
         if(db_entry->entry_type_ == EntryType::kDummy) {
             LOG_TRACE("No valid db entry.")
             return {nullptr, MakeUnique<String>("No valid db entry.")};
@@ -253,6 +260,16 @@ DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
     }
     LOG_TRACE("No db entry found.")
     return {nullptr, MakeUnique<String>("No db entry found.")};
+}
+
+SharedPtr<String>
+DBMeta::ToString(DBMeta* db_meta) {
+    std::shared_lock<RWMutex> r_locker(db_meta->rw_locker_);
+    SharedPtr<String> res = MakeShared<String>(fmt::format("DBMeta, base dir: {}, db name: {}, entry count: ",
+                                                           *db_meta->base_dir_,
+                                                           db_meta->db_name_,
+                                                           db_meta->entry_list_.size()));
+    return res;
 }
 
 }

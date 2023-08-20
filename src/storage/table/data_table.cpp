@@ -1,7 +1,7 @@
 //
 // Created by jinhai on 23-7-1.
 //
-
+#if 0
 #include "data_table.h"
 #include "storage/txn/txn_store.h"
 
@@ -105,3 +105,4 @@ DataTable::ImportAppendSegment(void* txn_ptr, SharedPtr<DataSegment> segment, Ap
 }
 
 }
+#endif

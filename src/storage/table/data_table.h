@@ -2,6 +2,8 @@
 // Created by jinhai on 23-7-1.
 //
 
+#if 0
+
 #pragma once
 
 #include "storage/base_table.h"
@@ -86,3 +88,5 @@ private:
 };
 
 }
+
+#endif
