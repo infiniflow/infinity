@@ -40,4 +40,9 @@ TEST_F(EmbeddingInfoTest, embedding_info_A) {
     EXPECT_EQ(embedding_info_ptr->Size(), EMBEDDING_LIMIT * 8);
     EXPECT_EQ(embedding_info_ptr->Dimension(), EMBEDDING_LIMIT);
     EXPECT_EQ(embedding_info_ptr->Type(), EmbeddingDataType::kElemInt64);
+
+    nlohmann::json json;
+    json["type_info"] = embedding_info_ptr->Serialize();
+    LOG_TRACE("{}", json.dump());
+//    EXPECT_EQ(json.dump(), "{\"type_info\":{\"precision\":38,\"scale\":38}}");
 }

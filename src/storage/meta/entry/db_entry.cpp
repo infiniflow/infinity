@@ -127,4 +127,16 @@ DBEntry::ToString(DBEntry* db_entry) {
     return res;
 }
 
+nlohmann::json
+DBEntry::Serialize(const DBEntry* db_entry) {
+    nlohmann::json json_res;
+
+    json_res["base_dir"] = *db_entry->base_dir_;
+    json_res["db_name"] = db_entry->db_name_;
+    for(const auto& table_meta_pair: db_entry->tables_) {
+        json_res["tables"].emplace_back(TableMeta::Serialize(table_meta_pair.second.get()));
+    }
+    return json_res;
+}
+
 }

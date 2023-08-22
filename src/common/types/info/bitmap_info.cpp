@@ -28,4 +28,11 @@ BitmapInfo::operator==(const TypeInfo& other) const {
     return this->length_limit_ == varchar_info_ptr->length_limit_;
 }
 
+nlohmann::json
+BitmapInfo::Serialize() const {
+    nlohmann::json res;
+    res["length_limit"] = length_limit_;
+    return res;
+}
+
 }

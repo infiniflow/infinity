@@ -88,6 +88,9 @@ public:
         return (TableMeta*)table_entry->table_meta_;
     }
 
+    static nlohmann::json
+    Serialize(const TableEntry* table_entry);
+
 public:
     RWMutex rw_locker_{};
 

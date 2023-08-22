@@ -46,6 +46,10 @@ public:
     Dimension() const noexcept {
         return dimension_;
     }
+
+    [[nodiscard]] nlohmann::json
+    Serialize() const override;
+
 private:
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     SizeT dimension_;

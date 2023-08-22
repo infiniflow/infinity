@@ -154,4 +154,15 @@ ColumnDataEntry::Flush(ColumnDataEntry* column_data_entry,
     column_data_entry->buffer_handle_->CloseFile();
 }
 
+nlohmann::json
+ColumnDataEntry::Serialize(const ColumnDataEntry* column_data_entry) {
+    nlohmann::json json_res;
+    json_res["column_type"] = column_data_entry->column_type_->Serialize();
+    json_res["base_dir"] = *column_data_entry->base_dir_;
+    json_res["file_name"] = *column_data_entry->file_name_;
+    json_res["column_id"] = column_data_entry->column_id_;
+    json_res["row_capacity"] =  column_data_entry->row_capacity_;
+    return json_res;
+}
+
 }

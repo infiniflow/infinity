@@ -38,6 +38,9 @@ public:
     [[nodiscard]] size_t
     Size() const override { return 16u; }
 
+    [[nodiscard]] nlohmann::json
+    Serialize() const override;
+
 private:
     i64 precision_;
     i64 scale_;

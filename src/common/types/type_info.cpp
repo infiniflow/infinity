@@ -10,4 +10,5 @@ bool
 TypeInfo::operator!=(const TypeInfo &other) const {
     return !operator==(other);
 }
+
 }

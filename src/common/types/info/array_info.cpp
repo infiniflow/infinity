@@ -15,4 +15,9 @@ ArrayInfo::operator==(const TypeInfo& other) const {
     return this->elem_type_ == array_info_ptr->elem_type_;
 }
 
+nlohmann::json
+ArrayInfo::Serialize() const {
+    NotImplementError("ArrayInfo::Serialize")
+}
+
 }

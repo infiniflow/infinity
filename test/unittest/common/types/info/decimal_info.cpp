@@ -36,4 +36,8 @@ TEST_F(DecimalInfoTest, decimal_info_A) {
     EXPECT_EQ(decimal_info->scale(), 38);
     EXPECT_EQ(decimal_info->precision(), 38);
     EXPECT_EQ(decimal_info->Size(), 16);
+
+    nlohmann::json json;
+    json["type_info"] = decimal_info->Serialize();
+    EXPECT_EQ(json.dump(), "{\"type_info\":{\"precision\":38,\"scale\":38}}");
 }

@@ -207,6 +207,140 @@ DataType::MaxDataType(const DataType& right) {
     NotImplementError(fmt::format("Max type of left: {} and right: {}", this->ToString(), right.ToString()));
 }
 
+nlohmann::json
+DataType::Serialize() {
+    nlohmann::json json_res;
+    switch(this->type_) {
+        case kBoolean: {
+            json_res["data_type"] = "boolean";
+            break;
+        }
+        case kTinyInt: {
+            json_res["data_type"] = "tinyint";
+            break;
+        }
+        case kSmallInt: {
+            json_res["data_type"] = "smallint";
+            break;
+        }
+        case kInteger: {
+            json_res["data_type"] = "int";
+            break;
+        }
+        case kBigInt: {
+            json_res["data_type"] = "bigint";
+            break;
+        }
+        case kHugeInt: {
+            json_res["data_type"] = "hugeint";
+            break;
+        }
+        case kDecimal: {
+            json_res["data_type"] = "decimal";
+            break;
+        }
+        case kFloat: {
+            json_res["data_type"] = "float";
+            break;
+        }
+        case kDouble: {
+            json_res["data_type"] = "double";
+            break;
+        }
+        case kVarchar: {
+            json_res["data_type"] = "varchar";
+            break;
+        }
+        case kDate: {
+            json_res["data_type"] = "date";
+            break;
+        }
+        case kTime: {
+            json_res["data_type"] = "time";
+            break;
+        }
+        case kDateTime: {
+            json_res["data_type"] = "datetime";
+            break;
+        }
+        case kTimestamp: {
+            json_res["data_type"] = "timestamp";
+            break;
+        }
+        case kInterval: {
+            json_res["data_type"] = "interval";
+            break;
+        }
+        case kArray: {
+            json_res["data_type"] = "array";
+            break;
+        }
+        case kTuple: {
+            json_res["data_type"] = "tuple";
+            break;
+        }
+        case kPoint: {
+            json_res["data_type"] = "point";
+            break;
+        }
+        case kLine: {
+            json_res["data_type"] = "line";
+            break;
+        }
+        case kLineSeg: {
+            json_res["data_type"] = "lineseg";
+            break;
+        }
+        case kBox: {
+            json_res["data_type"] = "box";
+            break;
+        }
+        case kPath: {
+            json_res["data_type"] = "path";
+            break;
+        }
+        case kPolygon: {
+            json_res["data_type"] = "polygon";
+            break;
+        }
+        case kCircle: {
+            json_res["data_type"] = "circle";
+            break;
+        }
+        case kBitmap: {
+            json_res["data_type"] = "bitmap";
+            break;
+        }
+        case kUuid: {
+            json_res["data_type"] = "uuid";
+            break;
+        }
+        case kBlob: {
+            json_res["data_type"] = "blob";
+            break;
+        }
+        case kEmbedding: {
+            json_res["data_type"] = "embedding";
+            break;
+        }
+        case kMixed: {
+            json_res["data_type"] = "mixed";
+            break;
+        }
+        case kNull:
+        case kMissing:
+        case kInvalid: {
+            TypeError("Invalid type")
+        }
+    }
+
+    if(this->type_info_ != nullptr) {
+        json_res["type_info"] = this->type_info_->Serialize();
+    }
+
+    return json_res;
+}
+
 template <> String DataType::TypeToString<BooleanT>() { return "Boolean"; }
 template <> String DataType::TypeToString<TinyIntT>() { return "TinyInt"; }
 template <> String DataType::TypeToString<SmallIntT>() { return "SmallInt"; }

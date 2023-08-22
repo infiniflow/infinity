@@ -15,7 +15,7 @@ namespace infinity {
 
 class BufferManager;
 
-enum class DataSegmentStatus {
+enum DataSegmentStatus : i8 {
     kOpen,
     kClosed,
     kFlushing,
@@ -82,6 +82,9 @@ public:
 
     static UniquePtr<String>
     Flush(SegmentEntry* segment_entry);
+
+    static nlohmann::json
+    Serialize(const SegmentEntry* segment_entry);
 
     inline static ColumnDataEntry*
     GetColumnDataByID(SegmentEntry* segment_entry, u64 column_id) {

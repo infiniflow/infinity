@@ -121,3 +121,10 @@ TEST_F(DataTypeTest, TypeToString) {
     EXPECT_STREQ(DataType::TypeToString<BlobT>().c_str(), "Blob");
     EXPECT_STREQ(DataType::TypeToString<EmbeddingT>().c_str(), "Embedding");
 }
+
+TEST_F(DataTypeTest, Serialize) {
+    using namespace infinity;
+    DataType bool_type(LogicalType::kBoolean);
+    String bool_type_str = bool_type.Serialize().dump();
+    LOG_TRACE("{}", bool_type_str);
+}

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/types/internal_types.h"
+#include "json.hpp"
 #include <iostream>
 
 namespace infinity {
@@ -60,6 +61,9 @@ public:
     type() const noexcept {
         return type_;
     }
+
+    [[nodiscard]] virtual nlohmann::json
+    Serialize() const = 0;
 
 protected:
     TypeInfoType type_ { TypeInfoType::kInvalid };

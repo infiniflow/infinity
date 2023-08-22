@@ -33,6 +33,9 @@ public:
     [[nodiscard]] SizeT
     length_limit() const { return length_limit_; }
 
+    [[nodiscard]] nlohmann::json
+    Serialize() const override;
+
 private:
     SizeT length_limit_ {0};
 };

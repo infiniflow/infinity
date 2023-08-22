@@ -50,6 +50,12 @@ public:
     static Vector<DBEntry*>
     Databases(NewCatalog* catalog, Txn* txn);
 
+
+    static nlohmann::json
+    Serialize(const NewCatalog* catalog);
+
+    static SharedPtr<NewCatalog>
+    Deserialize(const nlohmann::json& catalog_json);
 public:
     SharedPtr<String> current_dir_{nullptr};
     UniquePtr<AsyncBatchProcessor> scheduler_{nullptr};

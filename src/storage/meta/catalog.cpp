@@ -111,4 +111,22 @@ NewCatalog::Databases(NewCatalog* catalog, Txn* txn) {
     NotImplementError("NewCatalog::Databases isn't implemented.")
 }
 
+nlohmann::json
+NewCatalog::Serialize(const NewCatalog* catalog) {
+    SharedPtr<String> current_dir_{nullptr};
+
+    nlohmann::json json_res;
+
+    json_res["current_dir"] = *catalog->current_dir_;
+    for(const auto& db_meta: catalog->databases_) {
+        json_res["databases"].emplace_back(DBMeta::Serialize(db_meta.second.get()));
+    }
+    return json_res;
+}
+
+SharedPtr<NewCatalog>
+NewCatalog::Deserialize(const nlohmann::json& catalog_json) {
+    NotImplementError("NewCatalog::Databases isn't implemented.")
+}
+
 }

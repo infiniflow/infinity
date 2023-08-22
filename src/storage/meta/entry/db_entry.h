@@ -57,6 +57,9 @@ public:
     static SharedPtr<String>
     ToString(DBEntry* db_entry);
 
+    static nlohmann::json
+    Serialize(const DBEntry* db_entry);
+
 public:
     RWMutex rw_locker_{};
     SharedPtr<String> base_dir_{};

@@ -35,6 +35,9 @@ public:
         return 8u;
     }
 
+    [[nodiscard]] nlohmann::json
+    Serialize() const override;
+
 private:
     DataType elem_type_;
 };

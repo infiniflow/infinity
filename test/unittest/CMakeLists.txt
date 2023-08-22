@@ -87,3 +87,4 @@ target_link_libraries(test_main
         )
 
 target_include_directories(test_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
+target_include_directories(test_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")

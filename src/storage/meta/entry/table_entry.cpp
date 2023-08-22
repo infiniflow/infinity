@@ -133,4 +133,52 @@ TableEntry::GetDBEntry(const TableEntry* table_entry) {
     return (DBEntry*)table_meta->db_entry_;
 }
 
+nlohmann::json
+TableEntry::Serialize(const TableEntry* table_entry) {
+    nlohmann::json json_res;
+
+    json_res["base_dir"] = *table_entry->base_dir_;
+    json_res["table_name"] = table_entry->table_name_;
+    json_res["row_count"] = table_entry->table_name_;
+
+    for(const auto& column_def: table_entry->columns_) {
+        nlohmann::json column_def_json;
+        column_def_json["column_type"] = column_def->type()->Serialize();
+        column_def_json["column_id"] = column_def->id();
+        column_def_json["column_name"] = column_def->name();
+        for(const auto& column_constraint: column_def->constraints_) {
+            nlohmann::json column_constraint_json;
+            switch(column_constraint) {
+                case ConstraintType::kPrimaryKey: {
+                    column_constraint_json.emplace_back("PrimaryKey");
+                    break;
+                }
+                case ConstraintType::kUnique: {
+                    column_constraint_json.emplace_back("Unique");
+                    break;
+                }
+                case ConstraintType::kNull: {
+                    column_constraint_json.emplace_back("Null");
+                    break;
+                }
+                case ConstraintType::kNotNull: {
+                    column_constraint_json.emplace_back("NotNull");
+                    break;
+                }
+            }
+            column_def_json["constraints"].emplace_back(column_constraint_json);
+        }
+
+        json_res["column_definition"].emplace_back(column_def_json);
+    }
+
+    for(const auto& segment_pair: table_entry->segments_) {
+        json_res["segments"].emplace_back(SegmentEntry::Serialize(segment_pair.second.get()));
+    }
+    u64 next_segment_id = table_entry->next_segment_id_;
+    json_res["next_segment_id"] = next_segment_id;
+
+    return json_res;
+}
+
 }

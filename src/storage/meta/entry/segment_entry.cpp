@@ -181,5 +181,23 @@ SegmentEntry::Flush(SegmentEntry* segment_entry) {
     return nullptr;
 }
 
+nlohmann::json
+SegmentEntry::Serialize(const SegmentEntry* segment_entry) {
+    nlohmann::json json_res;
+
+    json_res["base_dir"] = *segment_entry->base_dir_;
+    json_res["row_capacity"] = segment_entry->row_capacity_;
+    i64 status_value = segment_entry->status_;
+    json_res["status"] = status_value;
+    json_res["segment_id"] = segment_entry->segment_id_;
+    for(const auto& column: segment_entry->columns_) {
+        json_res["columns"].emplace_back(column->Serialize(column.get()));
+    }
+    json_res["start_txn_id"] = segment_entry->start_txn_id_;
+    json_res["end_txn_id"] = segment_entry->end_txn_id_;
+
+    return json_res;
+}
+
 }
 

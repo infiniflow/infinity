@@ -31,4 +31,12 @@ DecimalInfo::operator==(const TypeInfo& other) const {
            && this->scale_ == decimal_info_ptr->scale_;
 }
 
+nlohmann::json
+DecimalInfo::Serialize() const {
+    nlohmann::json res;
+    res["precision"] = precision_;
+    res["scale"] = scale_;
+    return res;
+}
+
 }

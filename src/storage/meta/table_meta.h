@@ -54,6 +54,9 @@ public:
         return table_meta->db_entry_;
     }
 
+    static nlohmann::json
+    Serialize(const TableMeta* table_meta);
+
 public:
     RWMutex rw_locker_{};
     String table_name_{};

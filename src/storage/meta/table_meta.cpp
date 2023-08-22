@@ -302,4 +302,24 @@ TableMeta::ToString(TableMeta* table_meta) {
     return res;
 }
 
+nlohmann::json
+TableMeta::Serialize(const TableMeta* table_meta) {
+    nlohmann::json json_res;
+
+    json_res["base_dir"] = *table_meta->base_dir_;
+    json_res["table_name"] = table_meta->table_name_;
+
+    for(const auto& entry: table_meta->entry_list_) {
+        if(entry->entry_type_ == EntryType::kTable) {
+            json_res["entries"].emplace_back(TableEntry::Serialize((TableEntry*)entry.get()));
+        } else if(entry->entry_type_ == EntryType::kDummy) {
+            LOG_TRACE("Skip dummy type entry during serialize table {} meta", table_meta->table_name_);
+        } else {
+            StorageError("Unexpected entry type");
+        }
+    }
+
+    return json_res;
+}
+
 }

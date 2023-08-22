@@ -272,4 +272,23 @@ DBMeta::ToString(DBMeta* db_meta) {
     return res;
 }
 
+nlohmann::json
+DBMeta::Serialize(const DBMeta* db_meta) {
+    nlohmann::json json_res;
+
+    json_res["base_dir"] = *db_meta->base_dir_;
+    json_res["db_name"] = db_meta->db_name_;
+    for(const auto& base_entry: db_meta->entry_list_) {
+        if(base_entry->entry_type_ == EntryType::kDatabase) {
+            DBEntry* db_entry = (DBEntry*)base_entry.get();
+            json_res["entries"].emplace_back(DBEntry::Serialize(db_entry));
+        } else if(base_entry->entry_type_ == EntryType::kDummy) {
+            LOG_TRACE("Skip dummy type entry during serialize database {} meta", db_meta->db_name_);
+        } else {
+            StorageError("Unexpected entry type");
+        }
+    }
+    return json_res;
+}
+
 }

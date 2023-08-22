@@ -38,6 +38,9 @@ public:
     static SharedPtr<String>
     ToString(DBMeta* db_meta);
 
+    static nlohmann::json
+    Serialize(const DBMeta* db_meta);
+
 public:
     RWMutex rw_locker_{};
     String db_name_{};

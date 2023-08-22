@@ -8,6 +8,7 @@
 #include "type_info.h"
 
 #include "internal_types.h"
+#include "json.hpp"
 
 #include <string>
 
@@ -143,6 +144,9 @@ public:
             }
         }
     }
+
+    nlohmann::json
+    Serialize();
 
 private:
 

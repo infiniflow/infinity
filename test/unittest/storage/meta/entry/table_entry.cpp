@@ -19,7 +19,7 @@ class TableEntryTest : public BaseTest {
         infinity::GlobalResourceUsage::Init();
         infinity::Infinity::instance().Init();
 
-        system("rm -rf /tmp/infinity/data/table");
+        system("rm -rf /tmp/infinity/data/db");
         system("rm -rf /tmp/infinity/_tmp");
     }
 
@@ -97,7 +97,7 @@ TEST_F(TableEntryTest, test2) {
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
 //    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity/table");
-    UniquePtr<String> dir = MakeUnique<String>("table");
+    UniquePtr<String> dir = MakeUnique<String>("db");
     NewCatalog new_catalog(std::move(dir), nullptr);
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
@@ -366,4 +366,7 @@ TEST_F(TableEntryTest, test2) {
         // Txn3: Commit, OK
         new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
     }
+
+    nlohmann::json catalog_json = NewCatalog::Serialize(&new_catalog);
+    LOG_TRACE("{}", catalog_json.dump());
 }

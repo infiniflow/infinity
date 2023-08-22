@@ -180,7 +180,7 @@ Txn::CompleteScan(const String& db_name, const String& table_name) {
 
 BufferManager*
 Txn::GetBufferMgr() const {
-    this->txn_mgr_->GetBufferMgr();
+    return this->txn_mgr_->GetBufferMgr();
 }
 
 EntryResult

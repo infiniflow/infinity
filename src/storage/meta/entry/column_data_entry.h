@@ -49,6 +49,9 @@ public:
     static void
     Flush(ColumnDataEntry* column_data_entry,
           SizeT row_count);
+
+    static nlohmann::json
+    Serialize(const ColumnDataEntry* column_data_entry);
 };
 
 }
