@@ -169,8 +169,8 @@ struct InternalRecordList : BaseRecordList {
     }
 
     // Opens an existing RecordList
-    void Open(uint8_t *ptr, size_t range_size_, size_t node_count) {
-        range_size_ = range_size_;
+    void Open(uint8_t *ptr, size_t range_size, size_t node_count) {
+        range_size_ = range_size;
         range_data_ = ArrayView<uint64_t>((uint64_t *)ptr, range_size_ / 8);
     }
 

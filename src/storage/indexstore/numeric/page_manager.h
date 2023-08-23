@@ -156,13 +156,10 @@ struct PageManagerState {
     //  For serializing access
     SpinLock mutex_;
 
-    EnvHeader *header_;
+    EnvHeader *header_ = nullptr;
 
     // The File
-    File *file_;
-
-    // The lsn manager
-    //LsnManager *lsn_manager;
+    File *file_ = nullptr;
 
     // The cache
     Cache cache_;
@@ -175,10 +172,10 @@ struct PageManagerState {
 
     // Page with the persisted state data. If multiple pages are allocated
     // then these pages form a linked list, with |m_state_page| being the head
-    Page *state_page_;
+    Page *state_page_ = nullptr;
 
     // Cached page where to add more blobs
-    Page *last_blob_page_;
+    Page *last_blob_page_ = nullptr;
 
     // Page where to add more blobs - if |m_last_blob_page| was flushed
     uint64_t last_blob_page_id_;

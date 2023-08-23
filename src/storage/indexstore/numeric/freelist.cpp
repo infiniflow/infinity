@@ -1,6 +1,7 @@
 // Modified based on upscaledb by Christoph Rupp (chris@crupp.de)
 #include "freelist.h"
 #include "page.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -89,7 +90,7 @@ Freelist::EncodeState(std::pair<bool, Freelist::FreeMap::const_iterator> cont, u
     if (cont.first == false)
         it = free_pages_.begin();
     else
-        assert(it != free_pages_.end());
+        StorageAssert(it != free_pages_.end(), "it should not be equals to free_pages_.end()");
 
     uint32_t counter = 0;
     uint8_t *p = data;
@@ -106,7 +107,6 @@ Freelist::EncodeState(std::pair<bool, Freelist::FreeMap::const_iterator> cont, u
         // they are merged. Up to 16 pages can be merged.
         uint32_t page_counter = 1;
         uint64_t base = it->first;
-        assert(base % page_size == 0);
         uint64_t current = it->first;
 
         // move to the next entry, then merge all adjacent pages
@@ -125,7 +125,6 @@ Freelist::EncodeState(std::pair<bool, Freelist::FreeMap::const_iterator> cont, u
         //   - 4 bits for |page_counter|
         //   - 4 bits for the number of bytes following ("n")
         // - n byte page-id (div page_size)
-        assert(page_counter < 16);
         int num_bytes = Pickle::EncodeU64(p + 1, base / page_size);
         *p = (page_counter << 4) | num_bytes;
         p += 1 + num_bytes;

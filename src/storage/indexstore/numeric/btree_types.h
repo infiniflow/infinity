@@ -152,28 +152,28 @@ struct BtreeRecord {
 
 typedef struct {
     /** The size of the key, in bytes */
-    uint16_t size_;
+    uint16_t size_ = 0;
 
     /** The data of the key */
-    void *data_;
+    void *data_ = nullptr;
 
     /** The key flags; */
-    uint32_t flags_;
+    uint32_t flags_ = 0;
 
     /** For internal use */
-    uint32_t _flags;
+    uint32_t _flags = 0;
 
 } btree_key_t;
 
 typedef struct {
     /** The size of the record data, in bytes */
-    uint32_t size_;
+    uint32_t size_ = 0;
 
     /** Pointer to the record data */
-    void *data_;
+    void *data_ = nullptr;
 
     /** The record flags; */
-    uint32_t flags_;
+    uint32_t flags_ = 0;
 
 } btree_record_t;
 

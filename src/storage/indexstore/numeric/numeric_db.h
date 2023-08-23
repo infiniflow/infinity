@@ -4,7 +4,6 @@
 #include "btree_types.h"
 
 #include <leveldb/status.h>
-#include <leveldb/slice.h>
 #include <roaring/roaring.hh>
 
 #include <atomic>
@@ -16,7 +15,6 @@
 namespace infinity {
 
 using Status = leveldb::Status;
-using Slice = leveldb::Slice;
 using Roaring = roaring::Roaring;
 
 class EnvHeader;
@@ -34,14 +32,16 @@ public:
 
     void Open(SharedPtr<TableDef> table_def);
 
-    Status Put(const uint32_t column_id, const Slice& key, const Slice& value);
+    Status Put(const uint32_t column_id, const std::string& key, const uint32_t row_id);
 
-    Status Get(const uint32_t column_id, const Slice& key, std::string& value);
+    Status GetEqual(const uint32_t column_id, const std::string& key, std::shared_ptr<Roaring>& filter);
 
-    Status GetRange(const uint32_t column_id, const Slice& start_key, const Slice& end_key, std::unique_ptr<Roaring>& filter);
+    Status GetRange(const uint32_t column_id, const std::string& start_key, const std::string& end_key, std::shared_ptr<Roaring>& filter);
 
-    Status Delete(const uint32_t column_id, const Slice& key);
+    Status Delete(const uint32_t column_id, const std::string& key);
 private:
+    Status DoGetRange(const uint32_t column_id, btree_key_t* start_key, btree_key_t* end_key, std::shared_ptr<Roaring>& filter);
+
     void Initialize();
 
     void NewEnv();

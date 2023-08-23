@@ -7,9 +7,11 @@
 #include "common/utility/builtin.h"
 #include "common/utility/infinity_assert.h"
 
+#include <roaring/roaring.hh>
 #include <algorithm>
 
 namespace infinity {
+using Roaring = roaring::Roaring;
 struct BaseKeyList : BaseList {
     enum {
         // This KeyList cannot reduce its capacity in order to release storage
@@ -50,6 +52,7 @@ struct BaseKeyList : BaseList {
         return -1;
     }
 
+    void GetPayloads(int start_slot, int end_slot, std::shared_ptr<Roaring>& filter) ;
 };
 
 template<typename T>
@@ -267,8 +270,10 @@ struct PodKeyWithPayLoadList : BaseKeyList {
     template<typename Cmp>
     int Find(size_t node_count, const btree_key_t *hkey, Cmp &) {
         KeyWithPayLoad key = *(KeyWithPayLoad *)hkey->data_;
-        KeyWithPayLoad *result = std::lower_bound(&data_[0],&data_[node_count], key, 
-                     [](const KeyWithPayLoad& a, const KeyWithPayLoad& b){return a.key_ < b.key_;} );
+        KeyWithPayLoad *result = std::lower_bound(&data_[0], &data_[node_count], key, 
+                     [](const KeyWithPayLoad& a, const KeyWithPayLoad& b){
+                        return a.key_ == b.key_ ? (a.row_id_ < b.row_id_) : (a.key_ < b.key_);
+                    } );
 
         if (unlikely(result == &data_[node_count] || result->key_ != key.key_))
             return -1;
@@ -279,32 +284,44 @@ struct PodKeyWithPayLoadList : BaseKeyList {
     template<typename Cmp>
     int LowerBound(size_t node_count, const btree_key_t *hkey, Cmp &, int *pcmp) {
         KeyWithPayLoad key = *(KeyWithPayLoad *)hkey->data_;
-        KeyWithPayLoad *result = std::lower_bound(&data_[0],&data_[node_count], key, 
-                     [](const KeyWithPayLoad& a, const KeyWithPayLoad& b){return a.key_ < b.key_;} );
+        KeyWithPayLoad *result = std::lower_bound(&data_[0], &data_[node_count], key, 
+                     [](const KeyWithPayLoad& a, const KeyWithPayLoad& b){
+                        return a.key_ == b.key_ ? (a.row_id_ < b.row_id_) : (a.key_ < b.key_);
+                    } );
         if (unlikely(result == &data_[node_count])) {
-            if (key.key_ > data_[node_count - 1].key_) {
+            if (key.key_ > data_[node_count - 1].key_ || 
+                (key.key_ == data_[node_count - 1].key_ && key.row_id_ > data_[node_count - 1].row_id_ ) ) {
                 *pcmp = +1;
                 return node_count - 1;
             }
-            if (key.key_ < data_[0].key_) {
+            if (key.key_ < data_[0].key_ || 
+                (key.key_ == data_[0].key_ && key.row_id_ < data_[0].row_id_ ) ) {
                 *pcmp = -1;
                 return 0;
             }
             throw StorageException("shouldn't be here");
         }
 
-        if (key.key_ > result->key_) {
+        if (key.key_ > result->key_ ||
+            (key.key_ == result->key_ && key.row_id_ > result->row_id_) ) {
             *pcmp = +1;
             return result - &data_[0];
         }
 
-        if (key.key_ < result->key_) {
+        if (key.key_ < result->key_ || 
+            (key.key_ == result->key_ && key.row_id_ < result->row_id_)) {
             *pcmp = +1;
             return (result - 1) - &data_[0];
         }
 
         *pcmp = 0;
         return result - &data_[0];
+    }
+
+    void GetPayloads(int start_slot, int end_slot, std::shared_ptr<Roaring>& filter) {
+        for(int i = start_slot;i<= end_slot; ++i) {
+            filter->add(data_[i].row_id_);
+        }
     }
 
     // Copies a key into |dest|

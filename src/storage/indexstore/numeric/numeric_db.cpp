@@ -184,30 +184,64 @@ NumericDB::Open(SharedPtr<TableDef> table_def) {
     }
 }
 
-Status NumericDB::Put(const uint32_t column_id, const Slice& key, const Slice& value) {
+Status NumericDB::Put(const uint32_t column_id, const std::string& key, const uint32_t row_id) {
     std::shared_ptr<BtreeIndex> db = btree_indices_[column_id];
     if(!db.get()) throw StorageException(fmt::format("database not found, column: {}", column_id));
     Context context;
     page_manager_->PurgeCache(&context);
-
+    std::string encoded_key = key;
+    encoded_key.append(row_id, sizeof(uint32_t));
+    btree_key_t btree_key;
+    btree_key.data_ = (void*)encoded_key.data();
+    btree_key.size_ = key.length();
+    btree_record_t btree_value;
+    db->Insert(&context, &btree_key, &btree_value, 0);
 
     return Status::OK();
 }
 
-Status NumericDB::Get(const uint32_t column_id, const Slice& key, std::string& value) {
-    std::shared_ptr<BtreeIndex> db = btree_indices_[column_id];
-    if(!db.get()) throw StorageException(fmt::format("database not found, column: {}", column_id));
-    Context context;
-    page_manager_->PurgeCache(&context);
+Status NumericDB::GetEqual(const uint32_t column_id, const std::string& key, std::shared_ptr<Roaring>& filter) {
+    std::string encoded_start_key = key;
+    encoded_start_key.append(0, sizeof(uint32_t));
+    btree_key_t start_key;
+    start_key.data_ = (void*)encoded_start_key.data();
+    start_key.size_ = encoded_start_key.length();
 
-    return Status::OK();
+    std::string encoded_end_key = key;
+    encoded_end_key.append(std::numeric_limits<uint32_t>::max(), sizeof(uint32_t));
+    btree_key_t end_key;
+    end_key.data_ = (void*)encoded_end_key.data();
+    end_key.size_ = encoded_end_key.length();
+
+    return DoGetRange(column_id, &start_key, &end_key, filter);
 }
 
 Status NumericDB::GetRange(
     const uint32_t column_id,
-    const Slice& start_key,
-    const Slice& end_key,
-    std::unique_ptr<Roaring>& filter) {
+    const std::string& start_key,
+    const std::string& end_key,
+    std::shared_ptr<Roaring>& filter) {
+
+    std::string encoded_start_key = start_key;
+    encoded_start_key.append(0, sizeof(uint32_t));
+    btree_key_t btree_start_key;
+    btree_start_key.data_ = (void*)encoded_start_key.data();
+    btree_start_key.size_ = encoded_start_key.length();
+
+    std::string encoded_end_key = end_key;
+    encoded_end_key.append(std::numeric_limits<uint32_t>::max(), sizeof(uint32_t));
+    btree_key_t btree_end_key;
+    btree_end_key.data_ = (void*)encoded_end_key.data();
+    btree_end_key.size_ = encoded_end_key.length();
+
+    return DoGetRange(column_id, &btree_start_key, &btree_end_key, filter);
+}
+
+Status NumericDB::DoGetRange(
+    const uint32_t column_id,
+    btree_key_t* start_key,
+    btree_key_t* end_key,
+    std::shared_ptr<Roaring>& filter) {
     std::shared_ptr<BtreeIndex> db = btree_indices_[column_id];
     if(!db.get()) throw StorageException(fmt::format("database not found, column: {}", column_id));
     Context context;
@@ -216,7 +250,7 @@ Status NumericDB::GetRange(
     return Status::OK();
 }
 
-Status NumericDB::Delete(const uint32_t column_id, const Slice& key) {
+Status NumericDB::Delete(const uint32_t column_id, const std::string& key) {
     std::shared_ptr<BtreeIndex> db = btree_indices_[column_id];
     if(!db.get()) throw StorageException(fmt::format("database not found, column: {}", column_id));
     Context context;

@@ -11,6 +11,7 @@
 #include <memory>
 
 namespace infinity {
+using Roaring = roaring::Roaring;
 
 struct BtreeHeader {
     BtreeHeader() {
@@ -125,11 +126,11 @@ public:
 
     BtreeNodeProxy *GetNodeFromPage(Page *page);
 
-    int Insert(Context *context, btree_key_t *key_, btree_record_t *record_, uint32_t flags_);
+    int Insert(Context *context, btree_key_t *key, btree_record_t *record, uint32_t flags);
 
     int Erase(Context *context, btree_key_t *key, int duplicate_index, uint32_t flags);
 
-    int Find(Context *context, btree_key_t *key, ByteArray *key_arena, btree_record_t *record, ByteArray *record_arena, uint32_t flags);
+    int Find(Context *context, btree_key_t *start_key, btree_key_t *end_key, uint32_t flags, std::shared_ptr<Roaring>& filter);
 
 public:
     BtreeIndexState state_;

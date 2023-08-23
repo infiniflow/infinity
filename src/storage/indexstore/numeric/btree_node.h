@@ -4,7 +4,10 @@
 #include "page.h"
 #include "btree_types.h"
 
+#include <roaring/roaring.hh>
+
 namespace infinity {
+using Roaring = roaring::Roaring;
 
 struct BtreeNode {
 public:
@@ -193,6 +196,10 @@ public:
 
         keys_.Erase(node_length, slot);
         records_.Erase(node_length, slot);
+    }
+
+    void GetPayloads(int start_slot, int end_slot, std::shared_ptr<Roaring>& filter) {
+        keys_.GetPayloads(start_slot, end_slot, filter);
     }
 
     // Inserts a new key

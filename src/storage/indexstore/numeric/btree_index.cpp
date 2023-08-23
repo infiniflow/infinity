@@ -121,7 +121,6 @@ BtreeIndex::Drop(Context *context) {
     VisitNodes(context, visitor, true);
 }
 
-
 Page *
 BtreeIndex::LowerBound(Context *context, Page *page, const btree_key_t *key, uint32_t page_manager_flags, int *idxptr) {
     BtreeNodeProxy *node = GetNodeFromPage(page);
@@ -578,30 +577,7 @@ struct BtreeInsertAction : public BtreeUpdateAction {
           record_(record),
           flags_(flags) {}
 
-    // This is the entry point for the actual insert operation
     int Run() {
-        /*
-         * append the key_? AppendOrPrependKey() will try to append or
-         * prepend the key_; if this fails because the key_ is NOT the largest
-         * (or smallest) key_ in the database or because the current page is
-         * already full, it will remove the HINT_APPEND (or HINT_PREPEND)
-         * flag and call Insert()
-         */
-        /*
-                int st;
-                if (hints.leaf_page_addr
-                        && ISSETANY(hints.flags_, UPS_HINT_APPEND | UPS_HINT_PREPEND)) {
-                    st = AppendOrPrependKey();
-                    if (unlikely(st == UPS_LIMITS_REACHED))
-                        st = Insert();
-                } else {
-                    st = Insert();
-                }
-        */
-        return Insert();
-    }
-
-    int Insert() {
         // traverse the tree till a leaf is reached
         Page *parent;
         Page *page = TraverseTree(context_, key_, &parent);
@@ -709,133 +685,55 @@ BtreeIndex::Erase(Context *context, btree_key_t *key, int duplicate_index, uint3
 
 struct BtreeFindAction {
     BtreeFindAction(BtreeIndex *btree, Context *context,
-                    btree_key_t *key, ByteArray *key_arena,
-                    btree_record_t *record, ByteArray *record_arena,
-                    uint32_t flags)
-        : btree_(btree), context_(context), key_(key),
-          record_(record), flags_(flags), key_arena_(key_arena),
-          record_arena_(record_arena) {
-    }
+                    btree_key_t *start_key, btree_key_t *end_key, 
+                    uint32_t flags, std::shared_ptr<Roaring>& filter)
+        : btree_(btree), context_(context), start_key_(start_key), end_key_(end_key), filter_(filter) {}
 
     int Run() {
-        Page *page = 0;
+        Page *start_page = 0, *end_page = 0, *page = 0;
         int slot = -1;
-        BtreeNodeProxy *node = 0;
-        uint32_t is_approx_match = 0;
+        BtreeNodeProxy *start_node = 0, *end_node = 0, *node = 0;
 
-        if (slot == -1) {
-            /* load the root page */
-            page = btree_->RootPage(context_);
+        /* load the root page */
+        start_page = end_page = btree_->RootPage(context_);
 
-            /* now traverse the root to the leaf nodes till we find a leaf */
-            node = btree_->GetNodeFromPage(page);
-            while (!node->IsLeaf()) {
-                page = btree_->LowerBound(context_, page, key_, PageManager::kReadOnly, 0);
-                if (unlikely(!page)) {
-                    return -1;
-                }
-
-                node = btree_->GetNodeFromPage(page);
+        /* now traverse the root to the leaf nodes till we find a leaf */
+        start_node = btree_->GetNodeFromPage(start_page);
+        while (!start_node->IsLeaf()) {
+            start_page = btree_->LowerBound(context_, start_page, start_key_, PageManager::kReadOnly, 0);
+            if (unlikely(!start_page)) {
+                return -1;
             }
 
-            /* check the leaf page for the key (shortcut w/o approx. matching) */
-            if (flags_ == 0) {
-                slot = node->Find(key_);
-                if (unlikely(slot == -1)) {
-                    return -1;
-                }
+            start_node = btree_->GetNodeFromPage(start_page);
+        }
 
-                goto return_result;
+        end_node = btree_->GetNodeFromPage(end_page);
+        while (!end_node->IsLeaf()) {
+            end_page = btree_->LowerBound(context_, end_page, end_key_, PageManager::kReadOnly, 0);
+            if (unlikely(!end_page)) {
+                return -1;
             }
-
-            /* check the leaf page for the key (long path w/ approx. matching),
-             * then fall through */
-            slot = Find(context_, page, key_, flags_, &is_approx_match);
+            end_node = btree_->GetNodeFromPage(end_page);
         }
 
-        if (unlikely(slot == -1)) {
-            // find the left sibling
-            if (node->LeftSibling() > 0) {
-                page = btree_->state_.page_manager_->Fetch(context_, node->LeftSibling(), PageManager::kReadOnly);
+        slot = start_node->LowerBound(start_key_);
+        start_node->GetPayloads(slot, slot, filter_);
+
+        node = start_node;
+        while(node->page_->Address() != end_node->page_->Address()) {
+            uint64_t node_id = node->RightSibling();
+            if(node_id > 0) {
+                page = btree_->state_.page_manager_->Fetch(context_, node_id, PageManager::kReadOnly);
                 node = btree_->GetNodeFromPage(page);
-                slot = node->Length() - 1;
-                is_approx_match = BtreeKey::kLower;
             }
-        } else if (unlikely(slot >= (int)node->Length())) {
-            // find the right sibling
-            if (node->RightSibling() > 0) {
-                page = btree_->state_.page_manager_->Fetch(context_, node->RightSibling(),PageManager::kReadOnly);
-                node = btree_->GetNodeFromPage(page);
-                slot = 0;
-                is_approx_match = BtreeKey::kGreater;
-            } else
-                slot = -1;
+        };
+
+        if(end_node->page_->Address() != start_node->page_->Address()) {
+            slot = end_node->LowerBound(end_key_);
         }
-
-        if (unlikely(slot < 0)) {
-            return -1;
-        }
-
-        assert(node->IsLeaf());
-
-return_result:
-
-        // approx. match: patch the key flags
-        key_->flags_ = is_approx_match;
-
-        // no need to load the key if we have an exact match
-        if (key_ && is_approx_match )
-            node->Key(slot, key_arena_, key_);
-
-        if (likely(record_ != 0))
-            node->Record(slot, record_arena_, record_, flags_);
 
         return 0;
-    }
-
-    // Searches a leaf node for a key.
-    //
-    // !!!
-    // only works with leaf nodes!!
-    //
-    // Returns the index of the key, or -1 if the key was not found, or
-    // another negative status code value when an unexpected error occurred.
-    int Find(Context *context, Page *page, btree_key_t *key, uint32_t flags, uint32_t *is_approx_match) {
-        *is_approx_match = 0;
-
-        BtreeNodeProxy *node = btree_->GetNodeFromPage(page);
-        if (unlikely(node->Length() == 0))
-            return -1;
-
-        int cmp;
-        int slot = node->LowerBound(key, 0, &cmp);
-
-        if (cmp == 0)
-            return slot;
-
-        // approx. matching: smaller key is required
-        /*
-        if (ISSET(flags, UPS_FIND_LT_MATCH)) {
-            if (cmp == 0 && ISSET(flags, UPS_FIND_GT_MATCH)) {
-                *is_approx_match = BtreeKey::kLower;
-                return slot + 1;
-            }
-
-            if (slot < 0 && ISSET(flags, UPS_FIND_GT_MATCH)) {
-                *is_approx_match = BtreeKey::kGreater;
-                return 0;
-            }
-            *is_approx_match = BtreeKey::kLower;
-            return cmp <= 0 ? slot - 1 : slot;
-        }
-
-        // approx. matching: greater key is required
-        if (ISSET(flags, UPS_FIND_GT_MATCH)) {
-            *is_approx_match = BtreeKey::kGreater;
-            return slot + 1;
-        }*/
-
-        return cmp ? -1 : slot;
     }
 
     // the current btree
@@ -845,26 +743,20 @@ return_result:
     Context *context_;
 
     // the key that is retrieved
-    btree_key_t *key_;
+    btree_key_t *start_key_;
 
     // the record that is retrieved
-    btree_record_t *record_;
+    btree_key_t *end_key_;
 
     // flags of ups_db_find()
     uint32_t flags_;
 
-    // allocator for the key data
-    ByteArray *key_arena_;
-
-    // allocator for the record data
-    ByteArray *record_arena_;
+    std::shared_ptr<Roaring>& filter_;
 };
 
 int
-BtreeIndex::Find(Context *context, btree_key_t *key,
-                 ByteArray *key_arena, btree_record_t *record,
-                 ByteArray *record_arena, uint32_t flags) {
-    BtreeFindAction bfa(this, context, key, key_arena, record, record_arena, flags);
+BtreeIndex::Find(Context *context, btree_key_t *start_key, btree_key_t *end_key, uint32_t flags, std::shared_ptr<Roaring>& filter) {
+    BtreeFindAction bfa(this, context, start_key, end_key, flags, filter);
     return bfa.Run();
 }
 

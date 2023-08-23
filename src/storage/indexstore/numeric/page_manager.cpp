@@ -4,6 +4,7 @@
 #include "btree_node.h"
 #include "btree_node_proxy.h"
 #include "common/utility/spinlock.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 
@@ -24,7 +25,7 @@ struct FlushTask {
             // skip page if it's already in use
             Page *page = page_manager_->TryLockPurgeCandidate(*it);
             if (!page) continue;
-            assert(page->Mutex().try_lock() == false);
+            StorageAssert(page->Mutex().try_lock() == false, "page->Mutex().try_lock() should be false");
 
             // flush page if it's dirty
             if (page->IsDirty()) {
@@ -85,10 +86,11 @@ PageManagerState::PageManagerState() {
 }
 
 PageManagerState::~PageManagerState() {
-
+    if(state_page_) delete state_page_;
 }
 
 PageManager::PageManager() {
+    state_.reset(new PageManagerState);
 }
 
 void
@@ -108,7 +110,7 @@ PageManager::Initialize(uint64_t pageid) {
     state_->last_blob_page_id_ = *(uint64_t *)page->Payload();
 
     while (1) {
-        assert(page->Type() == Page::kTypePageManager);
+        StorageAssert(page->Type() == Page::kTypePageManager, "page->Type() == Page::kTypePageManager");
         uint8_t *p = page->Payload();
         // skip state_->last_blob_page_id?
         if (page == state_->state_page_)
@@ -146,7 +148,6 @@ PageManager::AllocUnlocked(Context *context, uint32_t page_type, uint32_t flags)
         address = state_->freelist_.Alloc(1);
 
         if (address != 0) {
-            assert(address % page_size == 0);
             state_->needs_flush_ = true;
 
             /* try to fetch the page from the cache_ */
@@ -181,7 +182,6 @@ done:
     /* initialize the page; also set the 'dirty' flag to force logging */
     page->SetType(page_type);
     page->SetDirty(true);
-    //page->set_db(context->db);
     page->SetWithoutHeader(false);
     page->SetCrc32(0);
 
@@ -247,6 +247,7 @@ PageManager::FetchUnlocked(Context *context, uint64_t address, uint32_t flags) {
         page->Fetch(address);
     } catch (Exception &ex) {
         delete page;
+        page = nullptr;
         throw ex;
     }
 
@@ -383,7 +384,7 @@ PageManager::Del(Context *context, Page *page, size_t page_count) {
 
     state_->needs_flush_ = true;
     state_->freelist_.Put(page->Address(), page_count);
-    assert(page->Address() % Page::kSize == 0);
+    StorageAssert(page->Address() % Page::kSize == 0, "page->Address() should be aligned with page size");
 
     if (page->NodeProxy()) {
         delete page->NodeProxy();
@@ -581,8 +582,13 @@ PageManager::AllocMultipleBlobPages(Context *context, size_t num_pages) {
 
 void
 PageManager::Close(Context *context) {
-
+    state_->file_->ReclaimSpace();
+    ReclaimSpace(context);
+    MaybeStoreState(context, true);
+    FlushAllPages();
 }
+
+
 
 Page *
 PageManager::TryLockPurgeCandidate(uint64_t address) {

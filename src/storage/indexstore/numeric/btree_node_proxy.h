@@ -95,6 +95,7 @@ struct BtreeNodeProxy {
     // and respects BTREE_KEY_USER_ALLOC in dest->flags.
     virtual void Key(int slot, ByteArray *arena, btree_key_t *dest) = 0;
 
+    virtual void GetPayloads(int start_slot, int end_slot, std::shared_ptr<Roaring>& filter) = 0;
     // Returns the number of records of a key at the given |slot|. This is
     // either 1 or higher, but only if duplicate keys exist.
     virtual int RecordCount(int slot) = 0;
@@ -242,6 +243,11 @@ struct BtreeNodeProxyImpl : BtreeNodeProxy {
     virtual void Key(int slot, ByteArray *arena,
                      btree_key_t *dest) {
         impl_.Key(slot, arena, dest);
+    }
+
+
+    virtual void GetPayloads(int start_slot, int end_slot, std::shared_ptr<Roaring>& filter) {
+        impl_.GetPayloads(start_slot, end_slot, filter);
     }
 
     // Returns the number of records of a key at the given |slot|
