@@ -8,10 +8,10 @@ namespace infinity {
 Page *
 BtreeIndex::RootPage(Context *context) {
     if (unlikely(state_.root_page_ == 0))
-        state_.root_page_ = state_.page_manager_->Fetch(context, state_.btree_header_->root_address_, 0);
+        state_.root_page_.reset(state_.page_manager_->Fetch(context, state_.btree_header_->root_address_, 0));
     else
-        context->changeset_.Put(state_.root_page_);
-    return state_.root_page_;
+        context->changeset_.Put(state_.root_page_.get());
+    return state_.root_page_.get();
 }
 
 void
@@ -25,7 +25,7 @@ BtreeIndex::Create(Context *context, BtreeHeader *btree_header, LogicalType key_
     SetRootPage(state_.page_manager_->Alloc(context, Page::kTypeBroot, PageManager::kClearWithZero));
 
     /* initialize the root page */
-    BtreeNode *node = BtreeNode::FromPage(state_.root_page_);
+    BtreeNode *node = BtreeNode::FromPage(state_.root_page_.get());
     node->SetFlags(BtreeNode::kLeafNode);
 }
 
@@ -41,7 +41,7 @@ BtreeIndex::Open(Context *context, BtreeHeader *btree_header) {
     SetRootPage(state_.page_manager_->Alloc(context, Page::kTypeBroot, PageManager::kClearWithZero));
 
     /* initialize the root page */
-    BtreeNode *node = BtreeNode::FromPage(state_.root_page_);
+    BtreeNode *node = BtreeNode::FromPage(state_.root_page_.get());
     node->SetFlags(BtreeNode::kLeafNode);
 }
 

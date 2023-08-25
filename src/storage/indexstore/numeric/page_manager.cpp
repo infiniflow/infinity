@@ -89,9 +89,10 @@ PageManagerState::~PageManagerState() {
     if(state_page_) delete state_page_;
 }
 
-PageManager::PageManager(File* file) {
+PageManager::PageManager(File* file, EnvHeader* header) {
     state_.reset(new PageManagerState);
     state_->file_ = file;
+    state_->header_ = header;
 }
 
 void
@@ -232,7 +233,7 @@ PageManager::FetchUnlocked(Context *context, uint64_t address, uint32_t flags) {
     Page *page;
 
     if (address == 0)
-        page = state_->header_->header_page_.get();
+        page = state_->header_->header_page_;
     else if (state_->state_page_ && address == state_->state_page_->Address())
         page = state_->state_page_;
     else
@@ -361,7 +362,7 @@ void PageManager::MaybeStoreState(Context *context, bool force) {
             state_->header_->SetPageManagerBlobid(new_blobid);
             // don't bother to lock the header page
             state_->header_->header_page_->SetDirty(true);
-            context->changeset_.Put(state_->header_->header_page_.get());
+            context->changeset_.Put(state_->header_->header_page_);
         }
     }
 }
@@ -601,7 +602,7 @@ PageManager::TryLockPurgeCandidate(uint64_t address) {
         return 0;
 
     if (address == 0)
-        page = state_->header_->header_page_.get();
+        page = state_->header_->header_page_;
     else if (state_->state_page_ && address == state_->state_page_->Address())
         page = state_->state_page_;
     else

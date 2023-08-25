@@ -74,6 +74,8 @@ public:
 
     void ReclaimSpace();
 private:
+    void ReadNoLock(uint64_t addr, void *buffer, size_t len);
+
     std::string filename_;
     int fd_;
     size_t file_size_;

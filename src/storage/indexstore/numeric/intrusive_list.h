@@ -102,8 +102,8 @@ struct IntrusiveList {
         size_ = 0;
     }
 
-    T *head_;
-    T *tail_;
-    size_t size_;
+    T *head_ = nullptr;
+    T *tail_ = nullptr;
+    size_t size_ = 0;
 };
 }

@@ -56,7 +56,9 @@ public:
         }
 
         ~PersistedData() {
-
+            if (is_allocated_)
+                std::free(raw_data_);
+            raw_data_ = 0;
         }
 
         SpinLock mutex_;

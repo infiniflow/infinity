@@ -64,10 +64,10 @@ struct BtreeIndexState {
     std::unique_ptr<BtreeIndexTraits> internal_traits_;
 
     // the index of the PBtreeHeader in the Environment's header page
-    BtreeHeader *btree_header_;
+    BtreeHeader *btree_header_ = nullptr;
 
     // the root page of the Btree
-    Page *root_page_;
+    std::unique_ptr<Page> root_page_;
 };
 
 struct BtreeVisitor {
@@ -80,6 +80,9 @@ struct BtreeVisitor {
 
 class BtreeIndex {
 public:
+    BtreeIndex(PageManager* page_manager) {
+        state_.page_manager_ = page_manager;
+    }
     enum {
         // for get_node_from_page(): Page is a leaf
         kLeafPage = 1,
@@ -93,7 +96,7 @@ public:
     void SetRootPage(Page *root_page) {
         root_page->SetType(Page::kTypeBroot);
         state_.btree_header_->root_address_ = root_page->Address();
-        state_.root_page_ = root_page;
+        state_.root_page_.reset(root_page);
     }
 
     void Create(Context *context, BtreeHeader *btree_header, LogicalType key_type);

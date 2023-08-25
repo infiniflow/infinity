@@ -17,7 +17,7 @@
 #include <thread>
 #include <string>
 #include <vector>
-
+#include <iostream>
 
 namespace infinity {
 
@@ -47,6 +47,12 @@ struct EnvHeader {
     // Constructor
     EnvHeader(Page *page)
         : header_page_(page) {
+    }
+
+    ~EnvHeader() {
+        if(header_page_) {
+            delete header_page_;
+        }
     }
 
     // Sets the 'magic_' field of a file Header
@@ -119,7 +125,7 @@ struct EnvHeader {
     }
 
     // The Header page of the Environment
-    std::unique_ptr<Page> header_page_;
+    Page* header_page_ = nullptr;
 };
 
 class FlushTask;
@@ -212,7 +218,7 @@ struct PageManagerState {
 
 class PageManager {
 public:
-    PageManager(File* file);
+    PageManager(File* file, EnvHeader* header);
 
     enum {
         // flag for alloc(): Clear the full page with zeroes
@@ -236,9 +242,9 @@ public:
 
     void Initialize(uint64_t pageid);
 
-    Page* Alloc(Context *context, uint32_t page_type, uint32_t flags = 0);
+    Page * Alloc(Context *context, uint32_t page_type, uint32_t flags = 0);
 
-    Page* Fetch(Context *context, uint32_t address, uint32_t flags = 0);
+    Page * Fetch(Context *context, uint32_t address, uint32_t flags = 0);
 
     void Del(Context *context, Page *page, size_t page_count = 1);
 
@@ -260,7 +266,7 @@ public:
 
     void Close(Context *context);
 private:
-    Page* AllocUnlocked(Context *context, uint32_t page_type, uint32_t flags);
+    Page * AllocUnlocked(Context *context, uint32_t page_type, uint32_t flags);
 
     Page * FetchUnlocked(Context *context, uint64_t address, uint32_t flags);
 

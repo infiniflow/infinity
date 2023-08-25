@@ -40,7 +40,6 @@ NumericDB::Initialize() {
     }
     fs::path file_path = db_path_/(kBTreePrefix + std::to_string(segment_id_));
     file_ = MakeShared<File>(file_path);
-    page_manager_ = MakeShared<PageManager>(file_.get());
     //journal_ = MakeShared<Journal>();
 
     bool db_exists = fs::is_directory(db_path_) && fs::is_regular_file(file_path);
@@ -66,6 +65,8 @@ NumericDB::NewEnv() {
     header_->SetMaxDatabases(BTREE_MAX_DATABASES);
     header_->header_page_->Flush();
     std::cout<<"header flush "<<std::endl;
+    page_manager_ = MakeShared<PageManager>(file_.get(), header_.get());
+
 }
 
 
@@ -75,14 +76,9 @@ NumericDB::OpenEnv() {
     file_->Open();
     // read the database header
     {
-        Page *page = 0;
-        uint8_t hdrbuf[Page::kSize];
-        file_->Read(0, hdrbuf, sizeof(hdrbuf));
-
-        Page fakepage(file_.get());
-        fakepage.SetData((PageData *)hdrbuf);
-        header_.reset(new EnvHeader(&fakepage));
-
+        Page *page = new Page(file_.get());
+        page->Fetch(0);
+        header_.reset(new EnvHeader(page));
         int st = 0;
         if (unlikely(!header_->VerifyMagic('H', 'A', 'M', '\0'))) {
             st = -1;
@@ -98,19 +94,15 @@ NumericDB::OpenEnv() {
 
 
 fail_with_fake_cleansing:
-
-        fakepage.SetData(0);
         if (unlikely(st != 0)) {
             if (file_->IsOpen())
                 file_->Close();
             return;
         }
 
-        page = new Page(file_.get());
-        page->Fetch(0);
-        header_.reset(new EnvHeader(page));
     }
 
+    page_manager_ = MakeShared<PageManager>(file_.get(), header_.get());
     // load the state of the PageManager
     if (header_->PageManagerBlobid() != 0)
         page_manager_->Initialize(header_->PageManagerBlobid());
@@ -123,7 +115,7 @@ NumericDB::Close() {
 
     page_manager_->Close(&context);
     if (likely(header_ && header_->header_page_)) {
-        Page *page = header_->header_page_.get();
+        Page *page = header_->header_page_;
         if (likely(page->Data() != 0))
             file_->FreePage(page);
     }
@@ -140,7 +132,7 @@ NumericDB::Create(SharedPtr<TableDef> table_def) {
     for(size_t i = 0 ;  i < colum_defs.size() ;  ++i) {
         SharedPtr<DataType> column_type = colum_defs[i]->type();
         if(column_type->IsNumeric()) {
-            std::shared_ptr<BtreeIndex> db(new BtreeIndex);
+            std::shared_ptr<BtreeIndex> db(new BtreeIndex(page_manager_.get()));
             uint32_t dbname = colum_defs[i]->id();
             size_t dbi = 0;
             for (; dbi < header_->MaxDatabases(); dbi++) {
@@ -161,7 +153,7 @@ NumericDB::Create(SharedPtr<TableDef> table_def) {
             context.changeset_.Flush(lsn_manager_.Next());
         }
     }
-    Page *page = header_->header_page_.get();
+    Page *page = header_->header_page_;
     page->SetDirty(true);
     context.changeset_.Put(page);
 }
@@ -173,7 +165,7 @@ NumericDB::Open(SharedPtr<TableDef> table_def) {
     for(size_t i = 0 ;  i < colum_defs.size() ;  ++i) {
         SharedPtr<DataType> column_type = colum_defs[i]->type();
         if(column_type->IsNumeric()) {
-            std::shared_ptr<BtreeIndex> db(new BtreeIndex);
+            std::shared_ptr<BtreeIndex> db(new BtreeIndex(page_manager_.get()));
             uint32_t dbname = colum_defs[i]->id();
             size_t dbi = 0;
             for (; dbi < header_->MaxDatabases(); dbi++) {

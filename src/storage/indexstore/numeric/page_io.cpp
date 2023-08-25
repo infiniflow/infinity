@@ -61,6 +61,11 @@ File::FileSize() const {
 void
 File::Read(uint64_t addr, void *buffer, size_t len) {
     ScopedSpinLock lock(mutex_);
+    ReadNoLock(addr, buffer, len);
+}
+
+void
+File::ReadNoLock(uint64_t addr, void *buffer, size_t len) {
     int r;
     size_t total = 0;
 
@@ -159,10 +164,10 @@ File::ReadPage(Page *page, uint64_t address) {
         // note that |p| will not leak if file.pread() throws; |p| is stored
         // in the |page| object and will be cleaned up by the caller in
         // case of an exception.
-        void *p = std::aligned_alloc(Page::kSize, Page::kSize);
+        void *p = calloc(Page::kSize, sizeof(uint8_t));
         page->AssignAllocatedBuffer(p, address);
     }
-    Read(address, page->Data(), Page::kSize);
+    ReadNoLock(address, page->Data(), Page::kSize);
 }
 
 void

@@ -845,7 +845,6 @@ benchmark_hnsw() {
     SizeT M = 16;
     SizeT ef_construction = 200;
     assert(dimension == 128 || !"embedding dimension isn't 128");
-    assert(embedding_count == 10000000 || !"embedding size isn't 1000000");
     hnswlib::L2Space l2space(dimension);
     hnswlib::HierarchicalNSW<float>* hnsw_index = nullptr;
 
