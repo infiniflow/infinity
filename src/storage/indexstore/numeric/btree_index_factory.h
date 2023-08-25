@@ -46,6 +46,10 @@ struct BtreeIndexTraitsImpl : public BtreeIndexTraits {
                               Compare >());                                     \
                 case kTinyInt:                                                  \
                     return (new BtreeIndexTraitsImpl                            \
+                              <Impl<KeyList, PodRecordList<uint8_t> >,         \
+                              Compare >());                                     \
+                case kSmallInt:                                                  \
+                    return (new BtreeIndexTraitsImpl                            \
                               <Impl<KeyList, PodRecordList<uint16_t> >,         \
                               Compare >());                                     \
                 case kInteger:                                                  \
@@ -80,6 +84,10 @@ struct BtreeIndexFactory {
                 PAX_INTERNAL_NUMERIC(uint8_t);
             PAX_LEAF_NUMERIC(uint8_t);
         case kTinyInt:
+            if (!is_leaf)
+                PAX_INTERNAL_NUMERIC(uint8_t);
+            PAX_LEAF_NUMERIC(uint8_t);
+        case kSmallInt:
             if (!is_leaf)
                 PAX_INTERNAL_NUMERIC(uint16_t);
             PAX_LEAF_NUMERIC(uint16_t);

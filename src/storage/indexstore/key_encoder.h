@@ -151,6 +151,20 @@ template<>
 class KeyEncoderTraits<LogicalType::kTinyInt> {
 public:
     static u32 Size() {
+        return sizeof(i8);
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+        i8 val;
+        memcpy(&val, value, sizeof(i8));
+        buf.append((char*)&val, sizeof(val));
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kSmallInt> {
+public:
+    static u32 Size() {
         return sizeof(i16);
     }
 
@@ -218,6 +232,34 @@ public:
 };
 
 template<>
+class KeyEncoderTraits<LogicalType::kFloat> {
+public:
+    static u32 Size() {
+        return sizeof(FloatT);
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+        FloatT val;
+        memcpy(&val, value, sizeof(FloatT));
+        buf.append((char*)&val, sizeof(FloatT));
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kDouble> {
+public:
+    static u32 Size() {
+        return sizeof(DoubleT);
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+        DoubleT val;
+        memcpy(&val, value, sizeof(DoubleT));
+        buf.append((char*)&val, sizeof(DoubleT));
+    }
+};
+
+template<>
 class KeyEncoderTraits<LogicalType::kDate> {
 public:
     static u32 Size() {
@@ -274,6 +316,20 @@ public:
 };
 
 template<>
+class KeyEncoderTraits<LogicalType::kInterval> {
+public:
+    static u32 Size() {
+        return sizeof(IntervalT);
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+        IntervalT val;
+        memcpy(&val, value, sizeof(IntervalT));
+        buf.append((char*)&val, sizeof(val));
+    }
+};
+
+template<>
 class KeyEncoderTraits<LogicalType::kVarchar> {
 public:
     static u32 Size() {
@@ -286,5 +342,191 @@ public:
     }
 };
 
+template<>
+class KeyEncoderTraits<LogicalType::kArray> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kTuple> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kPoint> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kLine> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kLineSeg> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kBox> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kPath> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kPolygon> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kCircle> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kBitmap> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kUuid> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kBlob> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kEmbedding> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kMixed> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kNull> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kMissing> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
+class KeyEncoderTraits<LogicalType::kInvalid> {
+public:
+    static u32 Size() {
+        return -1;
+    }
+
+    static void Encode(const void* value, std::string& buf) {
+    }
+};
 
 }

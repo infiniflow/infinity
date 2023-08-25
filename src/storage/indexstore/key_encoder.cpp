@@ -39,15 +39,30 @@ private:
     KeyEncoderIntializer() {
     	AddEntry<LogicalType::kBoolean>();
     	AddEntry<LogicalType::kTinyInt>();
+        AddEntry<LogicalType::kSmallInt>();
     	AddEntry<LogicalType::kInteger>();
     	AddEntry<LogicalType::kBigInt>();
     	AddEntry<LogicalType::kHugeInt>();
     	AddEntry<LogicalType::kDecimal>();
+        AddEntry<LogicalType::kFloat>();
+        AddEntry<LogicalType::kDouble>();
     	AddEntry<LogicalType::kVarchar>();
     	AddEntry<LogicalType::kDate>();
     	AddEntry<LogicalType::kTime>();
     	AddEntry<LogicalType::kDateTime>();
-    	AddEntry<LogicalType::kTimestamp>();
+    	AddEntry<LogicalType::kInterval>();
+        AddEntry<LogicalType::kArray>();
+        AddEntry<LogicalType::kTuple>();
+        AddEntry<LogicalType::kPoint>();
+        AddEntry<LogicalType::kLine>();
+        AddEntry<LogicalType::kLineSeg>();
+        AddEntry<LogicalType::kBox>();
+        AddEntry<LogicalType::kPolygon>();
+        AddEntry<LogicalType::kCircle>();
+        AddEntry<LogicalType::kBitmap>();
+        AddEntry<LogicalType::kUuid>();
+        AddEntry<LogicalType::kBlob>();
+        AddEntry<LogicalType::kEmbedding>();
     }
 
     template<LogicalType data_type>
@@ -58,4 +73,7 @@ private:
 	std::unordered_map<LogicalType, KeyEncoder*, FastHash> encoders_;
 };
 
+const KeyEncoder* GetKeyEncoder(LogicalType type) {
+    return KeyEncoderIntializer::GetInstance()->GetKeyEncoder(type);
+}
 }

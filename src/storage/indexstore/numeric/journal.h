@@ -156,10 +156,6 @@ struct JournalState {
     // Counting the flushed bytes (for ups_env_get_metrics)
     uint64_t count_bytes_flushed_;
 
-    // A map of all opened databases
-    //typedef std::map<uint16_t, Db *> DatabaseMap;
-    //DatabaseMap database_map_;
-
 };
 
 struct Journal {

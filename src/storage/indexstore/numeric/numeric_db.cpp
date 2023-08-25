@@ -9,6 +9,8 @@
 
 #include <string>
 
+#include <iostream>
+
 namespace infinity {
 
 namespace fs = std::filesystem;
@@ -33,10 +35,13 @@ NumericDB::~NumericDB() {
 
 void
 NumericDB::Initialize() {
+    if(!fs::exists(db_path_)) {
+        fs::create_directories(db_path_);
+    }
     fs::path file_path = db_path_/(kBTreePrefix + std::to_string(segment_id_));
     file_ = MakeShared<File>(file_path);
-    page_manager_ = MakeShared<PageManager>();
-    journal_ = MakeShared<Journal>();
+    page_manager_ = MakeShared<PageManager>(file_.get());
+    //journal_ = MakeShared<Journal>();
 
     bool db_exists = fs::is_directory(db_path_) && fs::is_regular_file(file_path);
 
@@ -47,7 +52,9 @@ void
 NumericDB::NewEnv() {
     file_->Create();
     Page *page = new Page(file_.get());
+    std::cout<<"new env "<<std::endl;
     page->Alloc(Page::kTypeHeader, Page::kSize);
+    std::cout<<"after alloc "<<std::endl;
     ::memset(page->Data(), 0, Page::kSize);
     page->SetType(Page::kTypeHeader);
     page->SetDirty(true);
@@ -58,6 +65,7 @@ NumericDB::NewEnv() {
     header_->SetPageSize(Page::kSize);
     header_->SetMaxDatabases(BTREE_MAX_DATABASES);
     header_->header_page_->Flush();
+    std::cout<<"header flush "<<std::endl;
 }
 
 
@@ -247,14 +255,24 @@ Status NumericDB::DoGetRange(
     Context context;
     page_manager_->PurgeCache(&context);
 
-    return Status::OK();
+    int ret = db->Find(&context, start_key, end_key, 0, filter);
+    return ret != -1 ? Status::OK() : Status::NotFound("not found");
 }
 
-Status NumericDB::Delete(const uint32_t column_id, const std::string& key) {
+Status NumericDB::Delete(const uint32_t column_id, const std::string& key, const uint32_t row_id) {
     std::shared_ptr<BtreeIndex> db = btree_indices_[column_id];
     if(!db.get()) throw StorageException(fmt::format("database not found, column: {}", column_id));
     Context context;
     page_manager_->PurgeCache(&context);
+
+    std::string encoded_key = key;
+    encoded_key.append(row_id, sizeof(uint32_t));
+    btree_key_t btree_key;
+    btree_key.data_ = (void*)encoded_key.data();
+    btree_key.size_ = key.length();
+    btree_record_t btree_value;
+    db->Erase(&context, &btree_key, 0, 0);
+
 
     return Status::OK();
 }

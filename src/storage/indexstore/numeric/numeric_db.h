@@ -38,7 +38,7 @@ public:
 
     Status GetRange(const uint32_t column_id, const std::string& start_key, const std::string& end_key, std::shared_ptr<Roaring>& filter);
 
-    Status Delete(const uint32_t column_id, const std::string& key);
+    Status Delete(const uint32_t column_id, const std::string& key, const uint32_t row_id);
 private:
     Status DoGetRange(const uint32_t column_id, btree_key_t* start_key, btree_key_t* end_key, std::shared_ptr<Roaring>& filter);
 

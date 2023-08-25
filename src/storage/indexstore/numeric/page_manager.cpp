@@ -89,8 +89,9 @@ PageManagerState::~PageManagerState() {
     if(state_page_) delete state_page_;
 }
 
-PageManager::PageManager() {
+PageManager::PageManager(File* file) {
     state_.reset(new PageManagerState);
+    state_->file_ = file;
 }
 
 void

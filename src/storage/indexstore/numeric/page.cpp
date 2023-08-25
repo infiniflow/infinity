@@ -9,6 +9,8 @@
 
 namespace infinity {
 
+uint64_t Page::ms_page_count_flushed_ = 0;
+
 Page::Page(File *file):file_(file) {
     persisted_data_.raw_data_ = 0;
     persisted_data_.is_dirty_ = false;

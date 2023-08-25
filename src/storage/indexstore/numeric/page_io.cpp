@@ -3,7 +3,7 @@
 #include "page.h"
 
 #include <memory>
-
+#include <iostream>
 namespace infinity {
 
 File::File(const std::filesystem::path& name)
@@ -138,7 +138,6 @@ File::Alloc(size_t requested_length) {
 
 void
 File::AllocPage(Page *page) {
-    ScopedSpinLock lock(mutex_);
     uint64_t address = Alloc(Page::kSize);
     page->SetAddress(address);
 

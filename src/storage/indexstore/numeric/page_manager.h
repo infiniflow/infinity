@@ -212,7 +212,7 @@ struct PageManagerState {
 
 class PageManager {
 public:
-    PageManager();
+    PageManager(File* file);
 
     enum {
         // flag for alloc(): Clear the full page with zeroes
