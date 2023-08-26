@@ -183,7 +183,7 @@ ExplainLogicalPlan::Explain(const LogicalCreateTable* create_node,
     // Table name
     {
         String table_name_str = String(intent_size, ' ') + " - table name: " +
-                                create_node->table_definitions()->table_name();
+                                *create_node->table_definitions()->table_name();
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -504,13 +504,13 @@ ExplainLogicalPlan::Explain(const LogicalInsert* insert_node,
 
     // Schema name
     {
-        String schema_name_str = String(intent_size, ' ') + " - schema name: " + insert_node->table_ptr()->schema_name();
+        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *insert_node->table_ptr()->schema_name();
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str = String(intent_size, ' ') + " - table name: " + insert_node->table_ptr()->table_name();
+        String table_name_str = String(intent_size, ' ') + " - table name: " + *insert_node->table_ptr()->table_name();
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -634,8 +634,8 @@ ExplainLogicalPlan::Explain(const LogicalTableScan* table_scan_node,
 
     // Table alias and name
     String table_name = String(intent_size, ' ') + " - table name: " + table_scan_node->table_alias_ + "(";
-    table_name += table_scan_node->table_ptr()->SchemaName() + ".";
-    table_name += table_scan_node->table_ptr()->TableName() + ")";
+    table_name += *table_scan_node->table_ptr()->SchemaName() + ".";
+    table_name += *table_scan_node->table_ptr()->TableName() + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index

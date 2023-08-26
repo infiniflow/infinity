@@ -148,6 +148,9 @@ public:
     nlohmann::json
     Serialize();
 
+    static SharedPtr<DataType>
+    Deserialize(const nlohmann::json& data_type_json);
+
 private:
 
     LogicalType type_{LogicalType::kInvalid};

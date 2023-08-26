@@ -35,7 +35,7 @@ ToString(BaseTableType type) {
 class BaseTable {
 public:
     explicit
-    BaseTable(BaseTableType kind, String schema_name, String table_name)
+    BaseTable(BaseTableType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
         : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
 
     [[nodiscard]] inline BaseTableType
@@ -45,18 +45,18 @@ public:
 
     BaseTableType kind_{BaseTableType::kInvalid};
 
-    [[nodiscard]] inline String
+    [[nodiscard]] inline SharedPtr<String>
     schema_name() const {
         return schema_name_;
     }
 
-    [[nodiscard]] inline String
+    [[nodiscard]] inline SharedPtr<String>
     table_name() const {
         return table_name_;
     }
 
-    const String schema_name_{};
-    const String table_name_{};
+    const SharedPtr<String> schema_name_{};
+    const SharedPtr<String> table_name_{};
 };
 
 }

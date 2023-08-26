@@ -21,7 +21,7 @@ enum class TableElementType {
     kColumn,
 };
 
-enum class ConstraintType {
+enum class ConstraintType : i8 {
     kNull,
     kNotNull,
     kPrimaryKey,

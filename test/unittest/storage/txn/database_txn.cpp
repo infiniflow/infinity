@@ -35,7 +35,7 @@ TEST_F(DBTxnTest, test1) {
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir));
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
     // Txn1: Create
@@ -108,7 +108,7 @@ TEST_F(DBTxnTest, test20) {
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir));
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
@@ -177,7 +177,7 @@ TEST_F(DBTxnTest, test2) {
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir));
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
@@ -260,7 +260,7 @@ TEST_F(DBTxnTest, test3) {
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir));
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();
@@ -304,7 +304,7 @@ TEST_F(DBTxnTest, test4) {
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir));
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();
@@ -341,7 +341,7 @@ TEST_F(DBTxnTest, test5) {
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir));
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
     // Txn1: Create, OK
@@ -383,7 +383,7 @@ TEST_F(DBTxnTest, test6) {
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir));
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();
@@ -444,7 +444,7 @@ TEST_F(DBTxnTest, test7) {
     BufferManager buffer_mgr(memory_limit, base_path, temp_path);
 
     UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir));
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr.CreateTxn();

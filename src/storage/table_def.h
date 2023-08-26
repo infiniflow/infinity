@@ -11,15 +11,16 @@ namespace infinity {
 class TableDef {
 public:
     static inline SharedPtr<TableDef>
-    Make(String table_name, Vector<SharedPtr<ColumnDef>> columns) {
-        return MakeShared<TableDef>(std::move(table_name), std::move(columns));
+    Make(SharedPtr<String> schema, SharedPtr<String> table_name, Vector<SharedPtr<ColumnDef>> columns) {
+        return MakeShared<TableDef>(std::move(schema), std::move(table_name), std::move(columns));
     }
 
 public:
     explicit
-    TableDef(String table_name, Vector<SharedPtr<ColumnDef>> columns)
-            : columns_(std::move(columns)),
-            table_name_(std::move(table_name)) {
+    TableDef(SharedPtr<String> schema, SharedPtr<String> table_name, Vector<SharedPtr<ColumnDef>> columns)
+            : schema_name_(std::move(schema)),
+              table_name_(std::move(table_name)),
+            columns_(std::move(columns)) {
         SizeT column_count = columns_.size();
         for(SizeT idx = 0; idx < column_count; ++ idx) {
             column_name2id_[columns_[idx]->name()] = idx;
@@ -36,12 +37,12 @@ public:
         return columns_.size();
     }
 
-    [[nodiscard]] inline const String&
+    [[nodiscard]] inline const SharedPtr<String>&
     table_name() const {
         return table_name_;
     }
 
-    [[nodiscard]] inline const String&
+    [[nodiscard]] inline const SharedPtr<String>&
     schema_name() const {
         return schema_name_;
     }
@@ -64,8 +65,8 @@ public:
 private:
     Vector<SharedPtr<ColumnDef>> columns_{};
     HashMap<String, SizeT> column_name2id_{};
-    String table_name_{};
-    String schema_name_{"default"};
+    SharedPtr<String> table_name_{};
+    SharedPtr<String> schema_name_{};
 };
-}
 
+}

@@ -70,7 +70,7 @@ TEST_F(DataTableTest, test1) {
             columns.emplace_back(column_def_ptr);
         }
 
-        table_def = TableDef::Make("t1", columns);
+        table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("t1"), columns);
 
         EXPECT_EQ(table_def->table_name(), "t1");
         EXPECT_EQ(table_def->column_count(), 2);

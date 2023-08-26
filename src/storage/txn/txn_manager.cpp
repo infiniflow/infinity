@@ -25,6 +25,13 @@ TxnManager::GetTxn(u64 txn_id) {
     return res;
 }
 
+TxnState
+TxnManager::GetTxnState(u64 txn_id) {
+    std::shared_lock<RWMutex> r_locker(rw_locker_);
+    Txn* txn_ptr = txn_map_[txn_id].get();
+    TxnState res = txn_ptr->GetTxnState();
+    return res;
+}
 
 u64
 TxnManager::GetNewTxnID() {

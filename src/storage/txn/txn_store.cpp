@@ -72,7 +72,7 @@ TxnTableStore::Rollback() {
         // Rollback the data already been appended.
         TableEntry::RollbackAppend(table_entry_, txn_, this);
         TableMeta* table_meta = (TableMeta*)TableEntry::GetTableMeta(table_entry_);
-        LOG_TRACE("Rollback prepare appended data in table: {}", table_meta->table_name_);
+        LOG_TRACE("Rollback prepare appended data in table: {}", *table_meta->table_name_);
     }
 
     blocks_.clear();

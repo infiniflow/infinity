@@ -69,9 +69,9 @@ TEST_F(TableEntryTest, test1) {
             columns.emplace_back(column_def_ptr);
         }
 
-        table_def = TableDef::Make("t1", columns);
+        table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("t1"), columns);
 
-        EXPECT_EQ(table_def->table_name(), "t1");
+        EXPECT_EQ(*table_def->table_name(), "t1");
         EXPECT_EQ(table_def->column_count(), 2);
         EXPECT_EQ(table_def->GetColIdByName("tiny_int_col"), 0);
         EXPECT_EQ(table_def->GetColIdByName("big_int_col"), 1);
@@ -83,8 +83,7 @@ TEST_F(TableEntryTest, test1) {
                                                                table_def->columns(),
                                                                nullptr,
                                                                0,
-                                                               0,
-                                                               nullptr);
+                                                               0);
 
 }
 
@@ -98,7 +97,7 @@ TEST_F(TableEntryTest, test2) {
 
 //    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity/table");
     UniquePtr<String> dir = MakeUnique<String>("db");
-    NewCatalog new_catalog(std::move(dir), nullptr);
+    NewCatalog new_catalog(std::move(dir));
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
     EntryResult create1_res, table1_res, get_res;
@@ -150,7 +149,9 @@ TEST_F(TableEntryTest, test2) {
         }
     }
 
-    UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>("tbl1", columns);
+    UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"),
+                                                        MakeShared<String>("tbl1"),
+                                                        columns);
     table1_res = new_txn->CreateTable("db1", std::move(tbl1_def));
     EXPECT_NE(table1_res.entry_, nullptr);
 
@@ -369,4 +370,8 @@ TEST_F(TableEntryTest, test2) {
 
     nlohmann::json catalog_json = NewCatalog::Serialize(&new_catalog);
     LOG_TRACE("{}", catalog_json.dump());
+
+    SharedPtr<NewCatalog> catalog1 = NewCatalog::Deserialize(catalog_json, &buffer_mgr);
+    nlohmann::json catalog_json1 = NewCatalog::Serialize(catalog1.get());
+    LOG_TRACE("{}", catalog_json1.dump());
 }

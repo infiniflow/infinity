@@ -47,7 +47,7 @@ PhysicalCrossProduct::Execute(SharedPtr<QueryContext>& query_context) {
         }
     }
 
-    SharedPtr<TableDef> cross_product_table_def = TableDef::Make("cross_product", columns_def);
+    SharedPtr<TableDef> cross_product_table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("cross_product"), columns_def);
     SharedPtr<Table> cross_product_table = Table::Make(cross_product_table_def, TableType::kCrossProduct);
 
     // Loop left table and scan right table

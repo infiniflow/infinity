@@ -9,14 +9,13 @@
 namespace infinity {
 
 SharedPtr<SegmentEntry>
-SegmentEntry::MakeNewSegmentEntry(const void* table_entry,
+SegmentEntry::MakeNewSegmentEntry(const TableEntry* table_entry,
                                   u64 txn_id,
-                                  TxnContext* txn_context,
                                   u64 segment_id,
                                   BufferManager* buffer_mgr,
                                   SizeT segment_row) {
 
-    SharedPtr<SegmentEntry> new_entry = MakeShared<SegmentEntry>(table_entry, txn_context);
+    SharedPtr<SegmentEntry> new_entry = MakeShared<SegmentEntry>(table_entry);
     new_entry->row_capacity_ = segment_row;
     new_entry->current_row_ = 0;
     new_entry->segment_id_ = segment_id;
@@ -30,7 +29,6 @@ SegmentEntry::MakeNewSegmentEntry(const void* table_entry,
     new_entry->columns_.reserve(columns.size());
     for(const auto& column_def: columns) {
         new_entry->columns_.emplace_back(ColumnDataEntry::MakeNewColumnDataEntry(new_entry.get(),
-                                                                                 txn_context,
                                                                                  column_def->id(),
                                                                                  segment_row,
                                                                                  column_def->type(),
@@ -41,7 +39,10 @@ SegmentEntry::MakeNewSegmentEntry(const void* table_entry,
 }
 
 void
-SegmentEntry::AppendData(SegmentEntry* segment_entry, void* txn_ptr, AppendState* append_state_ptr, void* buffer_mgr) {
+SegmentEntry::AppendData(SegmentEntry* segment_entry,
+                         Txn* txn_ptr,
+                         AppendState* append_state_ptr,
+                         BufferManager* buffer_mgr) {
     if(segment_entry->status_ != DataSegmentStatus::kOpen) {
         StorageError("Attempt to append data into Non-Open status data segment");
     }
@@ -148,8 +149,7 @@ SegmentEntry::AppendData(SegmentEntry* segment_entry, void* txn_ptr, AppendState
 }
 
 void
-SegmentEntry::CommitAppend(SegmentEntry* segment_entry, void* ptr, u64 start_pos, u64 row_count) {
-    Txn* txn_ptr = (Txn*)ptr;
+SegmentEntry::CommitAppend(SegmentEntry* segment_entry, Txn* txn_ptr, u64 start_pos, u64 row_count) {
     u64 end_pos = start_pos + row_count;
     Vector<au64>& create_vector = segment_entry->segment_version_->created_;
     for(SizeT i = start_pos; i < end_pos; ++ i) {
@@ -196,7 +196,32 @@ SegmentEntry::Serialize(const SegmentEntry* segment_entry) {
     json_res["start_txn_id"] = segment_entry->start_txn_id_;
     json_res["end_txn_id"] = segment_entry->end_txn_id_;
 
+    json_res["begin_ts"] = segment_entry->begin_ts_;
+    json_res["commit_ts"] = segment_entry->commit_ts_.load();
+    json_res["txn_id"] = segment_entry->txn_id_.load();
+    json_res["deleted"] = segment_entry->deleted_;
     return json_res;
+}
+
+SharedPtr<SegmentEntry>
+SegmentEntry::Deserialize(const nlohmann::json& table_entry_json, TableEntry* table_entry, BufferManager* buffer_mgr) {
+    SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
+
+    segment_entry->base_dir_ = MakeShared<String>(table_entry_json["base_dir"]);
+    segment_entry->row_capacity_ = table_entry_json["row_capacity"];
+
+    i64 status_value = table_entry_json["status"];
+    segment_entry->status_ = static_cast<DataSegmentStatus>(status_value);
+    segment_entry->segment_id_ = table_entry_json["segment_id"];
+    segment_entry->start_txn_id_ = table_entry_json["start_txn_id"];
+    segment_entry->end_txn_id_ = table_entry_json["end_txn_id"];
+
+    for(const auto& column_json: table_entry_json["columns"]) {
+        SharedPtr<ColumnDataEntry> column_data_entry = ColumnDataEntry::Deserialize(column_json, segment_entry.get(), buffer_mgr);
+        segment_entry->columns_.emplace_back(column_data_entry);
+    }
+
+    return segment_entry;
 }
 
 }

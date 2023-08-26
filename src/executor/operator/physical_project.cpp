@@ -57,7 +57,9 @@ PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
     }
 
     // output table definition
-    SharedPtr<TableDef> projection_tabledef = TableDef::Make("projection", projection_columns);
+    SharedPtr<TableDef> projection_tabledef = TableDef::Make(MakeShared<String>("default"),
+                                                             MakeShared<String>("projection"),
+                                                             projection_columns);
     SharedPtr<Table> projection_table = Table::Make(projection_tabledef, TableType::kAggregate);
 
     if(left_ == nullptr) {

@@ -105,7 +105,8 @@ Catalog::CreateCollection(String schema_name, String collection_name, ConflictTy
     }
 
     String copied_schema_name = schema_name;
-    SharedPtr<Collection> collection_ptr = MakeShared<Collection>(std::move(schema_name), std::move(collection_name));
+    SharedPtr<Collection> collection_ptr = MakeShared<Collection>(MakeShared<String>(schema_name),
+                                                                  MakeShared<String>(collection_name));
     schemas_[copied_schema_name]->AddTable(collection_ptr, conflict_type);
 }
 

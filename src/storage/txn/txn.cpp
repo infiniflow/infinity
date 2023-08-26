@@ -6,6 +6,7 @@
 #include "main/logger.h"
 #include "common/utility/infinity_assert.h"
 #include "common/utility/defer_op.h"
+#include "storage/txn/txn_manager.h"
 
 namespace infinity {
 
@@ -186,23 +187,16 @@ Txn::GetBufferMgr() const {
 EntryResult
 Txn::CreateDatabase(const String& db_name) {
 
-    TxnTimeStamp begin_ts;
-    TxnState txn_state;
-    {
-        txn_context_.RLock();
-        DeferFn defer_fn([&]() {
-            txn_context_.RUnLock();
-        });
-        begin_ts = txn_context_.begin_ts_;
-        txn_state = txn_context_.state_;
-    }
+    TxnState txn_state = txn_context_.GetTxnState();
 
     if(txn_state != TxnState::kStarted) {
         LOG_TRACE("Transaction isn't started.")
         return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
 
-    EntryResult res = NewCatalog::CreateDatabase(catalog_, db_name, this->txn_id_, begin_ts, &txn_context_);
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+
+    EntryResult res = NewCatalog::CreateDatabase(catalog_, db_name, this->txn_id_, begin_ts, txn_mgr_);
     if(res.entry_ == nullptr) {
         return res;
     }
@@ -220,23 +214,16 @@ Txn::CreateDatabase(const String& db_name) {
 EntryResult
 Txn::DropDatabase(const String& db_name) {
 
-    TxnTimeStamp begin_ts;
-    TxnState txn_state;
-    {
-        txn_context_.RLock();
-        DeferFn defer_fn([&]() {
-            txn_context_.RUnLock();
-        });
-        begin_ts = txn_context_.begin_ts_;
-        txn_state = txn_context_.state_;
-    }
+    TxnState txn_state = txn_context_.GetTxnState();
 
     if(txn_state != TxnState::kStarted) {
         LOG_TRACE("Transaction isn't started.")
         return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
 
-    EntryResult res = NewCatalog::DropDatabase(catalog_, db_name, txn_id_, begin_ts, &txn_context_);
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+
+    EntryResult res = NewCatalog::DropDatabase(catalog_, db_name, txn_id_, begin_ts, txn_mgr_);
 
     if(res.entry_ == nullptr) {
         return res;
@@ -261,20 +248,14 @@ Txn::DropDatabase(const String& db_name) {
 
 EntryResult
 Txn::GetDatabase(const String& db_name) {
-    TxnTimeStamp begin_ts;
-    TxnState txn_state;
-    {
-        txn_context_.RLock();
-        DeferFn defer_fn([&]() {
-            txn_context_.RUnLock();
-        });
-        begin_ts = txn_context_.begin_ts_;
-        txn_state = txn_context_.state_;
-    }
+    TxnState txn_state = txn_context_.GetTxnState();
 
     if(txn_state != TxnState::kStarted) {
-        StorageError("Transaction isn't in STARTED status.")
+        LOG_TRACE("Transaction isn't started.")
+        return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
+
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     return NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
 }
@@ -282,20 +263,14 @@ Txn::GetDatabase(const String& db_name) {
 
 EntryResult
 Txn::CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def) {
-    TxnTimeStamp begin_ts;
-    TxnState txn_state;
-    {
-        txn_context_.RLock();
-        DeferFn defer_fn([&]() {
-            txn_context_.RUnLock();
-        });
-        begin_ts = txn_context_.begin_ts_;
-        txn_state = txn_context_.state_;
-    }
+    TxnState txn_state = txn_context_.GetTxnState();
 
     if(txn_state != TxnState::kStarted) {
-        StorageError("Transaction isn't in STARTED status.")
+        LOG_TRACE("Transaction isn't started.")
+        return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
+
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     EntryResult db_entry_result =  NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
     if(db_entry_result.entry_ == nullptr) {
@@ -305,8 +280,7 @@ Txn::CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def) {
 
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
 
-    const String& table_name = table_def->table_name();
-    EntryResult res = DBEntry::CreateTable(db_entry, table_def, txn_id_, begin_ts, &txn_context_);
+    EntryResult res = DBEntry::CreateTable(db_entry, table_def, txn_id_, begin_ts, txn_mgr_);
     if(res.entry_ == nullptr) {
         return res;
     }
@@ -317,26 +291,20 @@ Txn::CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def) {
 
     auto* table_entry = static_cast<TableEntry*>(res.entry_);
     txn_tables_.insert(table_entry);
-    table_names_.insert(table_name);
+    table_names_.insert(*table_def->table_name());
     return res;
 }
 
 EntryResult
 Txn::DropTableByName(const String& db_name, const String& table_name) {
-    TxnTimeStamp begin_ts;
-    TxnState txn_state;
-    {
-        txn_context_.RLock();
-        DeferFn defer_fn([&]() {
-            txn_context_.RUnLock();
-        });
-        begin_ts = txn_context_.begin_ts_;
-        txn_state = txn_context_.state_;
-    }
+    TxnState txn_state = txn_context_.GetTxnState();
 
     if(txn_state != TxnState::kStarted) {
-        StorageError("Transaction isn't in STARTED status.")
+        LOG_TRACE("Transaction isn't started.")
+        return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
+
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     EntryResult db_entry_result = NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
     if(db_entry_result.entry_ == nullptr) {
@@ -346,7 +314,7 @@ Txn::DropTableByName(const String& db_name, const String& table_name) {
 
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
 
-    EntryResult res = DBEntry::DropTable(db_entry, table_name, txn_id_, begin_ts, &txn_context_);
+    EntryResult res = DBEntry::DropTable(db_entry, table_name, txn_id_, begin_ts, txn_mgr_);
 
     if(res.entry_ == nullptr) {
         return res;
@@ -371,20 +339,14 @@ Txn::DropTableByName(const String& db_name, const String& table_name) {
 
 EntryResult
 Txn::GetTableByName(const String& db_name, const String& table_name) {
-    TxnTimeStamp begin_ts;
-    TxnState txn_state;
-    {
-        txn_context_.RLock();
-        DeferFn defer_fn([&]() {
-            txn_context_.RUnLock();
-        });
-        begin_ts = txn_context_.begin_ts_;
-        txn_state = txn_context_.state_;
-    }
+    TxnState txn_state = txn_context_.GetTxnState();
 
     if(txn_state != TxnState::kStarted) {
-        StorageError("Transaction isn't in STARTED status.")
+        LOG_TRACE("Transaction isn't started.")
+        return {nullptr, MakeUnique<String>("Transaction isn't started.")};
     }
+
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     EntryResult db_entry_result = NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
     if(db_entry_result.entry_ == nullptr) {
@@ -399,37 +361,14 @@ Txn::GetTableByName(const String& db_name, const String& table_name) {
 
 void
 Txn::BeginTxn(TxnTimeStamp begin_ts) {
-    txn_context_.Lock();
-    DeferFn defer_fn([&]() {
-        txn_context_.UnLock();
-    });
-
-    if(txn_context_.state_ != TxnState::kNotStarted) {
-        StorageError("Transaction isn't in NOT_STARTED status.")
-    }
-    txn_context_.begin_ts_ = begin_ts;
-    txn_context_.state_ = TxnState::kStarted;
+    txn_context_.BeginCommit(begin_ts);
 }
 
 void
 Txn::CommitTxn(TxnTimeStamp commit_ts) {
-    {
-        txn_context_.Lock();
-        DeferFn defer_fn([&]() {
-            txn_context_.UnLock();
-        });
-        if(txn_context_.state_ != TxnState::kStarted) {
-            StorageError("Transaction isn't in STARTED status.")
-        }
-        txn_context_.state_ = TxnState::kCommitting;
-    }
+    txn_context_.SetTxnCommitting(commit_ts);
 
     {
-        txn_mgr_->Lock();
-        DeferFn defer_fn([&]() {
-            txn_mgr_->UnLock();
-        });
-
         // prepare to commit txn local data into table
         for(const auto& name_table_pair: txn_tables_store_) {
             TxnTableStore* table_local_store = name_table_pair.second.get();
@@ -437,16 +376,7 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
         }
     }
 
-    {
-        txn_context_.Lock();
-        DeferFn defer_fn([&]() {
-            txn_context_.UnLock();
-        });
-        if(txn_context_.state_ != TxnState::kCommitting) {
-            StorageError("Transaction isn't in COMMITTING status.")
-        }
-        txn_context_.state_ = TxnState::kCommitted;
-    }
+    txn_context_.SetTxnCommitted();
 
     // Commit databases in catalog
     for(auto* db_entry: txn_dbs_) {
@@ -471,29 +401,17 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
 void
 Txn::RollbackTxn(TxnTimeStamp abort_ts) {
 
-    {
-        txn_context_.Lock();
-        DeferFn defer_fn([&]() {
-            txn_context_.UnLock();
-        });
-        if(txn_context_.state_ == TxnState::kStarted) {
-            txn_context_.state_ = TxnState::kRollbacking;
-        } else if(txn_context_.state_ == TxnState::kRollbacking) {
-            ;
-        } else {
-            StorageError("Transaction isn't in STARTED or ROLLBACKING status.")
-        }
-    }
+    txn_context_.SetTxnRollbacking(abort_ts);
 
     for(const auto& base_entry: txn_tables_) {
         TableEntry* table_entry = (TableEntry*)(base_entry);
         TableMeta* table_meta = TableEntry::GetTableMeta(table_entry);
         DBEntry* db_entry = TableEntry::GetDBEntry(table_entry);
-        DBEntry::RemoveTableEntry(db_entry, table_meta->table_name_, txn_id_, &txn_context_);
+        DBEntry::RemoveTableEntry(db_entry, *table_meta->table_name_, txn_id_, txn_mgr_);
     }
 
     for(const auto& db_name: db_names_) {
-        NewCatalog::RemoveDBEntry(catalog_, db_name, this->txn_id_, &txn_context_);
+        NewCatalog::RemoveDBEntry(catalog_, db_name, this->txn_id_, txn_mgr_);
     }
 
     // Rollback the prepared data
@@ -503,14 +421,7 @@ Txn::RollbackTxn(TxnTimeStamp abort_ts) {
     }
 
     {
-        txn_context_.Lock();
-        DeferFn defer_fn([&]() {
-            txn_context_.UnLock();
-        });
-        if(txn_context_.state_ != TxnState::kRollbacking) {
-            StorageError("Transaction isn't in ROLLBACKING status.")
-        }
-        txn_context_.state_ = TxnState::kRollbacked;
+        txn_context_.SetTxnRollbacked();
     }
 }
 

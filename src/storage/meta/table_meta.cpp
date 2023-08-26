@@ -5,34 +5,35 @@
 #include "table_meta.h"
 #include "storage/meta/entry/table_entry.h"
 #include "common/utility/defer_op.h"
+#include "storage/txn/txn_manager.h"
 
 namespace infinity {
 
+class TxnManager;
 EntryResult
 TableMeta::CreateNewEntry(TableMeta* table_meta,
                           u64 txn_id,
                           TxnTimeStamp begin_ts,
-                          TxnContext* txn_context,
+                          TxnManager* txn_mgr,
                           const SharedPtr<TableDef>& table_def) {
     TableEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(table_meta->rw_locker_);
-    const String& table_name = table_def->table_name();
-    SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + table_meta->table_name_);
+    const String& table_name = *table_def->table_name();
+    SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + *table_meta->table_name_);
 
     if(table_meta->entry_list_.empty()) {
         // Insert a dummy entry.
-        UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy, nullptr);
+        UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
         dummy_entry->deleted_ = true;
         table_meta->entry_list_.emplace_back(std::move(dummy_entry));
 
         // Insert the new table entry
         UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                   table_name,
+                                                                   table_def->table_name(),
                                                                    table_def->columns(),
                                                                    table_meta,
                                                                    txn_id,
-                                                                   begin_ts,
-                                                                   txn_context);
+                                                                   begin_ts);
         res = table_entry.get();
         table_meta->entry_list_.emplace_front(std::move(table_entry));
 
@@ -44,12 +45,11 @@ TableMeta::CreateNewEntry(TableMeta* table_meta,
         if(header_base_entry->entry_type_ == EntryType::kDummy) {
             // Dummy entry in the header
             UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                       table_name,
+                                                                       table_def->table_name(),
                                                                        table_def->columns(),
                                                                        table_meta,
                                                                        txn_id,
-                                                                       begin_ts,
-                                                                       txn_context);
+                                                                       begin_ts);
             res = table_entry.get();
             table_meta->entry_list_.emplace_front(std::move(table_entry));
             return {res, nullptr};
@@ -62,12 +62,11 @@ TableMeta::CreateNewEntry(TableMeta* table_meta,
                 if(header_table_entry->deleted_) {
                     // No conflict
                     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                               table_name,
+                                                                               table_def->table_name(),
                                                                                table_def->columns(),
                                                                                table_meta,
                                                                                txn_id,
-                                                                               begin_ts,
-                                                                               txn_context);
+                                                                               begin_ts);
                     res = table_entry.get();
                     table_meta->entry_list_.emplace_front(std::move(table_entry));
                     return {res, nullptr};
@@ -83,48 +82,21 @@ TableMeta::CreateNewEntry(TableMeta* table_meta,
                 return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
             }
         } else {
-            header_table_entry->txn_context_->Lock();
-            DeferFn defer_fn([&]() {
-                header_table_entry->txn_context_->UnLock();
-            });
 
-            switch(header_table_entry->txn_context_->state_) {
+            TxnState head_table_entry_state = txn_mgr->GetTxnState(header_table_entry->txn_id_);
+
+            switch(head_table_entry_state) {
                 case TxnState::kStarted: {
                     // Started
-                    if(header_table_entry->txn_id_ < txn_id) {
-                        // header table entry txn is earlier than current txn
-                        LOG_TRACE("Write-write conflict: There is a uncommitted database which is older than current transaction.")
-                        return {nullptr, MakeUnique<String>("Write-write conflict: There is a uncommitted database which is older than current transaction.")};
-                    } else if (header_table_entry->txn_id_ > txn_id){
-                        // Current txn is older
-
-                        // Rollback header table entry txn
-                        header_table_entry->txn_context_->state_ = TxnState::kRollbacking;
-
-                        // Erase header table entry
-                        table_meta->entry_list_.erase(table_meta->entry_list_.begin());
-
-                        // Append new one
-                        UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                                   table_name,
-                                                                                   table_def->columns(),
-                                                                                   table_meta,
-                                                                                   txn_id,
-                                                                                   begin_ts,
-                                                                                   txn_context);
-                        res = table_entry.get();
-                        table_meta->entry_list_.emplace_front(std::move(table_entry));
-                        return {res, nullptr};
-                    } else {
+                    if(header_table_entry->txn_id_ == txn_id) {
                         // Same txn
                         if(header_table_entry->deleted_) {
                             UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                                       table_name,
+                                                                                       table_def->table_name(),
                                                                                        table_def->columns(),
                                                                                        table_meta,
                                                                                        txn_id,
-                                                                                       begin_ts,
-                                                                                       txn_context);
+                                                                                       begin_ts);
                             res = table_entry.get();
                             table_meta->entry_list_.emplace_front(std::move(table_entry));
                             return {res, nullptr};
@@ -132,6 +104,9 @@ TableMeta::CreateNewEntry(TableMeta* table_meta,
                             LOG_TRACE("Create a duplicated table {}.", table_name)
                             return {nullptr, MakeUnique<String>("Create a duplicated name table.")};
                         }
+                    } else {
+                        LOG_TRACE("Write-write conflict: There is a uncommitted transaction.")
+                        return {nullptr, MakeUnique<String>("Write-write conflict: There is a uncommitted transaction.")};
                     }
                 }
                 case TxnState::kCommitting:
@@ -147,12 +122,11 @@ TableMeta::CreateNewEntry(TableMeta* table_meta,
 
                     // Append new one
                     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                               table_name,
+                                                                               table_def->table_name(),
                                                                                table_def->columns(),
                                                                                table_meta,
                                                                                txn_id,
-                                                                               begin_ts,
-                                                                               txn_context);
+                                                                               begin_ts);
                     res = table_entry.get();
                     table_meta->entry_list_.emplace_front(std::move(table_entry));
                     return {res, nullptr};
@@ -170,7 +144,7 @@ EntryResult
 TableMeta::DropNewEntry(TableMeta* table_meta,
                         u64 txn_id,
                         TxnTimeStamp begin_ts,
-                        TxnContext* txn_context,
+                        TxnManager* txn_mgr,
                         const String& table_name) {
     TableEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(table_meta->rw_locker_);
@@ -200,14 +174,13 @@ TableMeta::DropNewEntry(TableMeta* table_meta,
 
             Vector<SharedPtr<ColumnDef>> dummy_columns;
 
-            SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + table_meta->table_name_);
+            SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + *table_meta->table_name_);
             UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                       table_name,
+                                                                       table_meta->table_name_,
                                                                        dummy_columns,
                                                                        table_meta,
                                                                        txn_id,
-                                                                       begin_ts,
-                                                                       txn_context);
+                                                                       begin_ts);
             res = table_entry.get();
             res->deleted_ = true;
             table_meta->entry_list_.emplace_front(std::move(table_entry));
@@ -237,7 +210,7 @@ TableMeta::DropNewEntry(TableMeta* table_meta,
 void
 TableMeta::DeleteNewEntry(TableMeta* table_meta,
                           u64 txn_id,
-                          TxnContext* txn_context) {
+                          TxnManager* txn_mgr) {
     std::unique_lock<RWMutex> rw_locker(table_meta->rw_locker_);
     if(table_meta->entry_list_.empty()) {
         LOG_TRACE("Empty table entry list.")
@@ -297,7 +270,7 @@ TableMeta::ToString(TableMeta* table_meta) {
     std::shared_lock<RWMutex> r_locker(table_meta->rw_locker_);
     SharedPtr<String> res = MakeShared<String>(fmt::format("TableMeta, base dir: {}, table name: {}, entry count: ",
                                                            *table_meta->base_dir_,
-                                                           table_meta->table_name_,
+                                                           *table_meta->table_name_,
                                                            table_meta->entry_list_.size()));
     return res;
 }
@@ -307,19 +280,38 @@ TableMeta::Serialize(const TableMeta* table_meta) {
     nlohmann::json json_res;
 
     json_res["base_dir"] = *table_meta->base_dir_;
-    json_res["table_name"] = table_meta->table_name_;
+    json_res["table_name"] = *table_meta->table_name_;
 
     for(const auto& entry: table_meta->entry_list_) {
         if(entry->entry_type_ == EntryType::kTable) {
             json_res["entries"].emplace_back(TableEntry::Serialize((TableEntry*)entry.get()));
         } else if(entry->entry_type_ == EntryType::kDummy) {
-            LOG_TRACE("Skip dummy type entry during serialize table {} meta", table_meta->table_name_);
+            LOG_TRACE("Skip dummy type entry during serialize table {} meta", *table_meta->table_name_);
         } else {
             StorageError("Unexpected entry type");
         }
     }
 
     return json_res;
+}
+
+UniquePtr<TableMeta>
+TableMeta::Deserialize(const nlohmann::json& table_meta_json, DBEntry* db_entry, BufferManager* buffer_mgr) {
+    nlohmann::json json_res;
+
+    SharedPtr<String> base_dir = MakeShared<String>(table_meta_json["base_dir"]);
+    SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
+
+    UniquePtr<TableMeta> res = MakeUnique<TableMeta>(base_dir, table_name, db_entry);
+    UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+    dummy_entry->deleted_ = true;
+    res->entry_list_.emplace_back(std::move(dummy_entry));
+    for(const auto& table_entry_json: table_meta_json["entries"]) {
+        UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
+        res->entry_list_.emplace_back(std::move(table_entry));
+    }
+
+    return res;
 }
 
 }

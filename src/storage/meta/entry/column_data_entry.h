@@ -11,15 +11,15 @@
 namespace infinity {
 
 class BufferManager;
-
+class SegmentEntry;
 struct ColumnDataEntry : public BaseEntry {
 public:
     explicit
-    ColumnDataEntry(const void* segment_entry, TxnContext* txn_context)
-        : BaseEntry(EntryType::kColumnData, txn_context),
+    ColumnDataEntry(const SegmentEntry* segment_entry)
+        : BaseEntry(EntryType::kColumnData),
         segment_entry_(segment_entry) {}
 
-    const void *segment_entry_{nullptr};
+    const SegmentEntry *segment_entry_{nullptr};
     SharedPtr<DataType> column_type_{};
     SharedPtr<String> base_dir_{};
     SharedPtr<String> file_name_{};
@@ -29,15 +29,14 @@ public:
     BufferHandle* buffer_handle_{};
 public:
     static SharedPtr<ColumnDataEntry>
-    MakeNewColumnDataEntry(const void* segment_entry,
-                           TxnContext* txn_context,
+    MakeNewColumnDataEntry(const SegmentEntry* segment_entry,
                            u64 column_id,
                            u64 row_capacity,
                            const SharedPtr<DataType>& data_type,
                            BufferManager* buffer_mgr);
 
     static ObjectHandle
-    GetColumnData(ColumnDataEntry* column_data_entry, void* buffer_mgr);
+    GetColumnData(ColumnDataEntry* column_data_entry, BufferManager* buffer_mgr);
 
     static void
     Append(ColumnDataEntry* column_data_entry,
@@ -52,6 +51,9 @@ public:
 
     static nlohmann::json
     Serialize(const ColumnDataEntry* column_data_entry);
+
+    static SharedPtr<ColumnDataEntry>
+    Deserialize(const nlohmann::json& column_data_json, SegmentEntry* table_entry, BufferManager* buffer_mgr);
 };
 
 }

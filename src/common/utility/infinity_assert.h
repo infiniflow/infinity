@@ -85,6 +85,12 @@ if(!(is_true)) {                                                            \
     throw NotImplementException(errmsg);                                       \
 }
 
+#define TransactionAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
+    throw TransactionException(errmsg);                                       \
+}
+
 #define GeneralAssert(is_true, message)                                              \
 if(!(is_true)) {                                                            \
     std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
@@ -177,6 +183,12 @@ if(!(is_true)) {                                                            \
     throw NotImplementException(errmsg);                                       \
 }
 
+#define TransactionAssert(is_true, message)                                              \
+if(!(is_true)) {                                                            \
+    std::string errmsg = (message);                                                      \
+    throw TransactionException(errmsg);                                       \
+}
+
 #endif
 
 #define ClientError(message) ClientAssert(false, message)
@@ -191,5 +203,6 @@ if(!(is_true)) {                                                            \
 #define TypeError(message) TypeAssert(false, message)
 #define FunctionError(message) FunctionAssert(false, message)
 #define NotImplementError(message) NotImplementAssert(false, message)
+#define TransactionError(message) TransactionAssert(false, message)
 #define GeneralError(message) GeneralAssert(false, message)
 }

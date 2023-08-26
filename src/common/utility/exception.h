@@ -12,26 +12,6 @@
 
 namespace infinity {
 
-enum class ExceptionType {
-    kInvalid,
-
-    // Exception from function module
-    kNetwork,
-    kParser,
-    kPlanner,
-    kOptimizer,
-    kExecutor,
-    kScheduler,
-    kCatalog,
-    kFunction,
-
-    // Type exception
-    kType,
-
-    // Other exception reason
-    kNotImplemented,
-};
-
 class Exception : public std::exception {
 public:
     explicit Exception(String message) : message_(std::move(message)) {}
@@ -141,6 +121,12 @@ class NotImplementException: public Exception {
 public:
     template<typename... Args>
     explicit NotImplementException(Args... params) : Exception(BuildMessage(String("NotImplement Error:"), params...)) {}
+};
+
+class TransactionException: public Exception {
+public:
+    template<typename... Args>
+    explicit TransactionException(Args... params) : Exception(BuildMessage(String("Transaction Error:"), params...)) {}
 };
 
 }

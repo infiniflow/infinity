@@ -206,7 +206,7 @@ ExplainPhysicalPlan::Explain(const PhysicalCreateTable* create_node,
     // Table name
     {
         String table_name_str = String(intent_size, ' ') + " - table name: " +
-                                create_node->table_definition()->table_name();
+                                *create_node->table_definition()->table_name();
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -420,13 +420,13 @@ ExplainPhysicalPlan::Explain(const PhysicalInsert* insert_node,
 
     // Schema name
     {
-        String schema_name_str = String(intent_size, ' ') + " - schema name: " + insert_node->table()->schema_name();
+        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *insert_node->table()->schema_name();
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str = String(intent_size, ' ') + " - table name: " + insert_node->table()->table_name();
+        String table_name_str = String(intent_size, ' ') + " - table name: " + *insert_node->table()->table_name();
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -550,8 +550,8 @@ ExplainPhysicalPlan::Explain(const PhysicalTableScan* table_scan_node,
 
     // Table alias and name
     String table_name = String(intent_size, ' ') + " - table name: " + table_scan_node->table_alias() + "(";
-    table_name += table_scan_node->function_data()->table_ptr_->schema_name() + ".";
-    table_name += table_scan_node->function_data()->table_ptr_->table_name() + ")";
+    table_name += *table_scan_node->function_data()->table_ptr_->schema_name() + ".";
+    table_name += *table_scan_node->function_data()->table_ptr_->table_name() + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index

@@ -14,6 +14,8 @@
 namespace infinity {
 
 class BufferManager;
+class Txn;
+class TableEntry;
 
 enum DataSegmentStatus : i8 {
     kOpen,
@@ -33,12 +35,12 @@ struct SegmentVersion {
 struct SegmentEntry : public BaseEntry {
 public:
     explicit
-    SegmentEntry(const void* table_entry, TxnContext* txn_context)
-        : BaseEntry(EntryType::kSegment, txn_context), table_entry_(table_entry) {}
+    SegmentEntry(const TableEntry* table_entry)
+        : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
 
     RWMutex rw_locker_{};
 
-    const void* table_entry_{};
+    const TableEntry* table_entry_{};
 
     SharedPtr<String> base_dir_{};
 
@@ -64,18 +66,17 @@ public:
 
 public:
     static SharedPtr<SegmentEntry>
-    MakeNewSegmentEntry(const void* table_entry,
+    MakeNewSegmentEntry(const TableEntry* table_entry,
                         u64 txn_id,
-                        TxnContext* txn_context,
                         u64 segment_id,
                         BufferManager* buffer_mgr,
                         SizeT segment_row = DEFAULT_SEGMENT_ROW);
 
     static void
-    AppendData(SegmentEntry* segment_entry, void* txn_ptr, AppendState* append_state_ptr, void* buffer_mgr);
+    AppendData(SegmentEntry* segment_entry, Txn* txn_ptr, AppendState* append_state_ptr, BufferManager* buffer_mgr);
 
     static void
-    CommitAppend(SegmentEntry* segment_entry, void* txn_ptr, u64 start_pos, u64 row_count);
+    CommitAppend(SegmentEntry* segment_entry, Txn* txn_ptr, u64 start_pos, u64 row_count);
 
     static bool
     PrepareFlush(SegmentEntry* segment_entry);
@@ -83,13 +84,17 @@ public:
     static UniquePtr<String>
     Flush(SegmentEntry* segment_entry);
 
-    static nlohmann::json
-    Serialize(const SegmentEntry* segment_entry);
-
     inline static ColumnDataEntry*
     GetColumnDataByID(SegmentEntry* segment_entry, u64 column_id) {
         return segment_entry->columns_[column_id].get();
     }
+
+    static nlohmann::json
+    Serialize(const SegmentEntry* segment_entry);
+
+    static SharedPtr<SegmentEntry>
+    Deserialize(const nlohmann::json& table_entry_json, TableEntry* table_entry, BufferManager* buffer_mgr);
+
 };
 
 }

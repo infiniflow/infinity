@@ -114,7 +114,9 @@ PhysicalLimit::GetLimitOutput(const SharedPtr<Table>& input_table, i64 limit, i6
         columns.emplace_back(col_def);
     }
 
-    SharedPtr<TableDef> table_def = TableDef::Make("limit", columns);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"),
+                                                   MakeShared<String>("limit"),
+                                                   columns);
     SharedPtr<Table> output_table = Table::Make(table_def, TableType::kIntermediate);
 
     const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;

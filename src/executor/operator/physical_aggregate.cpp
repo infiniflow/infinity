@@ -47,7 +47,7 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
         ++ idx;
     }
 
-    SharedPtr<TableDef> groupby_tabledef = TableDef::Make("groupby", groupby_columns);
+    SharedPtr<TableDef> groupby_tabledef = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("groupby"), groupby_columns);
     SharedPtr<Table> groupby_table = Table::Make(groupby_tabledef, TableType::kIntermediate);
 
     groupby_executor.Execute(input_table_, groupby_table);
@@ -80,7 +80,7 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
             columns.emplace_back(col_def);
         }
 
-        SharedPtr<TableDef> table_def = TableDef::Make("grouped_input", columns);
+        SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("grouped_input"), columns);
 
         grouped_input_table = Table::Make(table_def, TableType::kGroupBy);
     }
@@ -122,7 +122,9 @@ PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
         }
 
         // output aggregate table definition
-        SharedPtr<TableDef> aggregate_tabledef = TableDef::Make("aggregate", aggregate_columns);
+        SharedPtr<TableDef> aggregate_tabledef = TableDef::Make(MakeShared<String>("default"),
+                                                                MakeShared<String>("aggregate"),
+                                                                aggregate_columns);
         output_aggregate_table = Table::Make(aggregate_tabledef, TableType::kAggregate);
 
         // Loop blocks
@@ -567,7 +569,10 @@ PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
     }
 
     // output aggregate table definition
-    SharedPtr<TableDef> aggregate_tabledef = TableDef::Make("aggregate", aggregate_columns);
+    SharedPtr<TableDef> aggregate_tabledef = TableDef::Make(MakeShared<String>("default"),
+                                                            MakeShared<String>("aggregate"),
+                                                            aggregate_columns);
+
     output_table = Table::Make(aggregate_tabledef, TableType::kAggregate);
 
     SharedPtr<DataBlock> output_data_block = DataBlock::Make();

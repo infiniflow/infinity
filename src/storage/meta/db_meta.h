@@ -8,15 +8,16 @@
 
 #include "common/types/internal_types.h"
 #include "storage/meta/entry/db_entry.h"
-#include "storage/txn/txn_context.h"
 
 namespace infinity {
+
+class TxnManager;
 
 struct DBMeta {
 public:
     explicit
     DBMeta(const SharedPtr<String>& base_dir,
-           String name)
+           SharedPtr<String> name)
            : db_name_(std::move(name)), base_dir_(base_dir) {
     }
 
@@ -24,13 +25,16 @@ public:
 
     // Reserved
     static EntryResult
-    CreateNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
+    CreateNewEntry(DBMeta* db_meta,
+                   u64 txn_id,
+                   TxnTimeStamp begin_ts,
+                   TxnManager* txn_mgr);
 
     static EntryResult
-    DropNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnContext* txn_context);
+    DropNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager* txn_mgr);
 
     static void
-    DeleteNewEntry(DBMeta* db_meta, u64 txn_id, TxnContext* txn_context);
+    DeleteNewEntry(DBMeta* db_meta, u64 txn_id, TxnManager* txn_mgr);
 
     static EntryResult
     GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts);
@@ -41,9 +45,12 @@ public:
     static nlohmann::json
     Serialize(const DBMeta* db_meta);
 
+    static UniquePtr<DBMeta>
+    Deserialize(const nlohmann::json& db_meta_json,
+                BufferManager* buffer_mgr);
 public:
     RWMutex rw_locker_{};
-    String db_name_{};
+    SharedPtr<String> db_name_{};
     SharedPtr<String> base_dir_{};
 
     // Ordered by commit_ts from latest to oldest.
@@ -51,4 +58,3 @@ public:
 };
 
 }
-

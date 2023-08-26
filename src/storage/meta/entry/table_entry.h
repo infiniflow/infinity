@@ -17,18 +17,18 @@ namespace infinity {
 class DBEntry;
 class TableMeta;
 class BufferManager;
+class Txn;
 
 struct TableEntry : public BaseEntry {
 public:
     explicit
     TableEntry(const SharedPtr<String>& base_dir,
-               String table_name,
+               SharedPtr<String> table_name,
                const Vector<SharedPtr<ColumnDef>>& columns,
-               void* table_meta,
+               TableMeta* table_meta,
                u64 txn_id,
-               TxnTimeStamp begin_ts,
-               TxnContext* txn_context)
-            : BaseEntry(EntryType::kTable, txn_context),
+               TxnTimeStamp begin_ts)
+            : BaseEntry(EntryType::kTable),
               base_dir_(base_dir), table_name_(std::move(table_name)), columns_(columns), table_meta_(table_meta) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
@@ -36,32 +36,33 @@ public:
 
 public:
     static void
-    Append(TableEntry* table_entry, void* txn_ptr, void* txn_store, BufferManager* buffer_mgr);
+    Append(TableEntry* table_entry, Txn* txn_ptr, void* txn_store, BufferManager* buffer_mgr);
 
     static UniquePtr<String>
-    Delete(TableEntry* table_entry, void* txn_ptr, DeleteState& delete_state, BufferManager* buffer_mgr);
+    Delete(TableEntry* table_entry, Txn* txn_ptr, DeleteState& delete_state, BufferManager* buffer_mgr);
 
     static UniquePtr<String>
-    InitScan(TableEntry* table_entry, void* txn_ptr, ScanState& scan_state, BufferManager* buffer_mgr);
+    InitScan(TableEntry* table_entry, Txn* txn_ptr, ScanState& scan_state, BufferManager* buffer_mgr);
 
     static UniquePtr<String>
-    Scan(TableEntry* table_entry, void* txn_ptr, ScanState scan_state, BufferManager* buffer_mgr);
+    Scan(TableEntry* table_entry, Txn* txn_ptr, ScanState scan_state, BufferManager* buffer_mgr);
 
     static void
-    CommitAppend(TableEntry* table_entry, void* txn_ptr, const AppendState* append_state_ptr, BufferManager* buffer_mgr);
+    CommitAppend(TableEntry* table_entry, Txn* txn_ptr, const AppendState* append_state_ptr, BufferManager* buffer_mgr);
 
     static void
-    RollbackAppend(TableEntry* table_entry, void* txn_ptr, void* txn_store);
+    RollbackAppend(TableEntry* table_entry, Txn* txn_ptr, void* txn_store);
 
     static UniquePtr<String>
-    CommitDelete(TableEntry* table_entry, void* txn_ptr, DeleteState& append_state, BufferManager* buffer_mgr);
+    CommitDelete(TableEntry* table_entry, Txn* txn_ptr, DeleteState& append_state, BufferManager* buffer_mgr);
 
     static UniquePtr<String>
-    RollbackDelete(TableEntry* table_entry, void* txn_ptr, DeleteState& append_state, BufferManager* buffer_mgr);
+    RollbackDelete(TableEntry* table_entry, Txn* txn_ptr, DeleteState& append_state, BufferManager* buffer_mgr);
 
     static UniquePtr<String>
     ImportAppendSegment(TableEntry* table_entry,
-                        void* txn_ptr, SharedPtr<SegmentEntry> segment,
+                        Txn* txn_ptr,
+                        SharedPtr<SegmentEntry> segment,
                         AppendState& append_state,
                         BufferManager* buffer_mgr);
 
@@ -91,15 +92,20 @@ public:
     static nlohmann::json
     Serialize(const TableEntry* table_entry);
 
+    static UniquePtr<TableEntry>
+    Deserialize(const nlohmann::json& table_entry_json,
+                TableMeta* table_meta,
+                BufferManager* buffer_mgr);
+
 public:
     RWMutex rw_locker_{};
 
     SharedPtr<String> base_dir_{};
 
-    String table_name_{};
+    SharedPtr<String> table_name_{};
     Vector<SharedPtr<ColumnDef>> columns_{};
 
-    void* table_meta_{};
+    TableMeta* table_meta_{};
 
     // from data table
     SizeT row_count_{};

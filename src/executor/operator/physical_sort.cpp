@@ -194,7 +194,9 @@ PhysicalSort::Execute(SharedPtr<QueryContext>& query_context) {
         columns.emplace_back(col_def);
     }
 
-    SharedPtr<TableDef> table_def = TableDef::Make("sort", columns);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"),
+                                                   MakeShared<String>("sort"),
+                                                   columns);
 
     output_ = Table::Make(table_def, TableType::kIntermediate);
 
@@ -228,7 +230,7 @@ PhysicalSort::GetOrderTable() const {
 //
 //    columns.emplace_back(offset_col);
 
-    SharedPtr<TableDef> table_def = TableDef::Make("order_by_key_table", columns);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("order_by_key_table"), columns);
 
     return Table::Make(table_def, TableType::kIntermediate);
 }
@@ -264,7 +266,7 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
         columns.emplace_back(col_def);
     }
 
-    SharedPtr<TableDef> table_def = TableDef::Make("sort", columns);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("sort"), columns);
     SharedPtr<Table> output_table = Table::Make(table_def, TableType::kIntermediate);
 
     const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;

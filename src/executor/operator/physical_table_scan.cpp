@@ -29,7 +29,7 @@ PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
     }
 
     SharedPtr<TableDef> table_def_ptr
-            = MakeShared<TableDef>(table_alias_, column_defs);
+            = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_alias_), column_defs);
 
     output_ = MakeShared<Table>(table_def_ptr, TableType::kResult);
 

@@ -56,7 +56,9 @@ PhysicalFilter::Execute(SharedPtr<QueryContext>& query_context) {
 
         output_types.emplace_back(column_type);
     }
-    SharedPtr<TableDef> selected_table_def = TableDef::Make("selected", columns);
+    SharedPtr<TableDef> selected_table_def = TableDef::Make(MakeShared<String>("default"),
+                                                            MakeShared<String>("selected"),
+                                                            columns);
     SharedPtr<Table> selected_table = Table::Make(selected_table_def, TableType::kIntermediate);
 
     SizeT input_data_block_count = input_table_->DataBlockCount();

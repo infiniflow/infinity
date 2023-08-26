@@ -63,7 +63,7 @@ TEST_F(PhysicalSortTest, test1) {
                                     HashSet<ConstraintType>());
     columns.emplace_back(col_def);
 
-    SharedPtr<TableDef> table_def = TableDef::Make("input_table", columns);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("input_table"), columns);
 
     SharedPtr<Table> input_table = Table::Make(table_def, TableType::kIntermediate);
 

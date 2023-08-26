@@ -14,7 +14,7 @@ namespace infinity {
 class Collection : public BaseTable {
 public:
     explicit
-    Collection(String schema_name, String collection_name)
+    Collection(SharedPtr<String> schema_name, SharedPtr<String> collection_name)
         : BaseTable(BaseTableType::kCollection, std::move(schema_name), std::move(collection_name))
         {}
 

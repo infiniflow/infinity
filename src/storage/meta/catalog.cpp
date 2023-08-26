@@ -7,8 +7,8 @@
 
 namespace infinity {
 
-NewCatalog::NewCatalog(SharedPtr<String> dir, UniquePtr<AsyncBatchProcessor> scheduler)
-    : current_dir_(std::move(dir)), scheduler_(std::move(scheduler)) {
+NewCatalog::NewCatalog(SharedPtr<String> dir)
+    : current_dir_(std::move(dir)) {
 }
 
 EntryResult
@@ -16,7 +16,7 @@ NewCatalog::CreateDatabase(NewCatalog* catalog,
                            const String& db_name,
                            u64 txn_id,
                            TxnTimeStamp begin_ts,
-                           TxnContext* txn_context) {
+                           TxnManager* txn_mgr) {
 
     // Check if there is db_meta with the db_name
     catalog->rw_locker_.lock_shared();
@@ -31,7 +31,8 @@ NewCatalog::CreateDatabase(NewCatalog* catalog,
     if(db_meta == nullptr) {
         // Create new db meta
         LOG_TRACE("Create new database: {}", db_name);
-        UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(catalog->current_dir_, db_name);
+        UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(catalog->current_dir_,
+                                                           MakeShared<String>(db_name));
         db_meta = new_db_meta.get();
 
         catalog->rw_locker_.lock();
@@ -41,7 +42,7 @@ NewCatalog::CreateDatabase(NewCatalog* catalog,
     }
 
     LOG_TRACE("Add new database entry: {}", db_name);
-    EntryResult res = DBMeta::CreateNewEntry(db_meta, txn_id, begin_ts, txn_context);
+    EntryResult res = DBMeta::CreateNewEntry(db_meta, txn_id, begin_ts, txn_mgr);
 
     return res;
 }
@@ -51,7 +52,7 @@ NewCatalog::DropDatabase(NewCatalog* catalog,
                          const String& db_name,
                          u64 txn_id,
                          TxnTimeStamp begin_ts,
-                         TxnContext* txn_context) {
+                         TxnManager* txn_mgr) {
 
     catalog->rw_locker_.lock_shared();
 
@@ -66,7 +67,7 @@ NewCatalog::DropDatabase(NewCatalog* catalog,
     }
 
     LOG_TRACE("Drop a database entry {}", db_name);
-    EntryResult res = DBMeta::DropNewEntry(db_meta, txn_id, begin_ts, txn_context);
+    EntryResult res = DBMeta::DropNewEntry(db_meta, txn_id, begin_ts, txn_mgr);
 
     return res;
 
@@ -93,7 +94,7 @@ void
 NewCatalog::RemoveDBEntry(NewCatalog* catalog,
                           const String& db_name,
                           u64 txn_id,
-                          TxnContext* txn_context) {
+                          TxnManager* txn_mgr) {
     catalog->rw_locker_.lock_shared();
 
     DBMeta* db_meta{nullptr};
@@ -103,7 +104,7 @@ NewCatalog::RemoveDBEntry(NewCatalog* catalog,
     catalog->rw_locker_.unlock_shared();
 
     LOG_TRACE("Remove a database entry {}", db_name);
-    DBMeta::DeleteNewEntry(db_meta, txn_id, txn_context);
+    DBMeta::DeleteNewEntry(db_meta, txn_id, txn_mgr);
 }
 
 Vector<DBEntry*>
@@ -125,8 +126,18 @@ NewCatalog::Serialize(const NewCatalog* catalog) {
 }
 
 SharedPtr<NewCatalog>
-NewCatalog::Deserialize(const nlohmann::json& catalog_json) {
-    NotImplementError("NewCatalog::Databases isn't implemented.")
+NewCatalog::Deserialize(const nlohmann::json& catalog_json,
+                        BufferManager* buffer_mgr) {
+    SharedPtr<String> current_dir = MakeShared<String>(catalog_json["current_dir"]);
+
+    // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
+    SharedPtr<NewCatalog> res = MakeShared<NewCatalog>(current_dir);
+    for(const auto& db_json: catalog_json["databases"]) {
+        UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
+        res->databases_.emplace(*db_meta->db_name_, std::move(db_meta));
+    }
+
+    return res;
 }
 
 }

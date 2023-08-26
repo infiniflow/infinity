@@ -60,7 +60,7 @@ TEST_F(TableTest, test1) {
                                     HashSet<ConstraintType>());
     columns.emplace_back(col_def);
 
-    SharedPtr<TableDef> table_def = TableDef::Make("order_by_table", columns);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("order_by_table"), columns);
 
     SharedPtr<Table> order_by_table = Table::Make(table_def, TableType::kOrderBy);
 

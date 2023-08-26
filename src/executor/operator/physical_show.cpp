@@ -59,7 +59,7 @@ PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
             MakeShared<ColumnDef>(6, bigint_type, "block_size", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = MakeShared<TableDef>("Tables", column_defs);
+    SharedPtr<TableDef> table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     // Get tables from catalog
@@ -86,7 +86,7 @@ PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
         SizeT column_id = 0;
         {
             // Append schema name to the 1 column
-            const String& schema_name = base_table->schema_name();
+            const String& schema_name = *base_table->schema_name();
             Value value = Value::MakeVarchar(schema_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -95,7 +95,7 @@ PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
         ++ column_id;
         {
             // Append table name to the 0 column
-            const String& table_name = base_table->table_name();
+            const String& table_name = *base_table->table_name();
             Value value = Value::MakeVarchar(table_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -214,7 +214,7 @@ PhysicalShow::ExecuteShowViews(SharedPtr<QueryContext>& query_context) {
             MakeShared<ColumnDef>(3, bigint_type, "column_count", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
+    SharedPtr<TableDef> table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     // Get tables from catalog
@@ -309,7 +309,7 @@ PhysicalShow::ExecuteShowTableDetail(SharedPtr<QueryContext>& query_context,
             MakeShared<ColumnDef>(3, varchar_type, "constraint", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
@@ -370,7 +370,7 @@ PhysicalShow::ExecuteShowCollectionDetail(SharedPtr<QueryContext>& query_context
             MakeShared<ColumnDef>(3, varchar_type, "constraint", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
@@ -430,7 +430,7 @@ PhysicalShow::ExecuteShowViewDetail(SharedPtr<QueryContext>& query_context,
             MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = MakeShared<TableDef>("Views", column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();

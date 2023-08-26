@@ -21,9 +21,8 @@ public:
                void* table_entry,
                u64 txn_id,
                TxnTimeStamp begin_ts,
-               TxnContext* txn_context,
                void* buffer_mgr)
-            : BaseEntry(EntryType::kTable, txn_context), column_def_(std::move(column_def)), table_entry_(table_entry) {
+            : BaseEntry(EntryType::kTable), column_def_(std::move(column_def)), table_entry_(table_entry) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }

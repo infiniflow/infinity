@@ -13,15 +13,15 @@
 
 namespace infinity {
 
+class TxnManager;
 class DBEntry : public BaseEntry {
 public:
     explicit
     DBEntry(const SharedPtr<String>& base_dir,
-            String db_name,
+            SharedPtr<String> db_name,
             u64 txn_id,
-            TxnTimeStamp begin_ts,
-            TxnContext* txn_context)
-        : BaseEntry(EntryType::kDatabase, txn_context), base_dir_(base_dir), db_name_(std::move(db_name)) {
+            TxnTimeStamp begin_ts)
+        : BaseEntry(EntryType::kDatabase), base_dir_(base_dir), db_name_(std::move(db_name)) {
         // current_dir_ = MakeShared<String>(*base_dir + "/txn_" + std::to_string(txn_id));
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
@@ -33,14 +33,14 @@ public:
                 const SharedPtr<TableDef>& table_def,
                 u64 txn_id,
                 TxnTimeStamp begin_ts,
-                TxnContext* txn_context);
+                TxnManager* txn_mgr);
 
     static EntryResult
     DropTable(DBEntry* db_entry,
               const String& table_name,
               u64 txn_id,
               TxnTimeStamp begin_ts,
-              TxnContext* txn_context);
+              TxnManager* txn_mgr);
 
     static EntryResult
     GetTable(DBEntry* db_entry,
@@ -52,7 +52,7 @@ public:
     RemoveTableEntry(DBEntry* db_entry,
                      const String& table_name,
                      u64 txn_id,
-                     TxnContext* txn_context);
+                     TxnManager* txn_mgr);
 
     static SharedPtr<String>
     ToString(DBEntry* db_entry);
@@ -60,10 +60,14 @@ public:
     static nlohmann::json
     Serialize(const DBEntry* db_entry);
 
+    static UniquePtr<DBEntry>
+    Deserialize(const nlohmann::json& db_entry_json,
+                BufferManager* buffer_mgr);
+
 public:
     RWMutex rw_locker_{};
     SharedPtr<String> base_dir_{};
-    String db_name_{};
+    SharedPtr<String> db_name_{};
     HashMap<String, UniquePtr<TableMeta>> tables_{};
 };
 

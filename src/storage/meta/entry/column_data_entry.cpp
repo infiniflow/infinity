@@ -9,13 +9,12 @@
 namespace infinity {
 
 SharedPtr<ColumnDataEntry>
-ColumnDataEntry::MakeNewColumnDataEntry(const void *segment_entry,
-                                        TxnContext *txn_context,
+ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry *segment_entry,
                                         u64 column_id,
                                         u64 row_capacity,
                                         const SharedPtr<DataType>& data_type,
                                         BufferManager* buffer_mgr) {
-    SharedPtr<ColumnDataEntry> column_data_entry = MakeShared<ColumnDataEntry>(segment_entry, txn_context);
+    SharedPtr<ColumnDataEntry> column_data_entry = MakeShared<ColumnDataEntry>(segment_entry);
     const auto* segment_ptr = (const SegmentEntry*)segment_entry;
     column_data_entry->base_dir_ = segment_ptr->base_dir_;
     column_data_entry->row_capacity_ = row_capacity;
@@ -29,10 +28,9 @@ ColumnDataEntry::MakeNewColumnDataEntry(const void *segment_entry,
 }
 
 ObjectHandle
-ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, void* buf_mgr_ptr) {
+ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, BufferManager* buffer_mgr) {
     if(column_data_entry->buffer_handle_ == nullptr) {
         // Get buffer handle from buffer manager
-        BufferManager* buffer_mgr = (BufferManager*)buf_mgr_ptr;
         column_data_entry->buffer_handle_ = buffer_mgr->GetBufferHandle(column_data_entry->base_dir_,
                                                                         column_data_entry->file_name_,
                                                                         BufferType::kFile);
@@ -161,8 +159,32 @@ ColumnDataEntry::Serialize(const ColumnDataEntry* column_data_entry) {
     json_res["base_dir"] = *column_data_entry->base_dir_;
     json_res["file_name"] = *column_data_entry->file_name_;
     json_res["column_id"] = column_data_entry->column_id_;
-    json_res["row_capacity"] =  column_data_entry->row_capacity_;
+    json_res["row_capacity"] = column_data_entry->row_capacity_;
+    json_res["begin_ts"] = column_data_entry->begin_ts_;
+    json_res["commit_ts"] = column_data_entry->commit_ts_.load();
+    json_res["txn_id"] = column_data_entry->txn_id_.load();
+    json_res["deleted"] = column_data_entry->deleted_;
     return json_res;
+}
+
+SharedPtr<ColumnDataEntry>
+ColumnDataEntry::Deserialize(const nlohmann::json& column_data_json, SegmentEntry* segment_entry, BufferManager* buffer_mgr) {
+    SharedPtr<ColumnDataEntry> column_data_entry = MakeShared<ColumnDataEntry>(segment_entry);
+    column_data_entry->column_type_ = DataType::Deserialize(column_data_json["column_type"]);
+    column_data_entry->base_dir_ = MakeShared<String>(column_data_json["base_dir"]);
+    column_data_entry->file_name_ = MakeShared<String>(column_data_json["file_name"]);
+    column_data_entry->column_id_ = column_data_json["column_id"];
+    column_data_entry->row_capacity_ = column_data_json["row_capacity"];
+    column_data_entry->begin_ts_ = column_data_json["begin_ts"];
+    column_data_entry->commit_ts_ = column_data_json["commit_ts"];
+    column_data_entry->txn_id_ = column_data_json["txn_id"];
+    column_data_entry->deleted_ = column_data_json["deleted"];
+
+//    column_data_entry->buffer_handle_ = buffer_mgr->AllocateBufferHandle(column_data_entry->base_dir_,
+//                                                                         column_data_entry->file_name_,
+//                                                                         column_data_entry->column_type_ * column_data_entry->row_capacity_);
+
+    return column_data_entry;
 }
 
 }

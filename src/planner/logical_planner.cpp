@@ -281,7 +281,7 @@ LogicalPlanner::BuildCreateTable(const CreateStatement* statement, SharedPtr<Bin
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_table_info->schema_name_);
 
     SharedPtr<TableDef> table_def_ptr
-            = MakeShared<TableDef>(create_table_info->table_name_, columns);
+            = TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns);
 
     SharedPtr<LogicalNode> logical_create_table_operator
             = LogicalCreateTable::Make(bind_context_ptr->GetNewLogicalNodeId(),

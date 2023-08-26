@@ -12,10 +12,11 @@
 
 namespace infinity {
 
+class Txn;
 class TxnTableStore {
 public:
     explicit
-    TxnTableStore(String table_name, TableEntry* table_entry, void* txn)
+    TxnTableStore(String table_name, TableEntry* table_entry, Txn* txn)
         : table_name_(std::move(table_name)), table_entry_(table_entry), txn_(txn) {}
 
     UniquePtr<String>
@@ -44,7 +45,7 @@ public:
 
     String table_name_{};
     TableEntry* table_entry_{};
-    void* txn_{};
+    Txn* txn_{};
 };
 
 }

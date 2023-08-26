@@ -7,11 +7,10 @@
 #include "common/types/internal_types.h"
 #include "storage/meta/entry/db_entry.h"
 #include "storage/meta/catalog.h"
-#include "txn_manager.h"
-#include "txn_context.h"
 #include "storage/meta/entry/table_entry.h"
 #include "txn_store.h"
 #include "storage/table/meta_state.h"
+#include "txn_context.h"
 
 namespace infinity {
 
@@ -107,8 +106,13 @@ public:
     }
 
     inline TxnTimeStamp
-    CommitTS() const {
-        return txn_context_.commit_ts_;
+    CommitTS() {
+        return txn_context_.GetCommitTS();
+    }
+
+    inline TxnState
+    GetTxnState() {
+        return txn_context_.GetTxnState();
     }
 
 private:

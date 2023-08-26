@@ -78,7 +78,7 @@ TEST_F(ExpressionExecutorTest, add_bigint_constant_1) {
                                                          MakeShared<DataType>(DataType(LogicalType::kBigInt)),
                                                          "c1",
                                                          HashSet<ConstraintType>());
-    SharedPtr<TableDef> table_def = TableDef::Make("t1", {col_def});
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("t1"), {col_def});
     SharedPtr<Table> input_table = Table::Make(table_def, TableType::kDataTable);
 
     {
@@ -209,7 +209,7 @@ TEST_F(ExpressionExecutorTest, subtract_constant_8192_bigint) {
                                                          MakeShared<DataType>(DataType(LogicalType::kBigInt)),
                                                          "c1",
                                                          HashSet<ConstraintType>());
-    SharedPtr<TableDef> table_def = TableDef::Make("t1", {col_def});
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("t1"), {col_def});
     SharedPtr<Table> input_table = Table::Make(table_def, TableType::kDataTable);
 
     {

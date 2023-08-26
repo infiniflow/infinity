@@ -8,17 +8,19 @@
 
 #include "common/types/internal_types.h"
 #include "storage/meta/entry/base_entry.h"
-#include "storage/txn/txn_context.h"
 #include "storage/table_def.h"
 
 namespace infinity {
 
+class TxnManager;
+class DBEntry;
+class BufferManager;
 struct TableMeta {
 public:
     explicit
     TableMeta(const SharedPtr<String>& base_dir,
-              String name,
-              void* db_entry) : base_dir_(base_dir), table_name_(std::move(name)), db_entry_(db_entry) {
+              SharedPtr<String> name,
+              DBEntry* db_entry) : base_dir_(base_dir), table_name_(std::move(name)), db_entry_(db_entry) {
     }
 
 public:
@@ -26,20 +28,20 @@ public:
     CreateNewEntry(TableMeta* table_meta,
                    u64 txn_id,
                    TxnTimeStamp begin_ts,
-                   TxnContext* txn_context,
+                   TxnManager* txn_mgr,
                    const SharedPtr<TableDef>& table_def);
 
     static EntryResult
     DropNewEntry(TableMeta* table_meta,
                  u64 txn_id,
                  TxnTimeStamp begin_ts,
-                 TxnContext* txn_context,
+                 TxnManager* txn_mgr,
                  const String& table_name);
 
     static void
     DeleteNewEntry(TableMeta* table_meta,
                    u64 txn_id,
-                   TxnContext* txn_context);
+                   TxnManager* txn_mgr);
 
     static EntryResult
     GetEntry(TableMeta* table_meta,
@@ -57,12 +59,17 @@ public:
     static nlohmann::json
     Serialize(const TableMeta* table_meta);
 
+    static UniquePtr<TableMeta>
+    Deserialize(const nlohmann::json& table_meta_json,
+                DBEntry* db_entry,
+                BufferManager* buffer_mgr);
+
 public:
     RWMutex rw_locker_{};
-    String table_name_{};
+    SharedPtr<String> table_name_{};
     SharedPtr<String> base_dir_{};
 
-    void* db_entry_{};
+    DBEntry* db_entry_{};
 
     // Ordered by commit_ts from latest to oldest.
     List<UniquePtr<BaseEntry>> entry_list_{};

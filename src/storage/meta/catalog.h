@@ -9,16 +9,16 @@
 #include "storage/common/async_batch_processor.h"
 #include "storage/meta/entry/db_entry.h"
 #include "db_meta.h"
-#include "storage/txn/txn_context.h"
 //#include "storage/txn/txn.h"
 
 namespace infinity {
 
 class Txn;
+class TxnManager;
 struct NewCatalog {
 public:
-    NewCatalog(SharedPtr<String> dir,
-               UniquePtr<AsyncBatchProcessor> scheduler);
+    explicit
+    NewCatalog(SharedPtr<String> dir);
 
 public:
     static EntryResult
@@ -26,14 +26,14 @@ public:
                    const String& db_name,
                    u64 txn_id,
                    TxnTimeStamp begin_ts,
-                   TxnContext* txn_context);
+                   TxnManager* txn_mgr);
 
     static EntryResult
     DropDatabase(NewCatalog* catalog,
                  const String& db_name,
                  u64 txn_id,
                  TxnTimeStamp begin_ts,
-                 TxnContext* txn_context);
+                 TxnManager* txn_mgr);
 
     static EntryResult
     GetDatabase(NewCatalog* catalog,
@@ -45,7 +45,7 @@ public:
     RemoveDBEntry(NewCatalog* catalog,
                   const String& db_name,
                   u64 txn_id,
-                  TxnContext* txn_context);
+                  TxnManager* txn_mgr);
 
     static Vector<DBEntry*>
     Databases(NewCatalog* catalog, Txn* txn);
@@ -55,10 +55,10 @@ public:
     Serialize(const NewCatalog* catalog);
 
     static SharedPtr<NewCatalog>
-    Deserialize(const nlohmann::json& catalog_json);
+    Deserialize(const nlohmann::json& catalog_json,
+                BufferManager* buffer_mgr);
 public:
     SharedPtr<String> current_dir_{nullptr};
-    UniquePtr<AsyncBatchProcessor> scheduler_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
     RWMutex rw_locker_;
 };

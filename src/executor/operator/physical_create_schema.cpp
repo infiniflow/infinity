@@ -28,7 +28,7 @@ PhysicalCreateSchema::Execute(SharedPtr<QueryContext>& query_context) {
     };
 
     SharedPtr<TableDef> result_table_def_ptr
-            = MakeShared<TableDef>("Tables", column_defs);
+            = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 

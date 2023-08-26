@@ -47,12 +47,12 @@ public:
         return definition_ptr_->column_count();
     }
 
-    [[nodiscard]] String
+    [[nodiscard]] SharedPtr<String>
     TableName() const {
         return definition_ptr_->table_name();
     }
 
-    [[nodiscard]] inline const String&
+    [[nodiscard]] inline const SharedPtr<String>&
     SchemaName() const {
         return definition_ptr_->schema_name();
     }

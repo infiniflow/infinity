@@ -9,7 +9,6 @@
 namespace infinity {
 
 class BufferManager;
-
 class TxnManager {
 public:
     explicit
@@ -25,6 +24,9 @@ public:
     Txn*
     GetTxn(u64 txn_id);
 
+    TxnState
+    GetTxnState(u64 txn_id);
+
     inline void
     Lock() {
         rw_locker_.lock();
@@ -38,6 +40,11 @@ public:
     BufferManager*
     GetBufferMgr() const {
         return buffer_mgr_;
+    }
+
+    inline TxnTimeStamp
+    GetTimestamp() const {
+        return std::chrono::high_resolution_clock::now().time_since_epoch().count();
     }
 
 private:

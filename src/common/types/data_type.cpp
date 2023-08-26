@@ -5,6 +5,9 @@
 #include "data_type.h"
 #include "function/cast/cast_table.h"
 #include "common/utility/infinity_assert.h"
+#include "info/bitmap_info.h"
+#include "common/types/info/decimal_info.h"
+#include "common/types/info/embedding_info.h"
 
 namespace infinity {
 
@@ -51,7 +54,7 @@ static const char* type2name[] = {
     "Blob",
     "Embedding",
 
-    // Heterogeneous type
+    // Heterogeneous/Mix type
     "Heterogeneous",
 
     // only used in heterogeneous type
@@ -210,135 +213,46 @@ DataType::MaxDataType(const DataType& right) {
 nlohmann::json
 DataType::Serialize() {
     nlohmann::json json_res;
-    switch(this->type_) {
-        case kBoolean: {
-            json_res["data_type"] = "boolean";
-            break;
-        }
-        case kTinyInt: {
-            json_res["data_type"] = "tinyint";
-            break;
-        }
-        case kSmallInt: {
-            json_res["data_type"] = "smallint";
-            break;
-        }
-        case kInteger: {
-            json_res["data_type"] = "int";
-            break;
-        }
-        case kBigInt: {
-            json_res["data_type"] = "bigint";
-            break;
-        }
-        case kHugeInt: {
-            json_res["data_type"] = "hugeint";
-            break;
-        }
-        case kDecimal: {
-            json_res["data_type"] = "decimal";
-            break;
-        }
-        case kFloat: {
-            json_res["data_type"] = "float";
-            break;
-        }
-        case kDouble: {
-            json_res["data_type"] = "double";
-            break;
-        }
-        case kVarchar: {
-            json_res["data_type"] = "varchar";
-            break;
-        }
-        case kDate: {
-            json_res["data_type"] = "date";
-            break;
-        }
-        case kTime: {
-            json_res["data_type"] = "time";
-            break;
-        }
-        case kDateTime: {
-            json_res["data_type"] = "datetime";
-            break;
-        }
-        case kTimestamp: {
-            json_res["data_type"] = "timestamp";
-            break;
-        }
-        case kInterval: {
-            json_res["data_type"] = "interval";
-            break;
-        }
-        case kArray: {
-            json_res["data_type"] = "array";
-            break;
-        }
-        case kTuple: {
-            json_res["data_type"] = "tuple";
-            break;
-        }
-        case kPoint: {
-            json_res["data_type"] = "point";
-            break;
-        }
-        case kLine: {
-            json_res["data_type"] = "line";
-            break;
-        }
-        case kLineSeg: {
-            json_res["data_type"] = "lineseg";
-            break;
-        }
-        case kBox: {
-            json_res["data_type"] = "box";
-            break;
-        }
-        case kPath: {
-            json_res["data_type"] = "path";
-            break;
-        }
-        case kPolygon: {
-            json_res["data_type"] = "polygon";
-            break;
-        }
-        case kCircle: {
-            json_res["data_type"] = "circle";
-            break;
-        }
-        case kBitmap: {
-            json_res["data_type"] = "bitmap";
-            break;
-        }
-        case kUuid: {
-            json_res["data_type"] = "uuid";
-            break;
-        }
-        case kBlob: {
-            json_res["data_type"] = "blob";
-            break;
-        }
-        case kEmbedding: {
-            json_res["data_type"] = "embedding";
-            break;
-        }
-        case kMixed: {
-            json_res["data_type"] = "mixed";
-            break;
-        }
-        case kNull:
-        case kMissing:
-        case kInvalid: {
-            TypeError("Invalid type")
-        }
-    }
+    json_res["data_type"] = this->type_;
 
     if(this->type_info_ != nullptr) {
         json_res["type_info"] = this->type_info_->Serialize();
     }
 
     return json_res;
+}
+
+SharedPtr<DataType>
+DataType::Deserialize(const nlohmann::json& data_type_json) {
+    LogicalType logical_type = data_type_json["data_type"];
+    SharedPtr<TypeInfo> type_info {nullptr};
+    if(data_type_json.contains("type_info")) {
+        const nlohmann::json& type_info_json = data_type_json["type_info"];
+        switch(logical_type) {
+            case LogicalType::kArray: {
+                NotImplementError("Array isn't implemented here.");
+                type_info = nullptr;
+                break;
+            }
+            case LogicalType::kBitmap: {
+                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
+                break;
+            }
+            case LogicalType::kDecimal: {
+                type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
+                break;
+            }
+            default: {
+                TypeError("Unexpected type here.")
+            }
+        }
+    }
+    SharedPtr<DataType> data_type = MakeShared<DataType>(logical_type, type_info);
+    return data_type;
 }
 
 template <> String DataType::TypeToString<BooleanT>() { return "Boolean"; }

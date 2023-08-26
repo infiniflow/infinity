@@ -6,11 +6,10 @@
 
 #include "common/types/internal_types.h"
 #include "storage/txn/constants.h"
-#include "storage/txn/txn_context.h"
 
 namespace infinity {
 
-enum class EntryType {
+enum EntryType : i8 {
     kDummy,
     kDatabase,
     kTable,
@@ -22,7 +21,7 @@ enum class EntryType {
 
 struct BaseEntry {
     explicit
-    BaseEntry(EntryType entry_type, TxnContext* txn_context) : entry_type_(entry_type), txn_context_(txn_context) {}
+    BaseEntry(EntryType entry_type) : entry_type_(entry_type) {}
 
     virtual
     ~BaseEntry() = default;
@@ -50,7 +49,6 @@ public:
     }
 
 public:
-    TxnContext *txn_context_;
     std::atomic_uint64_t txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     std::atomic<TxnTimeStamp> commit_ts_{UNCOMMIT_TS};
