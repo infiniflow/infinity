@@ -17,6 +17,7 @@
 #include "parser/statement/show_statement.h"
 #include "parser/statement/explain_statement.h"
 #include "parser/table_reference/base_table_reference.h"
+#include "parser/statement/flush_statement.h"
 
 namespace infinity {
 
@@ -62,6 +63,11 @@ public:
     BuildShow(const ShowStatement* statement,
               SharedPtr<Vector<SharedPtr<String>>>& stmt_string,
               i64 intent_size);
+
+    static void
+    BuildFlush(const FlushStatement* flush_statement,
+               SharedPtr<Vector<SharedPtr<String>>>& result,
+               i64 intent_size);
 };
 
 }

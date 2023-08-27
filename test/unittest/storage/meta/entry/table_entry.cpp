@@ -371,7 +371,8 @@ TEST_F(TableEntryTest, test2) {
     nlohmann::json catalog_json = NewCatalog::Serialize(&new_catalog);
     LOG_TRACE("{}", catalog_json.dump());
 
-    SharedPtr<NewCatalog> catalog1 = NewCatalog::Deserialize(catalog_json, &buffer_mgr);
+    UniquePtr<NewCatalog> catalog1;
+    NewCatalog::Deserialize(catalog_json, &buffer_mgr, catalog1);
     nlohmann::json catalog_json1 = NewCatalog::Serialize(catalog1.get());
     LOG_TRACE("{}", catalog_json1.dump());
 }

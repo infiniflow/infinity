@@ -1,0 +1,5 @@
+id,license,DLL,Content or Link
+utf8proc,MIT,,Link
+sqlite3,Public,,https://sqlite.org/copyright.html
+inih,BSD,,https://raw.githubusercontent.com/benhoyt/inih/0b9092e80acc8dc820103c6a0cb9c030e3ca1a32/LICENSE.txt
+musl,MIT,,https://git.musl-libc.org/cgit/musl/plain/COPYRIGHT

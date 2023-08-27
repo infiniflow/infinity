@@ -98,6 +98,7 @@ struct SQL_LTYPE {
     AlterStatement*   alter_stmt;
     ShowStatement*    show_stmt;
     ExplainStatement* explain_stmt;
+    FlushStatement*  flush_stmt;
 
     Vector<BaseStatement*>* stmt_array;
 
@@ -278,7 +279,7 @@ struct SQL_LTYPE {
 /* SQL keywords */
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT
-%token EXCEPT
+%token EXCEPT FLUSH
 %token SCHEMA TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL VIEW INDEX ANALYZE VIEWS
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
@@ -287,6 +288,7 @@ struct SQL_LTYPE {
 %token PRIMARY KEY UNIQUE NULLABLE IS
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
+%token DATA LOG BUFFER
 
 %token NUMBER
 
@@ -303,6 +305,7 @@ struct SQL_LTYPE {
 %type <update_stmt>       update_statement
 %type <insert_stmt>       insert_statement
 %type <explain_stmt>      explain_statement
+%type <flush_stmt>        flush_statement
 
 %type <stmt_array>        statement_list
 
@@ -392,6 +395,7 @@ statement : create_statement { $$ = $1; }
 | update_statement { $$ = $1; }
 | insert_statement { $$ = $1; }
 | explain_statement { $$ = $1; }
+| flush_statement { $$ = $1; }
 
 explainable_statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
@@ -401,6 +405,7 @@ explainable_statement : create_statement { $$ = $1; }
 | delete_statement { $$ = $1; }
 | update_statement { $$ = $1; }
 | insert_statement { $$ = $1; }
+| flush_statement { $$ = $1; }
 
 /*
  * CREATE STATEMENT
@@ -1332,6 +1337,22 @@ show_statement: SHOW TABLES {
 };
 
 /*
+ * FLUSH STATEMENT
+ */
+flush_statement: FLUSH DATA {
+    $$ = new FlushStatement();
+    $$->type_ = FlushType::kData;
+}
+| FLUSH LOG {
+    $$ = new FlushStatement();
+    $$->type_ = FlushType::kLog;
+}
+| FLUSH BUFFER {
+    $$ = new FlushStatement();
+    $$->type_ = FlushType::kBuffer;
+};
+
+/*
  * EXPRESSION
  */
 
@@ -1872,10 +1893,13 @@ copy_option : FORMAT IDENTIFIER {
     if (strcasecmp($2, "csv") == 0) {
         $$->file_type_ = CopyFileType::kCSV;
         free($2);
+    } else if (strcasecmp($2, "json") == 0) {
+        $$->file_type_ = CopyFileType::kJSON;
+        free($2);
     } else {
         free($2);
         delete $$;
-        yyerror(&yyloc, scanner, result, "Unknown file type");
+        yyerror(&yyloc, scanner, result, "Unknown file format");
         YYERROR;
     }
 }

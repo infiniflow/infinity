@@ -10,6 +10,7 @@ namespace infinity {
 
 enum class CopyFileType {
     kCSV,
+    kJSON,
 };
 
 struct TableName {

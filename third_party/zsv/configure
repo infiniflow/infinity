@@ -1,0 +1,794 @@
+#!/bin/sh
+# Based on the configure script from musl libc, MIT licensed; vis, ISC licensed
+
+usage () {
+    cat <<EOF
+Usage: $0 [OPTION]... [VAR=VALUE]...
+
+To assign environment variables (e.g., CC, CFLAGS...), specify them as
+VAR=VALUE.  See below for descriptions of some of the useful variables.
+
+Defaults for the options are specified in brackets.
+
+Configuration:
+  --config-file=FILE      save config to FILE [config.mk]
+
+Optional configuration:
+  --minimal=yes           do not include extra features (default=no)
+  --arch=ARCH             use -march=ARCH. Set to 'none' for none, else defaults to 'native'
+  --jq-prefix=JQ_PREFIX   specify directory containing lib/libjq and include/jq.h
+
+Installation directories:
+  --prefix=PREFIX         main installation prefix [\$PREFIX or /usr/local]
+  --exec-prefix=EPREFIX   installation prefix for bin, lib, include [PREFIX]
+
+Fine tuning of the installation directories:
+  --sharedir=DIR          share directories [PREFIX/share]
+  --docdir=DIR            misc. documentation [PREFIX/share/doc]
+  --mandir=DIR            man pages [PREFIX/share/man]
+
+Optional features:
+  --try-avx512            use avx512 instructions, if available [no]
+  --force-avx2            force compile with (no CPU check) or without -mavx2 [auto]
+  --force-avx             force compile with (no CPU check) or without -mavx [auto]
+  --force-sse2            force compile with (no CPU check) or without -msse2 [auto]
+  --enable-lto            compile with LTO (works with some but not all platforms/compilers) [no]
+  --enable-whole-program  compile without -fwhole-program even if no -flto [yes]
+  --enable-pie            build with position independent executables [auto]
+  --enable-pic            build with position independent shared libraries [auto]
+  --enable-termcap        build with ncurses / termcap (used by \`pretty\` to get console width) [auto]
+
+Some influential environment variables:
+  CC                      C compiler command [detected]
+  AWK                     AWK tool command [detected]
+  MAKE                    gmake tool command [detected]
+  AR                      archive command [detected]
+  RANLIB                  ranlib archive indexer command [detected]
+  CFLAGS                  C compiler flags [-Os -pipe ...]
+  LDFLAGS                 Linker flags
+
+  CROSS_COMPILING=no      Set to yes to disable auto-detect compilation flags
+
+Use these variables to override the choices made by configure.
+
+EOF
+    exit 0
+}
+
+# Helper functions
+
+quote () {
+    tr '\n' ' ' <<EOF | grep '^[-[:alnum:]_=,./:]* $' >/dev/null 2>&1 && { echo "$1" ; return 0 ; }
+$1
+EOF
+    printf %s\\n "$1" | sed -e "s/'/'\\\\''/g" -e "1s/^/'/" -e "\$s/\$/'/" -e "s#^'\([-[:alnum:]_,./:]*\)=\(.*\)\$#\1='\2#"
+}
+echo () { printf "%s\n" "$*" ; }
+fail () { echo "$*" ; exit 1 ; }
+fnmatch () { eval "case \"\$2\" in $1) return 0 ;; *) return 1 ;; esac" ; }
+cmdexists () { type "$1" >/dev/null 2>&1 ; }
+trycc1 () { test -z "$CC" && cmdexists "$1" && ( "$1" --version | grep -i gcc ) >/dev/null 2>/dev/null && CC=$1 ; }
+trycc2 () { test -z "$CC" && cmdexists "$1" && CC=$1 ; }
+tryar () { test -z "$AR" && cmdexists "$1" && AR=$1 ; }
+tryranlib () { test -z "$RANLIB" && cmdexists "$1" && RANLIB=$1 ; }
+tryawk () { test -z "$AWK" && "$1" 'function works () {return 0} BEGIN{exit works()}' && AWK=$1 ; }
+trymake() {
+    if test -z "$MAKE" && cmdexists "$1" ; then
+	v=`$1 --version | grep 'GNU Make' | sed -e 's/.*Make //'`
+	if [ "$v" = "" ] ; then
+	    printf "Found but not using non-GNU make ($1)... "
+	else
+	    MAKE="$1"
+	    maj=`echo $v | cut -d. -f 1`
+	    min=`echo $v | cut -d. -f 2`
+	    if ! test $maj -gt 3 -o '(' $maj -eq 3 -a $min -ge 81 ')' ; then
+		printf "Warning: using make, but version $v < 3.81 has not been tested. "
+	    fi
+	fi
+    fi
+}
+
+stripdir () {
+    while eval "fnmatch '*/' \"\${$1}\"" ; do eval "$1=\${$1%/}" ; done
+}
+
+NO_HAVE=
+trycchdr () {
+    printf "checking whether there is a header called %s... " "$2"
+    dn=`dirname "$2"`
+    if [ "$dn" != "" ]; then
+	dn="/$dn"
+	bn=`basename "$2"`
+	for x in $CCSEARCHPATH ; do
+	    fnd=$fnd"$x$dn "
+	done
+    else
+	bn="$2"
+	fnd=$CCSEARCHPATH
+    fi
+    upper2=$(echo "$2" | tr a-z A-Z | tr . _ | tr / _)
+    if find $fnd -name "$bn" 2>/dev/null | grep "/$2$" >/dev/null 2>&1 ; then
+        eval "$1=\"\${$1} -DHAVE_\${upper2}\""
+        eval "$1=\${$1# }"
+        printf "yes\n"
+        return 0
+    else
+        printf "no\n"
+        NO_HAVE="$NO_HAVE
+NO_$upper2 = 1"
+        return 1
+    fi
+}
+
+trycpusupport() {
+    rm -f "$tmpc"
+    printf "checking whether CPU accepts $1... "
+    cat >> "$tmpc" <<EOF
+int main() {
+  if(__builtin_cpu_supports("$1"))
+    return 0;
+  return 1;
+}
+EOF
+    $CC -o "$tmpe" "$tmpc" >/dev/null 2>&1 && "$tmpe" && echo "yes" && return 0;
+    echo "no"
+    return 1;
+}
+
+tryccfn () {
+    rm -f "$tmpc"
+    if [ "$5" != "" ] ; then
+        printf "checking whether compiler accepts %s from %s with %s... " "$2" "$3" "$5"
+        echo "$5" >> "$tmpc"
+    else
+        printf "checking whether compiler accepts %s from %s..." "$2" "$3"
+    fi
+    if [ "$3" != "" ]; then
+        printf "%s\n" $3 | sed 's/\(.*\)/#include <\1>/' >> "$tmpc"
+    fi
+    cat >> "$tmpc" <<EOF
+int main() {$2;}
+EOF
+    flag=$(echo "$2" | cut -d'(' -f1 | tr a-z A-Z)
+    if $CC -o "$tmpo" "$tmpc" >/dev/null 2>&1 ; then
+        if [ "$4" != "" ] ; then
+            lib=$(echo "$4" | tr a-z A-Z | tr . _)
+            USE_LIBS="$USE_LIBS
+USE_LIB_$lib = 1"
+        fi
+
+        eval "vars=\$$1"
+        if ! printf "%s\n" ${vars} | grep "\-DHAVE_${flag}\$" >/dev/null 2>&1; then
+            flag="-DHAVE_${flag}"
+            eval "$1=\"\${vars} \${flag}\""
+            eval "$1=\${$1# }"
+        fi
+        printf "yes\n"
+        return 0
+    else
+        printf "no\n"
+        NO_HAVE="$NO_HAVE
+NO_$flag = 1"
+        echo "------" >> $CONFIGFILE.log
+        echo "Failed: $CC -o $tmpo tmp.c" >> $CONFIGFILE.log
+        cat "$tmpc" >> $CONFIGFILE.log
+        echo "------" >> $CONFIGFILE.log
+        return 1
+    fi
+}
+
+tryccfn1 () {
+    rm -f "$tmpc"
+    printf "checking whether compiler accepts %s(%s)..." "$2" "$3"
+    cat >> "$tmpc" <<EOF
+int main() {$2($3);}
+EOF
+    flag=$(echo "$2" | cut -d'(' -f1 | tr a-z A-Z)
+    eval "vars=\$$1"
+    if $CC -o "$tmpo" "$tmpc" >/dev/null 2>&1 ; then
+        flag="-DHAVE_${flag}"
+        have=1
+    else
+        flag="-DNO_${flag}"
+        have=0
+    fi
+    if ! printf "%s\n" ${vars} | grep "\-D${flag}\$" >/dev/null 2>&1; then
+        eval "$1=\"\${vars} \${flag}\""
+        eval "$1=\${$1# }"
+    fi
+    if [ "$have" = "1" ]; then
+        printf "yes\n"
+        return 0
+    else
+        printf "no\n"
+        return 1
+    fi
+}
+
+tryflag () {
+    printf "checking whether compiler accepts %s... " "$2"
+    echo "int main() {return 0;}" > "$tmpc"
+    if $CC $CFLAGS_TRY $2 -c -o "$tmpo" "$tmpc" >/dev/null 2>&1 ; then
+        printf "yes\n"
+        eval "$1=\"\${$1} \$2\""
+        eval "$1=\${$1# }"
+        return 0
+    else
+        printf "no\n"
+        return 1
+    fi
+}
+
+tryldflag () { # var, flag, other_arguments (optional)
+    printf "checking whether linker accepts %s... " "$2"
+    echo "int main(){return 0;}" > "$tmpc"
+    if $CC $LDFLAGS "$2" $3 -o "$tmpo" "$tmpc" >/dev/null 2>&1 ; then
+        printf "yes\n"
+        eval "$1=\"\${$1} \$2\""
+        eval "$1=\${$1# }"
+        return 0
+    else
+        printf "no\n"
+        return 1
+    fi
+}
+
+trysharedldflag () {
+    printf "checking whether linker accepts %s... " "$2"
+    echo "typedef int x;" > "$tmpc"
+    if $CC $LDFLAGS -shared "$2" -o "$tmpo" "$tmpc" >/dev/null 2>&1 ; then
+        printf "yes\n"
+        eval "$1=\"\${$1} \$2\""
+        eval "$1=\${$1# }"
+        return 0
+    else
+        printf "no\n"
+        return 1
+    fi
+}
+
+# Beginning of actual script
+CROSS_COMPILING=no
+CFLAGS_AUTO=
+CFLAGS_TRY=
+LDFLAGS_AUTO=
+LDFLAGS_TRY=
+CONFIGFILE=$CONFIGFILE
+if [ "$CONFIGFILE" = "" ]; then
+    CONFIGFILE=config.mk
+fi
+
+if [ "$ARCH" = "" ] && [ "$CROSS_COMPILING" = "no" ]; then
+    ARCH=native
+fi
+
+# check prefixes first, since others may be derived from it unless overridden
+PREFIX=$PREFIX
+for arg ; do
+    case "$arg" in
+        --prefix=*) PREFIX=${arg#*=} ;;
+    esac
+done
+if [ "$PREFIX" = "" ]; then
+    PREFIX=/usr/local
+elif [ "$PREFIX" = "${PREFIX#/}" ]; then
+    PREFIX="`pwd`/$PREFIX"
+fi
+
+EXEC_PREFIX=$EXEC_PREFIX
+for arg ; do
+    case "$arg" in
+        --exec-prefix=*) EXEC_PREFIX=${arg#*=} ;;
+    esac
+done
+if [ "$EXEC_PREFIX" = "" ]; then
+    EXEC_PREFIX=$PREFIX
+elif [ "$EXEC_PREFIX" = "${EXEC_PREFIX#/}" ]; then
+    EXEC_PREFIX="`pwd`/$EXEC_PREFIX"
+fi
+
+DOCDIR='$(PREFIX)/share/doc'
+MANDIR='$(PREFIX)/share/man'
+
+MINIMAL=no
+
+TRY_LTO=no
+TRY_WHOLE_PROGRAM=auto
+FORCE_AVX2=auto
+FORCE_AVX=auto
+FORCE_SSE2=auto
+
+help=yes
+usepie=auto
+usepic=auto
+usetermcap=auto
+
+for arg ; do
+    case "$arg" in
+        --help|-h) usage ;;
+        --host=*) host=${arg#*=} ;;
+
+        --arch=*) ARCH=${arg#*=} ;;
+        ARCH=*) ARCH=${arg#*=} ;;
+
+        --config-file=*) CONFIGFILE=${arg#*=} ;;
+        CONFIGFILE=*) CONFIGFILE=${arg#*=} ;;
+
+        --jq-prefix=*) JQ_PREFIX=${arg#*=} ;;
+        JQ_PREFIX=*) JQ_PREFIX=${arg#*=} ;;
+
+        --prefix=*) ;; # already handled
+        --exec-prefix=*) ;; # already handled EXEC_PREFIX=${arg#*=} ;;
+        --docdir=*) DOCDIR=${arg#*=} ;;
+        --mandir=*) MANDIR=${arg#*=} ;;
+        --minimal|--minimal=yes) MINIMAL=yes;;
+        --try-avx512|--try-avx512=yes) TRY_AVX512=yes;;
+
+        --force-avx2|--force-avx2=yes) FORCE_AVX2=yes;;
+        --force-avx2=no) FORCE_AVX2=no;;
+
+        --force-avx|--force-avx=yes) FORCE_AVX=yes;;
+        --force-avx=no) FORCE_AVX=no;;
+
+        --force-sse2|--force-sse2=yes) FORCE_SSE2=yes;;
+        --force-sse2=no) FORCE_SSE2=no;;
+
+        --enable-lto|--enable-lto=yes) TRY_LTO=yes;;
+        --enable-lto|--enable-lto=auto) TRY_LTO=auto;;
+        --disable-lto|--enable-lto=no) TRY_LTO=no;;
+
+        --enable-whole-program|--enable-whole-program=yes) TRY_WHOLE_PROGRAM=yes ;;
+        --disable-whole-program|--enable-whole-program=no) TRY_WHOLE_PROGRAM=no ;;
+
+        --enable-pie|--enable-pie=yes) usepie=yes ;;
+        --enable-pie=auto) usepie=auto ;;
+        --disable-pie|--enable-pie=no) usepie=no ;;
+
+        --enable-pic|enable-pic=yes) usepic=yes ;;
+        --enable-termcap|--enable-termcap=yes) usetermcap=yes ;;
+        --enable-termcap=auto) usetermcap=auto ;;
+        --disable-termcap|--enable-termcap=no) usetermcap=no ;;
+
+        --enable-pic=auto) usepic=auto ;;
+        --disable-pic|--enable-pic=no) usepic=no ;;
+        --enable-*|--disable-*|--with-*|--without-*|--*dir=*|--build=*) ;;
+        -* ) echo "$0: unknown option $arg" ;;
+        CC=*) CC=${arg#*=} ;;
+        CFLAGS=*) CFLAGS=${arg#*=} ;;
+        CPPFLAGS=*) CPPFLAGS=${arg#*=} ;;
+        LDFLAGS=*) LDFLAGS=${arg#*=} ;;
+        *=*) ;;
+        *) ;;
+    esac
+done
+
+echo "config will be saved to $CONFIGFILE"
+
+for i in PREFIX EXEC_PREFIX DOCDIR MANDIR ; do
+    stripdir $i
+done
+
+#
+# Get a temp filename we can use
+#
+i=0
+set -C
+while : ; do i=$(($i+1))
+             tmpc="./conf$$-$PPID-$i.c"
+             tmpo="./conf$$-$PPID-$i.o"
+             tmpe="./conf$$-$PPID-$i._"
+             2>|/dev/null > "$tmpc" && break
+             test "$i" -gt 50 && fail "$0: cannot create temporary file $tmpc"
+done
+set +C
+trap 'rm -f "$tmpc" "$tmpo" "$tmpe"' EXIT QUIT TERM HUP
+trap 'rm -f "$tmpc" "$tmpo" "$tmpe" && echo && fail "$0: interrupted"' INT
+
+#
+# Find an AWK tool to use
+#
+printf "checking for AWK tool... "
+for a in awk gawk mawk nawk; do tryawk "$a"; done
+printf "%s\n" "$AWK"
+test -n "$AWK" || fail "$0: cannot find an AWK tool"
+
+#
+# Find a MAKE tool to use#
+
+printf "checking for MAKE tool... "
+for a in make gmake ; do trymake "$a"; done
+printf "%s\n" "$MAKE"
+test -n "$MAKE" || fail "$0: cannot find a MAKE tool"
+
+#
+# Find a C compiler to use
+#
+printf "checking for C compiler... "
+for c in cc gcc gcc-11 gcc-10 gcc-9 gcc-8 gcc-7 clang; do trycc1 "$c"; done
+for c in cc gcc gcc-11 gcc-10 gcc-9 gcc-8 gcc-7 clang; do trycc2 "$c"; done
+printf "%s\n" "$CC"
+test -n "$CC" || fail "$0: cannot find a C compiler"
+
+printf "checking whether C compiler works... "
+echo "typedef int x;" > "$tmpc"
+if output=$($CC $CPPFLAGS $CFLAGS -c -o "$tmpo" "$tmpc" 2>&1) ; then
+    printf "yes\n"
+else
+    fail "no; compiler output follows:\n%s\n" "$output"
+fi
+
+#
+# Get compiler search paths
+#
+CCSEARCHPATH=$(echo | ${CC} -E -Wp,-v - 2>&1 | ${AWK} '/ \//{print substr($0,2);}')
+
+#
+# Check if it is clang, and the llvm tools instead
+compiler=$(${CC} -v 2>&1 | ${AWK} '/ +version +/{for(i=1;i<=NF;i++){if($i=="version"){printf("%s\n",(last=="LLVM")?"clang":last);exit 0;}last=$i;}}')
+if test "$compiler" = "clang"; then
+    arlist="$CC-llvm-ar $host-llvm-ar $CC-ar $host-ar llvm-ar `ls /usr/bin/llvm-ar* 2>/dev/null` ar"
+    ranliblist="$CC-llvm-ranlib $host-llvm-ranlib $CC-ranlib $host-ranlib llvm-ranlib `ls /usr/bin/llvm-ranlib* 2>/dev/null` ranlib"
+else
+    arlist="$CC-ar $host-$compiler-ar $host-ar $compiler-ar ar"
+    ranliblist="$CC-ranlib $host-$compiler-ranlib $host-ranlib $compiler-ranlib $compiler-ranlib ranlib"
+fi
+
+#
+# Find ar and ranlib to use
+#
+printf "checking for ar... "
+for a in $arlist; do tryar "$a"; done
+printf "%s\n" "$AR"
+test -n "$AR" || fail "$0: cannot find ar"
+
+printf "checking for ranlib... "
+for r in $ranliblist ; do tryranlib "$r"; done
+printf "%s\n" "$RANLIB"
+test -n "$RANLIB" || fail "$0: cannot find ranlib"
+
+#
+# Detect the host system
+#
+printf 'checking host system type... '
+test -n "$host" || host=$($CC -dumpmachine 2>/dev/null) || fail "could not determine host"
+printf '%s\n' "$host"
+
+# start the log
+cat >$CONFIGFILE.log <<_ACEOF
+Config log. Invocation command line was
+  $ $0 $@
+
+_ACEOF
+
+#
+# Figure out options to force errors on unknown flags.
+#
+tryflag   CFLAGS_TRY  -Werror=unknown-warning-option
+tryflag   CFLAGS_TRY  -Werror=unused-command-line-argument
+tryflag   CFLAGS_TRY  -Werror=ignored-optimization-argument
+tryldflag LDFLAGS_TRY -Werror=unknown-warning-option
+tryldflag LDFLAGS_TRY -Werror=unused-command-line-argument
+tryldflag LDFLAGS_TRY -Werror=ignored-optimization-argument
+
+CFLAGS_STD="-std=gnu11 -D_POSIX_C_SOURCE=200809L -U_XOPEN_SOURCE -D_XOPEN_SOURCE=700"
+# CFLAGS_OPT="-DNDEBUG"
+MINGW=0
+case "$host" in
+    *-*freebsd*) CFLAGS_STD="$CFLAGS_STD -D_BSD_SOURCE -D__BSD_VISIBLE=1" ;;
+    *-*netbsd*) CFLAGS_STD="$CFLAGS_STD -D_NETBSD_SOURCE" ;;
+    *-*bsd*) CFLAGS_STD="$CFLAGS_STD -D_BSD_SOURCE" ;;
+    *-*darwin*) CFLAGS_STD="$CFLAGS_STD -D_DARWIN_C_SOURCE" ;;
+    *-*mingw32|*-*msys*|*-windows-gnu)
+	CFLAGS_STD="$CFLAGS_STD -D__USE_MINGW_ANSI_STDIO"
+	MINGW=1
+	usepie=no
+	usepic=no
+	;;
+esac
+
+if test "$usepie" = "auto" ; then
+    usepie=yes
+fi
+
+if test "$usepic" = "auto" ; then
+    usepic=yes
+fi
+
+tryflag CFLAGS_VECTORIZE -fvectorize
+tryflag CFLAGS_VECTORIZE -ftree-vectorize
+tryflag CFLAGS_VECTORIZE_OPTIMIZED -fopt-info-vec-optimized
+tryflag CFLAGS_VECTORIZE_MISSED -fopt-info-vec-missed
+tryflag CFLAGS_VECTORIZE_ALL -fopt-info-vec-all
+tryflag CFLAGS_OPENMP -fopenmp
+
+if test "$usepie" = "yes" ; then
+    tryflag CFLAGS_PIE -fpie || tryflag CFLAGS_PIE -fPIE
+fi
+
+if test "$usepic" = "yes" ; then
+    tryflag CFLAGS_PIC -fpic || tryflag CFLAGS_PIC -fPIC
+fi
+
+test "$usepie" = "yes" && tryldflag LDFLAGS_PIE -pie
+
+if test "$usepic" = "yes" ; then
+    trysharedldflag LDFLAGS_PIC -fpic || trysharedldflag LDFLAGS_PIC -fPIC
+fi
+
+test "$usepie" = "no" && tryflag CFLAGS_PIE -fno-pie
+test "$usepic" = "no" && tryflag CFLAGS_PIC -fno-pic
+test "$usepie" = "no" && tryldflag LDFLAGS_PIE -no-pie
+test "$usepic" = "no" && trysharedldflag LDFLAGS_PIC -fno-pic
+
+tryflag CFLAGS -pipe
+
+# Try flags to optimize speed
+tryflag CFLAGS -ffunction-sections
+tryflag CFLAGS -fdata-sections
+
+CFLAGS_AVX=
+
+HAVE_AVX=
+if [ "$FORCE_AVX2" = "no" ]; then
+    tryflag CFLAGS -mno-avx2
+elif [ "$FORCE_AVX2" = "yes" ] ; then
+    CFLAGS_AVX=-mavx2
+    if [ "$CROSS_COMPILING" = "no" ] ; then
+        trycpusupport avx2 || echo "warning: avx2 forced but not supported on native CPU"
+    fi
+elif [ "$FORCE_AVX2" = "auto" ] && [ "$CROSS_COMPILING" = "no" ] ; then
+    trycpusupport avx2 && CFLAGS_AVX=-mavx2
+fi
+
+if [ "$FORCE_AVX" = "yes" ] ; then
+    CFLAGS_AVX=-mavx || echo "warning: avx forced but not supported on native CPU"
+elif [ "$FORCE_AVX" = "auto" ] && [ "$CFLAGS_AVX" = "" ] && [ "$CROSS_COMPILING" = "no" ] ; then
+    trycpusupport avx && CFLAGS_AVX=-mavx
+fi
+if [ "$FORCE_AVX" = "no" ]; then
+    tryflag CFLAGS -mno-avx
+fi
+
+if [ "$FORCE_SSE2" = "no" ]; then
+    tryflag CFLAGS -mno-sse2
+elif [ "$FORCE_SSE2" = "yes" ] ; then
+    CFLAGS_SSE=-msse2
+    if [ "$CROSS_COMPILING" = "no" ] ; then
+        trycpusupport sse2 || echo "warning: sse2 forced but not supported on native CPU"
+    fi
+elif [ "$FORCE_SSE2" = "auto" ] && [ "$CROSS_COMPILING" = "no" ] ; then
+    if [ "$CFLAGS_SSE" = "" ] && [ "$CROSS_COMPILING" = "no" ] ; then
+        trycpusupport sse2 && tryflag CFLAGS_SSE -msse2
+    fi
+fi
+
+HAVE_LTO=0
+if [ "$TRY_LTO" = "yes" ]; then
+    HAVE_LTO=1
+    CFLAGS_LTO="$CFLAGS_LTO -flto"
+elif [ "$TRY_LTO" = "auto" ]; then
+    tryflag CFLAGS_LTO -flto && HAVE_LTO=1
+fi
+
+if [ "$TRY_WHOLE_PROGRAM" = "yes" ] ; then
+    if [ "$HAVE_LTO" = "0" ] ; then
+        LDFLAGS_OPT="$LDFLAGS_OPT -fwhole-program"
+    else
+        echo "Error: whole-program and lto are mutually exclusive; disable one or set both to auto"
+        exit 1
+    fi
+elif [ "$TRY_WHOLE_PROGRAM" = "auto" ] ; then
+    if [ "$HAVE_LTO" = "0" ] ; then
+        tryldflag LDFLAGS_OPT -fwhole-program
+    else
+        echo "Have LTO, not trying -fwhole-program"
+    fi
+fi
+
+tryflag CFLAGS_OPT -fvisibility=hidden
+tryldflag LDFLAGS_AUTO -Wl,--gc-sections
+
+if [ "$ARCH" != "none" ] ; then
+    if ! tryflag CFLAGS -march=$ARCH ; then
+        echo "Flag -march=$ARCH failed!"
+        exit 1
+    fi
+fi
+tryldflag LDFLAGS_OPT -ldl
+
+# Try hardening flags
+if test "$usepie" = "yes" ; then
+    case "$LDFLAGS_PIE" in
+        *pie*)
+	    tryldflag LDFLAGS_PIE -Wl,-z,now
+	    tryldflag LDFLAGS_PIE -Wl,-z,relro
+	    ;;
+    esac
+fi
+if test "$usepic" = "yes" ; then
+    case "$LDFLAGS_PIC" in
+        *pic*)
+	    tryldflag LDFLAGS_PIC -Wl,-z,now
+	    tryldflag LDFLAGS_PIC -Wl,-z,relro
+	    ;;
+    esac
+fi
+
+# Check function availability
+if [ "$TRY_AVX512" = "yes" ]; then
+    printf "checking whether avx512 instructions are available..."
+    HAVE_AVX512=
+    tryccfn CFLAGS_AVX_512 "_mm512_movepi8_mask" "immintrin.h" && trycchdr CFLAGS_AVX_512 "immintrin.h" && ( tryccfn CFLAGS_AVX_512 "_blsr_u64" "immintrin.h" || tryccfn CFLAGS_AVX_512 "__blsr_u64" "immintrin.h" ) && tryflag CFLAGS_AVX_512 "-mbmi" && tryflag CFLAGS_AVX_512 "-mavx512bw" && CFLAGS_AVX_512="-mbmi -mavx512bw -DHAVE_AVX512=1" && HAVE_AVX512=1
+    if [ "$HAVE_AVX512" = "1" ]; then
+	echo "yes"
+    else
+	echo "no"
+	echo "WARNING: --try-avx512 option enabled, but no avx512 instruction set available"
+    fi
+fi
+
+tryccfn CFLAGS_AUTO "memmem" "string.h"
+
+if [ "$usetermcap" = "yes" ] || [ "$usetermcap" = "auto" ] ; then
+    tryccfn TERMCAP_H "tgetent" "termcap.h" && tryldflag LDFLAGS_TERMCAP -ltermcap && tryccfn CFLAGS_AUTO "tgetent" "termcap.h" termcap || \
+            if test "$usetermcap" = "yes"; then
+                echo "Error: --enable-termcap specified, but not found"
+                exit 1
+            fi
+fi
+
+if [ "$JQ_PREFIX" != "" ] && [ "$CROSS_COMPILING" = "no" ] ; then
+    echo "checking --prefix-jq ${JQ_PREFIX}"
+    if ! tryldflag LDFLAGS_JQ -ljq -L${JQ_PREFIX}/lib ; then
+        echo "Error: Failed to compile with -ljq and -L${JQ_PREFIX}/lib"
+        exit 1
+    else
+        LDFLAGS_JQ="$LDFLAGS_JQ -L$JQ_PREFIX/lib"
+    fi
+fi
+
+tryldflag LDFLAGS_JQ -lm
+tryldflag LDFLAGS_JQ -lshlwapi
+if [ "$MINGW" = "1" ]; then
+    tryldflag LDFLAGS_TMP -pthread && STATIC_LIBS="$STATIC_LIBS -pthread"
+else
+    tryldflag LDFLAGS_JQ -pthread
+fi
+
+tryccfn CFLAGS_AUTO "arc4random_uniform" "stdlib.h" || tryccfn CFLAGS_AUTO "rand_s" "stdlib.h" "" "#define _CRT_RAND_S"
+tryccfn1 CFLAGS_AUTO "__builtin_expect" "0,0"
+tryccfn1 CFLAGS_AUTO "__builtin_expect_with_probability" "0,0,0.5"
+
+# Optional features
+if test "$usedebugstderr" = "yes" ; then
+    USE_DEBUG_STDERR=1
+else
+    USE_DEBUG_STDERR=0
+fi
+
+ZSV_EXTRAS=
+if test "$MINIMAL" = "no" ; then
+    ZSV_EXTRAS=1
+fi
+
+printf "creating $CONFIGFILE... "
+
+cmdline=$(quote "$0")
+for i ; do cmdline="$cmdline $(quote "$i")" ; done
+
+exec 3>&1 1> $CONFIGFILE
+
+cat << EOF
+# This version of $CONFIGFILE was generated by:
+# $cmdline
+# Any changes made here will be lost if configure is re-run
+PREFIX = $PREFIX
+EXEC_PREFIX = $EXEC_PREFIX
+BINDIR = $EXEC_PREFIX/bin
+LIBDIR = $EXEC_PREFIX/lib
+INCLUDEDIR = $EXEC_PREFIX/include
+
+DOCPREFIX = $DOCDIR
+MANPREFIX = $MANDIR
+CC = $CC
+AWK = $AWK
+MAKE = $MAKE
+
+AR = $AR
+RANLIB = $RANLIB
+CFLAGS = $CFLAGS
+LDFLAGS = $LDFLAGS
+CFLAGS_STD = $CFLAGS_STD
+LDFLAGS_STD = $LDFLAGS_STD
+CFLAGS_OPT = $CFLAGS_OPT
+LDFLAGS_OPT = $LDFLAGS_OPT
+LDFLAGS_TERMCAP = $LDFLAGS_TERMCAP
+JQ_PREFIX = $JQ_PREFIX
+LDFLAGS_JQ = $LDFLAGS_JQ
+STATIC_LIBS = $STATIC_LIBS
+CFLAGS_AUTO = $CFLAGS_AUTO
+CFLAGS_LTO = $CFLAGS_LTO
+LDFLAGS_AUTO = $LDFLAGS_AUTO
+
+HAVE_AVX512=$HAVE_AVX512
+
+CFLAGS_AVX_512=$CFLAGS_AVX_512
+CFLAGS_AVX=$CFLAGS_AVX
+CFLAGS_SSE=$CFLAGS_SSE
+
+CFLAGS_DEBUG = -U_FORTIFY_SOURCE -UNDEBUG -O0 -g -Wall -Wextra -Wno-missing-field-initializers -Wunused # -g3 -ggdb
+LDFLAGS_DEBUG = -U_FORTIFY_SOURCE -UNDEBUG -O0 -g # -g3 -ggdb
+CFLAGS_PIC = $CFLAGS_PIC
+LDFLAGS_PIC = $LDFLAGS_PIC
+CFLAGS_PIE = $CFLAGS_PIE
+LDFLAGS_PIE = $LDFLAGS_PIE
+USE_DEBUG_STDERR = $USE_DEBUG_STDERR
+CFLAGS_VECTORIZE = $CFLAGS_VECTORIZE
+CFLAGS_VECTORIZE_OPTIMIZED = $CFLAGS_VECTORIZE_OPTIMIZED
+CFLAGS_VECTORIZE_MISSED = $CFLAGS_VECTORIZE_MISSED
+CFLAGS_VECTORIZE_ALL = $CFLAGS_VECTORIZE_ALL
+CFLAGS_OPENMP = $CFLAGS_OPENMP
+
+ZSV_EXTRAS = $ZSV_EXTRAS
+
+$NO_HAVE
+$USE_LIBS
+
+EOF
+exec 1>&3 3>&-
+
+printf "done\n"
+
+echo ""
+echo "****************************************************************"
+echo "*  zsv configuration                                           *"
+echo "****************************************************************"
+
+if [ "$JQ_PREFIX" != "" ]; then
+    echo "*  - jq-prefix: $JQ_PREFIX                                       *"
+fi
+
+if [ "$LDFLAGS_TERMCAP" = "" ]; then
+    echo "*  - termcap: no. \`pretty\` will use default width assumption   *"
+else
+    echo "*  - termcap: yes                                                *"
+fi
+
+if [ "$HAVE_AVX512" = "1" ]; then
+    echo "*  - using 512-bit AVX instruction set"
+elif [ "$CFLAGS_AVX" = "-mavx2" ]; then
+    echo "*  - using 256-bit AVX2 instruction set"
+elif [ "$CFLAGS_AVX" = "-mavx" ]; then
+    echo "*  - using 128-bit + AVX instruction set"
+else
+    echo "*  - using 128-bit vector size, no AVX"
+fi
+
+echo "****************************************************************"
+
+if ! [ "$MAKE" = "" ]; then
+    echo ""
+    echo "To build and install, run"
+    echo "$MAKE install" > `pwd`/install.sh 2>/dev/null && chmod 755 `pwd`/install.sh 2>/dev/null &&
+        printf "  ./install.sh\nor\n"
+    echo "  $MAKE install"
+    echo ""
+    echo "Other common commands:"
+    echo "  $MAKE                     # print available make commands"
+    echo "  (cd src && $MAKE install) # install library"
+    echo "  (cd app && $MAKE install) # install library and zsv CLI"
+    echo "  $MAKE uninstall           # uninstall library and zsv CLI"
+    echo "  $MAKE clean               # remove build artifacts"
+    echo ""
+fi
+
+if ! "$CC" --version | grep -i gcc >/dev/null && ! "$CC" --version | grep -i clang >/dev/null ; then
+    echo "*********************** WARNING!! ***********************"
+    echo "* Non-gcc/clang compiler untested; use at your own risk *"
+    echo "* consider using gcc or clang instead e.g.:             *"
+    echo "*       ./configure CC=gcc-11                           *"
+    echo "*********************************************************"
+    echo ""
+fi
+
+exit 0

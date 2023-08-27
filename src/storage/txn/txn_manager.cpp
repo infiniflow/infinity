@@ -35,8 +35,8 @@ TxnManager::GetTxnState(u64 txn_id) {
 
 u64
 TxnManager::GetNewTxnID() {
-    ++ txn_id_;
-    return txn_id_;
+    u64 new_txn_id = ++ catalog_->next_txn_id_;
+    return new_txn_id;
 }
 
 }

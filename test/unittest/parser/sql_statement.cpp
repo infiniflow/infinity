@@ -226,6 +226,29 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
+        String input_sql = "copy t1 to '/usr/filename' with (format json, header, delimiter '|');";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kCopy);
+            auto *copy_statement = (CopyStatement *) (statement);
+            EXPECT_EQ(copy_statement->copy_file_type_, CopyFileType::kJSON);
+            EXPECT_EQ(copy_statement->copy_from_, false);
+            EXPECT_EQ(copy_statement->schema_name_, "default");
+            EXPECT_EQ(copy_statement->table_name_, "t1");
+            EXPECT_EQ(copy_statement->file_path_, "/usr/filename");
+            EXPECT_EQ(copy_statement->header_, true);
+            EXPECT_EQ(copy_statement->delimiter_, '|');
+        }
+
+        result->Reset();
+    }
+
+
+    {
         String input_sql = "copy t2 from '/usr/filename' with (format csv, header, delimiter '|');";
         parser->Parse(input_sql, result);
 
@@ -236,6 +259,27 @@ TEST_F(StatementParsingTest, good_test1) {
             EXPECT_EQ(statement->type_, StatementType::kCopy);
             auto *copy_statement = (CopyStatement *) (statement);
             EXPECT_EQ(copy_statement->copy_file_type_, CopyFileType::kCSV);
+            EXPECT_EQ(copy_statement->copy_from_, true);
+            EXPECT_EQ(copy_statement->schema_name_, "default");
+            EXPECT_EQ(copy_statement->table_name_, "t2");
+            EXPECT_EQ(copy_statement->file_path_, "/usr/filename");
+            EXPECT_EQ(copy_statement->header_, true);
+            EXPECT_EQ(copy_statement->delimiter_, '|');
+        }
+        result->Reset();
+    }
+
+    {
+        String input_sql = "copy t2 from '/usr/filename' with (format json, header, delimiter '|');";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for(auto& statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kCopy);
+            auto *copy_statement = (CopyStatement *) (statement);
+            EXPECT_EQ(copy_statement->copy_file_type_, CopyFileType::kJSON);
             EXPECT_EQ(copy_statement->copy_from_, true);
             EXPECT_EQ(copy_statement->schema_name_, "default");
             EXPECT_EQ(copy_statement->table_name_, "t2");

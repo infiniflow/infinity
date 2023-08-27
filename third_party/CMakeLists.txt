@@ -41,3 +41,6 @@ add_subdirectory(leveldb)
 
 # Build fastpfor
 add_subdirectory(fastpfor)
+
+# Build zsv
+add_subdirectory(zsv)

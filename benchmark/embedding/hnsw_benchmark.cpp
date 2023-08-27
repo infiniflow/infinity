@@ -4,7 +4,6 @@
 
 #define ANKERL_NANOBENCH_IMPLEMENT
 
-#include "nanobench.h"
 #include "hnswlib/hnswlib.h"
 #include "common/types/internal_types.h"
 #include "main/profiler/base_profiler.h"

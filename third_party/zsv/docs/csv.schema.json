@@ -1,0 +1,46 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "array",
+      "description": "first row is ordered array of column specifications",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "examples": ["City", "State", "My Column"]
+          },
+          "datatype": {
+            "enum": ["int", "text", "real"]
+          },
+          "collate": {
+            "enum": [ "nocase", "binary", "rtrim" ]
+          }
+        }
+      }
+    }
+  ],
+  "additionalItems": 
+  {
+      "type": "array",
+      "description": "row of data",
+      "examples": [["A1 value", 22, true],
+                   ["Abc", "def", "ghi"],
+                   ["abc", "Def", ""]
+                  ],
+      "items": {
+        "examples": ["Hi there", 123],
+        "oneOf": [
+          { "type": "null" },
+          { "type": "integer" },
+          { "type": "number" },
+          { "type": "string" },
+          { "type": "boolean" }
+        ]
+      }
+    }
+
+}

@@ -185,6 +185,7 @@ target_link_libraries(
         faiss
         leveldb
         fastpfor
+        zsv_parser
         ${EXTERNAL_LIBS}
 )
 
@@ -197,5 +198,6 @@ target_link_libraries(
         roaring
         leveldb
         fastpfor
+        zsv_parser
         ${EXTERNAL_LIBS}
 )

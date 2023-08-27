@@ -50,6 +50,7 @@ enum class PhysicalOperatorType: uint8_t {
     kExplain,
     kPreparedPlan,
     kShow,
+    kFlush,
 
     kSink,
     kExchange,

@@ -22,6 +22,7 @@
 #include "parser/statement/show_statement.h"
 #include "parser/statement/explain_statement.h"
 #include "parser/statement/copy_statement.h"
+#include "parser/statement/flush_statement.h"
 
 namespace infinity {
 
@@ -112,12 +113,12 @@ public:
     void
     BuildExportCsv(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
+    void
+    BuildExportJson(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
+
     // Import operator
     void
     BuildImport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
-
-    void
-    BuildImportCsv(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Alter operator
     void
@@ -136,6 +137,20 @@ public:
     void
     BuildShowViews(const ShowStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
+    // Flush
+    void
+    BuildFlush(const FlushStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
+
+    void
+    BuildFlushData(const FlushStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
+
+    void
+    BuildFlushLog(const FlushStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
+
+    void
+    BuildFlushBuffer(const FlushStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
+
+    // Explain
     void
     BuildExplain(const ExplainStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 

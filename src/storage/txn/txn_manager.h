@@ -42,8 +42,8 @@ public:
         return buffer_mgr_;
     }
 
-    inline TxnTimeStamp
-    GetTimestamp() const {
+    static inline TxnTimeStamp
+    GetTimestamp() {
         return std::chrono::high_resolution_clock::now().time_since_epoch().count();
     }
 

@@ -119,25 +119,28 @@ NewCatalog::Serialize(const NewCatalog* catalog) {
     nlohmann::json json_res;
 
     json_res["current_dir"] = *catalog->current_dir_;
+    json_res["next_txn_id"] = catalog->next_txn_id_;
     for(const auto& db_meta: catalog->databases_) {
         json_res["databases"].emplace_back(DBMeta::Serialize(db_meta.second.get()));
     }
     return json_res;
 }
 
-SharedPtr<NewCatalog>
+void
 NewCatalog::Deserialize(const nlohmann::json& catalog_json,
-                        BufferManager* buffer_mgr) {
+                        BufferManager* buffer_mgr,
+                        UniquePtr<NewCatalog>& catalog) {
     SharedPtr<String> current_dir = MakeShared<String>(catalog_json["current_dir"]);
 
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
-    SharedPtr<NewCatalog> res = MakeShared<NewCatalog>(current_dir);
+    catalog = MakeUnique<NewCatalog>(current_dir);
+    catalog->next_txn_id_ = catalog_json["next_txn_id"];
     for(const auto& db_json: catalog_json["databases"]) {
         UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
-        res->databases_.emplace(*db_meta->db_name_, std::move(db_meta));
+        catalog->databases_.emplace(*db_meta->db_name_, std::move(db_meta));
     }
 
-    return res;
+    return ;
 }
 
 }

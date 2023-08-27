@@ -2,11 +2,8 @@
 // Created by jinhai on 23-5-1.
 //
 
-#define ANKERL_NANOBENCH_IMPLEMENT
-
 #include <thread>
-#include <openblas/cblas.h>
-#include "nanobench.h"
+#include <cblas.h>
 
 #include "common/types/internal_types.h"
 #include "faiss/index_factory.h"

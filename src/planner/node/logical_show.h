@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "planner/logical_node.h"
 
 #include "storage/table.h"
@@ -32,7 +34,7 @@ public:
         : LogicalNode(node_id, LogicalNodeType::kShow),
         scan_type_(type),
         schema_name_(std::move(schema_name)),
-        object_name_(object_name),
+        object_name_(std::move(object_name)),
         table_index_(table_index)
         {}
 

@@ -12,6 +12,7 @@
 #include "expression/cast_expression.h"
 #include "planner/node/logical_insert.h"
 #include "planner/node/logical_show.h"
+#include "planner/node/logical_flush.h"
 #include "planner/node/logical_drop_index.h"
 #include "planner/node/logical_drop_view.h"
 #include "planner/node/logical_drop_collection.h"
@@ -22,6 +23,8 @@
 #include "planner/node/logical_explain.h"
 #include "parser/statement.h"
 #include "explain_logical_plan.h"
+#include "planner/node/logical_import.h"
+#include "storage/io/local_file_system.h"
 
 namespace infinity {
 
@@ -57,6 +60,10 @@ LogicalPlanner::Build(const BaseStatement* statement, SharedPtr<BindContext> bin
         }
         case StatementType::kShow: {
             BuildShow(static_cast<const ShowStatement*>(statement), bind_context_ptr);
+            break;
+        }
+        case StatementType::kFlush: {
+            BuildFlush(static_cast<const FlushStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kCopy: {
@@ -528,6 +535,8 @@ LogicalPlanner::BuildExport(const CopyStatement* statement, SharedPtr<BindContex
     switch(statement->copy_file_type_) {
         case CopyFileType::kCSV:
             return BuildExportCsv(statement, bind_context_ptr);
+        case CopyFileType::kJSON:
+            return BuildExportJson(statement, bind_context_ptr);
         default: {
             PlannerError("Export data to unsupported file type.")
         }
@@ -540,19 +549,39 @@ LogicalPlanner::BuildExportCsv(const CopyStatement* statement, SharedPtr<BindCon
 }
 
 void
-LogicalPlanner::BuildImport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    switch(statement->copy_file_type_) {
-        case CopyFileType::kCSV:
-            return BuildImportCsv(statement, bind_context_ptr);
-        default: {
-            PlannerError("Export data to unsupported file type.")
-        }
-    }
+LogicalPlanner::BuildExportJson(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
+    PlannerError("Exporting to JSON file isn't supported.");
 }
 
 void
-LogicalPlanner::BuildImportCsv(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    PlannerError("Import from CSV file isn't supported.");
+LogicalPlanner::BuildImport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
+
+    // Check the table existence
+    auto base_table_ptr = Infinity::instance().catalog()->GetTableByNameNoExcept(statement->schema_name_,
+                                                                                 statement->table_name_);
+    if(base_table_ptr == nullptr) {
+        // Not found in catalog
+        PlannerError("Table: " + statement->schema_name_ + '.' + statement->table_name_ +" is not found in catalog.");
+    }
+
+    // Check the file existence
+    LocalFileSystem fs;
+
+    String to_write_path;
+    if(!fs.Exists(statement->file_path_)) {
+        PlannerError("File: " + statement->file_path_ +" doesn't exist.");
+    }
+
+    SharedPtr<LogicalNode> logical_import =
+            MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
+                                      statement->schema_name_,
+                                      statement->table_name_,
+                                      statement->file_path_,
+                                      statement->header_,
+                                      statement->delimiter_,
+                                      statement->copy_file_type_);
+
+    this->logical_plan_ = logical_import;
 }
 
 void
@@ -616,6 +645,46 @@ LogicalPlanner::BuildShowViews(const ShowStatement* statement, SharedPtr<BindCon
                                     bind_context_ptr->GenerateTableIndex());
     this->logical_plan_ = logical_show;
 }
+
+void
+LogicalPlanner::BuildFlush(const FlushStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
+    switch(statement->type()) {
+        case FlushType::kData: {
+            return BuildFlushData(statement, bind_context_ptr);
+        }
+        case FlushType::kBuffer: {
+            return BuildFlushBuffer(statement, bind_context_ptr);
+        }
+        case FlushType::kLog: {
+            return BuildFlushLog(statement, bind_context_ptr);
+        }
+    }
+}
+
+void
+LogicalPlanner::BuildFlushData(const FlushStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_flush =
+            MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(),
+                                    FlushType::kData);
+    this->logical_plan_ = logical_flush;
+}
+
+void
+LogicalPlanner::BuildFlushLog(const FlushStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_flush =
+            MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(),
+                                     FlushType::kLog);
+    this->logical_plan_ = logical_flush;
+}
+
+void
+LogicalPlanner::BuildFlushBuffer(const FlushStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_flush =
+            MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(),
+                                     FlushType::kBuffer);
+    this->logical_plan_ = logical_flush;
+}
+
 
 void
 LogicalPlanner::BuildExplain(const ExplainStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {

@@ -45,6 +45,9 @@ TEST_F(SQLParserTest, good_test1) {
     inputs.emplace_back("show tables;");
     inputs.emplace_back("describe t1;");
     inputs.emplace_back("describe s1.t1;");
+    inputs.emplace_back("flush data;");
+    inputs.emplace_back("flush log;");
+    inputs.emplace_back("flush buffer;");
 
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();

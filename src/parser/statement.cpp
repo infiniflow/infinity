@@ -49,6 +49,10 @@ Statement::Explain(const BaseStatement* statement,
             BuildShow((ShowStatement*)statement, stmt_string, intent_size);
             break;
         }
+        case StatementType::kFlush: {
+            BuildFlush((FlushStatement*)statement, stmt_string, intent_size);
+            break;
+        }
         default: {
             PlannerError("Unexpected statement type")
         }
@@ -439,6 +443,13 @@ Statement::BuildShow(const ShowStatement* show_statement,
             break;
         }
     }
+}
+
+void
+Statement::BuildFlush(const FlushStatement* flush_statement,
+                      SharedPtr<Vector<SharedPtr<String>>>& result,
+                      i64 intent_size) {
+    return ;
 }
 
 void

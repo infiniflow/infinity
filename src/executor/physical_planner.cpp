@@ -10,6 +10,20 @@
 #include "planner/node/logical_sort.h"
 #include "planner/node/logical_table_scan.h"
 #include "planner/node/logical_dummy_scan.h"
+#include "planner/node/logical_filter.h"
+#include "planner/node/logical_limit.h"
+#include "planner/node/logical_aggregate.h"
+#include "planner/node/logical_cross_product.h"
+#include "planner/node/logical_explain.h"
+#include "planner/node/logical_create_schema.h"
+#include "planner/node/logical_drop_schema.h"
+#include "planner/node/logical_create_collection.h"
+#include "planner/node/logical_drop_collection.h"
+#include "planner/node/logical_join.h"
+#include "planner/node/logical_create_view.h"
+#include "planner/node/logical_drop_view.h"
+#include "planner/node/logical_flush.h"
+#include "planner/node/logical_import.h"
 
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_aggregate.h"
@@ -40,22 +54,11 @@
 #include "executor/operator/physical_prepared_plan.h"
 #include "executor/operator/physical_dummy_operator.h"
 #include "executor/operator/physical_dummy_scan.h"
-#include "planner/node/logical_filter.h"
-#include "planner/node/logical_limit.h"
-#include "planner/node/logical_aggregate.h"
-#include "planner/node/logical_cross_product.h"
-#include "planner/node/logical_explain.h"
+#include "executor/operator/physical_flush.h"
 #include "executor/operator/physical_explain.h"
-#include "planner/node/logical_create_schema.h"
-#include "executor/operator/physical_create_schema.h"
-#include "planner/node/logical_drop_schema.h"
 #include "executor/operator/physical_drop_schema.h"
-#include "planner/node/logical_create_collection.h"
-#include "planner/node/logical_drop_collection.h"
-#include "planner/node/logical_join.h"
+#include "executor/operator/physical_create_schema.h"
 #include "explain_physical_plan.h"
-#include "planner/node/logical_create_view.h"
-#include "planner/node/logical_drop_view.h"
 
 #include <limits>
 
@@ -182,6 +185,10 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
         }
         case LogicalNodeType::kIntersect: {
             result = BuildIntersect(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kFlush: {
+            result = BuildFlush(logical_operator);
             break;
         }
         case LogicalNodeType::kExplain: {
@@ -324,7 +331,14 @@ PhysicalPlanner::BuildUpdate(const SharedPtr<LogicalNode> &logical_operator) con
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalImport>(logical_operator->node_id());
+    LogicalImport* logical_import = (LogicalImport*)(logical_operator.get());
+    return MakeShared<PhysicalImport>(logical_operator->node_id(),
+                                      logical_import->schema_name(),
+                                      logical_import->table_name(),
+                                      logical_import->file_path(),
+                                      logical_import->header(),
+                                      logical_import->delimiter(),
+                                      logical_import->ImportFileType());
 }
 
 SharedPtr<PhysicalOperator>
@@ -537,6 +551,12 @@ PhysicalPlanner::BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) 
     SharedPtr<LogicalDummyScan> logical_show =
             std::static_pointer_cast<LogicalDummyScan>(logical_operator);
     return MakeShared<PhysicalDummyScan>(logical_show->node_id());
+}
+
+SharedPtr<PhysicalOperator>
+PhysicalPlanner::BuildFlush(const SharedPtr<LogicalNode>& logical_operator) const {
+    LogicalFlush* logical_flush = (LogicalFlush*)(logical_operator.get());
+    return MakeShared<PhysicalFlush>(logical_flush->flush_type(), logical_flush->node_id());
 }
 
 SharedPtr<PhysicalOperator>

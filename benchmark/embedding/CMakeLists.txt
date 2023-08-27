@@ -13,10 +13,10 @@ add_executable(faiss_benchmark
         ${source_files}
         )
 
-target_include_directories(faiss_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nanobench/src/include")
 target_include_directories(faiss_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(faiss_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/hnswlib")
 target_include_directories(faiss_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
+target_include_directories(faiss_benchmark PUBLIC "/usr/include")
 
 target_link_libraries(
         faiss_benchmark
@@ -33,7 +33,6 @@ add_executable(hnsw_benchmark
         helper.h
         )
 
-target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nanobench/src/include")
 target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/hnswlib")
 target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 

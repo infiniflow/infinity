@@ -42,6 +42,7 @@ BITMAP          { return BITMAP; }
 BOOLEAN         { return BOOLEAN; }
 BOX             { return BOX; }
 BLOB            { return BLOB; }
+BUFFER          { return BUFFER; }
 BY              { return BY; }
 CASE            { return CASE; }
 CAST            { return CAST; }
@@ -51,6 +52,7 @@ COLLECTION      { return COLLECTION; }
 COPY            { return COPY; }
 CREATE          { return CREATE; }
 CROSS           { return CROSS; }
+DATA            { return DATA; }
 DATE            { return DATE; }
 DATETIME        { return DATETIME; }
 DAY             { return DAY; }
@@ -73,6 +75,7 @@ EXISTS          { return EXISTS; }
 EXPLAIN         { return EXPLAIN; }
 FALSE           { return FALSE; }
 FLOAT           { return FLOAT; }
+FLUSH           { return FLUSH; }
 FORMAT          { return FORMAT; }
 FROM            { return FROM; }
 FULL            { return FULL; }
@@ -98,6 +101,7 @@ LEFT            { return LEFT; }
 LIKE            { return LIKE; }
 LIMIT           { return LIMIT; }
 LINE            { return LINE; }
+LOG             { return LOG; }
 LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
 MINUTE          { return MINUTE; }

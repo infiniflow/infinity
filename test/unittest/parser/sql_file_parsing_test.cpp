@@ -91,3 +91,23 @@ TEST_F(SQLFileParsingTest, hyrise) {
         result->Reset();
     }
 }
+
+TEST_F(SQLFileParsingTest, infinity) {
+    using namespace infinity;
+
+    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr <ParserResult> result = MakeShared<ParserResult>();
+
+    // Get all tpch sql text;
+    String good_sql = String(TEST_DATA_PATH) + "/infinity/good.sql";
+    std::filesystem::path good_sql_path(good_sql);
+
+    Vector<String> sqls;
+    ReadSQLs(good_sql_path, sqls);
+    for(auto& input_sql: sqls) {
+//        std::cout << input_sql << std::endl;
+        parser->Parse(input_sql, result);
+        result->Reset();
+    }
+}
+

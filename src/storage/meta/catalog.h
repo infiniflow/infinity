@@ -54,12 +54,14 @@ public:
     static nlohmann::json
     Serialize(const NewCatalog* catalog);
 
-    static SharedPtr<NewCatalog>
+    static void
     Deserialize(const nlohmann::json& catalog_json,
-                BufferManager* buffer_mgr);
+                BufferManager* buffer_mgr,
+                UniquePtr<NewCatalog>& catalog);
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
+    u64 next_txn_id_{};
     RWMutex rw_locker_;
 };
 

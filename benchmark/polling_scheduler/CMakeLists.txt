@@ -17,7 +17,6 @@ add_executable(polling_scheduler_benchmark
         ${scheduler_benchmark_files}
         )
 
-target_include_directories(polling_scheduler_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nanobench/src/include")
 target_include_directories(polling_scheduler_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(polling_scheduler_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 

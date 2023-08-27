@@ -3,10 +3,11 @@ cxxopts v3.0.0
 googletest v1.12.1
 linenoise v1.0
 magic_enum v0.8.1
-nanobench v4.3.7
 spdlog v1.10.0
 simdjson v3.1.8
 tlsf v3.1.0
 leveldb commit-id:068d5ee1a3ac40dabd00d211d5013af44be55bea
 fastpfor commit-id:773283d4a11fa2440a1b3b28fd77f775e86d7898
 tlx v0.6.1
+nlohmann 3.11.2
+zsv commit-id:5c22aae4363fdcd433079d2a9b48007a7c6fbbdf

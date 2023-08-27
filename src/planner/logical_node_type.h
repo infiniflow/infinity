@@ -47,4 +47,5 @@ enum class LogicalNodeType: uint8_t {
     kShow,
     kExplain,
     kPrepare,
+    kFlush,
 };

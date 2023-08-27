@@ -22,6 +22,10 @@ CopyStatement::ToString() const {
             file_format = "CSV";
             break;
         }
+        case CopyFileType::kJSON: {
+            file_format = "JSON";
+            break;
+        }
     }
 
     ss << "COPY: " << schema_name_
