@@ -34,7 +34,9 @@ OperatorPipeline::OnExecute(SharedPtr<QueryContext>& query_context) {
 
 SharedPtr<Table>
 OperatorPipeline::GetResult() {
-    ExecutorAssert(operator_->output() != nullptr, "No input table.");
+    if(operator_->output() == nullptr) {
+        ExecutorError("No input table.");
+    }
     return operator_->output();
 }
 

@@ -58,12 +58,19 @@ PhysicalImport::ImportCSV(SharedPtr<QueryContext>& query_context) {
     zsv_delete(parser_context.parser_);
 
     fclose(fp);
-    if(csv_parser_status == zsv_status_ok) {
-        return ;
-    } else if(csv_parser_status != zsv_status_no_more_input) {
+    if(csv_parser_status != zsv_status_no_more_input) {
         String err_msg = (char*)zsv_parse_status_desc(csv_parser_status);
         ExecutorError(err_msg);
     }
+    // Generate the result
+    Vector<SharedPtr<ColumnDef>> column_defs;
+
+    SharedPtr<TableDef> result_table_def_ptr
+            = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
+
+    SharedPtr<String> result_msg = MakeShared<String>(fmt::format("IMPORTED {} Rows", parser_context.row_count_));
+    output_->SetResultMsg(result_msg);
 }
 
 void
@@ -94,7 +101,6 @@ PhysicalImport::CSVRowHandler(void *context) {
     }
 
     ++ parser_context->row_count_;
-    return ;
 }
 
 }

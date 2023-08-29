@@ -25,26 +25,25 @@ public:
     explicit Connection(boost::asio::io_service& io_service);
     void Run();
 
-    std::shared_ptr<boost::asio::ip::tcp::socket> socket() { return socket_; }
+    SharedPtr<boost::asio::ip::tcp::socket> socket() { return socket_; }
 private:
     void HandleConnection();
 
     void HandleRequest();
 
-    void HandlerSimpleQuery(std::shared_ptr<QueryContext>& query_context);
+    void HandlerSimpleQuery(SharedPtr<QueryContext>& query_context);
 
-    const std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
+    const SharedPtr<boost::asio::ip::tcp::socket> socket_;
 
-    const std::shared_ptr<PGProtocolHandler> pg_handler_;
+    const SharedPtr<PGProtocolHandler> pg_handler_;
 
     bool terminate_connection_ = false;
 
-    void SendTableDescription(const std::shared_ptr<Table>& result_table);
-    void SendQueryResponse(const std::shared_ptr<Table>& result_table);
-    void SendComplete(LogicalNodeType operator_type, uint64_t row_count);
+    void SendTableDescription(const SharedPtr<Table>& result_table);
+    void SendQueryResponse(const QueryResult& query_result);
 
 private:
-    std::shared_ptr<Session> session_ptr_;
+    SharedPtr<Session> session_ptr_;
 };
 
 }

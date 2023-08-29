@@ -111,9 +111,7 @@ Connection::HandlerSimpleQuery(SharedPtr<QueryContext>& query_context) {
     } else {
         // Have result
         SendTableDescription(result.result_);
-        SendQueryResponse(result.result_);
-        u64 row_count = result.result_->row_count();
-        SendComplete(result.root_operator_type_, row_count);
+        SendQueryResponse(result);
     }
 
     pg_handler_->send_ready_for_query();
@@ -205,7 +203,9 @@ Connection::SendTableDescription(const SharedPtr<Table>& result_table) {
 }
 
 void
-Connection::SendQueryResponse(const SharedPtr<Table>& result_table) {
+Connection::SendQueryResponse(const QueryResult& query_result) {
+
+    const SharedPtr<Table>& result_table = query_result.result_;
     SizeT column_count = result_table->ColumnCount();
     auto values_as_strings = std::vector<std::optional<String>>(column_count);
     SizeT block_count = result_table->DataBlockCount();
@@ -226,12 +226,9 @@ Connection::SendQueryResponse(const SharedPtr<Table>& result_table) {
             pg_handler_->SendData(values_as_strings, string_length_sum);
         }
     }
-}
 
-void
-Connection::SendComplete(LogicalNodeType root_operator_type, u64 row_count) {
     String message;
-    switch (root_operator_type) {
+    switch (query_result.root_operator_type_) {
         case LogicalNodeType::kInsert: {
             message = "INSERT 0 1";
             break;
@@ -244,8 +241,12 @@ Connection::SendComplete(LogicalNodeType root_operator_type, u64 row_count) {
             message = "DELETE -1";
             break;
         }
+        case LogicalNodeType::kImport: {
+            message = *query_result.result_->result_msg();
+            break;
+        }
         default: {
-            message = "SELECT " + std::to_string(row_count);
+            message = "SELECT " + std::to_string(query_result.result_->row_count());
         }
     }
 

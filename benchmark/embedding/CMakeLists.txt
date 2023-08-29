@@ -25,6 +25,7 @@ target_link_libraries(
         gfortran
         leveldb
         roaring
+        zsv_parser
 )
 
 add_executable(hnsw_benchmark
@@ -41,4 +42,5 @@ target_link_libraries(
         infinity_core
         leveldb
         roaring
+        zsv_parser
 )

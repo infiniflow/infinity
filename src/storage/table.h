@@ -105,6 +105,16 @@ public:
         row_count_ += row_count;
     }
 
+    inline void
+    SetResultMsg(const SharedPtr<String>& result_msg) {
+        result_msg_ = result_msg;
+    }
+
+    inline const SharedPtr<String>&
+    result_msg() const {
+        return result_msg_;
+    }
+
 public:
     [[nodiscard]] String
     ToString() const;
@@ -120,6 +130,7 @@ public:
     SizeT row_count_{0};
     TableType type_{TableType::kInvalid};
     Vector<SharedPtr<DataBlock>> data_blocks_;
+    SharedPtr<String> result_msg_{};
 };
 
 }
