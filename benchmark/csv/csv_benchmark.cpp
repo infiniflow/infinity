@@ -33,10 +33,12 @@ void my_row_handler(void *ctx) {
         /* use zsv_get_cell() to get our cell data */
         struct zsv_cell c = zsv_get_cell(data->parser, i);
 
+        printf("%s, ", c.str);
         /* check if the cell data length is zero */
         if(c.len > 0)
             nonblank++;
     }
+    printf("\n");
 
     /* print our results for this row */
     printf("Row %zu has %zu columns of which %zu %s non-blank\n", ++data->row_num, cell_count, nonblank, nonblank == 1 ? "is" : "are");
@@ -47,7 +49,7 @@ main () -> int {
 
     std::cout << std::filesystem::current_path() << std::endl;
 
-    std::string filename = std::string(CSV_DATA_PATH) + "/test/desc.csv";
+    std::string filename = std::string(CSV_DATA_PATH) + "/test/flatten.csv";
 
     FILE *f = fopen(filename.c_str(), "rb");
     if(!f) {
@@ -67,6 +69,8 @@ main () -> int {
     struct my_data data = { 0 };
     opts.ctx = &data;
     opts.stream = f;
+    opts.delimiter = ',';
+
 
     /**
      * Create a parser
@@ -77,8 +81,11 @@ main () -> int {
      * Continuously parse our input until we have no more input
      */
     enum zsv_status stat;
-    while((stat = zsv_parse_more(data.parser)) == zsv_status_ok)
-        ;
+    while((stat = zsv_parse_more(data.parser)) == zsv_status_ok) {
+
+        break;
+    }
+
 
     /**
      * Clean up
@@ -88,6 +95,10 @@ main () -> int {
 
     if(f != stdin)
         fclose(f);
+
+    if(stat == zsv_status_ok) {
+        return 0;
+    }
 
     /**
      * If there was a parse error, print it

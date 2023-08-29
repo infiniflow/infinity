@@ -1,15 +1,16 @@
 //
-// Created by jinhai on 23-8-27.
+// Created by jinhai on 23-8-29.
 //
 
-#include "logical_import.h"
+
+#include "logical_export.h"
 
 #include <sstream>
 
 namespace infinity {
 
 String
-LogicalImport::ToString(i64& space) {
+LogicalExport::ToString(i64& space) {
     std::stringstream ss;
     String arrow_str;
     if(space > 3) {
@@ -17,7 +18,7 @@ LogicalImport::ToString(i64& space) {
         arrow_str = "->  ";
     }
 
-    ss << String(space, ' ') << "-> " << "Import from: " << file_path_;
+    ss << String(space, ' ') << "-> " << "Export from: " << file_path_;
 
     switch(file_type_) {
         case CopyFileType::kCSV: {
@@ -37,3 +38,4 @@ LogicalImport::ToString(i64& space) {
 }
 
 }
+

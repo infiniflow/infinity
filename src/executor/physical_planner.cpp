@@ -24,6 +24,7 @@
 #include "planner/node/logical_drop_view.h"
 #include "planner/node/logical_flush.h"
 #include "planner/node/logical_import.h"
+#include "planner/node/logical_export.h"
 
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_aggregate.h"
@@ -125,7 +126,7 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
             break;
         }
         case LogicalNodeType::kExport: {
-            result = BuildExcept(logical_operator);
+            result = BuildExport(logical_operator);
             break;
         }
 
@@ -338,12 +339,19 @@ PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode> &logical_operator) con
                                       logical_import->file_path(),
                                       logical_import->header(),
                                       logical_import->delimiter(),
-                                      logical_import->ImportFileType());
+                                      logical_import->FileType());
 }
 
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildExport(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalExport>(logical_operator->node_id());
+    LogicalExport* logical_export = (LogicalExport*)(logical_operator.get());
+    return MakeShared<PhysicalExport>(logical_export->node_id(),
+                                      logical_export->schema_name(),
+                                      logical_export->table_name(),
+                                      logical_export->file_path(),
+                                      logical_export->header(),
+                                      logical_export->delimiter(),
+                                      logical_export->FileType());
 }
 
 SharedPtr<PhysicalOperator>

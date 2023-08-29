@@ -70,8 +70,8 @@ QueryContext::QueryContext(SharedPtr<Session> session_ptr, UniquePtr<Transaction
 
 QueryResult
 QueryContext::Query(const String &query) {
-    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
 
     parser->Parse(query, parsed_result);
 

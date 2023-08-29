@@ -1,5 +1,5 @@
 //
-// Created by jinhai on 23-8-27.
+// Created by jinhai on 23-8-29.
 //
 
 #pragma once
@@ -8,23 +8,23 @@
 
 namespace infinity {
 
-class LogicalImport : public LogicalNode {
+class LogicalExport : public LogicalNode {
 public:
     explicit
-    LogicalImport(u64 node_id,
+    LogicalExport(u64 node_id,
                   String schema_name,
                   String table_name,
                   String file_path,
                   bool header,
                   char delimiter,
                   CopyFileType type)
-            : LogicalNode(node_id, LogicalNodeType::kImport),
-            schema_name_(std::move(schema_name)),
-            table_name_(std::move(table_name)),
-            file_path_(std::move(file_path)),
-            header_(header),
-            delimiter_(delimiter),
-            file_type_(type) {}
+            : LogicalNode(node_id, LogicalNodeType::kExport),
+              schema_name_(std::move(schema_name)),
+              table_name_(std::move(table_name)),
+              file_path_(std::move(file_path)),
+              header_(header),
+              delimiter_(delimiter),
+              file_type_(type) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {
@@ -46,7 +46,7 @@ public:
 
     inline String
     name() final {
-        return "LogicalImport";
+        return "LogicalExport";
     }
 
     [[nodiscard]] CopyFileType

@@ -16,4 +16,14 @@ PhysicalExport::Execute(SharedPtr<QueryContext>& query_context) {
 
 }
 
+void
+PhysicalExport::ExportCSV(SharedPtr<QueryContext>& query_context) {
+
+}
+
+void
+PhysicalExport::ExportJSON(SharedPtr<QueryContext>& query_context) {
+
+}
+
 }

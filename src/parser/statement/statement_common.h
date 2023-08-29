@@ -13,6 +13,16 @@ enum class CopyFileType {
     kJSON,
 };
 
+inline SharedPtr<String>
+copy_file_to_str(CopyFileType copy_file_type) {
+    switch(copy_file_type) {
+        case CopyFileType::kCSV:
+            return MakeShared<String>("CSV");
+        case CopyFileType::kJSON:
+            return MakeShared<String>("JSON");
+    }
+}
+
 struct TableName {
     char* schema_name_ptr_{nullptr};
     char* table_name_ptr_{nullptr};

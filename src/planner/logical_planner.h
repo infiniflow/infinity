@@ -103,18 +103,12 @@ public:
     void
     BuildExecute(const ExecuteStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
-
     void
     BuildCopy(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
+
     // Export operator
     void
     BuildExport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
-
-    void
-    BuildExportCsv(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
-
-    void
-    BuildExportJson(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     // Import operator
     void

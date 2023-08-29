@@ -35,6 +35,7 @@
 #include "executor/operator/physical_alter.h"
 #include "executor/operator/physical_create_view.h"
 #include "executor/operator/physcial_drop_view.h"
+#include "executor/operator/physical_flush.h"
 
 namespace infinity {
 
@@ -195,6 +196,10 @@ public:
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 
+    static void
+    Explain(const PhysicalFlush* flush_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
 };
 
 }

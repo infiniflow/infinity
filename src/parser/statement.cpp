@@ -435,6 +435,14 @@ Statement::BuildShow(const ShowStatement* show_statement,
             result->emplace_back(MakeShared<String>(table_name));
             break;
         }
+        case ShowStmtType::kCollections: {
+            NotImplementError("Show collections");
+            break;
+        }
+        case ShowStmtType::kViews: {
+            NotImplementError("Show views");
+            break;
+        }
         case ShowStmtType::kTables: {
             result->emplace_back(MakeShared<String>("SHOW TABLES: "));
             intent_size += 2;
@@ -449,14 +457,63 @@ void
 Statement::BuildFlush(const FlushStatement* flush_statement,
                       SharedPtr<Vector<SharedPtr<String>>>& result,
                       i64 intent_size) {
-    return ;
+    switch(flush_statement->type_) {
+        case FlushType::kData:
+            result->emplace_back(MakeShared<String>("FLUSH DATA"));
+            break;
+        case FlushType::kLog:
+            result->emplace_back(MakeShared<String>("FLUSH LOG"));
+            break;
+        case FlushType::kBuffer:
+            result->emplace_back(MakeShared<String>("FLUSH BUFFER"));
+            break;
+    }
 }
 
 void
-Statement::BuildCopy(const CopyStatement* statement,
+Statement::BuildCopy(const CopyStatement* copy_statement,
                      SharedPtr<Vector<SharedPtr<String>>>& result,
                      i64 intent_size) {
-    return ;
+    if(copy_statement->copy_from_) {
+        // IMPORT
+        result->emplace_back(MakeShared<String>("IMPORT DATA:"));
+    } else {
+        // EXPORT
+        result->emplace_back(MakeShared<String>("EXPORT DATA:"));
+    }
+
+    SharedPtr<String> schema_name
+        = MakeShared<String>(String(intent_size, ' ') + "schema: " + copy_statement->schema_name_);
+    result->emplace_back(schema_name);
+
+    SharedPtr<String> table_name
+        = MakeShared<String>(String(intent_size, ' ') + "table: " + copy_statement->table_name_);
+    result->emplace_back(table_name);
+
+    SharedPtr<String> path
+        = MakeShared<String>(String(intent_size, ' ') + "file: " + copy_statement->file_path_);
+    result->emplace_back(path);
+
+    switch(copy_statement->copy_file_type_) {
+        case CopyFileType::kCSV: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: CSV");
+            result->emplace_back(file_type);
+
+            SharedPtr<String> header
+                    = MakeShared<String>(String(intent_size, ' ') + "header: " + (copy_statement->header_ ? "Yes": "No"));
+            result->emplace_back(header);
+
+            SharedPtr<String> delimiter
+                    = MakeShared<String>(String(intent_size, ' ') + "delimiter: " + copy_statement->delimiter_);
+            result->emplace_back(delimiter);
+            break;
+        }
+        case CopyFileType::kJSON: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSON");
+            result->emplace_back(file_type);
+            break;
+        }
+    }
 }
 
 }

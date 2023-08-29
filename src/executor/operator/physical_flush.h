@@ -37,6 +37,11 @@ public:
         return output_types_;
     }
 
+    inline FlushType
+    flush_type() const {
+        return flush_type_;
+    }
+
 private:
     void
     FlushData(SharedPtr<QueryContext>& query_context);

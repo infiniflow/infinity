@@ -305,8 +305,8 @@ LogicalPlanner::BuildCreateTable(const CreateStatement* statement, SharedPtr<Bin
     }
 
     this->logical_plan_ = logical_create_table_operator;
-    this->names_ptr_->emplace_back(String("OK"));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kInteger));
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void
@@ -324,8 +324,8 @@ LogicalPlanner::BuildCreateCollection(const CreateStatement* statement, SharedPt
                                             create_collection_info->conflict_type_);
 
     this->logical_plan_ = logical_create_collection_operator;
-    this->names_ptr_->emplace_back(String("OK"));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kInteger));
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void
@@ -340,8 +340,8 @@ LogicalPlanner::BuildCreateSchema(const CreateStatement* statement, SharedPtr<Bi
                                         create_schema_info->conflict_type_);
 
     this->logical_plan_ = logical_create_schema_operator;
-    this->names_ptr_->emplace_back(String("OK"));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kInteger));
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void
@@ -374,8 +374,8 @@ LogicalPlanner::BuildCreateView(const CreateStatement* statement, SharedPtr<Bind
                                       create_view_info);
 
     this->logical_plan_ = logical_create_view_operator;
-    this->names_ptr_->emplace_back(String("OK"));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kInteger));
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void
@@ -431,8 +431,8 @@ LogicalPlanner::BuildDropTable(const DropStatement* statement, SharedPtr<BindCon
                                            drop_table_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_table;
-    this->names_ptr_->emplace_back(String("OK"));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kInteger));
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void
@@ -453,8 +453,8 @@ LogicalPlanner::BuildDropCollection(const DropStatement* statement, SharedPtr<Bi
                                                 drop_collection_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_collection;
-    this->names_ptr_->emplace_back(String("OK"));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kInteger));
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void
@@ -469,8 +469,8 @@ LogicalPlanner::BuildDropSchema(const DropStatement* statement, SharedPtr<BindCo
                                             drop_schema_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_schema;
-    this->names_ptr_->emplace_back(String("OK"));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kInteger));
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void
@@ -487,8 +487,8 @@ LogicalPlanner::BuildDropIndex(const DropStatement* statement, SharedPtr<BindCon
                                            drop_index_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_index;
-    this->names_ptr_->emplace_back(String("OK"));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kInteger));
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void
@@ -505,8 +505,8 @@ LogicalPlanner::BuildDropView(const DropStatement* statement, SharedPtr<BindCont
                                           drop_view_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_view;
-    this->names_ptr_->emplace_back(String("OK"));
-    this->types_ptr_->emplace_back(DataType(LogicalType::kInteger));
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void
@@ -532,25 +532,32 @@ LogicalPlanner::BuildCopy(const CopyStatement* statement, SharedPtr<BindContext>
 
 void
 LogicalPlanner::BuildExport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    switch(statement->copy_file_type_) {
-        case CopyFileType::kCSV:
-            return BuildExportCsv(statement, bind_context_ptr);
-        case CopyFileType::kJSON:
-            return BuildExportJson(statement, bind_context_ptr);
-        default: {
-            PlannerError("Export data to unsupported file type.")
-        }
+    // Check the table existence
+    auto base_table_ptr = Infinity::instance().catalog()->GetTableByNameNoExcept(statement->schema_name_,
+                                                                                 statement->table_name_);
+    if(base_table_ptr == nullptr) {
+        // Not found in catalog
+        PlannerError("Table: " + statement->schema_name_ + '.' + statement->table_name_ +" is not found in catalog.");
     }
-}
 
-void
-LogicalPlanner::BuildExportCsv(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    PlannerError("Exporting to CSV file isn't supported.");
-}
+    // Check the file existence
+    LocalFileSystem fs;
 
-void
-LogicalPlanner::BuildExportJson(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    PlannerError("Exporting to JSON file isn't supported.");
+    String to_write_path;
+    if(!fs.Exists(statement->file_path_)) {
+        PlannerError("File: " + statement->file_path_ +" doesn't exist.");
+    }
+
+    SharedPtr<LogicalNode> logical_export =
+            MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
+                                      statement->schema_name_,
+                                      statement->table_name_,
+                                      statement->file_path_,
+                                      statement->header_,
+                                      statement->delimiter_,
+                                      statement->copy_file_type_);
+
+    this->logical_plan_ = logical_export;
 }
 
 void

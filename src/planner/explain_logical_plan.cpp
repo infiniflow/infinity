@@ -62,10 +62,14 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
             Explain((LogicalInsert*)statement, result, intent_size);
             break;
         }
-        case LogicalNodeType::kImport:
+        case LogicalNodeType::kImport: {
+            Explain((LogicalImport*)statement, result, intent_size);
             break;
-        case LogicalNodeType::kExport:
+        }
+        case LogicalNodeType::kExport: {
+            Explain((LogicalExport*)statement, result, intent_size);
             break;
+        }
         case LogicalNodeType::kAlter:
             break;
         case LogicalNodeType::kCreateTable: {
@@ -100,6 +104,10 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
             Explain((LogicalDropView*)statement, result, intent_size);
             break;
         }
+        case LogicalNodeType::kFlush: {
+            Explain((LogicalFlush*)statement, result, intent_size);
+            break;
+        }
         case LogicalNodeType::kShow: {
             Explain((LogicalShow*)statement, result, intent_size);
             break;
@@ -117,7 +125,7 @@ ExplainLogicalPlan::Explain(const LogicalNode *statement,
         case LogicalNodeType::kPrepare:
             break;
         default: {
-            PlannerError("Unexpect logical node type");
+            PlannerError("Unexpected logical node type");
         }
     }
 }
@@ -1099,6 +1107,153 @@ ExplainLogicalPlan::Explain(const BaseExpression* base_expression, String& expr_
             PlannerError("Unsupported expression type")
         }
     }
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalImport* import_node,
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
+    {
+        String import_header_str;
+        if (intent_size != 0) {
+            import_header_str = String(intent_size - 2, ' ') + "-> IMPORT ";
+        } else {
+            import_header_str = "IMPORT ";
+        }
+
+        import_header_str += "(" + std::to_string(import_node->node_id()) + ")";
+        result->emplace_back(MakeShared<String>(import_header_str));
+    }
+
+    {
+        SharedPtr<String> schema_name
+                = MakeShared<String>(String(intent_size, ' ') + " - schema name: " + import_node->schema_name());
+        result->emplace_back(schema_name);
+    }
+
+    {
+        SharedPtr<String> table_name
+                = MakeShared<String>(String(intent_size, ' ') + " - table name: " + import_node->table_name());
+        result->emplace_back(table_name);
+    }
+
+    {
+        SharedPtr<String> path
+                = MakeShared<String>(String(intent_size, ' ') + " - file: " + import_node->file_path());
+        result->emplace_back(path);
+    }
+
+    switch(import_node->FileType()) {
+        case CopyFileType::kCSV: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: CSV");
+            result->emplace_back(file_type);
+
+            SharedPtr<String> header
+                    = MakeShared<String>(String(intent_size, ' ') + " - header: " + (import_node->header() ? "Yes": "No"));
+            result->emplace_back(header);
+
+            SharedPtr<String> delimiter
+                    = MakeShared<String>(String(intent_size, ' ') + " - delimiter: " + import_node->delimiter());
+            result->emplace_back(delimiter);
+            break;
+        }
+        case CopyFileType::kJSON: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: CSV");
+            result->emplace_back(file_type);
+            break;
+        }
+    }
+
+    if(import_node->left_node() != nullptr or import_node->right_node() != nullptr) {
+        PlannerError("Import node have children nodes.")
+    }
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalExport* export_node,
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
+    {
+        String export_header_str;
+        if (intent_size != 0) {
+            export_header_str = String(intent_size - 2, ' ') + "-> EXPORT ";
+        } else {
+            export_header_str = "EXPORT ";
+        }
+
+        export_header_str += "(" + std::to_string(export_node->node_id()) + ")";
+        result->emplace_back(MakeShared<String>(export_header_str));
+    }
+
+    {
+        SharedPtr<String> schema_name
+                = MakeShared<String>(String(intent_size, ' ') + " - schema name: " + export_node->schema_name());
+        result->emplace_back(schema_name);
+    }
+
+    {
+        SharedPtr<String> table_name
+                = MakeShared<String>(String(intent_size, ' ') + " - table name: " + export_node->table_name());
+        result->emplace_back(table_name);
+    }
+
+    {
+        SharedPtr<String> path
+                = MakeShared<String>(String(intent_size, ' ') + " - file: " + export_node->file_path());
+        result->emplace_back(path);
+    }
+
+    switch(export_node->FileType()) {
+        case CopyFileType::kCSV: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: CSV");
+            result->emplace_back(file_type);
+
+            SharedPtr<String> header
+                    = MakeShared<String>(String(intent_size, ' ') + " - header: " + (export_node->header() ? "Yes": "No"));
+            result->emplace_back(header);
+
+            SharedPtr<String> delimiter
+                    = MakeShared<String>(String(intent_size, ' ') + " - delimiter: " + export_node->delimiter());
+            result->emplace_back(delimiter);
+            break;
+        }
+        case CopyFileType::kJSON: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: CSV");
+            result->emplace_back(file_type);
+            break;
+        }
+    }
+
+    if(export_node->left_node() != nullptr or export_node->right_node() != nullptr) {
+        PlannerError("EXPORT node have children nodes.")
+    }
+}
+
+void
+ExplainLogicalPlan::Explain(const LogicalFlush* flush_node,
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
+
+    String flush_header_str;
+    if (intent_size != 0) {
+        flush_header_str = String(intent_size - 2, ' ') + "-> FLUSH ";
+    } else {
+        flush_header_str = "FLUSH ";
+    }
+
+    switch(flush_node->flush_type()) {
+        case FlushType::kData:
+            flush_header_str += "DATA (" + std::to_string(flush_node->node_id()) + ")";
+            break;
+        case FlushType::kLog:
+            flush_header_str += "LOG (" + std::to_string(flush_node->node_id()) + ")";
+            break;
+        case FlushType::kBuffer:
+            flush_header_str += "BUFFER (" + std::to_string(flush_node->node_id()) + ")";
+            break;
+    }
+
+    result->emplace_back(MakeShared<String>(flush_header_str));
 }
 
 }

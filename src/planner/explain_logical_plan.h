@@ -23,6 +23,9 @@
 #include "planner/node/logical_show.h"
 #include "planner/node/logical_create_view.h"
 #include "planner/node/logical_drop_view.h"
+#include "planner/node/logical_flush.h"
+#include "planner/node/logical_import.h"
+#include "planner/node/logical_export.h"
 
 namespace infinity {
 
@@ -120,6 +123,21 @@ public:
 
     static void
     Explain(const LogicalShow* show_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalImport* show_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalExport* show_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalFlush* show_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 

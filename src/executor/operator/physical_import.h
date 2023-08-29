@@ -24,7 +24,7 @@ public:
           file_path_(std::move(file_path)),
           header_(header),
           delimiter_(delimiter),
-          import_file_type_(type) {}
+          file_type_(type) {}
 
     ~PhysicalImport() override = default;
 
@@ -44,11 +44,51 @@ public:
         return output_types_;
     }
 
+    void
+    ImportCSV(SharedPtr<QueryContext>& query_context);
+
+    void
+    ImportJSON(SharedPtr<QueryContext>& query_context);
+
+    inline CopyFileType
+    FileType() const {
+        return file_type_;
+    }
+
+    inline const String&
+    file_path() const {
+        return file_path_;
+    }
+
+    inline const String&
+    schema_name() const {
+        return schema_name_;
+    }
+
+    inline const String&
+    table_name() const {
+        return table_name_;
+    }
+
+    inline bool
+    header() const {
+        return header_;
+    }
+
+    inline char
+    delimiter() const {
+        return delimiter_;
+    }
+
+public:
+    static void
+    CSVRowHandler(void *);
+
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
-    CopyFileType import_file_type_ {CopyFileType::kCSV};
+    CopyFileType file_type_ {CopyFileType::kCSV};
     String file_path_{};
     String table_name_{};
     String schema_name_{"default"};
