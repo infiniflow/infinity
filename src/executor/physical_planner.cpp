@@ -334,8 +334,7 @@ SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode> &logical_operator) const {
     LogicalImport* logical_import = (LogicalImport*)(logical_operator.get());
     return MakeShared<PhysicalImport>(logical_operator->node_id(),
-                                      logical_import->schema_name(),
-                                      logical_import->table_name(),
+                                      logical_import->table_ptr(),
                                       logical_import->file_path(),
                                       logical_import->header(),
                                       logical_import->delimiter(),

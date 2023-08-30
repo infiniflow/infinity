@@ -29,7 +29,7 @@ LogicalImport::ToString(i64& space) {
             break;
         }
     }
-    ss << "to " << schema_name_ << '.' << table_name_;
+    ss << "to " << *table_ptr_->schema_name() << '.' << *table_ptr_->table_name();
 
     space += arrow_str.size();
 

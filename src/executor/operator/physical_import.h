@@ -12,15 +12,13 @@ namespace infinity {
 class PhysicalImport : public PhysicalOperator {
 public:
     explicit PhysicalImport(uint64_t id,
-                            String schema_name,
-                            String table_name,
+                            SharedPtr<Table> table_ptr,
                             String file_path,
                             bool header,
                             char delimiter,
                             CopyFileType type)
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id),
-          schema_name_(std::move(schema_name)),
-          table_name_(std::move(table_name)),
+          table_ptr_(std::move(table_ptr)),
           file_path_(std::move(file_path)),
           header_(header),
           delimiter_(delimiter),
@@ -50,6 +48,11 @@ public:
     void
     ImportJSON(SharedPtr<QueryContext>& query_context);
 
+    inline const SharedPtr<Table>&
+    table_ptr() const {
+        return table_ptr_;
+    }
+
     inline CopyFileType
     FileType() const {
         return file_type_;
@@ -58,16 +61,6 @@ public:
     inline const String&
     file_path() const {
         return file_path_;
-    }
-
-    inline const String&
-    schema_name() const {
-        return schema_name_;
-    }
-
-    inline const String&
-    table_name() const {
-        return table_name_;
     }
 
     inline bool
@@ -81,6 +74,10 @@ public:
     }
 
 public:
+
+    static void
+    CSVHeaderHandler(void *);
+
     static void
     CSVRowHandler(void *);
 
@@ -88,10 +85,9 @@ private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
+    SharedPtr<Table> table_ptr_{};
     CopyFileType file_type_ {CopyFileType::kCSV};
     String file_path_{};
-    String table_name_{};
-    String schema_name_{"default"};
     bool header_{false};
     char delimiter_{','};
 

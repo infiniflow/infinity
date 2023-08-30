@@ -84,7 +84,7 @@ public:
         return data_blocks_[idx];
     }
 
-    [[nodiscard]] String
+    [[nodiscard]] String&
     GetColumnNameById(SizeT idx) const {
         return definition_ptr_->columns()[idx]->name();
     }
@@ -110,7 +110,7 @@ public:
         result_msg_ = result_msg;
     }
 
-    inline const SharedPtr<String>&
+    [[nodiscard]] inline const SharedPtr<String>&
     result_msg() const {
         return result_msg_;
     }

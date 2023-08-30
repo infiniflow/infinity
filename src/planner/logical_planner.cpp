@@ -579,10 +579,11 @@ LogicalPlanner::BuildImport(const CopyStatement* statement, SharedPtr<BindContex
         PlannerError("File: " + statement->file_path_ +" doesn't exist.");
     }
 
+    SharedPtr<Table> table_ptr = std::static_pointer_cast<Table>(base_table_ptr);
+
     SharedPtr<LogicalNode> logical_import =
             MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
-                                      statement->schema_name_,
-                                      statement->table_name_,
+                                      table_ptr,
                                       statement->file_path_,
                                       statement->header_,
                                       statement->delimiter_,

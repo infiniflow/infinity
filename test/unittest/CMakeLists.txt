@@ -84,6 +84,7 @@ target_link_libraries(test_main
         gmock_main
         infinity_core
         tlsf
+        zsv_parser
         )
 
 target_include_directories(test_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")

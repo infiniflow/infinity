@@ -12,15 +12,13 @@ class LogicalImport : public LogicalNode {
 public:
     explicit
     LogicalImport(u64 node_id,
-                  String schema_name,
-                  String table_name,
+                  SharedPtr<Table> table_ptr,
                   String file_path,
                   bool header,
                   char delimiter,
                   CopyFileType type)
             : LogicalNode(node_id, LogicalNodeType::kImport),
-            schema_name_(std::move(schema_name)),
-            table_name_(std::move(table_name)),
+            table_ptr_(std::move(table_ptr)),
             file_path_(std::move(file_path)),
             header_(header),
             delimiter_(delimiter),
@@ -49,19 +47,14 @@ public:
         return "LogicalImport";
     }
 
-    [[nodiscard]] CopyFileType
+    inline const SharedPtr<Table>&
+    table_ptr() const {
+        return table_ptr_;
+    }
+
+    [[nodiscard]] inline CopyFileType
     FileType() const {
         return file_type_;
-    }
-
-    [[nodiscard]] inline const String&
-    schema_name() const {
-        return schema_name_;
-    }
-
-    [[nodiscard]] inline const String&
-    table_name() const {
-        return table_name_;
     }
 
     [[nodiscard]] inline const String&
@@ -81,10 +74,9 @@ public:
 
 private:
 
+    SharedPtr<Table> table_ptr_{};
     CopyFileType file_type_ {CopyFileType::kCSV};
     String file_path_{};
-    String table_name_{};
-    String schema_name_{"default"};
     bool header_{false};
     char delimiter_{','};
 };

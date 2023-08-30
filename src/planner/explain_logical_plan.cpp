@@ -1127,13 +1127,17 @@ ExplainLogicalPlan::Explain(const LogicalImport* import_node,
 
     {
         SharedPtr<String> schema_name
-                = MakeShared<String>(String(intent_size, ' ') + " - schema name: " + import_node->schema_name());
+                = MakeShared<String>(String(intent_size, ' ')
+                        + " - schema name: "
+                        + *import_node->table_ptr()->schema_name());
         result->emplace_back(schema_name);
     }
 
     {
         SharedPtr<String> table_name
-                = MakeShared<String>(String(intent_size, ' ') + " - table name: " + import_node->table_name());
+                = MakeShared<String>(String(intent_size, ' ')
+                        + " - table name: "
+                        + *import_node->table_ptr()->table_name());
         result->emplace_back(table_name);
     }
 

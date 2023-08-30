@@ -45,12 +45,12 @@ public:
 
     BaseTableType kind_{BaseTableType::kInvalid};
 
-    [[nodiscard]] inline SharedPtr<String>
+    [[nodiscard]] inline const SharedPtr<String>&
     schema_name() const {
         return schema_name_;
     }
 
-    [[nodiscard]] inline SharedPtr<String>
+    [[nodiscard]] inline const SharedPtr<String>&
     table_name() const {
         return table_name_;
     }
