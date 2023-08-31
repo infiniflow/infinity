@@ -19,7 +19,8 @@ class OrFunctionsTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
-        infinity::Infinity::instance().Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::Infinity::instance().Init(config_path);
     }
 
     void

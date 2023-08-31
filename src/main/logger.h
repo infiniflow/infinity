@@ -5,16 +5,17 @@
 #pragma once
 
 #include "spdlog/logger.h"
+#include "config.h"
 #include <memory>
 
 namespace infinity {
 
-extern std::shared_ptr<spdlog::logger> infinity_logger;
+extern SharedPtr<spdlog::logger> infinity_logger;
 
 class Logger {
 public:
     static void
-    Initialize();
+    Initialize(const Config* config_ptr);
 
     static void
     Shutdown();
@@ -22,9 +23,9 @@ public:
 };
 
 #define LOG_TRACE(...) infinity::infinity_logger->trace(__VA_ARGS__);
-#define LOG_DEBUG(...) infinity::infinity_logger->debug(__VA_ARGS__);
 #define LOG_INFO(...) infinity::infinity_logger->info(__VA_ARGS__);
 #define LOG_WARN(...) infinity::infinity_logger->warn(__VA_ARGS__);
 #define LOG_ERROR(...) infinity::infinity_logger->error(__VA_ARGS__);
+#define LOG_CRITICAL(...) infinity::infinity_logger->critical(__VA_ARGS__);
 
 }

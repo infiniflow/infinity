@@ -26,7 +26,7 @@ struct QueryResult {
 class QueryContext : public std::enable_shared_from_this<QueryContext> {
 public:
     explicit
-    QueryContext(SharedPtr<Session> session_ptr, UniquePtr<TransactionContext>& transaction);
+    QueryContext(Session* session_ptr, UniquePtr<TransactionContext>& transaction);
 
     QueryResult
     Query(const String& query);
@@ -71,7 +71,7 @@ private:
     UniquePtr<TransactionContext>& transaction_;
     UniquePtr<QueryProfiler> query_metrics_;
 
-    SharedPtr<Session> session_ptr_;
+    Session* session_ptr_;
 
     // Get following information from session.
     // Current schema

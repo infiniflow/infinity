@@ -37,7 +37,7 @@ public:
     }
 
     void
-    Init();
+    Init(const SharedPtr<String>& config_path);
 
     void
     UnInit();

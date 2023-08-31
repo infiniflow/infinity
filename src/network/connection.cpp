@@ -14,18 +14,23 @@ namespace infinity {
 Connection::Connection(boost::asio::io_service& io_service)
     : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)),
       pg_handler_(MakeShared<PGProtocolHandler>(socket())),
-      session_ptr_(MakeShared<Session>()){}
+      session_(MakeUnique<Session>()){}
 
 void
 Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
+
     HandleConnection();
+
+//    LOG_TRACE("A new connection from {}:{}",
+//              socket_->remote_endpoint().address().to_string(),
+//              socket_->remote_endpoint().port());
     while(!terminate_connection_) {
         try {
             HandleRequest();
         } catch (const infinity::ClientException& e) {
-            LOG_DEBUG("Client is closed");
+            LOG_TRACE("Client is closed");
             return ;
         } catch (const std::exception& e) {
             std::map<PGMessageType, String> error_message_map;
@@ -56,24 +61,24 @@ Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
     SharedPtr<QueryContext> query_context_ptr
-        = MakeShared<QueryContext>(session_ptr_, session_ptr_->transaction());
-    query_context_ptr->set_current_schema(session_ptr_->current_schema());
+        = MakeShared<QueryContext>(session_.get(), session_->transaction());
+    query_context_ptr->set_current_schema(session_->current_schema());
 
     switch (cmd_type) {
         case PGMessageType::kBindCommand: {
-            LOG_DEBUG("BindCommand");
+            LOG_TRACE("BindCommand");
             break;
         }
         case PGMessageType::kDescribeCommand: {
-            LOG_DEBUG("DescribeCommand");
+            LOG_TRACE("DescribeCommand");
             break;
         }
         case PGMessageType::kExecuteCommand: {
-            LOG_DEBUG("ExecuteCommand");
+            LOG_TRACE("ExecuteCommand");
             break;
         }
         case PGMessageType::kParseCommand: {
-            LOG_DEBUG("ParseCommand");
+            LOG_TRACE("ParseCommand");
             break;
         }
         case PGMessageType::kSimpleQueryCommand: {
@@ -81,7 +86,7 @@ Connection::HandleRequest() {
             break;
         }
         case PGMessageType::kSyncCommand: {
-            LOG_DEBUG("SyncCommand");
+            LOG_TRACE("SyncCommand");
             break;
         }
         case PGMessageType::kTerminateCommand: {
@@ -97,7 +102,7 @@ Connection::HandleRequest() {
 void
 Connection::HandlerSimpleQuery(SharedPtr<QueryContext>& query_context) {
     const String& query = pg_handler_->read_command_body();
-    LOG_DEBUG("Query: {}", query);
+    LOG_TRACE("Query: {}", query);
 
     // Start to execute the query.
     QueryResult result = query_context->Query(query);

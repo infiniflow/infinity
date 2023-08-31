@@ -192,7 +192,7 @@ PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
         ++ column_id;
         {
             // Append block limit the 6 column
-            Value value = Value::MakeBigInt(Infinity::instance().config()->option_.default_row_count_);
+            Value value = Value::MakeBigInt(Infinity::instance().config()->default_row_size());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }

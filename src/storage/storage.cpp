@@ -9,9 +9,9 @@
 
 namespace infinity {
 
-Storage::Storage(std::string data_path)
-    : data_path_(std::move(data_path)),
-    catalog_(std::make_unique<Catalog>())
+Storage::Storage(const Config* config_ptr)
+    : config_ptr_(config_ptr),
+    catalog_(MakeUnique<Catalog>())
     {}
 
 void

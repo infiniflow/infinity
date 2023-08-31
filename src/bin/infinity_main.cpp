@@ -9,13 +9,13 @@
 
 #include <iostream>
 
-void ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
+void
+ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
     cxxopts::Options options("./infinity_server", "");
 
     options.add_options()
             ("h,help", "Display this help and exit") // NOLINT
-            ("addr,address", "Specify the listening address. Default value: 0.0.0.0", cxxopts::value<std::string>()->default_value("0.0.0.0")) // NOLINT
-            ("p,port", "Specify the listening port. 0 means randomly select an available one. Default value: 5432", cxxopts::value<uint16_t>()->default_value("5432")) // NOLINT
+            ("f,config", "Specify the config file path. No default config file", cxxopts::value<std::string>()->default_value("")) // NOLINT
             ;
 
     cxxopts::ParseResult result = options.parse(argc, argv);
@@ -25,15 +25,21 @@ void ParseArguments(int argc, char** argv, infinity::StartupParameter& parameter
         return ;
     }
 
-    boost::system::error_code error;
-    parameters.address = boost::asio::ip::make_address(result["address"].as<std::string>(), error);
-
-    GeneralAssert(!error, "Not a valid IPv4 address: " + result["address"].as<std::string>() + ", panic!");
-
-    parameters.port = result["port"].as<uint16_t>();
+    std::string config_path = result["config"].as<std::string>();
+    if(!config_path.empty()) {
+        parameters.config_path = std::make_shared<std::string>(config_path);
+    }
 }
 
-int main(int argc, char** argv) {
+int
+main(int argc, char** argv) {
+    std::cout << " __  .__   __.  _______  __  .__   __.  __  .___________.____    ____ \n"
+                 "|  | |  \\ |  | |   ____||  | |  \\ |  | |  | |           |\\   \\  /   / \n"
+                 "|  | |   \\|  | |  |__   |  | |   \\|  | |  | `---|  |----` \\   \\/   /  \n"
+                 "|  | |  . `  | |   __|  |  | |  . `  | |  |     |  |       \\_    _/   \n"
+                 "|  | |  |\\   | |  |     |  | |  |\\   | |  |     |  |         |  |     \n"
+                 "|__| |__| \\__| |__|     |__| |__| \\__| |__|     |__|         |__|     \n";
+
     std::cout << "Infinity, version: "
               << VERSION_MAJOR << "."
               << VERSION_MINOR << "."
@@ -45,15 +51,6 @@ int main(int argc, char** argv) {
 
     infinity::StartupParameter parameters;
     ParseArguments(argc, argv, parameters);
-
-    std::cout << "Startup database server, at: "
-              << parameters.address.to_string() << " and port: "
-              << parameters.port << std::endl;
-
-    std::cout << std::endl
-              << "Run 'psql -h " << parameters.address.to_string()
-              << " -p " << parameters.port
-              << "' to connect to the server." << std::endl;
 
     infinity::DBServer db_server(parameters);
     db_server.Run();

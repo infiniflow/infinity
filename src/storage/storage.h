@@ -5,6 +5,7 @@
 #pragma once
 
 #include "catalog.h"
+#include "main/config.h"
 #include <string>
 
 
@@ -15,7 +16,7 @@ class Infinity;
 class Storage {
 public:
     explicit
-    Storage(String data_path);
+    Storage(const Config* config_ptr);
 
     [[nodiscard]] inline UniquePtr<Catalog>&
     catalog() noexcept {
@@ -29,7 +30,7 @@ public:
     Uninit();
 
 private:
-    String data_path_;
+    const Config* config_ptr_{};
     UniquePtr<Catalog> catalog_;
 };
 

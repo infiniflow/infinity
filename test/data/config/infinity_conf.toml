@@ -1,0 +1,26 @@
+[general]
+version                 = "0.1.0"
+timezone                = "utc-9"
+listen_address          = "127.0.0.1"
+pg_port                 = 25432
+http_port               = 8089
+sdk_port                = 24817
+
+[log]
+log_filename            = "info.log"
+log_dir                 = "/var/infinity/log"
+log_to_stdout           = true
+log_max_size            = "2GB"
+log_file_rotate_count   = 3
+
+# trace/info/warning/error/critical 5 log levels, default: info
+log_level               = "trace"
+
+[storage]
+data_dir                = "/var/infinity/data"
+wal_dir                 = "/var/infinity/wal"
+default_row_size        = 4096
+
+[buffer]
+buffer_pool_size        = "3GB"
+temp_dir                = "/tmp"

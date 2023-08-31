@@ -19,7 +19,7 @@ TableScanFunc(SharedPtr<QueryContext>& query_context,
     Vector<size_t>& column_ids = table_scan_function_data_ptr->column_ids_;
     i64& current_block_id = table_scan_function_data_ptr->block_count_;
     if(current_block_id >= table_ptr->DataBlockCount()) {
-        LOG_DEBUG("All blocks are read from storage.");
+        LOG_TRACE("All blocks are read from storage.");
         output.Reset();
         return ;
     } else {

@@ -22,28 +22,41 @@ enum class ConnectionStatus : char {
 
 class Connection {
 public:
-    explicit Connection(boost::asio::io_service& io_service);
-    void Run();
+    explicit
+    Connection(boost::asio::io_service& io_service);
 
-    SharedPtr<boost::asio::ip::tcp::socket> socket() { return socket_; }
+    void
+    Run();
+
+    inline SharedPtr<boost::asio::ip::tcp::socket>
+    socket() {
+        return socket_;
+    }
+
 private:
-    void HandleConnection();
+    void
+    HandleConnection();
 
-    void HandleRequest();
+    void
+    HandleRequest();
 
-    void HandlerSimpleQuery(SharedPtr<QueryContext>& query_context);
+    void
+    HandlerSimpleQuery(SharedPtr<QueryContext>& query_context);
 
+    void
+    SendTableDescription(const SharedPtr<Table>& result_table);
+
+    void
+    SendQueryResponse(const QueryResult& query_result);
+
+private:
     const SharedPtr<boost::asio::ip::tcp::socket> socket_;
 
     const SharedPtr<PGProtocolHandler> pg_handler_;
 
     bool terminate_connection_ = false;
 
-    void SendTableDescription(const SharedPtr<Table>& result_table);
-    void SendQueryResponse(const QueryResult& query_result);
-
-private:
-    SharedPtr<Session> session_ptr_;
+    UniquePtr<Session> session_;
 };
 
 }

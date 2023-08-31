@@ -28,7 +28,8 @@ class BufferMgrTest : public BaseTest {
 void
 BufferMgrTest::SetUp() {
     infinity::GlobalResourceUsage::Init();
-    infinity::Infinity::instance().Init();
+    std::shared_ptr<std::string> config_path = nullptr;
+        infinity::Infinity::instance().Init(config_path);
 
     using namespace infinity;
 

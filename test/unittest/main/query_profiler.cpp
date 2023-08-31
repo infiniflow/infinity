@@ -13,7 +13,8 @@ class QueryProfilerTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
-        infinity::Infinity::instance().Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::Infinity::instance().Init(config_path);
     }
 
     void
@@ -39,7 +40,6 @@ TEST_F(QueryProfilerTest, test1) {
         std::string sub = result.substr(0, result.find_first_of('@', 0) - 1);
         EXPECT_EQ(sub, "Invalid query phase in query profiler");
     }
-
 }
 
 // Exception cases

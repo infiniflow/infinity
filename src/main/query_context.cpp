@@ -65,8 +65,8 @@ QueryResult::ToString() const {
     return ss.str();
 }
 
-QueryContext::QueryContext(SharedPtr<Session> session_ptr, UniquePtr<TransactionContext>& transaction)
-    : session_ptr_(std::move(session_ptr)), transaction_(transaction) {}
+QueryContext::QueryContext(Session* session_ptr, UniquePtr<TransactionContext>& transaction)
+    : session_ptr_(session_ptr), transaction_(transaction) {}
 
 QueryResult
 QueryContext::Query(const String &query) {

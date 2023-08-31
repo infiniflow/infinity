@@ -43,7 +43,7 @@ private:
     // session config such as memory limitation, concurrency limitation
 
     // prepared plan for PREPARE and EXECUTE statement
-    std::unordered_map<String, std::shared_ptr<PreparedPlan>> prepared_plans_;
+    HashMap<String, SharedPtr<PreparedPlan>> prepared_plans_;
 
     // Current schema
     String current_schema_;

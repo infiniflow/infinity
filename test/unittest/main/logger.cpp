@@ -12,7 +12,8 @@ class LoggerTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
-        infinity::Infinity::instance().Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::Infinity::instance().Init(config_path);
     }
 
     void
@@ -26,8 +27,8 @@ class LoggerTest : public BaseTest {
 
 TEST_F(LoggerTest, test1) {
     LOG_TRACE("This is a trace log");
-    LOG_DEBUG("This is a debug log");
     LOG_INFO("This is a info log");
     LOG_WARN("This is a warn log");
     LOG_ERROR("This is a error log");
+    LOG_CRITICAL("This is a error log");
 }

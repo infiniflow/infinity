@@ -39,7 +39,7 @@ Console::Console() {
 void
 Console::Init() {
     GlobalResourceUsage::Init();
-    infinity::Infinity::instance().Init();
+    infinity::Infinity::instance().Init(nullptr);
 }
 
 void
@@ -102,8 +102,8 @@ Console::Explain(const String& arguments) {
     SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
-    SharedPtr<Session> session_ptr = std::make_shared<Session>();
-    SharedPtr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
+    UniquePtr<Session> session_ptr = MakeUnique<Session>();
+    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get(), session_ptr->transaction());
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
     LogicalPlanner logical_planner(query_context_ptr);
@@ -180,8 +180,8 @@ Console::Visualize(const String& arguments) {
     SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
-    SharedPtr<Session> session_ptr = std::make_shared<Session>();
-    SharedPtr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
+    UniquePtr<Session> session_ptr = MakeUnique<Session>();
+    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get(), session_ptr->transaction());
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
     LogicalPlanner logical_planner(query_context_ptr);
@@ -265,8 +265,8 @@ Console::ExecuteSQL(const String& sql_text) {
 
     PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
 
-    SharedPtr<Session> session_ptr = std::make_shared<Session>();
-    SharedPtr<QueryContext> query_context_ptr = std::make_shared<QueryContext>(session_ptr, session_ptr->transaction());
+    UniquePtr<Session> session_ptr = MakeUnique<Session>();
+    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get(), session_ptr->transaction());
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
     LogicalPlanner logical_planner(query_context_ptr);

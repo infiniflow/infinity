@@ -8,16 +8,20 @@
 namespace infinity {
 
 void
-Infinity::Init() {
+Infinity::Init(const SharedPtr<String>& config_path) {
     if(initialized_) {
         return ;
     } else {
-        scheduler_ = MakeUnique<NaiveScheduler>();
         config_ = MakeUnique<Config>();
-        storage_ = MakeUnique<Storage>(String());
+        config_->Init(config_path);
 
+        Logger::Initialize(config_.get());
+
+        scheduler_ = MakeUnique<NaiveScheduler>();
+
+        storage_ = MakeUnique<Storage>(config_.get());
         storage_->Init();
-        Logger::Initialize();
+
         initialized_ = true;
     }
 }
@@ -28,12 +32,15 @@ Infinity::UnInit() {
         return;
     }
     initialized_ = false;
+
     storage_->Uninit();
+    storage_.reset();
+
+    scheduler_.reset();
+
     Logger::Shutdown();
 
-    storage_.reset();
     config_.reset();
-    scheduler_.reset();
 }
 
 }
