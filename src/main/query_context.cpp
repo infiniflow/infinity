@@ -40,7 +40,6 @@ QueryResult::ToString() const {
         }
     }
 
-
     SizeT column_count = result_->ColumnCount();
     for(SizeT idx = 0; idx < column_count; ++ idx) {
         String end;
@@ -65,8 +64,10 @@ QueryResult::ToString() const {
     return ss.str();
 }
 
-QueryContext::QueryContext(Session* session_ptr, UniquePtr<TransactionContext>& transaction)
-    : session_ptr_(session_ptr), transaction_(transaction) {}
+QueryContext::QueryContext(Session* session_ptr)
+    : session_ptr_(session_ptr) {
+    transaction_ = MakeUnique<TransactionContext>();
+}
 
 QueryResult
 QueryContext::Query(const String &query) {
@@ -85,7 +86,7 @@ QueryContext::Query(const String &query) {
     Optimizer optimizer(query_context);
     PhysicalPlanner physical_planner(query_context);
 
-    PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
+    PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
     for (BaseStatement* statement : *parsed_result->statements_ptr_) {
         // Build unoptimized logical plan for each SQL statement.
         logical_planner.Build(statement);
@@ -110,10 +111,9 @@ QueryContext::Query(const String &query) {
         query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
         return query_result;
-//        ResponseError(optimized_plan->ToString(0));
     }
 
-    NetworkError("Can't reach here.")
+    NetworkError("Not reachable");
 }
 
 }

@@ -103,7 +103,7 @@ Console::Explain(const String& arguments) {
     SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
-    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get(), session_ptr->transaction());
+    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get());
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
     LogicalPlanner logical_planner(query_context_ptr);
@@ -181,7 +181,7 @@ Console::Visualize(const String& arguments) {
     SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
-    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get(), session_ptr->transaction());
+    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get());
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
     LogicalPlanner logical_planner(query_context_ptr);
@@ -266,7 +266,7 @@ Console::ExecuteSQL(const String& sql_text) {
     PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
-    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get(), session_ptr->transaction());
+    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get());
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
     LogicalPlanner logical_planner(query_context_ptr);

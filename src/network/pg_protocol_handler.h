@@ -14,30 +14,51 @@
 #include "buffer_writer.h"
 
 namespace infinity {
+
 class PGProtocolHandler {
 public:
-    explicit PGProtocolHandler(std::shared_ptr<boost::asio::ip::tcp::socket> socket);
+    explicit
+    PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket>& socket);
 
-    uint32_t read_startup_header();
-    void read_startup_body(uint32_t body_size);
+    u32
+    read_startup_header();
 
-    void send_authentication();
-    void send_parameter(const std::string& key, const std::string& value);
-    void send_ready_for_query();
+    void
+    read_startup_body(u32 body_size);
 
-    PGMessageType read_command_type();
-    std::string read_command_body();
+    void
+    send_authentication();
 
-    void send_error_response(const std::map<PGMessageType, std::string>& error_response_map);
+    void
+    send_parameter(const String& key, const String& value);
+
+    void
+    send_ready_for_query();
+
+    PGMessageType
+    read_command_type();
+
+    String
+    read_command_body();
+
+    void 
+    send_error_response(const HashMap<PGMessageType, String>& error_response_map);
 //
-//    std::string read_query_packet();
+//    String read_query_packet();
 
-    void SendDescriptionHeader(uint32_t total_column_name_length, uint32_t column_count);
-    void SendDescription(const std::string& column_name, uint32_t object_id, uint16_t width);
-    void SendData(const std::vector<std::optional<std::string>>& values_as_strings, uint64_t string_length_sum);
-    void SendComplete(const std::string& complete_message);
+    void
+    SendDescriptionHeader(u32 total_column_name_length, u32 column_count);
+
+    void
+    SendDescription(const String& column_name, u32 object_id, u16 width);
+
+    void
+    SendData(const Vector<std::optional<String>>& values_as_strings, u64 string_length_sum);
+
+    void
+    SendComplete(const String& complete_message);
 //
-//    std::pair<std::string, std::string> read_parse_packet();
+//    std::pair<String, String> read_parse_packet();
 //    void read_sync_packet();
 //
 //    void send_status_message(const PGMessageType message_type);

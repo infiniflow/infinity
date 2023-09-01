@@ -23,9 +23,9 @@ Connection::Run() {
 
     HandleConnection();
 
-//    LOG_TRACE("A new connection from {}:{}",
-//              socket_->remote_endpoint().address().to_string(),
-//              socket_->remote_endpoint().port());
+    session_->SetClientInfo(socket_->remote_endpoint().address().to_string(),
+                            socket_->remote_endpoint().port());
+
     while(!terminate_connection_) {
         try {
             HandleRequest();
@@ -33,7 +33,7 @@ Connection::Run() {
             LOG_TRACE("Client is closed");
             return ;
         } catch (const std::exception& e) {
-            std::map<PGMessageType, String> error_message_map;
+            HashMap<PGMessageType, String> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();
             LOG_ERROR(e.what());
             pg_handler_->send_error_response(error_message_map);
@@ -61,7 +61,7 @@ Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
     SharedPtr<QueryContext> query_context_ptr
-        = MakeShared<QueryContext>(session_.get(), session_->transaction());
+        = MakeShared<QueryContext>(session_.get());
     query_context_ptr->set_current_schema(session_->current_schema());
 
     switch (cmd_type) {
@@ -109,7 +109,7 @@ Connection::HandlerSimpleQuery(SharedPtr<QueryContext>& query_context) {
 
     // Response to the result message to client
     if(result.result_ == nullptr) {
-        std::map<PGMessageType, String> error_message_map;
+        HashMap<PGMessageType, String> error_message_map;
         String response_message = "Error: " + query;
         error_message_map[PGMessageType::kHumanReadableError] = response_message;
         pg_handler_->send_error_response(error_message_map);

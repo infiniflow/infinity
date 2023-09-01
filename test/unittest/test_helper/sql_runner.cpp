@@ -13,7 +13,7 @@ SQLRunner::Run(const String& sql_text, bool print) {
     }
 
     SharedPtr<Session> session_ptr = MakeShared<Session>();
-    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr, session_ptr->transaction());
+    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get());
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
     SharedPtr <SQLParser> parser = MakeShared<SQLParser>();

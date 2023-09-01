@@ -36,11 +36,17 @@ public:
         return transaction_;
     };
 
+    inline void
+    SetClientInfo(const String ip_address, u16 port) {
+        client_address_ = std::move(ip_address);
+        client_port_ = port;
+    }
+
 private:
     // transaction context
     UniquePtr<TransactionContext> transaction_;
 
-    // session config such as memory limitation, concurrency limitation
+    // session config such as memory limitation
 
     // prepared plan for PREPARE and EXECUTE statement
     HashMap<String, SharedPtr<PreparedPlan>> prepared_plans_;
@@ -53,6 +59,9 @@ private:
     String user_name_;
 
     u64 user_id_{0};
+
+    String client_address_;
+    u16 client_port_;
 };
 
 }
