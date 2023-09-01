@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "parser/sql_parser.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
 #include "main/logger.h"
@@ -16,7 +17,6 @@
 #include "main/infinity.h"
 
 #include "main/profiler/show_logical_plan.h"
-#include "parser/sql_parser.h"
 
 namespace infinity {
 

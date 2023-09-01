@@ -2,6 +2,7 @@
 // Created by JinHai on 2022/10/1.
 //
 
+#include "parser/sql_parser.h"
 #include "console.h"
 #include "common/utility/str.h"
 #include "common/utility/infinity_assert.h"
@@ -18,7 +19,6 @@
 #include "scheduler/operator_pipeline.h"
 #include "main/infinity.h"
 #include "main/query_context.h"
-#include "parser/sql_parser.h"
 
 #include <iostream>
 #include <algorithm>

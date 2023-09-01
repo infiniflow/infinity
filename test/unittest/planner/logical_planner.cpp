@@ -3,6 +3,7 @@
 //
 
 #include <gtest/gtest.h>
+#include "parser/sql_parser.h"
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
@@ -17,7 +18,6 @@
 #include "test_helper/sql_runner.h"
 
 #include "main/profiler/show_logical_plan.h"
-#include "parser/sql_parser.h"
 
 class LogicalPlannerTest : public BaseTest {
     void

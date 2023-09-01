@@ -2,6 +2,8 @@
 // Created by JinHai on 2022/7/22.
 //
 
+#include "parser/sql_parser.h"
+#include "parser/parser_result.h"
 #include "query_context.h"
 #include "infinity.h"
 #include "planner/logical_planner.h"
@@ -10,9 +12,6 @@
 #include "executor/physical_operator.h"
 #include "common/utility/infinity_assert.h"
 #include "scheduler/operator_pipeline.h"
-
-#include "parser/parser_result.h"
-#include "parser/sql_parser.h"
 
 #include <sstream>
 #include <utility>
