@@ -3,7 +3,7 @@
 //
 
 #include <thread>
-#include <cblas.h>
+#include <openblas/cblas.h>
 
 #include "common/types/internal_types.h"
 #include "faiss/index_factory.h"
