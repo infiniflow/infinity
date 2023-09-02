@@ -31,7 +31,7 @@ public:
     Init() override;
 
     void
-    Execute(SharedPtr<QueryContext>& query_context) override;
+    Execute(QueryContext* query_context) override;
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
@@ -44,10 +44,10 @@ public:
     }
 
     void
-    ExportCSV(SharedPtr<QueryContext>& query_context);
+    ExportCSV(QueryContext* query_context);
 
     void
-    ExportJSON(SharedPtr<QueryContext>& query_context);
+    ExportJSON(QueryContext* query_context);
 
     inline CopyFileType
     FileType() const {

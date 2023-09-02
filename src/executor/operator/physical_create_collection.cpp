@@ -33,7 +33,7 @@ PhysicalCreateCollection::Init() {
 }
 
 void
-PhysicalCreateCollection::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalCreateCollection::Execute(QueryContext* query_context) {
     Infinity::instance().catalog()->CreateCollection(*schema_name_, *collection_name_, conflict_type_);
 
     // Generate the result

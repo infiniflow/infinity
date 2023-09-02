@@ -33,7 +33,7 @@ public:
     Init() override;
 
     void
-    Execute(SharedPtr<QueryContext>& query_context) override;
+    Execute(QueryContext* query_context) override;
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
@@ -62,22 +62,22 @@ public:
 
 private:
     void
-    ExecuteShowTable(SharedPtr<QueryContext>& query_context);
+    ExecuteShowTable(QueryContext* query_context);
 
     void
-    ExecuteShowViews(SharedPtr<QueryContext>& query_context);
+    ExecuteShowViews(QueryContext* query_context);
 
     void
-    ExecuteShowColumns(SharedPtr<QueryContext>& query_context);
+    ExecuteShowColumns(QueryContext* query_context);
 
     void
-    ExecuteShowTableDetail(SharedPtr<QueryContext>& query_context, const SharedPtr<Table>& table_ptr);
+    ExecuteShowTableDetail(QueryContext* query_context, const SharedPtr<Table>& table_ptr);
 
     void
-    ExecuteShowCollectionDetail(SharedPtr<QueryContext>& query_context, const SharedPtr<Collection>& table_ptr);
+    ExecuteShowCollectionDetail(QueryContext* query_context, const SharedPtr<Collection>& table_ptr);
 
     void
-    ExecuteShowViewDetail(SharedPtr<QueryContext>& query_context, const SharedPtr<View>& table_ptr);
+    ExecuteShowViewDetail(QueryContext* query_context, const SharedPtr<View>& table_ptr);
 
 private:
     ShowType scan_type_{ShowType::kInvalid};

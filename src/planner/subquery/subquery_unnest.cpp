@@ -26,7 +26,7 @@ namespace infinity {
 void
 SubqueryUnnest::UnnestSubqueries(SharedPtr<BaseExpression> &expr_ptr,
                                  SharedPtr<LogicalNode> &root,
-                                 const SharedPtr<QueryContext>& query_context_ptr,
+                                 const QueryContext* query_context_ptr,
                                  const SharedPtr<BindContext>& bind_context) {
     // 2. Call Unnest Subquery to resolve subquery
     if (expr_ptr->type() == ExpressionType::kSubQuery) {
@@ -38,7 +38,7 @@ SubqueryUnnest::UnnestSubqueries(SharedPtr<BaseExpression> &expr_ptr,
 SharedPtr<BaseExpression>
 SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpression>& expr_ptr,
                                SharedPtr<LogicalNode>& root,
-                               const SharedPtr<QueryContext>& query_context_ptr,
+                               const QueryContext* query_context_ptr,
                                const SharedPtr<BindContext>& bind_context) {
     // 1. Check the subquery type: uncorrelated subquery or correlated subquery.
     auto subquery_expr = std::static_pointer_cast<SubqueryExpression>(expr_ptr);
@@ -59,7 +59,7 @@ SharedPtr<BaseExpression>
 SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
                                    SharedPtr<LogicalNode>& root,
                                    SharedPtr<LogicalNode>& subquery_plan,
-                                   const SharedPtr<QueryContext>& query_context_ptr,
+                                   const QueryContext* query_context_ptr,
                                    const SharedPtr<BindContext>& bind_context) {
     switch(expr_ptr->subquery_type_) {
 
@@ -212,7 +212,7 @@ SharedPtr<BaseExpression>
 SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
                                  SharedPtr<LogicalNode>& root,
                                  SharedPtr<LogicalNode>& subquery_plan,
-                                 const SharedPtr<QueryContext>& query_context_ptr,
+                                 const QueryContext* query_context_ptr,
                                  const SharedPtr<BindContext>& bind_context) {
 
     auto &correlated_columns = bind_context->correlated_column_exprs_;

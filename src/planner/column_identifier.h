@@ -13,7 +13,7 @@ namespace infinity {
 struct ColumnIdentifier {
 public:
     static ColumnIdentifier
-    MakeColumnIdentifier(SharedPtr<QueryContext>& query_context, const ColumnExpr& expr);
+    MakeColumnIdentifier(QueryContext* query_context, const ColumnExpr& expr);
 
 public:
     explicit

@@ -12,7 +12,7 @@ namespace infinity {
 class OptimizerRule {
 public:
     virtual void
-    ApplyToPlan(SharedPtr<QueryContext>& query_context_ptr,
+    ApplyToPlan(QueryContext* query_context_ptr,
                 const SharedPtr<LogicalNode>& logical_plan) = 0;
 
     virtual String

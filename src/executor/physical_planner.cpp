@@ -579,18 +579,36 @@ PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode>& logical_operator) co
             std::static_pointer_cast<LogicalExplain>(logical_operator);
 
     SharedPtr<PhysicalExplain> explain_node{nullptr};
-    if(logical_explain->explain_type() == ExplainType::kPhysical) {
-        SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-        ExplainPhysicalPlan::Explain(input_physical_operator.get(), texts_ptr);
-        explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
-                                                   logical_explain->explain_type(),
-                                                   texts_ptr,
-                                                   nullptr);
-    } else {
-        explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
-                                                   logical_explain->explain_type(),
-                                                   logical_explain->TextArray(),
-                                                   nullptr);
+    switch (logical_explain->explain_type()) {
+        case ExplainType::kAnalyze: {
+            NotImplementError("Explain analyze");
+            break;
+        }
+        case ExplainType::kAst:
+        case ExplainType::kUnOpt:
+        case ExplainType::kOpt: {
+            explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
+                                                       logical_explain->explain_type(),
+                                                       logical_explain->TextArray(),
+                                                       nullptr);
+            break;
+        }
+        case ExplainType::kPhysical: {
+            SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
+            ExplainPhysicalPlan::Explain(input_physical_operator.get(), texts_ptr);
+            explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
+                                                       logical_explain->explain_type(),
+                                                       texts_ptr,
+                                                       nullptr);
+            break;
+        }
+        case ExplainType::kPipeline: {
+            explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(),
+                                                       logical_explain->explain_type(),
+                                                       nullptr,
+                                                       input_physical_operator);
+            break;
+        }
     }
 
     return explain_node;

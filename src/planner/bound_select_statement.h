@@ -23,55 +23,55 @@ public:
     BoundSelectStatement(SharedPtr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
 
     SharedPtr<LogicalNode>
-    BuildPlan(const SharedPtr<QueryContext>& query_context_ptr) final;
+    BuildPlan(const QueryContext* query_context_ptr) final;
 
     SharedPtr<LogicalNode>
     BuildFrom(SharedPtr<TableRef>& table_ref,
-              const SharedPtr<QueryContext>& query_context_ptr,
+              const QueryContext* query_context_ptr,
               const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
     BuildBaseTable(SharedPtr<TableRef>& table_ref,
-                   const SharedPtr<QueryContext>& query_context_ptr,
+                   const QueryContext* query_context_ptr,
                    const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
     BuildSubqueryTable(SharedPtr<TableRef>& table_ref,
-                       const SharedPtr<QueryContext>& query_context_ptr,
+                       const QueryContext* query_context_ptr,
                        const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
     BuildCrossProductTable(SharedPtr<TableRef>& table_ref,
-                           const SharedPtr<QueryContext>& query_context_ptr,
+                           const QueryContext* query_context_ptr,
                            const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
     BuildJoinTable(SharedPtr<TableRef>& table_ref,
-                   const SharedPtr<QueryContext>& query_context_ptr,
+                   const QueryContext* query_context_ptr,
                    const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
     BuildDummyTable(SharedPtr<TableRef>& table_ref,
-                    const SharedPtr<QueryContext>& query_context_ptr,
+                    const QueryContext* query_context_ptr,
                     const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
     BuildFilter(SharedPtr<LogicalNode>& root,
                 Vector<SharedPtr<BaseExpression>>& conditions,
-                const SharedPtr<QueryContext>& query_context_ptr,
+                const QueryContext* query_context_ptr,
                 const SharedPtr<BindContext>& bind_context);
 
 
     void
     BuildSubquery(SharedPtr<LogicalNode>& root,
                   SharedPtr<BaseExpression>& condition,
-                  const SharedPtr<QueryContext>& query_context_ptr,
+                  const QueryContext* query_context_ptr,
                   const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<BaseExpression>
     UnnestSubquery(SharedPtr<LogicalNode>& root,
                    SharedPtr<BaseExpression>& condition,
-                   const SharedPtr<QueryContext>& query_context_ptr,
+                   const QueryContext* query_context_ptr,
                    const SharedPtr<BindContext>& bind_context);
 
 public:

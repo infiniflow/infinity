@@ -18,7 +18,7 @@ PhysicalInsert::Init() {
 
 #if 0
 void
-PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalInsert::Execute(QueryContext* query_context) {
 
     // TODO: execute insert into table;
     Vector<DataType> output_types;
@@ -49,7 +49,7 @@ PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
 }
 #else
 void
-PhysicalInsert::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalInsert::Execute(QueryContext* query_context) {
     SizeT column_count = value_list_.size();
     if(column_count != table_ptr_->ColumnCount()) {
         ExecutorError(fmt::format("Insert values count{} isn't matched with table column count{}.",

@@ -171,7 +171,7 @@ QueryBinder::BindSelect(const SelectStatement& statement) {
 }
 
 SharedPtr<TableRef>
-QueryBinder::BuildFromClause(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildFromClause(QueryContext* query_context,
                              const BaseTableReference *table_ref) {
 
     SharedPtr<TableRef> result = nullptr;
@@ -212,12 +212,12 @@ QueryBinder::BuildFromClause(SharedPtr<QueryContext>& query_context,
 }
 
 SharedPtr<TableRef>
-QueryBinder::BuildDummyTable(SharedPtr<QueryContext>& query_context) {
+QueryBinder::BuildDummyTable(QueryContext* query_context) {
     return nullptr;
 }
 
 SharedPtr<TableRef>
-QueryBinder::BuildTable(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildTable(QueryContext* query_context,
                         const TableReference* from_table) {
     // There are five cases here:
     // CTE*, which is subquery (may include correlated expression).
@@ -254,7 +254,7 @@ QueryBinder::BuildTable(SharedPtr<QueryContext>& query_context,
 }
 
 SharedPtr<TableRef>
-QueryBinder::BuildSubquery(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildSubquery(QueryContext* query_context,
                            const SubqueryReference* subquery_ref) {
     // Create new bind context and add into context array;
     SharedPtr<BindContext> subquery_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
@@ -297,7 +297,7 @@ QueryBinder::BuildSubquery(SharedPtr<QueryContext>& query_context,
 }
 
 SharedPtr<TableRef>
-QueryBinder::BuildCTE(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildCTE(QueryContext* query_context,
                       const String &name) {
     SharedPtr<CommonTableExpressionInfo> cte = this->bind_context_ptr_->GetCTE(name);
     if(cte == nullptr) {
@@ -339,7 +339,7 @@ QueryBinder::BuildCTE(SharedPtr<QueryContext>& query_context,
 }
 
 SharedPtr<TableRef>
-QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildBaseTable(QueryContext* query_context,
                             const TableReference* from_table) {
     String schema_name;
     if(from_table->schema_name_.empty()) {
@@ -388,7 +388,7 @@ QueryBinder::BuildBaseTable(SharedPtr<QueryContext>& query_context,
 }
 
 SharedPtr<TableRef>
-QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildView(QueryContext* query_context,
                        const TableReference* from_table) {
     SharedPtr<View> view_ptr = Infinity::instance().catalog()->GetViewByNameNoExcept(from_table->schema_name_,
                                                                                      from_table->table_name_);
@@ -432,7 +432,7 @@ QueryBinder::BuildView(SharedPtr<QueryContext>& query_context,
 }
 
 SharedPtr<TableRef>
-QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildCrossProduct(QueryContext* query_context,
                                const CrossProductReference* from_table) {
     const Vector<BaseTableReference*>& tables = from_table->tables_;
 
@@ -502,7 +502,7 @@ QueryBinder::BuildCrossProduct(SharedPtr<QueryContext>& query_context,
 }
 
 SharedPtr<TableRef>
-QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildJoin(QueryContext* query_context,
                        const JoinReference* from_table) {
 
     String alias{};
@@ -637,7 +637,7 @@ QueryBinder::BuildJoin(SharedPtr<QueryContext>& query_context,
 }
 
 void
-QueryBinder::UnfoldStarExpression(SharedPtr<QueryContext>& query_context,
+QueryBinder::UnfoldStarExpression(QueryContext* query_context,
                                   const Vector<ParsedExpr *>& input_select_list,
                                   Vector<ParsedExpr*>& output_select_list) {
     output_select_list.reserve(input_select_list.size());
@@ -722,7 +722,7 @@ QueryBinder::GenerateColumns(const SharedPtr<Binding>& binding,
 }
 
 void
-QueryBinder::BuildGroupBy(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildGroupBy(QueryContext* query_context,
                           const SelectStatement& select,
                           const SharedPtr<BindAliasProxy>& bind_alias_proxy,
                           SharedPtr<BoundSelectStatement>& select_statement) {
@@ -752,7 +752,7 @@ QueryBinder::BuildGroupBy(SharedPtr<QueryContext>& query_context,
 }
 
 void
-QueryBinder::BuildHaving(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildHaving(QueryContext* query_context,
                          const SelectStatement& select,
                          const SharedPtr<BindAliasProxy>& bind_alias_proxy,
                          SharedPtr<BoundSelectStatement>& select_statement) {
@@ -774,7 +774,7 @@ QueryBinder::BuildHaving(SharedPtr<QueryContext>& query_context,
 }
 
 void
-QueryBinder::PushOrderByToProject(SharedPtr<QueryContext>& query_context,
+QueryBinder::PushOrderByToProject(QueryContext* query_context,
                                   const SelectStatement& statement) {
     for(const OrderByExpr* order_by_expr: *statement.order_by_list) {
         OrderBinder::PushExtraExprToSelectList(order_by_expr->expr_, bind_context_ptr_);
@@ -782,7 +782,7 @@ QueryBinder::PushOrderByToProject(SharedPtr<QueryContext>& query_context,
 }
 
 void
-QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildSelectList(QueryContext* query_context,
                              SharedPtr<BoundSelectStatement>& bound_select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->project_table_index_ = table_index;
@@ -828,7 +828,7 @@ QueryBinder::BuildSelectList(SharedPtr<QueryContext>& query_context,
 }
 
 void
-QueryBinder::BuildOrderBy(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildOrderBy(QueryContext* query_context,
                           const SelectStatement& statement,
                           SharedPtr<BoundSelectStatement>& bound_statement) const {
     auto order_binder = MakeShared<OrderBinder>(query_context);
@@ -846,7 +846,7 @@ QueryBinder::BuildOrderBy(SharedPtr<QueryContext>& query_context,
 }
 
 void
-QueryBinder::BuildLimit(SharedPtr<QueryContext>& query_context,
+QueryBinder::BuildLimit(QueryContext* query_context,
                         const SelectStatement& statement,
                         SharedPtr<BoundSelectStatement>& bound_statement) const {
     auto limit_binder = MakeShared<LimitBinder>(query_context);
@@ -860,7 +860,7 @@ QueryBinder::BuildLimit(SharedPtr<QueryContext>& query_context,
 }
 
 void
-QueryBinder::PruneOutput(SharedPtr<QueryContext>& query_context,
+QueryBinder::PruneOutput(QueryContext* query_context,
                          i64 select_column_count,
                          SharedPtr<BoundSelectStatement>& bound_statement) {
     Vector<SharedPtr<BaseExpression>>& pruned_expressions = bound_statement->pruned_expression_;

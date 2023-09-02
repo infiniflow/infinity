@@ -12,7 +12,7 @@ PhysicalDummyScan::Init() {
 }
 
 void
-PhysicalDummyScan::Execute(SharedPtr<QueryContext> &query_context) {
+PhysicalDummyScan::Execute(QueryContext* query_context) {
 
 }
 

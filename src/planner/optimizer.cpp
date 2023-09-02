@@ -9,7 +9,7 @@
 
 namespace infinity {
 
-Optimizer::Optimizer(SharedPtr<QueryContext> query_context_ptr) : query_context_ptr_(std::move(query_context_ptr)) {
+Optimizer::Optimizer(QueryContext* query_context_ptr) : query_context_ptr_(query_context_ptr) {
     AddRule(MakeShared<ColumnRemapper>());
 }
 

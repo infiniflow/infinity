@@ -14,7 +14,7 @@ PhysicalDropCollection::Init() {
 }
 
 void
-PhysicalDropCollection::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalDropCollection::Execute(QueryContext* query_context) {
     Infinity::instance().catalog()->DeleteTable(*schema_name_, *collection_name_, conflict_type_);
 
     // Generate the result

@@ -49,7 +49,7 @@ PhysicalCreateTable::Init() {
 }
 
 void
-PhysicalCreateTable::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalCreateTable::Execute(QueryContext* query_context) {
 //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
     SharedPtr<Table> table_ptr = MakeShared<Table>(table_def_ptr_, TableType::kDataTable);
     Infinity::instance().catalog()->CreateTable(*schema_name_, table_ptr, conflict_type_);

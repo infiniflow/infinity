@@ -15,7 +15,7 @@ PhysicalDropSchema::Init() {
 }
 
 void
-PhysicalDropSchema::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalDropSchema::Execute(QueryContext* query_context) {
     Infinity::instance().catalog()->DeleteSchema(*schema_name_, conflict_type_);
 
     // Generate the result

@@ -33,7 +33,7 @@ public:
     Init() override;
 
     void
-    Execute(SharedPtr<QueryContext>& query_context) override;
+    Execute(QueryContext* query_context) override;
 
     void
     GroupByInputTable(const SharedPtr<Table>& input_table, SharedPtr<Table>& output_table);

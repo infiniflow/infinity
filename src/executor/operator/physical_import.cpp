@@ -17,7 +17,7 @@ PhysicalImport::Init() {
 }
 
 void
-PhysicalImport::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalImport::Execute(QueryContext* query_context) {
     switch(file_type_) {
         case CopyFileType::kCSV: {
             return ImportCSV(query_context);
@@ -36,7 +36,7 @@ struct ParserContext {
 };
 
 void
-PhysicalImport::ImportCSV(SharedPtr<QueryContext>& query_context) {
+PhysicalImport::ImportCSV(QueryContext* query_context) {
     FILE *fp = fopen(file_path_.c_str(), "rb");
     if(!fp) {
         ExecutorError(strerror(errno));
@@ -87,7 +87,7 @@ PhysicalImport::ImportCSV(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalImport::ImportJSON(SharedPtr<QueryContext>& query_context) {
+PhysicalImport::ImportJSON(QueryContext* query_context) {
     String err = fmt::format("IMPORT Table: {}.{} FROM file: {} WITH format JSON",
                              *table_ptr_->schema_name(),
                              *table_ptr_->table_name(),

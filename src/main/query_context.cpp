@@ -12,6 +12,7 @@
 #include "executor/physical_operator.h"
 #include "common/utility/infinity_assert.h"
 #include "scheduler/operator_pipeline.h"
+#include "executor/fragment_builder.h"
 
 #include <sstream>
 #include <utility>
@@ -63,8 +64,8 @@ QueryResult::ToString() const {
     return ss.str();
 }
 
-QueryContext::QueryContext(Session* session_ptr)
-    : session_ptr_(session_ptr) {
+QueryContext::QueryContext(Session* session_ptr, const Config* config_ptr)
+    : session_ptr_(session_ptr), global_config_(config_ptr) {
     transaction_ = MakeUnique<TransactionContext>();
 }
 
@@ -79,11 +80,10 @@ QueryContext::Query(const String &query) {
         ParserError(parsed_result->error_message_)
     }
 
-    SharedPtr<QueryContext> query_context = shared_from_this();
-
-    LogicalPlanner logical_planner(query_context);
-    Optimizer optimizer(query_context);
-    PhysicalPlanner physical_planner(query_context);
+    LogicalPlanner logical_planner(this);
+    Optimizer optimizer(this);
+    PhysicalPlanner physical_planner(this);
+    FragmentBuilder fragment_builder(this);
 
     PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
     for (BaseStatement* statement : *parsed_result->statements_ptr_) {
@@ -99,11 +99,14 @@ QueryContext::Query(const String &query) {
         // Build physical plan
         SharedPtr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
+        // Fragment Builder, only for test now.
+        // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
+
         // Create execution pipeline
         SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
 
         // Schedule the query pipeline
-        Infinity::instance().scheduler()->Schedule(query_context, pipeline);
+        Infinity::instance().scheduler()->Schedule(this, pipeline);
 
         QueryResult query_result;
         query_result.result_ = pipeline->GetResult();

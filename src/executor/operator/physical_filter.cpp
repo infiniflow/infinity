@@ -29,7 +29,7 @@ PhysicalFilter::Init() {
 }
 
 void
-PhysicalFilter::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalFilter::Execute(QueryContext* query_context) {
     // Get input from left child
     input_table_ = left_->output();
     ExecutorAssert(input_table_ != nullptr, "No input.");

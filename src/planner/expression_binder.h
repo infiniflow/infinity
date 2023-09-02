@@ -26,7 +26,7 @@ struct ExprBindResult {
 class ExpressionBinder {
 public:
     explicit
-    ExpressionBinder(SharedPtr<QueryContext>& query_context) : query_context_(query_context) {}
+    ExpressionBinder(QueryContext* query_context) : query_context_(query_context) {}
 
     virtual
     ~ExpressionBinder() = default;
@@ -104,7 +104,7 @@ public:
 
 //    SharedPtr<PlanBuilder> plan_builder_ptr_;
 protected:
-    SharedPtr<QueryContext>& query_context_;
+    QueryContext* query_context_;
 
 };
 

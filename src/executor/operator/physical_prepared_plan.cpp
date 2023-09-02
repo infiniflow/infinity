@@ -12,7 +12,7 @@ PhysicalPreparedPlan::Init() {
 }
 
 void
-PhysicalPreparedPlan::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalPreparedPlan::Execute(QueryContext* query_context) {
 
 }
 

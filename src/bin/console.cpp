@@ -103,12 +103,12 @@ Console::Explain(const String& arguments) {
     SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
-    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(), nullptr);
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
-    LogicalPlanner logical_planner(query_context_ptr);
-    Optimizer optimizer(query_context_ptr);
-    PhysicalPlanner physical_planner(query_context_ptr);
+    LogicalPlanner logical_planner(query_context_ptr.get());
+    Optimizer optimizer(query_context_ptr.get());
+    PhysicalPlanner physical_planner(query_context_ptr.get());
 
     size_t parameter_pos = arguments.find_first_of(' ');
     String parameter = arguments.substr(0, parameter_pos);
@@ -181,13 +181,13 @@ Console::Visualize(const String& arguments) {
     SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
-    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(), nullptr);
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
-    LogicalPlanner logical_planner(query_context_ptr);
+    LogicalPlanner logical_planner(query_context_ptr.get());
 
-    Optimizer optimizer(query_context_ptr);
-    PhysicalPlanner physical_planner(query_context_ptr);
+    Optimizer optimizer(query_context_ptr.get());
+    PhysicalPlanner physical_planner(query_context_ptr.get());
 
     size_t option_pos = arguments.find_first_of(' ');
     String option = arguments.substr(0, option_pos);
@@ -266,13 +266,13 @@ Console::ExecuteSQL(const String& sql_text) {
     PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
-    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(), nullptr);
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
-    LogicalPlanner logical_planner(query_context_ptr);
+    LogicalPlanner logical_planner(query_context_ptr.get());
 
-    Optimizer optimizer(query_context_ptr);
-    PhysicalPlanner physical_planner(query_context_ptr);
+    Optimizer optimizer(query_context_ptr.get());
+    PhysicalPlanner physical_planner(query_context_ptr.get());
 
     for (const BaseStatement *statement : *parsed_result->statements_ptr_) {
         // Build unoptimized logical plan for each SQL statement.
@@ -289,7 +289,7 @@ Console::ExecuteSQL(const String& sql_text) {
         SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
 
         // Schedule the query pipeline
-        Infinity::instance().scheduler()->Schedule(query_context_ptr, pipeline);
+        Infinity::instance().scheduler()->Schedule(query_context_ptr.get(), pipeline);
 
         // Initialize query result
         QueryResult query_result;

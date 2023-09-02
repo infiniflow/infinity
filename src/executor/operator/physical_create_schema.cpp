@@ -16,7 +16,7 @@ PhysicalCreateSchema::Init() {
 }
 
 void
-PhysicalCreateSchema::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalCreateSchema::Execute(QueryContext* query_context) {
 //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
     auto schema_def = MakeShared<SchemaDefinition>(schema_name_, conflict_type_);
 

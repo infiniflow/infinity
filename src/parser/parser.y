@@ -5,7 +5,7 @@
 #include "parser.h"
 #include "lexer.h"
 
-void yyerror(YYLTYPE * llocp, void* lexer, ParserResult* result, const char* msg);
+void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const char* msg);
 %}
 
 %code requires {
@@ -21,8 +21,6 @@ void yyerror(YYLTYPE * llocp, void* lexer, ParserResult* result, const char* msg
 #include "parser_helper.h"
 
 #include <vector>
-
-using namespace infinity;
 
 #define YYSTYPE SQLSTYPE
 #define YYLTYPE SQLLTYPE
@@ -66,7 +64,7 @@ struct SQL_LTYPE {
 %define api.prefix {sql}
 
 %lex-param {void *scanner}
-%parse-param {void *scanner} {ParserResult* result}
+%parse-param {void *scanner} {infinity::ParserResult* result}
 
 %locations
 %initial-action {
@@ -85,58 +83,58 @@ struct SQL_LTYPE {
     double  double_value;
     int64_t long_value;
 
-    BaseStatement*   base_stmt;
-    SelectStatement* select_stmt;
-    CopyStatement*   copy_stmt;
-    InsertStatement* insert_stmt;
-    UpdateStatement* update_stmt;
-    DeleteStatement* delete_stmt;
-    CreateStatement* create_stmt;
-    DropStatement*   drop_stmt;
-    PrepareStatement* prepare_stmt;
-    ExecuteStatement* execute_stmt;
-    AlterStatement*   alter_stmt;
-    ShowStatement*    show_stmt;
-    ExplainStatement* explain_stmt;
-    FlushStatement*  flush_stmt;
+    infinity::BaseStatement*   base_stmt;
+    infinity::SelectStatement* select_stmt;
+    infinity::CopyStatement*   copy_stmt;
+    infinity::InsertStatement* insert_stmt;
+    infinity::UpdateStatement* update_stmt;
+    infinity::DeleteStatement* delete_stmt;
+    infinity::CreateStatement* create_stmt;
+    infinity::DropStatement*   drop_stmt;
+    infinity::PrepareStatement* prepare_stmt;
+    infinity::ExecuteStatement* execute_stmt;
+    infinity::AlterStatement*   alter_stmt;
+    infinity::ShowStatement*    show_stmt;
+    infinity::ExplainStatement* explain_stmt;
+    infinity::FlushStatement*  flush_stmt;
 
-    Vector<BaseStatement*>* stmt_array;
+    std::vector<infinity::BaseStatement*>* stmt_array;
 
-    Vector<TableElement*>*  table_element_array_t;
-    TableElement*           table_element_t;
-    ColumnDef*              table_column_t;
-    ColumnType              column_type_t;
-    ConstraintType          column_constraint_t;
-    HashSet<ConstraintType>* column_constraints_t;
-    Vector<String>*         identifier_array_t;
-    TableConstraint*        table_constraint_t;
+    std::vector<infinity::TableElement*>*  table_element_array_t;
+    infinity::TableElement*           table_element_t;
+    infinity::ColumnDef*              table_column_t;
+    infinity::ColumnType              column_type_t;
+    infinity::ConstraintType          column_constraint_t;
+    infinity::HashSet<infinity::ConstraintType>* column_constraints_t;
+    std::vector<std::string>*         identifier_array_t;
+    infinity::TableConstraint*        table_constraint_t;
 
-    BaseTableReference*     table_reference_t;
-    TableAlias *            table_alias_t;
-    JoinType                join_type_t;
+    infinity::BaseTableReference*     table_reference_t;
+    infinity::TableAlias *            table_alias_t;
+    infinity::JoinType                join_type_t;
 
-    OrderByExpr*            order_by_expr_t;
-    Vector<OrderByExpr*>*   order_by_expr_list_t;
-    OrderType               order_by_type_t;
+    infinity::OrderByExpr*            order_by_expr_t;
+    std::vector<infinity::OrderByExpr*>*   order_by_expr_list_t;
+    infinity::OrderType               order_by_type_t;
 
-    WithExpr*               with_expr_t;
-    Vector<WithExpr*>*      with_expr_list_t;
+    infinity::WithExpr*               with_expr_t;
+    std::vector<infinity::WithExpr*>*      with_expr_list_t;
 
-    SetOperatorType         set_operator_t;
+    infinity::SetOperatorType         set_operator_t;
 
-    ExplainType             explain_type_t;
+    infinity::ExplainType             explain_type_t;
 
-    ParsedExpr*             expr_t;
-    Vector<ParsedExpr*>*    expr_array_t;
+    infinity::ParsedExpr*             expr_t;
+    std::vector<infinity::ParsedExpr*>*    expr_array_t;
 
-    Vector<WhenThen*>*     case_check_array_t;
+    std::vector<infinity::WhenThen*>*     case_check_array_t;
 
-    UpdateExpr*             update_expr_t;
-    Vector<UpdateExpr*>*    update_expr_array_t;
+    infinity::UpdateExpr*             update_expr_t;
+    std::vector<infinity::UpdateExpr*>*    update_expr_array_t;
 
-    TableName* table_name_t;
-    CopyOption* copy_option_t;
-    Vector<CopyOption*>* copy_option_array;
+    infinity::TableName* table_name_t;
+    infinity::CopyOption* copy_option_t;
+    std::vector<infinity::CopyOption*>* copy_option_array;
 }
 
 %destructor {
@@ -376,7 +374,7 @@ input_pattern : statement_list semicolon {
 statement_list : statement {
     $1->stmt_length_ = yylloc.string_length;
     yylloc.string_length = 0;
-    $$ = new Vector<BaseStatement*>();
+    $$ = new std::vector<infinity::BaseStatement*>();
     $$->push_back($1);
 }
 | statement_list ';' statement {
@@ -413,21 +411,21 @@ explainable_statement : create_statement { $$ = $1; }
 
 /* CREATE SCHEMA schema_name; */
 create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
-    $$ = new CreateStatement();
-    SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateSchemaInfo> create_schema_info = std::make_shared<infinity::CreateSchemaInfo>();
 
     ParserHelper::ToLower($4);
     create_schema_info->schema_name_ = $4;
     free($4);
 
     $$->create_info_ = create_schema_info;
-    $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    $$->create_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
 }
 
 /* CREATE COLLECTION collection_name; */
 | CREATE COLLECTION if_not_exists table_name {
-    $$ = new CreateStatement();
-    SharedPtr<CreateCollectionInfo> create_collection_info = MakeShared<CreateCollectionInfo>();
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateCollectionInfo> create_collection_info = std::make_shared<infinity::CreateCollectionInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         create_collection_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -435,14 +433,14 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     create_collection_info->collection_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
     $$->create_info_ = create_collection_info;
-    $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    $$->create_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     delete $4;
 }
 
 /* CREATE TABLE table_name ( column list ); */
 | CREATE TABLE if_not_exists table_name '(' table_element_array ')' {
-    $$ = new CreateStatement();
-    SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateTableInfo> create_table_info = std::make_shared<infinity::CreateTableInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         create_table_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -451,22 +449,22 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     free($4->table_name_ptr_);
     delete $4;
 
-    for (TableElement*& element : *$6) {
-        if(element->type_ == TableElementType::kColumn) {
-            create_table_info->column_defs_.emplace_back((ColumnDef*)element);
+    for (infinity::TableElement*& element : *$6) {
+        if(element->type_ == infinity::TableElementType::kColumn) {
+            create_table_info->column_defs_.emplace_back((infinity::ColumnDef*)element);
         } else {
-            create_table_info->constraints_.emplace_back((TableConstraint*)element);
+            create_table_info->constraints_.emplace_back((infinity::TableConstraint*)element);
         }
     }
     delete $6;
 
     $$->create_info_ = create_table_info;
-    $$->create_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    $$->create_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
 }
 /* CREATE TABLE table_name AS SELECT .... ; */
 | CREATE TABLE if_not_exists table_name AS select_statement {
-    $$ = new CreateStatement();
-    SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateTableInfo> create_table_info = std::make_shared<infinity::CreateTableInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         create_table_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -475,14 +473,14 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     free($4->table_name_ptr_);
     delete $4;
 
-    create_table_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    create_table_info->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     create_table_info->select_ = $6;
     $$->create_info_ = create_table_info;
 }
 /* CREATE VIEW table_name AS SELECT .... ; */
 | CREATE VIEW if_not_exists table_name optional_identifier_array AS select_statement {
-    $$ = new CreateStatement();
-    SharedPtr<CreateViewInfo> create_view_info = MakeShared<CreateViewInfo>();
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateViewInfo> create_view_info = std::make_shared<infinity::CreateViewInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         create_view_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -493,13 +491,13 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
 
     create_view_info->view_columns_ = $5;
     create_view_info->select_ = $7;
-    create_view_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    create_view_info->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     $$->create_info_ = create_view_info;
 }
 /* CREATE INDEX index_name ON table_name (column1) ; */
 | CREATE INDEX if_not_exists IDENTIFIER ON table_name '(' identifier_array ')' {
-    $$ = new CreateStatement();
-    SharedPtr<CreateIndexInfo> create_index_info = MakeShared<CreateIndexInfo>();
+    $$ = new infinity::CreateStatement();
+    std::shared_ptr<infinity::CreateIndexInfo> create_index_info = std::make_shared<infinity::CreateIndexInfo>();
     if($6->schema_name_ptr_ != nullptr) {
         create_index_info->schema_name_ = $6->schema_name_ptr_;
         free($6->schema_name_ptr_);
@@ -513,12 +511,12 @@ create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
     free($4);
 
     create_index_info->column_names_ = $8;
-    create_index_info->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    create_index_info->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     $$->create_info_ = create_index_info;
 };
 
 table_element_array : table_element {
-    $$ = new Vector<TableElement*>();
+    $$ = new std::vector<infinity::TableElement*>();
     $$->push_back($1);
 }
 | table_element_array ',' table_element {
@@ -537,10 +535,10 @@ table_element : table_column {
 
 table_column :
 IDENTIFIER column_type {
-    SharedPtr<TypeInfo> type_info_ptr{nullptr};
+    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
-        case LogicalType::kDecimal: {
-            type_info_ptr = DecimalInfo::Make($2.precision, $2.scale);
+        case infinity::LogicalType::kDecimal: {
+            type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
             if(type_info_ptr == nullptr) {
                 yyerror(&yyloc, scanner, result, "Fail to create decimal info.");
                 delete $1;
@@ -548,16 +546,16 @@ IDENTIFIER column_type {
             }
             break;
         }
-        case LogicalType::kBitmap: {
-            type_info_ptr = BitmapInfo::Make($2.width);
+        case infinity::LogicalType::kBitmap: {
+            type_info_ptr = infinity::BitmapInfo::Make($2.width);
             break;
         }
-        case LogicalType::kEmbedding: {
-            type_info_ptr = EmbeddingInfo::Make($2.embedding_type_, $2.width);
+        case infinity::LogicalType::kEmbedding: {
+            type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
             break;
         }
     }
-    $$ = new ColumnDef($2.logical_type_, type_info_ptr);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr);
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;
@@ -569,22 +567,22 @@ IDENTIFIER column_type {
     */
 };
 | IDENTIFIER column_type column_constraints {
-    SharedPtr<TypeInfo> type_info_ptr{nullptr};
+    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
-        case LogicalType::kDecimal: {
-            type_info_ptr = DecimalInfo::Make($2.precision, $2.scale);
+        case infinity::LogicalType::kDecimal: {
+            type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
             break;
         }
-        case LogicalType::kBitmap: {
-            type_info_ptr = BitmapInfo::Make($2.width);
+        case infinity::LogicalType::kBitmap: {
+            type_info_ptr = infinity::BitmapInfo::Make($2.width);
             break;
         }
-        case LogicalType::kEmbedding: {
-            type_info_ptr = EmbeddingInfo::Make($2.embedding_type_, $2.width);
+        case infinity::LogicalType::kEmbedding: {
+            type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
             break;
         }
     }
-    $$ = new ColumnDef($2.logical_type_, type_info_ptr);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr);
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;
@@ -599,60 +597,60 @@ IDENTIFIER column_type {
 };
 
 column_type :
-BOOLEAN { $$ = ColumnType{LogicalType::kBoolean}; }
-| TINYINT { $$ = ColumnType{LogicalType::kTinyInt}; }
-| SMALLINT { $$ = ColumnType{LogicalType::kSmallInt}; }
-| INTEGER { $$ = ColumnType{LogicalType::kInteger}; }
-| BIGINT { $$ = ColumnType{LogicalType::kBigInt}; }
-| HUGEINT { $$ = ColumnType{LogicalType::kHugeInt}; }
-| FLOAT { $$ = ColumnType{LogicalType::kFloat}; }
-| REAL  { $$ = ColumnType{LogicalType::kFloat}; }
-| DOUBLE { $$ = ColumnType{LogicalType::kDouble}; }
-| DATE { $$ = ColumnType{LogicalType::kDate}; }
-| TIME { $$ = ColumnType{LogicalType::kTime}; }
-| DATETIME { $$ = ColumnType{LogicalType::kDateTime}; }
-| TIMESTAMP { $$ = ColumnType{LogicalType::kTimestamp}; }
-| UUID { $$ = ColumnType{LogicalType::kUuid}; }
-| POINT { $$ = ColumnType{LogicalType::kPoint}; }
-| LINE { $$ = ColumnType{LogicalType::kLine}; }
-| LSEG { $$ = ColumnType{LogicalType::kLineSeg}; }
-| BOX { $$ = ColumnType{LogicalType::kBox}; }
-| PATH { $$ = ColumnType{LogicalType::kPath}; }
-| POLYGON { $$ = ColumnType{LogicalType::kPolygon}; }
-| CIRCLE { $$ = ColumnType{LogicalType::kCircle}; }
+BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean}; }
+| TINYINT { $$ = infinity::ColumnType{infinity::LogicalType::kTinyInt}; }
+| SMALLINT { $$ = infinity::ColumnType{infinity::LogicalType::kSmallInt}; }
+| INTEGER { $$ = infinity::ColumnType{infinity::LogicalType::kInteger}; }
+| BIGINT { $$ = infinity::ColumnType{infinity::LogicalType::kBigInt}; }
+| HUGEINT { $$ = infinity::ColumnType{infinity::LogicalType::kHugeInt}; }
+| FLOAT { $$ = infinity::ColumnType{infinity::LogicalType::kFloat}; }
+| REAL  { $$ = infinity::ColumnType{infinity::LogicalType::kFloat}; }
+| DOUBLE { $$ = infinity::ColumnType{infinity::LogicalType::kDouble}; }
+| DATE { $$ = infinity::ColumnType{infinity::LogicalType::kDate}; }
+| TIME { $$ = infinity::ColumnType{infinity::LogicalType::kTime}; }
+| DATETIME { $$ = infinity::ColumnType{infinity::LogicalType::kDateTime}; }
+| TIMESTAMP { $$ = infinity::ColumnType{infinity::LogicalType::kTimestamp}; }
+| UUID { $$ = infinity::ColumnType{infinity::LogicalType::kUuid}; }
+| POINT { $$ = infinity::ColumnType{infinity::LogicalType::kPoint}; }
+| LINE { $$ = infinity::ColumnType{infinity::LogicalType::kLine}; }
+| LSEG { $$ = infinity::ColumnType{infinity::LogicalType::kLineSeg}; }
+| BOX { $$ = infinity::ColumnType{infinity::LogicalType::kBox}; }
+| PATH { $$ = infinity::ColumnType{infinity::LogicalType::kPath}; }
+| POLYGON { $$ = infinity::ColumnType{infinity::LogicalType::kPolygon}; }
+| CIRCLE { $$ = infinity::ColumnType{infinity::LogicalType::kCircle}; }
 // Variable types
-| CHAR { $$ = ColumnType{LogicalType::kVarchar}; }
-| CHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kVarchar}; }
-| VARCHAR { $$ = ColumnType{LogicalType::kVarchar}; }
-| VARCHAR '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kVarchar}; }
-| DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kDecimal, 0, $3, $5}; }
-| DECIMAL '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kDecimal, 0, $3, 0}; }
-| DECIMAL { $$ = ColumnType{LogicalType::kDecimal, 0, 0, 0}; }
-| BLOB '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kBlob, $3}; }
-| BITMAP '(' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kBitmap, $3}; }
-| EMBEDDING '(' BIT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemBit}; }
-| EMBEDDING '(' TINYINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt8}; }
-| EMBEDDING '(' SMALLINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt16}; }
-| EMBEDDING '(' INTEGER ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt32}; }
-| EMBEDDING '(' BIGINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt64}; }
-| EMBEDDING '(' FLOAT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemFloat}; }
-| EMBEDDING '(' DOUBLE ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemDouble}; }
-| VECTOR '(' BIT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemBit}; }
-| VECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt8}; }
-| VECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt16}; }
-| VECTOR '(' INTEGER ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt32}; }
-| VECTOR '(' BIGINT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemInt64}; }
-| VECTOR '(' FLOAT ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemFloat}; }
-| VECTOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = ColumnType{LogicalType::kEmbedding, $5, 0, 0, kElemDouble}; }
+| CHAR { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar}; }
+| CHAR '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar}; }
+| VARCHAR { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar}; }
+| VARCHAR '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar}; }
+| DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, $3, $5}; }
+| DECIMAL '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, $3, 0}; }
+| DECIMAL { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, 0, 0}; }
+| BLOB '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kBlob, $3}; }
+| BITMAP '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kBitmap, $3}; }
+| EMBEDDING '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemBit}; }
+| EMBEDDING '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt8}; }
+| EMBEDDING '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt16}; }
+| EMBEDDING '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt32}; }
+| EMBEDDING '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt64}; }
+| EMBEDDING '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemFloat}; }
+| EMBEDDING '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemDouble}; }
+| VECTOR '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemBit}; }
+| VECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt8}; }
+| VECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt16}; }
+| VECTOR '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt32}; }
+| VECTOR '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt64}; }
+| VECTOR '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemFloat}; }
+| VECTOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemDouble}; }
 /*
 | DECIMAL opt_decimal_specification {
-  $$ = ColumnType{DataType::DECIMAL, 0, $2->first, $2->second};
+  $$ = infinity::ColumnType{DataType::DECIMAL, 0, $2->first, $2->second};
   delete $2;
 }
-| TEXT { $$ = ColumnType{DataType::TEXT}; }
-| TIME opt_time_precision { $$ = ColumnType{DataType::TIME, 0, $2}; }
-| TIMESTAMP { $$ = ColumnType{DataType::DATETIME}; }
-| VARCHAR '(' INTVAL ')' { $$ = ColumnType{DataType::VARCHAR, $3}; }
+| TEXT { $$ = infinity::ColumnType{DataType::TEXT}; }
+| TIME opt_time_precision { $$ = infinity::ColumnType{DataType::TIME, 0, $2}; }
+| TIMESTAMP { $$ = infinity::ColumnType{DataType::DATETIME}; }
+| VARCHAR '(' INTVAL ')' { $$ = infinity::ColumnType{DataType::VARCHAR, $3}; }
 
 opt_time_precision : '(' INTVAL ')' { $$ = $2; }
 | { $$ = 0; };
@@ -663,7 +661,7 @@ opt_decimal_specification : '(' INTVAL ',' INTVAL ')' { $$ = new std::pair<int64
 */
 
 column_constraints : column_constraint {
-    $$ = new HashSet<ConstraintType>();
+    $$ = new infinity::HashSet<infinity::ConstraintType>();
     $$->insert($1);
 }
 | column_constraints column_constraint {
@@ -677,32 +675,32 @@ column_constraints : column_constraint {
 }
 
 column_constraint : PRIMARY KEY {
-    $$ = ConstraintType::kPrimaryKey;
+    $$ = infinity::ConstraintType::kPrimaryKey;
 }
 | UNIQUE {
-    $$ = ConstraintType::kUnique;
+    $$ = infinity::ConstraintType::kUnique;
 }
 | NULLABLE {
-    $$ = ConstraintType::kNull;
+    $$ = infinity::ConstraintType::kNull;
 }
 | NOT NULLABLE {
-    $$ = ConstraintType::kNotNull;
+    $$ = infinity::ConstraintType::kNotNull;
 };
 
 table_constraint : PRIMARY KEY '(' identifier_array ')' {
-    $$ = new TableConstraint();
+    $$ = new infinity::TableConstraint();
     $$->names_ptr_ = $4;
-    $$->constraint_ = ConstraintType::kPrimaryKey;
+    $$->constraint_ = infinity::ConstraintType::kPrimaryKey;
 }
 | UNIQUE '(' identifier_array ')' {
-    $$ = new TableConstraint();
+    $$ = new infinity::TableConstraint();
     $$->names_ptr_ = $3;
-    $$->constraint_ = ConstraintType::kUnique;
+    $$->constraint_ = infinity::ConstraintType::kUnique;
 };
 
 
 identifier_array : IDENTIFIER {
-    $$ = new Vector<String>();
+    $$ = new std::vector<std::string>();
     ParserHelper::ToLower($1);
     $$->emplace_back($1);
     free($1);
@@ -718,7 +716,7 @@ identifier_array : IDENTIFIER {
  * DELETE STATEMENT
  */
 delete_statement : DELETE FROM table_name where_clause {
-    $$ = new DeleteStatement();
+    $$ = new infinity::DeleteStatement();
 
     if($3->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $3->schema_name_ptr_;
@@ -734,7 +732,7 @@ delete_statement : DELETE FROM table_name where_clause {
  * INSERT STATEMENT
  */
 insert_statement: INSERT INTO table_name optional_identifier_array VALUES '(' expr_array ')' {
-    $$ = new InsertStatement();
+    $$ = new infinity::InsertStatement();
     if($3->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $3->schema_name_ptr_;
         free($3->schema_name_ptr_);
@@ -746,7 +744,7 @@ insert_statement: INSERT INTO table_name optional_identifier_array VALUES '(' ex
     $$->values_ = $7;
 }
 | INSERT INTO table_name optional_identifier_array select_without_paren {
-    $$ = new InsertStatement();
+    $$ = new infinity::InsertStatement();
     if($3->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $3->schema_name_ptr_;
         free($3->schema_name_ptr_);
@@ -769,38 +767,38 @@ optional_identifier_array: '(' identifier_array ')' {
  * EXPLAIN STATEMENT
  */
 explain_statement : EXPLAIN explain_type explainable_statement {
-    $$ = new ExplainStatement();
+    $$ = new infinity::ExplainStatement();
     $$->type_ = $2;
     $$->statement_ = $3;
 }
 
 explain_type: ANALYZE {
-    $$ = ExplainType::kAnalyze;
+    $$ = infinity::ExplainType::kAnalyze;
 }
 | AST {
-    $$ = ExplainType::kAst;
+    $$ = infinity::ExplainType::kAst;
 }
 | RAW {
-    $$ = ExplainType::kUnOpt;
+    $$ = infinity::ExplainType::kUnOpt;
 }
 | LOGICAL {
-    $$ = ExplainType::kOpt;
+    $$ = infinity::ExplainType::kOpt;
 }
 | PHYSICAL {
-    $$ = ExplainType::kPhysical;
+    $$ = infinity::ExplainType::kPhysical;
 }
 | PIPELINE {
-    $$ = ExplainType::kPipeline;
+    $$ = infinity::ExplainType::kPipeline;
 }
 | {
-    $$ = ExplainType::kPhysical;
+    $$ = infinity::ExplainType::kPhysical;
 }
 
 /*
  * UPDATE STATEMENT
  */
 update_statement: UPDATE table_name SET update_expr_array where_clause {
-    $$ = new UpdateStatement();
+    $$ = new infinity::UpdateStatement();
     if($2->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $2->schema_name_ptr_;
         free($2->schema_name_ptr_);
@@ -813,7 +811,7 @@ update_statement: UPDATE table_name SET update_expr_array where_clause {
 }
 
 update_expr_array: update_expr {
-    $$ = new Vector<UpdateExpr*>();
+    $$ = new std::vector<infinity::UpdateExpr*>();
     $$->emplace_back($1);
 }
 | update_expr_array ',' update_expr {
@@ -822,7 +820,7 @@ update_expr_array: update_expr {
 }
 
 update_expr : IDENTIFIER '=' expr {
-    $$ = new UpdateExpr();
+    $$ = new infinity::UpdateExpr();
     ParserHelper::ToLower($1);
     $$->column_name = $1;
     free($1);
@@ -835,21 +833,21 @@ update_expr : IDENTIFIER '=' expr {
 
 /* DROP SCHEMA schema_name; */
 drop_statement: DROP SCHEMA if_exists IDENTIFIER {
-    $$ = new DropStatement();
-    SharedPtr<DropSchemaInfo> drop_schema_info = MakeShared<DropSchemaInfo>();
+    $$ = new infinity::DropStatement();
+    std::shared_ptr<infinity::DropSchemaInfo> drop_schema_info = std::make_shared<infinity::DropSchemaInfo>();
 
     ParserHelper::ToLower($4);
     drop_schema_info->schema_name_ = $4;
     free($4);
 
     $$->drop_info_ = drop_schema_info;
-    $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    $$->drop_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
 };
 
 /* DROP COLLECTION collection_name; */
 | DROP COLLECTION if_exists table_name {
-    $$ = new DropStatement();
-    SharedPtr<DropCollectionInfo> drop_collection_info = std::make_unique<DropCollectionInfo>();
+    $$ = new infinity::DropStatement();
+    std::shared_ptr<infinity::DropCollectionInfo> drop_collection_info = std::make_unique<infinity::DropCollectionInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         drop_collection_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -857,14 +855,14 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     drop_collection_info->collection_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
     $$->drop_info_ = drop_collection_info;
-    $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    $$->drop_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     delete $4;
 }
 
 /* DROP TABLE table_name; */
 | DROP TABLE if_exists table_name {
-    $$ = new DropStatement();
-    SharedPtr<DropTableInfo> drop_table_info = std::make_unique<DropTableInfo>();
+    $$ = new infinity::DropStatement();
+    std::shared_ptr<infinity::DropTableInfo> drop_table_info = std::make_unique<infinity::DropTableInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         drop_table_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -872,14 +870,14 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     drop_table_info->table_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
     $$->drop_info_ = drop_table_info;
-    $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    $$->drop_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     delete $4;
 }
 
 /* DROP VIEW view_name; */
 | DROP VIEW if_exists table_name {
-    $$ = new DropStatement();
-    SharedPtr<DropViewInfo> drop_view_info = std::make_unique<DropViewInfo>();
+    $$ = new infinity::DropStatement();
+    std::shared_ptr<infinity::DropViewInfo> drop_view_info = std::make_unique<infinity::DropViewInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         drop_view_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -887,14 +885,14 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     drop_view_info->view_name_ = $4->table_name_ptr_;
     free($4->table_name_ptr_);
     $$->drop_info_ = drop_view_info;
-    $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    $$->drop_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     delete $4;
 }
 
 /* DROP INDEX index_name; */
 | DROP INDEX if_exists table_name {
-    $$ = new DropStatement();
-    SharedPtr<DropIndexInfo> drop_index_info = MakeShared<DropIndexInfo>();
+    $$ = new infinity::DropStatement();
+    std::shared_ptr<infinity::DropIndexInfo> drop_index_info = std::make_shared<infinity::DropIndexInfo>();
     if($4->schema_name_ptr_ != nullptr) {
         drop_index_info->schema_name_ = $4->schema_name_ptr_;
         free($4->schema_name_ptr_);
@@ -904,7 +902,7 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
     delete $4;
 
     $$->drop_info_ = drop_index_info;
-    $$->drop_info_->conflict_type_ = $3 ? ConflictType::kIgnore : ConflictType::kError;
+    $$->drop_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
 };
 
 /*
@@ -912,7 +910,7 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
  */
 // COPY schema.table TO file_path WITH (FORMAT csv, DELIMITER ',', HEADER TRUE)
 copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
-    $$ = new CopyStatement();
+    $$ = new infinity::CopyStatement();
 
     // Copy To
     $$->copy_from_ = false;
@@ -931,19 +929,19 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     free($4);
 
     // copy options
-    SizeT option_count = (*$7).size();
-    for(SizeT idx = 0; idx < option_count; ++ idx) {
-        CopyOption* option_ptr = (*$7)[idx];
+    infinity::SizeT option_count = (*$7).size();
+    for(infinity::SizeT idx = 0; idx < option_count; ++ idx) {
+        infinity::CopyOption* option_ptr = (*$7)[idx];
         switch(option_ptr->option_type_) {
-            case CopyOptionType::kFormat: {
+            case infinity::CopyOptionType::kFormat: {
                 $$->copy_file_type_ = option_ptr->file_type_;
                 break;
             }
-            case CopyOptionType::kDelimiter: {
+            case infinity::CopyOptionType::kDelimiter: {
                 $$->delimiter_ = option_ptr->delimiter_;
                 break;
             }
-            case CopyOptionType::kHeader: {
+            case infinity::CopyOptionType::kHeader: {
                 $$->header_ = option_ptr->header_;
                 break;
             }
@@ -953,7 +951,7 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     delete $7;
 }
 | COPY table_name FROM file_path WITH '(' copy_option_list ')' {
-    $$ = new CopyStatement();
+    $$ = new infinity::CopyStatement();
 
     // Copy From
     $$->copy_from_ = true;
@@ -972,19 +970,19 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     free($4);
 
     // copy options
-    SizeT option_count = (*$7).size();
-    for(SizeT idx = 0; idx < option_count; ++ idx) {
-        CopyOption* option_ptr = (*$7)[idx];
+    infinity::SizeT option_count = (*$7).size();
+    for(infinity::SizeT idx = 0; idx < option_count; ++ idx) {
+        infinity::CopyOption* option_ptr = (*$7)[idx];
         switch(option_ptr->option_type_) {
-            case CopyOptionType::kFormat: {
+            case infinity::CopyOptionType::kFormat: {
                 $$->copy_file_type_ = option_ptr->file_type_;
                 break;
             }
-            case CopyOptionType::kDelimiter: {
+            case infinity::CopyOptionType::kDelimiter: {
                 $$->delimiter_ = option_ptr->delimiter_;
                 break;
             }
-            case CopyOptionType::kHeader: {
+            case infinity::CopyOptionType::kHeader: {
                 $$->header_ = option_ptr->header_;
                 break;
             }
@@ -1004,7 +1002,7 @@ select_statement : select_without_paren {
     $$ = $1;
 }
 | select_statement set_operator select_clause_without_modifier_paren {
-    SelectStatement* node = $1;
+    infinity::SelectStatement* node = $1;
     while(node->nested_select_ != nullptr) {
         node = node->nested_select_;
     }
@@ -1013,7 +1011,7 @@ select_statement : select_without_paren {
     $$ = $1;
 }
 | select_statement set_operator select_clause_without_modifier {
-    SelectStatement* node = $1;
+    infinity::SelectStatement* node = $1;
     while(node->nested_select_ != nullptr) {
         node = node->nested_select_;
     }
@@ -1050,7 +1048,7 @@ select_clause_without_modifier_paren: '(' select_clause_without_modifier ')' {
 
 select_clause_without_modifier:
 SELECT distinct expr_array from_clause where_clause group_by_clause having_clause {
-    $$ = new SelectStatement();
+    $$ = new infinity::SelectStatement();
     $$->select_list_ = $3;
     $$->select_distinct_ = $2;
     $$->table_ref_ = $4;
@@ -1072,7 +1070,7 @@ order_by_clause : ORDER BY order_by_expr_list {
 };
 
 order_by_expr_list: order_by_expr {
-    $$ = new Vector<OrderByExpr*>();
+    $$ = new std::vector<infinity::OrderByExpr*>();
     $$->emplace_back($1);
 }
 | order_by_expr_list ',' order_by_expr {
@@ -1081,19 +1079,19 @@ order_by_expr_list: order_by_expr {
 }
 
 order_by_expr : expr order_by_type {
-    $$ = new OrderByExpr();
+    $$ = new infinity::OrderByExpr();
     $$->expr_ = $1;
     $$->type_ = $2;
 };
 
 order_by_type: ASC {
-    $$ = kAsc;
+    $$ = infinity::kAsc;
 }
 | DESC {
-    $$ = kDesc;
+    $$ = infinity::kDesc;
 }
 | {
-    $$ = kAsc;
+    $$ = infinity::kAsc;
 }
 
 limit_expr: LIMIT expr {
@@ -1144,16 +1142,16 @@ group_by_clause: GROUP BY expr_array {
 }
 
 set_operator : UNION {
-    $$ = SetOperatorType::kUnion;
+    $$ = infinity::SetOperatorType::kUnion;
 }
 | UNION ALL {
-    $$ = SetOperatorType::kUnionAll;
+    $$ = infinity::SetOperatorType::kUnionAll;
 }
 | INTERSECT {
-    $$ = SetOperatorType::kIntersect;
+    $$ = infinity::SetOperatorType::kIntersect;
 }
 | EXCEPT {
-    $$ = SetOperatorType::kExcept;
+    $$ = infinity::SetOperatorType::kExcept;
 };
 
 /*
@@ -1164,12 +1162,12 @@ table_reference : table_reference_unit {
     $$ = $1;
 }
 | table_reference ',' table_reference_unit {
-    CrossProductReference* cross_product_ref = nullptr;
-    if($1->type_ == TableRefType::kCrossProduct) {
-        cross_product_ref = (CrossProductReference*)$1;
+    infinity::CrossProductReference* cross_product_ref = nullptr;
+    if($1->type_ == infinity::TableRefType::kCrossProduct) {
+        cross_product_ref = (infinity::CrossProductReference*)$1;
         cross_product_ref->tables_.emplace_back($3);
     } else {
-        cross_product_ref = new CrossProductReference();
+        cross_product_ref = new infinity::CrossProductReference();
         cross_product_ref->tables_.emplace_back($1);
         cross_product_ref->tables_.emplace_back($3);
     }
@@ -1181,7 +1179,7 @@ table_reference : table_reference_unit {
 table_reference_unit : table_reference_name | join_clause;
 
 table_reference_name : table_name table_alias {
-    TableReference* table_ref = new TableReference();
+    infinity::TableReference* table_ref = new infinity::TableReference();
     if($1->schema_name_ptr_ != nullptr) {
         table_ref->schema_name_ = $1->schema_name_ptr_;
         free($1->schema_name_ptr_);
@@ -1195,7 +1193,7 @@ table_reference_name : table_name table_alias {
 }
 /* FROM (select * from t1) AS t2 */
 | '(' select_statement ')' table_alias {
-    SubqueryReference* subquery_reference = new SubqueryReference();
+    infinity::SubqueryReference* subquery_reference = new infinity::SubqueryReference();
     subquery_reference->select_statement_ = $2;
     subquery_reference->alias_ = $4;
     $$ = subquery_reference;
@@ -1205,14 +1203,14 @@ table_reference_name : table_name table_alias {
 /* 'table_name' or 'schema_name.table_name' */
 table_name : IDENTIFIER {
     if(!result->IsError()) {
-        $$ = new TableName();
+        $$ = new infinity::TableName();
         ParserHelper::ToLower($1);
         $$->table_name_ptr_ = $1;
     }
 }
 | IDENTIFIER '.' IDENTIFIER {
     if(!result->IsError()) {
-        $$ = new TableName();
+        $$ = new infinity::TableName();
         ParserHelper::ToLower($1);
         ParserHelper::ToLower($3);
         $$->schema_name_ptr_ = $1;
@@ -1222,17 +1220,17 @@ table_name : IDENTIFIER {
 
 /* AS 'table_alias' or AS 'table_alias(col1_alias, col2_alias ... )' */
 table_alias : AS IDENTIFIER {
-    $$ = new TableAlias();
+    $$ = new infinity::TableAlias();
     ParserHelper::ToLower($2);
     $$->alias_ = $2;
 }
 | IDENTIFIER {
-    $$ = new TableAlias();
+    $$ = new infinity::TableAlias();
     ParserHelper::ToLower($1);
     $$->alias_ = $1;
 }
 | AS IDENTIFIER '(' identifier_array ')' {
-    $$ = new TableAlias();
+    $$ = new infinity::TableAlias();
     ParserHelper::ToLower($2);
     $$->alias_ = $2;
     $$->column_alias_array_ = $4;
@@ -1252,7 +1250,7 @@ with_clause : WITH with_expr_list {
 }
 
 with_expr_list: with_expr {
-    $$ = new Vector<WithExpr*>();
+    $$ = new std::vector<infinity::WithExpr*>();
     $$->emplace_back($1);
 } | with_expr_list ',' with_expr {
     $1->emplace_back($3);
@@ -1260,7 +1258,7 @@ with_expr_list: with_expr {
 }
 
 with_expr: IDENTIFIER AS '(' select_clause_with_modifier ')' {
-    $$ = new WithExpr();
+    $$ = new infinity::WithExpr();
     ParserHelper::ToLower($1);
     $$->alias_ = $1;
     free($1);
@@ -1272,14 +1270,14 @@ with_expr: IDENTIFIER AS '(' select_clause_with_modifier ')' {
  */
 
 join_clause: table_reference_unit NATURAL JOIN table_reference_name {
-    JoinReference* join_reference = new JoinReference();
+    infinity::JoinReference* join_reference = new infinity::JoinReference();
     join_reference->left_ = $1;
     join_reference->right_ = $4;
-    join_reference->join_type_ = JoinType::kNatural;
+    join_reference->join_type_ = infinity::JoinType::kNatural;
     $$ = join_reference;
 }
 | table_reference_unit join_type JOIN table_reference_name ON expr {
-    JoinReference* join_reference = new JoinReference();
+    infinity::JoinReference* join_reference = new infinity::JoinReference();
     join_reference->left_ = $1;
     join_reference->right_ = $4;
     join_reference->join_type_ = $2;
@@ -1293,22 +1291,22 @@ join_clause: table_reference_unit NATURAL JOIN table_reference_name {
 
 
 join_type : INNER {
-    $$ = JoinType::kInner;
+    $$ = infinity::JoinType::kInner;
 }
 | LEFT {
-    $$ = JoinType::kLeft;
+    $$ = infinity::JoinType::kLeft;
 }
 | RIGHT {
-    $$ = JoinType::kRight;
+    $$ = infinity::JoinType::kRight;
 }
 | OUTER {
-    $$ = JoinType::kFull;
+    $$ = infinity::JoinType::kFull;
 }
 | FULL {
-    $$ = JoinType::kFull;
+    $$ = infinity::JoinType::kFull;
 }
 | CROSS {
-    $$ = JoinType::kCross;
+    $$ = infinity::JoinType::kCross;
 }
 | /* default */ {
 };
@@ -1317,16 +1315,16 @@ join_type : INNER {
  * SHOW STATEMENT
  */
 show_statement: SHOW TABLES {
-    $$ = new ShowStatement();
-    $$->show_type_ = ShowStmtType::kTables;
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kTables;
 }
 | SHOW VIEWS {
-    $$ = new ShowStatement();
-    $$->show_type_ = ShowStmtType::kViews;
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kViews;
 }
 | DESCRIBE table_name {
-    $$ = new ShowStatement();
-    $$->show_type_ = ShowStmtType::kColumns;
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kColumns;
     if($2->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $2->schema_name_ptr_;
         free($2->schema_name_ptr_);
@@ -1340,16 +1338,16 @@ show_statement: SHOW TABLES {
  * FLUSH STATEMENT
  */
 flush_statement: FLUSH DATA {
-    $$ = new FlushStatement();
-    $$->type_ = FlushType::kData;
+    $$ = new infinity::FlushStatement();
+    $$->type_ = infinity::FlushType::kData;
 }
 | FLUSH LOG {
-    $$ = new FlushStatement();
-    $$->type_ = FlushType::kLog;
+    $$ = new infinity::FlushStatement();
+    $$->type_ = infinity::FlushType::kLog;
 }
 | FLUSH BUFFER {
-    $$ = new FlushStatement();
-    $$->type_ = FlushType::kBuffer;
+    $$ = new infinity::FlushStatement();
+    $$->type_ = infinity::FlushType::kBuffer;
 };
 
 /*
@@ -1357,7 +1355,7 @@ flush_statement: FLUSH DATA {
  */
 
 expr_array : expr_alias {
-    $$ = new Vector<ParsedExpr*>();
+    $$ = new std::vector<infinity::ParsedExpr*>();
     $$->emplace_back($1);
 }
 | expr_array ',' expr_alias {
@@ -1367,7 +1365,7 @@ expr_array : expr_alias {
 
 /*
 constant_expr_array: constant_expr {
-    $$ = new Vector<ParsedExpr*>();
+    $$ = new std::vector<infinity::ParsedExpr*>();
     $$->emplace_back($1);
 }
 | constant_expr_array ',' constant_expr {
@@ -1396,8 +1394,8 @@ operand: '(' expr ')' {
    $$ = $2;
 }
 | '(' select_without_paren ')' {
-    SubqueryExpr* subquery_expr = new SubqueryExpr();
-    subquery_expr->subquery_type_ = SubqueryType::kScalar;
+    infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
+    subquery_expr->subquery_type_ = infinity::SubqueryType::kScalar;
     subquery_expr->select_ = $2;
     $$ = subquery_expr;
 }
@@ -1408,7 +1406,7 @@ operand: '(' expr ')' {
 | cast_expr
 
 function_expr : IDENTIFIER '(' ')' {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower($1);
     func_expr->func_name_ = $1;
     free($1);
@@ -1416,7 +1414,7 @@ function_expr : IDENTIFIER '(' ')' {
     $$ = func_expr;
 }
 | IDENTIFIER '(' expr_array ')' {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower($1);
     func_expr->func_name_ = $1;
     free($1);
@@ -1424,7 +1422,7 @@ function_expr : IDENTIFIER '(' ')' {
     $$ = func_expr;
 }
 | IDENTIFIER '(' DISTINCT expr_array ')' {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower($1);
     func_expr->func_name_ = $1;
     free($1);
@@ -1433,157 +1431,157 @@ function_expr : IDENTIFIER '(' ')' {
     $$ = func_expr;
 }
 | operand IS NOT NULLABLE {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "is_not_null";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     $$ = func_expr;
 }
 | operand IS NULLABLE {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "is_null";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     $$ = func_expr;
 }
 | NOT operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "not";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($2);
     $$ = func_expr;
 }
 | '-' operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "-";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($2);
     $$ = func_expr;
 }
 | '+' operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "+";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($2);
     $$ = func_expr;
 }
 | operand '-' operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "-";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand '+' operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "+";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand '*' operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "*";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand '/' operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "/";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand '%' operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "%";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand '=' operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "=";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand EQUAL operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "=";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand NOT_EQ operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "<>";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand '<' operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "<";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand '>' operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = ">";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand LESS_EQ operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "<=";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand GREATER_EQ operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = ">=";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | EXTRACT '(' STRING FROM operand ')' {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower($3);
     if(strcmp($3, "year") == 0) {
         func_expr->func_name_ = "extract_year";
-        func_expr->arguments_ = new Vector<ParsedExpr*>();
+        func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     } else if(strcmp($3, "month") == 0) {
         func_expr->func_name_ = "extract_month";
-        func_expr->arguments_ = new Vector<ParsedExpr*>();
+        func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     } else if(strcmp($3, "day") == 0) {
         func_expr->func_name_ = "extract_day";
-        func_expr->arguments_ = new Vector<ParsedExpr*>();
+        func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     } else if(strcmp($3, "hour") == 0) {
         func_expr->func_name_ = "extract_hour";
-        func_expr->arguments_ = new Vector<ParsedExpr*>();
+        func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     } else if(strcmp($3, "minute") == 0) {
         func_expr->func_name_ = "extract_minute";
-        func_expr->arguments_ = new Vector<ParsedExpr*>();
+        func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     } else if(strcmp($3, "second") == 0) {
         func_expr->func_name_ = "extract_second";
-        func_expr->arguments_ = new Vector<ParsedExpr*>();
+        func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     } else {
         yyerror(&yyloc, scanner, result, "Invalid column expression format");
         YYERROR;
@@ -1593,41 +1591,41 @@ function_expr : IDENTIFIER '(' ')' {
     $$ = func_expr;
 }
 | operand LIKE operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "like";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | operand NOT LIKE operand {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "not_like";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($4);
     $$ = func_expr;
 };
 
 conjunction_expr: expr AND expr {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "and";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 }
 | expr OR expr {
-    FunctionExpr* func_expr = new FunctionExpr();
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "or";
-    func_expr->arguments_ = new Vector<ParsedExpr*>();
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
     $$ = func_expr;
 };
 
 between_expr: operand BETWEEN operand AND operand {
-    BetweenExpr* between_expr = new BetweenExpr();
+    infinity::BetweenExpr* between_expr = new infinity::BetweenExpr();
     between_expr->value_ = $1;
     between_expr->lower_bound_ = $3;
     between_expr->upper_bound_ = $5;
@@ -1635,52 +1633,52 @@ between_expr: operand BETWEEN operand AND operand {
 }
 
 in_expr: operand IN '(' expr_array ')' {
-    InExpr* in_expr = new InExpr(true);
+    infinity::InExpr* in_expr = new infinity::InExpr(true);
     in_expr->left_ = $1;
     in_expr->arguments_ = $4;
     $$ = in_expr;
 }
 | operand NOT IN '(' expr_array ')' {
-    InExpr* in_expr = new InExpr(false);
+    infinity::InExpr* in_expr = new infinity::InExpr(false);
     in_expr->left_ = $1;
     in_expr->arguments_ = $5;
     $$ = in_expr;
 };
 
 case_expr: CASE expr case_check_array END {
-    CaseExpr* case_expr = new CaseExpr();
+    infinity::CaseExpr* case_expr = new infinity::CaseExpr();
     case_expr->expr_ = $2;
     case_expr->case_check_array_ = $3;
     $$ = case_expr;
 }
 | CASE expr case_check_array ELSE expr END {
-    CaseExpr* case_expr = new CaseExpr();
+    infinity::CaseExpr* case_expr = new infinity::CaseExpr();
     case_expr->expr_ = $2;
     case_expr->case_check_array_ = $3;
     case_expr->else_expr_ = $5;
     $$ = case_expr;
 }
 | CASE case_check_array END {
-    CaseExpr* case_expr = new CaseExpr();
+    infinity::CaseExpr* case_expr = new infinity::CaseExpr();
     case_expr->case_check_array_ = $2;
     $$ = case_expr;
 }
 | CASE case_check_array ELSE expr END {
-    CaseExpr* case_expr = new CaseExpr();
+    infinity::CaseExpr* case_expr = new infinity::CaseExpr();
     case_expr->case_check_array_ = $2;
     case_expr->else_expr_ = $4;
     $$ = case_expr;
 };
 
 case_check_array: WHEN expr THEN expr {
-    $$ = new Vector<WhenThen*>();
-    WhenThen* when_then_ptr = new WhenThen();
+    $$ = new std::vector<infinity::WhenThen*>();
+    infinity::WhenThen* when_then_ptr = new infinity::WhenThen();
     when_then_ptr->when_ = $2;
     when_then_ptr->then_ = $4;
     $$->emplace_back(when_then_ptr);
 }
 | case_check_array WHEN expr THEN expr {
-    WhenThen* when_then_ptr = new WhenThen();
+    infinity::WhenThen* when_then_ptr = new infinity::WhenThen();
     when_then_ptr->when_ = $3;
     when_then_ptr->then_ = $5;
     $1->emplace_back(when_then_ptr);
@@ -1688,74 +1686,74 @@ case_check_array: WHEN expr THEN expr {
 };
 
 cast_expr: CAST '(' expr AS column_type ')' {
-    SharedPtr<TypeInfo> type_info_ptr{nullptr};
+    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
     switch($5.logical_type_) {
-        case LogicalType::kDecimal: {
-            type_info_ptr = DecimalInfo::Make($5.precision, $5.scale);
+        case infinity::LogicalType::kDecimal: {
+            type_info_ptr = infinity::DecimalInfo::Make($5.precision, $5.scale);
             break;
         }
-        case LogicalType::kBitmap: {
-            type_info_ptr = BitmapInfo::Make($5.width);
+        case infinity::LogicalType::kBitmap: {
+            type_info_ptr = infinity::BitmapInfo::Make($5.width);
             break;
         }
-        case LogicalType::kEmbedding: {
-            type_info_ptr = EmbeddingInfo::Make($5.embedding_type_, $5.width);
+        case infinity::LogicalType::kEmbedding: {
+            type_info_ptr = infinity::EmbeddingInfo::Make($5.embedding_type_, $5.width);
             break;
         }
     }
-    CastExpr* cast_expr = new CastExpr($5.logical_type_, type_info_ptr);
+    infinity::CastExpr* cast_expr = new infinity::CastExpr($5.logical_type_, type_info_ptr);
     cast_expr->expr_ = $3;
     $$ = cast_expr;
 };
 
 subquery_expr: EXISTS '(' select_without_paren ')' {
-    SubqueryExpr* subquery_expr = new SubqueryExpr();
-    subquery_expr->subquery_type_ = SubqueryType::kExists;
+    infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
+    subquery_expr->subquery_type_ = infinity::SubqueryType::kExists;
     subquery_expr->select_ = $3;
     $$ = subquery_expr;
 }
 | NOT EXISTS '(' select_without_paren ')' {
-    SubqueryExpr* subquery_expr = new SubqueryExpr();
-    subquery_expr->subquery_type_ = SubqueryType::kNotExists;
+    infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
+    subquery_expr->subquery_type_ = infinity::SubqueryType::kNotExists;
     subquery_expr->select_ = $4;
     $$ = subquery_expr;
 }
 | operand IN '(' select_without_paren ')' {
-    SubqueryExpr* subquery_expr = new SubqueryExpr();
-    subquery_expr->subquery_type_ = SubqueryType::kIn;
+    infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
+    subquery_expr->subquery_type_ = infinity::SubqueryType::kIn;
     subquery_expr->left_ = $1;
     subquery_expr->select_ = $4;
     $$ = subquery_expr;
 }
 | operand NOT IN '(' select_without_paren ')' {
-    SubqueryExpr* subquery_expr = new SubqueryExpr();
-    subquery_expr->subquery_type_ = SubqueryType::kNotIn;
+    infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
+    subquery_expr->subquery_type_ = infinity::SubqueryType::kNotIn;
     subquery_expr->left_ = $1;
     subquery_expr->select_ = $5;
     $$ = subquery_expr;
 };
 
 column_expr : IDENTIFIER {
-    ColumnExpr* column_expr = new ColumnExpr();
+    infinity::ColumnExpr* column_expr = new infinity::ColumnExpr();
     ParserHelper::ToLower($1);
     column_expr->names_.emplace_back($1);
     free($1);
     $$ = column_expr;
 }
 | column_expr '.' IDENTIFIER {
-    ColumnExpr* column_expr = (ColumnExpr*)$1;
+    infinity::ColumnExpr* column_expr = (infinity::ColumnExpr*)$1;
     ParserHelper::ToLower($3);
     column_expr->names_.emplace_back($3);
     free($3);
     $$ = column_expr;
 }
 | '*' {
-    ColumnExpr* column_expr = new ColumnExpr();
+    infinity::ColumnExpr* column_expr = new infinity::ColumnExpr();
     column_expr->star_ = true;
     $$ = column_expr;
 }
 | column_expr '.' '*' {
-    ColumnExpr* column_expr = (ColumnExpr*)$1;
+    infinity::ColumnExpr* column_expr = (infinity::ColumnExpr*)$1;
     if(column_expr->star_) {
         yyerror(&yyloc, scanner, result, "Invalid column expression format");
         YYERROR;
@@ -1765,32 +1763,32 @@ column_expr : IDENTIFIER {
 };
 
 constant_expr: STRING {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kString);
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kString);
     const_expr->str_value_ = $1;
     $$ = const_expr;
 }
 | TRUE {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kBoolean);
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kBoolean);
     const_expr->bool_value_ = true;
     $$ = const_expr;
 }
 | FALSE {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kBoolean);
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kBoolean);
     const_expr->bool_value_ = false;
     $$ = const_expr;
 }
 | DOUBLE_VALUE {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kDouble);
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDouble);
     const_expr->double_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInteger);
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInteger);
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | DATE STRING {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kDate);
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDate);
     const_expr->date_value_ = $2;
     $$ = const_expr;
 }
@@ -1802,74 +1800,74 @@ constant_expr: STRING {
 };
 
 interval_expr: LONG_VALUE SECONDS {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kSecond;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kSecond;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE SECOND {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kSecond;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kSecond;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE MINUTES {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kMinute;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kMinute;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE MINUTE {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kMinute;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kMinute;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE HOURS {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kHour;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kHour;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE HOUR {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kHour;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kHour;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE DAYS {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kDay;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kDay;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE DAY {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kDay;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kDay;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE MONTHS {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kMonth;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kMonth;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE MONTH {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kMonth;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kMonth;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE YEARS {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kYear;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kYear;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 }
 | LONG_VALUE YEAR {
-    ConstantExpr* const_expr = new ConstantExpr(LiteralType::kInterval);
-    const_expr->interval_type_ = TimeUnit::kYear;
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
+    const_expr->interval_type_ = infinity::TimeUnit::kYear;
     const_expr->integer_value_ = $1;
     $$ = const_expr;
 };
@@ -1879,7 +1877,7 @@ interval_expr: LONG_VALUE SECONDS {
  */
 
 copy_option_list : copy_option {
-    $$ = new Vector<CopyOption*>();
+    $$ = new std::vector<infinity::CopyOption*>();
     $$->push_back($1);
 }
 | copy_option_list ',' copy_option {
@@ -1888,13 +1886,13 @@ copy_option_list : copy_option {
 };
 
 copy_option : FORMAT IDENTIFIER {
-    $$ = new CopyOption();
-    $$->option_type_ = CopyOptionType::kFormat;
+    $$ = new infinity::CopyOption();
+    $$->option_type_ = infinity::CopyOptionType::kFormat;
     if (strcasecmp($2, "csv") == 0) {
-        $$->file_type_ = CopyFileType::kCSV;
+        $$->file_type_ = infinity::CopyFileType::kCSV;
         free($2);
     } else if (strcasecmp($2, "json") == 0) {
-        $$->file_type_ = CopyFileType::kJSON;
+        $$->file_type_ = infinity::CopyFileType::kJSON;
         free($2);
     } else {
         free($2);
@@ -1904,14 +1902,14 @@ copy_option : FORMAT IDENTIFIER {
     }
 }
 | DELIMITER STRING {
-    $$ = new CopyOption();
-    $$->option_type_ = CopyOptionType::kDelimiter;
+    $$ = new infinity::CopyOption();
+    $$->option_type_ = infinity::CopyOptionType::kDelimiter;
     $$->delimiter_ = $2[0];
     free($2);
 }
 | HEADER {
-    $$ = new CopyOption();
-    $$->option_type_ = CopyOptionType::kHeader;
+    $$ = new infinity::CopyOption();
+    $$->option_type_ = infinity::CopyOptionType::kHeader;
     $$->header_ = true;
 };
 
@@ -1932,9 +1930,9 @@ semicolon : ';'
 %%
 
 void
-yyerror(YYLTYPE * llocp, void* lexer, ParserResult* result, const char* msg) {
+yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const char* msg) {
     if(result->IsError()) return ;
 
-    result->error_message_ = String(msg) + ", " + std::to_string(llocp->first_column);
+    result->error_message_ = std::string(msg) + ", " + std::to_string(llocp->first_column);
 	fprintf(stderr, "Error: %s, %d:%d\n", msg, llocp->first_line, llocp->first_column);
 }

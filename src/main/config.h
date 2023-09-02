@@ -36,7 +36,7 @@ struct Options {
     String log_dir{};
     String log_file_path{};
     bool log_to_stdout{};
-    u64 log_max_size{};
+    SizeT log_max_size{};
     SizeT log_file_rotate_count{};
     spdlog::level::level_enum log_level{spdlog::level::info};
 

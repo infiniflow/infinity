@@ -11,7 +11,7 @@ namespace infinity {
 
 class LimitBinder final : public ExpressionBinder {
 public:
-    explicit LimitBinder(SharedPtr<QueryContext>& query_context): ExpressionBinder(query_context) {}
+    explicit LimitBinder(QueryContext* query_context): ExpressionBinder(query_context) {}
 
     // Bind expression entry
     SharedPtr<BaseExpression>

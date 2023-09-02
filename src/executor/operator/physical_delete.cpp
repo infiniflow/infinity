@@ -12,7 +12,7 @@ PhysicalDelete::Init() {
 }
 
 void
-PhysicalDelete::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalDelete::Execute(QueryContext* query_context) {
 
 }
 

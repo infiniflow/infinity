@@ -26,7 +26,7 @@ public:
 
 protected:
     void
-    OnExecute(SharedPtr<QueryContext>& query_context) final;
+    OnExecute(QueryContext* query_context) final;
 
 private:
     SharedPtr<PhysicalOperator> operator_;

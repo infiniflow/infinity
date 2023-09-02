@@ -24,7 +24,7 @@ private:
 class ColumnRemapper: public OptimizerRule {
 public:
     inline void
-    ApplyToPlan(SharedPtr<QueryContext>& query_context_ptr,
+    ApplyToPlan(QueryContext* query_context_ptr,
                 const SharedPtr<LogicalNode>& logical_plan) final {
         return remapper_.VisitNode(*logical_plan);
     }

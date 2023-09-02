@@ -8,7 +8,7 @@
 namespace infinity {
 
 static void
-TableScanFunc(SharedPtr<QueryContext>& query_context,
+TableScanFunc(QueryContext* query_context,
               const SharedPtr<TableFunctionData>& table_function_data_ptr,
               DataBlock &output) {
 

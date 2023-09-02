@@ -30,7 +30,7 @@ public:
     Init() override;
 
     void
-    Execute(SharedPtr<QueryContext>& query_context) override;
+    Execute(QueryContext* query_context) override;
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
@@ -43,10 +43,10 @@ public:
     }
 
     void
-    ImportCSV(SharedPtr<QueryContext>& query_context);
+    ImportCSV(QueryContext* query_context);
 
     void
-    ImportJSON(SharedPtr<QueryContext>& query_context);
+    ImportJSON(QueryContext* query_context);
 
     inline const SharedPtr<Table>&
     table_ptr() const {

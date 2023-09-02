@@ -25,7 +25,7 @@
 namespace infinity {
 
 SharedPtr<LogicalNode>
-BoundSelectStatement::BuildPlan(const SharedPtr<QueryContext>& query_context_ptr) {
+BoundSelectStatement::BuildPlan(const QueryContext* query_context_ptr) {
 
     const SharedPtr<BindContext>& bind_context = this->bind_context_;
     SharedPtr<LogicalNode> root = BuildFrom(table_ref_ptr_,
@@ -99,7 +99,7 @@ BoundSelectStatement::BuildPlan(const SharedPtr<QueryContext>& query_context_ptr
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildFrom(SharedPtr<TableRef>& table_ref,
-                                const SharedPtr<QueryContext>& query_context_ptr,
+                                const QueryContext* query_context_ptr,
                                 const SharedPtr<BindContext>& bind_context) {
     if(table_ref) {
         switch(table_ref->type_) {
@@ -130,7 +130,7 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef>& table_ref,
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef>& table_ref,
-                                     const SharedPtr<QueryContext>& query_context_ptr,
+                                     const QueryContext* query_context_ptr,
                                      const SharedPtr<BindContext>& bind_context) {
     // SharedPtr<BaseTableRef> base_table_ref
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
@@ -149,7 +149,7 @@ BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef>& table_ref,
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildSubqueryTable(SharedPtr<TableRef>& table_ref,
-                                         const SharedPtr<QueryContext>& query_context_ptr,
+                                         const QueryContext* query_context_ptr,
                                          const SharedPtr<BindContext>& bind_context) {
     // SharedPtr<SubqueryTableRef> subquery_table_ref
     auto subquery_table_ref = std::static_pointer_cast<SubqueryTableRef>(table_ref);
@@ -159,7 +159,7 @@ BoundSelectStatement::BuildSubqueryTable(SharedPtr<TableRef>& table_ref,
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildCrossProductTable(SharedPtr<TableRef>& table_ref,
-                                             const SharedPtr<QueryContext>& query_context_ptr,
+                                             const QueryContext* query_context_ptr,
                                              const SharedPtr<BindContext>& bind_context) {
     // SharedPtr<CrossProductTableRef> cross_product_table_ref
     auto cross_product_table_ref = std::static_pointer_cast<CrossProductTableRef>(table_ref);
@@ -180,7 +180,7 @@ BoundSelectStatement::BuildCrossProductTable(SharedPtr<TableRef>& table_ref,
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef>& table_ref,
-                                     const SharedPtr<QueryContext>& query_context_ptr,
+                                     const QueryContext* query_context_ptr,
                                      const SharedPtr<BindContext>& bind_context) {
     // SharedPtr<JoinTableRef> join_table_ref
     auto join_table_ref = std::static_pointer_cast<JoinTableRef>(table_ref);
@@ -203,7 +203,7 @@ BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef>& table_ref,
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef>& table_ref,
-                                      const SharedPtr<QueryContext>& query_context_ptr,
+                                      const QueryContext* query_context_ptr,
                                       const SharedPtr<BindContext>& bind_context) {
     u64 logical_node_id = bind_context->GetNewLogicalNodeId();
     String alias("DummyTable" + std::to_string(logical_node_id));
@@ -216,7 +216,7 @@ BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef>& table_ref,
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildFilter(SharedPtr<LogicalNode>& root,
                                   Vector<SharedPtr<BaseExpression>>& conditions,
-                                  const SharedPtr<QueryContext>& query_context_ptr,
+                                  const QueryContext* query_context_ptr,
                                   const SharedPtr<BindContext>& bind_context) {
     for(auto& cond: conditions) {
         // 1. Go through all the expression to find subquery
@@ -240,7 +240,7 @@ BoundSelectStatement::BuildFilter(SharedPtr<LogicalNode>& root,
 void
 BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode>& root,
                                     SharedPtr<BaseExpression>& condition,
-                                    const SharedPtr<QueryContext>& query_context_ptr,
+                                    const QueryContext* query_context_ptr,
                                     const SharedPtr<BindContext>& bind_context) {
     if(condition == nullptr) {
         return ;
@@ -262,7 +262,7 @@ BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode>& root,
 SharedPtr<BaseExpression>
 BoundSelectStatement::UnnestSubquery(SharedPtr<LogicalNode>& root,
                                      SharedPtr<BaseExpression>& condition,
-                                     const SharedPtr<QueryContext>& query_context_ptr,
+                                     const QueryContext* query_context_ptr,
                                      const SharedPtr<BindContext>& bind_context) {
     building_subquery_ = true;
 //    SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(query_context_ptr,

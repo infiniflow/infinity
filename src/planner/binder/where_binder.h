@@ -13,7 +13,7 @@ namespace infinity {
 class WhereBinder final : public ExpressionBinder {
 public:
     explicit
-    WhereBinder(SharedPtr<QueryContext>& query_context,
+    WhereBinder(QueryContext* query_context,
                          const SharedPtr<BindAliasProxy>& bind_alias_proxy)
         : ExpressionBinder(query_context),
         bind_alias_proxy_(bind_alias_proxy) {}

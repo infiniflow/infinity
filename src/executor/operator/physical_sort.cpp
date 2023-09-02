@@ -174,7 +174,7 @@ PhysicalSort::Init() {
 }
 
 void
-PhysicalSort::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalSort::Execute(QueryContext* query_context) {
 
     executor_.Init(this->expressions_);
 

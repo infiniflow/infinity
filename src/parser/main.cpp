@@ -17,6 +17,7 @@ public:
 
 int main(int argc, char *argv[])
 {
+    using namespace infinity;
     Vector<String> inputs;
     inputs.emplace_back("create collection c1;");
     inputs.emplace_back("create schema s1;");

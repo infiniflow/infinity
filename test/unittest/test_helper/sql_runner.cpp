@@ -13,7 +13,7 @@ SQLRunner::Run(const String& sql_text, bool print) {
     }
 
     SharedPtr<Session> session_ptr = MakeShared<Session>();
-    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get());
+    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get(), nullptr);
     query_context_ptr->set_current_schema(session_ptr->current_schema());
 
     SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
@@ -28,9 +28,9 @@ SQLRunner::Run(const String& sql_text, bool print) {
     std::cout << "Statement count: " << parsed_result->statements_ptr_->size() << std::endl;
 
     for(SizeT idx = 0; idx < statement_count; ++ idx) {
-        LogicalPlanner logical_planner(query_context_ptr);
-        Optimizer optimizer(query_context_ptr);
-        PhysicalPlanner physical_planner(query_context_ptr);
+        LogicalPlanner logical_planner(query_context_ptr.get());
+        Optimizer optimizer(query_context_ptr.get());
+        PhysicalPlanner physical_planner(query_context_ptr.get());
 
         BaseStatement* statement = (*parsed_result->statements_ptr_)[idx];
 
@@ -54,7 +54,7 @@ SQLRunner::Run(const String& sql_text, bool print) {
         SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
 
         // Schedule the query pipeline
-        Infinity::instance().scheduler()->Schedule(query_context_ptr, pipeline);
+        Infinity::instance().scheduler()->Schedule(query_context_ptr.get(), pipeline);
 
         // Initialize query result
         QueryResult query_result;

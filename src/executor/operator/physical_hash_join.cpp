@@ -12,7 +12,7 @@ PhysicalHashJoin::Init() {
 }
 
 void
-PhysicalHashJoin::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalHashJoin::Execute(QueryContext* query_context) {
 
 }
 

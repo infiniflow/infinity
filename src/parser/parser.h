@@ -68,8 +68,6 @@ extern int sqldebug;
 
 #include <vector>
 
-using namespace infinity;
-
 #define YYSTYPE SQLSTYPE
 #define YYLTYPE SQLLTYPE
 
@@ -102,7 +100,7 @@ struct SQL_LTYPE {
         }                                         \
     }
 
-#line 106 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 104 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 /* Token kinds.  */
 #ifndef SQLTOKENTYPE
@@ -257,67 +255,67 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 82 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 80 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
 
     bool    bool_value;
     char*   str_value;
     double  double_value;
     int64_t long_value;
 
-    BaseStatement*   base_stmt;
-    SelectStatement* select_stmt;
-    CopyStatement*   copy_stmt;
-    InsertStatement* insert_stmt;
-    UpdateStatement* update_stmt;
-    DeleteStatement* delete_stmt;
-    CreateStatement* create_stmt;
-    DropStatement*   drop_stmt;
-    PrepareStatement* prepare_stmt;
-    ExecuteStatement* execute_stmt;
-    AlterStatement*   alter_stmt;
-    ShowStatement*    show_stmt;
-    ExplainStatement* explain_stmt;
-    FlushStatement*  flush_stmt;
+    infinity::BaseStatement*   base_stmt;
+    infinity::SelectStatement* select_stmt;
+    infinity::CopyStatement*   copy_stmt;
+    infinity::InsertStatement* insert_stmt;
+    infinity::UpdateStatement* update_stmt;
+    infinity::DeleteStatement* delete_stmt;
+    infinity::CreateStatement* create_stmt;
+    infinity::DropStatement*   drop_stmt;
+    infinity::PrepareStatement* prepare_stmt;
+    infinity::ExecuteStatement* execute_stmt;
+    infinity::AlterStatement*   alter_stmt;
+    infinity::ShowStatement*    show_stmt;
+    infinity::ExplainStatement* explain_stmt;
+    infinity::FlushStatement*  flush_stmt;
 
-    Vector<BaseStatement*>* stmt_array;
+    std::vector<infinity::BaseStatement*>* stmt_array;
 
-    Vector<TableElement*>*  table_element_array_t;
-    TableElement*           table_element_t;
-    ColumnDef*              table_column_t;
-    ColumnType              column_type_t;
-    ConstraintType          column_constraint_t;
-    HashSet<ConstraintType>* column_constraints_t;
-    Vector<String>*         identifier_array_t;
-    TableConstraint*        table_constraint_t;
+    std::vector<infinity::TableElement*>*  table_element_array_t;
+    infinity::TableElement*           table_element_t;
+    infinity::ColumnDef*              table_column_t;
+    infinity::ColumnType              column_type_t;
+    infinity::ConstraintType          column_constraint_t;
+    infinity::HashSet<infinity::ConstraintType>* column_constraints_t;
+    std::vector<std::string>*         identifier_array_t;
+    infinity::TableConstraint*        table_constraint_t;
 
-    BaseTableReference*     table_reference_t;
-    TableAlias *            table_alias_t;
-    JoinType                join_type_t;
+    infinity::BaseTableReference*     table_reference_t;
+    infinity::TableAlias *            table_alias_t;
+    infinity::JoinType                join_type_t;
 
-    OrderByExpr*            order_by_expr_t;
-    Vector<OrderByExpr*>*   order_by_expr_list_t;
-    OrderType               order_by_type_t;
+    infinity::OrderByExpr*            order_by_expr_t;
+    std::vector<infinity::OrderByExpr*>*   order_by_expr_list_t;
+    infinity::OrderType               order_by_type_t;
 
-    WithExpr*               with_expr_t;
-    Vector<WithExpr*>*      with_expr_list_t;
+    infinity::WithExpr*               with_expr_t;
+    std::vector<infinity::WithExpr*>*      with_expr_list_t;
 
-    SetOperatorType         set_operator_t;
+    infinity::SetOperatorType         set_operator_t;
 
-    ExplainType             explain_type_t;
+    infinity::ExplainType             explain_type_t;
 
-    ParsedExpr*             expr_t;
-    Vector<ParsedExpr*>*    expr_array_t;
+    infinity::ParsedExpr*             expr_t;
+    std::vector<infinity::ParsedExpr*>*    expr_array_t;
 
-    Vector<WhenThen*>*     case_check_array_t;
+    std::vector<infinity::WhenThen*>*     case_check_array_t;
 
-    UpdateExpr*             update_expr_t;
-    Vector<UpdateExpr*>*    update_expr_array_t;
+    infinity::UpdateExpr*             update_expr_t;
+    std::vector<infinity::UpdateExpr*>*    update_expr_array_t;
 
-    TableName* table_name_t;
-    CopyOption* copy_option_t;
-    Vector<CopyOption*>* copy_option_array;
+    infinity::TableName* table_name_t;
+    infinity::CopyOption* copy_option_t;
+    std::vector<infinity::CopyOption*>* copy_option_array;
 
-#line 321 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 319 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;
@@ -342,7 +340,7 @@ struct SQLLTYPE
 
 
 
-int sqlparse (void *scanner, ParserResult* result);
+int sqlparse (void *scanner, infinity::ParserResult* result);
 
 
 #endif /* !YY_SQL_HOME_JINHAI_DOCUMENTS_DEVELOPMENT_INFINITY_SRC_PARSER_PARSER_H_INCLUDED  */

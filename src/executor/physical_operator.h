@@ -53,7 +53,7 @@ public:
     }
 
     virtual void
-    Execute(SharedPtr<QueryContext>& query_context) = 0;
+    Execute(QueryContext* query_context) = 0;
 
     const SharedPtr<Table>&
     output() const {

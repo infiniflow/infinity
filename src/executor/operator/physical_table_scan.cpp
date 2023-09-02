@@ -12,7 +12,7 @@ PhysicalTableScan::Init() {
 }
 
 void
-PhysicalTableScan::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalTableScan::Execute(QueryContext* query_context) {
     // Generate the result table definition
     Vector<SharedPtr<ColumnDef>> column_defs;
     size_t column_count = column_names_->size();

@@ -9,7 +9,7 @@ namespace infinity {
 class InsertBinder final : public ExpressionBinder {
 public:
     explicit
-    InsertBinder(SharedPtr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
+    InsertBinder(QueryContext* query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
     SharedPtr<BaseExpression>

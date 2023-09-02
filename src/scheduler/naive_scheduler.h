@@ -13,8 +13,7 @@ public:
     ~NaiveScheduler() override = default;
 
     void
-    Schedule(SharedPtr<QueryContext>& query_context,
-             const SharedPtr<Pipeline>& pipeline) override;
+    Schedule(QueryContext* query_context, const SharedPtr<Pipeline>& pipeline) override;
 };
 
 }

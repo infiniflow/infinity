@@ -29,7 +29,7 @@ namespace infinity {
 class LogicalPlanner {
 public:
     explicit
-    LogicalPlanner(SharedPtr<QueryContext> query_context_ptr) : query_context_ptr_(std::move(query_context_ptr)) {
+    LogicalPlanner(QueryContext* query_context_ptr) : query_context_ptr_(query_context_ptr) {
         names_ptr_ = MakeShared<Vector<String>>();
         types_ptr_ = MakeShared<Vector<DataType>>();
     }
@@ -154,7 +154,7 @@ public:
     }
 
 private:
-    SharedPtr<QueryContext> query_context_ptr_{};
+    QueryContext* query_context_ptr_{};
 
     SharedPtr<Vector<String>> names_ptr_{};
     SharedPtr<Vector<DataType>> types_ptr_{};

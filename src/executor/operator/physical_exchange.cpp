@@ -12,7 +12,7 @@ PhysicalExchange::Init() {
 }
 
 void
-PhysicalExchange::Execute(SharedPtr<QueryContext> &query_context) {
+PhysicalExchange::Execute(QueryContext* query_context) {
 
 }
 

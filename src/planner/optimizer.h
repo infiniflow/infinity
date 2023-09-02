@@ -16,7 +16,7 @@ class QueryContext;
 class Optimizer {
 public:
     explicit
-    Optimizer(SharedPtr<QueryContext> query_context_ptr);
+    Optimizer(QueryContext* query_context_ptr);
 
     void
     AddRule(SharedPtr<OptimizerRule> rule);
@@ -25,7 +25,7 @@ public:
     optimize(const SharedPtr<LogicalNode>& unoptimized_plan);
 
 public:
-    SharedPtr<QueryContext> query_context_ptr_{};
+    QueryContext* query_context_ptr_{};
 
     Vector<SharedPtr<OptimizerRule>> rules_{};
 };

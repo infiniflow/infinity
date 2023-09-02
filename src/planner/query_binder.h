@@ -20,55 +20,55 @@ namespace infinity {
 class QueryBinder : public std::enable_shared_from_this<QueryBinder> {
 public:
     explicit
-    QueryBinder(SharedPtr<QueryContext> query_context, SharedPtr<BindContext> bind_context_ptr)
+    QueryBinder(QueryContext* query_context, SharedPtr<BindContext> bind_context_ptr)
         : query_context_ptr_(std::move(query_context)), bind_context_ptr_(std::move(bind_context_ptr))
         {}
 
     SharedPtr<BoundSelectStatement>
     BindSelect(const SelectStatement& statement);
 
-    SharedPtr<QueryContext> query_context_ptr_;
+    QueryContext* query_context_ptr_;
 
     SharedPtr<BindContext> bind_context_ptr_;
 
 private:
     SharedPtr<TableRef>
-    BuildFromClause(SharedPtr<QueryContext>& query_context,
+    BuildFromClause(QueryContext* query_context,
                     const BaseTableReference* from_table);
 
     SharedPtr<TableRef>
-    BuildDummyTable(SharedPtr<QueryContext>& query_context);
+    BuildDummyTable(QueryContext* query_context);
 
     SharedPtr<TableRef>
-    BuildTable(SharedPtr<QueryContext>& query_context,
+    BuildTable(QueryContext* query_context,
                const TableReference* table_reference);
 
     SharedPtr<TableRef>
-    BuildSubquery(SharedPtr<QueryContext>& query_context,
+    BuildSubquery(QueryContext* query_context,
                   const SubqueryReference* subquery_reference);
 
     SharedPtr<TableRef>
-    BuildCTE(SharedPtr<QueryContext>& query_context,
+    BuildCTE(QueryContext* query_context,
              const String &name);
 
     SharedPtr<TableRef>
-    BuildBaseTable(SharedPtr<QueryContext>& query_context,
+    BuildBaseTable(QueryContext* query_context,
                    const TableReference* table_reference);
 
     SharedPtr<TableRef>
-    BuildView(SharedPtr<QueryContext>& query_context,
+    BuildView(QueryContext* query_context,
               const TableReference* from_table);
 
     SharedPtr<TableRef>
-    BuildCrossProduct(SharedPtr<QueryContext>& query_context,
+    BuildCrossProduct(QueryContext* query_context,
                       const CrossProductReference* cross_product);
 
     SharedPtr<TableRef>
-    BuildJoin(SharedPtr<QueryContext>& query_context,
+    BuildJoin(QueryContext* query_context,
               const JoinReference* join_reference);
 
     void
-    UnfoldStarExpression(SharedPtr<QueryContext>& query_context,
+    UnfoldStarExpression(QueryContext* query_context,
                          const Vector<ParsedExpr *>& input_select_list,
                          Vector<ParsedExpr*>& output_select_list);
 
@@ -78,37 +78,37 @@ private:
                     Vector<ParsedExpr*>& output_select_list);
 
     void
-    BuildGroupBy(SharedPtr<QueryContext>& query_context,
+    BuildGroupBy(QueryContext* query_context,
                  const SelectStatement& select,
                  const SharedPtr<BindAliasProxy>& bind_alias_proxy,
                  SharedPtr<BoundSelectStatement>& select_statement);
 
     void
-    BuildHaving(SharedPtr<QueryContext>& query_context,
+    BuildHaving(QueryContext* query_context,
                 const SelectStatement& select,
                 const SharedPtr<BindAliasProxy>& bind_alias_proxy,
                 SharedPtr<BoundSelectStatement>& select_statement);
 
     void
-    PushOrderByToProject(SharedPtr<QueryContext>& query_context,
+    PushOrderByToProject(QueryContext* query_context,
                          const SelectStatement& statement);
 
     void
-    BuildSelectList(SharedPtr<QueryContext>& query_context,
+    BuildSelectList(QueryContext* query_context,
                     SharedPtr<BoundSelectStatement>& select_statement);
 
     void
-    BuildOrderBy(SharedPtr<QueryContext>& query_context,
+    BuildOrderBy(QueryContext* query_context,
                  const SelectStatement& statement,
                  SharedPtr<BoundSelectStatement>& bound_statement) const;
 
     void
-    BuildLimit(SharedPtr<QueryContext>& query_context,
+    BuildLimit(QueryContext* query_context,
                const SelectStatement& statement,
                SharedPtr<BoundSelectStatement>& bound_statement) const;
 
     void
-    PruneOutput(SharedPtr<QueryContext>& query_context,
+    PruneOutput(QueryContext* query_context,
                 i64 select_column_count,
                 SharedPtr<BoundSelectStatement>& bound_statement);
 };

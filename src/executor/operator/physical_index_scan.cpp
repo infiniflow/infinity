@@ -12,7 +12,7 @@ PhysicalIndexScan::Init() {
 }
 
 void
-PhysicalIndexScan::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalIndexScan::Execute(QueryContext* query_context) {
 
 }
 

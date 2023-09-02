@@ -11,7 +11,7 @@ namespace infinity {
 
 
 void
-NaiveScheduler::Schedule(SharedPtr<QueryContext>& query_context, const SharedPtr<Pipeline> &pipeline) {
+NaiveScheduler::Schedule(QueryContext* query_context, const SharedPtr<Pipeline> &pipeline) {
     std::stack<SharedPtr<Pipeline>> pipeline_stack;
 
     SharedPtr<Pipeline> current_pipeline = nullptr;

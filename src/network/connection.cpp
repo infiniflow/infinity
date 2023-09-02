@@ -5,6 +5,7 @@
 #include "connection.h"
 #include "main/query_context.h"
 #include "main/logger.h"
+#include "main/infinity.h"
 #include "common/utility/infinity_assert.h"
 
 #include <iostream>
@@ -60,8 +61,8 @@ void
 Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
-    SharedPtr<QueryContext> query_context_ptr
-        = MakeShared<QueryContext>(session_.get());
+    UniquePtr<QueryContext> query_context_ptr
+        = MakeUnique<QueryContext>(session_.get(), Infinity::instance().config().get());
     query_context_ptr->set_current_schema(session_->current_schema());
 
     switch (cmd_type) {
@@ -82,7 +83,7 @@ Connection::HandleRequest() {
             break;
         }
         case PGMessageType::kSimpleQueryCommand: {
-            HandlerSimpleQuery(query_context_ptr);
+            HandlerSimpleQuery(query_context_ptr.get());
             break;
         }
         case PGMessageType::kSyncCommand: {
@@ -100,7 +101,7 @@ Connection::HandleRequest() {
 }
 
 void
-Connection::HandlerSimpleQuery(SharedPtr<QueryContext>& query_context) {
+Connection::HandlerSimpleQuery(QueryContext* query_context) {
     const String& query = pg_handler_->read_command_body();
     LOG_TRACE("Query: {}", query);
 

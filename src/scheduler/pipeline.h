@@ -57,7 +57,7 @@ public:
     Schedule();
 
     void
-    Execute(SharedPtr<QueryContext>& query_context);
+    Execute(QueryContext* query_context);
 
     TaskState
     state() const {
@@ -74,7 +74,7 @@ public:
 
 protected:
     virtual void
-    OnExecute(SharedPtr<QueryContext>& query_context) = 0;
+    OnExecute(QueryContext* query_context) = 0;
 
 private:
     void

@@ -16,7 +16,7 @@ void PipelineExecutor::Run() {
 }
 
 bool PipelineExecutor::AdmitQuery(
-    SharedPtr<QueryContext> query_context,
+    QueryContext* query_context,
     const SharedPtr<Pipeline> &pipeline){
     //Judge according to load
     if(policy_enforcer_.AdmitQuery(query_context)){
@@ -27,7 +27,7 @@ bool PipelineExecutor::AdmitQuery(
     return false;
 }
 
-bool PipelineExecutor::CancelQuery(SharedPtr<QueryContext> query_context){
+bool PipelineExecutor::CancelQuery(QueryContext* query_context){
     return false;
 }
 

@@ -23,7 +23,7 @@ PhysicalProject::Init() {
 }
 
 void
-PhysicalProject::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalProject::Execute(QueryContext* query_context) {
     SizeT expression_count = expressions_.size();
 
     // Prepare the output table columns

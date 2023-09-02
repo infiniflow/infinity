@@ -11,7 +11,7 @@ namespace infinity {
 class ProjectBinder final: public ExpressionBinder {
 public:
     explicit
-    ProjectBinder(SharedPtr<QueryContext>& query_context) : ExpressionBinder(query_context) {}
+    ProjectBinder(QueryContext* query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
     SharedPtr<BaseExpression>

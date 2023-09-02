@@ -12,7 +12,7 @@ PhysicalExplain::Init() {
 }
 
 void
-PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
+PhysicalExplain::Execute(QueryContext* query_context) {
     String title;
 
     auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
@@ -22,6 +22,7 @@ PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
     switch(explain_type_) {
         case ExplainType::kAnalyze: {
             title = "Query Analyze";
+            NotImplementError("Not implement: Query analyze");
             break;
         }
         case ExplainType::kAst: {
@@ -79,6 +80,7 @@ PhysicalExplain::Execute(SharedPtr<QueryContext> &query_context) {
         }
         case ExplainType::kPipeline: {
             title = "Pipeline";
+            NotImplementError("Not implement: Query pipeline");
             break;
         }
     }

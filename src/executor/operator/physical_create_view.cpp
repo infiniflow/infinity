@@ -14,7 +14,7 @@ PhysicalCreateView::Init() {
 }
 
 void
-PhysicalCreateView::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalCreateView::Execute(QueryContext* query_context) {
     SharedPtr<View> view_ptr = MakeShared<View>(create_view_info_,
                                                 GetOutputNames(),
                                                 GetOutputTypes());

@@ -18,7 +18,7 @@ PhysicalShow::Init() {
 }
 
 void
-PhysicalShow::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalShow::Execute(QueryContext* query_context) {
 
     switch(scan_type_) {
         case ShowType::kShowTables: {
@@ -44,7 +44,7 @@ PhysicalShow::Execute(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
+PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
     // Define output table schema
     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
@@ -203,7 +203,7 @@ PhysicalShow::ExecuteShowTable(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalShow::ExecuteShowViews(SharedPtr<QueryContext>& query_context) {
+PhysicalShow::ExecuteShowViews(QueryContext* query_context) {
     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
@@ -270,7 +270,7 @@ PhysicalShow::ExecuteShowViews(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalShow::ExecuteShowColumns(SharedPtr<QueryContext>& query_context) {
+PhysicalShow::ExecuteShowColumns(QueryContext* query_context) {
     SharedPtr<BaseTable> table_collection = Infinity::instance().catalog()->GetTableByNameNoExcept(this->schema_name_,
                                                                                         this->object_name_);
     if(table_collection != nullptr) {
@@ -299,7 +299,7 @@ PhysicalShow::ExecuteShowColumns(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalShow::ExecuteShowTableDetail(SharedPtr<QueryContext>& query_context,
+PhysicalShow::ExecuteShowTableDetail(QueryContext* query_context,
                                      const SharedPtr<Table>& table_ptr) {
     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
@@ -360,7 +360,7 @@ PhysicalShow::ExecuteShowTableDetail(SharedPtr<QueryContext>& query_context,
 }
 
 void
-PhysicalShow::ExecuteShowCollectionDetail(SharedPtr<QueryContext>& query_context,
+PhysicalShow::ExecuteShowCollectionDetail(QueryContext* query_context,
                                           const SharedPtr<Collection>& collection_ptr) {
     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
@@ -422,7 +422,7 @@ PhysicalShow::ExecuteShowCollectionDetail(SharedPtr<QueryContext>& query_context
 }
 
 void
-PhysicalShow::ExecuteShowViewDetail(SharedPtr<QueryContext>& query_context,
+PhysicalShow::ExecuteShowViewDetail(QueryContext* query_context,
                                     const SharedPtr<View>& view_ptr) {
     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     Vector<SharedPtr<ColumnDef>> column_defs = {

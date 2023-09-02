@@ -13,7 +13,7 @@ PhysicalLimit::Init() {
 }
 
 void
-PhysicalLimit::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalLimit::Execute(QueryContext* query_context) {
 
     // output table definition is same as input
     input_table_ = left_->output();

@@ -14,8 +14,8 @@ namespace infinity {
 class FragmentBuilder {
 public:
     explicit
-    FragmentBuilder(SharedPtr<QueryContext> query_context_ptr)
-    : query_context_ptr_(std::move(query_context_ptr)) {}
+    FragmentBuilder(QueryContext* query_context_ptr)
+    : query_context_ptr_(query_context_ptr) {}
 
     [[nodiscard]] SharedPtr<PlanFragment>
     Build(const SharedPtr<PhysicalOperator>& phys_op) const;
@@ -118,7 +118,7 @@ private:
     BuildTableScan(const SharedPtr<PhysicalOperator>& phys_op) const;
 
 private:
-    SharedPtr<QueryContext> query_context_ptr_{};
+    QueryContext* query_context_ptr_{};
 };
 
 }

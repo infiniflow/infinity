@@ -13,7 +13,7 @@ PhysicalDropView::Init() {
 }
 
 void
-PhysicalDropView::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalDropView::Execute(QueryContext* query_context) {
     Infinity::instance().catalog()->DeleteView(*schema_name_, *view_name_, conflict_type_);
 
     // Generate the result

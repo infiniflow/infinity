@@ -12,7 +12,7 @@ public:
 
     ~PolicyEnforcer() noexcept = default;
 
-    bool AdmitQuery(SharedPtr<QueryContext> query_context);
+    bool AdmitQuery(QueryContext* query_context);
 
     bool HasWaitingQueries() const {
         return !(waiting_queries_.empty());
@@ -20,7 +20,7 @@ public:
 private:
     static constexpr std::size_t kMaxConcurrentQueries = 1;
 
-    std::queue<SharedPtr<QueryContext> > waiting_queries_;
+    std::queue<QueryContext* > waiting_queries_;
 };
 
 }

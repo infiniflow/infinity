@@ -28,7 +28,7 @@ OperatorPipeline::OperatorPipeline(SharedPtr<PhysicalOperator> op)
     : Pipeline(op->node_id()), operator_(std::move(op)) {}
 
 void
-OperatorPipeline::OnExecute(SharedPtr<QueryContext>& query_context) {
+OperatorPipeline::OnExecute(QueryContext* query_context) {
     operator_->Execute(query_context);
 }
 

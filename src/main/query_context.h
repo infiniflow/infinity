@@ -23,10 +23,10 @@ struct QueryResult {
     ToString() const;
 };
 
-class QueryContext : public std::enable_shared_from_this<QueryContext> {
+class QueryContext {
 public:
     explicit
-    QueryContext(Session* session_ptr);
+    QueryContext(Session* session_ptr, const Config* global_config);
 
     QueryResult
     Query(const String& query);
@@ -37,17 +37,17 @@ public:
         current_schema_ = current_schema;
     }
 
-    inline const String&
+    [[nodiscard]] inline const String&
     schema_name() const { 
         return current_schema_; 
     }
 
-    inline u64
+    [[nodiscard]] inline u64
     query_id() const {
         return query_id_;
     }
 
-    inline u64
+    [[nodiscard]] inline u64
     max_node_id() const {
         return current_max_node_id_;
     }
@@ -66,11 +66,14 @@ private:
     UniquePtr<TransactionContext> transaction_;
     UniquePtr<QueryProfiler> query_metrics_;
 
-    Session* session_ptr_;
+    const Config* global_config_{};
+    Session* session_ptr_{};
 
     // Get following information from session.
     // Current schema
     String current_schema_;
+
+    u64 catalog_version_{};
 
     // User / Tenant information
     String tenant_name_;

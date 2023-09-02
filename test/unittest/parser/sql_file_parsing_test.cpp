@@ -47,6 +47,8 @@ TEST_F(SQLFileParsingTest, tpch) {
     }
 }
 
+namespace infinity {
+
 void
 ReadSQLs(const String& file_path, Vector<String>& sqls) {
     std::ifstream infile(file_path);
@@ -62,6 +64,8 @@ ReadSQLs(const String& file_path, Vector<String>& sqls) {
         }
         sqls.emplace_back(line);
     }
+}
+
 }
 
 TEST_F(SQLFileParsingTest, hyrise) {

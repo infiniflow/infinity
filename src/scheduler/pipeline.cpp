@@ -33,7 +33,7 @@ Pipeline::Schedule() {
 }
 
 void
-Pipeline::Execute(SharedPtr<QueryContext>& query_context) {
+Pipeline::Execute(QueryContext* query_context) {
     OnExecute(query_context);
 }
 

@@ -25,7 +25,7 @@ public:
     Init() override;
 
     void
-    Execute(SharedPtr<QueryContext>& query_context) override;
+    Execute(QueryContext* query_context) override;
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
@@ -44,13 +44,13 @@ public:
 
 private:
     void
-    FlushData(SharedPtr<QueryContext>& query_context);
+    FlushData(QueryContext* query_context);
 
     void
-    FlushLog(SharedPtr<QueryContext>& query_context);
+    FlushLog(QueryContext* query_context);
 
     void
-    FlushBuffer(SharedPtr<QueryContext>& query_context);
+    FlushBuffer(QueryContext* query_context);
 
 private:
     FlushType flush_type_;

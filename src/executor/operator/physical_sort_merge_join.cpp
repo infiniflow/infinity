@@ -12,7 +12,7 @@ PhysicalSortMergeJoin::Init() {
 }
 
 void
-PhysicalSortMergeJoin::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalSortMergeJoin::Execute(QueryContext* query_context) {
 
 }
 

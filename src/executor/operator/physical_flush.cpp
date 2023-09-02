@@ -12,7 +12,7 @@ PhysicalFlush::Init() {
 }
 
 void
-PhysicalFlush::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalFlush::Execute(QueryContext* query_context) {
     switch(flush_type_) {
         case FlushType::kData: {
             FlushData(query_context);
@@ -30,7 +30,7 @@ PhysicalFlush::Execute(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalFlush::FlushData(SharedPtr<QueryContext>& query_context) {
+PhysicalFlush::FlushData(QueryContext* query_context) {
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
             MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
@@ -42,7 +42,7 @@ PhysicalFlush::FlushData(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalFlush::FlushLog(SharedPtr<QueryContext>& query_context) {
+PhysicalFlush::FlushLog(QueryContext* query_context) {
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
             MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
@@ -54,7 +54,7 @@ PhysicalFlush::FlushLog(SharedPtr<QueryContext>& query_context) {
 }
 
 void
-PhysicalFlush::FlushBuffer(SharedPtr<QueryContext>& query_context) {
+PhysicalFlush::FlushBuffer(QueryContext* query_context) {
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
             MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())

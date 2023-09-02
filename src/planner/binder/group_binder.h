@@ -17,7 +17,7 @@ public:
 
 public:
     explicit
-    GroupBinder(SharedPtr<QueryContext>& query_context,
+    GroupBinder(QueryContext* query_context,
                 const SharedPtr<BindAliasProxy>& bind_alias_proxy)
                 : ExpressionBinder(query_context),
                 bind_alias_proxy_(bind_alias_proxy) {}

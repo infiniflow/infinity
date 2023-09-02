@@ -12,7 +12,7 @@ PhysicalAlter::Init() {
 }
 
 void
-PhysicalAlter::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalAlter::Execute(QueryContext* query_context) {
 
 }
 

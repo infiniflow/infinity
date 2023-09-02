@@ -12,7 +12,7 @@ PhysicalUnionAll::Init() {
 }
 
 void
-PhysicalUnionAll::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalUnionAll::Execute(QueryContext* query_context) {
 
 }
 

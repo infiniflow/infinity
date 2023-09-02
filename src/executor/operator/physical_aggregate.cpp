@@ -14,7 +14,7 @@ PhysicalAggregate::Init() {
 }
 
 void
-PhysicalAggregate::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalAggregate::Execute(QueryContext* query_context) {
     input_table_ = left_->output();
     ExecutorAssert(input_table_ != nullptr, "No left input.");
 

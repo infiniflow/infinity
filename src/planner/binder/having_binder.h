@@ -12,7 +12,7 @@ namespace infinity {
 class HavingBinder final: public ExpressionBinder {
 public:
     explicit
-    HavingBinder(SharedPtr<QueryContext>& query_context,
+    HavingBinder(QueryContext* query_context,
                           const SharedPtr<BindAliasProxy>& bind_alias_proxy)
                           : ExpressionBinder(query_context),
                           bind_alias_proxy_(bind_alias_proxy) {}

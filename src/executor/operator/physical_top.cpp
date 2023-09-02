@@ -12,7 +12,7 @@ PhysicalTop::Init() {
 }
 
 void
-PhysicalTop::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalTop::Execute(QueryContext* query_context) {
 
 }
 

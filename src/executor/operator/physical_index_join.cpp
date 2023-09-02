@@ -12,7 +12,7 @@ PhysicalIndexJoin::Init() {
 }
 
 void
-PhysicalIndexJoin::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalIndexJoin::Execute(QueryContext* query_context) {
 
 }
 

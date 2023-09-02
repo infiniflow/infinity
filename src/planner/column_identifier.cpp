@@ -7,7 +7,7 @@
 namespace infinity {
 
 ColumnIdentifier
-ColumnIdentifier::MakeColumnIdentifier(SharedPtr<QueryContext>& query_context,
+ColumnIdentifier::MakeColumnIdentifier(QueryContext* query_context,
                                        const ColumnExpr& expr) {
     if(expr.star_) {
         PlannerError("Star expression should be unfolded before.");

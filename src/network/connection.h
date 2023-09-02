@@ -41,7 +41,7 @@ private:
     HandleRequest();
 
     void
-    HandlerSimpleQuery(SharedPtr<QueryContext>& query_context);
+    HandlerSimpleQuery(QueryContext* query_context);
 
     void
     SendTableDescription(const SharedPtr<Table>& result_table);

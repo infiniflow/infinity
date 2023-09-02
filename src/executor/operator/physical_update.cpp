@@ -12,7 +12,7 @@ PhysicalUpdate::Init() {
 }
 
 void
-PhysicalUpdate::Execute(SharedPtr<QueryContext>& query_context) {
+PhysicalUpdate::Execute(QueryContext* query_context) {
 
 }
 
