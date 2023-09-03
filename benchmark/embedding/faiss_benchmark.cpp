@@ -3,7 +3,6 @@
 //
 
 #include <thread>
-#include <openblas/cblas.h>
 
 #include "common/types/internal_types.h"
 #include "faiss/index_factory.h"
@@ -948,7 +947,7 @@ scheduler_test() {
 
 auto
 main () -> int {
-    openblas_set_num_threads(1);
+//    benchmark_flat();
 //    benchmark_flat();
 //    benchmark_ivfflat();
     benchmark_ivfsq8();

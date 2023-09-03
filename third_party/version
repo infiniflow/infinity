@@ -11,3 +11,4 @@ fastpfor commit-id:773283d4a11fa2440a1b3b28fd77f775e86d7898
 tlx v0.6.1
 nlohmann 3.11.2
 zsv commit-id:5c22aae4363fdcd433079d2a9b48007a7c6fbbdf
+mlas onnxruntime:v1.14.1

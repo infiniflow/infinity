@@ -26,7 +26,7 @@ target_link_libraries(
         leveldb
         roaring
         zsv_parser
-        openblas
+        onnxruntime_mlas
 )
 
 add_executable(hnsw_benchmark

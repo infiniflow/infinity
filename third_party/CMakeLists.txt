@@ -24,6 +24,9 @@ add_library(
 # Build roaring
 add_subdirectory(croaring)
 
+# Build mlas
+add_subdirectory(mlas)
+
 # Build faiss
 add_subdirectory(faiss)
 

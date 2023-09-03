@@ -92,6 +92,7 @@ set(FAISS_SRC
   utils/distances_fused/avx512.cpp
   utils/distances_fused/distances_fused.cpp
   utils/distances_fused/simdlib_based.cpp
+  sgemm.cpp
 )
 
 set(FAISS_HEADERS
@@ -245,6 +246,9 @@ target_include_directories(faiss PUBLIC
 # Handle `#include <faiss/foo.h>`.
 target_include_directories(faiss_avx2 PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>)
+target_include_directories(faiss PUBLIC  
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/third_party/mlas/inc>  
+)
 
 set_target_properties(faiss PROPERTIES
   POSITION_INDEPENDENT_CODE ON
