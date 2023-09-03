@@ -25,7 +25,7 @@ Infinity is an AI-native database that can be used with large language models (L
 ## Build Infinity from source
 ### Requirements
 
--   Operating system: Ubuntu 22.04 or higher
+-   Operating system: Ubuntu 22.04,  openSUSE Tumbleweed 20230828 or higher
 
 -   GCC 11.3 or higher to support C++23
 
@@ -41,19 +41,28 @@ $ git clone https://github.com/infiniflow/infinity.git
 
 ### Step2 Install dependency
 
+On Ubuntu,
 ```shell
 $ sudo apt install libboost-dev-all
 ```
+
+On OpenSUSE Tumbleweed,
+```shell
+$ sudo zypper install ccache gcc-c++ gcc-fortran flex bison boost-devel libopenblas_pthreads-devel blas-devel lapack-devel cblas-devel
+$ export CC=/usr/lib64/ccache/gcc
+$ export CXX=/usr/lib64/ccache/g++
+```
+
 ### Step3 Build source code
 
 ```shell
 $ cd infinity && mkdir build && cd build
 $ cmake ..
-$ make
+$ make -j 6
 ```
 
 ### Step4 Start up Infinity server
 
 ```shell
-$ ./build/src/infinity_main
+$ ./src/infinity_main
 ```
