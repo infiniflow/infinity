@@ -30,21 +30,21 @@ Config::Init(const SharedPtr<String>& config_path) {
     u32 default_sdk_port = 23817;
 
     // Default log config
-    String default_log_filename = "infinity.log";
-    String default_log_dir = "/tmp/infinity/log";
+    SharedPtr<String> default_log_filename = MakeShared<String>("infinity.log");
+    SharedPtr<String> default_log_dir = MakeShared<String>("/tmp/infinity/log");
     bool default_log_to_stdout = false;
     u64 default_log_max_size = 1024lu * 1024lu * 1024lu; // 1Gib
     u64 default_log_file_rotate_count = 10;
     spdlog::level::level_enum default_log_level = spdlog::level::level_enum::trace;
 
     // Default storage config
-    String default_data_dir = "/tmp/infinity/data";
-    String default_wal_dir = "/tmp/infinity/wal";
+    SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
+    SharedPtr<String> default_wal_dir = MakeShared<String>("/tmp/infinity/wal");
     u64 default_row_size = 8192lu;
 
     // Default buffer config
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
-    String default_temp_dir = "/tmp/infinity/temp";
+    SharedPtr<String> default_temp_dir = MakeShared<String>("/tmp/infinity/temp");
 
     if(config_path == nullptr) {
         std::cout << "No config file is given, use default configs." << std::endl;
@@ -61,20 +61,20 @@ Config::Init(const SharedPtr<String>& config_path) {
         // Log
         option_.log_filename = default_log_filename;
         option_.log_dir = default_log_dir;
-        option_.log_file_path = option_.log_dir + '/' + option_.log_filename;
+        option_.log_file_path = MakeShared<String>(*option_.log_dir + '/' + *option_.log_filename);
         option_.log_to_stdout = default_log_to_stdout;
         option_.log_max_size = default_log_max_size; // 1Gib
         option_.log_file_rotate_count = default_log_file_rotate_count;
         option_.log_level = default_log_level;
 
         // Storage
-        option_.data_dir = default_data_dir;
-        option_.wal_dir = default_wal_dir;
+        option_.data_dir = MakeShared<String>(*default_data_dir);
+        option_.wal_dir = MakeShared<String>(*default_wal_dir);
         option_.default_row_size = default_row_size;
 
         // Buffer
         option_.buffer_pool_size = default_buffer_pool_size; // 4Gib
-        option_.temp_dir = default_temp_dir;
+        option_.temp_dir = MakeShared<String>(*default_temp_dir);
     } else {
         std::cout << "Read config from: " << *config_path << std::endl;
         auto config = toml::parse_file(*config_path);
@@ -118,9 +118,9 @@ Config::Init(const SharedPtr<String>& config_path) {
 
         // Log
         auto log_config = config["log"];
-        option_.log_filename = log_config["log_filename"].value_or(default_log_filename);
-        option_.log_dir = log_config["log_dir"].value_or(default_log_dir);
-        option_.log_file_path = option_.log_dir + '/' + option_.log_filename;;
+        option_.log_filename = MakeShared<String>(log_config["log_filename"].value_or(*default_log_filename));
+        option_.log_dir = MakeShared<String>(log_config["log_dir"].value_or(*default_log_dir));
+        option_.log_file_path = MakeShared<String>(*option_.log_dir + '/' + *option_.log_filename);
         option_.log_to_stdout = log_config["log_to_stdout"].value_or(default_log_to_stdout);
 
         String log_max_size_str = log_config["log_max_size"].value_or("1GB");
@@ -149,8 +149,8 @@ Config::Init(const SharedPtr<String>& config_path) {
 
         // Storage
         auto storage_config = config["storage"];
-        option_.data_dir = storage_config["data_dir"].value_or(default_data_dir);
-        option_.wal_dir = storage_config["wal_dir"].value_or(default_wal_dir);
+        option_.data_dir = MakeShared<String>(storage_config["data_dir"].value_or(*default_data_dir));
+        option_.wal_dir = MakeShared<String>(storage_config["wal_dir"].value_or(*default_wal_dir));
         option_.default_row_size = storage_config["default_row_size"].value_or(default_row_size);
 
         // Buffer
@@ -160,7 +160,7 @@ Config::Init(const SharedPtr<String>& config_path) {
         if(result != nullptr) {
             return result;
         }
-        option_.temp_dir = buffer_config["temp_dir"].value_or("invalid");
+        option_.temp_dir = MakeShared<String>(buffer_config["temp_dir"].value_or("invalid"));
     }
 
     return result;
@@ -177,20 +177,20 @@ Config::PrintAll() const {
         infinity::infinity_logger->info(" - http port: " + std::to_string(option_.http_port));
         infinity::infinity_logger->info(" - sdk port: " + std::to_string(option_.sdk_port));
 
-        infinity::infinity_logger->info(" - log_file_path: " + option_.log_file_path);
+        infinity::infinity_logger->info(" - log_file_path: " + *option_.log_file_path);
         infinity::infinity_logger->info(" - log_to_stdout: " + std::to_string(option_.log_to_stdout));
         infinity::infinity_logger->info(" - log_max_size: " + std::to_string(option_.log_max_size));
         infinity::infinity_logger->info(" - log_file_rotate_count: " + std::to_string(option_.log_file_rotate_count));
         infinity::infinity_logger->info(" - log_level: " + String(spdlog::level::to_short_c_str(option_.log_level)));
 
-        infinity::infinity_logger->info(" - data_dir: " + option_.data_dir);
-        infinity::infinity_logger->info(" - wal_dir: " + option_.wal_dir);
+        infinity::infinity_logger->info(" - data_dir: " + *option_.data_dir);
+        infinity::infinity_logger->info(" - wal_dir: " + *option_.wal_dir);
         infinity::infinity_logger->info(" - default_row_size: " + std::to_string(option_.default_row_size));
         infinity::infinity_logger->info(" - log_file_rotate_count: " + std::to_string(option_.log_file_rotate_count));
 
         // Buffer
         infinity::infinity_logger->info(" - default_row_size: " + std::to_string(option_.buffer_pool_size));
-        infinity::infinity_logger->info(" - temp_dir: " + option_.temp_dir);
+        infinity::infinity_logger->info(" - temp_dir: " + *option_.temp_dir);
     }
 }
 

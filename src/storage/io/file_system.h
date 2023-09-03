@@ -11,6 +11,8 @@ namespace infinity {
 
 class FileSystem;
 
+using DirEntry = std::filesystem::directory_entry;
+
 class FileHandler {
 public:
     FileHandler(FileSystem &file_system, String path) : file_system_(file_system), path_(std::move(path)) {}
@@ -98,6 +100,9 @@ public:
 
     virtual void
     DeleteDirectory(const String& path) = 0;
+
+    virtual Vector<SharedPtr<DirEntry>>
+    ListDirectory(const String& path) = 0;
 
 private:
     FileSystemType file_system_type_{FileSystemType::kPosix};

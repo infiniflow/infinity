@@ -182,4 +182,20 @@ LocalFileSystem::DeleteDirectory(const String& path) {
     }
 }
 
+Vector<SharedPtr<DirEntry>>
+LocalFileSystem::ListDirectory(const String& path) {
+
+    std::filesystem::path dir_path(path);
+    if(!is_directory(dir_path)) {
+        StorageError(fmt::format("{} isn't a directory", path));
+    }
+
+    Vector<SharedPtr<DirEntry>> file_array;
+    std::ranges::for_each(std::filesystem::directory_iterator{path},
+                          [&](const auto& dir_entry) {
+                              file_array.emplace_back(MakeShared<DirEntry>(dir_entry));
+                          });
+    return file_array;
+}
+
 }

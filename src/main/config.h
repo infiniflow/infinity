@@ -32,22 +32,22 @@ struct Options {
     u32 sdk_port{};
 
     // Log
-    String log_filename{"infinity.log"};
-    String log_dir{};
-    String log_file_path{};
+    SharedPtr<String> log_filename{MakeShared<String>("infinity.log")};
+    SharedPtr<String> log_dir{};
+    SharedPtr<String> log_file_path{};
     bool log_to_stdout{};
     SizeT log_max_size{};
     SizeT log_file_rotate_count{};
     spdlog::level::level_enum log_level{spdlog::level::info};
 
     // Storage
-    String data_dir{};
-    String wal_dir{};
+    SharedPtr<String> data_dir{};
+    SharedPtr<String> wal_dir{};
     u64 default_row_size{};
 
     // Buffer
     u64 buffer_pool_size{};
-    String temp_dir{};
+    SharedPtr<String> temp_dir{};
 };
 
 struct Config {
@@ -95,17 +95,17 @@ public:
     }
 
     // Log
-    [[nodiscard]] inline String
+    [[nodiscard]] inline SharedPtr<String>
     log_filename() const {
         return option_.log_filename;
     }
 
-    [[nodiscard]] inline String
+    [[nodiscard]] inline SharedPtr<String>
     log_dir() const {
         return option_.log_dir;
     }
 
-    [[nodiscard]] inline String
+    [[nodiscard]] inline SharedPtr<String>
     log_file_path() const {
         return option_.log_file_path;
     }
@@ -131,12 +131,12 @@ public:
     }
 
     // Storage
-    [[nodiscard]] inline String
+    [[nodiscard]] inline SharedPtr<String>
     data_dir() const {
         return option_.data_dir;
     }
 
-    [[nodiscard]] inline String
+    [[nodiscard]] inline SharedPtr<String>
     wal_dir() const {
         return option_.wal_dir;
     }
@@ -151,7 +151,7 @@ public:
         return option_.buffer_pool_size;
     }
 
-    [[nodiscard]] inline String
+    [[nodiscard]] inline SharedPtr<String>
     temp_dir() const {
         return option_.temp_dir;
     }

@@ -162,9 +162,11 @@ DBEntry::Deserialize(const nlohmann::json& db_entry_json,
     res->deleted_ = deleted;
     res->entry_type_ = entry_type;
 
-    for(const auto& table_meta_json: db_entry_json["tables"]) {
-        UniquePtr<TableMeta> table_meta = TableMeta::Deserialize(table_meta_json, res.get(), buffer_mgr);
-        res->tables_.emplace(*table_meta->table_name_, std::move(table_meta));
+    if(db_entry_json.contains("tables")) {
+        for(const auto& table_meta_json: db_entry_json["tables"]) {
+            UniquePtr<TableMeta> table_meta = TableMeta::Deserialize(table_meta_json, res.get(), buffer_mgr);
+            res->tables_.emplace(*table_meta->table_name_, std::move(table_meta));
+        }
     }
 
     return res;

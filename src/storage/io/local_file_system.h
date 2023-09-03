@@ -55,6 +55,9 @@ public:
 
     void
     DeleteDirectory(const String& path) final;
+
+    Vector<SharedPtr<DirEntry>>
+    ListDirectory(const String& path) final;
 };
 
 }

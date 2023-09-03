@@ -9,7 +9,6 @@
 #include "storage/common/async_batch_processor.h"
 #include "storage/meta/entry/db_entry.h"
 #include "db_meta.h"
-//#include "storage/txn/txn.h"
 
 namespace infinity {
 
@@ -21,6 +20,7 @@ public:
     NewCatalog(SharedPtr<String> dir);
 
 public:
+
     static EntryResult
     CreateDatabase(NewCatalog* catalog,
                    const String& db_name,
@@ -58,10 +58,18 @@ public:
     Deserialize(const nlohmann::json& catalog_json,
                 BufferManager* buffer_mgr,
                 UniquePtr<NewCatalog>& catalog);
+
+    static UniquePtr<NewCatalog>
+    LoadFromFile(const SharedPtr<DirEntry>& dir_entry,
+                 BufferManager* buffer_mgr);
+
+    static void
+    SaveAsFile(const NewCatalog* catalog_ptr, const String& file_name);
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
     u64 next_txn_id_{};
+    u64 catalog_version_{};
     RWMutex rw_locker_;
 };
 

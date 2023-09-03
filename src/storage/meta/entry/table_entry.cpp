@@ -195,10 +195,12 @@ TableEntry::Deserialize(const nlohmann::json& table_entry_json, TableMeta* table
     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir, table_name, columns, table_meta, txn_id, begin_ts);
     table_entry->row_count_ = row_count;
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
-    for(const auto& segment_json: table_entry_json["segments"]) {
-        SharedPtr<SegmentEntry> segment_entry
-            = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
-        table_entry->segments_.emplace(segment_entry->segment_id_, segment_entry);
+    if(table_entry_json.contains("segments")) {
+        for(const auto& segment_json: table_entry_json["segments"]) {
+            SharedPtr<SegmentEntry> segment_entry
+                    = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
+            table_entry->segments_.emplace(segment_entry->segment_id_, segment_entry);
+        }
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];

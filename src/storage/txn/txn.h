@@ -35,7 +35,13 @@ public:
     Txn(TxnManager* txn_mgr, NewCatalog* catalog, u32 txn_id) : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id) {}
 
     void
+    BeginTxn();
+
+    void
     BeginTxn(TxnTimeStamp begin_ts);
+
+    void
+    CommitTxn();
 
     void
     CommitTxn(TxnTimeStamp commit_ts);

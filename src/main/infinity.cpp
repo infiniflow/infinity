@@ -17,6 +17,16 @@ Infinity::Init(const SharedPtr<String>& config_path) {
 
         Logger::Initialize(config_.get());
 
+        SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
+        SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
+        SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
+        BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+
+        UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
+        NewCatalog new_catalog(std::move(dir));
+        TxnManager txn_mgr(&new_catalog, &buffer_mgr);
+
+
         scheduler_ = MakeUnique<NaiveScheduler>();
 
         storage_ = MakeUnique<Storage>(config_.get());

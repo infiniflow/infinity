@@ -4,6 +4,7 @@
 
 #include "catalog.h"
 #include "main/logger.h"
+#include "storage/io/local_file_system.h"
 
 namespace infinity {
 
@@ -120,10 +121,34 @@ NewCatalog::Serialize(const NewCatalog* catalog) {
 
     json_res["current_dir"] = *catalog->current_dir_;
     json_res["next_txn_id"] = catalog->next_txn_id_;
+    json_res["catalog_version"] = catalog->catalog_version_;
     for(const auto& db_meta: catalog->databases_) {
         json_res["databases"].emplace_back(DBMeta::Serialize(db_meta.second.get()));
     }
     return json_res;
+}
+
+UniquePtr<NewCatalog>
+NewCatalog::LoadFromFile(const SharedPtr<DirEntry>& dir_entry,
+                         BufferManager* buffer_mgr) {
+    UniquePtr<NewCatalog> catalog = nullptr;
+    String filename = dir_entry->path();
+
+    LocalFileSystem fs;
+    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(filename,
+                                                              FileFlags::READ_FLAG,
+                                                              FileLockType::kReadLock);
+
+    SizeT file_size = dir_entry->file_size();
+    String json_str(file_size, 0);
+    SizeT nbytes = catalog_file_handler->Read(json_str.data(), file_size);
+    if(file_size != nbytes) {
+        StorageError(fmt::format("Catalog file {}, read error.", filename));
+    }
+
+    nlohmann::json catalog_json = nlohmann::json::parse(json_str);
+    Deserialize(catalog_json, buffer_mgr, catalog);
+    return catalog;
 }
 
 void
@@ -135,12 +160,35 @@ NewCatalog::Deserialize(const nlohmann::json& catalog_json,
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
     catalog = MakeUnique<NewCatalog>(current_dir);
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
-    for(const auto& db_json: catalog_json["databases"]) {
-        UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
-        catalog->databases_.emplace(*db_meta->db_name_, std::move(db_meta));
+    catalog->catalog_version_ = catalog_json["catalog_version"];
+    if(catalog_json.contains("databases")) {
+        for(const auto& db_json: catalog_json["databases"]) {
+            UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
+            catalog->databases_.emplace(*db_meta->db_name_, std::move(db_meta));
+        }
     }
+}
 
-    return ;
+void
+NewCatalog::SaveAsFile(const NewCatalog* catalog_ptr, const String& file_name) {
+    nlohmann::json catalog_json = Serialize(catalog_ptr);
+    String catalog_str = catalog_json.dump();
+
+    // FIXME: Temp implementation, will be replaced by async task.
+    LocalFileSystem fs;
+    u8 fileflags = FileFlags::WRITE_FLAG;
+    if(!fs.Exists(file_name)) {
+        fileflags |= FileFlags::CREATE_FLAG;
+    }
+    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(file_name, fileflags, FileLockType::kWriteLock);
+
+    // TODO: Save as a temp filename, then rename it to the real filename.
+    SizeT nbytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
+    if(nbytes != catalog_str.size()) {
+        StorageError(fmt::format("Catalog file {}, saving error.", file_name));
+    }
+    catalog_file_handler->Sync();
+    catalog_file_handler->Close();
 }
 
 }

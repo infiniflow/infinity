@@ -360,8 +360,18 @@ Txn::GetTableByName(const String& db_name, const String& table_name) {
 }
 
 void
+Txn::BeginTxn() {
+    txn_context_.BeginCommit(txn_mgr_->GetTimestamp());
+}
+
+void
 Txn::BeginTxn(TxnTimeStamp begin_ts) {
     txn_context_.BeginCommit(begin_ts);
+}
+
+void
+Txn::CommitTxn() {
+    this->CommitTxn(infinity::TxnManager::GetTimestamp());
 }
 
 void

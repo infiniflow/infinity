@@ -43,20 +43,20 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(config.http_port(), 8088);
     EXPECT_EQ(config.sdk_port(), 23817);
 
-    EXPECT_EQ(config.log_filename(), "infinity.log");
-    EXPECT_EQ(config.log_dir(), "/tmp/infinity/log");
-    EXPECT_EQ(config.log_file_path(), "/tmp/infinity/log/infinity.log");
+    EXPECT_EQ(*config.log_filename(), "infinity.log");
+    EXPECT_EQ(*config.log_dir(), "/tmp/infinity/log");
+    EXPECT_EQ(*config.log_file_path(), "/tmp/infinity/log/infinity.log");
     EXPECT_EQ(config.log_to_stdout(), false);
     EXPECT_EQ(config.log_max_size(), 1024ul*1024ul*1024ul);
     EXPECT_EQ(config.log_file_rotate_count(), 10);
     EXPECT_EQ(config.log_level(), spdlog::level::trace);
 
-    EXPECT_EQ(config.data_dir(), "/tmp/infinity/data");
-    EXPECT_EQ(config.wal_dir(), "/tmp/infinity/wal");
+    EXPECT_EQ(*config.data_dir(), "/tmp/infinity/data");
+    EXPECT_EQ(*config.wal_dir(), "/tmp/infinity/wal");
     EXPECT_EQ(config.default_row_size(), 8192u);
 
     EXPECT_EQ(config.buffer_pool_size(), 4*1024ul*1024ul*1024ul);
-    EXPECT_EQ(config.temp_dir(), "/tmp/infinity/temp");
+    EXPECT_EQ(*config.temp_dir(), "/tmp/infinity/temp");
 }
 
 TEST_F(ConfigTest, test2) {
@@ -74,18 +74,18 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.http_port(), 8089);
     EXPECT_EQ(config.sdk_port(), 24817);
 
-    EXPECT_EQ(config.log_filename(), "info.log");
-    EXPECT_EQ(config.log_dir(), "/var/infinity/log");
-    EXPECT_EQ(config.log_file_path(), "/var/infinity/log/info.log");
+    EXPECT_EQ(*config.log_filename(), "info.log");
+    EXPECT_EQ(*config.log_dir(), "/var/infinity/log");
+    EXPECT_EQ(*config.log_file_path(), "/var/infinity/log/info.log");
     EXPECT_EQ(config.log_to_stdout(), true);
     EXPECT_EQ(config.log_max_size(), 2*1024ul*1024ul*1024ul);
     EXPECT_EQ(config.log_file_rotate_count(), 3);
     EXPECT_EQ(config.log_level(), spdlog::level::trace);
 
-    EXPECT_EQ(config.data_dir(), "/var/infinity/data");
-    EXPECT_EQ(config.wal_dir(), "/var/infinity/wal");
+    EXPECT_EQ(*config.data_dir(), "/var/infinity/data");
+    EXPECT_EQ(*config.wal_dir(), "/var/infinity/wal");
     EXPECT_EQ(config.default_row_size(), 4096u);
 
     EXPECT_EQ(config.buffer_pool_size(), 3*1024ul*1024ul*1024ul);
-    EXPECT_EQ(config.temp_dir(), "/tmp");
+    EXPECT_EQ(*config.temp_dir(), "/tmp");
 }

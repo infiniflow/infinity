@@ -275,8 +275,10 @@ DBMeta::Deserialize(const nlohmann::json& db_meta_json,
     SharedPtr<String> db_name = MakeShared<String>(db_meta_json["db_name"]);
     UniquePtr<DBMeta> res = MakeUnique<DBMeta>(base_dir, db_name);
 
-    for(const auto& db_entry_json: db_meta_json["entries"]) {
-        res->entry_list_.emplace_back(DBEntry::Deserialize(db_entry_json, buffer_mgr));
+    if(db_meta_json.contains("entries")) {
+        for(const auto& db_entry_json: db_meta_json["entries"]) {
+            res->entry_list_.emplace_back(DBEntry::Deserialize(db_entry_json, buffer_mgr));
+        }
     }
     return res;
 }

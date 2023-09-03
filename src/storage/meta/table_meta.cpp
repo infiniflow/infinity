@@ -306,9 +306,11 @@ TableMeta::Deserialize(const nlohmann::json& table_meta_json, DBEntry* db_entry,
     UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
     dummy_entry->deleted_ = true;
     res->entry_list_.emplace_back(std::move(dummy_entry));
-    for(const auto& table_entry_json: table_meta_json["entries"]) {
-        UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
-        res->entry_list_.emplace_back(std::move(table_entry));
+    if(table_meta_json.contains("entries")) {
+        for(const auto& table_entry_json: table_meta_json["entries"]) {
+            UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
+            res->entry_list_.emplace_back(std::move(table_entry));
+        }
     }
 
     return res;
