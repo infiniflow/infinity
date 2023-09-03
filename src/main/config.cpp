@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+#include <charconv>
 #include <boost/asio/ip/address.hpp>
 #include "config.h"
 #include "bin/compilation_config.h"
