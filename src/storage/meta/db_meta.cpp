@@ -50,8 +50,7 @@ DBMeta::CreateNewEntry(DBMeta* db_meta,
         }
 
         DBEntry* header_db_entry = (DBEntry*)header_base_entry;
-        if(header_db_entry->commit_ts_ < UNCOMMIT_TS) {
-            // Committed
+        if(header_db_entry->Committed()) {
             if(begin_ts > header_db_entry->commit_ts_) {
                 if(header_db_entry->deleted_) {
                     // No conflict
@@ -144,8 +143,7 @@ DBMeta::DropNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnMana
     }
 
     DBEntry* header_db_entry = (DBEntry*)header_base_entry;
-    if(header_db_entry->commit_ts_ < UNCOMMIT_TS) {
-        // Committed
+    if(header_db_entry->Committed()) {
         if(begin_ts > header_db_entry->commit_ts_) {
             // No conflict
             if(header_db_entry->deleted_) {
@@ -193,7 +191,7 @@ DBMeta::DeleteNewEntry(DBMeta* db_meta, u64 txn_id, TxnManager* txn_mgr) {
 
     auto removed_iter = std::remove_if(db_meta->entry_list_.begin(),
                                        db_meta->entry_list_.end(),
-                                       [&](UniquePtr<BaseEntry>& entry)->bool {
+                                       [&](auto& entry)->bool {
         return entry->txn_id_ == txn_id;
     });
 
@@ -215,8 +213,7 @@ DBMeta::GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts) {
             return {nullptr, MakeUnique<String>("No valid db entry.")};
         }
 
-        if(db_entry->commit_ts_ < UNCOMMIT_TS) {
-            // committed
+        if(db_entry->Committed()) {
             if(begin_ts > db_entry->commit_ts_) {
                 if(db_entry->deleted_) {
                     LOG_TRACE("DB is dropped.")

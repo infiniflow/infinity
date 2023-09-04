@@ -115,8 +115,6 @@ NewCatalog::Databases(NewCatalog* catalog, Txn* txn) {
 
 nlohmann::json
 NewCatalog::Serialize(const NewCatalog* catalog) {
-    SharedPtr<String> current_dir_{nullptr};
-
     nlohmann::json json_res;
 
     json_res["current_dir"] = *catalog->current_dir_;
