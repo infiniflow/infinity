@@ -83,6 +83,9 @@ QueryContext::Query(const String &query) {
 
     PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
     for (BaseStatement* statement : *parsed_result->statements_ptr_) {
+        this->CreateTxn();
+        this->BeginTxn();
+
         // Build unoptimized logical plan for each SQL statement.
         logical_planner.Build(statement);
         parsed_result->Reset();
@@ -106,8 +109,9 @@ QueryContext::Query(const String &query) {
 
         QueryResult query_result;
         query_result.result_ = pipeline->GetResult();
-        query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
+        this->CommitTxn();
+        query_result.root_operator_type_ = unoptimized_plan->operator_type();
         return query_result;
     }
 
@@ -129,6 +133,7 @@ QueryContext::BeginTxn() {
 void
 QueryContext::CommitTxn() {
     session_ptr_->txn_->CommitTxn();
+    session_ptr_->txn_ = nullptr;
 }
 
 Txn*
