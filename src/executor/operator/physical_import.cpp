@@ -137,6 +137,10 @@ PhysicalImport::CSVRowHandler(void *context) {
     }
 
     ++ parser_context->row_count_;
+
+    // 1. construct segment entry.
+    // 2. append each row to segment entry.
+    // 3. when segment is full, flush it, append to txn_store and go to 1.
 }
 
 }

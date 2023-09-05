@@ -38,7 +38,8 @@ public:
     }
 
 public:
-    explicit TableScanFunction(std::string name, TableFunctionType function)
+    explicit
+    TableScanFunction(std::string name, TableFunctionType function)
         : TableFunction(std::move(name), {}, std::move(function))
         {}
 

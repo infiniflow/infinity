@@ -140,8 +140,11 @@ DBEntry::TableCollections(DBEntry* db_entry,
         EntryResult entry_result = TableCollectionMeta::GetEntry(table_collection_meta, txn_id, begin_ts);
         if(entry_result.err_ != nullptr) {
             CatalogError(*entry_result.err_)
+        } else {
+            if(entry_result.entry_ != nullptr) {
+                results.emplace_back((TableCollectionEntry*)entry_result.entry_);
+            }
         }
-        results.emplace_back((TableCollectionEntry*)entry_result.entry_);
     }
 
     return results;

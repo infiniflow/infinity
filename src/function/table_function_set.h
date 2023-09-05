@@ -11,7 +11,7 @@ namespace infinity {
 class TableFunctionSet: public FunctionSet {
 public:
     explicit
-    TableFunctionSet(std::string name): FunctionSet(std::move(name), FunctionType::kTable) {}
+    TableFunctionSet(String name): FunctionSet(std::move(name), FunctionType::kTable) {}
 
     void
     AddFunction(const TableFunction& func);
