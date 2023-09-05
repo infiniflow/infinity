@@ -141,6 +141,11 @@ public:
         return txn_context_.GetCommitTS();
     }
 
+    inline TxnTimeStamp
+    BeginTS() {
+        return txn_context_.GetBeginTS();
+    }
+
     inline TxnState
     GetTxnState() {
         return txn_context_.GetTxnState();

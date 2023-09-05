@@ -14,6 +14,10 @@ NewCatalog::NewCatalog(SharedPtr<String> dir)
     : current_dir_(std::move(dir)) {
 }
 
+// do not only use this method to create database
+// it will not record database in transaction, so when you commit transaction
+// it will lost operation
+// use Txn::CreateDatabase instead
 EntryResult
 NewCatalog::CreateDatabase(NewCatalog* catalog,
                            const String& db_name,
@@ -50,6 +54,10 @@ NewCatalog::CreateDatabase(NewCatalog* catalog,
     return res;
 }
 
+// do not only use this method to drop database
+// it will not record database in transaction, so when you commit transaction
+// it will lost operation
+// use Txn::DropDatabase instead
 EntryResult
 NewCatalog::DropDatabase(NewCatalog* catalog,
                          const String& db_name,
