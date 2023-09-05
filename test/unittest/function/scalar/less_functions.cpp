@@ -35,12 +35,12 @@ class LessFunctionsTest : public BaseTest {
 TEST_F(LessFunctionsTest, less_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
+    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
 
     RegisterLessFunction(catalog_ptr);
 
     String op = "<";
-    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
+    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 

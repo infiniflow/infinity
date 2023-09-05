@@ -87,7 +87,7 @@ GenerateEqualsFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr, DataType 
 }
 
 void
-RegisterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "=";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -173,7 +173,7 @@ RegisterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, EqualsFunction>);
     function_set_ptr->AddFunction(varchar_equals_mixed);
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

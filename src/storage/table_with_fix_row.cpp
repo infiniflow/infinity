@@ -4,7 +4,6 @@
 #if 0
 #include "table_with_fix_row.h"
 
-#include "main/infinity.h"
 #include "block.h"
 
 #include <memory>

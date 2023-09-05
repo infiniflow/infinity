@@ -3,7 +3,6 @@
 //
 
 #include "physical_create_collection.h"
-#include "main/infinity.h"
 
 namespace infinity {
 
@@ -34,7 +33,8 @@ PhysicalCreateCollection::Init() {
 
 void
 PhysicalCreateCollection::Execute(QueryContext* query_context) {
-    Infinity::instance().catalog()->CreateCollection(*schema_name_, *collection_name_, conflict_type_);
+    Txn* txn = query_context->GetTxn();
+    txn->CreateCollection(*schema_name_, *collection_name_, conflict_type_);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {

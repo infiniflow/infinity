@@ -124,6 +124,14 @@ public:
     void
     AppendWith(const ColumnVector &other, SizeT from, SizeT count);
 
+    // input parameter:
+    // ptr - input raw data
+    // start_row - start row number of ptr
+    // row_count - total row count to be copied
+    // return value: appended rows actually
+    SizeT
+    AppendWith(const ptr_t ptr, SizeT start_row, SizeT row_count);
+
     void
     ShallowCopy(const ColumnVector &other);
 

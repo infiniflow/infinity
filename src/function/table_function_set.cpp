@@ -3,6 +3,7 @@
 //
 
 #include "table_function_set.h"
+#include "table_function.h"
 
 namespace infinity {
 

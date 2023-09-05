@@ -4,9 +4,8 @@
 
 #pragma once
 #include "pg_protocol_handler.h"
-#include "storage/table.h"
+//#include "storage/table.h"
 #include "planner/logical_node_type.h"
-#include "main/session.h"
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -20,6 +19,10 @@ enum class ConnectionStatus : char {
     kTerminated
 };
 
+class QueryContext;
+class QueryResult;
+class Session;
+class Table;
 class Connection {
 public:
     explicit
@@ -56,7 +59,7 @@ private:
 
     bool terminate_connection_ = false;
 
-    UniquePtr<Session> session_;
+    SharedPtr<Session> session_;
 };
 
 }

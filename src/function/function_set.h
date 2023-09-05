@@ -5,10 +5,9 @@
 #pragma once
 
 #include "common/utility/infinity_assert.h"
-#include "aggregate_function.h"
-#include "scalar_function.h"
-#include "table_function.h"
-
+#include "expression/base_expression.h"
+#include "function.h"
+#include "storage/meta/catalog.h"
 #include "parser/parsed_expr/function_expr.h"
 
 namespace infinity {
@@ -16,7 +15,7 @@ namespace infinity {
 class FunctionSet {
 public:
     static SharedPtr<FunctionSet>
-    GetFunctionSet(const FunctionExpr &expr);
+    GetFunctionSet(NewCatalog* catalog, const FunctionExpr& expr);
 
     static String
     ToString(const String& name, const Vector<SharedPtr<BaseExpression>>& arguments);

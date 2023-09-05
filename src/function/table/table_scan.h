@@ -7,33 +7,32 @@
 
 #include "function/table_function.h"
 #include "function/function_data.h"
-#include "storage/catalog.h"
-#include "main/infinity.h"
+#include "storage/meta/catalog.h"
 
 namespace infinity {
 
 void
-RegisterTableScanFunction(const UniquePtr<Catalog> &catalog_ptr);
+RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 class TableScanFunctionData: public TableFunctionData {
 public:
-    TableScanFunctionData(SharedPtr<Table> table_ptr, Vector<SizeT> column_ids)
-        : table_ptr_(std::move(table_ptr)),
+    TableScanFunctionData(TableCollectionEntry* table_entry_ptr, Vector<SizeT> column_ids)
+        : table_entry_ptr_(table_entry_ptr),
         column_ids_(std::move(column_ids))
     {}
 
-    SharedPtr<Table> table_ptr_;
+    TableCollectionEntry* table_entry_ptr_;
     Vector<SizeT> column_ids_;
 
-    // How many block is scanned.
-    i64 block_count_{0};
+    // How many segments are scanned.
+    i64 segment_count_{0};
 };
 
 class TableScanFunction : public TableFunction {
 public:
     static inline SharedPtr<TableScanFunction>
-    Make(const String& func_name) {
-        SharedPtr<TableFunction> table_func = Infinity::instance().catalog()->GetTableFunctionByName(func_name);
+    Make(NewCatalog* catalog, const String& func_name) {
+        SharedPtr<TableFunction> table_func = NewCatalog::GetTableFunctionByName(catalog, func_name);
         SharedPtr<TableScanFunction> table_scan_func = std::static_pointer_cast<TableScanFunction>(table_func);
         return table_scan_func;
     }

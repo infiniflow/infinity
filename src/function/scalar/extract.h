@@ -6,12 +6,12 @@
 
 #include "function/scalar_function.h"
 #include "function/function_set.h"
-#include "storage/catalog.h"
+#include "storage/meta/catalog.h"
 
 namespace infinity {
 
 void
-RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr);
+RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }
 

@@ -6,14 +6,14 @@
 
 #include "function/scalar_function.h"
 #include "function/function_set.h"
-#include "storage/catalog.h"
+#include "storage/meta/catalog.h"
 
 namespace infinity {
 
 void
-RegisterLikeFunction(const UniquePtr<Catalog> &catalog_ptr);
+RegisterLikeFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 void
-RegisterNotLikeFunction(const UniquePtr<Catalog> &catalog_ptr);
+RegisterNotLikeFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

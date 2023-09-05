@@ -134,7 +134,7 @@ GroupBinder::BuildFuncExpr(const FunctionExpr& expr,
                            BindContext* bind_context_ptr,
                            i64 depth,
                            bool root) {
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if(function_set_ptr->type_ != FunctionType::kScalar) {
         PlannerError("Only scalar function is supported in group by list.");
     }

@@ -5,11 +5,11 @@
 #pragma once
 
 #include "function/aggregate_function.h"
-#include "storage/catalog.h"
+#include "storage/meta/catalog.h"
 
 namespace infinity {
 
 void
-RegisterMinFunction(const UniquePtr<Catalog> &catalog_ptr);
+RegisterMinFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

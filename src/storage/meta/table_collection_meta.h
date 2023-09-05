@@ -8,65 +8,68 @@
 
 #include "common/types/internal_types.h"
 #include "storage/meta/entry/base_entry.h"
-#include "storage/table_def.h"
+#include "storage/meta/entry/table_collection_entry.h"
+#include "parser/statement/extra/create_table_info.h"
 
 namespace infinity {
 
 class TxnManager;
 class DBEntry;
 class BufferManager;
-struct TableMeta {
+struct TableCollectionMeta {
 public:
     explicit
-    TableMeta(const SharedPtr<String>& base_dir,
-              SharedPtr<String> name,
-              DBEntry* db_entry) : base_dir_(base_dir), table_name_(std::move(name)), db_entry_(db_entry) {
+    TableCollectionMeta(const SharedPtr<String>& base_dir,
+                        SharedPtr<String> name,
+                        DBEntry* db_entry) : base_dir_(base_dir), table_collection_name_(std::move(name)), db_entry_(db_entry) {
     }
 
 public:
     static EntryResult
-    CreateNewEntry(TableMeta* table_meta,
+    CreateNewEntry(TableCollectionMeta* table_meta,
+                   TableCollectionType table_collection_type,
+                   const SharedPtr<String>& table_collection_name,
+                   const Vector<SharedPtr<ColumnDef>>& columns,
                    u64 txn_id,
                    TxnTimeStamp begin_ts,
-                   TxnManager* txn_mgr,
-                   const SharedPtr<TableDef>& table_def);
+                   TxnManager* txn_mgr);
 
     static EntryResult
-    DropNewEntry(TableMeta* table_meta,
+    DropNewEntry(TableCollectionMeta* table_meta,
                  u64 txn_id,
                  TxnTimeStamp begin_ts,
                  TxnManager* txn_mgr,
                  const String& table_name);
 
     static void
-    DeleteNewEntry(TableMeta* table_meta,
+    DeleteNewEntry(TableCollectionMeta* table_meta,
                    u64 txn_id,
                    TxnManager* txn_mgr);
 
     static EntryResult
-    GetEntry(TableMeta* table_meta,
+    GetEntry(TableCollectionMeta* table_meta,
              u64 txn_id,
              TxnTimeStamp begin_ts);
 
     static SharedPtr<String>
-    ToString(TableMeta* table_meta);
+    ToString(TableCollectionMeta* table_meta);
 
-    static inline void*
-    GetDBEntry(TableMeta* table_meta) {
+    static inline DBEntry*
+    GetDBEntry(TableCollectionMeta* table_meta) {
         return table_meta->db_entry_;
     }
 
     static nlohmann::json
-    Serialize(const TableMeta* table_meta);
+    Serialize(const TableCollectionMeta* table_meta);
 
-    static UniquePtr<TableMeta>
+    static UniquePtr<TableCollectionMeta>
     Deserialize(const nlohmann::json& table_meta_json,
                 DBEntry* db_entry,
                 BufferManager* buffer_mgr);
 
 public:
     RWMutex rw_locker_{};
-    SharedPtr<String> table_name_{};
+    SharedPtr<String> table_collection_name_{};
     SharedPtr<String> base_dir_{};
 
     DBEntry* db_entry_{};

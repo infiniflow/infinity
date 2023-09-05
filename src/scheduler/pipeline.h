@@ -5,7 +5,6 @@
 #pragma once
 
 #include "storage/table.h"
-#include "main/query_context.h"
 
 #include <atomic>
 #include <memory>
@@ -20,7 +19,7 @@ enum class TaskState {
 
 namespace infinity {
 
-
+class QueryContext;
 class Pipeline : public std::enable_shared_from_this<Pipeline> {
 public:
     explicit

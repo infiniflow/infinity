@@ -6,6 +6,7 @@
 #include "parser/parser_result.h"
 #include "query_context.h"
 #include "infinity.h"
+#include "main/session.h"
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
 #include "executor/physical_planner.h"
@@ -64,11 +65,6 @@ QueryResult::ToString() const {
     return ss.str();
 }
 
-QueryContext::QueryContext(Session* session_ptr, const Config* config_ptr)
-    : session_ptr_(session_ptr), global_config_(config_ptr) {
-    transaction_ = MakeUnique<TransactionContext>();
-}
-
 QueryResult
 QueryContext::Query(const String &query) {
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
@@ -116,6 +112,28 @@ QueryContext::Query(const String &query) {
     }
 
     NetworkError("Not reachable");
+}
+
+void
+QueryContext::CreateTxn() {
+    if(session_ptr_->txn_ == nullptr) {
+        session_ptr_->txn_ = storage_->txn_manager()->CreateTxn();
+    }
+}
+
+void
+QueryContext::BeginTxn() {
+    session_ptr_->txn_->BeginTxn();
+}
+
+void
+QueryContext::CommitTxn() {
+    session_ptr_->txn_->CommitTxn();
+}
+
+Txn*
+QueryContext::GetTxn() const {
+    return session_ptr_->txn_;
 }
 
 }

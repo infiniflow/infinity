@@ -13,6 +13,7 @@ enum EntryType : i8 {
     kDummy,
     kDatabase,
     kTable,
+    kView,
     kColumn,
     kSegment,
     kColumnData,

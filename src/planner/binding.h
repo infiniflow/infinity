@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "storage/table.h"
+#include "storage/meta/entry/table_collection_entry.h"
+#include "storage/meta/entry/view_entry.h"
 
 #include <unordered_map>
 
@@ -30,7 +31,7 @@ public:
     MakeBinding(BindingType binding_type,
                 const String& name,
                 u64 table_index,
-                SharedPtr<Table> table_ptr,
+                TableCollectionEntry* table_collection_entry_ptr,
                 SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                 SharedPtr<Vector<String>> column_names);
 
@@ -49,7 +50,7 @@ public:
 //    SharedPtr<LogicalNode> logical_node_ptr_{nullptr};
 
     // if the binding is table, this is the table_ptr
-    SharedPtr<Table> table_ptr_{nullptr};
+    TableCollectionEntry* table_collection_entry_ptr_{nullptr};
 
     // Column types of the binding
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};

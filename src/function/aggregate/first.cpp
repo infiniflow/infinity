@@ -130,7 +130,7 @@ public:
 
 
 void
-RegisterFirstFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterFirstFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "FIRST";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -295,7 +295,7 @@ RegisterFirstFunction(const UniquePtr<Catalog> &catalog_ptr) {
         function_set_ptr->AddFunction(first_function);
     }
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

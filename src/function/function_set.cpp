@@ -3,18 +3,16 @@
 //
 
 #include "function_set.h"
-#include "main/infinity.h"
 #include <iostream>
 
 namespace infinity {
 
 SharedPtr<FunctionSet>
-FunctionSet::GetFunctionSet(const FunctionExpr &expr) {
+FunctionSet::GetFunctionSet(NewCatalog* catalog, const FunctionExpr &expr) {
     String function_name = expr.func_name_;
 
-    // UniquePtr<Catalog>& catalog
-    auto& catalog = Infinity::instance().catalog();
-    SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(function_name);
+    // SharedPtr<NewCatalog>& catalog
+    SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, function_name);
 
     return function_set_ptr;
 }

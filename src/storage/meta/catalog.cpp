@@ -5,6 +5,8 @@
 #include "catalog.h"
 #include "main/logger.h"
 #include "storage/io/local_file_system.h"
+#include "function/function_set.h"
+#include "function/table_function.h"
 
 namespace infinity {
 
@@ -87,7 +89,7 @@ NewCatalog::GetDatabase(NewCatalog* catalog,
     }
     catalog->rw_locker_.unlock_shared();
 
-    LOG_TRACE("Get a database entry {}", db_name);
+//    LOG_TRACE("Get a database entry {}", db_name);
     return DBMeta::GetEntry(db_meta, txn_id, begin_ts);
 }
 
@@ -109,8 +111,82 @@ NewCatalog::RemoveDBEntry(NewCatalog* catalog,
 }
 
 Vector<DBEntry*>
-NewCatalog::Databases(NewCatalog* catalog, Txn* txn) {
-    NotImplementError("NewCatalog::Databases isn't implemented.")
+NewCatalog::Databases(NewCatalog* catalog, u64 txn_id, TxnTimeStamp begin_ts) {
+
+    Vector<DBEntry*> results;
+    catalog->rw_locker_.lock_shared();
+
+    results.reserve(catalog->databases_.size());
+    for(const auto& db: catalog->databases_) {
+        EntryResult result = DBMeta::GetEntry(db.second.get(), txn_id, begin_ts);
+        if(result.err_ != nullptr) {
+            CatalogError(*result.err_);
+        }
+        results.emplace_back((DBEntry*)result.entry_);
+    }
+
+    return results;
+}
+
+SharedPtr<FunctionSet>
+NewCatalog::GetFunctionSetByName(NewCatalog* catalog, String function_name) {
+    // Transfer the function to upper case.
+    StringToLower(function_name);
+
+    if(!catalog->function_sets_.contains(function_name)) {
+        CatalogError("No function name: " + function_name);
+    }
+    return catalog->function_sets_[function_name];
+}
+
+void
+NewCatalog::AddFunctionSet(NewCatalog* catalog, const SharedPtr<FunctionSet>& function_set) {
+    String name = function_set->name();
+    StringToLower(name);
+    if(catalog->function_sets_.contains(name)) {
+        CatalogError("Trying to add duplicated function table_name into catalog: " + name);
+    }
+    catalog->function_sets_.emplace(name, function_set);
+}
+
+void
+NewCatalog::DeleteFunctionSet(NewCatalog* catalog, String function_name) {
+    // Unused now.
+    StringToLower(function_name);
+    if(!catalog->function_sets_.contains(function_name)) {
+        CatalogError("Delete not exist function: " + function_name);
+    }
+    catalog->function_sets_.erase(function_name);
+}
+
+// Table Function related methods
+SharedPtr<TableFunction>
+NewCatalog::GetTableFunctionByName(NewCatalog* catalog, String function_name) {
+    StringToLower(function_name);
+    if(!catalog->table_functions_.contains(function_name)) {
+        CatalogError("No table function table_name: " + function_name);
+    }
+    return catalog->table_functions_[function_name];
+}
+
+void
+NewCatalog::AddTableFunction(NewCatalog* catalog, const SharedPtr<TableFunction>& table_function) {
+    String name = table_function->name();
+    StringToLower(name);
+    if(catalog->table_functions_.contains(name)) {
+        CatalogError("Trying to add duplicated table function table_name into catalog: " + name);
+    }
+    catalog->table_functions_.emplace(name, table_function);
+}
+
+void
+NewCatalog::DeleteTableFunction(NewCatalog* catalog, String function_name) {
+    // Unused now.
+    StringToLower(function_name);
+    if(!catalog->table_functions_.contains(function_name)) {
+        CatalogError("Delete not exist table function: " + function_name);
+    }
+    catalog->table_functions_.erase(function_name);
 }
 
 nlohmann::json

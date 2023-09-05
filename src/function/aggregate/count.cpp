@@ -40,7 +40,7 @@ public:
 };
 
 void
-RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "COUNT";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -241,7 +241,7 @@ RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                                                                DataType(LogicalType::kBigInt));
         function_set_ptr->AddFunction(count_function);
     }
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

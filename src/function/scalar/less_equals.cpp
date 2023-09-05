@@ -87,7 +87,7 @@ GenerateLessEqualsFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr, DataT
 }
 
 void
-RegisterLessEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterLessEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "<=";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -158,7 +158,7 @@ RegisterLessEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, LessEqualsFunction>);
     function_set_ptr->AddFunction(varchar_less_equals_mixed);
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

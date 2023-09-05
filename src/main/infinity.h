@@ -5,35 +5,29 @@
 #pragma once
 
 #include "common/singleton.h"
-#include "network/connection.h"
+#include "common/types/internal_types.h"
 #include <memory>
-#include "scheduler/naive_scheduler.h"
-#include "storage/catalog.h"
-#include "storage/storage.h"
+#include "scheduler/scheduler.h"
 #include "config.h"
+#include "storage/storage.h"
 
 namespace infinity {
 
 class Infinity : public Singleton<Infinity> {
 public:
-    [[nodiscard]] inline UniquePtr<Scheduler>&
+    [[nodiscard]] inline Scheduler*
     scheduler() noexcept {
-        return scheduler_;
+        return scheduler_.get();
     }
 
-    [[nodiscard]] inline UniquePtr<Catalog>&
-    catalog() noexcept {
-        return storage_->catalog();
-    }
-
-    [[nodiscard]] UniquePtr<Config>&
+    [[nodiscard]] inline Config*
     config() noexcept {
-        return config_;
+        return config_.get();
     }
 
-    [[nodiscard]] inline UniquePtr<Storage>&
+    [[nodiscard]] inline Storage*
     storage() noexcept {
-        return storage_;
+        return storage_.get();
     }
 
     void
@@ -46,9 +40,9 @@ private:
     friend class Singleton;
     Infinity() = default;
 
-    UniquePtr<Scheduler> scheduler_;
-    UniquePtr<Config> config_;
-    UniquePtr<Storage> storage_;
+    UniquePtr<Scheduler> scheduler_{};
+    UniquePtr<Config> config_{};
+    UniquePtr<Storage> storage_{};
 
     bool initialized_ {false};
 };

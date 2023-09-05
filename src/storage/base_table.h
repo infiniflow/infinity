@@ -8,6 +8,7 @@
 
 #include "common/types/internal_types.h"
 #include "common/utility/infinity_assert.h"
+#include "storage/meta/entry/table_collecton_type.h"
 
 namespace infinity {
 
@@ -35,15 +36,15 @@ ToString(BaseTableType type) {
 class BaseTable {
 public:
     explicit
-    BaseTable(BaseTableType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
+    BaseTable(TableCollectionType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
         : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
 
-    [[nodiscard]] inline BaseTableType
+    [[nodiscard]] inline TableCollectionType
     kind() const {
         return kind_;
     }
 
-    BaseTableType kind_{BaseTableType::kInvalid};
+    TableCollectionType kind_{TableCollectionType::kTableEntry};
 
     [[nodiscard]] inline const SharedPtr<String>&
     schema_name() const {

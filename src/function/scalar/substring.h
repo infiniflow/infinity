@@ -6,11 +6,11 @@
 
 #include "function/scalar_function.h"
 #include "function/function_set.h"
-#include "storage/catalog.h"
+#include "storage/meta/catalog.h"
 
 namespace infinity {
 
 void
-RegisterSubstringFunction(const UniquePtr<Catalog> &catalog_ptr);
+RegisterSubstringFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

@@ -315,7 +315,7 @@ PhysicalPlanner::BuildInsert(const SharedPtr<LogicalNode> &logical_operator) con
 
     SharedPtr<LogicalInsert> logical_insert_ptr = std::dynamic_pointer_cast<LogicalInsert>(logical_operator);
     return MakeShared<PhysicalInsert>(logical_operator->node_id(),
-                                      logical_insert_ptr->table_ptr(),
+                                      logical_insert_ptr->table_collection_entry(),
                                       logical_insert_ptr->table_index(),
                                       logical_insert_ptr->value_list());
 }
@@ -334,7 +334,7 @@ SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode> &logical_operator) const {
     LogicalImport* logical_import = (LogicalImport*)(logical_operator.get());
     return MakeShared<PhysicalImport>(logical_operator->node_id(),
-                                      logical_import->table_ptr(),
+                                      logical_import->table_collection_entry(),
                                       logical_import->file_path(),
                                       logical_import->header(),
                                       logical_import->delimiter(),
@@ -537,7 +537,7 @@ PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) 
 //    }
 
     SharedPtr<TableScanFunctionData> table_scan_function_data_ptr
-        = MakeShared<TableScanFunctionData>(logical_table_scan->table_ptr(), logical_table_scan->column_ids_);
+        = MakeShared<TableScanFunctionData>(logical_table_scan->table_collection_ptr(), logical_table_scan->column_ids_);
 
     return MakeShared<PhysicalTableScan>(logical_operator->node_id(),
                                          logical_table_scan->table_alias_,

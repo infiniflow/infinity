@@ -3,8 +3,6 @@
 //
 
 #include "physical_create_view.h"
-#include "storage/view.h"
-#include "main/infinity.h"
 
 namespace infinity {
 
@@ -15,12 +13,17 @@ PhysicalCreateView::Init() {
 
 void
 PhysicalCreateView::Execute(QueryContext* query_context) {
-    SharedPtr<View> view_ptr = MakeShared<View>(create_view_info_,
-                                                GetOutputNames(),
-                                                GetOutputTypes());
-    Infinity::instance().catalog()->CreateView(create_view_info_->schema_name_,
-                                               view_ptr,
-                                               create_view_info_->conflict_type_);
+
+    Txn* txn = query_context->GetTxn();
+
+    txn->CreateView(create_view_info_->schema_name_, create_view_info_->view_name_, create_view_info_->conflict_type_);
+
+//    SharedPtr<View> view_ptr = MakeShared<View>(create_view_info_,
+//                                                GetOutputNames(),
+//                                                GetOutputTypes());
+//    Infinity::instance().catalog()->CreateView(create_view_info_->schema_name_,
+//                                               view_ptr,
+//                                               create_view_info_->conflict_type_);
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
             MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())

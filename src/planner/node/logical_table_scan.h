@@ -16,7 +16,7 @@ class LogicalTableScan : public LogicalNode {
 public:
     explicit
     LogicalTableScan(u64 node_id,
-                     SharedPtr<Table> table_ptr,
+                     TableCollectionEntry* table_ptr,
                      SharedPtr<TableScanFunction> table_scan_func,
                      String table_alias,
                      u64 table_index,
@@ -37,9 +37,9 @@ public:
         return column_types_;
     }
 
-    [[nodiscard]] SharedPtr<Table>
-    table_ptr() const {
-        return table_ptr_;
+    [[nodiscard]] TableCollectionEntry*
+    table_collection_ptr() const {
+        return table_collection_ptr_;
     }
 
     String
@@ -59,7 +59,7 @@ public:
 
     SharedPtr<TableScanFunction> table_scan_func_ptr_{nullptr};
 private:
-    SharedPtr<Table> table_ptr_{nullptr};
+    TableCollectionEntry* table_collection_ptr_{};
 
 };
 

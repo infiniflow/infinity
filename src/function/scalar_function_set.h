@@ -5,6 +5,7 @@
 #pragma once
 
 #include "function_set.h"
+#include "scalar_function.h"
 
 namespace infinity {
 

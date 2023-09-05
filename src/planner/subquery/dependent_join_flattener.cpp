@@ -124,8 +124,8 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
             auto right_pushed_plan = PushDependentJoinInternal(subquery_plan->right_node());
             auto right_correlated_binding = this->base_binding_;
 
-            auto& catalog = Infinity::instance().catalog();
-            SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName("=");
+            NewCatalog* catalog = query_context_->storage()->catalog();
+            SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "=");
             Vector<SharedPtr<BaseExpression>> join_conditions;
 
             SizeT column_count = bind_context_ptr_->correlated_column_exprs_.size();
@@ -292,11 +292,12 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
         PlannerError(fmt::format("Can't find table: {} in binding context.", correlated_columns[0]->table_name()));
     }
 
-    SharedPtr<TableScanFunction> scan_function = TableScanFunction::Make("seq_scan");
+    NewCatalog* catalog = query_context_->storage()->catalog();
+    SharedPtr<TableScanFunction> scan_function = TableScanFunction::Make(catalog, "seq_scan");
 
     SharedPtr<LogicalTableScan> logical_table_scan = MakeShared<LogicalTableScan>(
             bind_context_ptr_->GetNewLogicalNodeId(),
-            table_binding_ptr->table_ptr_,
+            table_binding_ptr->table_collection_entry_ptr_,
             scan_function,
             table_binding_ptr->table_name_,
             table_index,

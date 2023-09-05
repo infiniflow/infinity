@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "query_context.h"
-
+//#include "query_context.h"
 #include "prepared_plan.h"
+#include "storage/txn/txn.h"
 
 #include <unordered_map>
 
@@ -14,11 +14,12 @@ namespace infinity {
 
 class Session {
 public:
-    explicit Session();
+    explicit
+    Session(): current_database_("default") {}
 
     [[nodiscard]] inline String&
-    current_schema() {
-        return current_schema_;
+    current_database() {
+        return current_database_;
     }
 
     [[nodiscard]] inline const String&
@@ -31,28 +32,23 @@ public:
         return user_id_;
     }
 
-    inline UniquePtr<TransactionContext>&
-    transaction() {
-        return transaction_;
-    };
-
     inline void
-    SetClientInfo(const String ip_address, u16 port) {
-        client_address_ = std::move(ip_address);
+    SetClientInfo(const String& ip_address, u16 port) {
+        client_address_ = ip_address;
         client_port_ = port;
     }
 
-private:
-    // transaction context
-    UniquePtr<TransactionContext> transaction_;
+public:
+    // Txn is session level.
+    Txn* txn_{};
 
-    // session config such as memory limitation
+private:
 
     // prepared plan for PREPARE and EXECUTE statement
     HashMap<String, SharedPtr<PreparedPlan>> prepared_plans_;
 
     // Current schema
-    String current_schema_;
+    String current_database_;
 
     // User / Tenant information
     String tenant_name_;
@@ -60,8 +56,8 @@ private:
 
     u64 user_id_{0};
 
-    String client_address_;
-    u16 client_port_;
+    String client_address_{};
+    u16 client_port_{};
 };
 
 }

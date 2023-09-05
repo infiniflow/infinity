@@ -4,8 +4,6 @@
 
 #include "physical_drop_table.h"
 
-#include "main/infinity.h"
-
 namespace infinity {
 
 void
@@ -15,7 +13,9 @@ PhysicalDropTable::Init() {
 
 void
 PhysicalDropTable::Execute(QueryContext* query_context) {
-    Infinity::instance().catalog()->DeleteTable(*schema_name_, *table_name_, conflict_type_);
+
+    Txn* txn = query_context->GetTxn();
+    txn->DropTableCollectionByName(*schema_name_, *table_name_, conflict_type_);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {

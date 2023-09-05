@@ -29,7 +29,10 @@ LogicalImport::ToString(i64& space) {
             break;
         }
     }
-    ss << "to " << *table_ptr_->schema_name() << '.' << *table_ptr_->table_name();
+
+    DBEntry* db_entry
+            = TableCollectionMeta::GetDBEntry(table_collection_entry_->table_collection_meta_);
+    ss << "to " << *db_entry->db_name_ << '.' << *table_collection_entry_->table_collection_name_;
 
     space += arrow_str.size();
 

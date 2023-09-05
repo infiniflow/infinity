@@ -51,7 +51,7 @@ ModuloFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 }
 
 void
-RegisterModuloFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterModuloFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "%";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -105,7 +105,7 @@ RegisterModuloFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, ModuloFunction>);
     function_set_ptr->AddFunction(mod_function_double);
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

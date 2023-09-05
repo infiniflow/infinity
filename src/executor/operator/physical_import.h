@@ -12,13 +12,13 @@ namespace infinity {
 class PhysicalImport : public PhysicalOperator {
 public:
     explicit PhysicalImport(uint64_t id,
-                            SharedPtr<Table> table_ptr,
+                            TableCollectionEntry* table_collection_entry,
                             String file_path,
                             bool header,
                             char delimiter,
                             CopyFileType type)
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id),
-          table_ptr_(std::move(table_ptr)),
+          table_collection_entry_(table_collection_entry),
           file_path_(std::move(file_path)),
           header_(header),
           delimiter_(delimiter),
@@ -48,9 +48,9 @@ public:
     void
     ImportJSON(QueryContext* query_context);
 
-    inline const SharedPtr<Table>&
-    table_ptr() const {
-        return table_ptr_;
+    inline const TableCollectionEntry*
+    table_collection_entry() const {
+        return table_collection_entry_;
     }
 
     inline CopyFileType
@@ -85,7 +85,7 @@ private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
-    SharedPtr<Table> table_ptr_{};
+    TableCollectionEntry* table_collection_entry_{};
     CopyFileType file_type_ {CopyFileType::kCSV};
     String file_path_{};
     bool header_{false};

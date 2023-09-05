@@ -87,7 +87,7 @@ GenerateGreaterEqualsFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr, Da
 }
 
 void
-RegisterGreaterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterGreaterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = ">=";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
@@ -158,7 +158,7 @@ RegisterGreaterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, GreaterEqualsFunction>);
     function_set_ptr->AddFunction(varchar_greater_equals_mixed);
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

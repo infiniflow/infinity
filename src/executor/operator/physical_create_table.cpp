@@ -3,7 +3,6 @@
 //
 
 #include "physical_create_table.h"
-#include "main/infinity.h"
 #include "common/utility/infinity_assert.h"
 
 #include <utility>
@@ -51,8 +50,8 @@ PhysicalCreateTable::Init() {
 void
 PhysicalCreateTable::Execute(QueryContext* query_context) {
 //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
-    SharedPtr<Table> table_ptr = MakeShared<Table>(table_def_ptr_, TableType::kDataTable);
-    Infinity::instance().catalog()->CreateTable(*schema_name_, table_ptr, conflict_type_);
+    Txn* txn = query_context->GetTxn();
+    txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {

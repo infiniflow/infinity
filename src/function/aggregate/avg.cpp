@@ -283,7 +283,7 @@ public:
 };
 
 void
-RegisterAvgFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterAvgFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "AVG";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -361,7 +361,7 @@ RegisterAvgFunction(const UniquePtr<Catalog> &catalog_ptr) {
         function_set_ptr->AddFunction(avg_function);
     }
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

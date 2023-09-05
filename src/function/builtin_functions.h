@@ -5,20 +5,20 @@
 #pragma once
 
 #include "function_set.h"
-#include "storage/catalog.h"
+#include "storage/meta/catalog.h"
 
 namespace infinity {
 
 class BuiltinFunctions : public std::enable_shared_from_this<BuiltinFunctions> {
 public:
     explicit
-    BuiltinFunctions(UniquePtr<Catalog>& catalog_ptr);
+    BuiltinFunctions(UniquePtr<NewCatalog>& catalog_ptr);
 
     void Init();
 
 
 private:
-    UniquePtr<Catalog>& catalog_ptr_;
+    UniquePtr<NewCatalog>& catalog_ptr_;
 
 private:
 

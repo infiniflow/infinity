@@ -39,12 +39,14 @@ Console::Console() {
 void
 Console::Init() {
     GlobalResourceUsage::Init();
-    infinity::Infinity::instance().Init(nullptr);
+    SharedPtr<String> config_path{};
+
+//    Infinity::instance().Init(config_path);
 }
 
 void
 Console::UnInit() {
-    infinity::Infinity::instance().UnInit();
+//    infinity::Infinity::instance().UnInit();
     GlobalResourceUsage::UnInit();
 }
 
@@ -103,8 +105,8 @@ Console::Explain(const String& arguments) {
     SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(), nullptr);
-    query_context_ptr->set_current_schema(session_ptr->current_schema());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(), nullptr, nullptr, nullptr);
+    query_context_ptr->set_current_schema(session_ptr->current_database());
 
     LogicalPlanner logical_planner(query_context_ptr.get());
     Optimizer optimizer(query_context_ptr.get());
@@ -181,8 +183,8 @@ Console::Visualize(const String& arguments) {
     SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(), nullptr);
-    query_context_ptr->set_current_schema(session_ptr->current_schema());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(), nullptr, nullptr, nullptr);
+    query_context_ptr->set_current_schema(session_ptr->current_database());
 
     LogicalPlanner logical_planner(query_context_ptr.get());
 
@@ -266,8 +268,8 @@ Console::ExecuteSQL(const String& sql_text) {
     PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Not support more statements");
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(), nullptr);
-    query_context_ptr->set_current_schema(session_ptr->current_schema());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(), nullptr, nullptr, nullptr);
+    query_context_ptr->set_current_schema(session_ptr->current_database());
 
     LogicalPlanner logical_planner(query_context_ptr.get());
 
@@ -289,7 +291,7 @@ Console::ExecuteSQL(const String& sql_text) {
         SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
 
         // Schedule the query pipeline
-        Infinity::instance().scheduler()->Schedule(query_context_ptr.get(), pipeline);
+        query_context_ptr->scheduler()->Schedule(query_context_ptr.get(), pipeline);
 
         // Initialize query result
         QueryResult query_result;

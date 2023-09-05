@@ -9,7 +9,7 @@
 namespace infinity {
 
 SharedPtr<SegmentEntry>
-SegmentEntry::MakeNewSegmentEntry(const TableEntry* table_entry,
+SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
                                   u64 txn_id,
                                   u64 segment_id,
                                   BufferManager* buffer_mgr,
@@ -22,7 +22,7 @@ SegmentEntry::MakeNewSegmentEntry(const TableEntry* table_entry,
     new_entry->status_ = DataSegmentStatus::kOpen;
     new_entry->segment_version_ = MakeUnique<SegmentVersion>(segment_row);
 
-    const auto* table_ptr = (const TableEntry*)table_entry;
+    const auto* table_ptr = (const TableCollectionEntry*)table_entry;
     new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + '/' + std::to_string(txn_id));
 
     const Vector<SharedPtr<ColumnDef>>& columns = table_ptr->columns_;
@@ -204,7 +204,7 @@ SegmentEntry::Serialize(const SegmentEntry* segment_entry) {
 }
 
 SharedPtr<SegmentEntry>
-SegmentEntry::Deserialize(const nlohmann::json& table_entry_json, TableEntry* table_entry, BufferManager* buffer_mgr) {
+SegmentEntry::Deserialize(const nlohmann::json& table_entry_json, TableCollectionEntry* table_entry, BufferManager* buffer_mgr) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
 
     segment_entry->base_dir_ = MakeShared<String>(table_entry_json["base_dir"]);

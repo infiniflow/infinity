@@ -2,9 +2,10 @@
 // Created by JinHai on 2022/12/14.
 //
 
-#include "function_set.h"
-
 #pragma once
+
+#include "function_set.h"
+#include "aggregate_function.h"
 
 namespace infinity {
 

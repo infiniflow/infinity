@@ -577,6 +577,12 @@ PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
 
     SharedPtr<DataBlock> output_data_block = DataBlock::Make();
     output_data_block->Init(output_types);
+
+    if(input_data_block_count == 0) {
+        // No input data
+        LOG_TRACE("No input, no aggregate result")
+        return ;
+    }
     // Loop blocks
 
     ExpressionEvaluator evaluator;

@@ -122,7 +122,7 @@ MulFunction::Run(MixedT left, MixedT right, MixedT& result) {
 }
 
 void
-RegisterMulFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterMulFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "*";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -219,7 +219,7 @@ RegisterMulFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::BinaryFunctionWithFailure<MixedT, MixedT, MixedT, MulFunction>);
     function_set_ptr->AddFunction(add_function_mixed_mixed);
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }
