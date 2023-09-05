@@ -191,8 +191,6 @@ NewCatalog::DeleteTableFunction(NewCatalog* catalog, String function_name) {
 
 nlohmann::json
 NewCatalog::Serialize(const NewCatalog* catalog) {
-    SharedPtr<String> current_dir_{nullptr};
-
     nlohmann::json json_res;
 
     json_res["current_dir"] = *catalog->current_dir_;
