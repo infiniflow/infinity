@@ -3,6 +3,7 @@
 //
 
 #include "db_meta.h"
+#include "common/types/internal_types.h"
 #include "main/logger.h"
 #include "common/utility/defer_op.h"
 #include "storage/txn/txn_manager.h"
@@ -33,7 +34,7 @@ DBMeta::CreateNewEntry(DBMeta* db_meta,
         res = db_entry.get();
         db_meta->entry_list_.emplace_front(std::move(db_entry));
 
-//        rw_locker_.unlock();
+
         LOG_TRACE("New database entry is added.");
         return {res, nullptr};
     } else {
@@ -223,12 +224,15 @@ DBMeta::GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts) {
                 }
             }
         } else {
-            // Only committed txn is visible. Committing txn isn't visble.
-
-            // not committed, but the same txn is also visible
-            if(txn_id == db_entry->txn_id_) {
-                // same txn
-                return {db_entry.get(), nullptr};
+            // Only committed txn is visible. Committing txn isn't visble,
+            // except same txn is visible
+            if(txn_id == db_entry->txn_id_ ) {
+                if (db_entry->deleted_) {
+                    LOG_TRACE("DB is dropped.")
+                    return {nullptr, MakeUnique<String>("DB is dropped.")};
+                } else {
+                    return {db_entry.get(), nullptr};
+                }
             }
         }
     }

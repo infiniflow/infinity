@@ -61,6 +61,21 @@ public:
 struct EntryResult {
     BaseEntry* entry_;
     UniquePtr<String> err_;
+
+    bool Success() {
+        return err_ == nullptr;
+    }
+
+    bool Fail() {
+        return err_ != nullptr;
+    }
+
+    String ToString() {
+        if(err_ == nullptr) {
+            return "Success";
+        }
+        return *err_.get();
+    }
 };
 
 }
