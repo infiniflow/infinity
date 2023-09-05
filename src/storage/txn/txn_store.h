@@ -23,6 +23,9 @@ public:
     Append(const SharedPtr<DataBlock>& input_block);
 
     UniquePtr<String>
+    Import(const SharedPtr<SegmentEntry>& segment);
+
+    UniquePtr<String>
     Delete(const Vector<RowID>& row_ids);
 
     void
@@ -39,6 +42,7 @@ public:
 
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};
+    Vector<SharedPtr<SegmentEntry>> uncommitted_segments_{};
     UniquePtr<AppendState> append_state_{};
 
     SizeT current_block_id_{0};

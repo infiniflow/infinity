@@ -15,7 +15,10 @@ void
 PhysicalDropTable::Execute(QueryContext* query_context) {
 
     Txn* txn = query_context->GetTxn();
-    txn->DropTableCollectionByName(*schema_name_, *table_name_, conflict_type_);
+    EntryResult res = txn->DropTableCollectionByName(*schema_name_, *table_name_, conflict_type_);
+    if(res.err_ != nullptr) {
+        ExecutorError(*res.err_);
+    }
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {

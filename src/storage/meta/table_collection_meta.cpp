@@ -176,8 +176,8 @@ TableCollectionMeta::DropNewEntry(TableCollectionMeta* table_meta,
         if(begin_ts > header_table_entry->commit_ts_) {
             // No conflict
             if(header_table_entry->deleted_) {
-                LOG_TRACE("Table is dropped before.")
-                return {nullptr, MakeUnique<String>("Table is dropped before.")};
+                LOG_TRACE("Table was dropped before.")
+                return {nullptr, MakeUnique<String>("Table was dropped before.")};
             }
 
             Vector<SharedPtr<ColumnDef>> dummy_columns;
@@ -256,8 +256,8 @@ TableCollectionMeta::GetEntry(TableCollectionMeta* table_meta,
             // committed
             if(begin_ts > table_entry->commit_ts_) {
                 if(table_entry->deleted_) {
-                    LOG_TRACE("Table is dropped.")
-                    return {nullptr, MakeUnique<String>("Table is dropped.")};
+                    // LOG_TRACE("Table was dropped.")
+                    return {nullptr, nullptr};
                 } else {
                     return {table_entry.get(), nullptr};
                 }

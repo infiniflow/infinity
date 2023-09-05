@@ -573,7 +573,7 @@ LogicalPlanner::BuildImport(const CopyStatement* statement, SharedPtr<BindContex
     if(result.err_ != nullptr) {
         PlannerError(*result.err_);
     }
-    TableCollectionEntry* table_collection_entry = static_cast<TableCollectionEntry*>(table_collection_entry);
+    TableCollectionEntry* table_collection_entry = static_cast<TableCollectionEntry*>(result.entry_);
 
     // Check the file existence
     LocalFileSystem fs;

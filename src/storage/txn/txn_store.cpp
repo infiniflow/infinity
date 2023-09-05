@@ -57,6 +57,11 @@ TxnTableStore::Append(const SharedPtr<DataBlock>& input_block) {
 }
 
 UniquePtr<String>
+TxnTableStore::Import(const SharedPtr<SegmentEntry>& segment) {
+    uncommitted_segments_.emplace_back(segment);
+}
+
+UniquePtr<String>
 TxnTableStore::Delete(const Vector<RowID>& row_ids) {
     NotImplementError("TxnTableStore::Delete")
 }
@@ -87,6 +92,12 @@ TxnTableStore::PrepareCommit() {
     LOG_TRACE("Transaction local storage table: {}, Start to prepare commit", this->table_name_);
     Txn* txn_ptr = (Txn*)txn_;
     TableCollectionEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
+
+    // TODO: pre-commit uncommitted segment.
+    for(const auto& uncommitted_segment: uncommitted_segments_) {
+        ;
+    }
+
     LOG_TRACE("Transaction local storage table: {}, Complete commit preparing", this->table_name_);
 }
 

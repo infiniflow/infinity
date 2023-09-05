@@ -492,7 +492,8 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
         table_local_store->Commit();
     }
 
-    // Flush to disk
+    // TODO: Flush the whole catalog.
+
     // Reset the LSN of WAL
 }
 

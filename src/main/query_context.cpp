@@ -14,6 +14,7 @@
 #include "common/utility/infinity_assert.h"
 #include "scheduler/operator_pipeline.h"
 #include "executor/fragment_builder.h"
+#include "common/utility/defer_op.h"
 
 #include <sstream>
 #include <utility>
@@ -83,35 +84,38 @@ QueryContext::Query(const String &query) {
 
     PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
     for (BaseStatement* statement : *parsed_result->statements_ptr_) {
-        this->CreateTxn();
-        this->BeginTxn();
-
-        // Build unoptimized logical plan for each SQL statement.
-        logical_planner.Build(statement);
-        parsed_result->Reset();
-
-        SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
-
-        // Apply optimized rule to the logical plan
-        SharedPtr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
-
-        // Build physical plan
-        SharedPtr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
-
-        // Fragment Builder, only for test now.
-        // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
-
-        // Create execution pipeline
-        SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
-
-        // Schedule the query pipeline
-        Infinity::instance().scheduler()->Schedule(this, pipeline);
-
         QueryResult query_result;
-        query_result.result_ = pipeline->GetResult();
+        {
+            this->CreateTxn();
+            this->BeginTxn();
+            DeferFn defer_fn([&]() {
+                this->CommitTxn();
+            });
 
-        this->CommitTxn();
-        query_result.root_operator_type_ = unoptimized_plan->operator_type();
+            // Build unoptimized logical plan for each SQL statement.
+            logical_planner.Build(statement);
+            parsed_result->Reset();
+
+            SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
+
+            // Apply optimized rule to the logical plan
+            SharedPtr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
+
+            // Build physical plan
+            SharedPtr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
+
+            // Fragment Builder, only for test now.
+            // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
+
+            // Create execution pipeline
+            SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
+
+            // Schedule the query pipeline
+            Infinity::instance().scheduler()->Schedule(this, pipeline);
+            query_result.result_ = pipeline->GetResult();
+            query_result.root_operator_type_ = unoptimized_plan->operator_type();
+        }
+
         return query_result;
     }
 

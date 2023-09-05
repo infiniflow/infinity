@@ -15,7 +15,10 @@ void
 PhysicalDropSchema::Execute(QueryContext* query_context) {
 
     Txn* txn = query_context->GetTxn();
-    txn->DropDatabase(*schema_name_, conflict_type_);
+    EntryResult res = txn->DropDatabase(*schema_name_, conflict_type_);
+    if(res.err_ != nullptr) {
+        ExecutorError(*res.err_);
+    }
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
