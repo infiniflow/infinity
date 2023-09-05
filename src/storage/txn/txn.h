@@ -47,6 +47,9 @@ public:
     CommitTxn(TxnTimeStamp commit_ts);
 
     void
+    RollbackTxn();
+
+    void
     RollbackTxn(TxnTimeStamp abort_ts);
 
     EntryResult

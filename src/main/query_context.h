@@ -81,20 +81,23 @@ public:
     void
     CommitTxn();
 
-    Txn*
+    void
+    RollbackTxn();
+
+    [[nodiscard]] Txn*
     GetTxn() const;
 
-    inline Storage*
+    [[nodiscard]] inline Storage*
     storage() const {
         return storage_;
     }
 
-    inline Scheduler*
+    [[nodiscard]] inline Scheduler*
     scheduler() const {
         return scheduler_;
     }
 
-    inline const Config*
+    [[nodiscard]] inline const Config*
     global_config() const {
         return global_config_;
     }
