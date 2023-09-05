@@ -459,7 +459,7 @@ Txn::BeginTxn(TxnTimeStamp begin_ts) {
 
 void
 Txn::CommitTxn() {
-    this->CommitTxn(infinity::TxnManager::GetTimestamp());
+    CommitTxn(TxnManager::GetTimestamp());
 }
 
 void
@@ -495,6 +495,13 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
     // TODO: Flush the whole catalog.
 
     // Reset the LSN of WAL
+
+    LOG_TRACE("Txn: {} is committed.", txn_id_);
+}
+
+void
+Txn::RollbackTxn() {
+    RollbackTxn(TxnManager::GetTimestamp());
 }
 
 void
@@ -522,6 +529,8 @@ Txn::RollbackTxn(TxnTimeStamp abort_ts) {
     {
         txn_context_.SetTxnRollbacked();
     }
+
+    LOG_TRACE("Txn: {} is dropped.", txn_id_);
 }
 
 }

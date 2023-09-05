@@ -47,6 +47,9 @@ public:
     CommitTxn(TxnTimeStamp commit_ts);
 
     void
+    RollbackTxn();
+
+    void
     RollbackTxn(TxnTimeStamp abort_ts);
 
     EntryResult
@@ -136,6 +139,11 @@ public:
     inline TxnTimeStamp
     CommitTS() {
         return txn_context_.GetCommitTS();
+    }
+
+    inline TxnTimeStamp
+    BeginTS() {
+        return txn_context_.GetBeginTS();
     }
 
     inline TxnState

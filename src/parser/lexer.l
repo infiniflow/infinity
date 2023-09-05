@@ -91,6 +91,7 @@ INDEX           { return INDEX; }
 INNER           { return INNER; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }
+INT             { return INT; }
 INTERSECT       { return INTERSECT; }
 INTERVAL        { return INTERVAL; }
 INTO            { return INTO; }

@@ -85,12 +85,9 @@ QueryContext::Query(const String &query) {
     PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
     for (BaseStatement* statement : *parsed_result->statements_ptr_) {
         QueryResult query_result;
-        {
+        try {
             this->CreateTxn();
             this->BeginTxn();
-            DeferFn defer_fn([&]() {
-                this->CommitTxn();
-            });
 
             // Build unoptimized logical plan for each SQL statement.
             logical_planner.Build(statement);
@@ -114,8 +111,14 @@ QueryContext::Query(const String &query) {
             Infinity::instance().scheduler()->Schedule(this, pipeline);
             query_result.result_ = pipeline->GetResult();
             query_result.root_operator_type_ = unoptimized_plan->operator_type();
-        }
 
+            this->CommitTxn();
+        } catch (const Exception& e) {
+            this->RollbackTxn();
+            throw Exception(e.what());
+        } catch (std::exception& e) {
+            throw e;
+        }
         return query_result;
     }
 
@@ -137,6 +140,12 @@ QueryContext::BeginTxn() {
 void
 QueryContext::CommitTxn() {
     session_ptr_->txn_->CommitTxn();
+    session_ptr_->txn_ = nullptr;
+}
+
+void
+QueryContext::RollbackTxn() {
+    session_ptr_->txn_->RollbackTxn();
     session_ptr_->txn_ = nullptr;
 }
 

@@ -96,7 +96,9 @@ TEST_F(SQLParserTest, good_test2) {
                            "                 ac embedding(bit, 256), "
                            "                 ad vector(float, 512), "
                            "                 primary key (a, b), "
-                           "                 unique (c, d)); ";
+                           "                 unique (c, d), "
+                           "                 ae int not null, "
+                           "                 af embedding(int, 32)); ";
 
 
         parser->Parse(input_sql, result);
@@ -111,7 +113,7 @@ TEST_F(SQLParserTest, good_test2) {
             auto* create_table_info = (CreateTableInfo*)(create_statement->create_info_.get());
             EXPECT_EQ(create_table_info->schema_name_, String("default"));
             EXPECT_EQ(create_table_info->table_name_, String("t1"));
-            EXPECT_EQ(create_table_info->column_defs_.size(), 30);
+            EXPECT_EQ(create_table_info->column_defs_.size(), 32);
 
             {
                 auto& column_def = create_table_info->column_defs_[0];
@@ -395,6 +397,24 @@ TEST_F(SQLParserTest, good_test2) {
                 const String &column4 = (*(create_table_info->constraints_[1]->names_ptr_))[1];
                 EXPECT_EQ(column3, "c");
                 EXPECT_EQ(column4, "d");
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[30];
+                EXPECT_EQ(column_def->name_, "ae");
+                DataType column_type(LogicalType::kInteger, nullptr);
+                EXPECT_EQ(*column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_.size(), 1);
+                EXPECT_EQ(column_def->constraints_.contains(ConstraintType::kNotNull), true);
+            }
+
+            {
+                auto& column_def = create_table_info->column_defs_[31];
+                EXPECT_EQ(column_def->name_, "af");
+                SharedPtr<TypeInfo> type_info = EmbeddingInfo::Make(kElemInt32, 32);
+                DataType column_type(LogicalType::kEmbedding, type_info);
+                EXPECT_EQ(*column_def->column_type_, column_type);
+                EXPECT_EQ(column_def->constraints_.size(), 0);
             }
         }
 
