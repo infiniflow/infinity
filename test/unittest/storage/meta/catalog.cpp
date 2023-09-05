@@ -131,7 +131,7 @@ TEST_F(CatalogTest, simple_test2) {
     // create db in empty catalog should be success
     {
         EntryResult res;
-        res = txn1->CreateDatabase("db1");
+        res = txn1->CreateDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(res.Success());
         // store this entry
         databases["db1"] = res.entry_;
@@ -159,7 +159,7 @@ TEST_F(CatalogTest, simple_test2) {
         EXPECT_TRUE(res.Success());
         EXPECT_EQ(res.entry_, databases["db1"]);
 
-        res = txn3->DropDatabase("db1");
+        res = txn3->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(res.Success());
         // should be different db entry
         EXPECT_NE(res.entry_, databases["db1"]);
@@ -201,7 +201,7 @@ TEST_F(CatalogTest, concurrent_test) {
         EntryResult res;
         for(int i = start; i < 1000; i += 2) {
             String db_name = "db" + std::to_string(i);
-            res = txn1->CreateDatabase(db_name);
+            res = txn1->CreateDatabase(db_name, ConflictType::kError);
             EXPECT_TRUE(res.Success());
             // store this entry
             lock.lock();
@@ -254,7 +254,7 @@ TEST_F(CatalogTest, concurrent_test) {
         EntryResult res;
         for(int i = start; i < 1000; i += 2) {
             String db_name = "db" + std::to_string(i);
-            res = txn->DropDatabase(db_name);
+            res = txn->DropDatabase(db_name, ConflictType::kError);
             EXPECT_TRUE(res.Success());
             // store this entry
             lock.lock();
