@@ -7,17 +7,19 @@
 namespace infinity {
 
 EntryResult
-DBEntry::CreateTable(DBEntry* db_entry,
-                     const SharedPtr<TableDef>& table_def,
-                     u64 txn_id,
-                     TxnTimeStamp begin_ts,
-                     TxnManager* txn_mgr) {
-    const String& table_name = *table_def->table_name();
+DBEntry::CreateTableCollection(DBEntry* db_entry,
+                               TableCollectionType table_collection_type,
+                               const SharedPtr<String>& table_collection_name,
+                               const Vector<SharedPtr<ColumnDef>>& columns,
+                               u64 txn_id,
+                               TxnTimeStamp begin_ts,
+                               TxnManager* txn_mgr) {
+    const String& table_name = *table_collection_name;
 
     // Check if there is table_meta with the table_name
     db_entry->rw_locker_.lock_shared();
 
-    TableMeta* table_meta{nullptr};
+    TableCollectionMeta* table_meta{nullptr};
     if(db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
         table_meta = db_entry->tables_[table_name].get();
     }
@@ -26,9 +28,11 @@ DBEntry::CreateTable(DBEntry* db_entry,
     // no table_meta
     if(table_meta == nullptr) {
         // Create new db meta
-        LOG_TRACE("Create new table: {}", table_name);
+        LOG_TRACE("Create new table/collection: {}", table_name);
         SharedPtr<String> db_entry_dir = MakeShared<String>((*db_entry->base_dir_) + "/txn_" + std::to_string(txn_id));
-        UniquePtr<TableMeta> new_table_meta = MakeUnique<TableMeta>(db_entry_dir, table_def->table_name(), db_entry);
+        UniquePtr<TableCollectionMeta> new_table_meta = MakeUnique<TableCollectionMeta>(db_entry_dir,
+                                                                                        table_collection_name,
+                                                                                        db_entry);
         table_meta = new_table_meta.get();
 
         db_entry->rw_locker_.lock();
@@ -36,85 +40,111 @@ DBEntry::CreateTable(DBEntry* db_entry,
         db_entry->rw_locker_.unlock();
 
         LOG_TRACE("Add new database entry for: {} in new table meta: {} ", table_name, *db_entry->base_dir_);
-        EntryResult res = TableMeta::CreateNewEntry(table_meta,
-                                                    txn_id,
-                                                    begin_ts,
-                                                    txn_mgr,
-                                                    table_def);
+
+        EntryResult res = TableCollectionMeta::CreateNewEntry(table_meta,
+                                                              table_collection_type,
+                                                              table_collection_name,
+                                                              columns,
+                                                              txn_id,
+                                                              begin_ts,
+                                                              txn_mgr);
         return res;
     } else {
         LOG_TRACE("Add new database entry for: {} in existed table meta: {}", table_name, *db_entry->base_dir_);
-        EntryResult res = TableMeta::CreateNewEntry(table_meta,
-                                                    txn_id,
-                                                    begin_ts,
-                                                    txn_mgr,
-                                                    table_def);
+        EntryResult res = TableCollectionMeta::CreateNewEntry(table_meta,
+                                                              table_collection_type,
+                                                              table_collection_name,
+                                                              columns,
+                                                              txn_id,
+                                                              begin_ts,
+                                                              txn_mgr);
         return res;
     }
 }
 
 EntryResult
-DBEntry::DropTable(DBEntry* db_entry,
-                   const String& table_name,
-                   u64 txn_id,
-                   TxnTimeStamp begin_ts,
-                   TxnManager* txn_mgr) {
+DBEntry::DropTableCollection(DBEntry* db_entry,
+                             const String& table_collection_name,
+                             u64 txn_id,
+                             TxnTimeStamp begin_ts,
+                             TxnManager* txn_mgr) {
     db_entry->rw_locker_.lock_shared();
 
-    TableMeta* table_meta{nullptr};
-    if(db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
-        table_meta = db_entry->tables_[table_name].get();
+    TableCollectionMeta* table_meta{nullptr};
+    if(db_entry->tables_.find(table_collection_name) != db_entry->tables_.end()) {
+        table_meta = db_entry->tables_[table_collection_name].get();
     }
     db_entry->rw_locker_.unlock_shared();
     if(table_meta == nullptr) {
-        LOG_TRACE("Attempt to drop not existed table entry {}", table_name);
-        return {nullptr, MakeUnique<String>("Attempt to drop not existed table entry")};
+        LOG_TRACE("Attempt to drop not existed table/collection entry {}", table_collection_name);
+        return {nullptr, MakeUnique<String>("Attempt to drop not existed table/collection entry")};
     }
 
-    LOG_TRACE("Drop a table entry {}", table_name);
-    EntryResult res = TableMeta::DropNewEntry(table_meta,
-                                              txn_id,
-                                              begin_ts,
-                                              txn_mgr,
-                                              table_name);
+    LOG_TRACE("Drop a table/collection entry {}", table_collection_name);
+    EntryResult res = TableCollectionMeta::DropNewEntry(table_meta,
+                                                        txn_id,
+                                                        begin_ts,
+                                                        txn_mgr,
+                                                        table_collection_name);
 
     return res;
 }
 
 
 EntryResult
-DBEntry::GetTable(DBEntry* db_entry,
-                  const String& table_name,
-                  u64 txn_id,
-                  TxnTimeStamp begin_ts) {
+DBEntry::GetTableCollection(DBEntry* db_entry,
+                            const String& table_name,
+                            u64 txn_id,
+                            TxnTimeStamp begin_ts) {
     db_entry->rw_locker_.lock_shared();
 
-    TableMeta* table_meta{nullptr};
+    TableCollectionMeta* table_meta{nullptr};
     if(db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
         table_meta = db_entry->tables_[table_name].get();
     }
     db_entry->rw_locker_.unlock_shared();
 
-    LOG_TRACE("Get a table entry {}", table_name);
-    return TableMeta::GetEntry(table_meta, txn_id, begin_ts);
+//    LOG_TRACE("Get a table entry {}", table_name);
+    return TableCollectionMeta::GetEntry(table_meta, txn_id, begin_ts);
 }
 
 
 void
-DBEntry::RemoveTableEntry(DBEntry* db_entry,
-                          const String& table_name,
-                          u64 txn_id,
-                          TxnManager* txn_mgr) {
+DBEntry::RemoveTableCollectionEntry(DBEntry* db_entry,
+                                    const String& table_collection_name,
+                                    u64 txn_id,
+                                    TxnManager* txn_mgr) {
     db_entry->rw_locker_.lock_shared();
 
-    TableMeta* table_meta{nullptr};
-    if(db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
-        table_meta = db_entry->tables_[table_name].get();
+    TableCollectionMeta* table_meta{nullptr};
+    if(db_entry->tables_.find(table_collection_name) != db_entry->tables_.end()) {
+        table_meta = db_entry->tables_[table_collection_name].get();
     }
     db_entry->rw_locker_.unlock_shared();
 
-    LOG_TRACE("Remove a table entry: {}", table_name);
-    TableMeta::DeleteNewEntry(table_meta, txn_id, txn_mgr);
+    LOG_TRACE("Remove a table/collection entry: {}", table_collection_name);
+    TableCollectionMeta::DeleteNewEntry(table_meta, txn_id, txn_mgr);
+}
+
+Vector<TableCollectionEntry*>
+DBEntry::TableCollections(DBEntry* db_entry,
+                          u64 txn_id,
+                          TxnTimeStamp begin_ts) {
+    Vector<TableCollectionEntry*> results;
+
+    db_entry->rw_locker_.lock_shared();
+
+    results.reserve(db_entry->tables_.size());
+    for(auto& table_collection_meta_pair: db_entry->tables_) {
+        TableCollectionMeta* table_collection_meta = table_collection_meta_pair.second.get();
+        EntryResult entry_result = TableCollectionMeta::GetEntry(table_collection_meta, txn_id, begin_ts);
+        if(entry_result.err_ != nullptr) {
+            CatalogError(*entry_result.err_)
+        }
+        results.emplace_back((TableCollectionEntry*)entry_result.entry_);
+    }
+
+    return results;
 }
 
 SharedPtr<String>
@@ -139,7 +169,7 @@ DBEntry::Serialize(const DBEntry* db_entry) {
     json_res["deleted"] = db_entry->deleted_;
     json_res["entry_type"] = db_entry->entry_type_;
     for(const auto& table_meta_pair: db_entry->tables_) {
-        json_res["tables"].emplace_back(TableMeta::Serialize(table_meta_pair.second.get()));
+        json_res["tables"].emplace_back(TableCollectionMeta::Serialize(table_meta_pair.second.get()));
     }
     return json_res;
 }
@@ -164,8 +194,8 @@ DBEntry::Deserialize(const nlohmann::json& db_entry_json,
 
     if(db_entry_json.contains("tables")) {
         for(const auto& table_meta_json: db_entry_json["tables"]) {
-            UniquePtr<TableMeta> table_meta = TableMeta::Deserialize(table_meta_json, res.get(), buffer_mgr);
-            res->tables_.emplace(*table_meta->table_name_, std::move(table_meta));
+            UniquePtr<TableCollectionMeta> table_meta = TableCollectionMeta::Deserialize(table_meta_json, res.get(), buffer_mgr);
+            res->tables_.emplace(*table_meta->table_collection_name_, std::move(table_meta));
         }
     }
 

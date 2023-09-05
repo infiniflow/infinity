@@ -6,8 +6,7 @@
 
 #include "common/types/internal_types.h"
 #include "storage/meta/entry/db_entry.h"
-#include "storage/meta/catalog.h"
-#include "storage/meta/entry/table_entry.h"
+#include "storage/meta/entry/table_collection_entry.h"
 #include "txn_store.h"
 #include "storage/table/meta_state.h"
 #include "txn_context.h"
@@ -16,6 +15,7 @@ namespace infinity {
 
 class TxnManager;
 class BufferManager;
+class NewCatalog;
 
 struct GetParam {
     const String& db_name_{};
@@ -50,22 +50,44 @@ public:
     RollbackTxn(TxnTimeStamp abort_ts);
 
     EntryResult
-    CreateDatabase(const String& db_name);
+    CreateDatabase(const String& db_name, ConflictType conflict_type);
 
     EntryResult
-    DropDatabase(const String& db_name);
+    DropDatabase(const String& db_name, ConflictType conflict_type);
 
     EntryResult
     GetDatabase(const String& db_name);
 
-    EntryResult
-    CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def);
+    Vector<TableCollectionEntry*>
+    GetTableCollections(const String& db_name);
 
     EntryResult
-    DropTableByName(const String& db_name, const String& table_name);
+    CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def, ConflictType conflict_type);
 
     EntryResult
     GetTableByName(const String& db_name, const String& table_name);
+
+    EntryResult
+    CreateCollection(const String& db_name, const String& collection_name, ConflictType conflict_type);
+
+    EntryResult
+    DropTableCollectionByName(const String& db_name, const String& table_name, ConflictType conflict_type);
+
+    EntryResult
+    GetCollectionByName(const String& db_name, const String& table_name);
+
+    // Fixme: view definition should be given
+    EntryResult
+    CreateView(const String& db_name, const String& view_name, ConflictType conflict_type);
+
+    EntryResult
+    DropViewByName(const String& db_name, const String& view_name, ConflictType conflict_type);
+
+    EntryResult
+    GetViewByName(const String& db_name, const String& view_name);
+
+    Vector<BaseEntry*>
+    GetViews(const String& db_name);
 
     UniquePtr<String>
     Append(const String& db_name, const String& table_name, const SharedPtr<DataBlock>& input_block);
@@ -123,7 +145,7 @@ public:
 
 private:
     UniquePtr<String>
-    GetTableEntry(const String& db_name, const String& table_name, TableEntry*& table_entry);
+    GetTableEntry(const String& db_name, const String& table_name, TableCollectionEntry*& table_entry);
 
 private:
     NewCatalog* catalog_{};
@@ -136,7 +158,7 @@ private:
 
     // Txn store
     Set<DBEntry*> txn_dbs_{};
-    Set<TableEntry*> txn_tables_{};
+    Set<TableCollectionEntry*> txn_tables_{};
 
     // Only one db can be handled in one transaction.
     HashMap<String, BaseEntry*> txn_table_entries_{};

@@ -10,7 +10,7 @@
 namespace infinity {
 
 LogicalTableScan::LogicalTableScan(u64 node_id,
-                                   SharedPtr<Table> table_ptr,
+                                   TableCollectionEntry* table_ptr,
                                    SharedPtr<TableScanFunction> table_scan_func,
                                    String table_alias,
                                    u64 table_index,
@@ -18,7 +18,7 @@ LogicalTableScan::LogicalTableScan(u64 node_id,
                                    SharedPtr<Vector<String>> column_names,
                                    SharedPtr<Vector<SharedPtr<DataType>>> column_types)
     : LogicalNode(node_id, LogicalNodeType::kTableScan),
-    table_ptr_(std::move(table_ptr)),
+    table_collection_ptr_(std::move(table_ptr)),
     table_scan_func_ptr_(std::move(table_scan_func)),
     table_alias_(std::move(table_alias)),
     table_index_(table_index),
@@ -55,8 +55,8 @@ LogicalTableScan::ToString(i64& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "TableScan: " << table_ptr_->TableName() << ", on: ";
-    size_t column_count = table_ptr_->ColumnCount();
+    ss << String(space, ' ') << arrow_str << "TableScan: " << table_collection_ptr_->table_collection_name_ << ", on: ";
+    size_t column_count = table_collection_ptr_->columns_.size();
     for(size_t i = 0; i < column_count - 1; ++ i) {
         ss << column_names_->at(i) << " ";
     }

@@ -168,13 +168,13 @@ BindContext::AddViewBinding(const String& name,
 void
 BindContext::AddTableBinding(const String& table_alias,
                              u64 table_index,
-                             SharedPtr<Table> table_ptr,
+                             TableCollectionEntry* table_collection_entry_ptr,
                              SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                              SharedPtr<Vector<String>> column_names) {
     auto binding = Binding::MakeBinding(BindingType::kTable,
                                         table_alias,
                                         table_index,
-                                        std::move(table_ptr),
+                                        table_collection_entry_ptr,
                                         std::move(column_types),
                                         std::move(column_names));
     AddBinding(binding);

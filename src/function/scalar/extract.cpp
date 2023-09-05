@@ -52,7 +52,7 @@ ExtractDayFunction::Run(DateT left, BigIntT &result) {
 }
 
 void
-RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     {
         String func_name = "extract_year";
         SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -62,7 +62,7 @@ RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
                 DataType(kBigInt),
                 &ScalarFunction::UnaryFunction<DateT, BigIntT, ExtractYearFunction>);
         function_set_ptr->AddFunction(extract_year_from_date);
-        catalog_ptr->AddFunctionSet(function_set_ptr);
+        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -74,7 +74,7 @@ RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
                 DataType(kBigInt),
                 &ScalarFunction::UnaryFunction<DateT, BigIntT, ExtractMonthFunction>);
         function_set_ptr->AddFunction(extract_month_from_date);
-        catalog_ptr->AddFunctionSet(function_set_ptr);
+        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -86,7 +86,7 @@ RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
                 DataType(kBigInt),
                 &ScalarFunction::UnaryFunction<DateT, BigIntT, ExtractDayFunction>);
         function_set_ptr->AddFunction(extract_day_from_date);
-        catalog_ptr->AddFunctionSet(function_set_ptr);
+        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 }
 

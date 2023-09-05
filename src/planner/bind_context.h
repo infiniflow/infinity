@@ -197,7 +197,7 @@ public:
     void
     AddTableBinding(const String& name,
                     u64 table_index,
-                    SharedPtr<Table> table_ptr,
+                    TableCollectionEntry* table_collection_entry_ptr,
                     SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                     SharedPtr<Vector<String>> column_names);
 

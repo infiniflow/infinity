@@ -13,14 +13,15 @@ namespace infinity {
 
 class PhysicalTableScan : public PhysicalOperator {
 public:
-    explicit PhysicalTableScan(uint64_t id,
-                               String table_alias,
-                               u64 table_index,
-                               SharedPtr<Vector<String>> column_names,
-                               SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                               SharedPtr<TableScanFunction> table_scan_function_ptr,
-                               SharedPtr<TableScanFunctionData> table_scan_function_data_ptr)
-        : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr,id),
+    explicit
+    PhysicalTableScan(u64 id,
+                      String table_alias,
+                      u64 table_index,
+                      SharedPtr<Vector<String>> column_names,
+                      SharedPtr<Vector<SharedPtr<DataType>>> column_types,
+                      SharedPtr<TableScanFunction> table_scan_function_ptr,
+                      SharedPtr<TableScanFunctionData> table_scan_function_data_ptr)
+        : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id),
           table_alias_(std::move(table_alias)),
           table_index_(table_index),
           column_names_(std::move(column_names)),

@@ -15,7 +15,7 @@ LogicalInsert::ToString(i64& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Insert Table: " << table_ptr_->TableName();
+    ss << String(space, ' ') << arrow_str << "Insert Table: " << *table_collection_entry_->table_collection_name_;
     space += arrow_str.size();
 
     return ss.str();

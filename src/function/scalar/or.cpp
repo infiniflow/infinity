@@ -2,7 +2,7 @@
 // Created by JinHai on 2022/9/28.
 //
 
-#include "less.h"
+#include "or.h"
 #include "function/scalar_function.h"
 #include "function/scalar_function_set.h"
 
@@ -28,14 +28,14 @@ GenerateOrFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr) {
 }
 
 void
-RegisterOrFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterOrFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "OR";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateOrFunction(function_set_ptr);
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

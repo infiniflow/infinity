@@ -45,14 +45,14 @@ TEST_F(DBTxnTest, test1) {
     EntryResult create_res;
 
     // Txn1: Create db1 before txn start, NOT OK
-    create_res = new_txn->CreateDatabase("db1");
+    create_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create_res.entry_, nullptr);
 
     // Txn1: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create_res = new_txn->CreateDatabase("db1");
+    create_res = new_txn->CreateDatabase("db1", ConflictType::kError);
 
     // Txn1: Get db1, OK
     EntryResult same_create_res = new_txn->GetDatabase("db1");
@@ -74,7 +74,7 @@ TEST_F(DBTxnTest, test1) {
     EXPECT_EQ(create_res.entry_, same_create_res.entry_);
 
     // Txn2: Drop db1, OK
-    EntryResult drop_db_res = new_txn->DropDatabase("db1");
+    EntryResult drop_db_res = new_txn->DropDatabase("db1", ConflictType::kError);;
     EXPECT_NE(drop_db_res.entry_, nullptr);
     EXPECT_EQ(drop_db_res.err_, nullptr);
 
@@ -94,7 +94,7 @@ TEST_F(DBTxnTest, test1) {
     EXPECT_EQ(same_create_res.entry_, nullptr);
 
     // Txn3: Drop db1, NOT OK
-    drop_db_res = new_txn->DropDatabase("db1");
+    drop_db_res = new_txn->DropDatabase("db1", ConflictType::kError);;
     EXPECT_EQ(drop_db_res.entry_, nullptr);
 
     // Txn3: Commit, OK
@@ -121,7 +121,7 @@ TEST_F(DBTxnTest, test20) {
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn->CreateDatabase("db1");
+    create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Commit, OK
@@ -138,11 +138,11 @@ TEST_F(DBTxnTest, test20) {
     EXPECT_NE(get_res.entry_, nullptr);
 
     // Txn2: Drop db1, OK
-    create1_res = new_txn->DropDatabase("db1");
+    create1_res = new_txn->DropDatabase("db1", ConflictType::kError);;
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn2: Create db1, OK
-    create1_res = new_txn->CreateDatabase("db1");
+    create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn2: Get db1, OK
@@ -163,7 +163,7 @@ TEST_F(DBTxnTest, test20) {
     EXPECT_NE(get_res.entry_, nullptr);
 
     // Txn3: Create db1, NOT OK
-    create3_res = new_txn->CreateDatabase("db1");
+    create3_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create3_res.entry_, nullptr);
 
     // Txn3: Commit, OK
@@ -190,16 +190,16 @@ TEST_F(DBTxnTest, test2) {
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn->CreateDatabase("db1");
+    create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Create db1, duplicated，NOT OK
-    create2_res = new_txn->CreateDatabase("db1");
+    create2_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn1: Drop db1, OK
-    dropped_res = new_txn->DropDatabase("db1");
+    dropped_res = new_txn->DropDatabase("db1", ConflictType::kError);;
     EXPECT_EQ(create1_res.entry_, dropped_res.entry_);
 
     // Txn1: Get db1, NOT OK
@@ -220,7 +220,7 @@ TEST_F(DBTxnTest, test2) {
     EXPECT_EQ(get_res.entry_, nullptr);
 
     // Txn2: Create db1, OK
-    create1_res = new_txn->CreateDatabase("db1");
+    create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
@@ -242,7 +242,7 @@ TEST_F(DBTxnTest, test2) {
     EXPECT_NE(get_res.entry_, nullptr);
 
     // Txn3: Create db1, NOT OK
-    create3_res = new_txn->CreateDatabase("db1");
+    create3_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create3_res.entry_, nullptr);
 
     // Txn3: Commit, OK
@@ -278,12 +278,12 @@ TEST_F(DBTxnTest, test3) {
     new_txn2->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn2: Create db1, NOT OK, WW-conflict
-    create2_res = new_txn2->CreateDatabase("db1");
+    create2_res = new_txn2->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn1: Commit, OK
@@ -319,7 +319,7 @@ TEST_F(DBTxnTest, test4) {
     new_txn1->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
@@ -327,7 +327,7 @@ TEST_F(DBTxnTest, test4) {
     new_txn1->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create db1, NOT OK
-    create2_res = new_txn2->CreateDatabase("db1");
+    create2_res = new_txn2->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn2: Commit, OK
@@ -353,7 +353,7 @@ TEST_F(DBTxnTest, test5) {
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create_res = new_txn->CreateDatabase("db1");
+    create_res = new_txn->CreateDatabase("db1", ConflictType::kError);
 
     // Txn1: Rollback, OK
     new_txn->RollbackTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -401,19 +401,19 @@ TEST_F(DBTxnTest, test6) {
     new_txn2->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn2: Create db1, NOT OK, WW-conflict
-    create2_res = new_txn2->CreateDatabase("db1");
+    create2_res = new_txn2->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn1: Commit, OK
     new_txn1->RollbackTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create db1, NOT OK, WW-conflict
-    create2_res = new_txn2->CreateDatabase("db1");
+    create2_res = new_txn2->CreateDatabase("db1", ConflictType::kError);
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn2: Commit, OK
@@ -462,20 +462,20 @@ TEST_F(DBTxnTest, test7) {
     new_txn2->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn2: Create db1, NOT OK, WW-conflict
-    create2_res = new_txn2->CreateDatabase("db1");
+    create2_res = new_txn2->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn1: Drop db1, OK
-    dropped1_res = new_txn1->DropDatabase("db1");
+    dropped1_res = new_txn1->DropDatabase("db1", ConflictType::kError);;
     EXPECT_NE(dropped1_res.entry_, nullptr);
 
     // Txn2: Create db1, OK
-    create2_res = new_txn2->CreateDatabase("db1");
+    create2_res = new_txn2->CreateDatabase("db1", ConflictType::kError);
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn1: Commit, OK

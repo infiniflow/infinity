@@ -51,10 +51,11 @@ PhysicalInsert::Execute(QueryContext* query_context) {
 void
 PhysicalInsert::Execute(QueryContext* query_context) {
     SizeT column_count = value_list_.size();
-    if(column_count != table_ptr_->ColumnCount()) {
+    SizeT table_collection_column_count = table_collection_entry_->columns_.size();
+    if(column_count != table_collection_column_count) {
         ExecutorError(fmt::format("Insert values count{} isn't matched with table column count{}.",
                                   column_count,
-                                  table_ptr_->ColumnCount()));
+                                  table_collection_column_count));
     }
 
     // Prepare the expression states
@@ -91,6 +92,8 @@ PhysicalInsert::Execute(QueryContext* query_context) {
 
     output_block->Finalize();
 
+    // FIXME: to implemented
+#if 0
     SizeT block_count = table_ptr_->DataBlockCount();
     if(block_count == 0) {
         table_ptr_->Append(output_block);
@@ -105,6 +108,7 @@ PhysicalInsert::Execute(QueryContext* query_context) {
             table_ptr_->Append(output_block);
         }
     }
+#endif
 
     // Generate the result table
     Vector<SharedPtr<ColumnDef>> column_defs;

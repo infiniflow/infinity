@@ -6,6 +6,7 @@
 #include "main/query_context.h"
 #include "main/logger.h"
 #include "main/infinity.h"
+#include "main/session.h"
 #include "common/utility/infinity_assert.h"
 
 #include <iostream>
@@ -62,8 +63,11 @@ Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
     UniquePtr<QueryContext> query_context_ptr
-        = MakeUnique<QueryContext>(session_.get(), Infinity::instance().config().get());
-    query_context_ptr->set_current_schema(session_->current_schema());
+        = MakeUnique<QueryContext>(session_.get(),
+                                   Infinity::instance().config(),
+                                   Infinity::instance().scheduler(),
+                                   Infinity::instance().storage());
+    query_context_ptr->set_current_schema(session_->current_database());
 
     switch (cmd_type) {
         case PGMessageType::kBindCommand: {

@@ -14,6 +14,8 @@ namespace infinity {
 
 class Txn;
 class TxnManager;
+class FunctionSet;
+class TableFunction;
 struct NewCatalog {
 public:
     explicit
@@ -48,8 +50,61 @@ public:
                   TxnManager* txn_mgr);
 
     static Vector<DBEntry*>
-    Databases(NewCatalog* catalog, Txn* txn);
+    Databases(NewCatalog* catalog, u64 txn_id, TxnTimeStamp begin_ts);
 
+#if 0
+
+    void
+    CreateTable(String schema_name, const SharedPtr<Table>& table_def, ConflictType conflict_type);
+
+    void
+    DeleteTable(String schema_name, String table_name, ConflictType conflict_type);
+
+    void
+    CreateCollection(String schema_name, String collection_name, ConflictType conflict_type);
+
+    void
+    DeleteCollection(String schema_name, String collection_name, ConflictType conflict_type);
+
+    Vector<SharedPtr<BaseTable>>
+    GetTables(String schema_name);
+
+    // View related methods
+    SharedPtr<View>
+    GetViewByName(String schema_name, String view_name);
+
+    SharedPtr<View>
+    GetViewByNameNoExcept(String schema_name, String view_name) noexcept;
+
+    void
+    CreateView(String schema_name, const SharedPtr<View>& view, ConflictType conflict_type);
+
+    void
+    DeleteView(String schema_name, String view_name, ConflictType conflict_type);
+
+    Vector<SharedPtr<View>>
+    GetViews(String schema_name);
+#endif
+
+    // Function related methods
+    static SharedPtr<FunctionSet>
+    GetFunctionSetByName(NewCatalog* catalog, String function_name);
+
+    static void
+    AddFunctionSet(NewCatalog* catalog, const SharedPtr<FunctionSet>& function_set);
+
+    static void
+    DeleteFunctionSet(NewCatalog* catalog, String function_name);
+
+    // Table Function related methods
+    static SharedPtr<TableFunction>
+    GetTableFunctionByName(NewCatalog* catalog, String function_name);
+
+    static void
+    AddTableFunction(NewCatalog* catalog, const SharedPtr<TableFunction>& table_function);
+
+    static void
+    DeleteTableFunction(NewCatalog* catalog, String function_name);
 
     static nlohmann::json
     Serialize(const NewCatalog* catalog);
@@ -71,6 +126,10 @@ public:
     u64 next_txn_id_{};
     u64 catalog_version_{};
     RWMutex rw_locker_;
+
+    // Currently, these function or function set can't be changed and also will not be persistent.
+    HashMap<String, SharedPtr<FunctionSet>> function_sets_;
+    HashMap<String, SharedPtr<TableFunction>> table_functions_;
 };
 
 }

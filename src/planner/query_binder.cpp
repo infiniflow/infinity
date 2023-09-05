@@ -3,7 +3,6 @@
 //
 
 #include "query_binder.h"
-#include "main/infinity.h"
 #include "planner/bound/base_table_ref.h"
 #include "planner/bound/subquery_table_ref.h"
 #include "planner/bound/cross_product_table_ref.h"
@@ -347,31 +346,34 @@ QueryBinder::BuildBaseTable(QueryContext* query_context,
     } else {
         schema_name = from_table->schema_name_;
     }
-    auto base_table_ptr = Infinity::instance().catalog()->GetTableByNameNoExcept(schema_name, from_table->table_name_);
-    if(base_table_ptr == nullptr) {
-        // Not found in catalog
-        return nullptr;
+    EntryResult result = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_);
+    if(result.err_ != nullptr) {
+        PlannerError(*result.err_);
     }
-    PlannerAssert(base_table_ptr->kind() == BaseTableType::kTable, "Currently, collection isn't supported.");
-    SharedPtr<Table> table_ptr = std::static_pointer_cast<Table>(base_table_ptr);
+    TableCollectionEntry* table_entry = static_cast<TableCollectionEntry*>(result.entry_);
+    if(table_entry->table_collection_type_ == TableCollectionType::kCollectionEntry) {
+        PlannerError("Currently, collection isn't supported.");
+    }
+
 
     String alias = from_table->GetTableName();
     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
     SharedPtr<Vector<String>> names_ptr = MakeShared<Vector<String>>();
     Vector<SizeT> columns;
 
-    SizeT column_count = table_ptr->ColumnCount();
+    SizeT column_count = table_entry->columns_.size();
     types_ptr->reserve(column_count);
     names_ptr->reserve(column_count);
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        types_ptr->emplace_back(table_ptr->GetColumnTypeById(idx));
-        names_ptr->emplace_back(table_ptr->GetColumnNameById(idx));
+        const ColumnDef* column_def = table_entry->columns_[idx].get();
+        types_ptr->emplace_back(column_def->column_type_);
+        names_ptr->emplace_back(column_def->name_);
         columns.emplace_back(idx);
     }
 
-    SharedPtr<TableScanFunction> scan_function = TableScanFunction::Make("seq_scan");
-    SharedPtr<TableScanFunctionData> function_data = MakeShared<TableScanFunctionData>(table_ptr, columns);
+    SharedPtr<TableScanFunction> scan_function = TableScanFunction::Make(query_context->storage()->catalog(), "seq_scan");
+    SharedPtr<TableScanFunctionData> function_data = MakeShared<TableScanFunctionData>(table_entry, columns);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(scan_function,
@@ -382,7 +384,7 @@ QueryBinder::BuildBaseTable(QueryContext* query_context,
                                               types_ptr);
 
     // Insert the table in the binding context
-    this->bind_context_ptr_->AddTableBinding(alias, table_index, table_ptr, types_ptr, names_ptr);
+    this->bind_context_ptr_->AddTableBinding(alias, table_index, table_entry, types_ptr, names_ptr);
 
     return table_ref;
 }
@@ -390,19 +392,20 @@ QueryBinder::BuildBaseTable(QueryContext* query_context,
 SharedPtr<TableRef>
 QueryBinder::BuildView(QueryContext* query_context,
                        const TableReference* from_table) {
-    SharedPtr<View> view_ptr = Infinity::instance().catalog()->GetViewByNameNoExcept(from_table->schema_name_,
-                                                                                     from_table->table_name_);
-    if(view_ptr == nullptr) {
-        // Not found in catalog
-        return nullptr;
+
+    EntryResult result = query_context->GetTxn()->GetViewByName(from_table->schema_name_, from_table->table_name_);
+    if(result.err_ != nullptr) {
+        PlannerError(*result.err_);
     }
+
+    ViewEntry* view_entry = static_cast<ViewEntry*>(result.entry_);
 
     // Build view scan operator
     PlannerAssert(!(this->bind_context_ptr_->IsViewBound(from_table->table_name_)),
                   "View: " + from_table->table_name_ + " is bound before!");
     this->bind_context_ptr_->BoundView(from_table->table_name_);
 
-    const SelectStatement* select_stmt_ptr = view_ptr->GetSQLStatement();
+    const SelectStatement* select_stmt_ptr = view_entry->GetSQLStatement();
 
     // Create new bind context and add into context array;
     SharedPtr<BindContext> view_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
@@ -417,8 +420,8 @@ QueryBinder::BuildView(QueryContext* query_context,
     // Add binding into bind context
     this->bind_context_ptr_->AddViewBinding(from_table->table_name_,
                                             view_index,
-                                            view_ptr->column_types(),
-                                            view_ptr->column_names());
+                                            view_entry->column_types(),
+                                            view_entry->column_names());
 
     // Use view name as the subquery table reference name
     auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr,
@@ -680,14 +683,14 @@ QueryBinder::GenerateColumns(const SharedPtr<Binding>& binding,
             break;
         }
         case BindingType::kTable: {
-            SizeT column_count = binding->table_ptr_->ColumnCount();
+            SizeT column_count = binding->table_collection_entry_ptr_->columns_.size();
 
             // Reserve more data in select list
             output_select_list.reserve(output_select_list.size() + column_count);
 
             // Build select list
             for(SizeT idx = 0; idx < column_count; ++ idx) {
-                String column_name = binding->table_ptr_->GetColumnNameById(idx);
+                String column_name = binding->table_collection_entry_ptr_->columns_[idx]->name_;
                 auto* column_expr = new ColumnExpr();
                 column_expr->names_.emplace_back(table_name);
                 column_expr->names_.emplace_back(column_name);

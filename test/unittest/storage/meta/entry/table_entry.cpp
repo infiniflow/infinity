@@ -79,12 +79,13 @@ TEST_F(TableEntryTest, test1) {
         LOG_TRACE("\n{}", table_def->ToString());
     }
 
-    SharedPtr<TableEntry> table_entry = MakeShared<TableEntry>(table_dir,
-                                                               table_def->table_name(),
-                                                               table_def->columns(),
-                                                               nullptr,
-                                                               0,
-                                                               0);
+    SharedPtr<TableCollectionEntry> table_entry = MakeShared<TableCollectionEntry>(table_dir,
+                                                                                   table_def->table_name(),
+                                                                                   table_def->columns(),
+                                                                                   TableCollectionType::kTableEntry,
+                                                                                   nullptr,
+                                                                                   0,
+                                                                                   0);
 
 }
 
@@ -110,7 +111,7 @@ TEST_F(TableEntryTest, test2) {
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn->CreateDatabase("db1");
+    create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
@@ -153,7 +154,7 @@ TEST_F(TableEntryTest, test2) {
     UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"),
                                                         MakeShared<String>("tbl1"),
                                                         columns);
-    table1_res = new_txn->CreateTable("db1", std::move(tbl1_def));
+    table1_res = new_txn->CreateTable("db1", std::move(tbl1_def), ConflictType::kError);
     EXPECT_NE(table1_res.entry_, nullptr);
 
     // Txn1: Commit, OK

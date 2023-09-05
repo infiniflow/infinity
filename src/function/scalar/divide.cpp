@@ -47,7 +47,7 @@ DivFunction::Run(HugeIntT left, HugeIntT right, HugeIntT& result) {
 }
 
 void
-RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "/";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -101,7 +101,7 @@ RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_double);
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

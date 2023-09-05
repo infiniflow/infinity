@@ -6,11 +6,11 @@
 
 #include "function/scalar_function.h"
 #include "function/function_set.h"
-#include "storage/catalog.h"
+#include "storage/meta/catalog.h"
 
 namespace infinity {
 
 void
-RegisterGreaterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr);
+RegisterGreaterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

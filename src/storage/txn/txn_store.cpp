@@ -70,9 +70,9 @@ void
 TxnTableStore::Rollback() {
     if(append_state_ != nullptr) {
         // Rollback the data already been appended.
-        TableEntry::RollbackAppend(table_entry_, txn_, this);
-        TableMeta* table_meta = (TableMeta*)TableEntry::GetTableMeta(table_entry_);
-        LOG_TRACE("Rollback prepare appended data in table: {}", *table_meta->table_name_);
+        TableCollectionEntry::RollbackAppend(table_entry_, txn_, this);
+        TableCollectionMeta* table_meta = (TableCollectionMeta*)TableCollectionEntry::GetTableMeta(table_entry_);
+        LOG_TRACE("Rollback prepare appended data in table: {}", *table_meta->table_collection_name_);
     }
 
     blocks_.clear();
@@ -86,14 +86,14 @@ TxnTableStore::PrepareCommit() {
     // Start to append
     LOG_TRACE("Transaction local storage table: {}, Start to prepare commit", this->table_name_);
     Txn* txn_ptr = (Txn*)txn_;
-    TableEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
+    TableCollectionEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
     LOG_TRACE("Transaction local storage table: {}, Complete commit preparing", this->table_name_);
 }
 
 void
 TxnTableStore::Commit() {
     Txn* txn_ptr = (Txn*)txn_;
-    TableEntry::CommitAppend(table_entry_, txn_, append_state_.get(), txn_ptr->GetBufferMgr());
+    TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get(), txn_ptr->GetBufferMgr());
 //    for(const auto& range: append_state_->append_ranges_) {
 //        LOG_TRACE("Commit, segment: {}, start: {}, count: {}", range.segment_id_, range.start_pos_, range.row_count_);
 //    }

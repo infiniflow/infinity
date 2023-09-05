@@ -3,7 +3,6 @@
 //
 
 #include "logical_planner.h"
-#include "main/infinity.h"
 #include "query_binder.h"
 #include "planner/node/logical_create_table.h"
 #include "planner/node/logical_drop_table.h"
@@ -123,11 +122,17 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
         PlannerError("Insert statement missing table table_name.");
     }
     // Check schema and table in the catalog
-    SharedPtr<BaseTable> base_table_ptr = Infinity::instance().catalog()->GetTableByName(schema_name, table_name);
-    if(base_table_ptr == nullptr) { PlannerError(schema_name + "." + table_name + " not exists.")}
+    Txn* txn = query_context_ptr_->GetTxn();
+    EntryResult result = txn->GetTableByName(schema_name, table_name);
+    if(result.err_ != nullptr) {
+        PlannerError(*result.err_);
+    }
 
-    PlannerAssert(base_table_ptr->kind() == BaseTableType::kTable, "Currently, collection isn't supported.");
-    SharedPtr<Table> table_ptr = std::static_pointer_cast<Table>(base_table_ptr);
+    TableCollectionEntry* table_entry = static_cast<TableCollectionEntry*>(result.entry_);
+
+    if(table_entry->table_collection_type_ == TableCollectionType::kCollectionEntry) {
+        PlannerError("Currently, collection isn't supported.");
+    }
 
     // Create value list
     Vector<SharedPtr<BaseExpression>> value_list;
@@ -151,7 +156,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
 //        Value null_value = Value::MakeNullData();
 //        SharedPtr<BaseExpression> null_value_expr = MakeShared<ValueExpression>(null_value);
 
-        SizeT table_column_count = table_ptr->ColumnCount();
+        SizeT table_column_count = table_entry->columns_.size();
 
         // Create value list with table column size and null value
         Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
@@ -159,8 +164,8 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
         SizeT column_idx = 0;
         for(const auto& column_name : *statement->columns_) {
             // Get table index from the inserted value column name;
-            SizeT table_column_id = table_ptr->GetColumnIdByName(column_name);
-            SharedPtr<DataType> table_column_type = table_ptr->GetColumnTypeById(table_column_id);
+            SizeT table_column_id = table_entry->GetColumnIdByName(column_name);
+            const SharedPtr<DataType>& table_column_type = table_entry->columns_[table_column_id]->column_type_;
             DataType value_type = value_list[column_idx]->Type();
             if(value_type == *table_column_type) {
                 rewrite_value_list[table_column_id] = value_list[column_idx];
@@ -182,7 +187,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
 
         value_list = rewrite_value_list;
     } else {
-        SizeT table_column_count = table_ptr->ColumnCount();
+        SizeT table_column_count = table_entry->columns_.size();
         if(value_list.size() != table_column_count) {
             PlannerError(fmt::format("INSERT: Table column count ({}) and input value count mismatch ({})",
                                      table_column_count,
@@ -193,7 +198,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
         Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
         for(SizeT column_idx = 0; column_idx < table_column_count; ++ column_idx) {
-            SharedPtr<DataType> table_column_type = table_ptr->GetColumnTypeById(column_idx);
+            const SharedPtr<DataType>& table_column_type = table_entry->columns_[column_idx]->column_type_;
             DataType value_type = value_list[column_idx]->Type();
             if(*table_column_type == value_type) {
                 rewrite_value_list[column_idx] = value_list[column_idx];
@@ -215,7 +220,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
 
     // Create logical insert node.
     SharedPtr<LogicalNode> logical_insert = MakeShared<LogicalInsert>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                      table_ptr,
+                                                                      table_entry,
                                                                       bind_context_ptr->GenerateTableIndex(),
                                                                       value_list);
 
@@ -533,11 +538,10 @@ LogicalPlanner::BuildCopy(const CopyStatement* statement, SharedPtr<BindContext>
 void
 LogicalPlanner::BuildExport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     // Check the table existence
-    auto base_table_ptr = Infinity::instance().catalog()->GetTableByNameNoExcept(statement->schema_name_,
-                                                                                 statement->table_name_);
-    if(base_table_ptr == nullptr) {
-        // Not found in catalog
-        PlannerError("Table: " + statement->schema_name_ + '.' + statement->table_name_ +" is not found in catalog.");
+    Txn* txn = query_context_ptr_->GetTxn();
+    EntryResult result = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    if(result.err_ != nullptr) {
+        PlannerError(*result.err_);
     }
 
     // Check the file existence
@@ -564,12 +568,12 @@ void
 LogicalPlanner::BuildImport(const CopyStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
 
     // Check the table existence
-    auto base_table_ptr = Infinity::instance().catalog()->GetTableByNameNoExcept(statement->schema_name_,
-                                                                                 statement->table_name_);
-    if(base_table_ptr == nullptr) {
-        // Not found in catalog
-        PlannerError("Table: " + statement->schema_name_ + '.' + statement->table_name_ +" is not found in catalog.");
+    Txn* txn = query_context_ptr_->GetTxn();
+    EntryResult result = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    if(result.err_ != nullptr) {
+        PlannerError(*result.err_);
     }
+    TableCollectionEntry* table_collection_entry = static_cast<TableCollectionEntry*>(table_collection_entry);
 
     // Check the file existence
     LocalFileSystem fs;
@@ -579,11 +583,9 @@ LogicalPlanner::BuildImport(const CopyStatement* statement, SharedPtr<BindContex
         PlannerError("File: " + statement->file_path_ +" doesn't exist.");
     }
 
-    SharedPtr<Table> table_ptr = std::static_pointer_cast<Table>(base_table_ptr);
-
     SharedPtr<LogicalNode> logical_import =
             MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
-                                      table_ptr,
+                                      table_collection_entry,
                                       statement->file_path_,
                                       statement->header_,
                                       statement->delimiter_,

@@ -8,6 +8,8 @@
 #include "planner/logical_node_type.h"
 #include "transaction_context.h"
 #include "main/profiler/query_profiler.h"
+#include "scheduler/scheduler.h"
+#include "storage/storage.h"
 
 #include <string>
 
@@ -26,7 +28,15 @@ struct QueryResult {
 class QueryContext {
 public:
     explicit
-    QueryContext(Session* session_ptr, const Config* global_config);
+    QueryContext(Session* session_ptr,
+                 const Config* global_config,
+                 Scheduler* scheduler,
+                 Storage* storage)
+                 : session_ptr_(session_ptr),
+                 global_config_(global_config),
+                 scheduler_(scheduler),
+                 storage_(storage)
+    {}
 
     QueryResult
     Query(const String& query);
@@ -62,11 +72,40 @@ public:
         return ++ current_max_node_id_;
     }
 
+    void
+    CreateTxn();
+
+    void
+    BeginTxn();
+
+    void
+    CommitTxn();
+
+    Txn*
+    GetTxn() const;
+
+    inline Storage*
+    storage() const {
+        return storage_;
+    }
+
+    inline Scheduler*
+    scheduler() const {
+        return scheduler_;
+    }
+
+    inline const Config*
+    global_config() const {
+        return global_config_;
+    }
+
 private:
-    UniquePtr<TransactionContext> transaction_;
     UniquePtr<QueryProfiler> query_metrics_;
 
     const Config* global_config_{};
+    Scheduler* scheduler_{};
+    Storage* storage_{};
+
     Session* session_ptr_{};
 
     // Get following information from session.

@@ -8,8 +8,8 @@
 
 #include "base_entry.h"
 #include "common/types/internal_types.h"
-#include "table_entry.h"
-#include "storage/meta/table_meta.h"
+#include "table_collection_entry.h"
+#include "storage/meta/table_collection_meta.h"
 
 namespace infinity {
 
@@ -29,30 +29,37 @@ public:
 
 public:
     static EntryResult
-    CreateTable(DBEntry* db_entry,
-                const SharedPtr<TableDef>& table_def,
-                u64 txn_id,
-                TxnTimeStamp begin_ts,
-                TxnManager* txn_mgr);
+    CreateTableCollection(DBEntry* db_entry,
+                          TableCollectionType table_collection_type,
+                          const SharedPtr<String>& table_collection_name,
+                          const Vector<SharedPtr<ColumnDef>>& columns,
+                          u64 txn_id,
+                          TxnTimeStamp begin_ts,
+                          TxnManager* txn_mgr);
 
     static EntryResult
-    DropTable(DBEntry* db_entry,
-              const String& table_name,
-              u64 txn_id,
-              TxnTimeStamp begin_ts,
-              TxnManager* txn_mgr);
+    DropTableCollection(DBEntry* db_entry,
+                        const String& table_collection_name,
+                        u64 txn_id,
+                        TxnTimeStamp begin_ts,
+                        TxnManager* txn_mgr);
 
     static EntryResult
-    GetTable(DBEntry* db_entry,
-             const String& table_name,
-             u64 txn_id,
-             TxnTimeStamp begin_ts);
+    GetTableCollection(DBEntry* db_entry,
+                       const String& table_collection_name,
+                       u64 txn_id,
+                       TxnTimeStamp begin_ts);
 
     static void
-    RemoveTableEntry(DBEntry* db_entry,
-                     const String& table_name,
+    RemoveTableCollectionEntry(DBEntry* db_entry,
+                               const String& table_collection_name,
+                               u64 txn_id,
+                               TxnManager* txn_mgr);
+
+    static Vector<TableCollectionEntry*>
+    TableCollections(DBEntry* db_entry,
                      u64 txn_id,
-                     TxnManager* txn_mgr);
+                     TxnTimeStamp begin_ts);
 
     static SharedPtr<String>
     ToString(DBEntry* db_entry);
@@ -68,7 +75,7 @@ public:
     RWMutex rw_locker_{};
     SharedPtr<String> base_dir_{};
     SharedPtr<String> db_name_{};
-    HashMap<String, UniquePtr<TableMeta>> tables_{};
+    HashMap<String, UniquePtr<TableCollectionMeta>> tables_{};
 };
 
 }

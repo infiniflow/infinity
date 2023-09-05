@@ -225,7 +225,7 @@ public:
 };
 
 void
-RegisterSumFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterSumFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "SUM";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -320,7 +320,7 @@ RegisterSumFunction(const UniquePtr<Catalog> &catalog_ptr) {
         function_set_ptr->AddFunction(sum_function);
     }
 #endif
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

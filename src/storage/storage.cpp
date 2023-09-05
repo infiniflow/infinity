@@ -34,25 +34,30 @@ Storage::Init() {
     } else {
         // load catalog file.
         new_catalog_ = NewCatalog::LoadFromFile(catalog_file_entry, buffer_mgr_.get());
+        txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get());
     }
 
     // Check current schema/catalog to default database.
 
-
+#if 0
     catalog_ = MakeUnique<Catalog>();
     // Update schema need to begin transaction
     SharedPtr<String> schema_name = MakeShared<String>("default");
     SharedPtr<SchemaDefinition> schema_def_ptr = MakeShared<SchemaDefinition>(schema_name, ConflictType::kError);
     catalog_->CreateSchema(schema_def_ptr);
     // Commit transaction
+#endif
 
-    BuiltinFunctions builtin_functions(catalog_);
+    BuiltinFunctions builtin_functions(new_catalog_);
     builtin_functions.Init();
 }
 
 void
 Storage::Uninit() {
-    catalog_.reset();
+    txn_mgr_.reset();
+    new_catalog_.reset();
+    buffer_mgr_.reset();
+    config_ptr_ = nullptr;
 }
 
 SharedPtr<DirEntry>
@@ -92,7 +97,7 @@ Storage::InitCatalog(NewCatalog* catalog, TxnManager* txn_mgr) {
     EntryResult create_res;
     Txn* new_txn = txn_mgr->CreateTxn();
     new_txn->BeginTxn();
-    create_res = new_txn->CreateDatabase("default");
+    create_res = new_txn->CreateDatabase("default", ConflictType::kError);
     new_txn->CommitTxn();
     if(create_res.err_ != nullptr) {
         StorageError(*create_res.err_);

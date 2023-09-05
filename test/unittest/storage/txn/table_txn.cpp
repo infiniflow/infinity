@@ -55,12 +55,12 @@ TEST_F(TableTxnTest, test1) {
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn->CreateDatabase("db1");
+    create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Create tbl1, OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc());
+    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(table1_res.entry_, nullptr);
 
     // Txn1: Commit, OK
@@ -73,7 +73,7 @@ TEST_F(TableTxnTest, test1) {
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create duplicated tbl1, NOT OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc());
+    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_EQ(table1_res.entry_, nullptr);
 
     // Txn2: Get db1, OK
@@ -104,12 +104,12 @@ TEST_F(TableTxnTest, test2) {
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn->CreateDatabase("db1");
+    create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Create tbl1, OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc());
+    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(table1_res.entry_, nullptr);
 
     // Txn1: Get db1, OK
@@ -117,7 +117,7 @@ TEST_F(TableTxnTest, test2) {
     EXPECT_NE(get_res.entry_, nullptr);
 
     // Txn1: Drop tbl1, OK
-    dropped_res = new_txn->DropTableByName("db1", "tbl1");
+    dropped_res = new_txn->DropTableCollectionByName("db1", "tbl1", ConflictType::kError);
     EXPECT_NE(dropped_res.entry_, nullptr);
 
     // Txn1: Get db1, OK
@@ -125,7 +125,7 @@ TEST_F(TableTxnTest, test2) {
     EXPECT_EQ(get_res.entry_, nullptr);
 
     // Txn1: Create tbl1, OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc());
+    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(table1_res.entry_, nullptr);
 
     // Txn1: Commit, OK
@@ -138,7 +138,7 @@ TEST_F(TableTxnTest, test2) {
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create duplicated tbl1, NOT OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc());
+    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_EQ(table1_res.entry_, nullptr);
 
     // Txn2: Get db1, OK
@@ -169,11 +169,11 @@ TEST_F(TableTxnTest, test3) {
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn->CreateDatabase("db1");
+    create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Create tbl1, OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc());
+    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(table1_res.entry_, nullptr);
 
     // Txn1: Commit, OK
@@ -186,11 +186,11 @@ TEST_F(TableTxnTest, test3) {
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Drop tbl1, OK
-    dropped_res = new_txn->DropTableByName("db1", "tbl1");
+    dropped_res = new_txn->DropTableCollectionByName("db1", "tbl1", ConflictType::kError);
     EXPECT_NE(dropped_res.entry_, nullptr);
 
     // Txn2: Create tbl1, OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc());
+    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(table1_res.entry_, nullptr);
 
     // Txn2: Commit, OK
@@ -239,23 +239,23 @@ TEST_F(TableTxnTest, test4) {
     new_txn2->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Create tbl1, OK
-    create1_res = new_txn1->CreateTable("db1", MockTableDesc());
+    create1_res = new_txn1->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn2: Create tbl1, NOT OK, DB not found
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc());
+    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn1: Commit, OK
     new_txn1->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create tbl1, NOT OK, DB not found
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc());
+    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn2: Commit, OK
@@ -284,7 +284,7 @@ TEST_F(TableTxnTest, test5) {
     new_txn1->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
@@ -304,11 +304,11 @@ TEST_F(TableTxnTest, test5) {
     new_txn3->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc());
+    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn3: Create tbl1, NOT OK，W-W Conflict
-    create3_res = new_txn2->CreateTable("db1", MockTableDesc());
+    create3_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_EQ(create3_res.entry_, nullptr);
 
     // Txn2: Commit, OK
@@ -341,7 +341,7 @@ TEST_F(TableTxnTest, test6) {
     new_txn1->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
@@ -361,11 +361,11 @@ TEST_F(TableTxnTest, test6) {
     new_txn3->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc());
+    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn3: Create tbl1, NOT OK，W-W Conflict
-    create3_res = new_txn2->CreateTable("db1", MockTableDesc());
+    create3_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_EQ(create3_res.entry_, nullptr);
 
     // Txn3: Commit, OK
@@ -393,12 +393,12 @@ TEST_F(TableTxnTest, test7) {
     new_txn1->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn1->CreateTable("db1", MockTableDesc());
+    create2_res = new_txn1->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn1: Commit, OK
@@ -440,7 +440,7 @@ TEST_F(TableTxnTest, test8) {
     new_txn1->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
@@ -454,7 +454,7 @@ TEST_F(TableTxnTest, test8) {
     new_txn2->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc());
+    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn2: Commit, OK
@@ -500,7 +500,7 @@ TEST_F(TableTxnTest, test9) {
     new_txn1->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
@@ -514,7 +514,7 @@ TEST_F(TableTxnTest, test9) {
     new_txn2->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc());
+    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn3: Create, OK
@@ -524,14 +524,14 @@ TEST_F(TableTxnTest, test9) {
     new_txn3->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn3: Create tbl1, NOT OK, WW conflict
-    create3_res = new_txn3->CreateTable("db1", MockTableDesc());
+    create3_res = new_txn3->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_EQ(create3_res.entry_, nullptr);
 
     // Txn2: Rollback, OK
     new_txn2->RollbackTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn3: Create tbl1, OK
-    create3_res = new_txn3->CreateTable("db1", MockTableDesc());
+    create3_res = new_txn3->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(create3_res.entry_, nullptr);
 
     // Txn3: Commit, OK
@@ -562,7 +562,7 @@ TEST_F(TableTxnTest, test10) {
     new_txn1->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn1: Create db1, OK
-    create1_res = new_txn1->CreateDatabase("db1");
+    create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create1_res.entry_->Committed(), false);
     EXPECT_NE(create1_res.entry_, nullptr);
 
@@ -582,15 +582,15 @@ TEST_F(TableTxnTest, test10) {
     new_txn3->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc());
+    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn2: Drop tbl1, OK
-    dropped1_res = new_txn2->DropTableByName("db1", "tbl1");
+    dropped1_res = new_txn2->DropTableCollectionByName("db1", "tbl1", ConflictType::kError);
     EXPECT_NE(dropped1_res.entry_, nullptr);
 
     // Txn3: Create tbl1, OK
-    create3_res = new_txn3->CreateTable("db1", MockTableDesc());
+    create3_res = new_txn3->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_NE(create3_res.entry_, nullptr);
 
     // Txn2: Commit, OK

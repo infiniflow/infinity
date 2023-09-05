@@ -146,7 +146,7 @@ SubFunction::Run(MixedT left, MixedT right, MixedT& result) {
 }
 
 void
-RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterSubtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "-";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -264,7 +264,7 @@ RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::BinaryFunctionWithFailure<MixedT, MixedT, MixedT, SubFunction>);
     function_set_ptr->AddFunction(sub_function_mixed_mixed);
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

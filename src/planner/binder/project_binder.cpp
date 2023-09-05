@@ -76,7 +76,7 @@ ProjectBinder::BuildFuncExpr(const FunctionExpr& expr,
                              i64 depth,
                              bool root) {
 
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if(function_set_ptr->type_ == FunctionType::kAggregate) {
         if(this->binding_agg_func_) {
             PlannerError("Aggregate function is called in another aggregate function.");

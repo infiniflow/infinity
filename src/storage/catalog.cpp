@@ -1,7 +1,7 @@
 //
 // Created by JinHai on 2022/7/24.
 //
-
+#if 0
 #include "catalog.h"
 
 #include <utility>
@@ -263,3 +263,4 @@ Catalog::DeleteTableFunction(String function_name) {
 }
 
 }
+#endif

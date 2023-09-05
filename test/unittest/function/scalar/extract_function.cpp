@@ -36,13 +36,13 @@ class ExtractFunctionTest : public BaseTest {
 TEST_F(ExtractFunctionTest, extract_year_test) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
+    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
 
     RegisterExtractFunction(catalog_ptr);
 
     {
         String op = "extract_year";
-        SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
+        SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
         SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -99,7 +99,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
 
     {
         String op = "extract_month";
-        SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
+        SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
         SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -148,7 +148,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
 
     {
         String op = "extract_day";
-        SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
+        SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
         SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 

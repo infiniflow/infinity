@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "catalog.h"
 #include "meta/catalog.h"
 #include "main/config.h"
 #include "txn/txn_manager.h"
@@ -14,15 +13,26 @@
 namespace infinity {
 
 class Infinity;
+class BufferManager;
 
 class Storage {
 public:
     explicit
     Storage(const Config* config_ptr);
 
-    [[nodiscard]] inline UniquePtr<Catalog>&
+    [[nodiscard]] inline NewCatalog*
     catalog() noexcept {
-        return catalog_;
+        return new_catalog_.get();
+    }
+
+    [[nodiscard]] inline BufferManager*
+    buffer_manager() noexcept {
+        return buffer_mgr_.get();
+    }
+
+    [[nodiscard]] inline TxnManager*
+    txn_manager() const noexcept {
+        return txn_mgr_.get();
     }
 
     void
@@ -40,9 +50,8 @@ private:
 
 private:
     const Config* config_ptr_{};
-    UniquePtr<Catalog> catalog_{};
+//    UniquePtr<Catalog> catalog_{};
     UniquePtr<NewCatalog> new_catalog_{};
-
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<TxnManager> txn_mgr_{};
 };

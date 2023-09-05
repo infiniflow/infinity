@@ -13,8 +13,11 @@ SQLRunner::Run(const String& sql_text, bool print) {
     }
 
     SharedPtr<Session> session_ptr = MakeShared<Session>();
-    SharedPtr<QueryContext> query_context_ptr = MakeShared<QueryContext>(session_ptr.get(), nullptr);
-    query_context_ptr->set_current_schema(session_ptr->current_schema());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(),
+                                                                         Infinity::instance().config(),
+                                                                         Infinity::instance().scheduler(),
+                                                                         Infinity::instance().storage());
+    query_context_ptr->set_current_schema(session_ptr->current_database());
 
     SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
@@ -23,6 +26,9 @@ SQLRunner::Run(const String& sql_text, bool print) {
     if(parsed_result->IsError()) {
         ParserError(parsed_result->error_message_)
     }
+
+    query_context_ptr->CreateTxn();
+    query_context_ptr->BeginTxn();
 
     SizeT statement_count = parsed_result->statements_ptr_->size();
     std::cout << "Statement count: " << parsed_result->statements_ptr_->size() << std::endl;
@@ -69,6 +75,8 @@ SQLRunner::Run(const String& sql_text, bool print) {
     }
     LOG_TRACE("{} statements executed.", statement_count);
     parsed_result->Reset();
+
+    query_context_ptr->CommitTxn();
     return String();
 }
 

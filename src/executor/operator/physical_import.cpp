@@ -32,7 +32,7 @@ struct ParserContext {
     zsv_parser parser_{};
     size_t row_count_{};
     SharedPtr<String> err_msg_{};
-    Table* table_ptr_{};
+    TableCollectionEntry* table_collection_entry_{};
 };
 
 void
@@ -46,7 +46,7 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
     struct ParserContext parser_context{};
     if(header_) {
         opts.row_handler = CSVHeaderHandler;
-        parser_context.table_ptr_ = table_ptr_.get();
+        parser_context.table_collection_entry_ = table_collection_entry_;
     } else {
         opts.row_handler = CSVRowHandler;
     }
@@ -88,9 +88,10 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
 
 void
 PhysicalImport::ImportJSON(QueryContext* query_context) {
+    DBEntry* db_entry = TableCollectionMeta::GetDBEntry(table_collection_entry_->table_collection_meta_);
     String err = fmt::format("IMPORT Table: {}.{} FROM file: {} WITH format JSON",
-                             *table_ptr_->schema_name(),
-                             *table_ptr_->table_name(),
+                             *db_entry->db_name_,
+                             *table_collection_entry_->table_collection_name_,
                              file_path_);
     NotImplementError(err);
 }
@@ -100,7 +101,7 @@ PhysicalImport::CSVHeaderHandler(void *context) {
     ParserContext *parser_context = static_cast<ParserContext*>(context);
     SizeT csv_column_count = zsv_cell_count(parser_context->parser_);
 
-    SizeT table_column_count = parser_context->table_ptr_->definition_ptr_->column_count();
+    SizeT table_column_count = parser_context->table_collection_entry_->columns_.size();
     if(csv_column_count != table_column_count) {
         parser_context->err_msg_ =
                 MakeShared<String>(fmt::format("Unmatched column count ({} != {})",

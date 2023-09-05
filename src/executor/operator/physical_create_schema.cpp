@@ -3,10 +3,6 @@
 //
 
 #include "physical_create_schema.h"
-#include "main/infinity.h"
-#include "common/utility/infinity_assert.h"
-
-#include <utility>
 
 namespace infinity {
 
@@ -18,9 +14,8 @@ PhysicalCreateSchema::Init() {
 void
 PhysicalCreateSchema::Execute(QueryContext* query_context) {
 //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
-    auto schema_def = MakeShared<SchemaDefinition>(schema_name_, conflict_type_);
-
-    Infinity::instance().catalog()->CreateSchema(schema_def);
+    Txn* txn = query_context->GetTxn();
+    txn->CreateDatabase(*schema_name_, conflict_type_);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {

@@ -32,7 +32,7 @@ class BuiltinFunctionsTest : public BaseTest {
 TEST_F(BuiltinFunctionsTest, test1) {
 //    using namespace infinity;
 //
-//    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
+//    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
 //
 //    BuiltinFunctions builtin_functions(catalog_ptr);
 //    builtin_functions.Init();

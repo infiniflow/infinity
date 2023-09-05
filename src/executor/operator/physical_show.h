@@ -71,13 +71,13 @@ private:
     ExecuteShowColumns(QueryContext* query_context);
 
     void
-    ExecuteShowTableDetail(QueryContext* query_context, const SharedPtr<Table>& table_ptr);
+    ExecuteShowTableDetail(QueryContext* query_context,
+                           const Vector<SharedPtr<ColumnDef>>& table_columns);
 
     void
-    ExecuteShowCollectionDetail(QueryContext* query_context, const SharedPtr<Collection>& table_ptr);
-
-    void
-    ExecuteShowViewDetail(QueryContext* query_context, const SharedPtr<View>& table_ptr);
+    ExecuteShowViewDetail(QueryContext* query_context,
+                          const SharedPtr<Vector<SharedPtr<DataType>>>& column_types,
+                          const SharedPtr<Vector<String>>& column_names);
 
 private:
     ShowType scan_type_{ShowType::kInvalid};

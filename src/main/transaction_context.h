@@ -4,10 +4,9 @@
 
 #pragma once
 
-#include "storage/txn/txn.h"
-
 namespace infinity {
 
+class Txn;
 class TransactionContext {
 public:
     void

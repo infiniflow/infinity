@@ -11,8 +11,10 @@ namespace infinity {
 class DependentJoinFlattener {
 public:
     explicit
-    DependentJoinFlattener(const SharedPtr<BindContext>& bind_context_ptr)
-                           : bind_context_ptr_(bind_context_ptr)
+    DependentJoinFlattener(const SharedPtr<BindContext>& bind_context_ptr,
+                           QueryContext* query_context)
+                           : bind_context_ptr_(bind_context_ptr),
+                           query_context_(query_context)
     {}
 
     bool
@@ -35,7 +37,8 @@ private:
     BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& logical_node);
 
 private:
-    const SharedPtr<BindContext> &bind_context_ptr_;
+    const SharedPtr<BindContext>& bind_context_ptr_;
+    QueryContext* query_context_{};
     HashMap<u64, bool> operator2correlated_expression_map_;
     ColumnBinding base_binding_{};
     SizeT correlated_expression_offset_{};

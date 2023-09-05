@@ -15,7 +15,7 @@ namespace infinity {
 
 class BufferManager;
 class Txn;
-class TableEntry;
+class TableCollectionEntry;
 
 enum DataSegmentStatus : i8 {
     kOpen,
@@ -35,12 +35,12 @@ struct SegmentVersion {
 struct SegmentEntry : public BaseEntry {
 public:
     explicit
-    SegmentEntry(const TableEntry* table_entry)
+    SegmentEntry(const TableCollectionEntry* table_entry)
         : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
 
     RWMutex rw_locker_{};
 
-    const TableEntry* table_entry_{};
+    const TableCollectionEntry* table_entry_{};
 
     SharedPtr<String> base_dir_{};
 
@@ -66,7 +66,7 @@ public:
 
 public:
     static SharedPtr<SegmentEntry>
-    MakeNewSegmentEntry(const TableEntry* table_entry,
+    MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
                         u64 txn_id,
                         u64 segment_id,
                         BufferManager* buffer_mgr,
@@ -93,7 +93,7 @@ public:
     Serialize(const SegmentEntry* segment_entry);
 
     static SharedPtr<SegmentEntry>
-    Deserialize(const nlohmann::json& table_entry_json, TableEntry* table_entry, BufferManager* buffer_mgr);
+    Deserialize(const nlohmann::json& table_entry_json, TableCollectionEntry* table_entry, BufferManager* buffer_mgr);
 
 };
 

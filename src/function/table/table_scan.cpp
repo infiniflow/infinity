@@ -15,9 +15,21 @@ TableScanFunc(QueryContext* query_context,
     SharedPtr<TableScanFunctionData> table_scan_function_data_ptr
         = std::static_pointer_cast<TableScanFunctionData>(table_function_data_ptr);
 
-    SharedPtr<Table>& table_ptr = table_scan_function_data_ptr->table_ptr_;
-    Vector<size_t>& column_ids = table_scan_function_data_ptr->column_ids_;
-    i64& current_block_id = table_scan_function_data_ptr->block_count_;
+    TableCollectionEntry* table_column_entry_ptr = table_scan_function_data_ptr->table_entry_ptr_;
+    Vector<SizeT>& column_ids = table_scan_function_data_ptr->column_ids_;
+//    i64& current_segment_id = table_scan_function_data_ptr->segment_count_;
+
+    for(auto& segment_pair: table_column_entry_ptr->segments_) {
+        for(SizeT column_id: column_ids) {
+            ObjectHandle col_object = ColumnDataEntry::GetColumnData(segment_pair.second->columns_[column_id].get(),
+                                                                     query_context->storage()->buffer_manager());
+            output.column_vectors[column_id]->AppendWith(col_object.GetData(), 0, segment_pair.second->current_row_);
+        }
+    }
+    output.Finalize();
+
+//    StorageError("Not implemented");
+#if 0
     if(current_block_id >= table_ptr->DataBlockCount()) {
         LOG_TRACE("All blocks are read from storage.");
         output.Reset();
@@ -33,14 +45,15 @@ TableScanFunc(QueryContext* query_context,
         output.Finalize();
         ++ current_block_id;
     }
+#endif
 }
 
 void
-RegisterTableScanFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
     SharedPtr<TableScanFunction> seq_scan_ptr = MakeShared<TableScanFunction>("seq_scan", TableScanFunc);
 
-    catalog_ptr->AddTableFunction(seq_scan_ptr);
+    NewCatalog::AddTableFunction(catalog_ptr.get(), seq_scan_ptr);
 
 }
 

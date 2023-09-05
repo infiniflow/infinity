@@ -35,12 +35,12 @@ class CountFunctionTest : public BaseTest {
 TEST_F(CountFunctionTest, count_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
+    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
 
     RegisterCountFunction(catalog_ptr);
 
     String op = "count";
-    SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
+    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     SharedPtr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
     {

@@ -16,11 +16,11 @@ class LogicalInsert : public LogicalNode {
 public:
     explicit
     LogicalInsert(u64 node_id,
-                  SharedPtr<Table> table_ptr,
+                  TableCollectionEntry* table_collection_ptr,
                   u64 table_index,
                   Vector<SharedPtr<BaseExpression>> value_list)
             : LogicalNode(node_id, LogicalNodeType::kInsert),
-              table_ptr_(std::move(table_ptr)),
+              table_collection_entry_(table_collection_ptr),
               table_index_(table_index),
               value_list_(std::move(value_list)) {};
 
@@ -52,14 +52,14 @@ public:
         value_list_ = value_list;
     }
 
-    inline SharedPtr<Table>&
-    table_ptr() {
-        return table_ptr_;
+    inline TableCollectionEntry*
+    table_collection_entry() {
+        return table_collection_entry_;
     }
 
-    [[nodiscard]] inline const SharedPtr<Table>&
-    table_ptr() const {
-        return table_ptr_;
+    [[nodiscard]] inline const TableCollectionEntry*
+    table_collection_entry() const {
+        return table_collection_entry_;
     }
 
     inline Vector<SharedPtr<BaseExpression>>&
@@ -93,7 +93,7 @@ public:
     }
 
 private:
-    SharedPtr<Table> table_ptr_{};
+    TableCollectionEntry* table_collection_entry_{};
     Vector<SharedPtr<BaseExpression>> value_list_{};
     u64 table_index_{};
 };

@@ -512,13 +512,20 @@ ExplainLogicalPlan::Explain(const LogicalInsert* insert_node,
 
     // Schema name
     {
-        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *insert_node->table_ptr()->schema_name();
+        DBEntry* db_entry = TableCollectionMeta::GetDBEntry(insert_node->table_collection_entry()->table_collection_meta_);
+        String schema_name_str = String(intent_size, ' ')
+                                 + " - schema name: "
+                                 + *db_entry->db_name_;
+
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str = String(intent_size, ' ') + " - table name: " + *insert_node->table_ptr()->table_name();
+        String table_name_str = String(intent_size, ' ')
+                                + " - table name: "
+                                + *insert_node->table_collection_entry()->table_collection_name_;
+
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -642,8 +649,11 @@ ExplainLogicalPlan::Explain(const LogicalTableScan* table_scan_node,
 
     // Table alias and name
     String table_name = String(intent_size, ' ') + " - table name: " + table_scan_node->table_alias_ + "(";
-    table_name += *table_scan_node->table_ptr()->SchemaName() + ".";
-    table_name += *table_scan_node->table_ptr()->TableName() + ")";
+
+    DBEntry* db_entry = TableCollectionEntry::GetDBEntry(table_scan_node->table_collection_ptr());
+
+    table_name += *db_entry->db_name_+ ".";
+    table_name += *table_scan_node->table_collection_ptr()->table_collection_name_ + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index
@@ -1126,10 +1136,11 @@ ExplainLogicalPlan::Explain(const LogicalImport* import_node,
     }
 
     {
+        DBEntry* db_entry = TableCollectionMeta::GetDBEntry(import_node->table_collection_entry()->table_collection_meta_);
         SharedPtr<String> schema_name
                 = MakeShared<String>(String(intent_size, ' ')
                         + " - schema name: "
-                        + *import_node->table_ptr()->schema_name());
+                        + *db_entry->db_name_);
         result->emplace_back(schema_name);
     }
 
@@ -1137,7 +1148,7 @@ ExplainLogicalPlan::Explain(const LogicalImport* import_node,
         SharedPtr<String> table_name
                 = MakeShared<String>(String(intent_size, ' ')
                         + " - table name: "
-                        + *import_node->table_ptr()->table_name());
+                        + *import_node->table_collection_entry()->table_collection_name_);
         result->emplace_back(table_name);
     }
 

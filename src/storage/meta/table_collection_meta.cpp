@@ -2,24 +2,27 @@
 // Created by jinhai on 23-6-23.
 //
 
-#include "table_meta.h"
-#include "storage/meta/entry/table_entry.h"
+#include "table_collection_meta.h"
+#include "storage/meta/entry/table_collection_entry.h"
 #include "common/utility/defer_op.h"
 #include "storage/txn/txn_manager.h"
 
 namespace infinity {
 
 class TxnManager;
+
 EntryResult
-TableMeta::CreateNewEntry(TableMeta* table_meta,
-                          u64 txn_id,
-                          TxnTimeStamp begin_ts,
-                          TxnManager* txn_mgr,
-                          const SharedPtr<TableDef>& table_def) {
-    TableEntry* res = nullptr;
+TableCollectionMeta::CreateNewEntry(TableCollectionMeta* table_meta,
+                                    TableCollectionType table_collection_type,
+                                    const SharedPtr<String>& table_collection_name_ptr,
+                                    const Vector<SharedPtr<ColumnDef>>& columns,
+                                    u64 txn_id,
+                                    TxnTimeStamp begin_ts,
+                                    TxnManager* txn_mgr) {
+    TableCollectionEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(table_meta->rw_locker_);
-    const String& table_name = *table_def->table_name();
-    SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + *table_meta->table_name_);
+    const String& table_collection_name = *table_collection_name_ptr;
+    SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + *table_meta->table_collection_name_);
 
     if(table_meta->entry_list_.empty()) {
         // Insert a dummy entry.
@@ -28,57 +31,60 @@ TableMeta::CreateNewEntry(TableMeta* table_meta,
         table_meta->entry_list_.emplace_back(std::move(dummy_entry));
 
         // Insert the new table entry
-        UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                   table_def->table_name(),
-                                                                   table_def->columns(),
-                                                                   table_meta,
-                                                                   txn_id,
-                                                                   begin_ts);
+        UniquePtr<TableCollectionEntry> table_entry = MakeUnique<TableCollectionEntry>(base_dir,
+                                                                                       table_collection_name_ptr,
+                                                                                       columns,
+                                                                                       table_collection_type,
+                                                                                       table_meta,
+                                                                                       txn_id,
+                                                                                       begin_ts);
         res = table_entry.get();
         table_meta->entry_list_.emplace_front(std::move(table_entry));
 
-        LOG_TRACE("New table entry is added: {}.", table_name);
+        LOG_TRACE("New table entry is added: {}.", table_collection_name);
         return {res, nullptr};
     } else {
         // Already have a table entry, check if the table entry is valid here.
         BaseEntry* header_base_entry = table_meta->entry_list_.front().get();
         if(header_base_entry->entry_type_ == EntryType::kDummy) {
             // Dummy entry in the header
-            UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                       table_def->table_name(),
-                                                                       table_def->columns(),
-                                                                       table_meta,
-                                                                       txn_id,
-                                                                       begin_ts);
+            UniquePtr<TableCollectionEntry> table_entry = MakeUnique<TableCollectionEntry>(base_dir,
+                                                                                           table_collection_name_ptr,
+                                                                                           columns,
+                                                                                           table_collection_type,
+                                                                                           table_meta,
+                                                                                           txn_id,
+                                                                                           begin_ts);
             res = table_entry.get();
             table_meta->entry_list_.emplace_front(std::move(table_entry));
             return {res, nullptr};
         }
 
-        TableEntry* header_table_entry = (TableEntry*)header_base_entry;
+        TableCollectionEntry* header_table_entry = (TableCollectionEntry*)header_base_entry;
         if(header_table_entry->commit_ts_ < UNCOMMIT_TS) {
             // Committed
             if(begin_ts > header_table_entry->commit_ts_) {
                 if(header_table_entry->deleted_) {
                     // No conflict
-                    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                               table_def->table_name(),
-                                                                               table_def->columns(),
-                                                                               table_meta,
-                                                                               txn_id,
-                                                                               begin_ts);
+                    UniquePtr<TableCollectionEntry> table_entry = MakeUnique<TableCollectionEntry>(base_dir,
+                                                                                                   table_collection_name_ptr,
+                                                                                                   columns,
+                                                                                                   table_collection_type,
+                                                                                                   table_meta,
+                                                                                                   txn_id,
+                                                                                                   begin_ts);
                     res = table_entry.get();
                     table_meta->entry_list_.emplace_front(std::move(table_entry));
                     return {res, nullptr};
                 } else {
                     // Duplicated table
-                    LOG_TRACE("Duplicated table name {}.", table_name)
+                    LOG_TRACE("Duplicated table name {}.", table_collection_name)
                     return {nullptr, MakeUnique<String>("Duplicated table.")};
                 }
             } else {
                 // Write-Write conflict
                 LOG_TRACE("Write-write conflict: There is a committed table: {} which is later than current transaction.",
-                          table_name)
+                          table_collection_name)
                 return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
             }
         } else {
@@ -91,17 +97,18 @@ TableMeta::CreateNewEntry(TableMeta* table_meta,
                     if(header_table_entry->txn_id_ == txn_id) {
                         // Same txn
                         if(header_table_entry->deleted_) {
-                            UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                                       table_def->table_name(),
-                                                                                       table_def->columns(),
-                                                                                       table_meta,
-                                                                                       txn_id,
-                                                                                       begin_ts);
+                            UniquePtr<TableCollectionEntry> table_entry = MakeUnique<TableCollectionEntry>(base_dir,
+                                                                                                           table_collection_name_ptr,
+                                                                                                           columns,
+                                                                                                           table_collection_type,
+                                                                                                           table_meta,
+                                                                                                           txn_id,
+                                                                                                           begin_ts);
                             res = table_entry.get();
                             table_meta->entry_list_.emplace_front(std::move(table_entry));
                             return {res, nullptr};
                         } else {
-                            LOG_TRACE("Create a duplicated table {}.", table_name)
+                            LOG_TRACE("Create a duplicated table {}.", table_collection_name)
                             return {nullptr, MakeUnique<String>("Create a duplicated name table.")};
                         }
                     } else {
@@ -121,12 +128,13 @@ TableMeta::CreateNewEntry(TableMeta* table_meta,
                     table_meta->entry_list_.erase(table_meta->entry_list_.begin());
 
                     // Append new one
-                    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                               table_def->table_name(),
-                                                                               table_def->columns(),
-                                                                               table_meta,
-                                                                               txn_id,
-                                                                               begin_ts);
+                    UniquePtr<TableCollectionEntry> table_entry = MakeUnique<TableCollectionEntry>(base_dir,
+                                                                                                   table_collection_name_ptr,
+                                                                                                   columns,
+                                                                                                   table_collection_type,
+                                                                                                   table_meta,
+                                                                                                   txn_id,
+                                                                                                   begin_ts);
                     res = table_entry.get();
                     table_meta->entry_list_.emplace_front(std::move(table_entry));
                     return {res, nullptr};
@@ -141,12 +149,12 @@ TableMeta::CreateNewEntry(TableMeta* table_meta,
 }
 
 EntryResult
-TableMeta::DropNewEntry(TableMeta* table_meta,
-                        u64 txn_id,
-                        TxnTimeStamp begin_ts,
-                        TxnManager* txn_mgr,
-                        const String& table_name) {
-    TableEntry* res = nullptr;
+TableCollectionMeta::DropNewEntry(TableCollectionMeta* table_meta,
+                                  u64 txn_id,
+                                  TxnTimeStamp begin_ts,
+                                  TxnManager* txn_mgr,
+                                  const String& table_name) {
+    TableCollectionEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(table_meta->rw_locker_);
     if(table_meta->entry_list_.empty()) {
         LOG_TRACE("Empty table entry list.")
@@ -162,7 +170,7 @@ TableMeta::DropNewEntry(TableMeta* table_meta,
 
 //    SharedPtr<String> entry_dir = MakeShared<String>(*current_dir_ + "/txn_" + std::to_string(txn_id));
 
-    TableEntry* header_table_entry = (TableEntry*)header_base_entry;
+    TableCollectionEntry* header_table_entry = (TableCollectionEntry*)header_base_entry;
     if(header_table_entry->commit_ts_ < UNCOMMIT_TS) {
         // Committed
         if(begin_ts > header_table_entry->commit_ts_) {
@@ -174,13 +182,14 @@ TableMeta::DropNewEntry(TableMeta* table_meta,
 
             Vector<SharedPtr<ColumnDef>> dummy_columns;
 
-            SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + *table_meta->table_name_);
-            UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(base_dir,
-                                                                       table_meta->table_name_,
-                                                                       dummy_columns,
-                                                                       table_meta,
-                                                                       txn_id,
-                                                                       begin_ts);
+            SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + *table_meta->table_collection_name_);
+            UniquePtr<TableCollectionEntry> table_entry = MakeUnique<TableCollectionEntry>(base_dir,
+                                                                                           table_meta->table_collection_name_,
+                                                                                           dummy_columns,
+                                                                                           TableCollectionType::kTableEntry,
+                                                                                           table_meta,
+                                                                                           txn_id,
+                                                                                           begin_ts);
             res = table_entry.get();
             res->deleted_ = true;
             table_meta->entry_list_.emplace_front(std::move(table_entry));
@@ -208,9 +217,9 @@ TableMeta::DropNewEntry(TableMeta* table_meta,
 }
 
 void
-TableMeta::DeleteNewEntry(TableMeta* table_meta,
-                          u64 txn_id,
-                          TxnManager* txn_mgr) {
+TableCollectionMeta::DeleteNewEntry(TableCollectionMeta* table_meta,
+                                    u64 txn_id,
+                                    TxnManager* txn_mgr) {
     std::unique_lock<RWMutex> rw_locker(table_meta->rw_locker_);
     if(table_meta->entry_list_.empty()) {
         LOG_TRACE("Empty table entry list.")
@@ -227,9 +236,9 @@ TableMeta::DeleteNewEntry(TableMeta* table_meta,
 }
 
 EntryResult
-TableMeta::GetEntry(TableMeta* table_meta,
-                    u64 txn_id,
-                    TxnTimeStamp begin_ts) {
+TableCollectionMeta::GetEntry(TableCollectionMeta* table_meta,
+                              u64 txn_id,
+                              TxnTimeStamp begin_ts) {
     std::shared_lock<RWMutex> r_locker(table_meta->rw_locker_);
     if(table_meta->entry_list_.empty()) {
         LOG_TRACE("Empty table entry list.")
@@ -266,27 +275,27 @@ TableMeta::GetEntry(TableMeta* table_meta,
 }
 
 SharedPtr<String>
-TableMeta::ToString(TableMeta* table_meta) {
+TableCollectionMeta::ToString(TableCollectionMeta* table_meta) {
     std::shared_lock<RWMutex> r_locker(table_meta->rw_locker_);
     SharedPtr<String> res = MakeShared<String>(fmt::format("TableMeta, base dir: {}, table name: {}, entry count: ",
                                                            *table_meta->base_dir_,
-                                                           *table_meta->table_name_,
+                                                           *table_meta->table_collection_name_,
                                                            table_meta->entry_list_.size()));
     return res;
 }
 
 nlohmann::json
-TableMeta::Serialize(const TableMeta* table_meta) {
+TableCollectionMeta::Serialize(const TableCollectionMeta* table_meta) {
     nlohmann::json json_res;
 
     json_res["base_dir"] = *table_meta->base_dir_;
-    json_res["table_name"] = *table_meta->table_name_;
+    json_res["table_name"] = *table_meta->table_collection_name_;
 
     for(const auto& entry: table_meta->entry_list_) {
         if(entry->entry_type_ == EntryType::kTable) {
-            json_res["entries"].emplace_back(TableEntry::Serialize((TableEntry*)entry.get()));
+            json_res["entries"].emplace_back(TableCollectionEntry::Serialize((TableCollectionEntry*)entry.get()));
         } else if(entry->entry_type_ == EntryType::kDummy) {
-            LOG_TRACE("Skip dummy type entry during serialize table {} meta", *table_meta->table_name_);
+            LOG_TRACE("Skip dummy type entry during serialize table {} meta", *table_meta->table_collection_name_);
         } else {
             StorageError("Unexpected entry type");
         }
@@ -295,20 +304,20 @@ TableMeta::Serialize(const TableMeta* table_meta) {
     return json_res;
 }
 
-UniquePtr<TableMeta>
-TableMeta::Deserialize(const nlohmann::json& table_meta_json, DBEntry* db_entry, BufferManager* buffer_mgr) {
+UniquePtr<TableCollectionMeta>
+TableCollectionMeta::Deserialize(const nlohmann::json& table_meta_json, DBEntry* db_entry, BufferManager* buffer_mgr) {
     nlohmann::json json_res;
 
     SharedPtr<String> base_dir = MakeShared<String>(table_meta_json["base_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
 
-    UniquePtr<TableMeta> res = MakeUnique<TableMeta>(base_dir, table_name, db_entry);
+    UniquePtr<TableCollectionMeta> res = MakeUnique<TableCollectionMeta>(base_dir, table_name, db_entry);
     UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
     dummy_entry->deleted_ = true;
     res->entry_list_.emplace_back(std::move(dummy_entry));
     if(table_meta_json.contains("entries")) {
         for(const auto& table_entry_json: table_meta_json["entries"]) {
-            UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
+            UniquePtr<TableCollectionEntry> table_entry = TableCollectionEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
             res->entry_list_.emplace_back(std::move(table_entry));
         }
     }

@@ -13,7 +13,6 @@
 #include "function/aggregate_function_set.h"
 
 #include "common/utility/infinity_assert.h"
-#include "main/infinity.h"
 #include "expression_binder.h"
 #include "query_binder.h"
 
@@ -93,7 +92,7 @@ ExpressionBinder::BuildBetweenExpr(const BetweenExpr& expr,
     auto lower_ptr = BuildExpression(*expr.lower_bound_, bind_context_ptr, depth, false);
     auto upper_ptr = BuildExpression(*expr.upper_bound_, bind_context_ptr, depth, false);
 
-    auto &catalog = Infinity::instance().catalog();
+    NewCatalog* catalog = query_context_->storage()->catalog();
     SharedPtr<FunctionExpression> left_function_expr{nullptr}, right_function_expr{nullptr};
 
     {
@@ -102,7 +101,7 @@ ExpressionBinder::BuildBetweenExpr(const BetweenExpr& expr,
         arguments.reserve(2);
         arguments.emplace_back(value_ptr);
         arguments.emplace_back(lower_ptr);
-        SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(left_func);
+        SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, left_func);
         CheckFuncType(function_set_ptr->type_);
         auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
         ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
@@ -115,7 +114,7 @@ ExpressionBinder::BuildBetweenExpr(const BetweenExpr& expr,
         arguments.reserve(2);
         arguments.emplace_back(value_ptr);
         arguments.emplace_back(upper_ptr);
-        SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(left_func);
+        SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, left_func);
         CheckFuncType(function_set_ptr->type_);
         auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
         ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
@@ -128,7 +127,7 @@ ExpressionBinder::BuildBetweenExpr(const BetweenExpr& expr,
     arguments.emplace_back(left_function_expr);
     arguments.emplace_back(right_function_expr);
 
-    SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(and_func);
+    SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, and_func);
     CheckFuncType(function_set_ptr->type_);
     auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
     ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
@@ -206,7 +205,7 @@ ExpressionBinder::BuildFuncExpr(const FunctionExpr& expr,
                                 i64 depth,
                                 bool root) {
 
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(expr);
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
 
     CheckFuncType(function_set_ptr->type_);
 
@@ -284,8 +283,8 @@ ExpressionBinder::BuildCaseExpr(const CaseExpr& expr,
         SharedPtr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr_, bind_context_ptr, depth, false);
 
         String function_name = "=";
-        auto &catalog = Infinity::instance().catalog();
-        SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName(function_name);
+        NewCatalog* catalog = query_context_->storage()->catalog();
+        SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, function_name);
         auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
 
         for (const WhenThen *when_then_expr : *expr.case_check_array_) {

@@ -38,13 +38,13 @@ class SubstrFunctionTest : public BaseTest {
 TEST_F(SubstrFunctionTest, varchar_substr) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
+    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
 
     RegisterSubstringFunction(catalog_ptr);
 
     {
         String op = "substring";
-        SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
+        SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
         SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -123,7 +123,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
 
     {
         String op = "substring";
-        SharedPtr<FunctionSet> function_set = catalog_ptr->GetFunctionSetByName(op);
+        SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
         EXPECT_EQ(function_set->type_, FunctionType::kScalar);
         SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 

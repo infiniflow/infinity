@@ -292,7 +292,7 @@ public:
 
 
 void
-RegisterMaxFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterMaxFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "MAX";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -370,7 +370,7 @@ RegisterMaxFunction(const UniquePtr<Catalog> &catalog_ptr) {
         function_set_ptr->AddFunction(max_function);
     }
 #endif
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 }

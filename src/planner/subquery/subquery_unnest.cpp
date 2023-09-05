@@ -8,7 +8,6 @@
 #include "common/utility/infinity_assert.h"
 #include "planner/node/logical_limit.h"
 #include "expression/value_expression.h"
-#include "main/infinity.h"
 #include "function/aggregate_function_set.h"
 #include "expression/aggregate_expression.h"
 #include "planner/node/logical_aggregate.h"
@@ -26,27 +25,27 @@ namespace infinity {
 void
 SubqueryUnnest::UnnestSubqueries(SharedPtr<BaseExpression> &expr_ptr,
                                  SharedPtr<LogicalNode> &root,
-                                 const QueryContext* query_context_ptr,
+                                 QueryContext* query_context,
                                  const SharedPtr<BindContext>& bind_context) {
     // 2. Call Unnest Subquery to resolve subquery
     if (expr_ptr->type() == ExpressionType::kSubQuery) {
         // Subquery, need to be unnested.
-        UnnestSubquery(expr_ptr, root, query_context_ptr, bind_context);
+        UnnestSubquery(expr_ptr, root, query_context, bind_context);
     }
 }
 
 SharedPtr<BaseExpression>
 SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpression>& expr_ptr,
                                SharedPtr<LogicalNode>& root,
-                               const QueryContext* query_context_ptr,
+                               QueryContext* query_context,
                                const SharedPtr<BindContext>& bind_context) {
     // 1. Check the subquery type: uncorrelated subquery or correlated subquery.
     auto subquery_expr = std::static_pointer_cast<SubqueryExpression>(expr_ptr);
 
-    auto right = subquery_expr->bound_select_statement_ptr_->BuildPlan(query_context_ptr);
+    auto right = subquery_expr->bound_select_statement_ptr_->BuildPlan(query_context);
     // TODO: if the correlated information of the subquery should be stored in bind context.
     // Check the correlated information
-    auto result = UnnestUncorrelated(subquery_expr.get(), root, right, query_context_ptr, bind_context);
+    auto result = UnnestUncorrelated(subquery_expr.get(), root, right, query_context, bind_context);
     // If it isn't a correlated subquery
 
     // 2. Call different function to resolve uncorrelated subquery and correlated subquery.
@@ -59,7 +58,7 @@ SharedPtr<BaseExpression>
 SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
                                    SharedPtr<LogicalNode>& root,
                                    SharedPtr<LogicalNode>& subquery_plan,
-                                   const QueryContext* query_context_ptr,
+                                   QueryContext* query_context,
                                    const SharedPtr<BindContext>& bind_context) {
     switch(expr_ptr->subquery_type_) {
 
@@ -73,8 +72,8 @@ SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
 
             limit_node->set_left_node(subquery_plan);
             // Step2 Generate aggregate first operator on the limit operator
-            auto& catalog = Infinity::instance().catalog();
-            SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName("first");
+            NewCatalog* catalog = query_context->storage()->catalog();
+            SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "first");
             ColumnBinding limit_column_binding = limit_node->GetColumnBindings()[0];
 
             SharedPtr<ColumnExpression> argument = ColumnExpression::Make(expr_ptr->Type(),
@@ -159,13 +158,13 @@ SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
             SharedPtr<BaseExpression> right_expr = CastExpression::AddCastToType(right_column, expr_ptr->left_->Type());
             function_arguments.emplace_back(right_expr);
 
-            auto& catalog = Infinity::instance().catalog();
+            NewCatalog* catalog = query_context->storage()->catalog();
+            SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "first");
 
-            SharedPtr<FunctionSet> function_set_ptr = nullptr;
             if(expr_ptr->subquery_type_ == SubqueryType::kIn) {
-                function_set_ptr = catalog->GetFunctionSetByName("=");
+                function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "=");
             } else {
-                function_set_ptr = catalog->GetFunctionSetByName("<>");
+                function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "<>");
             }
             auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
             ScalarFunction equi_function = scalar_function_set_ptr->GetMostMatchFunction(function_arguments);
@@ -212,7 +211,7 @@ SharedPtr<BaseExpression>
 SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
                                  SharedPtr<LogicalNode>& root,
                                  SharedPtr<LogicalNode>& subquery_plan,
-                                 const QueryContext* query_context_ptr,
+                                 QueryContext* query_context,
                                  const SharedPtr<BindContext>& bind_context) {
 
     auto &correlated_columns = bind_context->correlated_column_exprs_;
@@ -232,7 +231,7 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
     switch(expr_ptr->subquery_type_) {
 
         case SubqueryType::kExists: {
-            DependentJoinFlattener dependent_join_flattener(bind_context);
+            DependentJoinFlattener dependent_join_flattener(bind_context, query_context);
 
             dependent_join_flattener.DetectCorrelatedExpressions(subquery_plan);
 
@@ -244,7 +243,8 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             Vector<SharedPtr<BaseExpression>> join_conditions;
             SizeT correlated_base_index = dependent_join_flattener.CorrelatedColumnBaseIndex();
 
-            GenerateJoinConditions(join_conditions,
+            GenerateJoinConditions(query_context,
+                                   join_conditions,
                                    correlated_columns,
                                    subplan_column_bindings,
                                    correlated_base_index);
@@ -271,7 +271,7 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             return result;
         }
         case SubqueryType::kNotExists: {
-            DependentJoinFlattener dependent_join_flattener(bind_context);
+            DependentJoinFlattener dependent_join_flattener(bind_context, query_context);
 
             dependent_join_flattener.DetectCorrelatedExpressions(subquery_plan);
 
@@ -283,7 +283,8 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             Vector<SharedPtr<BaseExpression>> join_conditions;
             SizeT correlated_base_index = dependent_join_flattener.CorrelatedColumnBaseIndex();
 
-            GenerateJoinConditions(join_conditions,
+            GenerateJoinConditions(query_context,
+                                   join_conditions,
                                    correlated_columns,
                                    subplan_column_bindings,
                                    correlated_base_index);
@@ -309,8 +310,8 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
                                                                         0);
 
             // Add NOT function on the mark column
-            auto& catalog = Infinity::instance().catalog();
-            SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName("not");
+            NewCatalog* catalog = query_context->storage()->catalog();
+            SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "not");
             Vector<SharedPtr<BaseExpression>> function_arguments;
             function_arguments.reserve(1);
             function_arguments.emplace_back(mark_column);
@@ -323,7 +324,7 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
         }
         case SubqueryType::kNotIn:
         case SubqueryType::kIn: {
-            DependentJoinFlattener dependent_join_flattener(bind_context);
+            DependentJoinFlattener dependent_join_flattener(bind_context, query_context);
 
             dependent_join_flattener.DetectCorrelatedExpressions(subquery_plan);
 
@@ -337,7 +338,8 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             Vector<SharedPtr<BaseExpression>> join_conditions;
             SizeT correlated_base_index = dependent_join_flattener.CorrelatedColumnBaseIndex();
 
-            GenerateJoinConditions(join_conditions,
+            GenerateJoinConditions(query_context,
+                                   join_conditions,
                                    correlated_columns,
                                    subplan_column_bindings,
                                    correlated_base_index);
@@ -392,7 +394,7 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             return result;
         }
         case SubqueryType::kScalar: {
-            DependentJoinFlattener dependent_join_flattener(bind_context);
+            DependentJoinFlattener dependent_join_flattener(bind_context, query_context);
 
             dependent_join_flattener.DetectCorrelatedExpressions(subquery_plan);
 
@@ -404,7 +406,8 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             Vector<SharedPtr<BaseExpression>> join_conditions;
             SizeT correlated_base_index = dependent_join_flattener.CorrelatedColumnBaseIndex();
 
-            GenerateJoinConditions(join_conditions,
+            GenerateJoinConditions(query_context,
+                                   join_conditions,
                                    correlated_columns,
                                    subplan_column_bindings,
                                    correlated_base_index);
@@ -437,12 +440,13 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
 }
 
 void
-SubqueryUnnest::GenerateJoinConditions(Vector<SharedPtr<BaseExpression>>& join_conditions,
+SubqueryUnnest::GenerateJoinConditions(QueryContext* query_context,
+                                       Vector<SharedPtr<BaseExpression>>& join_conditions,
                                        const Vector<SharedPtr<ColumnExpression>>& correlated_columns,
                                        const Vector<ColumnBinding>& subplan_column_bindings,
                                        SizeT correlated_base_index) {
-    auto& catalog = Infinity::instance().catalog();
-    SharedPtr<FunctionSet> function_set_ptr = catalog->GetFunctionSetByName("=");
+    NewCatalog* catalog = query_context->storage()->catalog();
+    SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "=");
     SizeT column_count = correlated_columns.size();
     for (SizeT idx = 0; idx < column_count; ++ idx) {
         auto& left_column_expr = correlated_columns[idx];

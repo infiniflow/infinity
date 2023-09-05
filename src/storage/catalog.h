@@ -3,7 +3,7 @@
 //
 
 #pragma once
-
+#if 0
 #include "function/function_set.h"
 #include "common/singleton.h"
 #include "schema_definition.h"
@@ -88,3 +88,4 @@ private:
 };
 
 }
+#endif

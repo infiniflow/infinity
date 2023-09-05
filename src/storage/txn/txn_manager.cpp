@@ -3,6 +3,7 @@
 //
 
 #include "txn_manager.h"
+#include "storage/meta/catalog.h"
 
 namespace infinity {
 

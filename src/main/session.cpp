@@ -6,8 +6,5 @@
 
 namespace infinity {
 
-Session::Session()
-    : current_schema_("default")
-      {}
 
 }

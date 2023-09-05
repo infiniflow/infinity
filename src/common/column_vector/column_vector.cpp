@@ -1717,6 +1717,72 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
     this->tail_index_ += count;
 }
 
+SizeT
+ColumnVector::AppendWith(const ptr_t ptr, SizeT start_row, SizeT row_count) {
+    if(row_count == 0) {
+        return 0;
+    }
+
+    SizeT appended_rows = row_count;
+    if(tail_index_ + row_count > capacity_) {
+        // attempt to append data rows more than the capacity;
+        appended_rows = capacity_ - tail_index_;
+    }
+
+    switch(data_type_->type()) {
+        case kBoolean:
+        case kTinyInt:
+        case kSmallInt:
+        case kInteger:
+        case kBigInt:
+        case kHugeInt:
+        case kDecimal:
+        case kFloat:
+        case kDouble:
+        case kDate:
+        case kTime:
+        case kDateTime:
+        case kTimestamp:
+        case kInterval:
+        case kPoint:
+        case kLine:
+        case kLineSeg:
+        case kBox:
+        case kCircle:
+        case kBitmap:
+        case kUuid:
+        case kEmbedding: {
+            ptr_t src_ptr = ptr + start_row * data_type_size_;
+            ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
+            memcpy(dst_ptr, src_ptr, appended_rows * data_type_size_);
+            break;
+        }
+
+        case kVarchar:
+        case kArray:
+        case kTuple:
+        case kPath:
+        case kPolygon:
+        case kBlob:
+        case kMixed:
+        case kNull: {
+            LOG_ERROR("{} isn't supported", data_type_->ToString())
+            NotImplementError("Not supported now in append data in column")
+        }
+        case kMissing:
+        case kInvalid: {
+            LOG_ERROR("Invalid data type {}", data_type_->ToString())
+            StorageError("Invalid data type")
+        }
+        default: {
+            TypeError("Attempt to store an unaccepted type");
+            // Null/Missing/Invalid
+        }
+    }
+    this->tail_index_ += appended_rows;
+    return appended_rows;
+}
+
 void
 ColumnVector::ShallowCopy(const ColumnVector &other) {
     if(*this->data_type_ != *other.data_type_) {

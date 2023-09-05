@@ -70,7 +70,7 @@ MinusFunction::Run(MixedT value, MixedT &result) {
 }
 
 void
-RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr) {
+RegisterMinusFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "-";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -139,6 +139,6 @@ RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr) {
             &ScalarFunction::UnaryFunctionWithFailure<MixedT, MixedT, MinusFunction>);
     function_set_ptr->AddFunction(minus_mixed);
 
-    catalog_ptr->AddFunctionSet(function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 }
