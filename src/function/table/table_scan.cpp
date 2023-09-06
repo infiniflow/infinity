@@ -2,7 +2,10 @@
 // Created by JinHai on 2022/9/14.
 //
 
+#include "common/utility/infinity_assert.h"
 #include "main/logger.h"
+#include "storage/meta/entry/segment_entry.h"
+#include "storage/txn/constants.h"
 #include "table_scan.h"
 
 namespace infinity {
@@ -17,35 +20,54 @@ TableScanFunc(QueryContext* query_context,
 
     TableCollectionEntry* table_column_entry_ptr = table_scan_function_data_ptr->table_entry_ptr_;
     Vector<SizeT>& column_ids = table_scan_function_data_ptr->column_ids_;
-//    i64& current_segment_id = table_scan_function_data_ptr->segment_count_;
 
-    for(auto& segment_pair: table_column_entry_ptr->segments_) {
-        for(SizeT column_id: column_ids) {
-            ObjectHandle col_object = ColumnDataEntry::GetColumnData(segment_pair.second->columns_[column_id].get(),
+    i64 current_segment_id = table_scan_function_data_ptr->current_segment_id_;
+    if (current_segment_id == INITIAL_SEGMENT_ID) {
+        auto iter = table_column_entry_ptr->segments_.begin();
+        if (iter != table_column_entry_ptr->segments_.end()) {
+            current_segment_id = iter->first;
+        } else {
+            current_segment_id = INVALID_SEGMENT_ID;
+        }
+    }
+
+
+    // Here we assume output is a fresh databolck, we have never write anything into it.
+    auto write_capacity = output.capacity();
+    
+
+    // fill the whole output datablock or we have read all data from table
+    while (write_capacity > 0 && current_segment_id != INVALID_SEGMENT_ID) {
+        auto iter = table_column_entry_ptr->segments_.find(current_segment_id);
+        StorageAssert(iter != nullptr, "empty segment entry");
+        auto remaining = iter->second->Remaining();
+        auto write_size = std::min(write_capacity, remaining);
+        for (auto column_id : column_ids) {
+
+            ObjectHandle col_object = ColumnDataEntry::GetColumnData(iter->second->columns_[column_id].get(),
                                                                      query_context->storage()->buffer_manager());
-            output.column_vectors[column_id]->AppendWith(col_object.GetData(), 0, segment_pair.second->current_row_);
+            output.column_vectors[column_id]->AppendWith( col_object.GetData(), iter->second->read_offset(), write_size);
         }
-    }
-    output.Finalize();
+        
+        // write_size = already read size = already write size
+        write_capacity -= write_size;
+        remaining -= write_size;
+        iter->second->AdvanceReadOffset(write_size);
 
-//    StorageError("Not implemented");
-#if 0
-    if(current_block_id >= table_ptr->DataBlockCount()) {
-        LOG_TRACE("All blocks are read from storage.");
-        output.Reset();
-        return ;
-    } else {
-        SharedPtr<DataBlock> current_block = table_ptr->GetDataBlockById(current_block_id);
-        i64 output_column_id = 0;
-        for(size_t column_id: column_ids) {
-//            output.column_vectors[output_column_id ++] = current_block->column_vectors[column_id];
-            output.column_vectors[output_column_id ++]->ShallowCopy(*current_block->column_vectors[column_id]);
+        // we have read all data from current segment, move to next block
+        if (remaining == 0) {
+            ++iter;
+            if (iter != table_column_entry_ptr->segments_.end()) {
+                current_segment_id = iter->first;
+            } else {
+                current_segment_id = INVALID_SEGMENT_ID;
+            }
         }
-        // Fixme: use set_row_count to save time cost?
-        output.Finalize();
-        ++ current_block_id;
     }
-#endif
+
+    output.Finalize();
+    table_scan_function_data_ptr->current_segment_id_ = current_segment_id;
+
 }
 
 void

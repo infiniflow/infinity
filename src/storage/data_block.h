@@ -83,9 +83,6 @@ public:
             if(row_count_ == 0) return 0;
             StorageError("Not finalized data block")
         }
-
-        if(row_count_ == 0) return 0;
-
         return row_count_;
     }
 

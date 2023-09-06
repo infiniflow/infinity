@@ -53,3 +53,7 @@ src/bin/compilation_config.h
 
 # bison output file
 parser.output
+
+#vscode file
+.cache
+.vscode

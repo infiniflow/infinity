@@ -8,6 +8,7 @@
 #include "function/table_function.h"
 #include "function/function_data.h"
 #include "storage/meta/catalog.h"
+#include "storage/txn/constants.h"
 
 namespace infinity {
 
@@ -26,6 +27,8 @@ public:
 
     // How many segments are scanned.
     i64 segment_count_{0};
+
+    i64 current_segment_id_{INITIAL_SEGMENT_ID};
 };
 
 class TableScanFunction : public TableFunction {

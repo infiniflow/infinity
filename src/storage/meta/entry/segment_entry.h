@@ -9,6 +9,8 @@
 
 #include "base_entry.h"
 #include "column_data_entry.h"
+#include "common/types/internal_types.h"
+#include "common/utility/infinity_assert.h"
 #include "data_access_state.h"
 
 namespace infinity {
@@ -48,6 +50,8 @@ public:
 
     SizeT current_row_{};
 
+    SizeT read_offset_ {0};
+
     u64 segment_id_{};
 
     std::atomic<DataSegmentStatus> status_{DataSegmentStatus::kOpen};
@@ -62,6 +66,24 @@ public:
     inline SizeT
     AvailableCapacity() const {
         return row_capacity_ - current_row_;
+    }
+
+    [[nodiscard]] inline SizeT
+    Remaining() const {
+        StorageAssert(current_row_ >= read_offset_, "Read offset is larger than row count.");
+        return current_row_ - read_offset_;
+    }
+
+    [[nodiscard]] inline SizeT
+    read_offset() const {
+        StorageAssert(current_row_ >= read_offset_, "Read offset is larger than row count.");
+        return read_offset_;
+    }
+
+    void
+    AdvanceReadOffset(SizeT offset) {
+        StorageAssert(read_offset_ + offset <= current_row_, "Read offset is larger than row count.");
+        read_offset_ += offset;
     }
 
 public:
