@@ -118,7 +118,6 @@ TEST_F(TableScanTest, block_read_test) {
         }
 
         EXPECT_EQ(times, ceil(total_row / 1024.0));
-        segment_entry1->read_offset_ = 0;
     }
 
     
@@ -149,9 +148,6 @@ TEST_F(TableScanTest, block_read_test) {
             times += 1;
         }
         EXPECT_EQ(times, ceil(total_row / 1024.0) );
-        segment_entry1->read_offset_ = 0;
-        segment_entry2->read_offset_ = 0;
-        segment_entry3->read_offset_ = 0;
     }
 
     // total row is multipy of block size
