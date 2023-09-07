@@ -59,6 +59,8 @@ batch_run_on_cpu(faiss::Index* index,
             index->search(query_count, query_vectors, top_k, D, I);
             break;
         }
+        default:
+            break;
     }
 
     // evaluate result by hand.
@@ -130,6 +132,8 @@ single_run_on_cpu(void* index,
                 flat_index->search(1, query_vector, top_k, D, I);
                 break;
             }
+            default:
+                break;
         }
 
         int gt_nn = ground_truth[query_index * top_k];
@@ -200,7 +204,7 @@ struct AnnFlatTask : public Task {
         profiler.End();
 //        std::cout << "Search: " << profiler.ElapsedToString() << ", "
 //                  << get_current_rss() / 1000000 << " MB" << std::endl;
-        printf("Run AnnFlat by worker: %ld, spend: %s\n", worker_id, profiler.ElapsedToString().c_str());
+        printf("Run AnnFlat by worker: %ld, spend: %s\n", (long)worker_id, profiler.ElapsedToString().c_str());
 //        usleep(1000 * 1000);
     }
 
@@ -467,6 +471,8 @@ scheduler_run_on_cpu(void* index,
                                                            result_distances));
                 break;
             }
+            default:
+                break;
         }
 
         query_offset += query_count;

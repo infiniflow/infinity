@@ -2,6 +2,7 @@
 #include <string>
 #include <thread>
 #include <set>
+#include <algorithm>
 #include <gtest/gtest.h>
 
 namespace infinity {

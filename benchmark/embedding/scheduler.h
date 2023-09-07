@@ -50,7 +50,7 @@ struct DummyTask final: public Task {
 
     void
     run(i64 worker_id) override {
-        printf("Run dummy task by worker: %ld\n", worker_id);
+        printf("Run dummy task by worker: %ld\n", (long)worker_id);
         sleep(1);
     }
 };
