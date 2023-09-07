@@ -6,16 +6,7 @@
 
 namespace infinity {
 
-void
-RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
-
-    SharedPtr<TableScanFunction> seq_scan_ptr = MakeShared<TableScanFunction>("seq_scan", TableScanFunc);
-
-    NewCatalog::AddTableFunction(catalog_ptr.get(), seq_scan_ptr);
-
-}
-
-void
+static void
 TableScanFunc(QueryContext* query_context,
               const SharedPtr<TableFunctionData>& table_function_data_ptr,
               DataBlock &output) {
@@ -78,5 +69,15 @@ TableScanFunc(QueryContext* query_context,
     table_scan_function_data_ptr->current_segment_id_ = current_segment_id;
     table_scan_function_data_ptr->read_offset_ = read_offset;
 }
+
+void
+RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+
+    SharedPtr<TableScanFunction> seq_scan_ptr = MakeShared<TableScanFunction>("seq_scan", TableScanFunc);
+
+    NewCatalog::AddTableFunction(catalog_ptr.get(), seq_scan_ptr);
+
+}
+
 
 }

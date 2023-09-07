@@ -51,7 +51,7 @@ public:
 private:
 };
 
-void
+static void
 TableScanFunc(QueryContext* query_context,
               const SharedPtr<TableFunctionData>& table_function_data_ptr,
               DataBlock &output);

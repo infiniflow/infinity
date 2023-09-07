@@ -14,6 +14,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "scheduler/pipeline.h"
 #include "storage/data_block.h"
+#include "storage/meta/catalog.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/entry/column_data_entry.h"
 #include "storage/storage.h"
@@ -40,6 +41,8 @@ class TableScanTest : public BaseTest {
 
 TEST_F(TableScanTest, block_read_test) {
     using namespace infinity;
+    auto catalog = MakeUnique<NewCatalog>(MakeShared<String>("/tmp/infinity"));
+    RegisterTableScanFunction(catalog);
 
     Config config;
     config.Init(nullptr);
@@ -110,7 +113,8 @@ TEST_F(TableScanTest, block_read_test) {
 
             DataBlock output;
             output.Init(column_types, 1024);
-            TableScanFunc(query_context.get(), table_scan_func, output);
+            auto func = NewCatalog::GetTableFunctionByName(catalog.get(), "seq_scan");
+            func->main_function_(query_context.get(), table_scan_func, output);
             if (output.row_count() == 0) {
                 break;
             }
@@ -141,7 +145,8 @@ TEST_F(TableScanTest, block_read_test) {
 
             DataBlock output;
             output.Init(column_types, 1024);
-            TableScanFunc(query_context.get(), table_scan_func, output);
+            auto func = NewCatalog::GetTableFunctionByName(catalog.get(), "seq_scan");
+            func->main_function_(query_context.get(), table_scan_func, output);
             if (output.row_count() == 0) {
                 break;
             }
@@ -171,7 +176,8 @@ TEST_F(TableScanTest, block_read_test) {
 
             DataBlock output;
             output.Init(column_types, 1024);
-            TableScanFunc(query_context.get(), table_scan_func, output);
+            auto func = NewCatalog::GetTableFunctionByName(catalog.get(), "seq_scan");
+            func->main_function_(query_context.get(), table_scan_func, output);
             if (output.row_count() == 0) {
                 break;
             }
