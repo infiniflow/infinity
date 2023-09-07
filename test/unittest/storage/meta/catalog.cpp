@@ -187,72 +187,74 @@ TEST_F(CatalogTest, concurrent_test) {
     NewCatalog new_catalog(std::move(dir));
     TxnManager txn_mgr(&new_catalog, &buffer_mgr);
 
-    // start txn1 && txn2
-    auto* txn1 = txn_mgr.CreateTxn();
-    txn1->BeginTxn();
-    auto* txn2 = txn_mgr.CreateTxn();
-    txn2->BeginTxn();
+    for (int i = 0; i < 100; i++) {
+        // start txn1 && txn2
+        auto *txn1 = txn_mgr.CreateTxn();
+        txn1->BeginTxn();
+        auto *txn2 = txn_mgr.CreateTxn();
+        txn2->BeginTxn();
 
-    // lock protect databases
-    std::mutex lock;
-    HashMap<String, BaseEntry*> databases;
+        // lock protect databases
+        std::mutex lock;
+        HashMap<String, BaseEntry *> databases;
 
-    auto write_routine = [&](int start, Txn* txn) {
-        EntryResult res;
-        for(int i = start; i < 1000; i += 2) {
+        auto write_routine = [&](int start, Txn *txn) {
+          EntryResult res;
+          for (int i = start; i < 1000; i += 2) {
             String db_name = "db" + std::to_string(i);
-            res = txn1->CreateDatabase(db_name, ConflictType::kError);
+            res = txn->CreateDatabase(db_name, ConflictType::kError);
             EXPECT_TRUE(res.Success());
             // store this entry
             lock.lock();
             databases[db_name] = res.entry_;
             lock.unlock();
-        }
-    };
+          }
+        };
 
-    std::thread write_thread1(write_routine, 0, txn1);
-    std::thread write_thread2(write_routine, 1, txn2);
+        std::thread write_thread1(write_routine, 0, txn1);
+        std::thread write_thread2(write_routine, 1, txn2);
 
-    write_thread1.join();
-    write_thread2.join();
+        write_thread1.join();
+        write_thread2.join();
 
-    txn1->CommitTxn();
-    txn2->CommitTxn();
+        txn1->CommitTxn();
+        txn2->CommitTxn();
 
-    // start txn3 && txn4
-    auto* txn3 = txn_mgr.CreateTxn();
-    txn3->BeginTxn();
-    auto* txn4 = txn_mgr.CreateTxn();
-    txn4->BeginTxn();
+        // start txn3 && txn4
+        auto *txn3 = txn_mgr.CreateTxn();
+        txn3->BeginTxn();
+        auto *txn4 = txn_mgr.CreateTxn();
+        txn4->BeginTxn();
 
-    auto read_routine = [&](Txn* txn) {
-        EntryResult res;
-        for(int i = 0; i < 1000; i++) {
+        auto read_routine = [&](Txn *txn) {
+          EntryResult res;
+          for (int i = 0; i < 1000; i++) {
             String db_name = "db" + std::to_string(i);
-            res = NewCatalog::GetDatabase(&new_catalog, db_name, txn->TxnID(), txn->BeginTS());
+            res = NewCatalog::GetDatabase(&new_catalog, db_name, txn->TxnID(),
+                                          txn->BeginTS());
             EXPECT_TRUE(res.Success());
             // only read, don't need lock
             EXPECT_EQ(res.entry_, databases[db_name]);
-        }
-    };
+          }
+        };
 
-    std::thread read_thread1(read_routine, txn3);
-    std::thread read_thread2(read_routine, txn4);
-    read_thread1.join();
-    read_thread2.join();
+        std::thread read_thread1(read_routine, txn3);
+        std::thread read_thread2(read_routine, txn4);
+        read_thread1.join();
+        read_thread2.join();
 
-    txn3->CommitTxn();
-    txn4->CommitTxn();
+        txn3->CommitTxn();
+        txn4->CommitTxn();
 
-    // start txn5 && txn6
-    auto* txn5 = txn_mgr.CreateTxn();
-    txn5->BeginTxn();
-    auto* txn6 = txn_mgr.CreateTxn();
-    txn6->BeginTxn();
+        // start txn5 && txn6
+        auto *txn5 = txn_mgr.CreateTxn();
+        txn5->BeginTxn();
+        auto *txn6 = txn_mgr.CreateTxn();
+        txn6->BeginTxn();
 
-    auto drop_routine = [&](int start, Txn* txn) {
-        EntryResult res;
-        for(int i = start; i < 1000; i += 2) {
+        auto drop_routine = [&](int start, Txn *txn) {
+          EntryResult res;
+          for (int i = start; i < 1000; i += 2) {
             String db_name = "db" + std::to_string(i);
             res = txn->DropDatabase(db_name, ConflictType::kError);
             EXPECT_TRUE(res.Success());
@@ -260,27 +262,28 @@ TEST_F(CatalogTest, concurrent_test) {
             lock.lock();
             databases.erase(db_name);
             lock.unlock();
+          }
+        };
+
+        std::thread drop_thread1(drop_routine, 0, txn5);
+        std::thread drop_thread2(drop_routine, 1, txn6);
+        drop_thread1.join();
+        drop_thread2.join();
+
+        txn5->CommitTxn();
+        txn6->CommitTxn();
+
+        // start txn7
+        auto *txn7 = txn_mgr.CreateTxn();
+        txn7->BeginTxn();
+
+        // check all has been dropped
+        EntryResult res;
+        for (int i = 0; i < 1000; i++) {
+          String db_name = "db" + std::to_string(i);
+          res = NewCatalog::GetDatabase(&new_catalog, db_name, txn7->TxnID(),
+                                        txn7->BeginTS());
+          EXPECT_TRUE(res.Fail());
         }
-    };
-
-    std::thread drop_thread1(drop_routine,0, txn5);
-    std::thread drop_thread2(drop_routine,1, txn6);
-    drop_thread1.join();
-    drop_thread2.join();
-
-    txn5->CommitTxn();
-    txn6->CommitTxn();
-
-    // start txn7
-    auto* txn7 = txn_mgr.CreateTxn();
-    txn7->BeginTxn();
-
-    // check all has been dropped
-    EntryResult res;
-    for(int i = 0; i < 1000; i++) {
-        String db_name = "db" + std::to_string(i);
-        res = NewCatalog::GetDatabase(&new_catalog, db_name, txn7->TxnID(), txn7->BeginTS());
-        EXPECT_TRUE(res.Fail());
     }
 }
-
