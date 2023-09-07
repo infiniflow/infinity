@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "file_system.h"
+#include "storage/io/file_system.h"
+#include "common/types/internal_types.h"
 
 namespace infinity {
 
@@ -15,8 +16,8 @@ public:
     FileReader(const FileReader& other);
 
     FileSystem& fs_;
-    String path_;
-    UniquePtr<char_t[]> data_;
+    String path_{};
+    UniquePtr<char_t[]> data_{};
     i64 buffer_offset_{};
     i64 already_read_size_{};
     SizeT buffer_start_{};

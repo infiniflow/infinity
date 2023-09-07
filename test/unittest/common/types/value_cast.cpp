@@ -1440,7 +1440,7 @@ TEST_F(ValueCastTest, float_value_cast) {
         }
 
         {
-            source = std::numeric_limits<IntegerT>::max() - 100;
+            source = static_cast<FloatT>(std::numeric_limits<IntegerT>::max() - 100);
             value = Value::MakeFloat(source);
             EXPECT_EQ(value.GetValue<FloatT>(), source);
             value.TryCastAs(target_type, target_value);

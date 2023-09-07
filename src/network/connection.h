@@ -3,10 +3,8 @@
 //
 
 #pragma once
-#include "pg_protocol_handler.h"
-//#include "storage/table.h"
-#include "planner/logical_node_type.h"
 
+#include "pg_protocol_handler.h"
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
 

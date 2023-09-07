@@ -48,6 +48,9 @@ ToString(TxnState txn_state) {
         case TxnState::kRollbacked: {
             return "Rollbacked";
         }
+        default: {
+            break;
+        }
     }
     StorageError("Invalid transaction state.")
 }

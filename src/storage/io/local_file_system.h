@@ -22,6 +22,8 @@ class LocalFileSystem final : public FileSystem {
 public:
     LocalFileSystem(): FileSystem(FileSystemType::kPosix) {}
 
+    ~LocalFileSystem() override = default;
+
     UniquePtr<FileHandler>
     OpenFile(const String& path, u8 flags, FileLockType lock_type) final;
 

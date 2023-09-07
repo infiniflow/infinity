@@ -6,13 +6,12 @@
 
 #include "common/singleton.h"
 #include "common/types/internal_types.h"
-#include <memory>
 #include "scheduler/scheduler.h"
-#include "config.h"
 #include "storage/storage.h"
 
 namespace infinity {
 
+class Config;
 class Infinity : public Singleton<Infinity> {
 public:
     [[nodiscard]] inline Scheduler*

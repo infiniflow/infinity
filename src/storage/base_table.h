@@ -6,8 +6,6 @@
 
 #include <utility>
 
-#include "common/types/internal_types.h"
-#include "common/utility/infinity_assert.h"
 #include "storage/meta/entry/table_collecton_type.h"
 
 namespace infinity {

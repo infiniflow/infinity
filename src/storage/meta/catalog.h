@@ -6,6 +6,7 @@
 
 #include <shared_mutex>
 #include "common/types/internal_types.h"
+#include "storage/io/file_system_type.h"
 #include "storage/common/async_batch_processor.h"
 #include "storage/meta/entry/db_entry.h"
 #include "db_meta.h"

@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(infinity VERSION 0.1.0)
 
+set(CMAKE_CXX_STANDARD 23)
+
 # Print CMake version and project name
 message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION}")
 
@@ -21,6 +23,16 @@ message(STATUS "Commit-id = ${GIT_COMMIT_ID}")
 set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  MESSAGE("${CMAKE_CXX_COMPILER_ID}")
+  MESSAGE("${CMAKE_CXX_COMPILER}")
+  MESSAGE("CLANG")
+  set (CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations" )
+#  set (CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -Wno-deprecated-declarations -ftime-trace" )
+else ()
+  message("GCC")
+endif ()
+
 if(NOT CMAKE_BUILD_TYPE)
   if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
     set(default_build_type "RelWithDebInfo")
@@ -31,23 +43,6 @@ if(NOT CMAKE_BUILD_TYPE)
     "Default BUILD_TYPE is ${default_build_type}" FORCE)
 endif()
 add_definitions(-march=native)
-
-#include(cmake/jemalloc.cmake)
-#include(cmake/snappy.cmake)
-#include(cmake/lz4.cmake)
-#include(cmake/zlib.cmake)
-#include(cmake/zstd.cmake)
-#include(cmake/tbb.cmake)
-#include(cmake/rocksdb.cmake)
-
-#list(APPEND EXTERNAL_LIBS jemalloc)
-#list(APPEND EXTERNAL_LIBS snappy)
-#list(APPEND EXTERNAL_LIBS rocksdb_with_headers)
-#list(APPEND EXTERNAL_LIBS lz4)
-#list(APPEND EXTERNAL_LIBS zstd)
-#list(APPEND EXTERNAL_LIBS zlib_with_headers)
-
-set(CMAKE_CXX_STANDARD 23)
 
 ADD_DEFINITIONS(-D INFINITY_DEBUG)
 

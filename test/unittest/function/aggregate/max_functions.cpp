@@ -141,8 +141,6 @@ TEST_F(MaxFunctionTest, max_func) {
             EXPECT_EQ(v.value_.small_int, static_cast<SmallIntT>(i));
         }
 
-        data_block.column_vectors[0];
-
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         SmallIntT result;

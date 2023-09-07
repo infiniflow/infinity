@@ -13,13 +13,21 @@ namespace infinity {
 
 class BufferWriter {
 public:
-    explicit BufferWriter(const std::shared_ptr<boost::asio::ip::tcp::socket> socket) : socket_(socket) {}
+    explicit
+    BufferWriter(const SharedPtr<boost::asio::ip::tcp::socket> socket) : socket_(socket) {}
 
-    [[nodiscard]] size_t size() const;
+    [[nodiscard]] size_t
+    size() const;
 
-    inline static size_t max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }
+    inline static size_t
+    max_capacity() {
+        return PG_MSG_BUFFER_SIZE - 1;
+    }
 
-    inline bool full() const { return size() == max_capacity(); }
+    inline bool 
+    full() const { 
+        return size() == max_capacity(); 
+    }
 
     template<typename T>
     void send_value(T host_value) {
@@ -39,7 +47,8 @@ public:
         std::advance(current_pos_, sizeof(T));
     }
 
-    void send_string(const std::string& value, NullTerminator null_terminator = NullTerminator::kYes);
+    void 
+    send_string(const String& value, NullTerminator null_terminator = NullTerminator::kYes);
 
     // 0 means flush whole buffer.
     void flush(size_t bytes = 0);
@@ -50,7 +59,7 @@ private:
     std::array<char, PG_MSG_BUFFER_SIZE> data_{};
     RingBufferIterator start_pos_{data_};
     RingBufferIterator current_pos_{data_};
-    std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
+    SharedPtr<boost::asio::ip::tcp::socket> socket_{};
 };
 
 }

@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include "base_test.h"
 #include "storage/data_block.h"
+#include "storage/table.h"
 #include "common/types/info/decimal_info.h"
 
 #include "common/types/info/array_info.h"

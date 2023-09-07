@@ -3,10 +3,7 @@
 //
 
 #include "infinity.h"
-#include "logger.h"
 #include "scheduler/naive_scheduler.h"
-#include "storage/storage.h"
-#include "config.h"
 
 namespace infinity {
 

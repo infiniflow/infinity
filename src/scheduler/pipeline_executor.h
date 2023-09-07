@@ -10,7 +10,7 @@ class PipelineExecutor {
 public:
     PipelineExecutor(std::uint16_t max_cores);
 
-    ~PipelineExecutor() noexcept;
+    ~PipelineExecutor() noexcept = default;
 
     void Run();
 

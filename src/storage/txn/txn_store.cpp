@@ -59,6 +59,7 @@ TxnTableStore::Append(const SharedPtr<DataBlock>& input_block) {
 UniquePtr<String>
 TxnTableStore::Import(const SharedPtr<SegmentEntry>& segment) {
     uncommitted_segments_.emplace_back(segment);
+    return nullptr;
 }
 
 UniquePtr<String>

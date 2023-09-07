@@ -4,11 +4,8 @@
 
 #pragma once
 
-#include "storage/table.h"
 
-#include <atomic>
-#include <memory>
-#include <vector>
+#include "common/types/internal_types.h"
 
 enum class TaskState {
     kCreated,
@@ -19,6 +16,7 @@ enum class TaskState {
 
 namespace infinity {
 
+class Table;
 class QueryContext;
 class Pipeline : public std::enable_shared_from_this<Pipeline> {
 public:

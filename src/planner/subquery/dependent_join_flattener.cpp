@@ -256,6 +256,9 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
         case LogicalNodeType::kInvalid: {
             PlannerError("Invalid logical operator node");
         }
+        default: {
+            PlannerError("Unsupported logical operator node");
+        }
     }
     PlannerError("Unreachable");
 }

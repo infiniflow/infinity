@@ -578,12 +578,6 @@ foreach(mlas_target ${ONNXRUNTIME_MLAS_LIBS})
     target_include_directories(${mlas_target} PRIVATE inc ${MLAS_SRC_DIR})
 endforeach()
 set_target_properties(onnxruntime_mlas PROPERTIES FOLDER "ONNXRuntime")
-if (WIN32)
-  target_compile_options(onnxruntime_mlas PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:/wd6385>" "$<$<COMPILE_LANGUAGE:CXX>:/wd4127>")
-  if (onnxruntime_ENABLE_STATIC_ANALYSIS)
-    target_compile_options(onnxruntime_mlas PRIVATE  "$<$<COMPILE_LANGUAGE:CXX>:/analyze:stacksize 131072">)
-  endif()
-endif()
 
 if (NOT onnxruntime_BUILD_SHARED_LIB)
     install(TARGETS onnxruntime_mlas

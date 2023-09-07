@@ -4,7 +4,8 @@
 
 #include <iostream>
 #include <charconv>
-#include <boost/asio/ip/address.hpp>
+#include <boost/asio/ip/impl/address.ipp>
+//#include <boost/asio/ip/address.hpp>
 #include "config.h"
 #include "bin/compilation_config.h"
 #include "toml.hpp"

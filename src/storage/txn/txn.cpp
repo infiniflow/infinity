@@ -424,7 +424,7 @@ Txn::CreateCollection(const String& db_name, const String& collection_name, Conf
 
 EntryResult
 Txn::GetCollectionByName(const String& db_name, const String& table_name) {
-
+    TransactionError("Not Implemented")
 }
 
 EntryResult

@@ -78,18 +78,30 @@ TableCollectionEntry::Append(TableCollectionEntry* table_entry, Txn* txn_ptr, vo
 }
 
 UniquePtr<String>
-TableCollectionEntry::Delete(TableCollectionEntry* table_entry, Txn* txn_ptr, DeleteState& delete_state, BufferManager* buffer_mgr) {
-
+TableCollectionEntry::Delete(TableCollectionEntry* table_entry,
+                             Txn* txn_ptr,
+                             DeleteState& delete_state,
+                             BufferManager* buffer_mgr) {
+    NotImplementError("TableCollectionEntry::Delete");
+    return nullptr;
 }
 
 UniquePtr<String>
-TableCollectionEntry::InitScan(TableCollectionEntry* table_entry, Txn* txn_ptr, ScanState& scan_state, BufferManager* buffer_mgr) {
-
+TableCollectionEntry::InitScan(TableCollectionEntry* table_entry,
+                               Txn* txn_ptr,
+                               ScanState& scan_state,
+                               BufferManager* buffer_mgr) {
+    NotImplementError("TableCollectionEntry::InitScan");
+    return nullptr;
 }
 
 UniquePtr<String>
-TableCollectionEntry::Scan(TableCollectionEntry* table_entry, Txn* txn_ptr, ScanState scan_state, BufferManager* buffer_mgr) {
-
+TableCollectionEntry::Scan(TableCollectionEntry* table_entry,
+                           Txn* txn_ptr,
+                           const ScanState& scan_state,
+                           BufferManager* buffer_mgr) {
+    NotImplementError("TableCollectionEntry::Scan");
+    return nullptr;
 }
 
 void
@@ -114,7 +126,7 @@ TableCollectionEntry::CommitAppend(TableCollectionEntry* table_entry,
 
 void
 TableCollectionEntry::RollbackAppend(TableCollectionEntry* table_entry, Txn* txn_ptr, void* txn_store) {
-    TxnTableStore* txn_store_ptr = (TxnTableStore*)txn_store;
+    auto* txn_store_ptr = (TxnTableStore*)txn_store;
     AppendState* append_state_ptr = txn_store_ptr->append_state_.get();
     NotImplementError("Not implemented");
 }
@@ -124,7 +136,8 @@ TableCollectionEntry::CommitDelete(TableCollectionEntry* table_entry,
                                    Txn* txn_ptr,
                                    DeleteState& append_state,
                                    BufferManager* buffer_mgr) {
-
+    NotImplementError("TableCollectionEntry::CommitDelete");
+    return nullptr;
 }
 
 UniquePtr<String>
@@ -132,7 +145,8 @@ TableCollectionEntry::RollbackDelete(TableCollectionEntry* table_entry,
                                      Txn* txn_ptr,
                                      DeleteState& append_state,
                                      BufferManager* buffer_mgr) {
-
+    NotImplementError("TableCollectionEntry::RollbackDelete");
+    return nullptr;
 }
 
 UniquePtr<String>

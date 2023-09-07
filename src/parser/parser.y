@@ -554,6 +554,9 @@ IDENTIFIER column_type {
             type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
             break;
         }
+        default: {
+            break;
+        }
     }
     $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr);
 
@@ -579,6 +582,9 @@ IDENTIFIER column_type {
         }
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
+            break;
+        }
+        default: {
             break;
         }
     }
@@ -1701,6 +1707,9 @@ cast_expr: CAST '(' expr AS column_type ')' {
         }
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($5.embedding_type_, $5.width);
+            break;
+        }
+        default: {
             break;
         }
     }

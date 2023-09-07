@@ -99,11 +99,11 @@ TEST_F(FloatCastTest, float_cast0) {
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
         EXPECT_EQ(source, target);
 
-        source = std::numeric_limits<IntegerT>::max();
+        source = static_cast<FloatT>(std::numeric_limits<IntegerT>::max());
         EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
 //        EXPECT_FLOAT_EQ(source, target);
 
-        source = std::numeric_limits<IntegerT>::min();
+        source = static_cast<FloatT>(std::numeric_limits<IntegerT>::min());
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
         EXPECT_FLOAT_EQ(source, target);
     }
@@ -121,11 +121,11 @@ TEST_F(FloatCastTest, float_cast0) {
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
         EXPECT_FLOAT_EQ(source, target);
 
-        source = std::numeric_limits<BigIntT>::max();
+        source = static_cast<FloatT>(std::numeric_limits<BigIntT>::max());
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
 //        EXPECT_FLOAT_EQ(source, target);
 
-        source = std::numeric_limits<BigIntT>::min();
+        source = static_cast<FloatT>(std::numeric_limits<BigIntT>::min());
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
         EXPECT_FLOAT_EQ(source, target);
     }
@@ -144,7 +144,7 @@ TEST_F(FloatCastTest, float_cast0) {
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
         EXPECT_FLOAT_EQ(source, target);
 
-        source = std::numeric_limits<IntegerT>::max();
+        source = static_cast<FloatT>(std::numeric_limits<IntegerT>::max());
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
         EXPECT_FLOAT_EQ(source, target);
 

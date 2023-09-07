@@ -32,28 +32,50 @@ public:
 
 public:
     static void
-    Append(TableCollectionEntry* table_entry, Txn* txn_ptr, void* txn_store, BufferManager* buffer_mgr);
+    Append(TableCollectionEntry* table_entry,
+           Txn* txn_ptr,
+           void* txn_store,
+           BufferManager* buffer_mgr);
 
     static UniquePtr<String>
-    Delete(TableCollectionEntry* table_entry, Txn* txn_ptr, DeleteState& delete_state, BufferManager* buffer_mgr);
+    Delete(TableCollectionEntry* table_entry,
+           Txn* txn_ptr,
+           DeleteState& delete_state,
+           BufferManager* buffer_mgr);
 
     static UniquePtr<String>
-    InitScan(TableCollectionEntry* table_entry, Txn* txn_ptr, ScanState& scan_state, BufferManager* buffer_mgr);
+    InitScan(TableCollectionEntry* table_entry,
+             Txn* txn_ptr,
+             ScanState& scan_state,
+             BufferManager* buffer_mgr);
 
     static UniquePtr<String>
-    Scan(TableCollectionEntry* table_entry, Txn* txn_ptr, ScanState scan_state, BufferManager* buffer_mgr);
+    Scan(TableCollectionEntry* table_entry,
+         Txn* txn_ptr, const ScanState& scan_state,
+         BufferManager* buffer_mgr);
 
     static void
-    CommitAppend(TableCollectionEntry* table_entry, Txn* txn_ptr, const AppendState* append_state_ptr, BufferManager* buffer_mgr);
+    CommitAppend(TableCollectionEntry* table_entry,
+                 Txn* txn_ptr,
+                 const AppendState* append_state_ptr,
+                 BufferManager* buffer_mgr);
 
     static void
-    RollbackAppend(TableCollectionEntry* table_entry, Txn* txn_ptr, void* txn_store);
+    RollbackAppend(TableCollectionEntry* table_entry,
+                   Txn* txn_ptr,
+                   void* txn_store);
 
     static UniquePtr<String>
-    CommitDelete(TableCollectionEntry* table_entry, Txn* txn_ptr, DeleteState& append_state, BufferManager* buffer_mgr);
+    CommitDelete(TableCollectionEntry* table_entry,
+                 Txn* txn_ptr,
+                 DeleteState& append_state,
+                 BufferManager* buffer_mgr);
 
     static UniquePtr<String>
-    RollbackDelete(TableCollectionEntry* table_entry, Txn* txn_ptr, DeleteState& append_state, BufferManager* buffer_mgr);
+    RollbackDelete(TableCollectionEntry* table_entry,
+                   Txn* txn_ptr,
+                   DeleteState& append_state,
+                   BufferManager* buffer_mgr);
 
     static UniquePtr<String>
     ImportAppendSegment(TableCollectionEntry* table_entry,

@@ -4,10 +4,12 @@
 
 #pragma once
 
-#include "file_system.h"
+#include "storage/io/file_system.h"
+#include "common/types/internal_types.h"
 
 namespace infinity {
 
+class FileHandler;
 class FileWriter {
 public:
     explicit
@@ -18,8 +20,8 @@ public:
     }
 
     FileSystem& fs_;
-    String path_;
-    UniquePtr<char_t[]> data_;
+    String path_{};
+    UniquePtr<char_t[]> data_{};
     i64 offset_{};
     SizeT total_written_{};
     SizeT buffer_size_{};

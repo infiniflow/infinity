@@ -17,6 +17,14 @@ TableTypeToString(TableType type) {
             return "Intermediate";
         case TableType::kResult:
             return "Result";
+        case TableType::kOrderBy:
+            return "OrderBy";
+        case TableType::kGroupBy:
+            return "GroupBy";
+        case TableType::kAggregate:
+            return "Aggregate";
+        case TableType::kCrossProduct:
+            return "CrossProduct";
     }
     TypeError("Unexpected error.")
 }

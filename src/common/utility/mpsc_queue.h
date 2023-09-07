@@ -79,7 +79,7 @@ private:
             memset(curr_buffer_, 0, NODE_SIZE * sizeof(Node));
         }
 
-        Node curr_buffer_[NODE_SIZE] alignas(CACHE_LINE_SIZE) ;
+        alignas(CACHE_LINE_SIZE) Node curr_buffer_[NODE_SIZE] ;
 
         std::atomic<BufferList*> next_ alignas(CACHE_LINE_SIZE);
 

@@ -34,8 +34,8 @@ TEST_F(SelectionTest, test1) {
 
     Selection s1;
     EXPECT_THROW(s1.Append(1), ExecutorException);
-    EXPECT_THROW(s1.Size() == 0, ExecutorException);
-    EXPECT_THROW(s1.Capacity() == 0, ExecutorException);
+    EXPECT_THROW(s1.Size(), ExecutorException);
+    EXPECT_THROW(s1.Capacity(), ExecutorException);
 
     EXPECT_THROW(s1.Initialize(std::numeric_limits<u16>::max() + 1), ExecutorException);
 
@@ -46,8 +46,8 @@ TEST_F(SelectionTest, test1) {
     s1.Initialize();
     EXPECT_EQ(s1.Size(), 0);
     EXPECT_EQ(s1.Capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(s1.Get(DEFAULT_VECTOR_SIZE) == 0, ExecutorException);
-    EXPECT_THROW(s1.Get(0) == 0, ExecutorException);
+    EXPECT_THROW(s1.Get(DEFAULT_VECTOR_SIZE), ExecutorException);
+    EXPECT_THROW(s1.Get(0), ExecutorException);
 
     for(SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         s1.Append(i * 2);
@@ -62,7 +62,7 @@ TEST_F(SelectionTest, test1) {
     for(SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         EXPECT_EQ(s1.Get(i), 3 * i);
     }
-    EXPECT_THROW(s1.Get(DEFAULT_VECTOR_SIZE) == 0, ExecutorException);
+    EXPECT_THROW(s1.Get(DEFAULT_VECTOR_SIZE), ExecutorException);
     for(SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
         s1.Set(i, 4 * i);
     }

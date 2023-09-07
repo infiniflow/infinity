@@ -30,6 +30,11 @@ GroupBinder::BuildExpression(const ParsedExpr& expr,
                 // Group by the column expression.
                 // For example: select a as x from t1 group by x;
                 result = BindColumnReference((ColumnExpr&)expr, bind_context_ptr);
+                break;
+            }
+            default: {
+                LOG_TRACE("Go to bind non-constant and column expression in group binder");
+                break;
             }
         }
     }

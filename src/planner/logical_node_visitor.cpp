@@ -302,6 +302,9 @@ LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression>& expressio
             break;
         case ExpressionType::kRaw:
             break;
+        default: {
+            break;
+        }
     }
 }
 

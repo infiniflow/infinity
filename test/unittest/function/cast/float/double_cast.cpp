@@ -120,10 +120,10 @@ TEST_F(DoubleCastTest, double_cast0) {
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
         EXPECT_FLOAT_EQ(source, target);
 
-        source = std::numeric_limits<BigIntT>::max();
+        source = static_cast<DoubleT>(std::numeric_limits<BigIntT>::max());
         EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
 
-        source = std::numeric_limits<BigIntT>::min();
+        source = static_cast<DoubleT>(std::numeric_limits<BigIntT>::min());
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
         EXPECT_FLOAT_EQ(source, target);
     }

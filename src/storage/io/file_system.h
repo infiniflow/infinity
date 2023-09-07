@@ -4,14 +4,12 @@
 
 #pragma once
 
-#include <filesystem>
+#include "file_system_type.h"
 #include "common/types/internal_types.h"
 
 namespace infinity {
 
 class FileSystem;
-
-using DirEntry = std::filesystem::directory_entry;
 
 class FileHandler {
 public:
@@ -38,33 +36,13 @@ public:
     std::filesystem::path path_;
 };
 
-enum class FileSystemType {
-    kPosix,
-    kS3,
-    kHDFS,
-    kNFS,
-};
-
-enum class FileLockType {
-    kNoLock,
-    kReadLock,
-    kWriteLock
-};
-
-class FileFlags {
-public:
-    static constexpr u8 READ_FLAG = 1 << 0;
-    static constexpr u8 WRITE_FLAG = 1 << 1;
-    static constexpr u8 DIRECT_IO = 1 << 2;
-    static constexpr u8 CREATE_FLAG = 1 << 3;
-    static constexpr u8 TRUNCATE_CREATE = 1 << 4;
-    static constexpr u8 APPEND_FLAG = 1 << 5;
-};
-
 class FileSystem {
 public:
     explicit
     FileSystem(FileSystemType file_system_type) : file_system_type_(file_system_type) {}
+
+    virtual
+    ~FileSystem() = default;
 
     // File related methods
     virtual UniquePtr<FileHandler>

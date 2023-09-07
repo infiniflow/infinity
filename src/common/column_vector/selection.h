@@ -56,7 +56,7 @@ public:
         ++ latest_selection_idx_;
     }
 
-    [[nodiscard]] inline SizeT
+    inline SizeT
     Get(SizeT idx) const {
         if(selection_vector == nullptr) {
             return idx;
@@ -73,13 +73,13 @@ public:
         return selection_vector[idx];
     }
 
-    [[nodiscard]] inline SizeT
+    inline SizeT
     Capacity() const {
         ExecutorAssert(selection_vector != nullptr, "Selection container isn't initialized")
         return storage_->capacity_;
     }
 
-    [[nodiscard]] inline SizeT
+    inline SizeT
     Size() const {
         ExecutorAssert(selection_vector != nullptr, "Selection container isn't initialized")
         return latest_selection_idx_;

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "function_set.h"
+#include "table_function.h"
 
 namespace infinity {
 
@@ -14,7 +15,7 @@ public:
     TableFunctionSet(String name): FunctionSet(std::move(name), FunctionType::kTable) {}
 
     void
-    AddFunction(const TableFunction& func);
+    AddFunction(TableFunction func);
 
 private:
     Vector<TableFunction> functions_;

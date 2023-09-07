@@ -653,8 +653,8 @@ static void yynoreturn yy_fatal_error ( const char* msg , yyscan_t yyscanner );
 /* %% [3.0] code to copy yytext_ptr to yytext[] goes here, if %array \ */\
 	yyg->yy_c_buf_p = yy_cp;
 /* %% [4.0] data tables for the DFA and the user's section 1 definitions go here */
-#define YY_NUM_RULES 145
-#define YY_END_OF_BUFFER 146
+#define YY_NUM_RULES 146
+#define YY_END_OF_BUFFER 147
 /* This struct is not used in this scanner,
    but its presence is necessary. */
 struct yy_trans_info
@@ -664,60 +664,60 @@ struct yy_trans_info
 	};
 static const flex_int16_t yy_accept[499] =
     {   0,
-        0,    0,  142,  142,  146,  144,    1,    1,  144,  144,
-      134,  140,  134,  134,  137,  134,  134,  134,  139,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,  139,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,  139,  139,
-      139,  139,  142,  143,    1,  130,    0,  137,  136,  135,
-      132,  131,  129,  133,  139,  139,  139,    6,  139,  139,
-      139,  139,  139,   17,  139,  139,  139,  139,  139,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,  139,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,   59,   60,
-       68,  139,  139,  139,  139,  139,  139,  139,  139,  139,
+        0,    0,  143,  143,  147,  145,    1,    1,  145,  145,
+      135,  141,  135,  135,  138,  135,  135,  135,  140,  140,
+      140,  140,  140,  140,  140,  140,  140,  140,  140,  140,
+      140,  140,  140,  140,  140,  140,  140,  140,  140,  140,
+      140,  140,  143,  144,    1,  131,    0,  138,  137,  136,
+      133,  132,  130,  134,  140,  140,  140,    6,  140,  140,
+      140,  140,  140,   17,  140,  140,  140,  140,  140,  140,
+      140,  140,  140,  140,  140,  140,  140,  140,  140,  140,
+      140,  140,  140,  140,  140,  140,  140,  140,   59,   60,
+       69,  140,  140,  140,  140,  140,  140,  140,  140,  140,
 
-      139,  139,  139,   86,   87,  139,  139,  139,  139,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,  139,  139,
-      139,  110,  139,  139,  139,  139,  139,  139,  139,  139,
-      139,  139,  142,  141,  138,  135,    2,  139,  139,    5,
-        8,    7,  139,  139,   11,  139,  139,   14,  139,  139,
-      139,  139,  139,  139,  139,  139,  139,   29,  139,  139,
-      139,  139,  139,  139,  139,  139,   41,  139,  139,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,  139,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,   70,  139,
-      139,  139,  139,   75,  139,  139,  139,  139,   84,  139,
+      140,  140,  140,   87,   88,  140,  140,  140,  140,  140,
+      140,  140,  140,  140,  140,  140,  140,  140,  140,  140,
+      140,  111,  140,  140,  140,  140,  140,  140,  140,  140,
+      140,  140,  143,  142,  139,  136,    2,  140,  140,    5,
+        8,    7,  140,  140,   11,  140,  140,   14,  140,  140,
+      140,  140,  140,  140,  140,  140,  140,   29,  140,  140,
+      140,  140,  140,  140,  140,  140,   41,  140,  140,  140,
+      140,  140,  140,  140,  140,  140,  140,  140,  140,  140,
+      140,  140,  140,  140,  140,  140,   65,  140,   71,  140,
+      140,  140,  140,   76,  140,  140,  140,  140,   85,  140,
 
-      139,  139,  139,  139,  139,  139,  139,  139,  139,  139,
-       97,  139,  139,  139,  139,  139,  104,  139,  139,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,  139,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,  139,   15,
-      139,  139,   18,   19,   20,  139,  139,   23,  139,  139,
-       26,   27,   30,  139,  139,  139,   37,  139,  139,   38,
-       39,  139,  139,  139,  139,  139,  139,  139,  139,  139,
-      139,   51,   52,  139,  139,  139,   56,  139,  139,  139,
-      139,  139,   67,   69,   71,   72,  139,   74,  139,   77,
-      139,  139,  139,   83,  139,  139,  139,   90,  139,  139,
+      140,  140,  140,  140,  140,  140,  140,  140,  140,  140,
+       98,  140,  140,  140,  140,  140,  105,  140,  140,  140,
+      140,  140,  140,  140,  140,  140,  140,  140,  140,  140,
+      140,  140,  140,  140,  140,  140,  140,  140,  140,   15,
+      140,  140,   18,   19,   20,  140,  140,   23,  140,  140,
+       26,   27,   30,  140,  140,  140,   37,  140,  140,   38,
+       39,  140,  140,  140,  140,  140,  140,  140,  140,  140,
+      140,   51,   52,  140,  140,  140,   56,  140,  140,  140,
+      140,  140,   68,   70,   72,   73,  140,   75,  140,   78,
+      140,  140,  140,   84,  140,  140,  140,   91,  140,  140,
 
-      139,  139,  139,  139,   98,  139,  139,  139,  139,  105,
-      139,  139,  107,  108,  139,  113,  139,  139,  139,  118,
-      139,  139,  139,  122,  124,  139,  126,  127,    3,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,   25,  139,
-      139,  139,  139,  139,  139,  139,  139,  139,  139,  139,
-      139,  139,   47,   48,   49,  139,   53,  139,  139,   57,
-      139,   61,   62,  139,  139,  139,   73,  139,  139,   80,
-      139,  139,   88,   89,  139,  139,   93,  139,  139,  139,
-       99,  139,  139,  139,  139,  111,  139,  139,  115,  139,
-      139,  139,  139,  139,  123,  125,  128,  139,  139,   10,
+      140,  140,  140,  140,   99,  140,  140,  140,  140,  106,
+      140,  140,  108,  109,  140,  114,  140,  140,  140,  119,
+      140,  140,  140,  123,  125,  140,  127,  128,    3,  140,
+      140,  140,  140,  140,  140,  140,  140,  140,   25,  140,
+      140,  140,  140,  140,  140,  140,  140,  140,  140,  140,
+      140,  140,   47,   48,   49,  140,   53,  140,  140,   57,
+      140,   61,   62,  140,  140,  140,   74,  140,  140,   81,
+      140,  140,   89,   90,  140,  140,   94,  140,  140,  140,
+      100,  140,  140,  140,  140,  112,  140,  140,  116,  140,
+      140,  140,  140,  140,  124,  126,  129,  140,  140,   10,
 
-       12,  139,   16,   21,  139,   24,  139,  139,   34,  139,
-      139,  139,   32,  139,   42,  139,   45,  139,  139,   50,
-       54,   55,  139,   63,  139,  139,  139,  139,   78,   81,
-      139,   85,  139,  139,  139,  139,  139,  100,  101,  103,
-      139,  112,  139,  139,  116,  117,  119,  139,  121,    4,
-        9,   13,  139,  139,   33,  139,  139,  139,  139,   44,
-       46,   43,   58,   64,  139,  139,   76,   79,   82,  139,
-      139,   94,   95,   96,  102,  139,  139,  114,  120,  139,
-       28,  139,   36,   31,  139,  139,   66,   91,   92,  106,
-      139,  139,   35,   40,   65,  109,   22,    0
+       12,  140,   16,   21,  140,   24,  140,  140,   34,  140,
+      140,  140,   32,  140,   42,  140,   45,  140,  140,   50,
+       54,   55,  140,   63,  140,  140,  140,  140,   79,   82,
+      140,   86,  140,  140,  140,  140,  140,  101,  102,  104,
+      140,  113,  140,  140,  117,  118,  120,  140,  122,    4,
+        9,   13,  140,  140,   33,  140,  140,  140,  140,   44,
+       46,   43,   58,   64,  140,  140,   77,   80,   83,  140,
+      140,   95,   96,   97,  103,  140,  140,  115,  121,  140,
+       28,  140,   36,   31,  140,  140,   67,   92,   93,  107,
+      140,  140,   35,   40,   66,  110,   22,    0
 
     } ;
 
@@ -1128,7 +1128,7 @@ static const flex_int16_t yy_chk[1072] =
       498
     } ;
 
-static const flex_int16_t yy_rule_linenum[145] =
+static const flex_int16_t yy_rule_linenum[146] =
     {   0,
        29,   31,   32,   33,   34,   35,   36,   37,   38,   39,
        40,   41,   42,   43,   44,   45,   46,   47,   48,   49,
@@ -1143,9 +1143,9 @@ static const flex_int16_t yy_rule_linenum[145] =
 
       130,  131,  132,  133,  134,  135,  136,  137,  138,  139,
       140,  141,  142,  143,  144,  145,  146,  147,  148,  149,
-      150,  151,  152,  153,  154,  155,  156,  157,  159,  160,
-      161,  162,  163,  165,  167,  168,  173,  183,  192,  197,
-      198,  199,  200,  203
+      150,  151,  152,  153,  154,  155,  156,  157,  158,  160,
+      161,  162,  163,  164,  166,  168,  169,  174,  184,  193,
+      198,  199,  200,  201,  204
     } ;
 
 /* The intent behind this definition is that it'll catch
@@ -1574,13 +1574,13 @@ do_action:	/* This label is used only to access EOF actions. */
 			{
 			if ( yy_act == 0 )
 				fprintf( stderr, "--scanner backing up\n" );
-			else if ( yy_act < 145 )
+			else if ( yy_act < 146 )
 				fprintf( stderr, "--accepting rule at line %ld (\"%s\")\n",
 				         (long)yy_rule_linenum[yy_act], yytext );
-			else if ( yy_act == 145 )
+			else if ( yy_act == 146 )
 				fprintf( stderr, "--accepting default rule (\"%s\")\n",
 				         yytext );
-			else if ( yy_act == 146 )
+			else if ( yy_act == 147 )
 				fprintf( stderr, "--(end of buffer or a NUL)\n" );
 			else
 				fprintf( stderr, "--EOF (start condition %d)\n", YY_START );
@@ -1920,332 +1920,332 @@ YY_RULE_SETUP
 case 65:
 YY_RULE_SETUP
 #line 94 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return INTERSECT; }
+{ return INT; }
 	YY_BREAK
 case 66:
 YY_RULE_SETUP
 #line 95 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return INTERVAL; }
+{ return INTERSECT; }
 	YY_BREAK
 case 67:
 YY_RULE_SETUP
 #line 96 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return INTO; }
+{ return INTERVAL; }
 	YY_BREAK
 case 68:
 YY_RULE_SETUP
 #line 97 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return IS; }
+{ return INTO; }
 	YY_BREAK
 case 69:
 YY_RULE_SETUP
 #line 98 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return JOIN; }
+{ return IS; }
 	YY_BREAK
 case 70:
 YY_RULE_SETUP
 #line 99 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return KEY; }
+{ return JOIN; }
 	YY_BREAK
 case 71:
 YY_RULE_SETUP
 #line 100 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return LEFT; }
+{ return KEY; }
 	YY_BREAK
 case 72:
 YY_RULE_SETUP
 #line 101 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return LIKE; }
+{ return LEFT; }
 	YY_BREAK
 case 73:
 YY_RULE_SETUP
 #line 102 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return LIMIT; }
+{ return LIKE; }
 	YY_BREAK
 case 74:
 YY_RULE_SETUP
 #line 103 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return LINE; }
+{ return LIMIT; }
 	YY_BREAK
 case 75:
 YY_RULE_SETUP
 #line 104 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return LOG; }
+{ return LINE; }
 	YY_BREAK
 case 76:
 YY_RULE_SETUP
 #line 105 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return LOGICAL; }
+{ return LOG; }
 	YY_BREAK
 case 77:
 YY_RULE_SETUP
 #line 106 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return LSEG; }
+{ return LOGICAL; }
 	YY_BREAK
 case 78:
 YY_RULE_SETUP
 #line 107 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return MINUTE; }
+{ return LSEG; }
 	YY_BREAK
 case 79:
 YY_RULE_SETUP
 #line 108 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return MINUTES; }
+{ return MINUTE; }
 	YY_BREAK
 case 80:
 YY_RULE_SETUP
 #line 109 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return MONTH; }
+{ return MINUTES; }
 	YY_BREAK
 case 81:
 YY_RULE_SETUP
 #line 110 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return MONTHS; }
+{ return MONTH; }
 	YY_BREAK
 case 82:
 YY_RULE_SETUP
 #line 111 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return NATURAL; }
+{ return MONTHS; }
 	YY_BREAK
 case 83:
 YY_RULE_SETUP
 #line 112 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return NULLABLE; }
+{ return NATURAL; }
 	YY_BREAK
 case 84:
 YY_RULE_SETUP
 #line 113 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return NOT; }
+{ return NULLABLE; }
 	YY_BREAK
 case 85:
 YY_RULE_SETUP
 #line 114 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return OFFSET; }
+{ return NOT; }
 	YY_BREAK
 case 86:
 YY_RULE_SETUP
 #line 115 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return ON; }
+{ return OFFSET; }
 	YY_BREAK
 case 87:
 YY_RULE_SETUP
 #line 116 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return OR; }
+{ return ON; }
 	YY_BREAK
 case 88:
 YY_RULE_SETUP
 #line 117 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return ORDER; }
+{ return OR; }
 	YY_BREAK
 case 89:
 YY_RULE_SETUP
 #line 118 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return OUTER; }
+{ return ORDER; }
 	YY_BREAK
 case 90:
 YY_RULE_SETUP
 #line 119 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return PATH; }
+{ return OUTER; }
 	YY_BREAK
 case 91:
 YY_RULE_SETUP
 #line 120 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return PHYSICAL; }
+{ return PATH; }
 	YY_BREAK
 case 92:
 YY_RULE_SETUP
 #line 121 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return PIPELINE; }
+{ return PHYSICAL; }
 	YY_BREAK
 case 93:
 YY_RULE_SETUP
 #line 122 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return POINT; }
+{ return PIPELINE; }
 	YY_BREAK
 case 94:
 YY_RULE_SETUP
 #line 123 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return POLYGON; }
+{ return POINT; }
 	YY_BREAK
 case 95:
 YY_RULE_SETUP
 #line 124 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return PREPARE; }
+{ return POLYGON; }
 	YY_BREAK
 case 96:
 YY_RULE_SETUP
 #line 125 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return PRIMARY; }
+{ return PREPARE; }
 	YY_BREAK
 case 97:
 YY_RULE_SETUP
 #line 126 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return RAW; }
+{ return PRIMARY; }
 	YY_BREAK
 case 98:
 YY_RULE_SETUP
 #line 127 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return REAL; }
+{ return RAW; }
 	YY_BREAK
 case 99:
 YY_RULE_SETUP
 #line 128 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return RIGHT; }
+{ return REAL; }
 	YY_BREAK
 case 100:
 YY_RULE_SETUP
 #line 129 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return SCHEMA; }
+{ return RIGHT; }
 	YY_BREAK
 case 101:
 YY_RULE_SETUP
 #line 130 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return SECOND; }
+{ return SCHEMA; }
 	YY_BREAK
 case 102:
 YY_RULE_SETUP
 #line 131 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return SECONDS; }
+{ return SECOND; }
 	YY_BREAK
 case 103:
 YY_RULE_SETUP
 #line 132 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return SELECT; }
+{ return SECONDS; }
 	YY_BREAK
 case 104:
 YY_RULE_SETUP
 #line 133 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return SET; }
+{ return SELECT; }
 	YY_BREAK
 case 105:
 YY_RULE_SETUP
 #line 134 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return SHOW; }
+{ return SET; }
 	YY_BREAK
 case 106:
 YY_RULE_SETUP
 #line 135 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return SMALLINT; }
+{ return SHOW; }
 	YY_BREAK
 case 107:
 YY_RULE_SETUP
 #line 136 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return THEN; }
+{ return SMALLINT; }
 	YY_BREAK
 case 108:
 YY_RULE_SETUP
 #line 137 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return TIME; }
+{ return THEN; }
 	YY_BREAK
 case 109:
 YY_RULE_SETUP
 #line 138 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return TIMESTAMP; }
+{ return TIME; }
 	YY_BREAK
 case 110:
 YY_RULE_SETUP
 #line 139 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return TO; }
+{ return TIMESTAMP; }
 	YY_BREAK
 case 111:
 YY_RULE_SETUP
 #line 140 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return TABLE; }
+{ return TO; }
 	YY_BREAK
 case 112:
 YY_RULE_SETUP
 #line 141 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return TABLES; }
+{ return TABLE; }
 	YY_BREAK
 case 113:
 YY_RULE_SETUP
 #line 142 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return TRUE; }
+{ return TABLES; }
 	YY_BREAK
 case 114:
 YY_RULE_SETUP
 #line 143 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return TINYINT; }
+{ return TRUE; }
 	YY_BREAK
 case 115:
 YY_RULE_SETUP
 #line 144 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return UNION; }
+{ return TINYINT; }
 	YY_BREAK
 case 116:
 YY_RULE_SETUP
 #line 145 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return UNIQUE; }
+{ return UNION; }
 	YY_BREAK
 case 117:
 YY_RULE_SETUP
 #line 146 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return UPDATE; }
+{ return UNIQUE; }
 	YY_BREAK
 case 118:
 YY_RULE_SETUP
 #line 147 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return UUID; }
+{ return UPDATE; }
 	YY_BREAK
 case 119:
 YY_RULE_SETUP
 #line 148 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return VALUES; }
+{ return UUID; }
 	YY_BREAK
 case 120:
 YY_RULE_SETUP
 #line 149 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return VARCHAR; }
+{ return VALUES; }
 	YY_BREAK
 case 121:
 YY_RULE_SETUP
 #line 150 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return VECTOR; }
+{ return VARCHAR; }
 	YY_BREAK
 case 122:
 YY_RULE_SETUP
 #line 151 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return VIEW; }
+{ return VECTOR; }
 	YY_BREAK
 case 123:
 YY_RULE_SETUP
 #line 152 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return VIEWS; }
+{ return VIEW; }
 	YY_BREAK
 case 124:
 YY_RULE_SETUP
 #line 153 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return WHEN; }
+{ return VIEWS; }
 	YY_BREAK
 case 125:
 YY_RULE_SETUP
 #line 154 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return WHERE; }
+{ return WHEN; }
 	YY_BREAK
 case 126:
 YY_RULE_SETUP
 #line 155 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return WITH; }
+{ return WHERE; }
 	YY_BREAK
 case 127:
 YY_RULE_SETUP
 #line 156 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return YEAR; }
+{ return WITH; }
 	YY_BREAK
 case 128:
 YY_RULE_SETUP
 #line 157 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return YEARS; }
+{ return YEAR; }
 	YY_BREAK
 case 129:
 YY_RULE_SETUP
-#line 159 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return EQUAL; }
+#line 158 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+{ return YEARS; }
 	YY_BREAK
 case 130:
 YY_RULE_SETUP
 #line 160 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return NOT_EQ; }
+{ return EQUAL; }
 	YY_BREAK
 case 131:
 YY_RULE_SETUP
@@ -2255,31 +2255,36 @@ YY_RULE_SETUP
 case 132:
 YY_RULE_SETUP
 #line 162 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return LESS_EQ; }
+{ return NOT_EQ; }
 	YY_BREAK
 case 133:
 YY_RULE_SETUP
 #line 163 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return GREATER_EQ; }
+{ return LESS_EQ; }
 	YY_BREAK
 case 134:
 YY_RULE_SETUP
-#line 165 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ return yytext[0]; }
+#line 164 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+{ return GREATER_EQ; }
 	YY_BREAK
 case 135:
-#line 168 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-case 136:
 YY_RULE_SETUP
-#line 168 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 166 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+{ return yytext[0]; }
+	YY_BREAK
+case 136:
+#line 169 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+case 137:
+YY_RULE_SETUP
+#line 169 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
 {
     yylval->double_value = atof(yytext);
     return DOUBLE_VALUE;
 }
 	YY_BREAK
-case 137:
+case 138:
 YY_RULE_SETUP
-#line 173 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 174 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
 {
     errno = 0;
     yylval->long_value = strtoll(yytext, nullptr, 0);
@@ -2290,9 +2295,9 @@ YY_RULE_SETUP
     return LONG_VALUE;
 }
 	YY_BREAK
-case 138:
+case 139:
 YY_RULE_SETUP
-#line 183 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 184 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
 {
     // total length - 2 of quota + 1 null char
     long str_len = strlen(yytext) - 1;
@@ -2302,50 +2307,50 @@ YY_RULE_SETUP
     return IDENTIFIER;
 }
 	YY_BREAK
-case 139:
+case 140:
 YY_RULE_SETUP
-#line 192 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 193 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
 {
     yylval->str_value = strdup(yytext);
     return IDENTIFIER;
 }
 	YY_BREAK
-case 140:
-YY_RULE_SETUP
-#line 197 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ BEGIN SINGLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
-	YY_BREAK
 case 141:
 YY_RULE_SETUP
 #line 198 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ string_buffer << '\''; }
+{ BEGIN SINGLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
 	YY_BREAK
 case 142:
-/* rule 142 can match eol */
 YY_RULE_SETUP
 #line 199 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ string_buffer << yytext; }
+{ string_buffer << '\''; }
 	YY_BREAK
 case 143:
+/* rule 143 can match eol */
 YY_RULE_SETUP
 #line 200 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ BEGIN INITIAL; yylval->str_value = strdup(string_buffer.str().c_str()); return STRING; }
-	YY_BREAK
-case YY_STATE_EOF(SINGLE_QUOTED_STRING):
-#line 201 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ fprintf(stderr, "[SQL-Lexer-Error] Unterminated string\n"); return 0; }
+{ string_buffer << yytext; }
 	YY_BREAK
 case 144:
 YY_RULE_SETUP
-#line 203 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-{ fprintf(stderr, "[SQL-Lexer-Error] Unknown Character: %c\n", yytext[0]); return 0; }
+#line 201 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+{ BEGIN INITIAL; yylval->str_value = strdup(string_buffer.str().c_str()); return STRING; }
+	YY_BREAK
+case YY_STATE_EOF(SINGLE_QUOTED_STRING):
+#line 202 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+{ fprintf(stderr, "[SQL-Lexer-Error] Unterminated string\n"); return 0; }
 	YY_BREAK
 case 145:
 YY_RULE_SETUP
-#line 205 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 204 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+{ fprintf(stderr, "[SQL-Lexer-Error] Unknown Character: %c\n", yytext[0]); return 0; }
+	YY_BREAK
+case 146:
+YY_RULE_SETUP
+#line 206 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
 ECHO;
 	YY_BREAK
-#line 2349 "/home/jinhai/Documents/development/infinity/src/parser/lexer.cpp"
+#line 2354 "/home/jinhai/Documents/development/infinity/src/parser/lexer.cpp"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -3643,7 +3648,7 @@ void yyfree (void * ptr , yyscan_t yyscanner)
 
 /* %ok-for-header */
 
-#line 205 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 206 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
 
 
 int yyerror(const char *msg) {

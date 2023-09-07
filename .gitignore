@@ -34,7 +34,11 @@
 # Clion
 .idea/**
 cmake-build-debug/**
+cmake-build-debug-clang/**
+cmake-build-debug-gcc/**
 cmake-build-release/**
+cmake-build-release-clang/**
+cmake-build-release-gcc/**
 
 # OSX dir
 .DS_Store

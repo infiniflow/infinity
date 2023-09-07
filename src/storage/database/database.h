@@ -5,9 +5,11 @@
 #pragma once
 
 #include "common/types/internal_types.h"
-#include "storage/io/file_system.h"
+#include "storage/io/file_system_type.h"
 
 namespace infinity {
+
+class FileSystem;
 class Database {
 public:
     static inline SharedPtr<Database>

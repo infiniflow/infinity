@@ -133,8 +133,6 @@ target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_par
 # Configure the version file
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h)
 
-
-
 set(INFINITY_CORE_SOURCE
         ${console_src}
         ${common_src}
@@ -166,11 +164,13 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/leveldb/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
+#set_property(TARGET infinity_core PROPERTY CXX_INCLUDE_WHAT_YOU_USE /usr/bin/iwyu)
 
 add_executable(infinity_main
         ${infinity_main_src}
         )
 target_include_directories(infinity_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cxxopts/include")
+#set_property(TARGET infinity_main PROPERTY CXX_INCLUDE_WHAT_YOU_USE /usr/bin/iwyu)
 
 add_executable(infinity_console
         ${infinity_console_src}

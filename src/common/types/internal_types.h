@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "ctpl_stl.h"
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,7 +18,6 @@
 #include <sstream>
 #include <thread>
 #include <shared_mutex>
-#include "ctpl_stl.h"
 
 namespace infinity {
 
