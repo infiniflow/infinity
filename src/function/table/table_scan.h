@@ -5,9 +5,11 @@
 #pragma once
 //#include <utility>
 
+#include "common/types/internal_types.h"
 #include "function/table_function.h"
 #include "function/function_data.h"
 #include "storage/meta/catalog.h"
+#include "storage/txn/constants.h"
 
 namespace infinity {
 
@@ -26,6 +28,9 @@ public:
 
     // How many segments are scanned.
     i64 segment_count_{0};
+
+    i64 current_segment_id_{INITIAL_SEGMENT_ID};
+    SizeT read_offset_{0};
 };
 
 class TableScanFunction : public TableFunction {
@@ -46,8 +51,9 @@ public:
 private:
 };
 
+static void
+TableScanFunc(QueryContext* query_context,
+              const SharedPtr<TableFunctionData>& table_function_data_ptr,
+              DataBlock &output);
+
 }
-
-
-
-
