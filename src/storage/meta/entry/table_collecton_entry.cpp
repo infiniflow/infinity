@@ -119,6 +119,11 @@ TableCollectionEntry::CommitAppend(TableCollectionEntry* table_entry,
 
     // FIXME: now all commit will trigger flush
     for(u64 segment_id: new_segments) {
+        // already flushed
+        if (table_entry->segments_[segment_id]->status_.load() == DataSegmentStatus::kClosed) {
+            continue;
+        }
+
         SegmentEntry::PrepareFlush(table_entry->segments_[segment_id].get());
         SegmentEntry::Flush(table_entry->segments_[segment_id].get());
     }

@@ -3,6 +3,7 @@
 //
 
 #include "txn_store.h"
+#include "common/types/internal_types.h"
 #include "common/utility/infinity_assert.h"
 #include "txn.h"
 
@@ -94,23 +95,17 @@ TxnTableStore::PrepareCommit() {
     Txn* txn_ptr = (Txn*)txn_;
     TableCollectionEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
 
-    // TODO: pre-commit uncommitted segment.
-    for(const auto& uncommitted_segment: uncommitted_segments_) {
-        ;
+    for (const auto& uncommitted : uncommitted_segments_) {
+        TableCollectionEntry::ImportAppendSegment(table_entry_, txn_, uncommitted, *append_state_, txn_ptr->GetBufferMgr());
     }
-
+    
     LOG_TRACE("Transaction local storage table: {}, Complete commit preparing", this->table_name_);
 }
 
 void
-TxnTableStore::Commit() {
+TxnTableStore::Commit(TxnTimeStamp commit_ts) {
     Txn* txn_ptr = (Txn*)txn_;
     TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get(), txn_ptr->GetBufferMgr());
-//    for(const auto& range: append_state_->append_ranges_) {
-//        LOG_TRACE("Commit, segment: {}, start: {}, count: {}", range.segment_id_, range.start_pos_, range.row_count_);
-//    }
-    LOG_ERROR("Not implements the txn table store commit, table {}", this->table_name_);
-    LOG_ERROR("Not implement to flush the new appended data segment")
 }
 
 }

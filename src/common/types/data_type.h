@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "common/utility/infinity_assert.h"
 #include "logical_type.h"
 #include "type_info.h"
 
@@ -165,14 +166,33 @@ public:
     static String
     TypeToString();
 
+    template<typename T>
+    static T
+    StringToType(const String& str);
+
     void
     MaxDataType(const DataType& right);
+
+    // if type is variable length type
+    // use template specialization to solve that
+    template<typename T>
+    static void
+    WriteData(ptr_t ptr, const String& data) {
+        T value = StringToType<T>(data);
+        memcpy(ptr, &value, sizeof(T));
+    }
 };
 
 template<typename T>
 String
 DataType::TypeToString() {
     TypeError("Unexpected date type.");
+}
+
+template<typename T>
+T
+DataType::StringToType(const String& str) {
+    TypeError("Unexpected data type.");
 }
 
 template <> String DataType::TypeToString<BooleanT>();
@@ -204,5 +224,15 @@ template <> String DataType::TypeToString<UuidT>();
 template <> String DataType::TypeToString<BlobT>();
 template <> String DataType::TypeToString<EmbeddingT>();
 template <> String DataType::TypeToString<MixedT>();
+
+
+template <> BooleanT DataType::StringToType<BooleanT>(const String& str);
+template <> TinyIntT DataType::StringToType<TinyIntT>(const String& str);
+template <> SmallIntT DataType::StringToType<SmallIntT>(const String& str);
+template <> IntegerT DataType::StringToType<IntegerT>(const String& str);
+template <> BigIntT DataType::StringToType<BigIntT>(const String& str);
+template <> FloatT DataType::StringToType<FloatT>(const String& str);
+template <> DoubleT DataType::StringToType<DoubleT>(const String& str);
+
 
 }

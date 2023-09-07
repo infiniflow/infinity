@@ -285,6 +285,60 @@ template <> String DataType::TypeToString<BlobT>() { return "Blob"; }
 template <> String DataType::TypeToString<EmbeddingT>() { return "Embedding"; }
 template <> String DataType::TypeToString<MixedT>() { return "Heterogeneous"; }
 
+template <> BooleanT DataType::StringToType<BooleanT>(const String &str) {
+    if (str.empty()) {
+        return BooleanT{};
+    }
+    // TODO: should support True/False, maybe others
+    TypeAssert(str == "true" || str == "false",
+               "Boolean type should be true or false");
+    if (str == "true") {
+        return true;
+    }
+    return false;
+}
+
+template <> TinyIntT DataType::StringToType<TinyIntT>(const String &str) {
+    if (str.empty()) {
+        return TinyIntT{};
+    }
+    return std::stoi(str);
+}
+
+template <> SmallIntT DataType::StringToType<SmallIntT>(const String &str) {
+    if (str.empty()) {
+        return SmallIntT{};
+    }
+    return std::stoi(str);
+}
+
+template <> IntegerT DataType::StringToType<IntegerT>(const String &str) {
+    if (str.empty()) {
+        return IntegerT{};
+    }
+    return std::stoi(str);
+}
+
+template <> BigIntT DataType::StringToType<BigIntT>(const String &str) {
+    if (str.empty()) {
+        return BigIntT{};
+    }
+    return std::stol(str);
+}
+
+template <> FloatT DataType::StringToType<FloatT>(const String &str) {
+    if (str.empty()) {
+        return FloatT{};
+    }
+    return std::stof(str);
+}
+
+template <> DoubleT DataType::StringToType<DoubleT>(const String &str) {
+    if (str.empty()) {
+        return DoubleT{};
+    }
+    return std::stod(str);
+}
 }
 
 

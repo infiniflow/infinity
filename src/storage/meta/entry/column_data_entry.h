@@ -5,6 +5,7 @@
 #pragma once
 
 #include "base_entry.h"
+#include "common/types/internal_types.h"
 #include "storage/buffer/object_handle.h"
 #include "common/column_vector/column_vector.h"
 
@@ -44,6 +45,11 @@ public:
            SizeT block_start_offset,
            SizeT column_start_offset,
            SizeT rows);
+    
+    static void
+    Append(ColumnDataEntry* column_data_entry,
+           const String& data,
+           SizeT offset);
 
     static void
     Flush(ColumnDataEntry* column_data_entry,

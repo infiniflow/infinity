@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include "common/types/internal_types.h"
 #include "storage/data_block.h"
 #include "src/storage/meta/entry/data_access_state.h"
 #include "storage/meta/entry/table_collection_entry.h"
@@ -38,7 +39,7 @@ public:
     PrepareCommit();
 
     void
-    Commit();
+    Commit(TxnTimeStamp commit_ts);
 
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};
