@@ -5,6 +5,8 @@
 #include "buffer_handle.h"
 #include "buffer_manager.h"
 #include "buffer_task.h"
+#include "common/types/internal_types.h"
+#include "storage/io/file_system.h"
 #include "storage/io/local_file_system.h"
 #include "common/utility/defer_op.h"
 
@@ -442,8 +444,8 @@ BufferHandle::WriteFile(SizeT buffer_length) {
         LOG_ERROR(err_msg);
         StorageError(err_msg);
     }
-
-    file_handler_ = fs.OpenFile(to_write_file, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+    u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+    file_handler_ = fs.OpenFile(to_write_file, flags, FileLockType::kWriteLock);
 
     bool prepare_success = false;
     DeferFn defer_fn([&]() {

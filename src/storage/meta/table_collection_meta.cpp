@@ -3,6 +3,7 @@
 //
 
 #include "table_collection_meta.h"
+#include "main/logger.h"
 #include "storage/meta/entry/table_collection_entry.h"
 #include "common/utility/defer_op.h"
 #include "storage/txn/txn_manager.h"
@@ -310,7 +311,7 @@ TableCollectionMeta::Deserialize(const nlohmann::json& table_meta_json, DBEntry*
 
     SharedPtr<String> base_dir = MakeShared<String>(table_meta_json["base_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
-
+    LOG_TRACE("load table {}", *table_name);
     UniquePtr<TableCollectionMeta> res = MakeUnique<TableCollectionMeta>(base_dir, table_name, db_entry);
     UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
     dummy_entry->deleted_ = true;
@@ -318,7 +319,7 @@ TableCollectionMeta::Deserialize(const nlohmann::json& table_meta_json, DBEntry*
     if(table_meta_json.contains("entries")) {
         for(const auto& table_entry_json: table_meta_json["entries"]) {
             UniquePtr<TableCollectionEntry> table_entry = TableCollectionEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
-            res->entry_list_.emplace_back(std::move(table_entry));
+            res->entry_list_.emplace_front(std::move(table_entry));
         }
     }
 

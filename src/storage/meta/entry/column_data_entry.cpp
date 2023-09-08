@@ -3,8 +3,14 @@
 //
 
 #include "column_data_entry.h"
+#include "common/types/data_type.h"
+#include "common/types/internal_types.h"
+#include "common/types/logical_type.h"
+#include "common/utility/infinity_assert.h"
 #include "segment_entry.h"
 #include "storage/buffer/buffer_manager.h"
+#include <cstddef>
+#include <string>
 
 namespace infinity {
 
@@ -38,6 +44,49 @@ ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, BufferManager
 
 //    ptr_t ptr = buffer_handle_->LoadData();
     return ObjectHandle(column_data_entry->buffer_handle_);
+}
+
+/**
+ * @brief Convert data to coressponding type and append to column data entry
+ * 
+ * @param column_data_entry column data need to be inserted
+ * @param data data to be inserted, represented by string
+ * @param offset offset of column data
+ */
+void
+ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
+                        const String& data,
+                        SizeT offset) {
+    if (column_data_entry->buffer_handle_ == nullptr) {
+        StorageError("Not initialize buffer handle");
+    }
+    ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
+    auto type_size = column_data_entry->column_type_->Size();
+    switch (column_data_entry->column_type_->type()) {
+        case kBoolean:
+            DataType::WriteData<BooleanT>(ptr + offset * type_size, data);
+            break;
+        case kTinyInt:
+            DataType::WriteData<TinyIntT>(ptr + offset * type_size, data);
+            break;
+        case kSmallInt:
+            DataType::WriteData<SmallIntT>(ptr + offset * type_size, data);
+            break;
+        case kInteger:
+            DataType::WriteData<IntegerT>(ptr + offset * type_size, data);
+            break;
+        case kBigInt:
+            DataType::WriteData<BigIntT>(ptr + offset * type_size, data);
+            break;
+        case kFloat:
+            DataType::WriteData<FloatT>(ptr + offset * type_size, data);
+            break;
+        case kDouble: 
+            DataType::WriteData<DoubleT>(ptr + offset * type_size, data);
+            break;
+        default:
+            NotImplementError("not support data type");
+    }
 }
 
 void

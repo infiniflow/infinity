@@ -35,8 +35,8 @@
    especially those whose name start with YY_ or yy_.  They are
    private implementation details that can be changed or removed.  */
 
-#ifndef YY_SQL_HOME_JINHAI_DOCUMENTS_DEVELOPMENT_INFINITY_SRC_PARSER_PARSER_H_INCLUDED
-# define YY_SQL_HOME_JINHAI_DOCUMENTS_DEVELOPMENT_INFINITY_SRC_PARSER_PARSER_H_INCLUDED
+#ifndef YY_SQL_HOME_TANGDH_WORKSPACE_INFINITY_SRC_PARSER_PARSER_H_INCLUDED
+# define YY_SQL_HOME_TANGDH_WORKSPACE_INFINITY_SRC_PARSER_PARSER_H_INCLUDED
 /* Debug traces.  */
 #ifndef SQLDEBUG
 # if defined YYDEBUG
@@ -53,7 +53,7 @@
 extern int sqldebug;
 #endif
 /* "%code requires" blocks.  */
-#line 11 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 11 "/home/tangdh/workspace/infinity/src/parser/parser.y"
 
 
 #include "statement.h"
@@ -100,7 +100,7 @@ struct SQL_LTYPE {
         }                                         \
     }
 
-#line 104 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 104 "/home/tangdh/workspace/infinity/src/parser/parser.h"
 
 /* Token kinds.  */
 #ifndef SQLTOKENTYPE
@@ -256,7 +256,7 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 80 "/home/jinhai/Documents/development/infinity/src/parser/parser.y"
+#line 80 "/home/tangdh/workspace/infinity/src/parser/parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -316,7 +316,7 @@ union SQLSTYPE
     infinity::CopyOption* copy_option_t;
     std::vector<infinity::CopyOption*>* copy_option_array;
 
-#line 320 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 320 "/home/tangdh/workspace/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;
@@ -344,4 +344,4 @@ struct SQLLTYPE
 int sqlparse (void *scanner, infinity::ParserResult* result);
 
 
-#endif /* !YY_SQL_HOME_JINHAI_DOCUMENTS_DEVELOPMENT_INFINITY_SRC_PARSER_PARSER_H_INCLUDED  */
+#endif /* !YY_SQL_HOME_TANGDH_WORKSPACE_INFINITY_SRC_PARSER_PARSER_H_INCLUDED  */

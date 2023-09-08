@@ -2,9 +2,9 @@
 #define sqlHEADER_H 1
 #define sqlIN_HEADER 1
 
-#line 6 "/home/jinhai/Documents/development/infinity/src/parser/lexer.h"
+#line 5 "/home/tangdh/workspace/infinity/src/parser/lexer.h"
 
-#line 8 "/home/jinhai/Documents/development/infinity/src/parser/lexer.h"
+#line 7 "/home/tangdh/workspace/infinity/src/parser/lexer.h"
 
 #define  YY_INT_ALIGNED short int
 
@@ -846,9 +846,9 @@ extern int yylex \
 #undef yyTABLES_NAME
 #endif
 
-#line 206 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 206 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 
 
-#line 853 "/home/jinhai/Documents/development/infinity/src/parser/lexer.h"
+#line 852 "/home/tangdh/workspace/infinity/src/parser/lexer.h"
 #undef sqlIN_HEADER
 #endif /* sqlHEADER_H */
