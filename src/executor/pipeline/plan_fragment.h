@@ -13,7 +13,7 @@
 
 namespace infinity {
 
-class PlanFragment {
+class PlanFragment :public std::enable_shared_from_this<PlanFragment>{
 public:
     PlanFragment() = default;
 
@@ -23,15 +23,13 @@ public:
     }
 
     inline void
-    AddExchangeNode(const SharedPtr<PhysicalOperator>& op) {
-        PlannerAssert(op->operator_type() == PhysicalOperatorType::kExchange, "Not physical exchange node");
-        exchange_node_ = std::static_pointer_cast<PhysicalExchange>(op);
+    AddSourceNode(const SharedPtr<PhysicalOperator>& op) {
+        source_ = std::static_pointer_cast<PhysicalOperator>(op);
     }
 
     inline void
     AddSinkNode(const SharedPtr<PhysicalOperator>& op) {
-        PlannerAssert(op->operator_type() == PhysicalOperatorType::kSink, "Not physical sink node");
-        sink_node_ = std::static_pointer_cast<PhysicalSink>(op);
+        sink_ = std::static_pointer_cast<PhysicalOperator>(op);
     }
 
     inline void
@@ -46,20 +44,40 @@ public:
 
     [[nodiscard]] inline SharedPtr<Vector<String>>
     GetOutputNames() const {
-        return sink_node_->GetOutputNames();
+        return sink_->GetOutputNames();
     }
 
     [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const {
-        return sink_node_->GetOutputTypes();
+        return sink_->GetOutputTypes();
+    }
+    
+    inline void
+    AddDependency(PlanFragment* fragment) {
+        dependencies_.push_back(fragment);
+        fragment->parents_.push_back(this);
     }
 
-private:
-    SharedPtr<PhysicalExchange> exchange_node_;
-    SharedPtr<PhysicalSink> sink_node_;
-    Vector<SharedPtr<PhysicalOperator>> operators_{};
-    Vector<SharedPtr<DataBlock>> data_{};
+    SharedPtr<Vector<String>>
+    ToString();
 
+
+private:
+
+    /// The source of this fragment
+    SharedPtr<PhysicalOperator> source_{};
+    /// The chain of intermediate operators
+    Vector<SharedPtr<PhysicalOperator>> operators_{};
+    /// The sink (i.e. destination) for data;
+    SharedPtr<PhysicalOperator> sink_{};
+    /// The data blocks that are produced by this fragment
+    Vector<SharedPtr<DataBlock>> data_{};
+    /// The parent fragments (i.e. pipelines that are dependent on this pipeline to finish)
+    Vector<PlanFragment*> parents_{};
+    /// The dependencies of this fragment
+    Vector<PlanFragment*> dependencies_{};
+
+    /// may be not necessary
     SharedPtr<PlanFragment> left_{};
     SharedPtr<PlanFragment> right_{};
 };

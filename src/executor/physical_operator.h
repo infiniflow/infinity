@@ -71,6 +71,9 @@ public:
     virtual SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const = 0;
 
+    virtual String
+    GetName () const ;
+
 protected:
     u64 operator_id_;
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
@@ -80,8 +83,40 @@ protected:
     std::weak_ptr<OperatorPipeline> operator_pipeline_{};
 
     SharedPtr<Table> output_{};
+
+
+public:
+    // Operator
+
+    virtual bool ParallelOperator() const {
+        return false;
+    }
+
+
+
+public:
+    // Exchange
+    virtual bool IsExchange() const {
+        return false;
+    }
+
+    virtual bool ParallelExchange() const {
+        return false;
+    }
+
+public:
+    // Sink
+    virtual bool IsSink() const {
+        return false;
+    }
+
+    virtual bool ParallelSink() const {
+        return false;
+    }
+
+    virtual bool SinkOrderMatters() const {
+        return false;
+    }
 };
-
-
-}
+} // namespace infinity
 

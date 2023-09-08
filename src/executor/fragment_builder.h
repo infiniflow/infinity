@@ -20,6 +20,9 @@ public:
     [[nodiscard]] SharedPtr<PlanFragment>
     Build(const SharedPtr<PhysicalOperator>& phys_op) const;
 
+    void
+    BuildFragments(const SharedPtr <infinity::PhysicalOperator> &phys_op, PlanFragment *current);
+
 private:
     [[nodiscard]] SharedPtr<PlanFragment>
     BuildAggregate(const SharedPtr<PhysicalOperator>& phys_op) const;

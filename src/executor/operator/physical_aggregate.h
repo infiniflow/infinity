@@ -63,6 +63,12 @@ public:
 
     SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final;
+
+    bool
+    IsSink() const override {
+        return true;
+    }
+
 private:
     SharedPtr<Table> input_table_{};
     u64 groupby_index_{};

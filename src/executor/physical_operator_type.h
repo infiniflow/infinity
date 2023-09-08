@@ -4,7 +4,12 @@
 
 #pragma once
 
+#include "common/types/internal_types.h"
+
 #include <cstdint>
+
+
+namespace infinity {
 
 enum class PhysicalOperatorType: uint8_t {
     kInvalid = 0,
@@ -55,3 +60,10 @@ enum class PhysicalOperatorType: uint8_t {
     kSink,
     kExchange,
 };
+
+
+String
+PhysicalOperatorToString(PhysicalOperatorType type);
+
+
+} // namespace infinity
