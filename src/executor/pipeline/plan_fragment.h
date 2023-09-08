@@ -58,15 +58,8 @@ public:
         fragment->parents.push_back(SharedPtr<PlanFragment>(shared_from_this()));
     }
 
-    inline SharedPtr<Vector<String>> ToString(){
-        auto result = std::make_shared<Vector<String>>();
-        result->push_back(source_->GetName());
-        for(auto& op: operators_){
-            result->push_back(op->GetName());
-        }
-        result->push_back(sink_->GetName());
-        return result;
-    }
+    SharedPtr<Vector<String>>
+    ToString();
 
 
 private:

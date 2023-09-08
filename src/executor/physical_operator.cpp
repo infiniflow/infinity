@@ -19,11 +19,12 @@ PhysicalOperator::GenerateOperatorPipeline() {
         } else {
             return operator_pipeline_.lock();
         }
-    }
+}
 
-String PhysicalOperator::GetName() const {
-        return PhysicalOperatorToString(operator_type_);
-    }
+String
+PhysicalOperator::GetName() const {
+    return PhysicalOperatorToString(operator_type_);
+}
 
 } // namespace infinity
 

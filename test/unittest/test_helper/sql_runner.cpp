@@ -105,7 +105,6 @@ SQLRunner::RunV2(const String& sql_text, bool print) {
     query_context_ptr->BeginTxn();
 
     SizeT statement_count = parsed_result->statements_ptr_->size();
-    std::cout << "Statement count: " << parsed_result->statements_ptr_->size() << std::endl;
 
     for(SizeT idx = 0; idx < statement_count; ++ idx) {
         LogicalPlanner logical_planner(query_context_ptr.get());
@@ -128,8 +127,7 @@ SQLRunner::RunV2(const String& sql_text, bool print) {
         // Fragment Builder, only for test now. plan fragment is same as pipeline.
         auto root_fragment = MakeShared<PlanFragment>();
         fragment_builder.BuildFragments(physical_plan, root_fragment.get());
-//        auto result=root_fragment->ToString();
-//        std::cout<<result<<std::endl;
+        auto result=root_fragment->ToString();
 
         // Create execution pipeline
         SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);

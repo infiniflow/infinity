@@ -71,7 +71,7 @@ public:
     virtual SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const = 0;
 
-    String
+    virtual String
     GetName () const ;
 
 protected:
