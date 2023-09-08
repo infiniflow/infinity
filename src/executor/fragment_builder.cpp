@@ -122,7 +122,8 @@ FragmentBuilder::BuildAggregate(const SharedPtr<PhysicalOperator>& phys_op) cons
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildTableScan(const SharedPtr<PhysicalOperator>& phys_op) const {
     SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
-    fragment_ptr->AddOperator(phys_op);
+    GeneralAssert(phys_op->IsExchange(), "TableScan operator is source");
+    fragment_ptr->AddSourceNode(phys_op);
     return fragment_ptr;
 }
 
@@ -135,7 +136,7 @@ SharedPtr<PlanFragment>
 FragmentBuilder::BuildFilter(const SharedPtr<PhysicalOperator>& phys_op) const {
     PlannerAssert(phys_op->left() != nullptr, "Null left child in filter operator");
     PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in filter operator");
-    SharedPtr<PlanFragment> fragment_ptr = Build(phys_op);
+    SharedPtr<PlanFragment> fragment_ptr = Build(phys_op->left());
     fragment_ptr->AddOperator(phys_op);
     return fragment_ptr;
 }
@@ -193,7 +194,7 @@ SharedPtr<PlanFragment>
 FragmentBuilder::BuildProject(const SharedPtr<PhysicalOperator>& phys_op) const {
     PlannerAssert(phys_op->left() != nullptr, "Null left child in project operator");
     PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in project operator");
-    SharedPtr<PlanFragment> fragment_ptr = Build(phys_op);
+    SharedPtr<PlanFragment> fragment_ptr = Build(phys_op->left());
     fragment_ptr->AddOperator(phys_op);
     return fragment_ptr;
 }
@@ -351,4 +352,67 @@ FragmentBuilder::BuildShow(const SharedPtr<PhysicalOperator>& phys_op) const {
     return fragment_ptr;
 }
 
+void
+FragmentBuilder::BuildFragments(const SharedPtr<PhysicalOperator> &phys_op, PlanFragment *current) {
+    if (phys_op->IsSink()) {
+        /// Build sink node
+
+        SharedPtr<PhysicalOperator> fragment_child = nullptr;
+
+        switch (phys_op->operator_type()) {
+            case PhysicalOperatorType::kInsert:
+            case PhysicalOperatorType::kDelete:
+            case PhysicalOperatorType::kUpdate:
+            case PhysicalOperatorType::kCreateTable:
+            case PhysicalOperatorType::kCreateCollection:
+            case PhysicalOperatorType::kCreateSchema:
+            case PhysicalOperatorType::kTop:
+            case PhysicalOperatorType::kLimit:
+                assert(phys_op->left() != nullptr);
+                assert(phys_op->right() == nullptr);
+                current->AddSourceNode(phys_op);
+                fragment_child = phys_op->left();
+                break;
+
+            case PhysicalOperatorType::kJoinHash:
+            case PhysicalOperatorType::kJoinNestedLoop:
+                fragment_child = phys_op->right();
+                current->AddOperator(phys_op);
+                BuildFragments(phys_op->left(), current);
+                break;
+
+            default:
+                throw Exception("Invalid sink operator type");
+        }
+
+        /// the current is dependent on this fragment to complete
+        auto fragment = MakeShared<PlanFragment>();
+
+        fragment->AddSinkNode(phys_op);
+        current->AddDependency(fragment);
+
+        assert(fragment_child != nullptr);
+
+        BuildFragments(fragment_child, fragment.get());
+    }else{
+        /// operator is not sink
+        switch (phys_op->operator_type()){
+            PlannerAssert(phys_op->left() == nullptr, "Non-Null left child in create collection operator");
+            PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
+
+            case PhysicalOperatorType::kUnionAll:
+            /// do something
+
+            default:
+                break;
+        }
+        /// physical opt child is empty
+        if (phys_op->left() == nullptr&& phys_op->right() == nullptr) {
+            current->AddSourceNode(phys_op);
+        }else{
+            current->AddOperator(phys_op);
+            BuildFragments(phys_op->left(), current);
+        }
+    }
+}
 }

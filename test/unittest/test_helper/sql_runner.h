@@ -17,6 +17,7 @@
 #include "main/infinity.h"
 
 #include "main/profiler/show_logical_plan.h"
+#include "executor/fragment_builder.h"
 
 namespace infinity {
 
@@ -25,6 +26,8 @@ class SQLRunner {
 public:
     static String
     Run(const String& sql_text, bool print = true);
+    static String
+    RunV2(const String& sql_text, bool print = true);
 
 };
 

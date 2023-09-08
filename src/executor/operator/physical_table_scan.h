@@ -63,6 +63,16 @@ public:
         return table_index_;
     }
 
+    bool
+    ParallelExchange() const override {
+        return true;
+    }
+
+    bool
+    IsExchange() const override {
+        return true;
+    }
+
 private:
     String table_alias_{};
     u64 table_index_{};
