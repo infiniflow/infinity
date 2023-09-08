@@ -53,9 +53,9 @@ public:
     }
     
     inline void
-    AddDependency(SharedPtr<PlanFragment>& fragment) {
-        dependencies.push_back(SharedPtr<PlanFragment>(fragment));
-        fragment->parents.push_back(SharedPtr<PlanFragment>(shared_from_this()));
+    AddDependency(PlanFragment* fragment) {
+        dependencies_.push_back(fragment);
+        fragment->parents_.push_back(this);
     }
 
     SharedPtr<Vector<String>>
@@ -65,17 +65,17 @@ public:
 private:
 
     /// The source of this fragment
-    SharedPtr<PhysicalOperator> source_;
+    SharedPtr<PhysicalOperator> source_{};
     /// The chain of intermediate operators
     Vector<SharedPtr<PhysicalOperator>> operators_{};
     /// The sink (i.e. destination) for data;
-    SharedPtr<PhysicalOperator> sink_;
+    SharedPtr<PhysicalOperator> sink_{};
     /// The data blocks that are produced by this fragment
     Vector<SharedPtr<DataBlock>> data_{};
     /// The parent fragments (i.e. pipelines that are dependent on this pipeline to finish)
-    Vector<SharedPtr<PlanFragment>> parents;
+    Vector<PlanFragment*> parents_{};
     /// The dependencies of this fragment
-    Vector<SharedPtr<PlanFragment>> dependencies;
+    Vector<PlanFragment*> dependencies_{};
 
     /// may be not necessary
     SharedPtr<PlanFragment> left_{};

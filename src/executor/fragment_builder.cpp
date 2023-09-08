@@ -345,8 +345,8 @@ FragmentBuilder::BuildPreparePlan(const SharedPtr<PhysicalOperator>& phys_op) co
 
 SharedPtr<PlanFragment>
 FragmentBuilder::BuildShow(const SharedPtr<PhysicalOperator>& phys_op) const {
-    PlannerAssert(phys_op->left() == nullptr, "Null left child in create collection operator");
-    PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
+    ExecutorAssert(phys_op->left() == nullptr, "Null left child in create collection operator");
+    ExecutorAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
     SharedPtr<PlanFragment> fragment_ptr = MakeShared<PlanFragment>();
     fragment_ptr->AddOperator(phys_op);
     return fragment_ptr;
@@ -368,8 +368,8 @@ FragmentBuilder::BuildFragments(const SharedPtr<PhysicalOperator> &phys_op, Plan
             case PhysicalOperatorType::kCreateSchema:
             case PhysicalOperatorType::kTop:
             case PhysicalOperatorType::kLimit:
-                assert(phys_op->left() != nullptr);
-                assert(phys_op->right() == nullptr);
+                ExecutorAssert(phys_op->left() != nullptr, "Null left child in sink operator");
+                ExecutorAssert(phys_op->right() == nullptr, "Non-Null right child in sink operator");
                 current->AddSourceNode(phys_op);
                 fragment_child = phys_op->left();
                 break;
@@ -389,16 +389,16 @@ FragmentBuilder::BuildFragments(const SharedPtr<PhysicalOperator> &phys_op, Plan
         auto fragment = MakeShared<PlanFragment>();
 
         fragment->AddSinkNode(phys_op);
-        current->AddDependency(fragment);
+        current->AddDependency(fragment.get());
 
-        assert(fragment_child != nullptr);
+        ExecutorAssert(fragment_child != nullptr, "Null child in sink operator");
 
         BuildFragments(fragment_child, fragment.get());
     }else{
         /// operator is not sink
         switch (phys_op->operator_type()){
-            PlannerAssert(phys_op->left() == nullptr, "Non-Null left child in create collection operator");
-            PlannerAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
+            ExecutorAssert(phys_op->left() == nullptr, "Non-Null left child in create collection operator");
+            ExecutorAssert(phys_op->right() == nullptr, "Non-Null right child in create collection operator");
 
             case PhysicalOperatorType::kUnionAll:
             /// do something
