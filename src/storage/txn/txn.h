@@ -151,6 +151,12 @@ public:
         return txn_context_.GetTxnState();
     }
 
+    void
+    AddTxnTableStore(const String& table_name, UniquePtr<TxnTableStore> txn_table_store);
+
+    TxnTableStore*
+    GetTxnTableStore(const String& table_name);
+
 private:
     UniquePtr<String>
     GetTableEntry(const String& db_name, const String& table_name, TableCollectionEntry*& table_entry);

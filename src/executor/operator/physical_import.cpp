@@ -41,7 +41,6 @@ struct ParserContext {
     SharedPtr<String> err_msg_{};
     TableCollectionEntry* table_collection_entry_{};
     Txn* txn_{};
-    SharedPtr<TxnTableStore> txn_table_store_{};
     SharedPtr<SegmentEntry> segment_entry_{};
 };
 
@@ -57,13 +56,17 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
     // TODO: redesign parser_context
     parser_context.table_collection_entry_ = table_collection_entry_;
     parser_context.txn_ = query_context->GetTxn();
-    parser_context.txn_table_store_ = MakeShared<TxnTableStore>(
+    parser_context.txn_->AddTxnTableStore(
         *table_collection_entry_->table_collection_name_,
-        table_collection_entry_, parser_context.txn_);
+        MakeUnique<TxnTableStore>(
+            *table_collection_entry_->table_collection_name_,
+            table_collection_entry_, parser_context.txn_));
     parser_context.segment_entry_ = SegmentEntry::MakeNewSegmentEntry(
         table_collection_entry_, parser_context.txn_->TxnID(),
         TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
         parser_context.txn_->GetBufferMgr());
+
+    const String &table_name = *table_collection_entry_->table_collection_name_;
 
     if(header_) {
         opts.row_handler = CSVHeaderHandler;
@@ -84,9 +87,14 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
 
     // flush the last segment entry
     if (parser_context.segment_entry_->current_row_ > 0) {
-        auto txn_store = parser_context.txn_table_store_;
+        auto txn_store = parser_context.txn_->GetTxnTableStore(table_name);
+        // flush the segment entry
+        SegmentEntry::PrepareFlush(parser_context.segment_entry_.get());
+        SegmentEntry::Flush(parser_context.segment_entry_.get());
         txn_store->Import(parser_context.segment_entry_);
     }
+
+    
 
     zsv_finish(parser_context.parser_);
     zsv_delete(parser_context.parser_);
@@ -166,8 +174,8 @@ PhysicalImport::CSVRowHandler(void *context) {
 
     auto *table = parser_context->table_collection_entry_;
     SizeT column_count = zsv_cell_count(parser_context->parser_);
-    auto txn_store = parser_context->txn_table_store_;
     auto *txn = parser_context->txn_;
+    auto txn_store = txn->GetTxnTableStore(*table->table_collection_name_);
 
     auto segment_entry = parser_context->segment_entry_;
     // we have already eat all space in the segment

@@ -73,11 +73,13 @@ BufferMgrTest::SetUp() {
         processor.Submit(write_task1);
         processor.Submit(write_task2);
         write_task1->Wait();
+        EXPECT_FALSE(write_task1->IsError());
         if (write_task1->IsError()) {
             LOG_ERROR(write_task1->GetError());
         }
 
         write_task2->Wait();
+        EXPECT_FALSE(write_task2->IsError());
         if (write_task2->IsError()) {
             LOG_ERROR(write_task2->GetError());
         }

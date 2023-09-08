@@ -103,7 +103,7 @@ TxnTableStore::PrepareCommit() {
 }
 
 void
-TxnTableStore::Commit(TxnTimeStamp commit_ts) {
+TxnTableStore::Commit() {
     Txn* txn_ptr = (Txn*)txn_;
     TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get(), txn_ptr->GetBufferMgr());
 }

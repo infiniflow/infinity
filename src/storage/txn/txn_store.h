@@ -39,7 +39,7 @@ public:
     PrepareCommit();
 
     void
-    Commit(TxnTimeStamp commit_ts);
+    Commit();
 
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};

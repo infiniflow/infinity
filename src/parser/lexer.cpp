@@ -1,6 +1,6 @@
-#line 2 "/home/jinhai/Documents/development/infinity/src/parser/lexer.cpp"
+#line 1 "/home/tangdh/workspace/infinity/src/parser/lexer.cpp"
 
-#line 4 "/home/jinhai/Documents/development/infinity/src/parser/lexer.cpp"
+#line 3 "/home/tangdh/workspace/infinity/src/parser/lexer.cpp"
 
 #define  YY_INT_ALIGNED short int
 
@@ -1155,8 +1155,8 @@ static const flex_int16_t yy_rule_linenum[146] =
 #define yymore() yymore_used_but_not_detected
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
-#line 1 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
-#line 2 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 1 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
+#line 2 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 
 #include "parser.h"
 #include "parser_result.h"
@@ -1164,9 +1164,9 @@ static const flex_int16_t yy_rule_linenum[146] =
 
 static thread_local std::stringstream string_buffer;
 
-#line 1168 "/home/jinhai/Documents/development/infinity/src/parser/lexer.cpp"
+#line 1167 "/home/tangdh/workspace/infinity/src/parser/lexer.cpp"
 
-#line 1170 "/home/jinhai/Documents/development/infinity/src/parser/lexer.cpp"
+#line 1169 "/home/tangdh/workspace/infinity/src/parser/lexer.cpp"
 
 #define INITIAL 0
 #define SINGLE_QUOTED_STRING 1
@@ -1517,10 +1517,10 @@ YY_DECL
 
 	{
 /* %% [7.0] user's declarations go here */
-#line 27 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 27 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 
 
-#line 1524 "/home/jinhai/Documents/development/infinity/src/parser/lexer.cpp"
+#line 1523 "/home/tangdh/workspace/infinity/src/parser/lexer.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1599,322 +1599,322 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 29 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 29 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 /* ignore \t\n and space */;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 31 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 31 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return ALL; }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 32 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 32 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return ALTER; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 33 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 33 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return ANALYZE; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 34 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 34 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return AND; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 35 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 35 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return AS; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 36 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 36 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return AST; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 37 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 37 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return ASC; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 38 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 38 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return BETWEEN; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 39 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 39 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return BIGINT; }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 40 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 40 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return BIT; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 41 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 41 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return BITMAP; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 42 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 42 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return BOOLEAN; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 43 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 43 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return BOX; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 44 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 44 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return BLOB; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 45 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 45 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return BUFFER; }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 46 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 46 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return BY; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 47 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 47 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return CASE; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 48 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 48 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return CAST; }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 49 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 49 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return CHAR; }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 50 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 50 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return CIRCLE; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 51 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 51 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return COLLECTION; }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 52 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 52 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return COPY; }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 53 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 53 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return CREATE; }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 54 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 54 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return CROSS; }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 55 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 55 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DATA; }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 56 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 56 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DATE; }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 57 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 57 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DATETIME; }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 58 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 58 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DAY; }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 59 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 59 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DAYS; }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 60 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 60 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DISTINCT; }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 61 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 61 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DOUBLE; }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 62 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 62 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DECIMAL; }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 63 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 63 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DELETE; }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 64 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 64 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DELIMITER; }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 65 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 65 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DESCRIBE; }
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 66 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 66 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DESC; }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 67 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 67 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return DROP; }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 68 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 68 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return ELSE; }
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 69 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 69 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return EMBEDDING; }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 70 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 70 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return END; }
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 71 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 71 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return EXCEPT; }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 72 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 72 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return EXTRACT; }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 73 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 73 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return EXECUTE; }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 74 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 74 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return EXISTS; }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 75 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 75 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return EXPLAIN; }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 76 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 76 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return FALSE; }
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 77 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 77 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return FLOAT; }
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 78 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 78 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return FLUSH; }
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 79 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 79 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return FORMAT; }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 80 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 80 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return FROM; }
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
-#line 81 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 81 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return FULL; }
 	YY_BREAK
 case 53:
 YY_RULE_SETUP
-#line 82 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 82 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return GROUP; }
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-#line 83 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 83 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return HAVING; }
 	YY_BREAK
 case 55:
 YY_RULE_SETUP
-#line 84 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 84 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return HEADER; }
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 85 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 85 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return HOUR; }
 	YY_BREAK
 case 57:
 YY_RULE_SETUP
-#line 86 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 86 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return HOURS; }
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
-#line 87 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 87 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return HUGEINT; }
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
-#line 88 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 88 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return IF; }
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
-#line 89 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 89 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return IN; }
 	YY_BREAK
 case 61:
 YY_RULE_SETUP
-#line 90 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 90 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return INDEX; }
 	YY_BREAK
 case 62:
 YY_RULE_SETUP
-#line 91 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 91 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return INNER; }
 	YY_BREAK
 case 63:
 YY_RULE_SETUP
-#line 92 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 92 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return INSERT; }
 	YY_BREAK
 case 64:
 YY_RULE_SETUP
-#line 93 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 93 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return INTEGER; }
 	YY_BREAK
 case 65:
@@ -2249,7 +2249,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 131:
 YY_RULE_SETUP
-#line 161 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
+#line 161 "/home/tangdh/workspace/infinity/src/parser/lexer.l"
 { return NOT_EQ; }
 	YY_BREAK
 case 132:
@@ -2315,7 +2315,7 @@ YY_RULE_SETUP
     return IDENTIFIER;
 }
 	YY_BREAK
-case 141:
+case 142:
 YY_RULE_SETUP
 #line 198 "/home/jinhai/Documents/development/infinity/src/parser/lexer.l"
 { BEGIN SINGLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170

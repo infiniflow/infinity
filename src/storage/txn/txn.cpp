@@ -3,11 +3,13 @@
 //
 
 #include "txn.h"
+#include "common/types/internal_types.h"
 #include "main/logger.h"
 #include "common/utility/infinity_assert.h"
 #include "common/utility/defer_op.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/meta/catalog.h"
+#include "storage/txn/txn_store.h"
 
 namespace infinity {
 
@@ -112,6 +114,25 @@ Txn::InitializeGet(GetParam) {
 void
 Txn::TableGet() {
 
+}
+
+void
+Txn::AddTxnTableStore(const String& table_name, UniquePtr<TxnTableStore> txn_table_store) {
+    if (txn_tables_store_.find(table_name) != txn_tables_store_.end()) {
+        String err_msg = fmt::format("Attempt to add duplicated table store for table: {}", table_name);
+        LOG_ERROR(err_msg);
+        return;
+    }
+    txn_tables_store_[table_name] = std::move(txn_table_store);
+}
+
+TxnTableStore* 
+Txn::GetTxnTableStore(const String& table_name) {
+    auto txn_table_iter = txn_tables_store_.find(table_name);
+    if(txn_table_iter == txn_tables_store_.end()) {
+        return nullptr;
+    }
+    return txn_table_iter->second.get();
 }
 
 void
@@ -493,6 +514,9 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
     }
 
     // TODO: Flush the whole catalog.
+    String file_name = *catalog_->current_dir_ + "/catalog/META_"
+     + std::to_string(commit_ts) + ".json";
+    NewCatalog::SaveAsFile(catalog_, file_name);
 
     // Reset the LSN of WAL
 
