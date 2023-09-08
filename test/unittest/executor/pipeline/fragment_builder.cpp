@@ -2,6 +2,7 @@
 // Created by xwg on 23-9-6.
 //
 #include <gtest/gtest.h>
+#include "test_helper/sql_runner.h"
 #include "base_test.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
@@ -9,8 +10,6 @@
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
 #include "executor/operator/physical_sort.h"
-#include "test_helper/sql_runner.h"
-#include "parser/sql_parser.h"
 
 
 class FragmentBuilderTest : public BaseTest {
