@@ -316,7 +316,7 @@ union SQLSTYPE
     infinity::CopyOption* copy_option_t;
     std::vector<infinity::CopyOption*>* copy_option_array;
 
-#line 320 "/home/jinhai/Documents/development/infinity/src/parser/parser.h"
+#line 320 "/home/tangdh/workspace/infinity/src/parser/parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

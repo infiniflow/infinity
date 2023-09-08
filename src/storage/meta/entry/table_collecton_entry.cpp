@@ -47,7 +47,7 @@ TableCollectionEntry::Append(TableCollectionEntry* table_entry, Txn* txn_ptr, vo
                                                                                     table_entry->txn_id_,
                                                                                     next_segment_id,
                                                                                     buffer_mgr);
-            table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
+            // table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
             table_entry->unsealed_segment_ = new_segment.get();
 //            table_entry->unsealed_segment_->Init(this->definition_ptr_->columns(), dir_, buffer_mgr_);
             LOG_TRACE("Add a new segment");
@@ -57,7 +57,7 @@ TableCollectionEntry::Append(TableCollectionEntry* table_entry, Txn* txn_ptr, vo
     while(!append_state_ptr->Finished()) {
         SizeT current_row = append_state_ptr->current_count_;
 
-        if(table_entry->unsealed_segment_->AvailableCapacity() == 0) {
+        if(table_entry->unsealed_segment_->AvailableCapacity() == 0 && table_entry->unsealed_segment_->row_capacity_ > 0) {
             // uncommitted_segment is full
             std::unique_lock<RWMutex> rw_locker(table_entry->rw_locker_); // prevent another read conflict with this append operation
             // Need double-check
@@ -219,10 +219,10 @@ TableCollectionEntry::Deserialize(const nlohmann::json& table_entry_json, TableC
     Vector<SharedPtr<ColumnDef>> columns;
     for(const auto& column_def_json: table_entry_json["column_definition"]) {
         HashSet<ConstraintType> constraints;
-        for(const auto& column_constraint: column_def_json["constraints"]) {
-//            ConstraintType constraint = column_constraint;
-            constraints.emplace(column_constraint);
-        }
+//         for(const auto& column_constraint: column_def_json["constraints"]) {
+// //            ConstraintType constraint = column_constraint;
+//             constraints.emplace(column_constraint);
+//         }
 
         SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
         i64 column_id = column_def_json["column_id"];

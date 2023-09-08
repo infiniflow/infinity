@@ -200,6 +200,7 @@ SegmentEntry::Serialize(const SegmentEntry* segment_entry) {
     json_res["commit_ts"] = segment_entry->commit_ts_.load();
     json_res["txn_id"] = segment_entry->txn_id_.load();
     json_res["deleted"] = segment_entry->deleted_;
+    json_res["current_row"] = segment_entry->current_row_;
     return json_res;
 }
 
@@ -215,6 +216,7 @@ SegmentEntry::Deserialize(const nlohmann::json& table_entry_json, TableCollectio
     segment_entry->segment_id_ = table_entry_json["segment_id"];
     segment_entry->start_txn_id_ = table_entry_json["start_txn_id"];
     segment_entry->end_txn_id_ = table_entry_json["end_txn_id"];
+    segment_entry->current_row_ = table_entry_json["current_row"];
 
     for(const auto& column_json: table_entry_json["columns"]) {
         SharedPtr<ColumnDataEntry> column_data_entry = ColumnDataEntry::Deserialize(column_json, segment_entry.get(), buffer_mgr);

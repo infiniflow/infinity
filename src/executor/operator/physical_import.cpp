@@ -89,8 +89,8 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
     if (parser_context.segment_entry_->current_row_ > 0) {
         auto txn_store = parser_context.txn_->GetTxnTableStore(table_name);
         // flush the segment entry
-        SegmentEntry::PrepareFlush(parser_context.segment_entry_.get());
-        SegmentEntry::Flush(parser_context.segment_entry_.get());
+        // SegmentEntry::PrepareFlush(parser_context.segment_entry_.get());
+        // SegmentEntry::Flush(parser_context.segment_entry_.get());
         txn_store->Import(parser_context.segment_entry_);
     }
 
@@ -181,8 +181,8 @@ PhysicalImport::CSVRowHandler(void *context) {
     // we have already eat all space in the segment
     if (segment_entry->AvailableCapacity() == 0) {
         // flush the segment entry
-        SegmentEntry::PrepareFlush(segment_entry.get());
-        SegmentEntry::Flush(segment_entry.get());
+        // SegmentEntry::PrepareFlush(segment_entry.get());
+        // SegmentEntry::Flush(segment_entry.get());
         
         // add to txn_store
         txn_store->Import(segment_entry);

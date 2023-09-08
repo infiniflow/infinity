@@ -283,7 +283,7 @@ LogicalPlanner::BuildCreateTable(const CreateStatement* statement, SharedPtr<Bin
     SizeT column_count = create_table_info->column_defs_.size();
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(create_table_info->column_defs_[idx]->id(),
+        SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(idx,
                                                                 create_table_info->column_defs_[idx]->type(),
                                                                 create_table_info->column_defs_[idx]->name(),
                                                                 create_table_info->column_defs_[idx]->constraints_);
