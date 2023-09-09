@@ -61,6 +61,7 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
                     if(dummy_task->last_worker_id_ == -1) {
                         // Select an available cpu
                         NewScheduler::DispatchTask(current_cpu_id % cpu_array.size(), dummy_task);
+                        ++ current_cpu_id;
                     } else {
                         NewScheduler::DispatchTask(dummy_task->last_worker_id_, dummy_task);
                     }

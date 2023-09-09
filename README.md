@@ -48,7 +48,7 @@ $ sudo apt install libboost-dev-all
 
 On OpenSUSE Tumbleweed,
 ```shell
-$ sudo zypper install ccache gcc-c++ gcc-fortran flex bison boost-devel libopenblas_pthreads-devel blas-devel lapack-devel cblas-devel
+$ sudo zypper install ccache gcc-c++ gcc-fortran flex bison boost-devel libopenblas_pthreads-devel blas-devel lapack-devel cblas-devel libomp16-devel
 $ export CC=/usr/lib64/ccache/gcc
 $ export CXX=/usr/lib64/ccache/g++
 ```

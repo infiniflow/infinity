@@ -11,7 +11,7 @@
 
 void
 ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
-    cxxopts::Options options("./infinity_server", "");
+    cxxopts::Options options("./infinity_main", "");
 
     options.add_options()
             ("h,help", "Display this help and exit") // NOLINT
