@@ -28,6 +28,7 @@ class UuidTypeTest : public BaseTest {
 
 TEST_F(UuidTypeTest, Uuid) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     char uuid_str[17] = "aabbccddeeffgghh";
 
     // Default constructor and Set

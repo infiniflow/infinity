@@ -31,6 +31,7 @@ class SelectionTest : public BaseTest {
 
 TEST_F(SelectionTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     Selection s1;
     EXPECT_THROW(s1.Append(1), ExecutorException);

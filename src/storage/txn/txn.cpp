@@ -487,11 +487,13 @@ void
 Txn::CommitTxn(TxnTimeStamp commit_ts) {
     txn_context_.SetTxnCommitting(commit_ts);
 
+    bool is_read_only_txn = true;
     {
         // prepare to commit txn local data into table
         for(const auto& name_table_pair: txn_tables_store_) {
             TxnTableStore* table_local_store = name_table_pair.second.get();
             table_local_store->PrepareCommit();
+            is_read_only_txn = false;
         }
     }
 
@@ -500,23 +502,29 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
     // Commit databases in catalog
     for(auto* db_entry: txn_dbs_) {
         db_entry->Commit(commit_ts);
+        is_read_only_txn = false;
     }
 
     // Commit tables in catalog
     for(auto* table_entry: txn_tables_) {
         table_entry->Commit(commit_ts);
+        is_read_only_txn = false;
     }
 
     // Commit the prepared data
     for(const auto& name_table_pair: txn_tables_store_) {
         TxnTableStore* table_local_store = name_table_pair.second.get();
         table_local_store->Commit();
+        is_read_only_txn = false;
     }
 
     // TODO: Flush the whole catalog.
-    String file_name = *catalog_->current_dir_ + "/catalog/META_"
-     + std::to_string(commit_ts) + ".json";
-    NewCatalog::SaveAsFile(catalog_, file_name);
+    if(!is_read_only_txn) {
+        String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir() + "/catalog";
+        String file_name = "META_" + std::to_string(commit_ts) + ".json";
+        LOG_TRACE("Going to store META as file {}/{}", dir_name, file_name);
+        NewCatalog::SaveAsFile(catalog_, dir_name, file_name);
+    }
 
     // Reset the LSN of WAL
 

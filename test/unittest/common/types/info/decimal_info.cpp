@@ -29,6 +29,7 @@ class DecimalInfoTest : public BaseTest {
 
 TEST_F(DecimalInfoTest, decimal_info_A) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     EXPECT_THROW(DecimalInfo::Make(39, 39), TypeException);
     EXPECT_EQ(DecimalInfo::Make(38, 39), nullptr);

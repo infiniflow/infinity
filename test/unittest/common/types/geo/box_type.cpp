@@ -28,6 +28,7 @@ class BoxTypeTest : public BaseTest {
 
 TEST_F(BoxTypeTest, point1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     BoxT b1;
     b1.upper_left.x = 1.0f;

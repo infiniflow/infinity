@@ -13,7 +13,7 @@
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
 #include "executor/physical_planner.h"
-#include "scheduler/operator_pipeline.h"
+#include "legacy_sched/operator_pipeline.h"
 #include "main/infinity.h"
 #include "test_helper/sql_runner.h"
 
@@ -38,6 +38,7 @@ class LogicalPlannerTest : public BaseTest {
 
 TEST_F(LogicalPlannerTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SQLRunner::Run("create table t1(a bigint, b bigint);", false);
     SQLRunner::Run("insert into t1 values(1, 2);", false);

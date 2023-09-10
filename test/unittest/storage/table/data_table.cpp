@@ -37,6 +37,7 @@ TEST_F(DataTableTest, test1) {
 #if 0
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
     SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
@@ -89,6 +90,7 @@ TEST_F(DataTableTest, test1) {
 
 TEST_F(DataTableTest, test2) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
     SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");

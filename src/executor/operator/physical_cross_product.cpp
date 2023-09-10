@@ -12,6 +12,11 @@ PhysicalCrossProduct::Init() {
 }
 
 void
+PhysicalCrossProduct::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalCrossProduct::Execute(QueryContext* query_context) {
     ExecutorAssert(left_->output() != nullptr, "No left input.");
     ExecutorAssert(right_->output() != nullptr, "No right input.");

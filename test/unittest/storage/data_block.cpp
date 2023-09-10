@@ -33,6 +33,7 @@ class DataBlockTest : public BaseTest {
 
 TEST_F(DataBlockTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
 
     DataBlock data_block;
@@ -135,6 +136,7 @@ TEST_F(DataBlockTest, test1) {
 
 TEST_F(DataBlockTest, test2) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     DataBlock data_block;
     Vector<SharedPtr<DataType>> column_types;
@@ -168,6 +170,7 @@ TEST_F(DataBlockTest, test2) {
 
 TEST_F(DataBlockTest, test3) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     infinity::BaseProfiler profiler;
 

@@ -32,6 +32,7 @@ class LineCastTest : public BaseTest {
 
 TEST_F(LineCastTest, line_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Try to cast line type to wrong type.
     {
@@ -55,6 +56,7 @@ TEST_F(LineCastTest, line_cast0) {
 
 TEST_F(LineCastTest, line_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Call BindGeographyCast with wrong type of parameters
     {

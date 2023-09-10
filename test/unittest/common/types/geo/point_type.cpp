@@ -28,6 +28,7 @@ class PointTypeTest : public BaseTest {
 
 TEST_F(PointTypeTest, point1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     PointT p1;
     p1.x = 1.0f;

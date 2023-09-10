@@ -29,6 +29,7 @@ class ValueTest : public BaseTest {
 
 TEST_F(ValueTest, Bitmap) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     Value value = Value::MakeBool(true);
 
@@ -59,6 +60,7 @@ TEST_F(ValueTest, Bitmap) {
 
 TEST_F(ValueTest, Array) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     Value value = Value::MakeBool(true);
 
@@ -99,6 +101,7 @@ TEST_F(ValueTest, Array) {
 
 TEST_F(ValueTest, Blob) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     Value value = Value::MakeBool(true);
 
@@ -121,6 +124,7 @@ TEST_F(ValueTest, Blob) {
 TEST_F(ValueTest, MakeAndGet) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Boolean
     Value value = Value::MakeBool(true);

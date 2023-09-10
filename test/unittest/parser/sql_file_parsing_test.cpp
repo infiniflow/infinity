@@ -26,6 +26,7 @@ class SQLFileParsingTest : public BaseTest {
 
 TEST_F(SQLFileParsingTest, tpch) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr <ParserResult> result = MakeShared<ParserResult>();
@@ -70,6 +71,7 @@ ReadSQLs(const String& file_path, Vector<String>& sqls) {
 
 TEST_F(SQLFileParsingTest, hyrise) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr <ParserResult> result = MakeShared<ParserResult>();
@@ -98,6 +100,7 @@ TEST_F(SQLFileParsingTest, hyrise) {
 
 TEST_F(SQLFileParsingTest, infinity) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr <ParserResult> result = MakeShared<ParserResult>();

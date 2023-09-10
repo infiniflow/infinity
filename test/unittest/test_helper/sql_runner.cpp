@@ -13,10 +13,12 @@ SQLRunner::Run(const String& sql_text, bool print) {
     }
 
     SharedPtr<Session> session_ptr = MakeShared<Session>();
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(),
-                                                                         Infinity::instance().config(),
-                                                                         Infinity::instance().scheduler(),
-                                                                         Infinity::instance().storage());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>();
+    query_context_ptr->Init(session_ptr.get(),
+                            Infinity::instance().config(),
+                            Infinity::instance().fragment_scheduler(),
+                            Infinity::instance().storage(),
+                            Infinity::instance().resource_manager());
     query_context_ptr->set_current_schema(session_ptr->current_database());
 
     SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
@@ -87,10 +89,12 @@ SQLRunner::RunV2(const String& sql_text, bool print) {
     }
 
     SharedPtr<Session> session_ptr = MakeShared<Session>();
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get(),
-                                                                         Infinity::instance().config(),
-                                                                         Infinity::instance().scheduler(),
-                                                                         Infinity::instance().storage());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>();
+    query_context_ptr->Init(session_ptr.get(),
+                            Infinity::instance().config(),
+                            Infinity::instance().fragment_scheduler(),
+                            Infinity::instance().storage(),
+                            Infinity::instance().resource_manager());
     query_context_ptr->set_current_schema(session_ptr->current_database());
 
     SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
@@ -126,8 +130,8 @@ SQLRunner::RunV2(const String& sql_text, bool print) {
         // Create execution pipeline
         // Fragment Builder, only for test now. plan fragment is same as pipeline.
         auto root_fragment = MakeShared<PlanFragment>();
-        fragment_builder.BuildFragments(physical_plan, root_fragment.get());
-        auto result=root_fragment->ToString();
+        fragment_builder.BuildFragments(physical_plan.get(), root_fragment.get());
+        auto result = root_fragment->ToString();
 
         // Create execution pipeline
         SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);

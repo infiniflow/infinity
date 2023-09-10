@@ -12,6 +12,11 @@ PhysicalSortMergeJoin::Init() {
 }
 
 void
+PhysicalSortMergeJoin::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalSortMergeJoin::Execute(QueryContext* query_context) {
 
 }

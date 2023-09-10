@@ -29,6 +29,7 @@ class ColumnVectorFloatTest : public BaseTest {
 
 TEST_F(ColumnVectorFloatTest, flat_float) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
     ColumnVector column_vector(data_type);
@@ -156,6 +157,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
 TEST_F(ColumnVectorFloatTest, contant_float) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
     ColumnVector column_vector(data_type);
@@ -243,6 +245,7 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
 
 TEST_F(ColumnVectorFloatTest, float_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
     ColumnVector column_vector(data_type);
@@ -278,6 +281,7 @@ TEST_F(ColumnVectorFloatTest, float_column_vector_select) {
 
 TEST_F(ColumnVectorFloatTest, float_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
     ColumnVector column_vector(data_type);
@@ -312,6 +316,7 @@ TEST_F(ColumnVectorFloatTest, float_column_slice_init) {
 
 TEST_F(ColumnVectorFloatTest, flat_double) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
     ColumnVector column_vector(data_type);
@@ -431,6 +436,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
 TEST_F(ColumnVectorFloatTest, contant_double) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
     ColumnVector column_vector(data_type);
@@ -518,6 +524,7 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
 
 TEST_F(ColumnVectorFloatTest, double_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
     ColumnVector column_vector(data_type);
@@ -553,6 +560,7 @@ TEST_F(ColumnVectorFloatTest, double_column_vector_select) {
 
 TEST_F(ColumnVectorFloatTest, double_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
     ColumnVector column_vector(data_type);

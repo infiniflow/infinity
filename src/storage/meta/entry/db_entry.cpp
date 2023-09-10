@@ -104,7 +104,7 @@ DBEntry::GetTableCollection(DBEntry* db_entry,
     }
     db_entry->rw_locker_.unlock_shared();
 
-   LOG_TRACE("Get a table entry {}", table_name);
+//    LOG_TRACE("Get a table entry {}", table_name);
     return TableCollectionMeta::GetEntry(table_meta, txn_id, begin_ts);
 }
 

@@ -30,6 +30,7 @@ class ColumnVectorMixedTest : public BaseTest {
 
 TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -165,6 +166,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
 
 TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -207,6 +209,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
 
 TEST_F(ColumnVectorMixedTest, mixed_integer_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -248,6 +251,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -383,6 +387,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
 
 TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -425,6 +430,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
 
 TEST_F(ColumnVectorMixedTest, mixed_float_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -466,6 +472,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -611,6 +618,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
 
 TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -658,6 +666,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
 
 TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -704,6 +713,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -883,6 +893,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
 
 TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -943,6 +954,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
 
 TEST_F(ColumnVectorMixedTest, mixed_long_str_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -1002,6 +1014,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -1130,6 +1143,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
 
 TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -1168,6 +1182,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
 
 TEST_F(ColumnVectorMixedTest, mixed_null_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -1205,6 +1220,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -1333,6 +1349,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
 
 TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -1371,6 +1388,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
 
 TEST_F(ColumnVectorMixedTest, mixed_missing_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -1408,6 +1426,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -2331,6 +2350,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
 
 TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -2663,6 +2683,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
 
 TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -2994,6 +3015,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -4048,6 +4070,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
 TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -4431,6 +4454,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 
 TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);

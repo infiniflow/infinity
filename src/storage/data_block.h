@@ -35,6 +35,11 @@ public:
     void
     Init(const Vector<SharedPtr<ColumnVector>>& column_vectors);
 
+    [[nodiscard]] inline bool
+    Initialized() const {
+        return initialized;
+    }
+
     // Reset to just initialized state.
     void
     Reset();

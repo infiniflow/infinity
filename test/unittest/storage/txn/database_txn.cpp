@@ -25,22 +25,19 @@ class DBTxnTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+        system("rm -rf /tmp/infinity/data/db");
+        system("rm -rf /tmp/infinity/data/catalog/*");
+        system("rm -rf /tmp/infinity/_tmp");
     }
 };
 
 TEST_F(DBTxnTest, test1) {
     using namespace infinity;
-    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
-
-    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create
-    Txn* new_txn = txn_mgr.CreateTxn();
+    Txn* new_txn = txn_mgr->CreateTxn();
 
     EntryResult create_res;
 
@@ -64,7 +61,7 @@ TEST_F(DBTxnTest, test1) {
     EXPECT_EQ(create_res.entry_->Committed(), true);
 
     // Txn2: Create
-    new_txn = txn_mgr.CreateTxn();
+    new_txn = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -84,7 +81,7 @@ TEST_F(DBTxnTest, test1) {
     new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn3: Create, OK
-    new_txn = txn_mgr.CreateTxn();
+    new_txn = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -103,19 +100,13 @@ TEST_F(DBTxnTest, test1) {
 
 TEST_F(DBTxnTest, test20) {
     using namespace infinity;
-    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
-
-    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr.CreateTxn();
+    Txn* new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -128,7 +119,7 @@ TEST_F(DBTxnTest, test20) {
     new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create, OK
-    new_txn = txn_mgr.CreateTxn();
+    new_txn = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -153,7 +144,7 @@ TEST_F(DBTxnTest, test20) {
     new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn3: Create, OK
-    new_txn = txn_mgr.CreateTxn();
+    new_txn = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -172,19 +163,13 @@ TEST_F(DBTxnTest, test20) {
 
 TEST_F(DBTxnTest, test2) {
     using namespace infinity;
-    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
-
-    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr.CreateTxn();
+    Txn* new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -210,7 +195,7 @@ TEST_F(DBTxnTest, test2) {
     new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create, OK
-    new_txn = txn_mgr.CreateTxn();
+    new_txn = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -232,7 +217,7 @@ TEST_F(DBTxnTest, test2) {
     new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn3: Create, OK
-    new_txn = txn_mgr.CreateTxn();
+    new_txn = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -255,19 +240,14 @@ TEST_F(DBTxnTest, test2) {
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)            TXN2 Commit
 TEST_F(DBTxnTest, test3) {
     using namespace infinity;
-    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
-    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr.CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr.CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
 
@@ -299,18 +279,13 @@ TEST_F(DBTxnTest, test3) {
 //                    TXN1 Begin                    TXN1 Create db1(WW-Conflict)  TXN1 Commit
 TEST_F(DBTxnTest, test4) {
     using namespace infinity;
-    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
-    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr.CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr.CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
     // Txn2: Begin, OK
@@ -336,17 +311,11 @@ TEST_F(DBTxnTest, test4) {
 
 TEST_F(DBTxnTest, test5) {
     using namespace infinity;
-    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
-
-    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr.CreateTxn();
+    Txn* new_txn = txn_mgr->CreateTxn();
 
     EntryResult create_res, get_res;
     // Txn1: Begin, OK
@@ -359,7 +328,7 @@ TEST_F(DBTxnTest, test5) {
     new_txn->RollbackTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn2: Create, OK
-    new_txn = txn_mgr.CreateTxn();
+    new_txn = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -378,19 +347,14 @@ TEST_F(DBTxnTest, test5) {
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
 TEST_F(DBTxnTest, test6) {
     using namespace infinity;
-    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
-    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr.CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr.CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
 
@@ -420,7 +384,7 @@ TEST_F(DBTxnTest, test6) {
     new_txn2->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr.CreateTxn();
+    Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -439,19 +403,14 @@ TEST_F(DBTxnTest, test6) {
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
 TEST_F(DBTxnTest, test7) {
     using namespace infinity;
-    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
-    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr.CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr.CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped1_res, get_res;
 
@@ -485,7 +444,7 @@ TEST_F(DBTxnTest, test7) {
     new_txn2->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr.CreateTxn();
+    Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());

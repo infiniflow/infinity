@@ -12,6 +12,11 @@ PhysicalIndexJoin::Init() {
 }
 
 void
+PhysicalIndexJoin::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalIndexJoin::Execute(QueryContext* query_context) {
 
 }

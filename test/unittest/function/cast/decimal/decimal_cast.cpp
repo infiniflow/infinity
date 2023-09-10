@@ -31,6 +31,7 @@ class DecimalCastTest : public BaseTest {
 
 TEST_F(DecimalCastTest, decimal_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // DecimalT to TinyIntT, throw exception
     {
@@ -98,6 +99,7 @@ TEST_F(DecimalCastTest, decimal_cast0) {
 
 TEST_F(DecimalCastTest, decimal_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // cast decimal column vector to tiny int column vector
     {

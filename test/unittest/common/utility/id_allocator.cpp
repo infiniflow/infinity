@@ -27,6 +27,7 @@ class IDAllocatorTest : public BaseTest {
 
 TEST_F(IDAllocatorTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     IDAllocator id_allocator;
     Vector<Thread> threads;
 

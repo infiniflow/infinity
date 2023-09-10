@@ -29,6 +29,7 @@ class ColumnVectorGeoTest : public BaseTest {
 
 TEST_F(ColumnVectorGeoTest, flat_point) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
     ColumnVector column_vector(data_type);
@@ -155,6 +156,7 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
 TEST_F(ColumnVectorGeoTest, contant_point) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
     ColumnVector column_vector(data_type);
@@ -247,6 +249,7 @@ TEST_F(ColumnVectorGeoTest, contant_point) {
 
 TEST_F(ColumnVectorGeoTest, point_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
     ColumnVector column_vector(data_type);
@@ -285,6 +288,7 @@ TEST_F(ColumnVectorGeoTest, point_column_vector_select) {
 
 TEST_F(ColumnVectorGeoTest, point_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
     ColumnVector column_vector(data_type);
@@ -322,6 +326,7 @@ TEST_F(ColumnVectorGeoTest, point_column_slice_init) {
 
 TEST_F(ColumnVectorGeoTest, flat_line) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
     ColumnVector column_vector(data_type);
@@ -459,6 +464,7 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
 TEST_F(ColumnVectorGeoTest, contant_line) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
     ColumnVector column_vector(data_type);
@@ -558,6 +564,7 @@ TEST_F(ColumnVectorGeoTest, contant_line) {
 
 TEST_F(ColumnVectorGeoTest, line_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
     ColumnVector column_vector(data_type);
@@ -600,6 +607,7 @@ TEST_F(ColumnVectorGeoTest, line_column_vector_select) {
 
 TEST_F(ColumnVectorGeoTest, line_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
     ColumnVector column_vector(data_type);
@@ -641,6 +649,7 @@ TEST_F(ColumnVectorGeoTest, line_column_slice_init) {
 
 TEST_F(ColumnVectorGeoTest, flat_line_seg) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
     ColumnVector column_vector(data_type);
@@ -783,6 +792,7 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
 TEST_F(ColumnVectorGeoTest, contant_line_seg) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
     ColumnVector column_vector(data_type);
@@ -885,6 +895,7 @@ TEST_F(ColumnVectorGeoTest, contant_line_seg) {
 
 TEST_F(ColumnVectorGeoTest, line_seg_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
     ColumnVector column_vector(data_type);
@@ -929,6 +940,7 @@ TEST_F(ColumnVectorGeoTest, line_seg_column_vector_select) {
 
 TEST_F(ColumnVectorGeoTest, line_seg_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
     ColumnVector column_vector(data_type);
@@ -972,6 +984,7 @@ TEST_F(ColumnVectorGeoTest, line_seg_column_slice_init) {
 
 TEST_F(ColumnVectorGeoTest, flat_box) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
     ColumnVector column_vector(data_type);
@@ -1114,6 +1127,7 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
 TEST_F(ColumnVectorGeoTest, contant_box) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
     ColumnVector column_vector(data_type);
@@ -1216,6 +1230,7 @@ TEST_F(ColumnVectorGeoTest, contant_box) {
 
 TEST_F(ColumnVectorGeoTest, box_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
     ColumnVector column_vector(data_type);
@@ -1260,6 +1275,7 @@ TEST_F(ColumnVectorGeoTest, box_column_vector_select) {
 
 TEST_F(ColumnVectorGeoTest, box_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
     ColumnVector column_vector(data_type);
@@ -1304,6 +1320,7 @@ TEST_F(ColumnVectorGeoTest, box_column_slice_init) {
 TEST_F(ColumnVectorGeoTest, flat_path) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPath);
     ColumnVector column_vector(data_type);
@@ -1494,6 +1511,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
 TEST_F(ColumnVectorGeoTest, contant_path) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPath);
     ColumnVector column_vector(data_type);
@@ -1623,6 +1641,7 @@ TEST_F(ColumnVectorGeoTest, contant_path) {
 
 TEST_F(ColumnVectorGeoTest, path_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPath);
     ColumnVector column_vector(data_type);
@@ -1688,6 +1707,7 @@ TEST_F(ColumnVectorGeoTest, path_column_vector_select) {
 
 TEST_F(ColumnVectorGeoTest, path_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPath);
     ColumnVector column_vector(data_type);
@@ -1753,6 +1773,7 @@ TEST_F(ColumnVectorGeoTest, path_column_slice_init) {
 TEST_F(ColumnVectorGeoTest, flat_polygon) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPolygon);
     ColumnVector column_vector(data_type);
@@ -1967,6 +1988,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
 TEST_F(ColumnVectorGeoTest, contant_polygon) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPolygon);
     ColumnVector column_vector(data_type);
@@ -2111,6 +2133,7 @@ TEST_F(ColumnVectorGeoTest, contant_polygon) {
 
 TEST_F(ColumnVectorGeoTest, polygon_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPolygon);
     ColumnVector column_vector(data_type);
@@ -2186,6 +2209,7 @@ TEST_F(ColumnVectorGeoTest, polygon_column_vector_select) {
 
 TEST_F(ColumnVectorGeoTest, polygon_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPolygon);
     ColumnVector column_vector(data_type);
@@ -2262,6 +2286,7 @@ TEST_F(ColumnVectorGeoTest, polygon_column_slice_init) {
 
 TEST_F(ColumnVectorGeoTest, flat_circle) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
     ColumnVector column_vector(data_type);
@@ -2399,6 +2424,7 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
 TEST_F(ColumnVectorGeoTest, contant_circle) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
     ColumnVector column_vector(data_type);
@@ -2498,6 +2524,7 @@ TEST_F(ColumnVectorGeoTest, contant_circle) {
 
 TEST_F(ColumnVectorGeoTest, circle_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
     ColumnVector column_vector(data_type);
@@ -2540,6 +2567,7 @@ TEST_F(ColumnVectorGeoTest, circle_column_vector_select) {
 
 TEST_F(ColumnVectorGeoTest, circle_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
     ColumnVector column_vector(data_type);

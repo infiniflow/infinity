@@ -32,6 +32,7 @@ class DateTimeCastTest : public BaseTest {
 
 TEST_F(DateTimeCastTest, datetime_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Try to cast datetime type to wrong type.
     {
@@ -71,6 +72,7 @@ TEST_F(DateTimeCastTest, datetime_cast0) {
 
 TEST_F(DateTimeCastTest, datetime_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Call BindDateCast with wrong type of parameters
     {

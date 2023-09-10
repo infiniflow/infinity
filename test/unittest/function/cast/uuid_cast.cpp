@@ -31,6 +31,7 @@ class UuidCastTest : public BaseTest {
 
 TEST_F(UuidCastTest, uuid_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Try to cast uuid type to wrong type.
     {
@@ -60,6 +61,7 @@ TEST_F(UuidCastTest, uuid_cast0) {
 
 TEST_F(UuidCastTest, uuid_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Call BindUuidCast with wrong type of parameters
     {

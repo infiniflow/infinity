@@ -30,6 +30,7 @@ class ColumnVectorBitmapTest : public BaseTest {
 TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
@@ -196,6 +197,7 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
@@ -310,6 +312,7 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
 TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
@@ -370,6 +373,7 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
 
 TEST_F(ColumnVectorBitmapTest, bitmap_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);

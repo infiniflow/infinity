@@ -12,6 +12,11 @@ PhysicalExplain::Init() {
 }
 
 void
+PhysicalExplain::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalExplain::Execute(QueryContext* query_context) {
     String title;
 
@@ -23,68 +28,41 @@ PhysicalExplain::Execute(QueryContext* query_context) {
         case ExplainType::kAnalyze: {
             title = "Query Analyze";
             NotImplementError("Not implement: Query analyze");
-            break;
         }
         case ExplainType::kAst: {
             title = "Abstract Syntax Tree";
-
-            SizeT row_count = this->texts_->size();
-            SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
-
-            column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
-            for(SizeT idx = 0; idx < row_count; ++ idx) {
-                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
-                column_vector_ptr->AppendValue(str_v);
-            }
-            output_data_block->Init({column_vector_ptr});
             break;
         }
         case ExplainType::kUnOpt: {
             title = "Unoptimized Logical Plan";
-            SizeT row_count = this->texts_->size();
-            SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
-
-            column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
-            for(SizeT idx = 0; idx < row_count; ++ idx) {
-                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
-                column_vector_ptr->AppendValue(str_v);
-            }
-            output_data_block->Init({column_vector_ptr});
             break;
         }
         case ExplainType::kOpt: {
             title = "Optimized Logical Plan";
-            SizeT row_count = this->texts_->size();
-            SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
-
-            column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
-            for(SizeT idx = 0; idx < row_count; ++ idx) {
-                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
-                column_vector_ptr->AppendValue(str_v);
-            }
-            output_data_block->Init({column_vector_ptr});
             break;
         }
         case ExplainType::kPhysical: {
             title = "Physical Plan";
-            SizeT row_count = this->texts_->size();
-            SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
-
-            column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
-            for(SizeT idx = 0; idx < row_count; ++ idx) {
-                Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
-                column_vector_ptr->AppendValue(str_v);
-            }
-            output_data_block->Init({column_vector_ptr});
             break;
         }
         case ExplainType::kPipeline: {
             title = "Pipeline";
-            NotImplementError("Not implement: Query pipeline");
             break;
         }
     }
 
+    // Fill the explain text
+    SizeT row_count = this->texts_->size();
+    SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
+
+    column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
+    for(SizeT idx = 0; idx < row_count; ++ idx) {
+        Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
+        column_vector_ptr->AppendValue(str_v);
+    }
+    output_data_block->Init({column_vector_ptr});
+
+    // Prepare the output columns
     Vector<SharedPtr<ColumnDef>> column_defs = {
             MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kVarchar), title, HashSet<ConstraintType>())
     };

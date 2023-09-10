@@ -25,6 +25,13 @@ struct Options {
     String time_zone{};
     i32    time_zone_bias{};
 
+    // System
+    u64 total_cpu_number{};
+    u64 total_memory_size{};
+    u64 query_cpu_limit{};
+    u64 query_memory_limit{};
+
+    // Network
     String listen_address{};
     u16 pg_port{};
     u32 http_port{};
@@ -71,6 +78,26 @@ public:
     [[nodiscard]] inline i32
     time_zone_bias() const {
         return option_.time_zone_bias;
+    }
+
+    [[nodiscard]] inline u64
+    total_cpu_number() const {
+        return option_.total_cpu_number;
+    }
+
+    [[nodiscard]] inline u64
+    total_memory_size() const {
+        return option_.total_memory_size;
+    }
+
+    [[nodiscard]] inline u64
+    query_cpu_limit() const {
+        return option_.query_cpu_limit;
+    }
+
+    [[nodiscard]] inline u64
+    query_memory_limit() const {
+        return option_.query_memory_limit;
     }
 
     [[nodiscard]] inline String
@@ -161,6 +188,10 @@ private:
     static SharedPtr<String>
     ParseByteSize(const String& byte_size_str, u64& byte_size);
 
+    static u64
+    GetAvailableMem();
+
+private:
     Options option_;
 };
 

@@ -12,7 +12,7 @@
 #include "main/infinity.h"
 #include "main/session.h"
 #include "main/stats/global_resource_usage.h"
-#include "scheduler/pipeline.h"
+#include "legacy_sched/pipeline.h"
 #include "storage/data_block.h"
 #include "storage/meta/catalog.h"
 #include "storage/meta/entry/segment_entry.h"
@@ -41,6 +41,7 @@ class TableScanTest : public BaseTest {
 
 TEST_F(TableScanTest, block_read_test) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     auto catalog = MakeUnique<NewCatalog>(MakeShared<String>("/tmp/infinity"));
     RegisterTableScanFunction(catalog);
 
@@ -52,12 +53,15 @@ TEST_F(TableScanTest, block_read_test) {
 
     // create dummy query_context
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
-    UniquePtr<QueryContext> query_context = MakeUnique<QueryContext>(
-            session_ptr.get(),
-            &config,
-            nullptr,
-            &storage
-    );
+
+    UniquePtr<ResourceManager> resource_manager = MakeUnique<ResourceManager>(config.total_cpu_number(), config.total_memory_size());
+
+    UniquePtr<QueryContext> query_context = MakeUnique<QueryContext>();
+    query_context->Init(session_ptr.get(),
+                        &config,
+                        nullptr,
+                        &storage,
+                        resource_manager.get());
 
     Vector<SharedPtr<DataType>> column_types;
     column_types.push_back(MakeShared<DataType>(LogicalType::kInteger));

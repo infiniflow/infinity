@@ -29,6 +29,7 @@ class BitmaskTest : public BaseTest {
 
 TEST_F(BitmaskTest, bitmask_a) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     constexpr size_t bit_count =8192;
 
@@ -165,6 +166,7 @@ TEST_F(BitmaskTest, bitmask_a) {
 
 TEST_F(BitmaskTest, bitmask_b) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     constexpr size_t bit_count = 8192;
     SharedPtr<Bitmask> bitmask2 = Bitmask::Make(bit_count);

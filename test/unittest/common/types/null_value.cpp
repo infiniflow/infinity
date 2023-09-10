@@ -29,6 +29,7 @@ class NullValueTest : public BaseTest {
 
 TEST_F(NullValueTest, null_value_test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     {
         auto null_value = NullValue<BooleanT>();
         EXPECT_EQ(null_value, false);

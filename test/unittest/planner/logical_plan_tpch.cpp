@@ -12,7 +12,7 @@
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
 #include "executor/physical_planner.h"
-#include "scheduler/operator_pipeline.h"
+#include "legacy_sched/operator_pipeline.h"
 #include "main/infinity.h"
 #include "bin/compilation_config.h"
 #include "test_helper/sql_runner.h"
@@ -43,6 +43,7 @@ class LogicalPlannerTpchTest : public BaseTest {
 
 TEST_F(LogicalPlannerTpchTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Create tables;
     {

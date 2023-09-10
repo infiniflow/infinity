@@ -31,6 +31,7 @@ class FragmentBuilderTest : public BaseTest {
 
 TEST_F(FragmentBuilderTest, test_build_fragment) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SQLRunner::RunV2("create table t1(a bigint, b bigint, c bigint, x bigint, y bigint, z bigint)", true);
     SQLRunner::RunV2("show tables;", true);
     SQLRunner::RunV2("select * from t1 where a = 1", true);

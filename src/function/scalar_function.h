@@ -6,7 +6,7 @@
 
 #include "function.h"
 #include "expression/base_expression.h"
-#include "executor/operation_state.h"
+#include "executor/operator_state.h"
 #include "common/utility/infinity_assert.h"
 #include "common/column_vector/operator/unary_operator.h"
 #include "common/column_vector/operator/binary_operator.h"

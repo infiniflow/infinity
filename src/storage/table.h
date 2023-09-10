@@ -32,6 +32,12 @@ public:
         return MakeShared<Table>(std::move(table_def_ptr), type);
     }
 
+    static inline SharedPtr<Table>
+    MakeResultTable(const Vector<SharedPtr<ColumnDef>>& column_defs) {
+        SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, column_defs);
+        return Make(result_table_def_ptr, TableType::kResult);
+    }
+
 public:
     explicit
     Table(SharedPtr<TableDef> table_def_ptr, TableType type)

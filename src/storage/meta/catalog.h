@@ -120,7 +120,9 @@ public:
                  BufferManager* buffer_mgr);
 
     static void
-    SaveAsFile(const NewCatalog* catalog_ptr, const String& file_name);
+    SaveAsFile(const NewCatalog* catalog_ptr,
+               const String& dir,
+               const String& file_name);
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};

@@ -22,6 +22,7 @@ class SQLParserTest : public BaseTest {
 
 TEST_F(SQLParserTest, good_test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     Vector<String> inputs;
     inputs.emplace_back("create collection c1;");
@@ -61,6 +62,7 @@ TEST_F(SQLParserTest, good_test1) {
 
 TEST_F(SQLParserTest, good_test2) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -424,6 +426,7 @@ TEST_F(SQLParserTest, good_test2) {
 
 TEST_F(SQLParserTest, bad_test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 

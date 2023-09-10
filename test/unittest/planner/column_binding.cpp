@@ -29,6 +29,7 @@ class ColumnBindingTest : public BaseTest {
 
 TEST_F(ColumnBindingTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     ColumnBinding column1(0, 1);
     ColumnBinding column2(0, 1);

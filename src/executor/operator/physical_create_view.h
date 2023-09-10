@@ -30,7 +30,10 @@ public:
     Init() override;
 
     void
-    Execute(QueryContext* query_context) override;
+    Execute(QueryContext* query_context) final;
+
+    virtual void
+    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
 
     inline const SharedPtr<CreateViewInfo>&
     bound_select_statement() const {

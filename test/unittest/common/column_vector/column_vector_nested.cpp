@@ -29,24 +29,28 @@ class ColumnVectorNestedTest : public BaseTest {
 
 TEST_F(ColumnVectorNestedTest, flat_array) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // No test cases.
 }
 
 TEST_F(ColumnVectorNestedTest, contant_array) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // No test cases.
 }
 
 TEST_F(ColumnVectorNestedTest, flat_tuple) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // No test cases.
 }
 
 TEST_F(ColumnVectorNestedTest, contant_tuple) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // No test cases.
 }

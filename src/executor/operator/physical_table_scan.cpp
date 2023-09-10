@@ -12,6 +12,11 @@ PhysicalTableScan::Init() {
 }
 
 void
+PhysicalTableScan::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalTableScan::Execute(QueryContext* query_context) {
     // Generate the result table definition
     Vector<SharedPtr<ColumnDef>> column_defs;

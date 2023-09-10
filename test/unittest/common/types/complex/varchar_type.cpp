@@ -28,6 +28,7 @@ class VarcharTypeTest : public BaseTest {
 
 TEST_F(VarcharTypeTest, TestInit) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
@@ -75,6 +76,7 @@ TEST_F(VarcharTypeTest, TestInit) {
 
 TEST_F(VarcharTypeTest, TestConstructor1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
@@ -95,6 +97,7 @@ TEST_F(VarcharTypeTest, TestConstructor1) {
 
 TEST_F(VarcharTypeTest, TestConstructor2) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
@@ -115,6 +118,7 @@ TEST_F(VarcharTypeTest, TestConstructor2) {
 
 TEST_F(VarcharTypeTest, TestConstructor3) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
@@ -135,6 +139,7 @@ TEST_F(VarcharTypeTest, TestConstructor3) {
 
 TEST_F(VarcharTypeTest, TestCopy) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
@@ -162,6 +167,7 @@ TEST_F(VarcharTypeTest, TestCopy) {
 
 TEST_F(VarcharTypeTest, TestMove) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
@@ -191,6 +197,7 @@ TEST_F(VarcharTypeTest, TestMove) {
 
 TEST_F(VarcharTypeTest, TestCopyAssignment) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
     String s3 = "Hello World, Php is the best programming language in the world";
@@ -241,6 +248,7 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
 
 TEST_F(VarcharTypeTest, TestMoveAssignment) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
     String s3 = "Hello World, Php is the best programming language in the world";

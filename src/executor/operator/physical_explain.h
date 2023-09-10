@@ -28,7 +28,15 @@ public:
     Init() override;
 
     void
-    Execute(QueryContext* query_context) override;
+    Execute(QueryContext* query_context) final;
+
+    virtual void
+    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+
+    void
+    SetExplainText(SharedPtr<Vector<SharedPtr<String>>> text) {
+        texts_ = std::move(text);
+    }
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {

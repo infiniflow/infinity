@@ -31,6 +31,7 @@ class BigIntCastTest : public BaseTest {
 
 TEST_F(BigIntCastTest, bigint_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Integer to Integer, throw exception
     {
@@ -227,6 +228,7 @@ TEST_F(BigIntCastTest, bigint_cast0) {
 
 TEST_F(BigIntCastTest, bigint_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kBigInt);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);

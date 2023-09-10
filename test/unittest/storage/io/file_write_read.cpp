@@ -33,6 +33,7 @@ class FileWriteReadTest : public BaseTest {
 
 TEST_F(FileWriteReadTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     LocalFileSystem local_file_system;
     String path = "/tmp/test_file1.abc";
     FileWriter file_writer(local_file_system, path, 128);

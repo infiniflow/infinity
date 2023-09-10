@@ -31,6 +31,7 @@ class SmallIntegerCastTest : public BaseTest {
 
 TEST_F(SmallIntegerCastTest, small_integer_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // TinyInt to SmallInt, throw exception
     {
@@ -208,6 +209,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast0) {
 
 TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kSmallInt);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);

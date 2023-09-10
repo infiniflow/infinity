@@ -31,6 +31,7 @@ class PolygonCastTest : public BaseTest {
 
 TEST_F(PolygonCastTest, polygon_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Try to cast circle type to wrong type.
     {
@@ -72,6 +73,7 @@ TEST_F(PolygonCastTest, polygon_cast0) {
 
 TEST_F(PolygonCastTest, polygon_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Call BindGeographyCast with wrong type of parameters
     {

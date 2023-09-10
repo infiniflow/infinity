@@ -47,7 +47,7 @@ TableCollectionEntry::Append(TableCollectionEntry* table_entry, Txn* txn_ptr, vo
                                                                                     table_entry->txn_id_,
                                                                                     next_segment_id,
                                                                                     buffer_mgr);
-            // table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
+            table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
             table_entry->unsealed_segment_ = new_segment.get();
 //            table_entry->unsealed_segment_->Init(this->definition_ptr_->columns(), dir_, buffer_mgr_);
             LOG_TRACE("Add a new segment");
@@ -216,20 +216,26 @@ TableCollectionEntry::Deserialize(const nlohmann::json& table_entry_json, TableC
     TableCollectionType table_entry_type = table_entry_json["table_entry_type"];
     u64 row_count = table_entry_json["row_count"];
 
+    bool deleted = table_entry_json["deleted"];
+
     Vector<SharedPtr<ColumnDef>> columns;
-    for(const auto& column_def_json: table_entry_json["column_definition"]) {
-        HashSet<ConstraintType> constraints;
-//         for(const auto& column_constraint: column_def_json["constraints"]) {
-// //            ConstraintType constraint = column_constraint;
-//             constraints.emplace(column_constraint);
-//         }
+    if(!deleted) {
+        for(const auto& column_def_json: table_entry_json["column_definition"]) {
+            SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
+            i64 column_id = column_def_json["column_id"];
+            String column_name = column_def_json["column_name"];
 
-        SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
-        i64 column_id = column_def_json["column_id"];
-        String column_name = column_def_json["column_name"];
+            HashSet<ConstraintType> constraints;
+            if(column_def_json.contains("constraints")) {
+                for(const auto& column_constraint: column_def_json["constraints"]) {
+                    ConstraintType constraint = column_constraint;
+                    constraints.emplace(constraint);
+                }
+            }
 
-        SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints);
-        columns.emplace_back(column_def);
+            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints);
+            columns.emplace_back(column_def);
+        }
     }
 
     u64 txn_id = table_entry_json["txn_id"];
@@ -253,7 +259,7 @@ TableCollectionEntry::Deserialize(const nlohmann::json& table_entry_json, TableC
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
-    table_entry->deleted_ = table_entry_json["deleted"];
+    table_entry->deleted_ = deleted;
 
     return table_entry;
 }

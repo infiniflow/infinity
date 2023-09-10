@@ -12,6 +12,11 @@ PhysicalFlush::Init() {
 }
 
 void
+PhysicalFlush::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalFlush::Execute(QueryContext* query_context) {
     switch(flush_type_) {
         case FlushType::kData: {

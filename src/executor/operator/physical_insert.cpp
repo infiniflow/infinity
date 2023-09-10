@@ -48,6 +48,12 @@ PhysicalInsert::Execute(QueryContext* query_context) {
     output_ = MakeShared<Table>(table_def_ptr, TableType::kResult);
 }
 #else
+
+void
+PhysicalInsert::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
 void
 PhysicalInsert::Execute(QueryContext* query_context) {
     SizeT column_count = value_list_.size();

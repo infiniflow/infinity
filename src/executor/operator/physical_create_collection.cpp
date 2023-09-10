@@ -32,6 +32,11 @@ PhysicalCreateCollection::Init() {
 }
 
 void
+PhysicalCreateCollection::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalCreateCollection::Execute(QueryContext* query_context) {
     Txn* txn = query_context->GetTxn();
     txn->CreateCollection(*schema_name_, *collection_name_, conflict_type_);

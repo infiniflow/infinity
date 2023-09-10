@@ -72,12 +72,6 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
-        legacy_parser_src
-        CONFIGURE_DEPENDS
-        legacy_parser/*.cpp
-        )
-
-file(GLOB_RECURSE
         planner_src
         CONFIGURE_DEPENDS
         planner/*.cpp
@@ -88,6 +82,12 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         main/*.cpp
         )
+
+file(GLOB_RECURSE
+        legacy_sched_src
+        CONFIGURE_DEPENDS
+        legacy_sched/*.cpp
+)
 
 file(GLOB_RECURSE
         scheduler_src
@@ -141,9 +141,9 @@ set(INFINITY_CORE_SOURCE
         ${function_src}
         ${infinity_src}
         ${network_src}
-        ${legacy_parser_src}
         ${parser_src}
         ${planner_src}
+        ${legacy_sched_src}
         ${scheduler_src}
         ${storage_src}
         ${third_party_src}

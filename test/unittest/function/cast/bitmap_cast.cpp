@@ -31,6 +31,7 @@ class BitmapCastTest : public BaseTest {
 
 TEST_F(BitmapCastTest, bitmap_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Try to cast bitmap type to wrong type.
     {
@@ -71,6 +72,7 @@ TEST_F(BitmapCastTest, bitmap_cast0) {
 
 TEST_F(BitmapCastTest, bitmap_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Call BindBitmapCast with wrong type of parameters
     {

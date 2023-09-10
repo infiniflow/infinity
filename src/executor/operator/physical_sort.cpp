@@ -174,6 +174,11 @@ PhysicalSort::Init() {
 }
 
 void
+PhysicalSort::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalSort::Execute(QueryContext* query_context) {
 
     executor_.Init(this->expressions_);

@@ -9,8 +9,9 @@
 namespace infinity {
 
 enum class SinkType {
+    kGlobalMaterialize,
+    kLocalMaterialize,
     kStream,
-    kBatch,
 };
 
 class PhysicalSink final : public PhysicalOperator {
@@ -32,7 +33,10 @@ public:
     Init() override;
 
     void
-    Execute(QueryContext* query_context) override;
+    Execute(QueryContext* query_context) final;
+
+    virtual void
+    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
@@ -47,7 +51,7 @@ public:
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
-    SinkType sink_type_{SinkType::kBatch};
+    SinkType sink_type_{SinkType::kGlobalMaterialize};
 };
 
 }

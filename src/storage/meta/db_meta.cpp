@@ -217,7 +217,7 @@ DBMeta::GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts) {
         if(db_entry->Committed()) {
             if(begin_ts > db_entry->commit_ts_) {
                 if(db_entry->deleted_) {
-                    LOG_TRACE("DB is dropped.")
+//                    LOG_TRACE("DB is dropped.")
                     return {nullptr, MakeUnique<String>("DB is dropped.")};
                 } else {
                     return {db_entry.get(), nullptr};
@@ -228,7 +228,7 @@ DBMeta::GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts) {
             // except same txn is visible
             if(txn_id == db_entry->txn_id_ ) {
                 if (db_entry->deleted_) {
-                    LOG_TRACE("DB is dropped.")
+//                    LOG_TRACE("DB is dropped.")
                     return {nullptr, MakeUnique<String>("DB is dropped.")};
                 } else {
                     return {db_entry.get(), nullptr};
@@ -261,7 +261,7 @@ DBMeta::Serialize(const DBMeta* db_meta) {
             DBEntry* db_entry = (DBEntry*)base_entry.get();
             json_res["entries"].emplace_back(DBEntry::Serialize(db_entry));
         } else if(base_entry->entry_type_ == EntryType::kDummy) {
-            LOG_TRACE("Skip dummy type entry during serialize database {} meta", *db_meta->db_name_);
+            ; // LOG_TRACE("Skip dummy type entry during serialize database {} meta", *db_meta->db_name_);
         } else {
             StorageError("Unexpected entry type");
         }

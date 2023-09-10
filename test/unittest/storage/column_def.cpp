@@ -29,6 +29,7 @@ class ColumnDefTest : public BaseTest {
 
 TEST_F(ColumnDefTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     HashSet<ConstraintType> constraints;
     constraints.insert(ConstraintType::kUnique);
@@ -42,6 +43,7 @@ TEST_F(ColumnDefTest, test1) {
 
 TEST_F(ColumnDefTest, test2) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
 
     HashSet<ConstraintType> constraints;

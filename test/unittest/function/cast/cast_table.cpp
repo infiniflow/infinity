@@ -31,6 +31,7 @@ class CastTableTest : public BaseTest {
 
 TEST_F(CastTableTest, casttable_boolean) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     for(i8 to = LogicalType::kBoolean; to < LogicalType::kInvalid; ++ to) {
         switch(to) {
             case LogicalType::kBoolean: {

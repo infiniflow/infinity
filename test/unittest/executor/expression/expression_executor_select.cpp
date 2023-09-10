@@ -36,6 +36,7 @@ class ExpressionExecutorSelectTest : public BaseTest {
 
 TEST_F(ExpressionExecutorSelectTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
@@ -70,6 +71,7 @@ TEST_F(ExpressionExecutorSelectTest, test1) {
 
 TEST_F(ExpressionExecutorSelectTest, test2) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
@@ -104,6 +106,7 @@ TEST_F(ExpressionExecutorSelectTest, test2) {
 
 TEST_F(ExpressionExecutorSelectTest, test3) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);

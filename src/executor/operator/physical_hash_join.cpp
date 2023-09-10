@@ -12,6 +12,11 @@ PhysicalHashJoin::Init() {
 }
 
 void
+PhysicalHashJoin::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalHashJoin::Execute(QueryContext* query_context) {
 
 }

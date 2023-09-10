@@ -6,6 +6,7 @@
 
 #include "main/query_context.h"
 #include "physical_operator_type.h"
+#include "operator_state.h"
 #include "storage/table.h"
 
 #include <memory>
@@ -55,6 +56,9 @@ public:
     virtual void
     Execute(QueryContext* query_context) = 0;
 
+    virtual void
+    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) = 0;
+
     const SharedPtr<Table>&
     output() const {
         return output_;
@@ -88,35 +92,40 @@ protected:
 public:
     // Operator
 
-    virtual bool ParallelOperator() const {
+    virtual bool
+    ParallelOperator() const {
         return false;
     }
-
-
 
 public:
     // Exchange
-    virtual bool IsExchange() const {
+    virtual bool
+    IsExchange() const {
         return false;
     }
 
-    virtual bool ParallelExchange() const {
+    virtual bool
+    ParallelExchange() const {
         return false;
     }
 
 public:
     // Sink
-    virtual bool IsSink() const {
+    virtual bool
+    IsSink() const {
         return false;
     }
 
-    virtual bool ParallelSink() const {
+    virtual bool
+    ParallelSink() const {
         return false;
     }
 
-    virtual bool SinkOrderMatters() const {
+    virtual bool
+    SinkOrderMatters() const {
         return false;
     }
 };
+
 } // namespace infinity
 

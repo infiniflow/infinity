@@ -12,6 +12,11 @@ PhysicalExchange::Init() {
 }
 
 void
+PhysicalExchange::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalExchange::Execute(QueryContext* query_context) {
 
 }

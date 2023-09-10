@@ -31,6 +31,7 @@ class VarcharTest : public BaseTest {
 
 TEST_F(VarcharTest, varchar_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     {
 
         DataType source_type(LogicalType::kVarchar);

@@ -28,6 +28,7 @@ class PathTypeTest : public BaseTest {
 
 TEST_F(PathTypeTest, path1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     PathT path1;
     EXPECT_EQ(path1.PointCount(), 0);

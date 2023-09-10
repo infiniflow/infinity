@@ -1,6 +1,14 @@
 [general]
 version                 = "0.1.0"
 timezone                = "utc-9"
+
+[system]
+total_cpu_number        = 2
+total_memory_size       = "8GB"
+query_cpu_limit         = 2
+query_memory_limit      = "4MB"
+
+[network]
 listen_address          = "127.0.0.1"
 pg_port                 = 25432
 http_port               = 8089

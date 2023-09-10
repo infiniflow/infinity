@@ -3,7 +3,7 @@
 //
 
 #include "infinity.h"
-#include "scheduler/naive_scheduler.h"
+#include "legacy_sched/naive_scheduler.h"
 
 namespace infinity {
 
@@ -17,6 +17,10 @@ Infinity::Init(const SharedPtr<String>& config_path) {
         config_->Init(config_path);
 
         Logger::Initialize(config_.get());
+
+        resource_manager_ = MakeUnique<ResourceManager>(config_->total_cpu_number(), config_->total_memory_size());
+
+        fragment_scheduler_ = MakeUnique<FragmentScheduler>(config_.get());
 
         scheduler_ = MakeUnique<NaiveScheduler>();
 
@@ -36,6 +40,8 @@ Infinity::UnInit() {
 
     storage_->Uninit();
     storage_.reset();
+
+    resource_manager_.reset();
 
     scheduler_.reset();
 

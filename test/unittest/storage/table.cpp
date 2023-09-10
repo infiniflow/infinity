@@ -34,6 +34,7 @@ class TableTest : public BaseTest {
 
 TEST_F(TableTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SizeT column_count = 2;
     SizeT block_count = 3;

@@ -26,4 +26,9 @@ PhysicalDropView::Execute(QueryContext* query_context) {
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 
+void
+PhysicalDropView::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
 }

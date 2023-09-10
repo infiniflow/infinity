@@ -34,6 +34,7 @@ class GreaterFunctionsTest : public BaseTest {
 
 TEST_F(GreaterFunctionsTest, greater_func) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
 

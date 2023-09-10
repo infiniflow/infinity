@@ -12,6 +12,11 @@ PhysicalNestedLoopJoin::Init() {
 }
 
 void
+PhysicalNestedLoopJoin::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalNestedLoopJoin::Execute(QueryContext* query_context) {
 
 }

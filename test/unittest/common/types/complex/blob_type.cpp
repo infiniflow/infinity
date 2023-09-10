@@ -28,6 +28,7 @@ class BlobTypeTest : public BaseTest {
 
 TEST_F(BlobTypeTest, blob1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     constexpr i64 SIZE = 27;
 

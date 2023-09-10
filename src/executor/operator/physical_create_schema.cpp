@@ -12,6 +12,11 @@ PhysicalCreateSchema::Init() {
 }
 
 void
+PhysicalCreateSchema::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalCreateSchema::Execute(QueryContext* query_context) {
 //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
     Txn* txn = query_context->GetTxn();

@@ -29,6 +29,11 @@ PhysicalFilter::Init() {
 }
 
 void
+PhysicalFilter::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalFilter::Execute(QueryContext* query_context) {
     // Get input from left child
     input_table_ = left_->output();

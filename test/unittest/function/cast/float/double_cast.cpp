@@ -30,6 +30,7 @@ class DoubleCastTest : public BaseTest {
 
 TEST_F(DoubleCastTest, double_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // DoubleT to DoubleT, throw exception
     {
@@ -237,6 +238,7 @@ TEST_F(DoubleCastTest, double_cast0) {
 
 TEST_F(DoubleCastTest, double_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kDouble);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);

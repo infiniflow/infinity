@@ -48,6 +48,14 @@ PhysicalCreateTable::Init() {
 }
 
 void
+PhysicalCreateTable::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+    Txn* txn = query_context->GetTxn();
+    EntryResult result = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
+    DDLOutputState* ddl_output_state = (DDLOutputState*)output_state;
+    ddl_output_state->error_message_ = std::move(result.err_);
+}
+
+void
 PhysicalCreateTable::Execute(QueryContext* query_context) {
 //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
     Txn* txn = query_context->GetTxn();
@@ -58,9 +66,7 @@ PhysicalCreateTable::Execute(QueryContext* query_context) {
             MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
     };
 
-    SharedPtr<TableDef> result_table_def_ptr
-        = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
+    output_ = Table::MakeResultTable(column_defs);
 }
 
 }

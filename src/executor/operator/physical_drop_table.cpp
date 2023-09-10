@@ -12,6 +12,11 @@ PhysicalDropTable::Init() {
 }
 
 void
+PhysicalDropTable::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalDropTable::Execute(QueryContext* query_context) {
 
     Txn* txn = query_context->GetTxn();

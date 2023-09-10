@@ -33,6 +33,7 @@ class SimdJsonTest : public BaseTest {
 
 TEST_F(SimdJsonTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String json_path = String(TEST_DATA_PATH) + "/json/twitter.json";
 //    LOG_TRACE("JSON Path: {}", json_path);
     simdjson::ondemand::parser parser;

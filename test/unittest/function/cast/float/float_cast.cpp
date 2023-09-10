@@ -31,6 +31,7 @@ class FloatCastTest : public BaseTest {
 
 TEST_F(FloatCastTest, float_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // FloatT to FloatT, throw exception
     {
@@ -225,6 +226,7 @@ TEST_F(FloatCastTest, float_cast0) {
 
 TEST_F(FloatCastTest, float_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kFloat);
 

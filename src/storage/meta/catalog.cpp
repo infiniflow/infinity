@@ -216,6 +216,8 @@ NewCatalog::LoadFromFile(const SharedPtr<DirEntry>& dir_entry,
     UniquePtr<NewCatalog> catalog = nullptr;
     String filename = dir_entry->path();
 
+    LOG_INFO("Load catalog from: {}", filename);
+
     LocalFileSystem fs;
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(filename,
                                                               FileFlags::READ_FLAG,
@@ -252,22 +254,33 @@ NewCatalog::Deserialize(const nlohmann::json& catalog_json,
 }
 
 void
-NewCatalog::SaveAsFile(const NewCatalog* catalog_ptr, const String& file_name) {
+NewCatalog::SaveAsFile(const NewCatalog* catalog_ptr,
+                       const String& dir,
+                       const String& file_name) {
     nlohmann::json catalog_json = Serialize(catalog_ptr);
     String catalog_str = catalog_json.dump();
 
     // FIXME: Temp implementation, will be replaced by async task.
     LocalFileSystem fs;
+
+    if(!fs.Exists(dir)) {
+        fs.CreateDirectory(dir);
+    }
+
+    String file_path = dir + '/' + file_name;
+
     u8 fileflags = FileFlags::WRITE_FLAG;
-    if(!fs.Exists(file_name)) {
+    if(!fs.Exists(file_path)) {
         fileflags |= FileFlags::CREATE_FLAG;
     }
-    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(file_name, fileflags, FileLockType::kWriteLock);
+
+    LOG_TRACE("Open catalog file path: {}", file_path);
+    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(file_path, fileflags, FileLockType::kWriteLock);
 
     // TODO: Save as a temp filename, then rename it to the real filename.
     SizeT nbytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
     if(nbytes != catalog_str.size()) {
-        StorageError(fmt::format("Catalog file {}, saving error.", file_name));
+        StorageError(fmt::format("Catalog file {}, saving error.", file_path));
     }
     catalog_file_handler->Sync();
     catalog_file_handler->Close();

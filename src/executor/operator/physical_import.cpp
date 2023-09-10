@@ -24,6 +24,11 @@ PhysicalImport::Init() {
 }
 
 void
+PhysicalImport::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalImport::Execute(QueryContext* query_context) {
     switch(file_type_) {
         case CopyFileType::kCSV: {

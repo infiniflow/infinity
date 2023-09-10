@@ -31,6 +31,7 @@ class IntervalCastTest : public BaseTest {
 
 TEST_F(IntervalCastTest, date_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Try to cast Interval type to wrong type.
     {
@@ -53,6 +54,7 @@ TEST_F(IntervalCastTest, date_cast0) {
 
 TEST_F(IntervalCastTest, date_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Call BindIntervalCast with wrong type of parameters
     {

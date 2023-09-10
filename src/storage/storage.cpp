@@ -27,7 +27,7 @@ Storage::Init() {
     SharedPtr<DirEntry> catalog_file_entry = GetLatestCatalog(catalog_dir);
     if(catalog_file_entry == nullptr) {
         // No catalog file at all
-        new_catalog_ = MakeUnique<NewCatalog>(config_ptr_->data_dir());
+        new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir));
         txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get());
 
         Storage::InitCatalog(new_catalog_.get(), txn_mgr_.get());
@@ -102,8 +102,6 @@ Storage::InitCatalog(NewCatalog* catalog, TxnManager* txn_mgr) {
     if(create_res.err_ != nullptr) {
         StorageError(*create_res.err_);
     }
-    String file_name = *catalog->current_dir_ + "/catalog/META_" + std::to_string(new_txn->CommitTS()) + ".json";
-    NewCatalog::SaveAsFile(catalog, file_name);
 }
 
 }

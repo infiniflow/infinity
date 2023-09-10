@@ -28,6 +28,7 @@ class PolygonTypeTest : public BaseTest {
 
 TEST_F(PolygonTypeTest, polygon1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     PolygonT polygon1;
     EXPECT_EQ(polygon1.PointCount(), 0);

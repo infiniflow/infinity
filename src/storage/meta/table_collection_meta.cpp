@@ -79,7 +79,7 @@ TableCollectionMeta::CreateNewEntry(TableCollectionMeta* table_meta,
                     return {res, nullptr};
                 } else {
                     // Duplicated table
-                    LOG_TRACE("Duplicated table name {}.", table_collection_name)
+                    LOG_TRACE("Duplicated table: {}.", table_collection_name)
                     return {nullptr, MakeUnique<String>("Duplicated table.")};
                 }
             } else {

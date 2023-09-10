@@ -29,6 +29,7 @@ class DateTypeTest : public BaseTest {
 
 TEST_F(DateTypeTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     DateType date1;
 

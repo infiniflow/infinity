@@ -27,6 +27,7 @@ class VectorOperationTest : public BaseTest {
 
 TEST_F(VectorOperationTest, BoolToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto bool_type = LogicalType(LogicalTypeId::kBoolean);
@@ -105,6 +106,7 @@ TEST_F(VectorOperationTest, BoolToOther) {
 
 TEST_F(VectorOperationTest, tinyintToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto tinyint_type = LogicalType(LogicalTypeId::kTinyInt);
@@ -184,6 +186,7 @@ TEST_F(VectorOperationTest, tinyintToOther) {
 
 TEST_F(VectorOperationTest, SmallintoToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto smallint_type = LogicalType(LogicalTypeId::kSmallInt);
@@ -263,6 +266,7 @@ TEST_F(VectorOperationTest, SmallintoToOther) {
 
 TEST_F(VectorOperationTest, IntToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto int_type = LogicalType(LogicalTypeId::kInteger);
@@ -342,6 +346,7 @@ TEST_F(VectorOperationTest, IntToOther) {
 
 TEST_F(VectorOperationTest, BigintToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto bigint_type = LogicalType(LogicalTypeId::kBigInt);
@@ -421,6 +426,7 @@ TEST_F(VectorOperationTest, BigintToOther) {
 
 TEST_F(VectorOperationTest, DateToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto date_type = LogicalType(LogicalTypeId::kDate);
@@ -500,6 +506,7 @@ TEST_F(VectorOperationTest, DateToOther) {
 
 TEST_F(VectorOperationTest, TimeToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto time_type = LogicalType(LogicalTypeId::kTime);
@@ -579,6 +586,7 @@ TEST_F(VectorOperationTest, TimeToOther) {
 
 TEST_F(VectorOperationTest, DateTimeToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto datetime_type = LogicalType(LogicalTypeId::kDateTime);
@@ -659,6 +667,7 @@ TEST_F(VectorOperationTest, DateTimeToOther) {
 
 TEST_F(VectorOperationTest, IntervalToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto interval_type = LogicalType(LogicalTypeId::kInterval);
@@ -738,6 +747,7 @@ TEST_F(VectorOperationTest, IntervalToOther) {
 
 TEST_F(VectorOperationTest, VarcharToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto varchar_type = LogicalType(LogicalTypeId::kVarchar);
@@ -817,6 +827,7 @@ TEST_F(VectorOperationTest, VarcharToOther) {
 
 TEST_F(VectorOperationTest, TextToOther) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     try {
         // Create bool chunk with 2 rows;
         auto text_type = LogicalType(LogicalTypeId::kText);

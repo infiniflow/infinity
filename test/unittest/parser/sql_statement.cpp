@@ -21,6 +21,7 @@ class StatementParsingTest : public BaseTest {
 
 TEST_F(StatementParsingTest, good_test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 

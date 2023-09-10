@@ -28,6 +28,7 @@ class DataTypeTest : public BaseTest {
 
 TEST_F(DataTypeTest, GetTypeName) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     DataType bool_type(LogicalType::kBoolean);
     EXPECT_EQ(bool_type.ToString(), "Boolean");
     DataType tinyint_type(LogicalType::kTinyInt);
@@ -93,6 +94,7 @@ TEST_F(DataTypeTest, GetTypeName) {
 
 TEST_F(DataTypeTest, TypeToString) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     EXPECT_STREQ(DataType::TypeToString<BooleanT>().c_str(), "Boolean");
     EXPECT_STREQ(DataType::TypeToString<TinyIntT>().c_str(), "TinyInt");
     EXPECT_STREQ(DataType::TypeToString<SmallIntT>().c_str(), "SmallInt");
@@ -125,6 +127,7 @@ TEST_F(DataTypeTest, TypeToString) {
 
 TEST_F(DataTypeTest, Serialize) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     DataType bool_type(LogicalType::kBoolean);
     String bool_type_str = bool_type.Serialize().dump();
     LOG_TRACE("{}", bool_type_str);

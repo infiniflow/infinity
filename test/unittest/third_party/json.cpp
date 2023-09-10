@@ -34,6 +34,7 @@ class JsonTest : public BaseTest {
 
 TEST_F(JsonTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     using namespace nlohmann;
 
     String json_path = String(TEST_DATA_PATH) + "/json/twitter.json";

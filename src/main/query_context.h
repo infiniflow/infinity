@@ -8,15 +8,16 @@
 #include "planner/logical_node_type.h"
 #include "transaction_context.h"
 #include "main/profiler/query_profiler.h"
-#include "scheduler/scheduler.h"
+//#include "scheduler/fragment_scheduler.h"
 #include "storage/storage.h"
+#include "resource_manager.h"
 
 #include <string>
 
 namespace infinity {
 
 class Session;
-
+class FragmentScheduler;
 struct QueryResult {
     SharedPtr<Table> result_;
     LogicalNodeType root_operator_type_;
@@ -28,15 +29,38 @@ struct QueryResult {
 class QueryContext {
 public:
     explicit
-    QueryContext(Session* session_ptr,
-                 const Config* global_config,
-                 Scheduler* scheduler,
-                 Storage* storage)
-                 : session_ptr_(session_ptr),
-                 global_config_(global_config),
-                 scheduler_(scheduler),
-                 storage_(storage)
-    {}
+    QueryContext() = default;
+
+    inline
+    ~QueryContext() {
+        UnInit();
+    }
+
+    inline void
+    Init(Session* session_ptr,
+         const Config* global_config_ptr,
+         FragmentScheduler* scheduler_ptr,
+         Storage* storage_ptr,
+         ResourceManager* resource_manager_ptr) {
+        session_ptr_ = session_ptr;
+        global_config_ = global_config_ptr;
+        scheduler_ = scheduler_ptr;
+        storage_ = storage_ptr;
+        resource_manager_ = resource_manager_ptr;
+        initialized_ = true;
+        cpu_number_limit_ = resource_manager_ptr->GetMemoryResource();
+        memory_size_limit_ = resource_manager_ptr->GetCpuResource();
+    }
+
+    inline void
+    UnInit() {
+        initialized_ = false;
+        session_ptr_ = nullptr;
+        global_config_ = nullptr;
+        scheduler_ = nullptr;
+        storage_ = nullptr;
+        resource_manager_ = nullptr;
+    }
 
     QueryResult
     Query(const String& query);
@@ -50,6 +74,14 @@ public:
     [[nodiscard]] inline const String&
     schema_name() const { 
         return current_schema_; 
+    }
+
+    inline u64 cpu_number_limit() const {
+        return cpu_number_limit_;
+    }
+
+    inline u64 memory_size_limit() const {
+        return memory_size_limit_;
     }
 
     [[nodiscard]] inline u64
@@ -92,7 +124,7 @@ public:
         return storage_;
     }
 
-    [[nodiscard]] inline Scheduler*
+    [[nodiscard]] inline FragmentScheduler*
     scheduler() const {
         return scheduler_;
     }
@@ -102,14 +134,19 @@ public:
         return global_config_;
     }
 
+    [[nodiscard]] inline ResourceManager*
+    resource_manager() {
+        return resource_manager_;
+    }
+
 private:
     UniquePtr<QueryProfiler> query_metrics_;
 
     const Config* global_config_{};
-    Scheduler* scheduler_{};
+    FragmentScheduler* scheduler_{};
     Storage* storage_{};
-
     Session* session_ptr_{};
+    ResourceManager* resource_manager_{};
 
     // Get following information from session.
     // Current schema
@@ -125,6 +162,11 @@ private:
     u64 tenant_id_{0};
     u64 user_id_{0};
     u64 current_max_node_id_{0};
+
+    u64 cpu_number_limit_{};
+    u64 memory_size_limit_{};
+
+    bool initialized_{false};
 };
 
 }

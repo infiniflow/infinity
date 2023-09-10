@@ -19,9 +19,6 @@ class TableEntryTest : public BaseTest {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
-
-        system("rm -rf /tmp/infinity/data/db");
-        system("rm -rf /tmp/infinity/_tmp");
     }
 
     void
@@ -30,17 +27,16 @@ class TableEntryTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+        system("rm -rf /tmp/infinity/data/db");
+        system("rm -rf /tmp/infinity/data/catalog/*");
+        system("rm -rf /tmp/infinity/_tmp");
     }
 };
 
 
 TEST_F(TableEntryTest, test1) {
     using namespace infinity;
-
-    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<String> table_dir = MakeShared<String>("/tmp/infinity/table");
     SharedPtr<TableDef> table_def{};
@@ -91,21 +87,15 @@ TEST_F(TableEntryTest, test1) {
 
 TEST_F(TableEntryTest, test2) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
-    SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
-
-//    UniquePtr<String> dir = MakeUnique<String>("/tmp/infinity/table");
-    UniquePtr<String> dir = MakeUnique<String>("db");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    BufferManager* buffer_mgr = infinity::Infinity::instance().storage()->buffer_manager();
 
     EntryResult create1_res, table1_res, get_res;
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr.CreateTxn();
+    Txn* new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -162,7 +152,7 @@ TEST_F(TableEntryTest, test2) {
 
     {
         // Txn2: Create, OK
-        new_txn = txn_mgr.CreateTxn();
+        new_txn = txn_mgr->CreateTxn();
 
         // Txn2: Begin, OK
         new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -205,7 +195,7 @@ TEST_F(TableEntryTest, test2) {
 
     {
         // Txn2: Create, OK
-        new_txn = txn_mgr.CreateTxn();
+        new_txn = txn_mgr->CreateTxn();
 
         // Txn2: Begin, OK
         new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -227,14 +217,14 @@ TEST_F(TableEntryTest, test2) {
                 ColumnDataEntry *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
                 SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, &buffer_mgr);
+                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
                 i8 *col0_ptr = (i8 *) (col0_obj.GetData());
                 for (SizeT row = 0; row < row_count; ++row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                     EXPECT_EQ(col0_ptr[row], (i8) (row));
                 }
 
-                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, &buffer_mgr);
+                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
                 f64 *col2_ptr = (f64 *) (col2_obj.GetData());
                 for (SizeT row = 0; row < row_count; ++row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
@@ -306,14 +296,14 @@ TEST_F(TableEntryTest, test2) {
                 ColumnDataEntry* column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
                 SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, &buffer_mgr);
+                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
                 i8* col0_ptr = (i8*)(col0_obj.GetData());
                 for(SizeT row = 0; row < row_count; ++ row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                     EXPECT_EQ(col0_ptr[row], (i8)(row));
                 }
 
-                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, &buffer_mgr);
+                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
                 f64* col2_ptr = (f64*)(col2_obj.GetData());
                 for(SizeT row = 0; row < row_count; ++ row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
@@ -329,7 +319,7 @@ TEST_F(TableEntryTest, test2) {
 
     {
         // Txn3: Create, OK
-        new_txn = txn_mgr.CreateTxn();
+        new_txn = txn_mgr->CreateTxn();
 
         // Txn3: Begin, OK
         new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -351,14 +341,14 @@ TEST_F(TableEntryTest, test2) {
                 ColumnDataEntry *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
                 SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, &buffer_mgr);
+                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
                 i8 *col0_ptr = (i8 *) (col0_obj.GetData());
                 for (SizeT row = 0; row < row_count; ++row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                     EXPECT_EQ(col0_ptr[row], (i8) (row));
                 }
 
-                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, &buffer_mgr);
+                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
                 f64 *col2_ptr = (f64 *) (col2_obj.GetData());
                 for (SizeT row = 0; row < row_count; ++row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
@@ -369,12 +359,4 @@ TEST_F(TableEntryTest, test2) {
         // Txn3: Commit, OK
         new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
     }
-
-    nlohmann::json catalog_json = NewCatalog::Serialize(&new_catalog);
-    LOG_TRACE("{}", catalog_json.dump());
-
-    UniquePtr<NewCatalog> catalog1;
-    NewCatalog::Deserialize(catalog_json, &buffer_mgr, catalog1);
-    nlohmann::json catalog_json1 = NewCatalog::Serialize(catalog1.get());
-    LOG_TRACE("{}", catalog_json1.dump());
 }

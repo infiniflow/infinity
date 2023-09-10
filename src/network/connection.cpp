@@ -63,10 +63,12 @@ Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
     UniquePtr<QueryContext> query_context_ptr
-        = MakeUnique<QueryContext>(session_.get(),
-                                   Infinity::instance().config(),
-                                   Infinity::instance().scheduler(),
-                                   Infinity::instance().storage());
+        = MakeUnique<QueryContext>();
+    query_context_ptr->Init(session_.get(),
+                            Infinity::instance().config(),
+                            Infinity::instance().fragment_scheduler(),
+                            Infinity::instance().storage(),
+                            Infinity::instance().resource_manager());
     query_context_ptr->set_current_schema(session_->current_database());
 
     switch (cmd_type) {

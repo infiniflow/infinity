@@ -52,6 +52,7 @@ OnCommitTest(const SharedPtr<AsyncTask>& commit_task) {
 
 TEST_F(AsyncTaskProcessorTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     AsyncBatchProcessor processor(10 * 1024, 1024, OnPrepareTest, OnCommitTest);
     processor.Start();
 

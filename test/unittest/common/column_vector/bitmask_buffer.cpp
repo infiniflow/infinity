@@ -29,6 +29,7 @@ class BitmaskBufferTest : public BaseTest {
 
 TEST_F(BitmaskBufferTest, bitmask_buffer_a) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     constexpr size_t bit_count = 8192;
 

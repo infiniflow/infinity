@@ -30,6 +30,7 @@ class HugeIntCastTest : public BaseTest {
 
 TEST_F(HugeIntCastTest, hugeint_cast0) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // HugeInt to HugeInt, throw exception
     {
@@ -95,6 +96,7 @@ TEST_F(HugeIntCastTest, hugeint_cast0) {
 
 TEST_F(HugeIntCastTest, hugeint_cast1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kHugeInt);
 

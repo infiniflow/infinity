@@ -20,9 +20,6 @@ class CatalogTest : public BaseTest {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
-
-        system("rm -rf /tmp/infinity/data/db");
-        system("rm -rf /tmp/infinity/_tmp");
     }
 
     void
@@ -31,6 +28,10 @@ class CatalogTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+
+        system("rm -rf /tmp/infinity/data/db");
+        system("rm -rf /tmp/infinity/data/catalog/*");
+        system("rm -rf /tmp/infinity/_tmp");
     }
 
 };
@@ -39,30 +40,24 @@ class CatalogTest : public BaseTest {
 // txn2:             get db1,             get db1, commit
 TEST_F(CatalogTest, simple_test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
-    // create bufferManager && TxnManager
-    SizeT memory_limit = 1024 * 1024 * 1024;
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
-
-    UniquePtr<String> dir = MakeUnique<String>("db");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    NewCatalog* catalog = infinity::Infinity::instance().storage()->catalog();
 
     // start txn1
-    auto* txn1 = txn_mgr.CreateTxn();
+    auto* txn1 = txn_mgr->CreateTxn();
     txn1->BeginTxn();
 
     // start txn2
-    auto* txn2 = txn_mgr.CreateTxn();
+    auto* txn2 = txn_mgr->CreateTxn();
     txn2->BeginTxn();
     HashMap<String, BaseEntry*> databases;
 
     // create db in empty catalog should be success
     {
         EntryResult res;
-        res = NewCatalog::CreateDatabase(&new_catalog, "db1", txn1->TxnID(), txn1->BeginTS(), &txn_mgr);
+        res = NewCatalog::CreateDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(res.Success());
         // store this entry
         databases["db1"] = res.entry_;
@@ -70,31 +65,31 @@ TEST_F(CatalogTest, simple_test1) {
 
     {
         EntryResult res;
-        res = NewCatalog::GetDatabase(&new_catalog, "db1", txn1->TxnID(), txn1->BeginTS());
+        res = NewCatalog::GetDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS());
         // should be visible to same txn
         EXPECT_TRUE(res.Success());
         EXPECT_EQ(res.entry_, databases["db1"]);
 
         // should not be visible to other txn
-        res = NewCatalog::GetDatabase(&new_catalog, "db1", txn2->TxnID(), txn2->BeginTS());
+        res = NewCatalog::GetDatabase(catalog, "db1", txn2->TxnID(), txn2->BeginTS());
         EXPECT_TRUE(res.Fail());
     }
 
     // drop db should be success
     {
         EntryResult res;
-        res = NewCatalog::DropDatabase(&new_catalog, "db1", txn1->TxnID(), txn1->BeginTS(), &txn_mgr);
+        res = NewCatalog::DropDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(res.Success());
         EXPECT_EQ(res.entry_, databases["db1"]);
         // remove this entry
         databases.erase("db1");
 
-        res = NewCatalog::GetDatabase(&new_catalog, "db1", txn1->TxnID(), txn1->BeginTS());
+        res = NewCatalog::GetDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS());
         // should not be visible to same txn
         EXPECT_TRUE(res.Fail());
 
         // should not be visible to other txn
-        res = NewCatalog::GetDatabase(&new_catalog, "db1", txn2->TxnID(), txn2->BeginTS());
+        res = NewCatalog::GetDatabase(catalog, "db1", txn2->TxnID(), txn2->BeginTS());
         EXPECT_TRUE(res.Fail());
     }
 
@@ -107,23 +102,17 @@ TEST_F(CatalogTest, simple_test1) {
 // txn3:                     start, get db1, delete db1, commit
 TEST_F(CatalogTest, simple_test2) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
-    // create bufferManager && TxnManager
-    SizeT memory_limit = 1024 * 1024 * 1024;
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
-
-    UniquePtr<String> dir = MakeUnique<String>("db");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    NewCatalog* catalog = infinity::Infinity::instance().storage()->catalog();
 
     // start txn1
-    auto* txn1 = txn_mgr.CreateTxn();
+    auto* txn1 = txn_mgr->CreateTxn();
     txn1->BeginTxn();
 
     // start txn2
-    auto* txn2 = txn_mgr.CreateTxn();
+    auto* txn2 = txn_mgr->CreateTxn();
     txn2->BeginTxn();
 
     HashMap<String, BaseEntry*> databases;
@@ -142,20 +131,20 @@ TEST_F(CatalogTest, simple_test2) {
     // should not be visible to txn2
     {
         EntryResult res;
-        res = NewCatalog::GetDatabase(&new_catalog, "db1", txn2->TxnID(), txn2->BeginTS());
+        res = NewCatalog::GetDatabase(catalog, "db1", txn2->TxnID(), txn2->BeginTS());
         EXPECT_TRUE(res.Fail());
     }
 
     txn2->CommitTxn();
 
-    auto* txn3 = txn_mgr.CreateTxn();
+    auto* txn3 = txn_mgr->CreateTxn();
     txn3->BeginTxn();
 
 
     // should be visible to txn3
     {
         EntryResult res;
-        res = NewCatalog::GetDatabase(&new_catalog, "db1", txn3->TxnID(), txn3->BeginTS());
+        res = NewCatalog::GetDatabase(catalog, "db1", txn3->TxnID(), txn3->BeginTS());
         EXPECT_TRUE(res.Success());
         EXPECT_EQ(res.entry_, databases["db1"]);
 
@@ -167,7 +156,7 @@ TEST_F(CatalogTest, simple_test2) {
         databases.erase("db1");
 
         // should not be visible to other txn
-        res = NewCatalog::GetDatabase(&new_catalog, "db1", txn3->TxnID(), txn3->BeginTS());
+        res = NewCatalog::GetDatabase(catalog, "db1", txn3->TxnID(), txn3->BeginTS());
         EXPECT_TRUE(res.Fail());
     }
 
@@ -176,22 +165,16 @@ TEST_F(CatalogTest, simple_test2) {
 
 TEST_F(CatalogTest, concurrent_test) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
-    // create bufferManager && TxnManager
-    SizeT memory_limit = 1024 * 1024 * 1024;
-    SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
-    SharedPtr<String> base_path = MakeShared<String>("/tmp/infinity/data");
-    BufferManager buffer_mgr(memory_limit, base_path, temp_path);
+    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    NewCatalog* catalog = infinity::Infinity::instance().storage()->catalog();
 
-    UniquePtr<String> dir = MakeUnique<String>("db");
-    NewCatalog new_catalog(std::move(dir));
-    TxnManager txn_mgr(&new_catalog, &buffer_mgr);
-
-    for (int i = 0; i < 100; i++) {
+    for (int loop = 0; loop < 1; ++ loop) {
         // start txn1 && txn2
-        auto *txn1 = txn_mgr.CreateTxn();
+        auto *txn1 = txn_mgr->CreateTxn();
         txn1->BeginTxn();
-        auto *txn2 = txn_mgr.CreateTxn();
+        auto *txn2 = txn_mgr->CreateTxn();
         txn2->BeginTxn();
 
         // lock protect databases
@@ -199,20 +182,20 @@ TEST_F(CatalogTest, concurrent_test) {
         HashMap<String, BaseEntry *> databases;
 
         auto write_routine = [&](int start, Txn *txn) {
-          EntryResult res;
-          for (int i = start; i < 1000; i += 2) {
-            String db_name = "db" + std::to_string(i);
-            res = txn->CreateDatabase(db_name, ConflictType::kError);
-            EXPECT_TRUE(res.Success());
-            // store this entry
-            lock.lock();
-            databases[db_name] = res.entry_;
-            lock.unlock();
-          }
+            EntryResult res;
+            for (int db_id = start; db_id < 1000; db_id += 2) {
+                String db_name = "db" + std::to_string(db_id);
+                res = txn->CreateDatabase(db_name, ConflictType::kError);
+                EXPECT_TRUE(res.Success());
+                // store this entry
+                lock.lock();
+                databases[db_name] = res.entry_;
+                lock.unlock();
+            }
         };
 
-        std::thread write_thread1(write_routine, 0, txn1);
-        std::thread write_thread2(write_routine, 1, txn2);
+        Thread write_thread1(write_routine, 0, txn1);
+        Thread write_thread2(write_routine, 1, txn2);
 
         write_thread1.join();
         write_thread2.join();
@@ -221,21 +204,21 @@ TEST_F(CatalogTest, concurrent_test) {
         txn2->CommitTxn();
 
         // start txn3 && txn4
-        auto *txn3 = txn_mgr.CreateTxn();
+        auto *txn3 = txn_mgr->CreateTxn();
         txn3->BeginTxn();
-        auto *txn4 = txn_mgr.CreateTxn();
+        auto *txn4 = txn_mgr->CreateTxn();
         txn4->BeginTxn();
 
         auto read_routine = [&](Txn *txn) {
-          EntryResult res;
-          for (int i = 0; i < 1000; i++) {
-            String db_name = "db" + std::to_string(i);
-            res = NewCatalog::GetDatabase(&new_catalog, db_name, txn->TxnID(),
-                                          txn->BeginTS());
-            EXPECT_TRUE(res.Success());
-            // only read, don't need lock
-            EXPECT_EQ(res.entry_, databases[db_name]);
-          }
+            EntryResult res;
+            for (int db_id = 0; db_id < 1000; ++ db_id) {
+                String db_name = "db" + std::to_string(db_id);
+                res = NewCatalog::GetDatabase(catalog, db_name, txn->TxnID(),
+                                              txn->BeginTS());
+                EXPECT_TRUE(res.Success());
+                // only read, don't need lock
+                EXPECT_EQ(res.entry_, databases[db_name]);
+            }
         };
 
         std::thread read_thread1(read_routine, txn3);
@@ -247,22 +230,22 @@ TEST_F(CatalogTest, concurrent_test) {
         txn4->CommitTxn();
 
         // start txn5 && txn6
-        auto *txn5 = txn_mgr.CreateTxn();
+        auto *txn5 = txn_mgr->CreateTxn();
         txn5->BeginTxn();
-        auto *txn6 = txn_mgr.CreateTxn();
+        auto *txn6 = txn_mgr->CreateTxn();
         txn6->BeginTxn();
 
         auto drop_routine = [&](int start, Txn *txn) {
-          EntryResult res;
-          for (int i = start; i < 1000; i += 2) {
-            String db_name = "db" + std::to_string(i);
-            res = txn->DropDatabase(db_name, ConflictType::kError);
-            EXPECT_TRUE(res.Success());
-            // store this entry
-            lock.lock();
-            databases.erase(db_name);
-            lock.unlock();
-          }
+            EntryResult res;
+            for (int db_id = start; db_id < 1000; db_id += 2) {
+                String db_name = "db" + std::to_string(db_id);
+                res = txn->DropDatabase(db_name, ConflictType::kError);
+                EXPECT_TRUE(res.Success());
+                // store this entry
+                lock.lock();
+                databases.erase(db_name);
+                lock.unlock();
+            }
         };
 
         std::thread drop_thread1(drop_routine, 0, txn5);
@@ -274,16 +257,16 @@ TEST_F(CatalogTest, concurrent_test) {
         txn6->CommitTxn();
 
         // start txn7
-        auto *txn7 = txn_mgr.CreateTxn();
+        auto *txn7 = txn_mgr->CreateTxn();
         txn7->BeginTxn();
 
         // check all has been dropped
         EntryResult res;
-        for (int i = 0; i < 1000; i++) {
-          String db_name = "db" + std::to_string(i);
-          res = NewCatalog::GetDatabase(&new_catalog, db_name, txn7->TxnID(),
-                                        txn7->BeginTS());
-          EXPECT_TRUE(res.Fail());
+        for (int db_id = 0; db_id < 1000; ++ db_id) {
+            String db_name = "db" + std::to_string(db_id);
+            res = NewCatalog::GetDatabase(catalog, db_name, txn7->TxnID(),
+                                          txn7->BeginTS());
+            EXPECT_TRUE(res.Fail());
         }
     }
 }

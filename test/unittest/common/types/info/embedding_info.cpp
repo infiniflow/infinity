@@ -29,6 +29,7 @@ class EmbeddingInfoTest : public BaseTest {
 
 TEST_F(EmbeddingInfoTest, embedding_info_A) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     EXPECT_THROW(EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, EMBEDDING_LIMIT + 1), TypeException);
 

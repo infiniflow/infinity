@@ -24,6 +24,7 @@ class FP16TypeTest : public BaseTest {
 
 TEST_F(FP16TypeTest, test1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     const uint16_t min_po2_f16   = UINT16_C(0x0400);
     const uint16_t eighths_f16   = UINT16_C(0x3000);
     const uint16_t quarter_f16   = UINT16_C(0x3400);

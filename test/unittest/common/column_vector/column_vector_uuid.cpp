@@ -29,6 +29,7 @@ class ColumnVectorUuidTest : public BaseTest {
 
 TEST_F(ColumnVectorUuidTest, flat_uuid) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kUuid);
     ColumnVector column_vector(data_type);
@@ -163,6 +164,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
 TEST_F(ColumnVectorUuidTest, contant_uuid) {
 
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kUuid);
     ColumnVector column_vector(data_type);
@@ -259,6 +261,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
 
 TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kUuid);
     ColumnVector column_vector(data_type);
@@ -303,6 +306,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
 
 TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kUuid);
     ColumnVector column_vector(data_type);

@@ -12,7 +12,7 @@
 #include "executor/physical_planner.h"
 #include "executor/physical_operator.h"
 #include "common/utility/infinity_assert.h"
-#include "scheduler/operator_pipeline.h"
+#include "legacy_sched/operator_pipeline.h"
 #include "executor/fragment_builder.h"
 #include "common/utility/defer_op.h"
 
@@ -103,13 +103,18 @@ QueryContext::Query(const String &query) {
 
             // Fragment Builder, only for test now.
             // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
+            auto plan_fragment = MakeShared<PlanFragment>();
+            fragment_builder.BuildFragments(physical_plan.get(), plan_fragment.get());
 
-            // Create execution pipeline
-            SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
-
-            // Schedule the query pipeline
-            Infinity::instance().scheduler()->Schedule(this, pipeline);
-            query_result.result_ = pipeline->GetResult();
+            scheduler_->Schedule(this, plan_fragment.get());
+            query_result.result_ = plan_fragment->GetResult();
+//
+//            // Create execution pipeline
+//            SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
+//
+//            // Schedule the query pipeline
+//            Infinity::instance().scheduler()->Schedule(this, pipeline);
+//            query_result.result_ = pipeline->GetResult();
             query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
             this->CommitTxn();

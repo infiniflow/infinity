@@ -23,6 +23,11 @@ PhysicalProject::Init() {
 }
 
 void
+PhysicalProject::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+}
+
+void
 PhysicalProject::Execute(QueryContext* query_context) {
     SizeT expression_count = expressions_.size();
 

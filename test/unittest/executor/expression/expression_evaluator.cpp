@@ -38,6 +38,7 @@ class ExpressionEvaluatorTest : public BaseTest {
 
 TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
     RegisterAddFunction(catalog_ptr);
 
@@ -150,6 +151,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
 TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
     RegisterSubtractFunction(catalog_ptr);
 

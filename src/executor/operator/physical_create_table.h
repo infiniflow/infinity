@@ -20,7 +20,7 @@ public:
                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                         ConflictType conflict_type,
                         u64 table_index,
-                        uint64_t id);
+                        u64 id);
 
     explicit
     PhysicalCreateTable(SharedPtr<String> schema_name,
@@ -29,7 +29,7 @@ public:
                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                         ConflictType conflict_type,
                         u64 table_index,
-                        uint64_t id);
+                        u64 id);
 
     ~PhysicalCreateTable() override = default;
 
@@ -37,7 +37,10 @@ public:
     Init() override;
 
     void
-    Execute(QueryContext* query_context) override;
+    Execute(QueryContext* query_context) final;
+
+    virtual void
+    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
