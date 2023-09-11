@@ -81,7 +81,14 @@ SQLRunner::Run(const String& sql_text, bool print) {
     query_context_ptr->CommitTxn();
     return String();
 }
-/// For testing fragment
+
+
+/**
+ * @brief For testing the new push based execution engine
+ * @param sql_text
+ * @param print
+ * @return std::string
+ */
 String
 SQLRunner::RunV2(const String& sql_text, bool print) {
     if(print) {
@@ -108,45 +115,38 @@ SQLRunner::RunV2(const String& sql_text, bool print) {
     query_context_ptr->CreateTxn();
     query_context_ptr->BeginTxn();
 
-    SizeT statement_count = parsed_result->statements_ptr_->size();
 
-    for(SizeT idx = 0; idx < statement_count; ++ idx) {
-        LogicalPlanner logical_planner(query_context_ptr.get());
-        Optimizer optimizer(query_context_ptr.get());
-        PhysicalPlanner physical_planner(query_context_ptr.get());
-        FragmentBuilder fragment_builder(query_context_ptr.get());
-        BaseStatement* statement = (*parsed_result->statements_ptr_)[idx];
 
-        logical_planner.Build(statement);
+    LogicalPlanner logical_planner(query_context_ptr.get());
+    Optimizer optimizer(query_context_ptr.get());
+    PhysicalPlanner physical_planner(query_context_ptr.get());
+    FragmentBuilder fragment_builder(query_context_ptr.get());
+    BaseStatement* statement = (*parsed_result->statements_ptr_)[0];
 
-        SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
+    logical_planner.Build(statement);
 
-        // Apply optimized rule to the logical plan
-        SharedPtr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
+    SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 
-        // Build physical plan
-        SharedPtr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
+    // Apply optimized rule to the logical plan
+    SharedPtr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
 
-        // Create execution pipeline
-        // Fragment Builder, only for test now. plan fragment is same as pipeline.
-        auto root_fragment = MakeShared<PlanFragment>();
-        fragment_builder.BuildFragments(physical_plan.get(), root_fragment.get());
-        auto result = root_fragment->ToString();
+    // Build physical plan
+    SharedPtr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
 
-        // Create execution pipeline
-        SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
+    // Create execution pipeline
+    // Fragment Builder, only for test now. plan fragment is same as pipeline.
+    auto plan_fragment = MakeShared<PlanFragment>();
+    fragment_builder.BuildFragments(physical_plan.get(), plan_fragment.get());
 
-        // Schedule the query pipeline
-        Infinity::instance().scheduler()->Schedule(query_context_ptr.get(), pipeline);
+    // Schedule the query pipeline
+    query_context_ptr.get()->scheduler()->Schedule(query_context_ptr.get(), plan_fragment.get());
 
-        // Initialize query result
-        QueryResult query_result;
-        query_result.result_ = pipeline->GetResult();
-        query_result.root_operator_type_ = unoptimized_plan->operator_type();
-    }
-    LOG_TRACE("{} statements executed.", statement_count);
+    // Initialize query result
+    QueryResult query_result;
+    query_result.result_ = plan_fragment->GetResult();
+    query_result.root_operator_type_ = unoptimized_plan->operator_type();
+
     parsed_result->Reset();
-
     query_context_ptr->CommitTxn();
     return String();
 }
