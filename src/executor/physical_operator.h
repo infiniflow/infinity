@@ -53,9 +53,11 @@ public:
         return operator_id_;
     }
 
+    /// for naive execution
     virtual void
     Execute(QueryContext* query_context) = 0;
 
+    /// for push based execution
     virtual void
     Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) = 0;
 

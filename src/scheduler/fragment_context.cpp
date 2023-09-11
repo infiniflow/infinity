@@ -37,7 +37,21 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kPreparedPlan:
-        case PhysicalOperatorType::kShow:
+        case PhysicalOperatorType::kShow: {
+            if (fragment_ops.size() == 1) {
+                // Only one operator
+                // These operator only need one CPU to run
+                auto fragment_context =MakeUnique<GlobalMaterializedFragmentCtx>(fragment_ptr,
+                                                              query_context);
+                auto fragment_task =MakeUnique<FragmentTask>(fragment_context.get());
+                fragment_context->AddTask(std::move(fragment_task),
+                                          MakeUnique<ShowInputState>(),
+                                          MakeUnique<ShowOutputState>());
+                return fragment_context;
+            } else {
+                SchedulerError("Not support more one operator fragment")
+            }
+        }
         case PhysicalOperatorType::kFlush: {
             if(fragment_ops.size() == 1) {
                 // Only one operator
@@ -107,6 +121,34 @@ GlobalMaterializedFragmentCtx::GetResultInternal() {
                     };
 
                     return Table::MakeResultTable(column_defs);
+                }
+            }
+            case OperatorStateType::kShow:{
+                auto show_output_state = (ShowOutputState*)(output_states_[0].get());
+                if(show_output_state->error_message_ != nullptr) {
+                    ExecutorError(*show_output_state->error_message_);
+                } else {
+                    // Success
+
+                    // TODO: use cover function to define the different table type
+                    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+                    SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+                    Vector<SharedPtr<ColumnDef>> column_defs = {
+                        MakeShared<ColumnDef>(0, varchar_type, "schema", HashSet<ConstraintType>()),
+                        MakeShared<ColumnDef>(1, varchar_type, "table", HashSet<ConstraintType>()),
+                        MakeShared<ColumnDef>(2, varchar_type, "type", HashSet<ConstraintType>()),
+                        MakeShared<ColumnDef>(3, bigint_type, "column_count", HashSet<ConstraintType>()),
+                        MakeShared<ColumnDef>(4, bigint_type, "row_count", HashSet<ConstraintType>()),
+                        MakeShared<ColumnDef>(5, bigint_type, "block_count", HashSet<ConstraintType>()),
+                        MakeShared<ColumnDef>(6, bigint_type, "block_size", HashSet<ConstraintType>()),
+                    };
+
+                    auto table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+                    auto table = MakeShared<Table>(table_def, TableType::kResult);
+                    table->Append(show_output_state->output_[0]);
+
+                    return table;
                 }
             }
             case OperatorStateType::kInvalid: {
