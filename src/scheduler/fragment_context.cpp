@@ -146,7 +146,8 @@ GlobalMaterializedFragmentCtx::GetResultInternal() {
 
                     auto table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
                     auto table = MakeShared<Table>(table_def, TableType::kResult);
-                    table->Append(show_output_state->output_[0]);
+                    table->UpdateRowCount(show_output_state->output_[0]->row_count());
+                    table->data_blocks_.emplace_back(std::move(show_output_state->output_[0]));
 
                     return table;
                 }
