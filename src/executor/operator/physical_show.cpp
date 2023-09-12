@@ -26,20 +26,31 @@ PhysicalShow::Execute(QueryContext *query_context, InputState *input_state,
       ExecuteShowTable(query_context, show_input_state, show_output_state);
       break;
     }
+    case ShowType::kShowColumn: {
+      ExecuteShowColumns(query_context, show_input_state, show_output_state);
+      break;
+    }
     default:
       ExecutorError("Invalid chunk scan type");
     }
 }
 
+
+/**
+ * @brief Execute show table
+ * @param query_context
+ * @param input_state
+ * @param output_state
+ */
 void
 PhysicalShow::ExecuteShowTable(QueryContext* query_context,
                                ShowInputState *input_state,
                                ShowOutputState *output_state) {
     // Define output table schema
-    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
-    Vector<SharedPtr<ColumnDef>> column_defs = {
+    auto column_defs = {
         MakeShared<ColumnDef>(0, varchar_type, "schema", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(1, varchar_type, "table", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(2, varchar_type, "type", HashSet<ConstraintType>()),
@@ -49,14 +60,17 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
         MakeShared<ColumnDef>(6, bigint_type, "block_size", HashSet<ConstraintType>()),
     };
 
+    auto table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+    // Init the table definition
+    output_state->table_def_ = std::move(table_def);
+
 
 
     // Get tables from catalog
     Txn* txn = query_context->GetTxn();
     Vector<TableCollectionEntry*> entries = txn->GetTableCollections(schema_name_);
 
-    // check the entry size
-    // TODO: Use DataBlock to carry the output data
+    // TODO: Check the entry size, and split to many data blocks
 
 
     // Prepare the output data block
@@ -182,6 +196,81 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
     output_block_ptr->Finalize();
 
     output_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+/**
+ * @brief Execute Show table details statement (i.e. describe t1)
+ * @param query_context
+ * @param input_state
+ * @param output_state
+ */
+void
+PhysicalShow::ExecuteShowColumns(QueryContext *query_context,
+                                 ShowInputState *input_state,
+                                 ShowOutputState *output_state) {
+
+    auto txn = query_context->GetTxn();
+    auto result = txn->GetTableByName(schema_name_, object_name_);
+    output_state->error_message_= std::move(result.err_);
+    if (result.entry_!= nullptr){
+        auto table_collection_entry= dynamic_cast<TableCollectionEntry*>(result.entry_);
+
+        auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+        Vector<SharedPtr<ColumnDef>> column_defs = {
+                MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(2, varchar_type, "constraint", HashSet<ConstraintType>()),
+        };
+
+        SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
+
+        output_state->table_def_ = std::move(table_def);
+
+        // create data block for output state
+        auto output_block_ptr = DataBlock::Make();
+        Vector<SharedPtr<DataType>> column_types {
+            varchar_type,
+            varchar_type,
+            varchar_type,
+        };
+
+        output_block_ptr->Init(column_types);
+
+        for (auto& column: table_collection_entry->columns_){
+            SizeT column_id = 0;
+            {
+                // Append column name to the first column
+                Value value = Value::MakeVarchar(column->name());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++ column_id;
+            {
+                // Append column type to the second column
+                Value value = Value::MakeVarchar(column->type()->ToString());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++ column_id;
+            {
+                // Append column constraint to the third column
+                String column_constraint;
+                for(auto& constraint: column->constraints_) {
+                    column_constraint += " " + ConstrainTypeToString(constraint);
+                }
+
+                Value value = Value::MakeVarchar(column_constraint);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+            output_block_ptr->Finalize();
+        }
+
+        output_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 void
@@ -432,7 +521,7 @@ PhysicalShow::ExecuteShowColumns(QueryContext* query_context) {
         ExecutorError(*result.err_);
     } else {
         if(result.entry_ != nullptr) {
-            TableCollectionEntry* table_collection_entry = static_cast<TableCollectionEntry*>(result.entry_);
+            TableCollectionEntry* table_collection_entry = dynamic_cast<TableCollectionEntry*>(result.entry_);
             ExecuteShowTableDetail(query_context, table_collection_entry->columns_);
         }
     }
@@ -553,6 +642,8 @@ PhysicalShow::ExecuteShowViewDetail(QueryContext* query_context,
     output_block_ptr->Finalize();
     output_->Append(output_block_ptr);
 }
+
+
 
 }
 

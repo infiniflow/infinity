@@ -21,7 +21,8 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
         case PhysicalOperatorType::kDropTable:
         case PhysicalOperatorType::kDropCollection:
         case PhysicalOperatorType::kDropSchema:
-        case PhysicalOperatorType::kDropView: {
+        case PhysicalOperatorType::kDropView:
+        case PhysicalOperatorType::kAlter:{
             if(fragment_ops.size() == 1) {
                 // Only one operator
                 // These operator only need one CPU to run
@@ -34,7 +35,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
                 SchedulerError("Not support more one operator fragment")
             }
         }
-        case PhysicalOperatorType::kAlter:
+
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kShow: {
@@ -44,6 +45,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
                 auto fragment_context =MakeUnique<GlobalMaterializedFragmentCtx>(fragment_ptr,
                                                               query_context);
                 auto fragment_task =MakeUnique<FragmentTask>(fragment_context.get());
+                // we should set the table definition (i.e.table header) in output state
                 fragment_context->AddTask(std::move(fragment_task),
                                           MakeUnique<ShowInputState>(),
                                           MakeUnique<ShowOutputState>());
@@ -134,17 +136,7 @@ GlobalMaterializedFragmentCtx::GetResultInternal() {
                     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
                     SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
-                    Vector<SharedPtr<ColumnDef>> column_defs = {
-                        MakeShared<ColumnDef>(0, varchar_type, "schema", HashSet<ConstraintType>()),
-                        MakeShared<ColumnDef>(1, varchar_type, "table", HashSet<ConstraintType>()),
-                        MakeShared<ColumnDef>(2, varchar_type, "type", HashSet<ConstraintType>()),
-                        MakeShared<ColumnDef>(3, bigint_type, "column_count", HashSet<ConstraintType>()),
-                        MakeShared<ColumnDef>(4, bigint_type, "row_count", HashSet<ConstraintType>()),
-                        MakeShared<ColumnDef>(5, bigint_type, "block_count", HashSet<ConstraintType>()),
-                        MakeShared<ColumnDef>(6, bigint_type, "block_size", HashSet<ConstraintType>()),
-                    };
-
-                    auto table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+                    auto table_def = show_output_state->table_def_;
                     auto table = MakeShared<Table>(table_def, TableType::kResult);
                     table->UpdateRowCount(show_output_state->output_[0]->row_count());
                     table->data_blocks_.emplace_back(std::move(show_output_state->output_[0]));
