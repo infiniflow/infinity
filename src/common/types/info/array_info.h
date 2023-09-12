@@ -38,6 +38,10 @@ public:
     [[nodiscard]] nlohmann::json
     Serialize() const override;
 
+    [[nodiscard]] inline String
+    ToString() const override {
+        return "array(" + elem_type_.ToString() + ")";
+    }
 private:
     DataType elem_type_;
 };

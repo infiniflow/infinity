@@ -23,4 +23,25 @@ EmbeddingInfo::Serialize() const {
     return res;
 }
 
+String EmbeddingInfo::EmbeddingDataTypeToString(EmbeddingDataType type) {
+    switch (type) {
+        case kElemBit:
+            return "bit";
+        case kElemInt8:
+            return "int8";
+        case kElemInt16:
+            return "int16";
+        case kElemInt32:
+            return "int32";
+        case kElemInt64:
+            return "int64";
+        case kElemFloat:
+            return "float";
+        case kElemDouble:
+            return "double";
+        default:
+            TypeError("Unexpected embedding type");
+    }
+}
+
 }

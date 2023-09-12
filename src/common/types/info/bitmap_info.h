@@ -36,6 +36,11 @@ public:
     [[nodiscard]] nlohmann::json
     Serialize() const override;
 
+    [[nodiscard]] inline String
+    ToString() const override {
+        return "bitmap(" + std::to_string(length_limit_) + ")";
+    }
+
 private:
     SizeT length_limit_ {0};
 };

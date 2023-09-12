@@ -38,6 +38,7 @@ TEST_F(FragmentTest, test_build_fragment) {
     SQLRunner::RunV2("create schema s1", true);
     SQLRunner::RunV2("create table s1.t1(a bigint)", true);
     SQLRunner::RunV2("create table t2(a bigint)", true);
+    SQLRunner::RunV2("create table t3(c1 embedding(bit,10))", true);
     SQLRunner::RunV2("drop schema s1", true);
     SQLRunner::RunV2("drop table t1", true);
 

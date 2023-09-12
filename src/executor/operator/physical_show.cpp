@@ -248,8 +248,17 @@ PhysicalShow::ExecuteShowColumns(QueryContext *query_context,
 
             ++ column_id;
             {
-                // Append column type to the second column
-                Value value = Value::MakeVarchar(column->type()->ToString());
+                // Append column type to the second column, if the column type is embedded type, append the embedded type
+                String column_type;
+                if (column->type()->IsEmbedding()){
+                    auto type = column->type();
+                    auto embedding_type = type->type_info()->ToString();
+                    column_type = fmt::format("{}({})", type->ToString(), embedding_type);
+
+                } else {
+                    column_type = column->type()->ToString();
+                }
+                Value value = Value::MakeVarchar(column_type);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
