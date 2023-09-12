@@ -36,6 +36,17 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
             }
         }
 
+        case PhysicalOperatorType::kImport:
+            if (fragment_ops.size()==1){
+                UniquePtr<GlobalMaterializedFragmentCtx> fragment_context
+                    = MakeUnique<GlobalMaterializedFragmentCtx>(fragment_ptr, query_context);
+                 UniquePtr<FragmentTask> fragment_task = MakeUnique<FragmentTask>(fragment_context.get());
+                fragment_context->AddTask(std::move(fragment_task), MakeUnique<DMLInputState>(), MakeUnique<DMLOutputState>());
+                 return fragment_context;
+            } else {
+            SchedulerError("Not support more one operator fragment")
+            }
+
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kShow: {
@@ -132,10 +143,6 @@ GlobalMaterializedFragmentCtx::GetResultInternal() {
                 } else {
                     // Success
 
-                    // TODO: use cover function to define the different table type
-                    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-                    SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-
                     auto table_def = show_output_state->table_def_;
                     auto table = MakeShared<Table>(table_def, TableType::kResult);
                     table->UpdateRowCount(show_output_state->output_[0]->row_count());
@@ -143,6 +150,11 @@ GlobalMaterializedFragmentCtx::GetResultInternal() {
 
                     return table;
                 }
+            }
+            case OperatorStateType::kDML:{
+                return fragment_ptr_->GetOperators()[0]->output();
+
+
             }
             case OperatorStateType::kInvalid: {
                 ExecutorError("Invalid operator state type")

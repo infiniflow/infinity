@@ -45,17 +45,30 @@ struct DDLOutputState : public OutputState {
 
 struct ShowInputState : public InputState {
     inline explicit
-        ShowInputState(): InputState(OperatorStateType::kShow) {}
+    ShowInputState(): InputState(OperatorStateType::kShow) {}
 };
 
 struct ShowOutputState : public OutputState {
     inline explicit
-        ShowOutputState(): OutputState(OperatorStateType::kShow) {}
+    ShowOutputState(): OutputState(OperatorStateType::kShow) {}
 
 
     UniquePtr<String> error_message_{};
     Vector<SharedPtr<DataBlock>> output_{};
     SharedPtr<TableDef> table_def_{};
+};
+
+struct DMLInputState : public InputState {
+    inline explicit
+    DMLInputState(): InputState(OperatorStateType::kDML) {}
+};
+
+struct DMLOutputState : public OutputState {
+    inline explicit
+    DMLOutputState(): OutputState(OperatorStateType::kDML) {}
+
+    UniquePtr<String> error_message_{};
+    Vector<SharedPtr<DataBlock>> output_{};
 };
 
 }

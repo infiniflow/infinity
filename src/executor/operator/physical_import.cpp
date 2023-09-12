@@ -23,8 +23,23 @@ PhysicalImport::Init() {
 
 }
 
+
+/**
+ * @brief copy statement execute function
+ * @param query_context
+ * @param input_state
+ * @param output_state
+ */
 void
 PhysicalImport::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+    switch(file_type_) {
+        case CopyFileType::kCSV: {
+            return ImportCSV(query_context);
+        }
+        case CopyFileType::kJSON: {
+            return ImportJSON(query_context);
+        }
+    }
 
 }
 
