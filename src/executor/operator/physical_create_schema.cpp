@@ -13,7 +13,10 @@ PhysicalCreateSchema::Init() {
 
 void
 PhysicalCreateSchema::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
-
+  auto txn = query_context->GetTxn();
+  auto result = txn->CreateDatabase(*schema_name_, conflict_type_);
+  auto ddl_output_state =(DDLOutputState*)(output_state);
+  ddl_output_state->error_message_=std::move(result.err_);
 }
 
 void

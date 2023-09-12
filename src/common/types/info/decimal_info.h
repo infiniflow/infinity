@@ -41,6 +41,11 @@ public:
     [[nodiscard]] nlohmann::json
     Serialize() const override;
 
+    [[nodiscard]] inline
+    String ToString() const override {
+        return "decimal(" + std::to_string(precision_) + ", " + std::to_string(scale_) + ")";
+    }
+
 private:
     i64 precision_;
     i64 scale_;

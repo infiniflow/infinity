@@ -21,7 +21,8 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
         case PhysicalOperatorType::kDropTable:
         case PhysicalOperatorType::kDropCollection:
         case PhysicalOperatorType::kDropSchema:
-        case PhysicalOperatorType::kDropView: {
+        case PhysicalOperatorType::kDropView:
+        case PhysicalOperatorType::kAlter:{
             if(fragment_ops.size() == 1) {
                 // Only one operator
                 // These operator only need one CPU to run
@@ -34,10 +35,25 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
                 SchedulerError("Not support more one operator fragment")
             }
         }
-        case PhysicalOperatorType::kAlter:
+
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kPreparedPlan:
-        case PhysicalOperatorType::kShow:
+        case PhysicalOperatorType::kShow: {
+            if (fragment_ops.size() == 1) {
+                // Only one operator
+                // These operator only need one CPU to run
+                auto fragment_context =MakeUnique<GlobalMaterializedFragmentCtx>(fragment_ptr,
+                                                              query_context);
+                auto fragment_task =MakeUnique<FragmentTask>(fragment_context.get());
+                // we should set the table definition (i.e.table header) in output state
+                fragment_context->AddTask(std::move(fragment_task),
+                                          MakeUnique<ShowInputState>(),
+                                          MakeUnique<ShowOutputState>());
+                return fragment_context;
+            } else {
+                SchedulerError("Not support more one operator fragment")
+            }
+        }
         case PhysicalOperatorType::kFlush: {
             if(fragment_ops.size() == 1) {
                 // Only one operator
@@ -107,6 +123,25 @@ GlobalMaterializedFragmentCtx::GetResultInternal() {
                     };
 
                     return Table::MakeResultTable(column_defs);
+                }
+            }
+            case OperatorStateType::kShow:{
+                auto show_output_state = (ShowOutputState*)(output_states_[0].get());
+                if(show_output_state->error_message_ != nullptr) {
+                    ExecutorError(*show_output_state->error_message_);
+                } else {
+                    // Success
+
+                    // TODO: use cover function to define the different table type
+                    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+                    SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+                    auto table_def = show_output_state->table_def_;
+                    auto table = MakeShared<Table>(table_def, TableType::kResult);
+                    table->UpdateRowCount(show_output_state->output_[0]->row_count());
+                    table->data_blocks_.emplace_back(std::move(show_output_state->output_[0]));
+
+                    return table;
                 }
             }
             case OperatorStateType::kInvalid: {

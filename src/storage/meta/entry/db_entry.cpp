@@ -146,6 +146,7 @@ DBEntry::TableCollections(DBEntry* db_entry,
             }
         }
     }
+    db_entry->rw_locker_.unlock_shared();
 
     return results;
 }

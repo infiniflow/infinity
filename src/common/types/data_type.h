@@ -146,6 +146,11 @@ public:
         }
     }
 
+    inline bool
+    IsEmbedding(){
+        return type_ == kEmbedding;
+    }
+
     nlohmann::json
     Serialize();
 

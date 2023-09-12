@@ -50,6 +50,16 @@ public:
     [[nodiscard]] nlohmann::json
     Serialize() const override;
 
+    [[nodiscard]] inline
+    String ToString() const override {
+        return EmbeddingDataTypeToString(embedding_data_type_) + "," + std::to_string(dimension_);
+    }
+
+    static
+    String EmbeddingDataTypeToString(EmbeddingDataType type) ;
+
+
+
 private:
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     SizeT dimension_;

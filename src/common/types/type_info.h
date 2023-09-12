@@ -65,6 +65,9 @@ public:
     [[nodiscard]] virtual nlohmann::json
     Serialize() const = 0;
 
+    [[nodiscard]] virtual String
+    ToString() const = 0;
+
 protected:
     TypeInfoType type_ { TypeInfoType::kInvalid };
 };
