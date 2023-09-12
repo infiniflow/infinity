@@ -50,8 +50,16 @@ public:
     void
     ImportCSV(QueryContext* query_context);
 
+    /// for push based execution
+    void
+    ImportCSV(QueryContext* query_context, DMLInputState* input_state, DMLOutputState* output_state);
+
     void
     ImportJSON(QueryContext* query_context);
+
+    /// for push based execution
+    void
+    ImportJSON(QueryContext* query_context, DMLInputState* input_state, DMLOutputState* output_state);
 
     inline const TableCollectionEntry*
     table_collection_entry() const {

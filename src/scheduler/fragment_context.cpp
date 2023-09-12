@@ -38,13 +38,12 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
 
         case PhysicalOperatorType::kImport:
             if (fragment_ops.size()==1){
-                UniquePtr<GlobalMaterializedFragmentCtx> fragment_context
-                    = MakeUnique<GlobalMaterializedFragmentCtx>(fragment_ptr, query_context);
-                 UniquePtr<FragmentTask> fragment_task = MakeUnique<FragmentTask>(fragment_context.get());
+                auto fragment_context= MakeUnique<GlobalMaterializedFragmentCtx>(fragment_ptr, query_context);
+                auto fragment_task = MakeUnique<FragmentTask>(fragment_context.get());
                 fragment_context->AddTask(std::move(fragment_task), MakeUnique<DMLInputState>(), MakeUnique<DMLOutputState>());
-                 return fragment_context;
+                return fragment_context;
             } else {
-            SchedulerError("Not support more one operator fragment")
+                SchedulerError("Not support more one operator fragment")
             }
 
         case PhysicalOperatorType::kExplain:
@@ -53,8 +52,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
             if (fragment_ops.size() == 1) {
                 // Only one operator
                 // These operator only need one CPU to run
-                auto fragment_context =MakeUnique<GlobalMaterializedFragmentCtx>(fragment_ptr,
-                                                              query_context);
+                auto fragment_context =MakeUnique<GlobalMaterializedFragmentCtx>(fragment_ptr, query_context);
                 auto fragment_task =MakeUnique<FragmentTask>(fragment_context.get());
                 // we should set the table definition (i.e.table header) in output state
                 fragment_context->AddTask(std::move(fragment_task),
@@ -142,7 +140,6 @@ GlobalMaterializedFragmentCtx::GetResultInternal() {
                     ExecutorError(*show_output_state->error_message_);
                 } else {
                     // Success
-
                     auto table_def = show_output_state->table_def_;
                     auto table = MakeShared<Table>(table_def, TableType::kResult);
                     table->UpdateRowCount(show_output_state->output_[0]->row_count());
@@ -152,9 +149,17 @@ GlobalMaterializedFragmentCtx::GetResultInternal() {
                 }
             }
             case OperatorStateType::kDML:{
-                return fragment_ptr_->GetOperators()[0]->output();
+                auto dml_output_state = (DMLOutputState*)(output_states_[0].get());
+                if (dml_output_state->error_message_ != nullptr) {
+                    ExecutorError(*dml_output_state->error_message_);
+                } else {
+                    // Success
+                    auto table_def = dml_output_state->table_def_;
+                    auto table = MakeShared<Table>(table_def, TableType::kResult);
+                    table->SetResultMsg(dml_output_state->result_msg_);
 
-
+                    return table;
+                }
             }
             case OperatorStateType::kInvalid: {
                 ExecutorError("Invalid operator state type")

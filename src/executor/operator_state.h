@@ -69,6 +69,9 @@ struct DMLOutputState : public OutputState {
 
     UniquePtr<String> error_message_{};
     Vector<SharedPtr<DataBlock>> output_{};
+    SharedPtr<TableDef> table_def_{};
+    // For insert, update, delete, update
+    SharedPtr<String> result_msg_{};
 };
 
 }
