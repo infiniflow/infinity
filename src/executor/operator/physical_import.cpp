@@ -307,8 +307,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input
 
     auto result_msg = MakeShared<String>(fmt::format("AFFECT {} Rows", parser_context.row_count_));
     output_state->result_msg_= std::move(result_msg);
-
-
+    table_collection_entry_->row_count_ += parser_context.row_count_;
 }
 /**
  * @brief copy statement import csv function
