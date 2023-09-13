@@ -89,7 +89,8 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
 
 
     parser_context.segment_entry_ = SegmentEntry::MakeNewSegmentEntry(
-        table_collection_entry_, parser_context.txn_->TxnID(),
+        table_collection_entry_,
+        parser_context.txn_->TxnID(),
         TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
         parser_context.txn_->GetBufferMgr());
 
@@ -266,14 +267,15 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input
     parser_context.txn_->AddTxnTableStore(
             *table_collection_entry_->table_collection_name_,
             MakeUnique<TxnTableStore>(
-                    *table_collection_entry_->table_collection_name_,
-                    table_collection_entry_,
-                    parser_context.txn_));
+                *table_collection_entry_->table_collection_name_,
+                table_collection_entry_,
+                parser_context.txn_));
 
     parser_context.segment_entry_ = SegmentEntry::MakeNewSegmentEntry(
-            table_collection_entry_, parser_context.txn_->TxnID(),
-            TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
-            parser_context.txn_->GetBufferMgr());
+        table_collection_entry_,
+        parser_context.txn_->TxnID(),
+        TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
+        parser_context.txn_->GetBufferMgr());
 
     const String &table_name = *table_collection_entry_->table_collection_name_;
 
