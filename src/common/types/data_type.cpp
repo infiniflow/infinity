@@ -8,6 +8,7 @@
 #include "info/bitmap_info.h"
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/embedding_info.h"
+#include <charconv>
 
 namespace infinity {
 
@@ -285,59 +286,77 @@ template <> String DataType::TypeToString<BlobT>() { return "Blob"; }
 template <> String DataType::TypeToString<EmbeddingT>() { return "Embedding"; }
 template <> String DataType::TypeToString<MixedT>() { return "Heterogeneous"; }
 
-template <> BooleanT DataType::StringToType<BooleanT>(const String &str) {
+template <> BooleanT DataType::StringToValue<BooleanT>(const StringView& str) {
     if (str.empty()) {
         return BooleanT{};
     }
     // TODO: should support True/False, maybe others
-    TypeAssert(str == "true" || str == "false",
-               "Boolean type should be true or false");
-    if (str == "true") {
-        return true;
+    String str_lower;
+    for (char ch : str) {
+        str_lower.push_back(std::tolower(ch));
     }
-    return false;
+    TypeAssert(str_lower == "true" || str_lower == "false","Boolean type should be true or false");
+    return str_lower == "true";
 }
 
-template <> TinyIntT DataType::StringToType<TinyIntT>(const String &str) {
+template <> TinyIntT DataType::StringToValue<TinyIntT>(const StringView& str) {
     if (str.empty()) {
         return TinyIntT{};
     }
-    return std::stoi(str);
+    TinyIntT value{};
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    TypeAssert(res.ptr == str.data() + str.size(), "Parse TinyInt error"); // TODO: throw error here
+    return value;
 }
 
-template <> SmallIntT DataType::StringToType<SmallIntT>(const String &str) {
+template <> SmallIntT DataType::StringToValue<SmallIntT>(const StringView& str) {
     if (str.empty()) {
         return SmallIntT{};
     }
-    return std::stoi(str);
+    SmallIntT value{};
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    TypeAssert(res.ptr == str.data() + str.size(), "Parse SmallInt error");
+    return value;
 }
 
-template <> IntegerT DataType::StringToType<IntegerT>(const String &str) {
+template <> IntegerT DataType::StringToValue<IntegerT>(const StringView& str) {
     if (str.empty()) {
         return IntegerT{};
     }
-    return std::stoi(str);
+    IntegerT value{};
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    TypeAssert(res.ptr == str.data() + str.size(), "Parse Integer error");
+    return value;
 }
 
-template <> BigIntT DataType::StringToType<BigIntT>(const String &str) {
+template <> BigIntT DataType::StringToValue<BigIntT>(const StringView& str) {
     if (str.empty()) {
         return BigIntT{};
     }
-    return std::stol(str);
+    BigIntT value{};
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    TypeAssert(res.ptr == str.data() + str.size(), "Parse BigInt error");
+    return value;
 }
 
-template <> FloatT DataType::StringToType<FloatT>(const String &str) {
+template <> FloatT DataType::StringToValue<FloatT>(const StringView& str) {
     if (str.empty()) {
         return FloatT{};
     }
-    return std::stof(str);
+    FloatT value{};
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    TypeAssert(res.ptr == str.data() + str.size(), "Parse Float error");
+    return value;
 }
 
-template <> DoubleT DataType::StringToType<DoubleT>(const String &str) {
+template <> DoubleT DataType::StringToValue<DoubleT>(const StringView& str) {
     if (str.empty()) {
         return DoubleT{};
     }
-    return std::stod(str);
+    DoubleT value{};
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    TypeAssert(res.ptr == str.data() + str.size(), "Parse Double error");
+    return value;
 }
 }
 
