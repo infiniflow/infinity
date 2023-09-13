@@ -41,8 +41,12 @@ enum class WALType : uint8_t {
 };
 
 struct WALEntry {
+    int64_t lsn; // lsn is the sequence number of an entry inside WAL. It's always strictly increasing.
+    int32_t crc;
     WALType type;
-    int64_t lsn;
+    int8_t pad;
+    int16_t size;
+    int64_t txn_id;
     virtual int64_t GetSize() = 0;
 };
 
@@ -71,15 +75,30 @@ struct WALUpdateTuple : WALEntry {
 
 class Txn {
 public:
-    int64_t lsn;
+    int64_t txn_id;
     int64_t begin_ts;
     int64_t commit_ts;
+    int64_t lsn;
 
 public:
     void Commit()
     {
-        commit_ts = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        commit_ts = std::chrono::steady_clock::now().time_since_epoch().count();
     };
+};
+
+class SeqGenerator {
+public:
+    // Begin with 1 to avoid distinguish uninitialized value and the minimal valid value.
+    SeqGenerator(int64_t begin = 1)
+        : next_seq_(begin)
+    {
+    }
+    int64_t Generate() { return next_seq_.fetch_add(1); }
+    int64_t GetLast() { return next_seq_.load() - 1; }
+
+private:
+    atomic<int64_t> next_seq_;
 };
 
 class TxnManager {
@@ -94,38 +113,30 @@ public:
     void AddActiveTxn(std::shared_ptr<Txn> txn)
     {
         std::lock_guard guard(mutex_);
-        active_trans_[txn->lsn] = txn;
+        active_trans_[txn->txn_id] = txn;
     }
-    void CommitTxn(int64_t lsn)
+    int64_t AllocTxnId() { return txn_id_gen_.Generate(); }
+    void CommitTxn(int64_t txn_id, int64_t lsn)
     {
         std::shared_ptr<Txn> txn = nullptr;
         {
             std::lock_guard guard(mutex_);
-            auto ent = active_trans_.find(lsn);
+            auto ent = active_trans_.find(txn_id);
             if (ent != active_trans_.end()) {
                 txn = ent->second;
             }
         }
-        active_trans_.erase(lsn);
+        active_trans_.erase(txn_id);
+        txn->lsn = lsn;
         txn->Commit();
-        logger->info("TxnManager::CommitTxn done for transaction {}", lsn);
+        logger->info("TxnManager::CommitTxn done for transaction {}", txn_id);
     }
 
 private:
     static TxnManager* instance_;
     std::mutex mutex_;
     std::map<int64_t, std::shared_ptr<Txn>> active_trans_;
-};
-
-class LsnGenerator {
-public:
-    static int64_t GetNextLsn()
-    {
-        return next_lsn_++;
-    }
-
-private:
-    static int64_t next_lsn_;
+    SeqGenerator txn_id_gen_;
 };
 
 class WalManager {
@@ -145,6 +156,7 @@ public:
         running_.store(false);
     }
 
+    // Session request to persist an entry. Assuming txn_id of the entry has been initialized.
     void WriteEntry(std::shared_ptr<WALEntry> entry)
     {
         if (running_.load()) {
@@ -163,6 +175,7 @@ public:
         logger->info("WalManager::Flush {} enter", seq);
         boost::system::error_code ec;
         int written = 0;
+        int64_t max_lsn = lsn_gen_.GetLast();
         if (!running_.load()) {
             goto QUIT;
         }
@@ -171,25 +184,35 @@ public:
         mutex_.unlock();
         while (!que2_.empty()) {
             std::shared_ptr<WALEntry> entry = que2_.front();
-            logger->info("WalManager::Flush {}  begin writing wal for transaction {}", seq, entry->lsn);
+            entry->lsn = lsn_gen_.Generate();
+            max_lsn = entry->lsn;
+            logger->info("WalManager::Flush {} begin writing wal for transaction {}", seq, entry->txn_id);
             boost::asio::write(stream_file_, boost::asio::buffer(entry.get(), entry->GetSize()), ec);
             if (ec.failed()) {
-                logger->error("WalManager::Flush {} failed to write wal for transaction {}, async_write error: {}", seq, entry->lsn, ec.to_string());
+                logger->error("WalManager::Flush {} failed to write wal for transaction {}, async_write error: {}", seq, entry->txn_id, ec.to_string());
             } else {
-                logger->info("WalManager::Flush {} done writing wal for transaction {}", seq, entry->lsn);
-                // schedule a commit
-                ioc_.post([entry] { TxnManager::GetInstance()->CommitTxn(entry->lsn); });
+                logger->info("WalManager::Flush {} done writing wal for transaction {}", seq, entry->txn_id);
             }
             que2_.pop();
+            que3_.push(entry);
             written++;
         }
         if (written > 0) {
             logger->info("WalManager::Flush {} begin syncing wal for {} transactions", seq, written);
             stream_file_.sync_all();
             logger->info("WalManager::Flush {} done syncing wal for {} transactions", seq, written);
-            if (written >= 10) {
-                // TODO: do checkpoint?
+            while (!que3_.empty()) {
+                std::shared_ptr<WALEntry> entry = que3_.front();
+                // Commit sequently so they get visible in the same order with wal.
+                TxnManager::GetInstance()->CommitTxn(entry->txn_id, entry->lsn);
+                que3_.pop();
             }
+            pending_checkpoint_ += written;
+        }
+        // Schedule checkpoint for every 10 transactions or 20s.
+        if (pending_checkpoint_ >= 10 || (checkpoint_ts_ > 0 && std::chrono::steady_clock::now().time_since_epoch().count() - checkpoint_ts_ >= 20000000000)) {
+            ioc_.post([this, max_lsn] { Checkpoint(max_lsn); });
+            pending_checkpoint_ = 0;
         }
     QUIT:
         // Need to ensure all above async tasks be done at this point. However it's false.
@@ -216,9 +239,19 @@ public:
         logger->info("WalManager::Flush {} quit", seq);
     }
 
-    void
-    Sync()
+    // Do checkpoint for transactions which's lsn no larger than the given one.
+    void Checkpoint(int64_t lsn)
     {
+        // Ensure that at most one instance of a particular async task is running at any given time.
+        if (!checkpoint_mutex_.try_lock()) {
+            return;
+        }
+        // Checkponit is heavy and infrequent operation.
+        logger->info("WalManager::Checkpoint enter for transactions' lsn <= {}", lsn);
+        std::this_thread::sleep_for(std::chrono::seconds(10));
+        logger->info("WalManager::Checkpoint quit", lsn);
+        checkpoint_ts_ = std::chrono::steady_clock::now().time_since_epoch().count();
+        checkpoint_mutex_.unlock();
     }
 
 private:
@@ -227,11 +260,14 @@ private:
     atomic<int> seq_;
     boost::asio::io_context& ioc_;
     mutex mutex_;
-    queue<std::shared_ptr<WALEntry>> que_, que2_;
+    queue<std::shared_ptr<WALEntry>> que_, que2_, que3_;
     boost::asio::stream_file stream_file_;
+    SeqGenerator lsn_gen_;
+    int pending_checkpoint_;
+    int64_t checkpoint_ts_;
+    mutex checkpoint_mutex_;
 };
 
-int64_t LsnGenerator::next_lsn_ = 0;
 TxnManager* TxnManager::instance_ = nullptr;
 std::shared_ptr<WalManager> wal_manager = nullptr;
 
@@ -267,14 +303,14 @@ public:
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             if (wal_manager != nullptr) {
                 auto txn = std::make_shared<Txn>();
-                txn->lsn = LsnGenerator::GetNextLsn();
-                txn->begin_ts = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+                txn->txn_id = TxnManager::GetInstance()->AllocTxnId();
+                txn->begin_ts = std::chrono::steady_clock::now().time_since_epoch().count();
                 txn->commit_ts = 0;
                 TxnManager::GetInstance()->AddActiveTxn(txn);
-                logger->info("session {} generated transaction {}", seq_, txn->lsn);
+                logger->info("session {} generated transaction {}", seq_, txn->txn_id);
                 auto ent = std::make_shared<WALInsertTuple>();
                 ent->type = WALType::INSERT_TUPLE;
-                ent->lsn = txn->lsn;
+                ent->txn_id = txn->txn_id;
                 wal_manager->WriteEntry(ent);
             }
         }
@@ -308,7 +344,10 @@ int main(int argc, char* argv[])
         std::unique_ptr<std::thread> th(
             new std::thread([&ioc]() {
                 while (!ioc.stopped()) {
+                    // Process asynchronous operations till all are completed.
                     ioc.run();
+                    // Sleep for a short duration to avoid busy waiting.
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
             }));
         m_threads.push_back(std::move(th));
@@ -321,7 +360,7 @@ int main(int argc, char* argv[])
         sess->Start();
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::this_thread::sleep_for(std::chrono::seconds(30));
 
     // Stop generating transactions. This allows the I/O threads to exit the event loop when there are no more pending asynchronous operations.
     for (std::size_t i = 0; i != sessions; ++i) {
