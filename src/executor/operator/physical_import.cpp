@@ -65,6 +65,7 @@ struct ParserContext {
     TableCollectionEntry* table_collection_entry_{};
     Txn* txn_{};
     SharedPtr<SegmentEntry> segment_entry_{};
+    char delimiter_{};
 };
 
 void
@@ -93,6 +94,7 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
         parser_context.txn_->TxnID(),
         TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
         parser_context.txn_->GetBufferMgr());
+    parser_context.delimiter_ = delimiter_;
 
     const String &table_name = *table_collection_entry_->table_collection_name_;
 
@@ -112,7 +114,9 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
     while((csv_parser_status = zsv_parse_more(parser_context.parser_)) == zsv_status_ok) {
         ;
     }
+    
 
+    zsv_finish(parser_context.parser_);
     // flush the last segment entry
     if (parser_context.segment_entry_->current_row_ > 0) {
         auto txn_store = parser_context.txn_->GetTxnTableStore(table_name);
@@ -122,9 +126,6 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
         txn_store->Import(parser_context.segment_entry_);
     }
 
-    
-
-    zsv_finish(parser_context.parser_);
     zsv_delete(parser_context.parser_);
 
     fclose(fp);
@@ -229,13 +230,15 @@ PhysicalImport::CSVRowHandler(void *context) {
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
         struct zsv_cell cell =
             zsv_get_cell(parser_context->parser_, column_idx);
-        if (cell.len > 0) {
-            ColumnDataEntry::Append(segment_entry->columns_[column_idx].get(),
-                                    String((char *)cell.str, cell.len),
-                                    write_row);
+        StringView data{};
+        if (cell.len) {
+            data = StringView((char *)cell.str, cell.len);   
+        }
+        auto column_data_entry = segment_entry->    columns_[column_idx];
+        if (segment_entry->columns_[column_idx]->column_type_->IsEmbedding()) {
+            ColumnDataEntry::AppendEmbedding(column_data_entry.get(), data, write_row, parser_context->delimiter_);
         } else {
-            ColumnDataEntry::Append(segment_entry->columns_[column_idx].get(),
-                                    "", write_row);
+            ColumnDataEntry::Append(column_data_entry.get(), data, write_row);
         }
     }
 
@@ -267,15 +270,15 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input
     parser_context.txn_->AddTxnTableStore(
             *table_collection_entry_->table_collection_name_,
             MakeUnique<TxnTableStore>(
-                *table_collection_entry_->table_collection_name_,
-                table_collection_entry_,
-                parser_context.txn_));
+                    *table_collection_entry_->table_collection_name_,
+                    table_collection_entry_,
+                    parser_context.txn_));
 
     parser_context.segment_entry_ = SegmentEntry::MakeNewSegmentEntry(
-        table_collection_entry_,
-        parser_context.txn_->TxnID(),
-        TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
-        parser_context.txn_->GetBufferMgr());
+            table_collection_entry_, parser_context.txn_->TxnID(),
+            TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
+            parser_context.txn_->GetBufferMgr());
+    parser_context.delimiter_ = delimiter_;
 
     const String &table_name = *table_collection_entry_->table_collection_name_;
 
@@ -296,6 +299,8 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input
         ;
     }
 
+    zsv_finish(parser_context.parser_);
+
     // flush the last segment entry
     if (parser_context.segment_entry_->current_row_ > 0) {
         auto txn_store = parser_context.txn_->GetTxnTableStore(table_name);
@@ -305,7 +310,6 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input
         txn_store->Import(parser_context.segment_entry_);
     }
 
-    zsv_finish(parser_context.parser_);
     zsv_delete(parser_context.parser_);
 
     fclose(fp);
@@ -327,8 +331,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input
 
     auto result_msg = MakeShared<String>(fmt::format("AFFECT {} Rows", parser_context.row_count_));
     output_state->result_msg_= std::move(result_msg);
-
-
+    table_collection_entry_->row_count_ += parser_context.row_count_;
 }
 /**
  * @brief copy statement import csv function

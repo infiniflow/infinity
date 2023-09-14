@@ -57,6 +57,7 @@ using RWMutex = std::shared_mutex;
 using ThreadPool = ctpl::thread_pool;
 
 using String = std::string;
+using StringView = std::string_view;
 
 using Byte = std::byte;
 

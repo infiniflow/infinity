@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "common/types/complex/embedding_type.h"
 #include "common/utility/infinity_assert.h"
 #include "logical_type.h"
 #include "type_info.h"
@@ -147,7 +148,7 @@ public:
     }
 
     inline bool
-    IsEmbedding(){
+    IsEmbedding() const {
         return type_ == kEmbedding;
     }
 
@@ -173,7 +174,7 @@ public:
 
     template<typename T>
     static T
-    StringToType(const String& str);
+    StringToValue(const StringView& str);
 
     void
     MaxDataType(const DataType& right);
@@ -181,10 +182,38 @@ public:
     // if type is variable length type
     // use template specialization to solve that
     template<typename T>
-    static void
-    WriteData(ptr_t ptr, const String& data) {
-        T value = StringToType<T>(data);
+    static void WriteData(ptr_t ptr, const StringView& data) {
+        T value = StringToValue<T>(data);
         memcpy(ptr, &value, sizeof(T));
+    }
+
+
+    static void SplitEmbeddingData(const StringView& data, char delimiter, Vector<StringView> &res) {
+        SizeT data_size = data.size();
+        if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
+            TypeAssert(false, "Embedding data must be surrounded by [ and ]");
+        }
+        SizeT i = 1, j = 1;
+        while (true) {
+            if (data[i] == delimiter || i == data_size - 1) {
+                res.emplace_back(data.begin() + j, data.begin() + i);
+            }
+            if (i == data_size - 1) {
+                break;
+            }
+            j = i++;
+        }
+    }
+
+    template<typename EBD_T>
+    static void WriteEmbedding(ptr_t ptr, const StringView& data, SizeT dimension, char delimiter) {
+        Vector<StringView> ele_datas;
+        SplitEmbeddingData(data, delimiter, ele_datas);
+        TypeAssert(ele_datas.size() <= dimension, "Embbeding data size exceeds dimension");
+        for (SizeT idx = 0; auto &ele_data : ele_datas) {
+            DataType::WriteData<EBD_T>(ptr + idx * sizeof(EBD_T), ele_data);
+            idx++;
+        }
     }
 };
 
@@ -196,7 +225,7 @@ DataType::TypeToString() {
 
 template<typename T>
 T
-DataType::StringToType(const String& str) {
+DataType::StringToValue(const StringView& str) {
     TypeError("Unexpected data type.");
 }
 
@@ -230,14 +259,11 @@ template <> String DataType::TypeToString<BlobT>();
 template <> String DataType::TypeToString<EmbeddingT>();
 template <> String DataType::TypeToString<MixedT>();
 
-
-template <> BooleanT DataType::StringToType<BooleanT>(const String& str);
-template <> TinyIntT DataType::StringToType<TinyIntT>(const String& str);
-template <> SmallIntT DataType::StringToType<SmallIntT>(const String& str);
-template <> IntegerT DataType::StringToType<IntegerT>(const String& str);
-template <> BigIntT DataType::StringToType<BigIntT>(const String& str);
-template <> FloatT DataType::StringToType<FloatT>(const String& str);
-template <> DoubleT DataType::StringToType<DoubleT>(const String& str);
-
-
+template <> BooleanT DataType::StringToValue<BooleanT>(const StringView& str);
+template <> TinyIntT DataType::StringToValue<TinyIntT>(const StringView& str);
+template <> SmallIntT DataType::StringToValue<SmallIntT>(const StringView& str);
+template <> IntegerT DataType::StringToValue<IntegerT>(const StringView& str);
+template <> BigIntT DataType::StringToValue<BigIntT>(const StringView& str);
+template <> FloatT DataType::StringToValue<FloatT>(const StringView& str);
+template <> DoubleT DataType::StringToValue<DoubleT>(const StringView& str);
 }

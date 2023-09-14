@@ -47,9 +47,10 @@ public:
            SizeT rows);
     
     static void
-    Append(ColumnDataEntry* column_data_entry,
-           const String& data,
-           SizeT offset);
+    Append(ColumnDataEntry* column_data_entry, const StringView& data, SizeT offset);
+
+    static void
+    AppendEmbedding(ColumnDataEntry* column_data_entry, const StringView& data, SizeT offset, char delimiter);
 
     static void
     Flush(ColumnDataEntry* column_data_entry,

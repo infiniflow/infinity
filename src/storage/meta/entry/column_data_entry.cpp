@@ -3,6 +3,7 @@
 //
 
 #include "column_data_entry.h"
+#include "common/types/complex/embedding_type.h"
 #include "common/types/data_type.h"
 #include "common/types/internal_types.h"
 #include "common/types/logical_type.h"
@@ -54,37 +55,74 @@ ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, BufferManager
  * @param offset offset of column data
  */
 void
-ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
-                        const String& data,
-                        SizeT offset) {
+ColumnDataEntry::Append(ColumnDataEntry* column_data_entry, const StringView& data, SizeT offset) {
     if (column_data_entry->buffer_handle_ == nullptr) {
         StorageError("Not initialize buffer handle");
     }
     ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
     auto type_size = column_data_entry->column_type_->Size();
+    ptr += offset * type_size;
     switch (column_data_entry->column_type_->type()) {
         case kBoolean:
-            DataType::WriteData<BooleanT>(ptr + offset * type_size, data);
+            DataType::WriteData<BooleanT>(ptr, data);
             break;
         case kTinyInt:
-            DataType::WriteData<TinyIntT>(ptr + offset * type_size, data);
+            DataType::WriteData<TinyIntT>(ptr, data);
             break;
         case kSmallInt:
-            DataType::WriteData<SmallIntT>(ptr + offset * type_size, data);
+            DataType::WriteData<SmallIntT>(ptr, data);
             break;
         case kInteger:
-            DataType::WriteData<IntegerT>(ptr + offset * type_size, data);
+            DataType::WriteData<IntegerT>(ptr, data);
             break;
         case kBigInt:
-            DataType::WriteData<BigIntT>(ptr + offset * type_size, data);
+            DataType::WriteData<BigIntT>(ptr, data);
             break;
         case kFloat:
-            DataType::WriteData<FloatT>(ptr + offset * type_size, data);
+            DataType::WriteData<FloatT>(ptr, data);
             break;
         case kDouble: 
-            DataType::WriteData<DoubleT>(ptr + offset * type_size, data);
+            DataType::WriteData<DoubleT>(ptr, data);
             break;
         default:
+            NotImplementError("not support data type");
+    }
+}
+
+void ColumnDataEntry::AppendEmbedding(ColumnDataEntry *column_data_entry, const StringView &data, SizeT offset, char delimiter) {
+    if (column_data_entry->buffer_handle_ == nullptr) {
+        StorageError("Not initialize buffer handle");
+    }
+    ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
+    auto type_size = column_data_entry->column_type_->Size();
+    ptr += offset * type_size;
+
+    auto type_info = column_data_entry->column_type_->type_info().get();
+    auto embedding_info = dynamic_cast<EmbeddingInfo *>(type_info);
+    auto dimension = embedding_info->Dimension();
+    switch (embedding_info->Type()) {
+        case kElemBit:
+            DataType::WriteEmbedding<BooleanT>(ptr, data, dimension, delimiter);
+            break;
+        case kElemInt8:
+            DataType::WriteEmbedding<TinyIntT>(ptr, data, dimension, delimiter);
+            break;
+        case kElemInt16:
+            DataType::WriteEmbedding<SmallIntT>(ptr, data, dimension, delimiter);
+            break;
+        case kElemInt32:
+            DataType::WriteEmbedding<IntegerT>(ptr, data, dimension, delimiter);
+            break;
+        case kElemInt64:
+            DataType::WriteEmbedding<BigIntT>(ptr, data, dimension, delimiter);
+            break;
+        case kElemFloat:
+            DataType::WriteEmbedding<FloatT>(ptr, data, dimension, delimiter);
+            break;
+        case kElemDouble:
+            DataType::WriteEmbedding<DoubleT>(ptr, data, dimension, delimiter);
+            break;
+        case kElemInvalid:
             NotImplementError("not support data type");
     }
 }
