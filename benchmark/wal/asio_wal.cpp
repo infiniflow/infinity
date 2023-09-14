@@ -41,36 +41,42 @@ enum class WALType : uint8_t {
 };
 
 struct WALEntry {
-    int64_t lsn; // lsn is the sequence number of an entry inside WAL. It's always strictly increasing.
-    int32_t crc;
+    int64_t lsn; // each entry's lsn(Log Sequence Number) is strictly increasing by one.
+    int32_t size; // size of payload, excluding the header, round to multi of 4. There's 4 bytes pad just after the payload storing the same value to assist backward iterating.
     WALType type;
-    int8_t pad;
-    int16_t size;
-    int64_t txn_id;
-    virtual int64_t GetSize() = 0;
+    int32_t crc : 24; // crc24 of the entry, including the header and the payload.
+    union {
+        int64_t txn_id;
+        int64_t max_lsn;
+    };
+    virtual int32_t GetSize() = 0; // size of the entry, excluding the 4 bytes pad.
 };
 
 struct WALInsertTuple : WALEntry {
     int16_t columnId;
     int64_t row_start;
-    int64_t size;
+    int64_t len;
     char data[];
-    virtual int64_t GetSize() { return sizeof(WALInsertTuple) + size; }
+    virtual int32_t GetSize() { return sizeof(WALInsertTuple) + size; }
 };
 
 struct WALDeleteTuple : WALEntry {
     int16_t columnId;
     int64_t row_start;
     int64_t count;
-    virtual int64_t GetSize() { return sizeof(WALDeleteTuple); }
+    virtual int32_t GetSize() { return sizeof(WALDeleteTuple); }
 };
 
 struct WALUpdateTuple : WALEntry {
     int16_t columnId;
     int64_t row_start;
-    int64_t size;
+    int64_t len;
     char data[];
-    virtual int64_t GetSize() { return sizeof(WALUpdateTuple) + size; }
+    virtual int32_t GetSize() { return sizeof(WALUpdateTuple) + size; }
+};
+
+struct CheckpointEntry : WALEntry {
+    virtual int32_t GetSize() { return sizeof(CheckpointEntry); }
 };
 
 class Txn {
@@ -175,6 +181,7 @@ public:
         logger->info("WalManager::Flush {} enter", seq);
         boost::system::error_code ec;
         int written = 0;
+        int32_t size_pad = 0;
         int64_t max_lsn = lsn_gen_.GetLast();
         if (!running_.load()) {
             goto QUIT;
@@ -184,10 +191,12 @@ public:
         mutex_.unlock();
         while (!que2_.empty()) {
             std::shared_ptr<WALEntry> entry = que2_.front();
+            size_pad = entry->GetSize();
             entry->lsn = lsn_gen_.Generate();
             max_lsn = entry->lsn;
             logger->info("WalManager::Flush {} begin writing wal for transaction {}", seq, entry->txn_id);
             boost::asio::write(stream_file_, boost::asio::buffer(entry.get(), entry->GetSize()), ec);
+            boost::asio::write(stream_file_, boost::asio::buffer(&size_pad, 4), ec);
             if (ec.failed()) {
                 logger->error("WalManager::Flush {} failed to write wal for transaction {}, async_write error: {}", seq, entry->txn_id, ec.to_string());
             } else {
@@ -209,7 +218,7 @@ public:
             }
             pending_checkpoint_ += written;
         }
-        // Schedule checkpoint for every 10 transactions or 20s.
+        // Fuzzy checkpoint for every 10 transactions or 20s.
         if (pending_checkpoint_ >= 10 || (checkpoint_ts_ > 0 && std::chrono::steady_clock::now().time_since_epoch().count() - checkpoint_ts_ >= 20000000000)) {
             ioc_.post([this, max_lsn] { Checkpoint(max_lsn); });
             pending_checkpoint_ = 0;
