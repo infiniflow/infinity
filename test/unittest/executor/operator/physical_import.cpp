@@ -3,6 +3,7 @@
 
 #include "executor/operator/physical_import.h"
 #include "base_test.h"
+#include "bin/compilation_config.h"
 #include "common/types/data_type.h"
 #include "common/types/internal_types.h"
 #include "function/table/table_scan.h"
@@ -69,57 +70,55 @@ void check_column(const std::vector<T> &expect, const std::string &file_path) {
 TEST_F(PhysicalImportTest, test1) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    auto catalog = MakeUnique<NewCatalog>(MakeShared<String>("/tmp/infinity"));
-    RegisterTableScanFunction(catalog);
-    
+
     Config config;
-    config.Init(nullptr);
+    config.Init(nullptr); // default configuration
 
     Storage storage(&config);
     storage.Init();
 
-    // create dummy query_context
-    auto session_ptr = MakeUnique<Session>();
+    String catalog_dir = *config.data_dir() + "/catalog";
+    auto catalog = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir));
 
-    auto buffer_mgr = storage.buffer_manager();
+    auto session_ptr = MakeUnique<Session>();
     auto txn_mgr = storage.txn_manager();
     auto txn = MakeUnique<Txn>(txn_mgr, catalog.get(), 0);
     session_ptr->txn_ = txn.get();
 
-    UniquePtr<ResourceManager> resource_manager = MakeUnique<ResourceManager>(config.total_cpu_number(), config.total_memory_size());
-
+    auto resource_manager = MakeUnique<ResourceManager>(
+        config.total_cpu_number(), config.total_memory_size());
     auto query_context = MakeUnique<QueryContext>();
-    query_context->Init(session_ptr.get(), &config, nullptr, &storage, resource_manager.get());
+    query_context->Init(session_ptr.get(), &config,
+     nullptr, &storage, resource_manager.get());
+
+
+    Vector<SharedPtr<ColumnDef>> columns;
+    {
+        auto col_type = MakeShared<DataType>(LogicalType::kBoolean);
+        String col_name = "col1";
+        auto col_def = MakeShared<ColumnDef>(0, col_type, col_name, HashSet<ConstraintType>());
+        columns.emplace_back(col_def);
+
+        SizeT dimension = 2;
+        auto type_info = MakeShared<EmbeddingInfo>(kElemInt32, dimension);
+        col_type = MakeShared<DataType>(LogicalType::kEmbedding, type_info);
+        col_name = "col2";
+        col_def = MakeShared<ColumnDef>(1, col_type, col_name, HashSet<ConstraintType>());
+        columns.emplace_back(col_def);
+    }
 
     auto base_dir = MakeShared<String>("./table1");
     auto table_collection_name = MakeShared<String>("table1");
-
-    Vector<SharedPtr<ColumnDef>> columns;
-    Vector<SharedPtr<DataType>> column_types;
-    auto col_type = MakeShared<DataType>(LogicalType::kBoolean);
-    column_types.emplace_back(col_type);
-    String col_name = "col1";
-    auto col_def = MakeShared<ColumnDef>(0, col_type, col_name, HashSet<ConstraintType>());
-    columns.emplace_back(col_def);
-
-    SizeT dimension = 2;
-    auto type_info = MakeShared<EmbeddingInfo>(kElemInt32, dimension);
-    col_type = MakeShared<DataType>(LogicalType::kEmbedding, type_info);
-    column_types.emplace_back(col_type);
-    col_name = "col2";
-    col_def = MakeShared<ColumnDef>(1, col_type, col_name, HashSet<ConstraintType>());
-    columns.emplace_back(col_def);
-
     auto table_collection_meta = MakeUnique<TableCollectionMeta>(base_dir, table_collection_name, nullptr);
-
     auto table_collection_entry = MakeUnique<TableCollectionEntry>(
         base_dir, table_collection_name, columns, TableCollectionType::kTableEntry, table_collection_meta.get(), 0, 0);
+
+    String file_path = String(TEST_DATA_PATH) + "/csv/embedding1.csv";
     auto physical_import = MakeUnique<PhysicalImport>(
-        0, table_collection_entry.get(), "./test/data/csv/embedding1.csv", false, ',', CopyFileType::kCSV);
+        0, table_collection_entry.get(), file_path, false, ',', CopyFileType::kCSV);
     
     physical_import->ImportCSV(query_context.get());
     
-    size_t row_num = 2;
     std::string col1_path = "/tmp/infinity/data/table1/0/0.col";
     std::string col2_path = "/tmp/infinity/data/table1/0/1.col";
     std::vector<bool> expect_col1{true, false, true};

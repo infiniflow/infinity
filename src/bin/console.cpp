@@ -126,7 +126,7 @@ Console::Explain(const String& arguments) {
 
     // Parse sql
     parser->Parse(query, parsed_result);
-    if(!parsed_result->IsError()) {
+    if(parsed_result->IsError()) {
         ParserError(parsed_result->error_message_)
     }
 
@@ -207,7 +207,7 @@ Console::Visualize(const String& arguments) {
 
     // Parse sql
     parser->Parse(query, parsed_result);
-    if(!parsed_result->IsError()) {
+    if(parsed_result->IsError()) {
         ParserError(parsed_result->error_message_)
     }
 
@@ -271,7 +271,7 @@ Console::ExecuteSQL(const String& sql_text) {
 
     // Parse sql
     parser->Parse(sql_text, parsed_result);
-    if(!parsed_result->IsError()) {
+    if(parsed_result->IsError()) {
         ParserError(parsed_result->error_message_)
     }
 
