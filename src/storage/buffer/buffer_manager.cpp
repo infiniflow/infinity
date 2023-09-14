@@ -91,7 +91,13 @@ BufferManager::GetBufferHandle(const SharedPtr<String>& file_dir,
     }
     return nullptr;
 }
-
+/**
+ *
+ * @param file_dir  current dir i.e. table/segment
+ * @param filename
+ * @param buffer_size
+ * @return
+ */
 BufferHandle*
 BufferManager::AllocateBufferHandle(const SharedPtr<String>& file_dir,
                                     const SharedPtr<String>& filename,
@@ -108,7 +114,7 @@ BufferManager::AllocateBufferHandle(const SharedPtr<String>& file_dir,
     iter.first->second.id_ = next_buffer_id_ ++;
     iter.first->second.base_dir_ = this->base_dir_;
     iter.first->second.temp_dir_ = this->temp_dir_;
-    iter.first->second.current_dir_ = file_dir;
+    iter.first->second.current_dir_ = file_dir;// TODO: need to set the current dir table /segment
     iter.first->second.file_name_ = filename;
     iter.first->second.buffer_type_ = BufferType::kTempFile;
     iter.first->second.status_ = BufferStatus::kFreed;

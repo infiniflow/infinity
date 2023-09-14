@@ -48,7 +48,7 @@ BufferHandle::LoadData() {
                     if(current_dir_ == nullptr or current_dir_->empty()) {
                         file_path = *base_dir_ + '/' + *file_name_;
                     } else {
-                        file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                        file_path = *current_dir_ + '/' + *file_name_;
                     }
 
                     LOG_TRACE("Read data from spilled file from: {}", file_path);
@@ -86,7 +86,7 @@ BufferHandle::LoadData() {
                         if(current_dir_ == nullptr or current_dir_->empty()) {
                             file_path = *base_dir_ + '/' + *file_name_;
                         } else {
-                            file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                            file_path = *current_dir_ + '/' + *file_name_;
                         }
 
                         LOG_TRACE("Allocate buffer with name: {} and size {}", file_path, buffer_size_);
@@ -103,7 +103,7 @@ BufferHandle::LoadData() {
                             if(current_dir_ == nullptr or current_dir_->empty()) {
                                 file_path = *base_dir_ + '/' + *file_name_;
                             } else {
-                                file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                                file_path = *current_dir_ + '/' + *file_name_;
                             }
 
                             file_handler_ = fs.OpenFile(file_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
@@ -183,7 +183,7 @@ BufferHandle::LoadData() {
                         if(current_dir_ == nullptr or current_dir_->empty()) {
                             file_path = *base_dir_ + '/' + *file_name_;
                         } else {
-                            file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                            file_path = *current_dir_ + '/' + *file_name_;
                         }
 
                         LOG_TRACE("Read extra block: {}", file_path);
@@ -236,7 +236,7 @@ BufferHandle::FreeData() {
             if(current_dir_ == nullptr or current_dir_->empty()) {
                 file_path = *base_dir_ + '/' + *file_name_;
             } else {
-                file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                file_path = *current_dir_ + '/' + *file_name_;
             }
 
             LOG_TRACE("Spill current buffer into {}", file_path);
@@ -272,7 +272,7 @@ BufferHandle::SetSealing() {
                 if(current_dir_ == nullptr or current_dir_->empty()) {
                     file_path = *base_dir_ + '/' + *file_name_;
                 } else {
-                    file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+                    file_path = *current_dir_ + '/' + *file_name_;
                 }
 
                 LOG_TRACE("Read data from spilled file from: {}", file_path);
@@ -353,7 +353,7 @@ BufferHandle::ReadFile() {
     if(current_dir_ == nullptr or current_dir_->empty()) {
         file_path = *base_dir_ + '/' + *file_name_;
     } else {
-        file_path = *base_dir_ + '/' + *current_dir_ + '/' + *file_name_;
+        file_path = *current_dir_ + '/' + *file_name_;
     }
 
     file_handler_ = fs.OpenFile(file_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
@@ -430,7 +430,7 @@ BufferHandle::WriteFile(SizeT buffer_length) {
         to_write_path = *base_dir_;
 
     } else {
-        to_write_path = *base_dir_ + '/' + *current_dir_;
+        to_write_path = *current_dir_;
     }
     String to_write_file = to_write_path + '/' + *file_name_;
 
