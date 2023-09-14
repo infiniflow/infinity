@@ -107,7 +107,7 @@ TEST_F(PhysicalImportTest, test1) {
         columns.emplace_back(col_def);
     }
 
-    auto base_dir = MakeShared<String>("./table1");
+    auto base_dir = MakeShared<String>(catalog_dir + "/table1");
     auto table_collection_name = MakeShared<String>("table1");
     auto table_collection_meta = MakeUnique<TableCollectionMeta>(base_dir, table_collection_name, nullptr);
     auto table_collection_entry = MakeUnique<TableCollectionEntry>(
@@ -119,8 +119,8 @@ TEST_F(PhysicalImportTest, test1) {
     
     physical_import->ImportCSV(query_context.get());
     
-    std::string col1_path = "/tmp/infinity/data/table1/0/0.col";
-    std::string col2_path = "/tmp/infinity/data/table1/0/1.col";
+    std::string col1_path = *base_dir + "/0/0.col";
+    std::string col2_path = *base_dir + "/0/1.col";
     std::vector<bool> expect_col1{true, false, true};
     std::vector<std::array<int, 2>> expect_col2{{2, 3}, {5, 6}, {8, 9}};
     check_column(expect_col1, col1_path);
