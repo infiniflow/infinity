@@ -5,6 +5,7 @@
 
 #include "executor/physical_operator_type.h"
 #include "common/types/internal_types.h"
+#include "common/utility/exception.h"
 
 
 namespace infinity{
@@ -85,5 +86,6 @@ PhysicalOperatorToString(PhysicalOperatorType type){
         case PhysicalOperatorType::kExchange:
             return "Exchange";
     }
+    throw NotImplementException("Unknown physical operator type");
 }
 }

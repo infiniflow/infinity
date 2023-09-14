@@ -570,10 +570,10 @@ LogicalPlanner::BuildImport(const CopyStatement* statement, SharedPtr<BindContex
     // Check the table existence
     Txn* txn = query_context_ptr_->GetTxn();
     EntryResult result = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if(result.err_ != nullptr) {
+    if(result.entry_ == nullptr) {
         PlannerError(*result.err_);
     }
-    TableCollectionEntry* table_collection_entry = static_cast<TableCollectionEntry*>(result.entry_);
+   auto table_collection_entry = dynamic_cast<TableCollectionEntry*>(result.entry_);
 
     // Check the file existence
     LocalFileSystem fs;
