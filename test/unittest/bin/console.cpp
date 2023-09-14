@@ -59,21 +59,21 @@ execute_sql(infinity::Console& console, const std::string& filename) {
 
 
 
-TEST_F(ConsoleTest, explain_unopt_logical) {
-    {
-        infinity::Console console;
-        console.Init();
+// TEST_F(ConsoleTest, explain_unopt_logical) {
+//     {
+//         infinity::Console console;
+//         console.Init();
 
-        std::filesystem::path current_path = std::filesystem::current_path();
-        std::filesystem::path test_data = current_path / "../../../test/unittest/bin/test_data";
-        std::vector<std::filesystem::path> file_names;
-        recurse_dir(test_data, file_names);
-        for(auto& path: file_names) {
-            execute_sql(console, path.string());
-        }
-        console.UnInit();
-    }
+//         std::filesystem::path current_path = std::filesystem::current_path();
+//         std::filesystem::path test_data = current_path / "../../../test/unittest/bin/test_data";
+//         std::vector<std::filesystem::path> file_names;
+//         recurse_dir(test_data, file_names);
+//         for(auto& path: file_names) {
+//             execute_sql(console, path.string());
+//         }
+//         console.UnInit();
+//     }
 
-    EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-    EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-}
+//     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+//     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+// }

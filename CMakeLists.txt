@@ -4,14 +4,14 @@ project(infinity VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 23)
 
-#add ccache
-find_program(CCACHE_FOUND ccache)
-if(CCACHE_FOUND)
-    message(STATUS "Find ccache!")
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
-else()
-    message(STATUS "Could not find ccache!")
-endif(CCACHE_FOUND)
+# #add ccache
+# find_program(CCACHE_FOUND ccache)
+# if(CCACHE_FOUND)
+#     message(STATUS "Find ccache!")
+#     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+# else()
+#     message(STATUS "Could not find ccache!")
+# endif(CCACHE_FOUND)
 
 # Print CMake version and project name
 message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION}")

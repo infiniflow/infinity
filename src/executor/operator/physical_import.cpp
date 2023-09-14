@@ -71,6 +71,7 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
         table_collection_entry_, parser_context.txn_->TxnID(),
         TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
         parser_context.txn_->GetBufferMgr());
+    parser_context.delimiter_ = delimiter_;
 
     const String &table_name = *table_collection_entry_->table_collection_name_;
 
@@ -90,7 +91,9 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
     while((csv_parser_status = zsv_parse_more(parser_context.parser_)) == zsv_status_ok) {
         ;
     }
+    
 
+    zsv_finish(parser_context.parser_);
     // flush the last segment entry
     if (parser_context.segment_entry_->current_row_ > 0) {
         auto txn_store = parser_context.txn_->GetTxnTableStore(table_name);
@@ -100,9 +103,6 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
         txn_store->Import(parser_context.segment_entry_);
     }
 
-    
-
-    zsv_finish(parser_context.parser_);
     zsv_delete(parser_context.parser_);
 
     fclose(fp);
@@ -211,7 +211,7 @@ PhysicalImport::CSVRowHandler(void *context) {
         if (cell.len) {
             data = StringView((char *)cell.str, cell.len);   
         }
-        auto column_data_entry = segment_entry->columns_[column_idx];
+        auto column_data_entry = segment_entry->    columns_[column_idx];
         if (segment_entry->columns_[column_idx]->column_type_->IsEmbedding()) {
             ColumnDataEntry::AppendEmbedding(column_data_entry.get(), data, write_row, parser_context->delimiter_);
         } else {
@@ -255,6 +255,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input
             table_collection_entry_, parser_context.txn_->TxnID(),
             TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
             parser_context.txn_->GetBufferMgr());
+    parser_context.delimiter_ = delimiter_;
 
     const String &table_name = *table_collection_entry_->table_collection_name_;
 
@@ -270,11 +271,12 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input
     opts.buffsize = (1<<20); // default buffer size 256k, we use 1M
 
     parser_context.parser_ = zsv_new(&opts);
-    parser_context.delimiter_ = delimiter_;
     enum zsv_status csv_parser_status;
     while((csv_parser_status = zsv_parse_more(parser_context.parser_)) == zsv_status_ok) {
         ;
     }
+
+    zsv_finish(parser_context.parser_);
 
     // flush the last segment entry
     if (parser_context.segment_entry_->current_row_ > 0) {
@@ -285,7 +287,6 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input
         txn_store->Import(parser_context.segment_entry_);
     }
 
-    zsv_finish(parser_context.parser_);
     zsv_delete(parser_context.parser_);
 
     fclose(fp);
