@@ -23,11 +23,10 @@
 class TableScanTest : public BaseTest {
     void
     SetUp() override {
+        system("rm -rf /tmp/infinity");
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
-
-        system("rm -rf /tmp/infinity");
     }
 
     void
@@ -36,6 +35,7 @@ class TableScanTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+        system("rm -rf /tmp/infinity");
     }
 };
 
@@ -73,6 +73,7 @@ TEST_F(TableScanTest, block_read_test) {
     segment_entry1->segment_id_ = 1;
     segment_entry1->row_capacity_ = 1000;
     segment_entry1->current_row_ = 1000;
+    segment_entry1->base_dir_= MakeShared<String>("segment1/tx1");
     segment_entry1->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry1.get(), 0, 1000,
      MakeShared<DataType>(LogicalType::kInteger),storage.buffer_manager()));
 
@@ -80,6 +81,7 @@ TEST_F(TableScanTest, block_read_test) {
     segment_entry2->segment_id_ = 10;
     segment_entry2->row_capacity_ = 10000;
     segment_entry2->current_row_ = 8000;
+    segment_entry2->base_dir_= MakeShared<String>("segment2/tx1");
     segment_entry2->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry2.get(), 0, 8000,
      MakeShared<DataType>(LogicalType::kInteger),storage.buffer_manager()));
 
@@ -87,6 +89,7 @@ TEST_F(TableScanTest, block_read_test) {
     segment_entry3->segment_id_ = 30;
     segment_entry3->row_capacity_ = 10000;
     segment_entry3->current_row_ = 8000;
+    segment_entry3->base_dir_= MakeShared<String>("segment3/tx1");
     segment_entry3->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry3.get(), 0, 8000,
      MakeShared<DataType>(LogicalType::kInteger),storage.buffer_manager()));
 
@@ -94,6 +97,7 @@ TEST_F(TableScanTest, block_read_test) {
     segment_entry4->segment_id_ = 20;
     segment_entry4->row_capacity_ = 1000;
     segment_entry4->current_row_ = 408;
+    segment_entry4->base_dir_= MakeShared<String>("segment4/tx1");
     segment_entry4->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry4.get(), 0, 1000,
      MakeShared<DataType>(LogicalType::kInteger),storage.buffer_manager()));
 

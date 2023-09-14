@@ -38,7 +38,11 @@ NewCatalog::CreateDatabase(NewCatalog* catalog,
     if(db_meta == nullptr) {
         // Create new db meta
         LOG_TRACE("Create new database: {}", db_name);
-        UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(catalog->current_dir_,
+        // db current dir is same level as catalog
+        std::filesystem::path catalog_path(*catalog->current_dir_);
+        std::filesystem::path parent_path = catalog_path.parent_path();
+        auto db_dir = MakeShared<String>(parent_path.string());
+        UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(db_dir,
                                                            MakeShared<String>(db_name));
         db_meta = new_db_meta.get();
 
@@ -96,8 +100,10 @@ NewCatalog::GetDatabase(NewCatalog* catalog,
         db_meta = catalog->databases_[db_name].get();
     }
     catalog->rw_locker_.unlock_shared();
-
-//    LOG_TRACE("Get a database entry {}", db_name);
+    if (db_meta==nullptr) {
+        LOG_ERROR("Attempt to get not existed database {}", db_name);
+        return {nullptr, MakeUnique<String>("Attempt to get not existed database")};
+    }
     return DBMeta::GetEntry(db_meta, txn_id, begin_ts);
 }
 

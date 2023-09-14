@@ -23,8 +23,26 @@ PhysicalImport::Init() {
 
 }
 
+
+/**
+ * @brief copy statement execute function
+ * @param query_context
+ * @param input_state
+ * @param output_state
+ */
 void
 PhysicalImport::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+
+    auto import_input_state = (DMLInputState*)(input_state);
+    auto import_output_state = (DMLOutputState*)(output_state);
+    switch(file_type_) {
+        case CopyFileType::kCSV: {
+            return ImportCSV(query_context, import_input_state, import_output_state);
+        }
+        case CopyFileType::kJSON: {
+            return ImportJSON(query_context);
+        }
+    }
 
 }
 
@@ -61,14 +79,19 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
     struct ParserContext parser_context{};
     // TODO: redesign parser_context
     parser_context.table_collection_entry_ = table_collection_entry_;
+
     parser_context.txn_ = query_context->GetTxn();
-    parser_context.txn_->AddTxnTableStore(
-        *table_collection_entry_->table_collection_name_,
-        MakeUnique<TxnTableStore>(
-            *table_collection_entry_->table_collection_name_,
-            table_collection_entry_, parser_context.txn_));
+
+    parser_context.txn_->AddTxnTableStore(*table_collection_entry_->table_collection_name_,
+                                          MakeUnique<TxnTableStore>(
+                                                  *table_collection_entry_->table_collection_name_,
+                                                                    table_collection_entry_,
+                                                                    parser_context.txn_));
+
+
     parser_context.segment_entry_ = SegmentEntry::MakeNewSegmentEntry(
-        table_collection_entry_, parser_context.txn_->TxnID(),
+        table_collection_entry_,
+        parser_context.txn_->TxnID(),
         TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
         parser_context.txn_->GetBufferMgr());
     parser_context.delimiter_ = delimiter_;

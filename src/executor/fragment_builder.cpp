@@ -82,6 +82,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
             case PhysicalOperatorType::kDropView:
             case PhysicalOperatorType::kPreparedPlan:
             case PhysicalOperatorType::kShow:
+            case PhysicalOperatorType::kImport:
             case PhysicalOperatorType::kFlush: {
                 current_fragment_ptr->AddOperator(phys_op);
                 LOG_INFO("Fragment Builder: {}", phys_op->GetName());

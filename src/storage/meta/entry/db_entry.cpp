@@ -105,6 +105,9 @@ DBEntry::GetTableCollection(DBEntry* db_entry,
     db_entry->rw_locker_.unlock_shared();
 
 //    LOG_TRACE("Get a table entry {}", table_name);
+    if(table_meta == nullptr) {
+        return {nullptr, MakeUnique<String>("Attempt to get not existed table/collection entry")};
+    }
     return TableCollectionMeta::GetEntry(table_meta, txn_id, begin_ts);
 }
 
