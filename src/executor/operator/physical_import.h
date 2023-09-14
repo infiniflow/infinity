@@ -5,9 +5,19 @@
 #pragma once
 
 #include "executor/physical_operator.h"
+#include "third_party/zsv/include/zsv/common.h"
 
 namespace infinity {
 
+struct ParserContext {
+    zsv_parser parser_{};
+    size_t row_count_{};
+    SharedPtr<String> err_msg_{};
+    TableCollectionEntry* table_collection_entry_{};
+    Txn* txn_{};
+    SharedPtr<SegmentEntry> segment_entry_{};
+    char delimiter_{};
+};
 
 class PhysicalImport : public PhysicalOperator {
 public:
@@ -53,6 +63,9 @@ public:
     /// for push based execution
     void
     ImportCSV(QueryContext* query_context, DMLInputState* input_state, DMLOutputState* output_state);
+
+    void
+    ImportCSVHelper(QueryContext* query_context, ParserContext &parser_context);
 
     void
     ImportJSON(QueryContext* query_context);
