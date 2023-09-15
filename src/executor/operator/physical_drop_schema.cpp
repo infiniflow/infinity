@@ -16,8 +16,8 @@ PhysicalDropSchema::Execute(QueryContext* query_context, InputState* input_state
 
       auto txn = query_context->GetTxn();
       auto res = txn->DropDatabase(*schema_name_, conflict_type_);
-      auto ddl_output_state =(DDLOutputState*)(output_state);
-      ddl_output_state->error_message_=std::move(res.err_);
+      auto drop_database_output_state =(DropDatabaseOutputState*)(output_state);
+      drop_database_output_state->error_message_=std::move(res.err_);
 
       // Generate the result
       auto column_defs = {

@@ -62,7 +62,9 @@ public:
 
     /// for push based execution
     void
-    ImportCSV(QueryContext* query_context, DMLInputState* input_state, DMLOutputState* output_state);
+    ImportCSV(QueryContext *query_context,
+              ImportInputState *input_state,
+              ImportOutputState *output_state);
 
     void
     ImportCSVHelper(QueryContext* query_context, ParserContext &parser_context);
@@ -72,7 +74,9 @@ public:
 
     /// for push based execution
     void
-    ImportJSON(QueryContext* query_context, DMLInputState* input_state, DMLOutputState* output_state);
+    ImportJSON(QueryContext *query_context,
+               ImportInputState *input_state,
+               ImportOutputState *output_state);
 
     inline const TableCollectionEntry*
     table_collection_entry() const {

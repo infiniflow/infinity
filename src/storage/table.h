@@ -38,6 +38,13 @@ public:
         return Make(result_table_def_ptr, TableType::kResult);
     }
 
+    static inline SharedPtr<Table>
+    MakeEmptyResultTable() {
+        SharedPtr<TableDef> result_table_def_ptr
+                = MakeShared<TableDef>(nullptr, nullptr, Vector<SharedPtr<ColumnDef>>());
+        return Make(result_table_def_ptr, TableType::kResult);
+    }
+
 public:
     explicit
     Table(SharedPtr<TableDef> table_def_ptr, TableType type)
@@ -112,13 +119,13 @@ public:
     }
 
     inline void
-    SetResultMsg(const SharedPtr<String>& result_msg) {
-        result_msg_ = result_msg;
+    SetResultMsg(UniquePtr<String> result_msg) {
+        result_msg_ = std::move(result_msg);
     }
 
-    [[nodiscard]] inline const SharedPtr<String>&
+    [[nodiscard]] inline String*
     result_msg() const {
-        return result_msg_;
+        return result_msg_.get();
     }
 
 public:

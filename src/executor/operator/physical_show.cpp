@@ -13,25 +13,76 @@
 namespace infinity {
 
 void
-PhysicalShow::Init() {}
+PhysicalShow::Init() {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    output_names_ = MakeShared<Vector<String>>();
+    output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
+
+    switch(scan_type_) {
+        case ShowType::kShowTables: {
+
+            output_names_->reserve(7);
+            output_types_->reserve(7);
+
+            output_names_->emplace_back("schema");
+            output_names_->emplace_back("table");
+            output_names_->emplace_back("type");
+            output_names_->emplace_back("column_count");
+            output_names_->emplace_back("row_count");
+            output_names_->emplace_back("block_count");
+            output_names_->emplace_back("block_size");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
+        case ShowType::kShowColumn: {
+
+            output_names_->reserve(3);
+            output_types_->reserve(3);
+
+            output_names_->emplace_back("column_name");
+            output_names_->emplace_back("column_type");
+            output_names_->emplace_back("constraint");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        default: {
+            NotImplementError("Not implemented show type")
+        }
+    }
+}
 
 void
-PhysicalShow::Execute(QueryContext *query_context, InputState *input_state,
-                           OutputState *output_state) {
+PhysicalShow::Execute(QueryContext *query_context,
+                      InputState *input_state,
+                      OutputState *output_state) {
+
     auto show_input_state = (ShowInputState*)(input_state);
     auto show_output_state =(ShowOutputState*)(output_state);
 
     switch(scan_type_) {
-    case ShowType::kShowTables: {
-      ExecuteShowTable(query_context, show_input_state, show_output_state);
-      break;
-    }
-    case ShowType::kShowColumn: {
-      ExecuteShowColumns(query_context, show_input_state, show_output_state);
-      break;
-    }
-    default:
-      ExecutorError("Invalid chunk scan type");
+        case ShowType::kShowTables: {
+            ExecuteShowTable(query_context, show_input_state, show_output_state);
+            break;
+        }
+        case ShowType::kShowColumn: {
+            ExecuteShowColumns(query_context, show_input_state, show_output_state);
+            break;
+        }
+        default: {
+            ExecutorError("Invalid chunk scan type");
+        }
     }
 }
 
@@ -194,8 +245,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
     }
 
     output_block_ptr->Finalize();
-
-    output_state->output_.emplace_back(std::move(output_block_ptr));
+    output_state->output_.emplace_back(output_block_ptr);
 }
 
 /**

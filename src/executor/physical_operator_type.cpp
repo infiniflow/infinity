@@ -16,6 +16,10 @@ PhysicalOperatorToString(PhysicalOperatorType type){
             return "Invalid";
         case PhysicalOperatorType::kAggregate:
             return "Aggregate";
+        case PhysicalOperatorType::kParallelAggregate:
+            return "ParallelAggregate";
+        case PhysicalOperatorType::kMergeParallelAggregate:
+            return "MergeParallelAggregate";
         case PhysicalOperatorType::kUnionAll:
             return "UnionAll";
         case PhysicalOperatorType::kTableScan:
@@ -26,6 +30,10 @@ PhysicalOperatorToString(PhysicalOperatorType type){
             return "IndexScan";
         case PhysicalOperatorType::kDummyScan:
             return "DummyScan";
+        case PhysicalOperatorType::kHash:
+            return "Hash";
+        case PhysicalOperatorType::kMergeHash:
+            return "MergeHash";
         case PhysicalOperatorType::kJoinHash:
             return "JoinHash";
         case PhysicalOperatorType::kJoinNestedLoop:
@@ -38,12 +46,18 @@ PhysicalOperatorToString(PhysicalOperatorType type){
             return "CrossProduct";
         case PhysicalOperatorType::kLimit:
             return "Limit";
+        case PhysicalOperatorType::kMergeLimit:
+            return "MergeLimit";
         case PhysicalOperatorType::kTop:
             return "Top";
+        case PhysicalOperatorType::kMergeTop:
+            return "MergeTop";
         case PhysicalOperatorType::kProjection:
             return "Projection";
         case PhysicalOperatorType::kSort:
             return "Sort";
+        case PhysicalOperatorType::kMergeSort:
+            return "MergeSort";
         case PhysicalOperatorType::kDelete:
             return "Delete";
         case PhysicalOperatorType::kUpdate:
@@ -60,7 +74,7 @@ PhysicalOperatorToString(PhysicalOperatorType type){
             return "CreateTable";
         case PhysicalOperatorType::kCreateCollection:
             return "CreateCollection";
-        case PhysicalOperatorType::kCreateSchema:
+        case PhysicalOperatorType::kCreateDatabase:
             return "CreateSchema";
         case PhysicalOperatorType::kCreateView:
             return "CreateView";
@@ -68,7 +82,7 @@ PhysicalOperatorToString(PhysicalOperatorType type){
             return "DropTable";
         case PhysicalOperatorType::kDropCollection:
             return "DropCollection";
-        case PhysicalOperatorType::kDropSchema:
+        case PhysicalOperatorType::kDropDatabase:
             return "DropSchema";
         case PhysicalOperatorType::kDropView:
             return "DropView";
@@ -82,8 +96,12 @@ PhysicalOperatorToString(PhysicalOperatorType type){
             return "Flush";
         case PhysicalOperatorType::kSink:
             return "Sink";
-        case PhysicalOperatorType::kExchange:
-            return "Exchange";
+        case PhysicalOperatorType::kSource:
+            return "Source";
+        case PhysicalOperatorType::kIntersect:
+            return "Intersect";
+        case PhysicalOperatorType::kExcept:
+            return "Except";
     }
 }
 }

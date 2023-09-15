@@ -344,8 +344,13 @@ template <> FloatT DataType::StringToValue<FloatT>(const StringView& str) {
         return FloatT{};
     }
     FloatT value{};
+#if defined(__APPLE__)
+    auto ret = std::sscanf(str.data(),"%a",&value);
+    TypeAssert(ret == str.size(), "Parse Float error");
+#else
     auto res = std::from_chars(str.begin(), str.end(), value);
     TypeAssert(res.ptr == str.data() + str.size(), "Parse Float error");
+#endif
     return value;
 }
 
@@ -354,8 +359,13 @@ template <> DoubleT DataType::StringToValue<DoubleT>(const StringView& str) {
         return DoubleT{};
     }
     DoubleT value{};
+#if defined(__APPLE__)
+    auto ret = std::sscanf(str.data(),"%la",&value);
+    TypeAssert(ret == str.size(), "Parse Double error");
+#else
     auto res = std::from_chars(str.begin(), str.end(), value);
     TypeAssert(res.ptr == str.data() + str.size(), "Parse Double error");
+#endif
     return value;
 }
 }
