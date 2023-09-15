@@ -26,7 +26,7 @@ class SQLRunner {
 public:
     static String
     Run(const String& sql_text, bool print = true);
-    static String
+    static SharedPtr<Table>
     RunV2(const String& sql_text, bool print = true);
 
 };

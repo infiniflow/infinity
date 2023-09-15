@@ -390,13 +390,15 @@ Txn::GetTableByName(const String& db_name, const String& table_name) {
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
+    // Check the db entries
     EntryResult db_entry_result = NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
     if(db_entry_result.entry_ == nullptr) {
         // Error
         return db_entry_result;
     }
 
-    DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
+    // Check the table entries
+    auto db_entry = (DBEntry*)db_entry_result.entry_;
 
     return DBEntry::GetTableCollection(db_entry, table_name, txn_id_, begin_ts);
 }

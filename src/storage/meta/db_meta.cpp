@@ -220,6 +220,7 @@ DBMeta::GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts) {
 //                    LOG_TRACE("DB is dropped.")
                     return {nullptr, MakeUnique<String>("DB is dropped.")};
                 } else {
+                    // check the tables meta
                     return {db_entry.get(), nullptr};
                 }
             }
