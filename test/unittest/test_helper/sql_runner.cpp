@@ -141,11 +141,9 @@ SQLRunner::RunV2(const String& sql_text, bool print) {
     query_context_ptr.get()->scheduler()->Schedule(query_context_ptr.get(), plan_fragment.get());
 
     // Initialize query result
-    {
-        QueryResult query_result;
-        query_result.result_ = plan_fragment->GetResult();
-        query_result.root_operator_type_ = unoptimized_plan->operator_type();
-    }
+    QueryResult query_result;
+    query_result.result_ = plan_fragment->GetResult();
+    query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
     parsed_result->Reset();
     query_context_ptr->CommitTxn();

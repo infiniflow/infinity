@@ -7,12 +7,6 @@
 
 namespace infinity{
 
-PlanFragment::PlanFragment(QueryContext* query_context,
-                           SinkType sink_type,
-                           PhysicalOperator* last_phys_op) {
-    AddSinkNode(query_context, sink_type, last_phys_op->GetOutputNames(), last_phys_op->GetOutputTypes());
-}
-
 Vector<UniquePtr<FragmentTask>>&
 PlanFragment::CreateTasks(QueryContext* query_context) {
     context_ = FragmentContext::MakeFragmentContext(query_context, this);

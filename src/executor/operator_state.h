@@ -459,25 +459,8 @@ struct ShowOutputState : public OutputState {
 
     UniquePtr<String> error_message_{};
     Vector<SharedPtr<DataBlock>> output_{};
-    SharedPtr<TableDef> table_def_{};
 };
 
-//<<<<<<< Updated upstream
-//struct DMLInputState : public InputState {
-//    inline explicit
-//    DMLInputState(): InputState(OperatorStateType::kDML) {}
-//};
-//
-//struct DMLOutputState : public OutputState {
-//    inline explicit
-//    DMLOutputState(): OutputState(OperatorStateType::kDML) {}
-//
-//    UniquePtr<String> error_message_{};
-//    Vector<SharedPtr<DataBlock>> output_{};
-//    SharedPtr<TableDef> table_def_{};
-//    // For insert, update, delete, update
-//    SharedPtr<String> result_msg_{};
-//=======
 // Flush
 struct FlushInputState : public InputState {
     inline explicit
@@ -520,7 +503,8 @@ struct CommonSinkState: public SinkState {
     inline explicit
     CommonSinkState() : SinkState(SinkStateType::kCommon) {}
 
-    Vector<SharedPtr<ColumnDef>> column_defs_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
+    SharedPtr<Vector<String>> column_names_{};
     Vector<SharedPtr<DataBlock>> data_block_array_{};
 };
 

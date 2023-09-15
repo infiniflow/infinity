@@ -336,7 +336,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
                 break;
             }
             case PhysicalOperatorType::kExplain: {
-                BuildSerialTaskStateTemplate<ExplainInputState, InsertOutputState>(fragment_operators,
+                BuildSerialTaskStateTemplate<ExplainInputState, ExplainOutputState>(fragment_operators,
                                                                                    tasks,
                                                                                    operator_id,
                                                                                    operator_count);
@@ -439,6 +439,9 @@ FragmentContext::CreateTasks(i64 parallel_count, i64 operator_count) {
             }
 
             tasks_[0]->sink_state_ = MakeUnique<CommonSinkState>();
+            CommonSinkState* sink_state_ptr = static_cast<CommonSinkState*>(tasks_[0]->sink_state_.get());
+            sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
+            sink_state_ptr->column_names_ = last_operator->GetOutputNames();
             break;
         }
         case PhysicalOperatorType::kTableScan:
@@ -457,6 +460,9 @@ FragmentContext::CreateTasks(i64 parallel_count, i64 operator_count) {
 
             for(i64 task_id = 0; task_id < parallel_count; ++ task_id) {
                 tasks_[task_id]->sink_state_ = MakeUnique<CommonSinkState>();
+                CommonSinkState* sink_state_ptr = static_cast<CommonSinkState*>(tasks_[task_id]->sink_state_.get());
+                sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
+                sink_state_ptr->column_names_ = last_operator->GetOutputNames();
             }
             break;
         }
@@ -552,8 +558,10 @@ FragmentContext::CreateTasks(i64 parallel_count, i64 operator_count) {
         case PhysicalOperatorType::kProjection:
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop:
-        case PhysicalOperatorType::kSort: {
-            SchedulerError("ParallelAggregate shouldn't be the first operator of the fragment")
+        case PhysicalOperatorType::kSort:
+        case PhysicalOperatorType::kDelete: {
+            SchedulerError(fmt::format("{} shouldn't be the first operator of the fragment",
+                                       PhysicalOperatorToString(last_operator->operator_type())));
         }
         case PhysicalOperatorType::kMergeParallelAggregate:
         case PhysicalOperatorType::kMergeHash:
@@ -608,7 +616,6 @@ FragmentContext::CreateTasks(i64 parallel_count, i64 operator_count) {
             }
             break;
         }
-        case PhysicalOperatorType::kDelete:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:
@@ -661,7 +668,18 @@ SerialMaterializedFragmentCtx::GetResultInternal() {
         }
         case SinkStateType::kCommon: {
             auto* common_sink_state = static_cast<CommonSinkState*>(tasks_[0]->sink_state_.get());
-            SharedPtr<Table> result_table = Table::MakeResultTable(common_sink_state->column_defs_);
+
+            Vector<SharedPtr<ColumnDef>> column_defs;
+            SizeT column_count = common_sink_state->column_names_->size();
+            column_defs.reserve(column_count);
+            for(SizeT col_idx = 0; col_idx < column_count; ++ col_idx) {
+                column_defs.emplace_back(MakeShared<ColumnDef>(col_idx,
+                                                               common_sink_state->column_types_->at(col_idx),
+                                                               common_sink_state->column_names_->at(col_idx),
+                                                               HashSet<ConstraintType>()));
+            }
+
+            SharedPtr<Table> result_table = Table::MakeResultTable(column_defs);
             result_table->data_blocks_ = std::move(common_sink_state->data_block_array_);
             return result_table;
         }
@@ -690,6 +708,19 @@ SharedPtr<Table>
 ParallelMaterializedFragmentCtx::GetResultInternal() {
 
     SharedPtr<Table> result_table = nullptr;
+
+    auto* common_sink_state = static_cast<CommonSinkState*>(tasks_[0]->sink_state_.get());
+
+    Vector<SharedPtr<ColumnDef>> column_defs;
+    SizeT column_count = common_sink_state->column_names_->size();
+    column_defs.reserve(column_count);
+    for(SizeT col_idx = 0; col_idx < column_count; ++ col_idx) {
+        column_defs.emplace_back(MakeShared<ColumnDef>(col_idx,
+                                                       common_sink_state->column_types_->at(col_idx),
+                                                       common_sink_state->column_names_->at(col_idx),
+                                                       HashSet<ConstraintType>()));
+    }
+
     for(const auto& task: tasks_) {
         if(task->sink_state_->state_type() != SinkStateType::kCommon) {
             SchedulerError("Parallel materialized fragment will only have common sink stte")
@@ -699,7 +730,7 @@ ParallelMaterializedFragmentCtx::GetResultInternal() {
 
 
         if(result_table == nullptr) {
-            result_table = Table::MakeResultTable(common_sink_state->column_defs_);
+            result_table = Table::MakeResultTable(column_defs);
         }
 
         for(const auto& result_data_block: common_sink_state->data_block_array_) {

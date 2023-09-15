@@ -40,17 +40,25 @@ public:
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
-        return MakeShared<Vector<String>>();
+        return output_names_;
     }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
-        return MakeShared<Vector<SharedPtr<DataType>>>();
+        return output_types_;
+    }
+
+    inline ExplainType
+    explain_type() const {
+        return explain_type_;
     }
 
 private:
     ExplainType explain_type_{ExplainType::kPhysical};
     SharedPtr<Vector<SharedPtr<String>>> texts_{nullptr};
+
+    SharedPtr<Vector<String>> output_names_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 };
 
 }

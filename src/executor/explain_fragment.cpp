@@ -30,11 +30,8 @@ ExplainFragment::Explain(PlanFragment* fragment_ptr,
     }
 
     Vector<PhysicalOperator*>& fragment_operators = fragment_ptr->GetOperators();
-    SizeT op_count = fragment_operators.size();
-    for(SizeT op_idx = 0; op_idx < op_count; ++ op_idx) {
-        PhysicalOperator* phys_op = fragment_operators[op_idx];
-        ExplainPhysicalPlan::Explain(phys_op, result, intent_size);
-    }
+    PhysicalOperator* first_phys_op = fragment_operators[0];
+    ExplainPhysicalPlan::Explain(first_phys_op, result, intent_size);
 
     if(fragment_ptr->GetSourceNode()) {
         ExplainPhysicalPlan::Explain(fragment_ptr->GetSourceNode(), result, intent_size);

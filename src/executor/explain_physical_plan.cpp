@@ -4,6 +4,38 @@
 
 #include "explain_physical_plan.h"
 #include "planner/explain_logical_plan.h"
+#include "executor/operator/physical_create_schema.h"
+#include "executor/operator/physical_create_table.h"
+#include "executor/operator/physical_create_collection.h"
+#include "executor/operator/physical_drop_schema.h"
+#include "executor/operator/physical_drop_table.h"
+#include "executor/operator/physical_drop_collection.h"
+#include "executor/operator/physical_insert.h"
+#include "executor/operator/physical_project.h"
+#include "executor/operator/physical_filter.h"
+#include "executor/operator/physical_table_scan.h"
+#include "executor/operator/physical_aggregate.h"
+#include "executor/operator/physical_sort.h"
+#include "executor/operator/physical_limit.h"
+#include "executor/operator/physical_cross_product.h"
+#include "executor/operator/physical_nested_loop_join.h"
+#include "executor/operator/physical_show.h"
+#include "executor/operator/physical_union_all.h"
+#include "executor/operator/physical_index_scan.h"
+#include "executor/operator/physical_dummy_scan.h"
+#include "executor/operator/physical_hash_join.h"
+#include "executor/operator/physical_sort_merge_join.h"
+#include "executor/operator/physical_index_join.h"
+#include "executor/operator/physical_top.h"
+#include "executor/operator/physical_delete.h"
+#include "executor/operator/physical_update.h"
+#include "executor/operator/physical_import.h"
+#include "executor/operator/physical_export.h"
+#include "executor/operator/physical_alter.h"
+#include "executor/operator/physical_create_view.h"
+#include "executor/operator/physcial_drop_view.h"
+#include "executor/operator/physical_flush.h"
+#include "executor/operator/physical_source.h"
 
 
 namespace infinity {
@@ -143,8 +175,44 @@ ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
             Explain((PhysicalFlush*)op, result, intent_size);
             break;
         }
+        case PhysicalOperatorType::kSource: {
+            break;
+        }
+        case PhysicalOperatorType::kSink: {
+            break;
+        }
+        case PhysicalOperatorType::kInvalid: {
+            break;
+        }
+        case PhysicalOperatorType::kParallelAggregate: {
+            break;
+        }
+        case PhysicalOperatorType::kMergeParallelAggregate: {
+            break;
+        }
+        case PhysicalOperatorType::kIntersect: {
+            break;
+        }
+        case PhysicalOperatorType::kExcept: {
+            break;
+        }
+        case PhysicalOperatorType::kHash: {
+            break;
+        }
+        case PhysicalOperatorType::kMergeHash: {
+            break;
+        }
+        case PhysicalOperatorType::kMergeLimit: {
+            break;
+        }
+        case PhysicalOperatorType::kMergeTop: {
+            break;
+        }
+        case PhysicalOperatorType::kMergeSort: {
+            break;
+        }
         default: {
-            PlannerError("Unexpect logical node type");
+            PlannerError("Unexpected logical node type");
         }
     }
 }
@@ -1223,6 +1291,149 @@ ExplainPhysicalPlan::Explain(const PhysicalFlush* flush_node,
     }
 
     result->emplace_back(MakeShared<String>(flush_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalSource* source_node,
+                             SharedPtr<Vector<SharedPtr<String>>>& result,
+                             i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> SOURCE ";
+    } else {
+        explain_header_str = "SOURCE ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalSink* flush_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> SINK ";
+    } else {
+        explain_header_str = "SINK ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalParallelAggregate* parallel_aggregate_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> PARALLEL AGGREGATE ";
+    } else {
+        explain_header_str = "PARALLEL AGGREGATE ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalMergeParallelAggregate* merge_parallel_aggregate_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> MERGE PARALLEL AGGREGATE ";
+    } else {
+        explain_header_str = "MERGE PARALLEL AGGREGATE ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalIntersect* intersect_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> INTERSECT ";
+    } else {
+        explain_header_str = "INTERSECT ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalExcept* except_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> EXCEPT ";
+    } else {
+        explain_header_str = "EXCEPT ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalHash* hash_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> HASH ";
+    } else {
+        explain_header_str = "HASH ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalMergeHash* merge_hash_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> MERGE HASH ";
+    } else {
+        explain_header_str = "MERGE HASH ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalMergeLimit* merge_limit_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> MERGE LIMIT ";
+    } else {
+        explain_header_str = "MERGE LIMIT ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalMergeTop* merge_top_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> MERGE TOP ";
+    } else {
+        explain_header_str = "MERGE TOP ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalMergeSort* merge_sort_node,
+        SharedPtr<Vector<SharedPtr<String>>>& result,
+        i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> MERGE SORT ";
+    } else {
+        explain_header_str = "MERGE SORT ";
+    }
+    result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
 }
