@@ -17,13 +17,16 @@ public:
     FragmentBuilder(QueryContext* query_context_ptr)
     : query_context_ptr_(query_context_ptr) {}
 
+    UniquePtr<PlanFragment>
+    BuildFragment(PhysicalOperator* phys_op);
+
     void
-    BuildFragments(PhysicalOperator* phys_op, PlanFragment *current_fragment_ptr) const;
+    BuildFragments(PhysicalOperator* phys_op, PlanFragment *current_fragment_ptr);
 
 private:
 
     void
-    BuildExplain(PhysicalOperator* phys_op, PlanFragment* current_fragment_ptr) const;
+    BuildExplain(PhysicalOperator* phys_op, PlanFragment* current_fragment_ptr);
 
 private:
     QueryContext* query_context_ptr_{};

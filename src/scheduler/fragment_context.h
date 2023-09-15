@@ -8,6 +8,8 @@
 #include "main/query_context.h"
 #include "scheduler/fragment_task.h"
 #include "executor/physical_operator.h"
+#include "executor/operator/physical_sink.h"
+#include "executor/operator/physical_source.h"
 
 namespace infinity {
 
@@ -21,9 +23,9 @@ class PlanFragment;
 //    kFinish,
 //};
 enum class FragmentType {
-    kGlobalMaterialized,
-    kLocalMaterialized,
-    kStreamFragment
+    kSerialMaterialize,
+    kParallelMaterialize,
+    kParallelStream,
 };
 
 class FragmentContext {
@@ -33,8 +35,7 @@ public:
 
 public:
     explicit
-    FragmentContext(FragmentType fragment_type, PlanFragment* fragment_ptr, QueryContext* query_context):
-            fragment_type_(fragment_type), fragment_ptr_(fragment_ptr), query_context_(query_context) {};
+    FragmentContext(PlanFragment* fragment_ptr, QueryContext* query_context);
 
     virtual
     ~FragmentContext() = default;
@@ -52,18 +53,19 @@ public:
     Vector<PhysicalOperator*>&
     GetOperators();
 
-    inline void
-    AddTask(UniquePtr<FragmentTask> task,
-            UniquePtr<InputState> input_state,
-            UniquePtr<OutputState> output_state);
+    PhysicalSink*
+    GetSinkOperator() const;
+
+    PhysicalSource*
+    GetSourceOperator() const;
+
+    Vector<UniquePtr<FragmentTask>>&
+    CreateTasks(i64 parallel_count, i64 operator_count);
 
     inline Vector<UniquePtr<FragmentTask>>&
     Tasks() {
         return tasks_;
     }
-
-    virtual void
-    InitializeOutput(FragmentTask* fragment_task, u64 task_id) = 0;
 
     inline SharedPtr<Table>
     GetResult() {
@@ -100,60 +102,53 @@ protected:
     PlanFragment* fragment_ptr_{};
 //    HashMap<u64, UniquePtr<FragmentTask>> tasks_;
     Vector<UniquePtr<FragmentTask>> tasks_{};
-    Vector<UniquePtr<InputState>> input_states_{};
-    Vector<UniquePtr<OutputState>> output_states_{};
+
     bool finish_building_{false};
     bool completed_{false};
     i64 finished_task_count_{};
     Vector<SharedPtr<DataBlock>> data_array_{};
 
-    FragmentType fragment_type_{FragmentType::kGlobalMaterialized};
+    FragmentType fragment_type_{FragmentType::kSerialMaterialize};
     QueryContext* query_context_{};
 };
 
-class GlobalMaterializedFragmentCtx final : public FragmentContext {
+class SerialMaterializedFragmentCtx final : public FragmentContext {
 public:
     explicit
-    GlobalMaterializedFragmentCtx(PlanFragment* fragment_ptr, QueryContext* query_context)
-        : FragmentContext(FragmentType::kGlobalMaterialized, fragment_ptr, query_context) {}
-
-    void
-    InitializeOutput(FragmentTask* fragment_task, u64 task_id) final;
+    SerialMaterializedFragmentCtx(PlanFragment* fragment_ptr, QueryContext* query_context)
+            : FragmentContext(fragment_ptr, query_context) {}
 
     SharedPtr<Table>
     GetResultInternal() final;
+
 protected:
-    Vector<SharedPtr<DataBlock>> data_array_ptr_{};
+    Vector<SharedPtr<DataBlock>> task_result_{};
 };
 
-class LocalMaterializedFragmentCtx : public FragmentContext {
+class ParallelMaterializedFragmentCtx final : public FragmentContext {
 public:
     explicit
-    LocalMaterializedFragmentCtx(PlanFragment* fragment_ptr, QueryContext* query_context)
-        : FragmentContext(FragmentType::kLocalMaterialized, fragment_ptr, query_context) {}
-
-    void
-    InitializeOutput(FragmentTask* fragment_task, u64 task_id) final;
+    ParallelMaterializedFragmentCtx(PlanFragment* fragment_ptr, QueryContext* query_context)
+            : FragmentContext(fragment_ptr, query_context) {}
 
     SharedPtr<Table>
     GetResultInternal() final;
+
 protected:
-    HashMap<u64, Vector<SharedPtr<DataBlock>>> result_map_{};
+    HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};
 };
 
-class StreamFragmentCtx : public FragmentContext {
+class ParallelStreamFragmentCtx : public FragmentContext {
 public:
     explicit
-    StreamFragmentCtx(PlanFragment* fragment_ptr, QueryContext* query_context)
-        : FragmentContext(FragmentType::kStreamFragment, fragment_ptr, query_context) {}
-
-    void
-    InitializeOutput(FragmentTask* fragment_task, u64 task_id) final;
+    ParallelStreamFragmentCtx(PlanFragment* fragment_ptr, QueryContext* query_context)
+        : FragmentContext(fragment_ptr, query_context) {}
 
     SharedPtr<Table>
     GetResultInternal() final;
+
 protected:
-    HashMap<u64, SharedPtr<DataBlock>> result_map_{};
+    HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};
 };
 
 }

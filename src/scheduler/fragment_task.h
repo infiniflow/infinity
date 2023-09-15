@@ -38,27 +38,26 @@ enum class FragmentTaskState {
 
 class FragmentTask {
 public:
+
+
+public:
+
     explicit
-    FragmentTask() = default;
+    FragmentTask(bool terminator = true) : is_terminator_(terminator) {}
 
     explicit
     FragmentTask(void* fragment_context,
-                 FragmentSourceType source_type,
-                 FragmentSinkType sink_type)
-            : fragment_context_(fragment_context),
-              source_type_(source_type),
-              sink_type_(sink_type)
-    {}
-
-    explicit
-    FragmentTask(void* fragment_context) : fragment_context_(fragment_context) {}
+                 i64 task_id,
+                 i64 operator_count) : fragment_context_(fragment_context), task_id_(task_id), operator_count_(operator_count) {
+        Init();
+    }
 
     inline void
     SetTerminator() {
         is_terminator_ = true;
     }
 
-    inline bool
+    [[nodiscard]] inline bool
     IsTerminator() const {
         return is_terminator_;
     }
@@ -69,6 +68,16 @@ public:
         output_state_ptr_ = output_state_ptr;
     }
 
+    InputState*
+    GetInputStateByOperatorID(i64 operator_id) {
+        return operator_input_state_[operator_id].get();
+    }
+
+    OutputState*
+    GetOutputStateByOperatorID(i64 operator_id) {
+        return operator_output_state_[operator_id].get();
+    }
+
     // Set source
     // Scan source
 //    void
@@ -77,6 +86,8 @@ public:
 //    // Input queue
 //    void
 //    AddQueue(const BatchBlockingQueue);
+    void
+    Init();
 
     void
     OnExecute(i64 worker_id);
@@ -89,6 +100,13 @@ public:
 public:
     std::atomic<FragmentTaskState> state_{FragmentTaskState::kReady};
 
+    UniquePtr<SourceState> source_state_;
+
+    Vector<UniquePtr<InputState>> operator_input_state_;
+    Vector<UniquePtr<OutputState>> operator_output_state_;
+
+    UniquePtr<SinkState> sink_state_;
+
 private:
     void* fragment_context_{};
     FragmentSourceType source_type_{FragmentSourceType::kScan};
@@ -97,6 +115,8 @@ private:
     i64 last_worker_id_{-1};
     InputState* input_state_ptr_{};
     OutputState* output_state_ptr_{};
+    i64 task_id_{-1};
+    i64 operator_count_{0};
 };
 
 }

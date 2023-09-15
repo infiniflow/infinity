@@ -51,8 +51,10 @@ void
 PhysicalCreateTable::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
     auto txn = query_context->GetTxn();
     auto result = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
-    auto ddl_output_state = (DDLOutputState*)output_state;
-    ddl_output_state->error_message_ = std::move(result.err_);
+    auto create_table_output_state = (CreateTableOutputState*)output_state;
+    if(result.err_ != nullptr) {
+        create_table_output_state->error_message_ = std::move(result.err_);
+    }
 }
 
 void

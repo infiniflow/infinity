@@ -109,7 +109,7 @@ ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
             Explain((PhysicalCreateCollection*)op, result, intent_size);
             break;
         }
-        case PhysicalOperatorType::kCreateSchema: {
+        case PhysicalOperatorType::kCreateDatabase: {
             Explain((PhysicalCreateSchema*)op, result, intent_size);
             break;
         }
@@ -125,7 +125,7 @@ ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
             Explain((PhysicalDropCollection*)op, result, intent_size);
             break;
         }
-        case PhysicalOperatorType::kDropSchema: {
+        case PhysicalOperatorType::kDropDatabase: {
             Explain((PhysicalDropSchema*)op, result, intent_size);
             break;
         }

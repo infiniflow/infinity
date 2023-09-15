@@ -135,16 +135,17 @@ SQLRunner::RunV2(const String& sql_text, bool print) {
 
     // Create execution pipeline
     // Fragment Builder, only for test now. plan fragment is same as pipeline.
-    auto plan_fragment = MakeShared<PlanFragment>();
-    fragment_builder.BuildFragments(physical_plan.get(), plan_fragment.get());
+    auto plan_fragment = fragment_builder.BuildFragment(physical_plan.get());
 
     // Schedule the query pipeline
     query_context_ptr.get()->scheduler()->Schedule(query_context_ptr.get(), plan_fragment.get());
 
     // Initialize query result
-    QueryResult query_result;
-    query_result.result_ = plan_fragment->GetResult();
-    query_result.root_operator_type_ = unoptimized_plan->operator_type();
+    {
+        QueryResult query_result;
+        query_result.result_ = plan_fragment->GetResult();
+        query_result.root_operator_type_ = unoptimized_plan->operator_type();
+    }
 
     parsed_result->Reset();
     query_context_ptr->CommitTxn();
