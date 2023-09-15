@@ -127,6 +127,8 @@ void ColumnDataEntry::AppendEmbedding(ColumnDataEntry *column_data_entry, const 
     }
 }
 
+// copy data *from* `column_vector` (offset `block_start_offset`).
+// *to* `column_data_entry`'s buffer (offset column_start_offset).
 void
 ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
        const SharedPtr<ColumnVector>& column_vector,
