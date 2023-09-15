@@ -53,4 +53,10 @@ PhysicalTableScan::Execute(QueryContext* query_context) {
     }
 }
 
+Vector<Vector<u64>>
+PhysicalTableScan::GetSegmentIDs(i64 parallel_count) const {
+    Vector<Vector<u64>> result(parallel_count, Vector<u64>());
+    return result;
+}
+
 }

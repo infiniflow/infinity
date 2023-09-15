@@ -8,17 +8,29 @@
 
 namespace infinity {
 
-class PhysicalExchange final : public PhysicalOperator {
+enum class SourceType {
+    kInvalid,
+    kTable,
+    kLocalQueue,
+    kEmpty,
+    kRemote,
+};
+
+
+class PhysicalSource final : public PhysicalOperator {
 public:
-    explicit PhysicalExchange(u64 id,
-                              SharedPtr<Vector<String>> names,
-                              SharedPtr<Vector<SharedPtr<DataType>>> types)
-            : PhysicalOperator(PhysicalOperatorType::kExchange, nullptr, nullptr,id),
+    explicit
+    PhysicalSource(u64 id,
+                   SourceType source_type,
+                   SharedPtr<Vector<String>> names,
+                   SharedPtr<Vector<SharedPtr<DataType>>> types)
+            : PhysicalOperator(PhysicalOperatorType::kSource, nullptr, nullptr, id),
+              type_(source_type),
               output_names_(std::move(names)),
               output_types_(std::move(types))
     {}
 
-    ~PhysicalExchange() override = default;
+    ~PhysicalSource() override = default;
 
     void
     Init() override;
@@ -28,6 +40,9 @@ public:
 
     virtual void
     Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+
+    void
+    Execute(QueryContext* query_context, SourceState* source_state);
 
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
@@ -39,10 +54,15 @@ public:
         return output_types_;
     }
 
+    inline SourceType
+    source_type() const {
+        return type_;
+    }
+
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
-
+    SourceType type_{SourceType::kInvalid};
 };
 
 }

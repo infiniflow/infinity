@@ -51,6 +51,9 @@ public:
         return column_types_;
     }
 
+    Vector<Vector<u64>>
+    GetSegmentIDs(i64 parallel_count) const;
+
     inline String
     table_alias() const {
         return table_alias_;

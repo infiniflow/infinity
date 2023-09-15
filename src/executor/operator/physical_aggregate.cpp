@@ -639,4 +639,11 @@ PhysicalAggregate::GetOutputTypes() const {
     return result;
 }
 
+Vector<HashRange>
+PhysicalAggregate::GetHashRanges(i64 parallel_count) const {
+    Vector<HashRange> result;
+    result.resize(parallel_count);
+    return result;
+}
+
 }

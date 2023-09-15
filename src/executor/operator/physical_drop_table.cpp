@@ -16,8 +16,8 @@ PhysicalDropTable::Execute(QueryContext* query_context, InputState* input_state,
 
     auto txn = query_context->GetTxn();
     auto res = txn->DropTableCollectionByName(*schema_name_, *table_name_, conflict_type_);
-    auto ddl_output_state =(DDLOutputState*)(output_state);
-    ddl_output_state->error_message_=std::move(res.err_);
+    auto drop_table_output_state =(DropTableOutputState*)(output_state);
+    drop_table_output_state->error_message_ = std::move(res.err_);
 
     // Generate the result
     auto column_defs = {

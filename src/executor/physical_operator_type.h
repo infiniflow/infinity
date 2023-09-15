@@ -13,12 +13,23 @@ namespace infinity {
 
 enum class PhysicalOperatorType: uint8_t {
     kInvalid = 0,
+
     kAggregate,
+
+    kParallelAggregate,
+    kMergeParallelAggregate,
+
     kUnionAll,
+    kIntersect,
+    kExcept,
+
     kTableScan,
     kFilter,
     kIndexScan,
     kDummyScan,
+
+    kHash,
+    kMergeHash,
 
     // Join
     kJoinHash,
@@ -29,9 +40,15 @@ enum class PhysicalOperatorType: uint8_t {
 
     // Result modifier
     kLimit,
+    kMergeLimit,
+
     kTop,
+    kMergeTop,
+
     kProjection,
+
     kSort,
+    kMergeSort,
 
     // DML
     kDelete,
@@ -44,11 +61,11 @@ enum class PhysicalOperatorType: uint8_t {
     kAlter,
     kCreateTable,
     kCreateCollection,
-    kCreateSchema,
+    kCreateDatabase,
     kCreateView,
     kDropTable,
     kDropCollection,
-    kDropSchema,
+    kDropDatabase,
     kDropView,
 
     // misc
@@ -58,7 +75,7 @@ enum class PhysicalOperatorType: uint8_t {
     kFlush,
 
     kSink,
-    kExchange,
+    kSource,
 };
 
 

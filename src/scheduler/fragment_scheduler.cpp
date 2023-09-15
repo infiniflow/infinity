@@ -58,8 +58,7 @@ FragmentScheduler::Init(const Config* config_ptr) {
 void
 FragmentScheduler::UnInit() {
     initialized_ = false;
-    UniquePtr<FragmentTask> terminate_task = MakeUnique<FragmentTask>();
-    terminate_task->SetTerminator();
+    UniquePtr<FragmentTask> terminate_task = MakeUnique<FragmentTask>(true);
     poller_queue_->Enqueue(terminate_task.get());
     poller_->join();
     coordinator_->join();
@@ -76,7 +75,7 @@ FragmentScheduler::Schedule(QueryContext* query_context, PlanFragment* plan_frag
         SchedulerError("Empty plan fragment")
     }
 
-    Vector<PlanFragment*>& children = plan_fragment->Dependencies();
+    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
     if(!children.empty()) {
         SchedulerError("Only support one fragment query")
     }

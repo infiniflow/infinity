@@ -12,6 +12,11 @@
 
 namespace infinity {
 
+struct HashRange {
+    i64 start_{};
+    i64 end_{};
+};
+
 class PhysicalAggregate final : public PhysicalOperator {
 public:
     explicit PhysicalAggregate(u64 id,
@@ -71,6 +76,9 @@ public:
     IsSink() const override {
         return true;
     }
+
+    Vector<HashRange>
+    GetHashRanges(i64 parallel_count) const;
 
 private:
     SharedPtr<Table> input_table_{};

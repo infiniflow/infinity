@@ -103,8 +103,7 @@ QueryContext::Query(const String &query) {
 
             // Fragment Builder, only for test now.
             // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
-            auto plan_fragment = MakeShared<PlanFragment>();
-            fragment_builder.BuildFragments(physical_plan.get(), plan_fragment.get());
+            auto plan_fragment = fragment_builder.BuildFragment(physical_plan.get());
 
             scheduler_->Schedule(this, plan_fragment.get());
             query_result.result_ = plan_fragment->GetResult();

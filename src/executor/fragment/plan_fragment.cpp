@@ -7,10 +7,38 @@
 
 namespace infinity{
 
+PlanFragment::PlanFragment(QueryContext* query_context,
+                           SinkType sink_type,
+                           PhysicalOperator* last_phys_op) {
+    AddSinkNode(query_context, sink_type, last_phys_op->GetOutputNames(), last_phys_op->GetOutputTypes());
+}
+
 Vector<UniquePtr<FragmentTask>>&
 PlanFragment::CreateTasks(QueryContext* query_context) {
     context_ = FragmentContext::MakeFragmentContext(query_context, this);
     return context_->Tasks();
+}
+
+void
+PlanFragment::AddSourceNode(QueryContext* query_context,
+                            SourceType source_type,
+                            const SharedPtr<Vector<String>>& names,
+                            const SharedPtr<Vector<SharedPtr<DataType>>>& types) {
+    source_ = MakeUnique<PhysicalSource>(query_context->GetNextNodeID(),
+                                         source_type,
+                                         names,
+                                         types);
+}
+
+void
+PlanFragment::AddSinkNode(QueryContext* query_context,
+                          SinkType sink_type,
+                          const SharedPtr<Vector<String>>& names,
+                          const SharedPtr<Vector<SharedPtr<DataType>>>& types) {
+    sink_ = MakeUnique<PhysicalSink>(query_context->GetNextNodeID(),
+                                     sink_type,
+                                     names,
+                                     types);
 }
 
 SharedPtr<Vector<String>>

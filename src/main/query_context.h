@@ -76,11 +76,13 @@ public:
         return current_schema_; 
     }
 
-    inline u64 cpu_number_limit() const {
+    [[nodiscard]] inline u64
+    cpu_number_limit() const {
         return cpu_number_limit_;
     }
 
-    inline u64 memory_size_limit() const {
+    [[nodiscard]] inline u64
+    memory_size_limit() const {
         return memory_size_limit_;
     }
 
@@ -167,6 +169,8 @@ private:
     u64 memory_size_limit_{};
 
     bool initialized_{false};
+
+    u64 next_node_id_{};
 };
 
 }

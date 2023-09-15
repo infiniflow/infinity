@@ -7,6 +7,8 @@
 #include "main/query_context.h"
 #include "executor/physical_operator.h"
 #include "src/scheduler/fragment_context.h"
+#include "executor/operator/physical_source.h"
+#include "executor/operator/physical_sink.h"
 
 #include <memory>
 
@@ -14,9 +16,22 @@ namespace infinity {
 
 class PlanFragment {
 public:
-    PlanFragment() = default;
+    PlanFragment(QueryContext* query_context,
+                 SinkType sink_type,
+                 PhysicalOperator* last_phys_op);
+
     virtual
     ~PlanFragment() = default;
+
+    void
+    SetFragmentType(FragmentType fragment_type) {
+        fragment_type_ = fragment_type;
+    }
+
+    [[nodiscard]] inline FragmentType
+    GetFragmentType() const {
+        return fragment_type_;
+    }
 
     Vector<UniquePtr<FragmentTask>>&
     CreateTasks(QueryContext* query_context);
@@ -31,51 +46,43 @@ public:
         return operators_;
     }
 
-    inline void
-    SetSourceNode(PhysicalOperator* source_op) {
-        source_ = source_op;
-    }
+    void
+    AddSourceNode(QueryContext* query_context,
+                  SourceType source_type,
+                  const SharedPtr<Vector<String>>& names,
+                  const SharedPtr<Vector<SharedPtr<DataType>>>& types);
 
-    inline PhysicalOperator*
+    void
+    AddSinkNode(QueryContext* query_context,
+                SinkType sink_type,
+                const SharedPtr<Vector<String>>& names,
+                const SharedPtr<Vector<SharedPtr<DataType>>>& types);
+
+    [[nodiscard]] inline PhysicalSource*
     GetSourceNode() const {
-        return source_;
+        return source_.get();
     }
 
-    inline void
-    SetSinkNode(PhysicalOperator* sink_op) {
-        sink_ = sink_op;
-    }
-
-    inline PhysicalOperator*
+    [[nodiscard]] inline PhysicalSink*
     GetSinkNode() const {
-        return sink_;
+        return sink_.get();
     }
-
-//    [[nodiscard]] inline SharedPtr<Vector<String>>
-//    GetOutputNames() const {
-//        return sink_->GetOutputNames();
-//    }
-//
-//    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
-//    GetOutputTypes() const {
-//        return sink_->GetOutputTypes();
-//    }
     
     inline void
-    AddDependency(PlanFragment* fragment) {
-        dependencies_.push_back(fragment);
-        fragment->parents_.push_back(this);
+    AddChild(UniquePtr<PlanFragment> child_fragment) {
+        child_fragment->parent_ = this;
+        children_.emplace_back(std::move(child_fragment));
     }
 
-    inline Vector<PlanFragment*>&
-    Dependencies() {
-        return dependencies_;
+    inline Vector<UniquePtr<PlanFragment>>&
+    Children() {
+        return children_;
     }
 
     SharedPtr<Vector<String>>
     ToString();
 
-    inline u64
+    [[nodiscard]] inline u64
     FragmentID() const {
         return fragment_id_;
     }
@@ -97,20 +104,19 @@ private:
 
     u64 fragment_id_{};
 
-    PhysicalOperator* source_{};
+    UniquePtr<PhysicalSink> sink_{};
 
     Vector<PhysicalOperator*> operators_{};
 
-    PhysicalOperator* sink_{};
+    UniquePtr<PhysicalSource> source_{};
 
-    Vector<SharedPtr<DataBlock>> data_{};
+    PlanFragment* parent_{};
 
-    Vector<PlanFragment*> parents_{};
-
-    Vector<PlanFragment*> dependencies_{};
+    Vector<UniquePtr<PlanFragment>> children_{};
 
     UniquePtr<FragmentContext> context_{};
 
+    FragmentType fragment_type_{FragmentType::kSerialMaterialize};
 };
 
 }

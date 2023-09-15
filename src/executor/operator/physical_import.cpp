@@ -33,8 +33,8 @@ PhysicalImport::Init() {
 void
 PhysicalImport::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
 
-    auto import_input_state = (DMLInputState*)(input_state);
-    auto import_output_state = (DMLOutputState*)(output_state);
+    auto import_input_state = static_cast<ImportInputState*>(input_state);
+    auto import_output_state = static_cast<ImportOutputState*>(output_state);
     switch(file_type_) {
         case CopyFileType::kCSV: {
             return ImportCSV(query_context, import_input_state, import_output_state);
@@ -145,8 +145,8 @@ PhysicalImport::ImportCSV(QueryContext* query_context) {
             = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 
-    SharedPtr<String> result_msg = MakeShared<String>(fmt::format("IMPORTED {} Rows", parser_context.row_count_));
-    output_->SetResultMsg(result_msg);
+    UniquePtr<String> result_msg = MakeUnique<String>(fmt::format("IMPORTED {} Rows", parser_context.row_count_));
+    output_->SetResultMsg(std::move(result_msg));
 }
 
 void
@@ -253,7 +253,7 @@ PhysicalImport::CSVRowHandler(void *context) {
  * @param input_state
  * @param output_state
  */
-void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input_state, DMLOutputState *output_state) {
+void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
 
     FILE *fp = fopen(file_path_.c_str(), "rb");
     if(!fp) {
@@ -340,7 +340,9 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input
  * @param output_state
  */
 void
-PhysicalImport::ImportJSON(QueryContext *query_context, DMLInputState *input_state, DMLOutputState *output_state) {
+PhysicalImport::ImportJSON(QueryContext *query_context,
+                           ImportInputState *input_state,
+                           ImportOutputState *output_state) {
 
 }
 
