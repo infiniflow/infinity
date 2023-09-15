@@ -155,6 +155,39 @@ PhysicalImport::ImportJSON(QueryContext* query_context) {
     NotImplementError(err);
 }
 
+/**
+ * @brief copy statement import json function
+ * @param query_context
+ * @param input_state
+ * @param output_state
+ */
+void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input_state, DMLOutputState *output_state) {
+    ParserContext parser_context{};
+    ImportCSVHelper(query_context, parser_context);
+
+    // Generate the result
+    Vector<SharedPtr<ColumnDef>> column_defs;
+    auto result_table_def_ptr
+                = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+    output_state->table_def_ = std::move(result_table_def_ptr);
+
+
+    auto result_msg = MakeShared<String>(fmt::format("AFFECT {} Rows", parser_context.row_count_));
+    output_state->result_msg_= std::move(result_msg);
+}
+
+/**
+ * @brief copy statement import csv function
+ * @param query_context
+ * @param input_state
+ * @param output_state
+ */
+void
+PhysicalImport::ImportJSON(QueryContext *query_context, DMLInputState *input_state, DMLOutputState *output_state) {
+
+}
+
+
 void
 PhysicalImport::CSVHeaderHandler(void *context) {
     ParserContext *parser_context = static_cast<ParserContext*>(context);
@@ -214,9 +247,9 @@ PhysicalImport::CSVRowHandler(void *context) {
         
         
         // create new segment entry
+        // TODO the segment_id is wrong
         parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(
-            table, txn->TxnID(), TableCollectionEntry::GetNextSegmentID(table),
-            txn->GetBufferMgr());
+            table, txn->TxnID(), TableCollectionEntry::GetNextSegmentID(table), txn->GetBufferMgr());
         segment_entry = parser_context->segment_entry_;
     }
 
@@ -230,7 +263,7 @@ PhysicalImport::CSVRowHandler(void *context) {
         if (cell.len) {
             data = StringView((char *)cell.str, cell.len);   
         }
-        auto column_data_entry = segment_entry->    columns_[column_idx];
+        auto column_data_entry = segment_entry->columns_[column_idx];
         if (segment_entry->columns_[column_idx]->column_type_->IsEmbedding()) {
             ColumnDataEntry::AppendEmbedding(column_data_entry.get(), data, write_row, parser_context->delimiter_);
         } else {
@@ -241,42 +274,5 @@ PhysicalImport::CSVRowHandler(void *context) {
     ++parser_context->row_count_;
     ++segment_entry->current_row_;
 }
-
-
-/**
- * @brief copy statement import json function
- * @param query_context
- * @param input_state
- * @param output_state
- */
-void PhysicalImport::ImportCSV(QueryContext *query_context, DMLInputState *input_state, DMLOutputState *output_state) {
-    ParserContext parser_context{};
-    ImportCSVHelper(query_context, parser_context);
-
-    // Generate the result
-    Vector<SharedPtr<ColumnDef>> column_defs;
-    auto result_table_def_ptr
-                = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_state->table_def_ = std::move(result_table_def_ptr);
-
-
-    auto result_msg = MakeShared<String>(fmt::format("AFFECT {} Rows", parser_context.row_count_));
-    output_state->result_msg_= std::move(result_msg);
-}
-
-/**
- * @brief copy statement import csv function
- * @param query_context
- * @param input_state
- * @param output_state
- */
-void
-PhysicalImport::ImportJSON(QueryContext *query_context, DMLInputState *input_state, DMLOutputState *output_state) {
-
-}
-
-
-
-
 
 } // namespace infinity

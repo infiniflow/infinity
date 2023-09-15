@@ -23,8 +23,8 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
     new_entry->segment_version_ = MakeUnique<SegmentVersion>(segment_row);
 
     const auto* table_ptr = (const TableCollectionEntry*)table_entry;
-    // segment base dir: table_collection_name/txn_id
-    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + '/' + std::to_string(txn_id));
+    // column directory: txn_id/table_name/segment_id/col_id
+    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + "/seg_id" + std::to_string(segment_id));
 
     const Vector<SharedPtr<ColumnDef>>& columns = table_ptr->columns_;
     new_entry->columns_.reserve(columns.size());
