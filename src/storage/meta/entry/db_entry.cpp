@@ -141,8 +141,8 @@ DBEntry::TableCollections(DBEntry* db_entry,
     for(auto& table_collection_meta_pair: db_entry->tables_) {
         TableCollectionMeta* table_collection_meta = table_collection_meta_pair.second.get();
         EntryResult entry_result = TableCollectionMeta::GetEntry(table_collection_meta, txn_id, begin_ts);
-        if(entry_result.err_ != nullptr) {
-            CatalogError(*entry_result.err_)
+        if(entry_result.entry_ == nullptr) {
+            LOG_WARN("error when get table/collection entry: {}", *entry_result.err_);
         } else {
             if(entry_result.entry_ != nullptr) {
                 results.emplace_back((TableCollectionEntry*)entry_result.entry_);

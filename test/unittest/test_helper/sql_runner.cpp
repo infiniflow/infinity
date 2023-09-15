@@ -87,9 +87,9 @@ SQLRunner::Run(const String& sql_text, bool print) {
  * @brief For testing the new push based execution engine
  * @param sql_text
  * @param print
- * @return std::string
+ * @return Table
  */
-String
+SharedPtr<Table>
 SQLRunner::RunV2(const String& sql_text, bool print) {
     if(print) {
         LOG_TRACE("{}", sql_text);
@@ -141,15 +141,12 @@ SQLRunner::RunV2(const String& sql_text, bool print) {
     query_context_ptr.get()->scheduler()->Schedule(query_context_ptr.get(), plan_fragment.get());
 
     // Initialize query result
-    {
-        QueryResult query_result;
-        query_result.result_ = plan_fragment->GetResult();
-        query_result.root_operator_type_ = unoptimized_plan->operator_type();
-    }
+    QueryResult query_result;
+    query_result.result_ = plan_fragment->GetResult();
+    query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
     parsed_result->Reset();
     query_context_ptr->CommitTxn();
-    return String();
+    return query_result.result_;
 }
-
 }

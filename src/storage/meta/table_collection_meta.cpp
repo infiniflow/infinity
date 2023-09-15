@@ -246,7 +246,6 @@ TableCollectionMeta::GetEntry(TableCollectionMeta* table_meta,
         return {nullptr, MakeUnique<String>("Empty table entry list.")};
     }
 
-
     for(const auto& table_entry: table_meta->entry_list_) {
         if(table_entry->entry_type_ == EntryType::kDummy) {
             LOG_TRACE("No valid table entry.")
@@ -258,7 +257,7 @@ TableCollectionMeta::GetEntry(TableCollectionMeta* table_meta,
             if(begin_ts > table_entry->commit_ts_) {
                 if(table_entry->deleted_) {
                     // LOG_TRACE("Table was dropped.")
-                    return {nullptr, nullptr};
+                    return {nullptr, MakeUnique<String>("Table was dropped.")};
                 } else {
                     return {table_entry.get(), nullptr};
                 }
