@@ -113,9 +113,6 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
 
     auto table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     // Init the table definition
-    output_state->table_def_ = std::move(table_def);
-
-
 
     // Get tables from catalog
     Txn* txn = query_context->GetTxn();
@@ -274,8 +271,6 @@ PhysicalShow::ExecuteShowColumns(QueryContext *query_context,
         };
 
         SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
-
-        output_state->table_def_ = std::move(table_def);
 
         // create data block for output state
         auto output_block_ptr = DataBlock::Make();

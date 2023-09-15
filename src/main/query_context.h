@@ -48,8 +48,8 @@ public:
         storage_ = storage_ptr;
         resource_manager_ = resource_manager_ptr;
         initialized_ = true;
-        cpu_number_limit_ = resource_manager_ptr->GetMemoryResource();
-        memory_size_limit_ = resource_manager_ptr->GetCpuResource();
+        cpu_number_limit_ = resource_manager_ptr->GetCpuResource();
+        memory_size_limit_ = resource_manager_ptr->GetMemoryResource();
     }
 
     inline void

@@ -10,25 +10,50 @@ namespace infinity {
 
 UniquePtr<PlanFragment>
 FragmentBuilder::BuildFragment(PhysicalOperator* phys_op) {
-    auto plan_fragment = MakeUnique<PlanFragment>(query_context_ptr_, SinkType::kResult, phys_op);
+    auto plan_fragment = MakeUnique<PlanFragment>();
+    plan_fragment->AddSinkNode(query_context_ptr_,
+                               SinkType::kResult,
+                               phys_op->GetOutputNames(),
+                               phys_op->GetOutputTypes());
     BuildFragments(phys_op, plan_fragment.get());
+    plan_fragment->AddSourceNode(query_context_ptr_,
+                                 SourceType::kEmpty,
+                                 phys_op->GetOutputNames(),
+                                 phys_op->GetOutputTypes());
     return plan_fragment;
 }
 
 void
 FragmentBuilder::BuildExplain(PhysicalOperator* phys_op, PlanFragment* current_fragment_ptr) {
 
-    // Build explain pipeline fragment
-    SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-    auto explain_child_fragment = this->BuildFragment(phys_op->left().get());
-
-    // Generate explain context of the child fragment
-    ExplainFragment::Explain(explain_child_fragment.get(), texts_ptr);
     PhysicalExplain* explain_op = (PhysicalExplain*)phys_op;
-    explain_op->SetExplainText(texts_ptr);
+    switch(explain_op->explain_type()) {
 
-    // Set texts to explain physical operator
-    current_fragment_ptr->AddOperator(phys_op);
+        case ExplainType::kAnalyze: {
+            NotImplementError("Not implement: Query analyze");
+        }
+        case ExplainType::kAst:
+        case ExplainType::kUnOpt:
+        case ExplainType::kOpt:
+        case ExplainType::kPhysical: {
+            current_fragment_ptr->AddOperator(phys_op);
+            break;
+        }
+        case ExplainType::kPipeline:{
+            // Build explain pipeline fragment
+            SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
+            auto explain_child_fragment = this->BuildFragment(phys_op->left().get());
+
+            // Generate explain context of the child fragment
+            ExplainFragment::Explain(explain_child_fragment.get(), texts_ptr);
+
+            explain_op->SetExplainText(texts_ptr);
+
+            // Set texts to explain physical operator
+            current_fragment_ptr->AddOperator(phys_op);
+            break;
+        }
+    }
 }
 
 void
@@ -75,9 +100,11 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
             if(phys_op->left() == nullptr) {
                 SchedulerError("No input node of aggregate operator")
             }
-            auto next_plan_fragment = MakeUnique<PlanFragment>(query_context_ptr_,
-                                                               SinkType::kLocalQueue,
-                                                               phys_op->left().get());
+            auto next_plan_fragment = MakeUnique<PlanFragment>();
+            next_plan_fragment->AddSinkNode(query_context_ptr_,
+                                            SinkType::kLocalQueue,
+                                            phys_op->left()->GetOutputNames(),
+                                            phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op, next_plan_fragment.get());
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             return ;
@@ -109,10 +136,12 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
             if(phys_op->left() == nullptr) {
                 SchedulerError(fmt::format("No input node of {}", phys_op->GetName()));
             }
-            auto next_plan_fragment = MakeUnique<PlanFragment>(query_context_ptr_,
-                                                               SinkType::kLocalQueue,
-                                                               phys_op->left().get());
-            BuildFragments(phys_op, next_plan_fragment.get());
+            auto next_plan_fragment = MakeUnique<PlanFragment>();
+            next_plan_fragment->AddSinkNode(query_context_ptr_,
+                                            SinkType::kLocalQueue,
+                                            phys_op->left()->GetOutputNames(),
+                                            phys_op->left()->GetOutputTypes());
+            BuildFragments(phys_op->left().get(), next_plan_fragment.get());
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             return ;
         }

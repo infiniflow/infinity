@@ -1,6 +1,7 @@
 //
-// Created by JinHai on 2022/7/28.
+// Created by jinhai on 23-9-15.
 //
+
 
 #pragma once
 
@@ -8,18 +9,18 @@
 
 namespace infinity {
 
-class PhysicalAlter final : public PhysicalOperator {
+class PhysicalMergeParallelAggregate final : public PhysicalOperator {
 public:
     explicit
-    PhysicalAlter(SharedPtr<Vector<String>> output_names,
-                  SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                  u64 id)
-                  : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id),
-                    output_names_(std::move(output_names)),
-                    output_types_(std::move(output_types)) {
+    PhysicalMergeParallelAggregate(SharedPtr<Vector<String>> output_names,
+                                   SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                                   u64 id)
+            : PhysicalOperator(PhysicalOperatorType::kMergeParallelAggregate, nullptr, nullptr, id),
+              output_names_(std::move(output_names)),
+              output_types_(std::move(output_types)) {
     }
 
-    ~PhysicalAlter() override = default;
+    ~PhysicalMergeParallelAggregate() override = default;
 
     void
     Init() override;

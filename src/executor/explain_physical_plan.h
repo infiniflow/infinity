@@ -5,40 +5,51 @@
 #pragma once
 
 #include "physical_operator.h"
-#include "executor/operator/physical_create_schema.h"
-#include "executor/operator/physical_create_table.h"
-#include "executor/operator/physical_create_collection.h"
-#include "executor/operator/physical_drop_schema.h"
-#include "executor/operator/physical_drop_table.h"
-#include "executor/operator/physical_drop_collection.h"
-#include "executor/operator/physical_insert.h"
-#include "executor/operator/physical_project.h"
-#include "executor/operator/physical_filter.h"
-#include "executor/operator/physical_table_scan.h"
-#include "executor/operator/physical_aggregate.h"
-#include "executor/operator/physical_sort.h"
-#include "executor/operator/physical_limit.h"
-#include "executor/operator/physical_cross_product.h"
-#include "executor/operator/physical_nested_loop_join.h"
-#include "executor/operator/physical_show.h"
-#include "executor/operator/physical_union_all.h"
-#include "executor/operator/physical_index_scan.h"
-#include "executor/operator/physical_dummy_scan.h"
-#include "executor/operator/physical_hash_join.h"
-#include "executor/operator/physical_sort_merge_join.h"
-#include "executor/operator/physical_index_join.h"
-#include "executor/operator/physical_top.h"
-#include "executor/operator/physical_delete.h"
-#include "executor/operator/physical_update.h"
-#include "executor/operator/physical_import.h"
-#include "executor/operator/physical_export.h"
-#include "executor/operator/physical_alter.h"
-#include "executor/operator/physical_create_view.h"
-#include "executor/operator/physcial_drop_view.h"
-#include "executor/operator/physical_flush.h"
 
 namespace infinity {
 
+class PhysicalUnionAll;
+class PhysicalIndexScan;
+class PhysicalDummyScan;
+class PhysicalHashJoin;
+class PhysicalSortMergeJoin;
+class PhysicalIndexJoin;
+class PhysicalTop;
+class PhysicalDelete;
+class PhysicalUpdate;
+class PhysicalImport;
+class PhysicalExport;
+class PhysicalAlter;
+class PhysicalCreateView;
+class PhysicalDropView;
+class PhysicalCreateSchema;
+class PhysicalCreateTable;
+class PhysicalCreateCollection;
+class PhysicalDropSchema;
+class PhysicalDropTable;
+class PhysicalDropCollection;
+class PhysicalInsert;
+class PhysicalProject;
+class PhysicalFilter;
+class PhysicalTableScan;
+class PhysicalAggregate;
+class PhysicalSort;
+class PhysicalLimit;
+class PhysicalCrossProduct;
+class PhysicalNestedLoopJoin;
+class PhysicalShow;
+class PhysicalFlush;
+class PhysicalSource;
+class PhysicalSink;
+class PhysicalParallelAggregate;
+class PhysicalMergeParallelAggregate;
+class PhysicalIntersect;
+class PhysicalExcept;
+class PhysicalHash;
+class PhysicalMergeHash;
+class PhysicalMergeLimit;
+class PhysicalMergeTop;
+class PhysicalMergeSort;
 class ExplainPhysicalPlan {
 public:
     static void
@@ -198,6 +209,61 @@ public:
 
     static void
     Explain(const PhysicalFlush* flush_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalSource* source_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalSink* flush_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalParallelAggregate* parallel_aggregate_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalMergeParallelAggregate* merge_parallel_aggregate_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalIntersect* intersect_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalExcept* except_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalHash* hash_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalMergeHash* merge_hash_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalMergeLimit* merge_limit_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalMergeTop* merge_top_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalMergeSort* merge_sort_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 };

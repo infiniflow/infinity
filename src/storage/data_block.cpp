@@ -41,7 +41,9 @@ DataBlock::Init(const SharedPtr<DataBlock>& input, SizeT start_idx, SizeT end_id
 void
 DataBlock::Init(const Vector<SharedPtr<DataType>>& types, SizeT capacity) {
     StorageAssert(!initialized, "Data block was initialized before.");
-    StorageAssert(!types.empty(), "Empty data types collection.")
+    if(types.empty()) {
+        StorageError("Empty data types collection.")
+    }
     column_count_ = types.size();
     column_vectors.reserve(column_count_);
     for(SizeT idx = 0; idx < column_count_; ++ idx) {

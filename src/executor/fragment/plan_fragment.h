@@ -16,9 +16,7 @@ namespace infinity {
 
 class PlanFragment {
 public:
-    PlanFragment(QueryContext* query_context,
-                 SinkType sink_type,
-                 PhysicalOperator* last_phys_op);
+    PlanFragment() = default;
 
     virtual
     ~PlanFragment() = default;

@@ -62,12 +62,6 @@ public:
         return is_terminator_;
     }
 
-    inline void
-    SetInputOutputState(InputState* input_state_ptr, OutputState* output_state_ptr) {
-        input_state_ptr_ = input_state_ptr;
-        output_state_ptr_ = output_state_ptr;
-    }
-
     InputState*
     GetInputStateByOperatorID(i64 operator_id) {
         return operator_input_state_[operator_id].get();
@@ -109,12 +103,8 @@ public:
 
 private:
     void* fragment_context_{};
-    FragmentSourceType source_type_{FragmentSourceType::kScan};
-    FragmentSinkType sink_type_{FragmentSinkType::kGlobalMaterialize};
     bool is_terminator_{false};
     i64 last_worker_id_{-1};
-    InputState* input_state_ptr_{};
-    OutputState* output_state_ptr_{};
     i64 task_id_{-1};
     i64 operator_count_{0};
 };

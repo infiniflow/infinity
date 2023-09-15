@@ -36,8 +36,16 @@ PhysicalSink::Execute(QueryContext* query_context, SinkState* sink_state) {
                 }
                 case PhysicalOperatorType::kShow: {
                     ShowOutputState* show_output_state = static_cast<ShowOutputState*>(common_sink_state->prev_output_state_);
-                    common_sink_state->column_defs_ = show_output_state->table_def_->columns();
                     common_sink_state->data_block_array_ = std::move(show_output_state->output_);
+                    break;
+                }
+                case PhysicalOperatorType::kExplain: {
+                    ExplainOutputState* explain_output_state
+                        = static_cast<ExplainOutputState*>(common_sink_state->prev_output_state_);
+                    if(explain_output_state->data_block_ == nullptr) {
+                        ExecutorError("Empty explain output")
+                    }
+                    common_sink_state->data_block_array_.emplace_back(explain_output_state->data_block_);
                     break;
                 }
                 default: {
