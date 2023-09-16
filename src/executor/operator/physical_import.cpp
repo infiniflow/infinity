@@ -162,19 +162,22 @@ PhysicalImport::ImportJSON(QueryContext* query_context) {
  * @param input_state
  * @param output_state
  */
-void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
+void PhysicalImport::ImportCSV(QueryContext *query_context,
+                               ImportInputState *input_state,
+                               ImportOutputState *output_state) {
+
     ParserContext parser_context{};
     ImportCSVHelper(query_context, parser_context);
 
-    // Generate the result
-    Vector<SharedPtr<ColumnDef>> column_defs;
-    auto result_table_def_ptr
-                = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_state->table_def_ = std::move(result_table_def_ptr);
+//    // Generate the result
+//    Vector<SharedPtr<ColumnDef>> column_defs;
+//    auto result_table_def_ptr
+//                = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+//    output_state->table_def_ = std::move(result_table_def_ptr);
 
 
-    auto result_msg = MakeShared<String>(fmt::format("AFFECT {} Rows", parser_context.row_count_));
-    output_state->result_msg_= std::move(result_msg);
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", parser_context.row_count_));
+    output_state->result_msg_ = std::move(result_msg);
 }
 
 /**
@@ -184,7 +187,9 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *in
  * @param output_state
  */
 void
-PhysicalImport::ImportJSON(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
+PhysicalImport::ImportJSON(QueryContext *query_context,
+                           ImportInputState *input_state,
+                           ImportOutputState *output_state) {
 
 }
 
@@ -196,9 +201,8 @@ PhysicalImport::CSVHeaderHandler(void *context) {
 
     SizeT table_column_count = parser_context->table_collection_entry_->columns_.size();
     if(csv_column_count != table_column_count) {
-        parser_context->err_msg_ =
-                MakeShared<String>(fmt::format("Unmatched column count ({} != {})",
-                                               csv_column_count, table_column_count));
+        parser_context->err_msg_ = MakeShared<String>(fmt::format("Unmatched column count ({} != {})",
+                                                                  csv_column_count, table_column_count));
 
         zsv_abort(parser_context->parser_); // return zsv_status_cancelled
         return ;
@@ -208,14 +212,10 @@ PhysicalImport::CSVHeaderHandler(void *context) {
     for (SizeT idx = 0; idx < csv_column_count; ++idx) {
         auto *csv_col_name = reinterpret_cast<const char *>(
             zsv_get_cell_str(parser_context->parser_, idx));
-        auto *table_col_name =
-            parser_context->table_collection_entry_->columns_[idx]
-                ->name()
-                .c_str();
+        auto *table_col_name = parser_context->table_collection_entry_->columns_[idx]->name().c_str();
         if (!strcmp(csv_col_name, table_col_name)) {
             parser_context->err_msg_ = MakeShared<String>(
-                fmt::format("Unmatched column name({} != {})", csv_col_name,
-                            table_col_name));
+                fmt::format("Unmatched column name({} != {})", csv_col_name, table_col_name));
 
             zsv_abort(parser_context->parser_); // return zsv_status_cancelled
             return;
@@ -245,8 +245,7 @@ PhysicalImport::CSVRowHandler(void *context) {
         
         // add to txn_store
         txn_store->Import(segment_entry);
-        
-        
+
         // create new segment entry
         // TODO the segment_id is wrong
         parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(
@@ -258,17 +257,17 @@ PhysicalImport::CSVRowHandler(void *context) {
 
     // append data to segment entry
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
-        struct zsv_cell cell =
-            zsv_get_cell(parser_context->parser_, column_idx);
-        StringView data{};
+        struct zsv_cell cell = zsv_get_cell(parser_context->parser_, column_idx);
+        StringView str_view{};
         if (cell.len) {
-            data = StringView((char *)cell.str, cell.len);   
+            str_view = StringView((char *)cell.str, cell.len);
         }
+
         auto column_data_entry = segment_entry->columns_[column_idx];
         if (segment_entry->columns_[column_idx]->column_type_->IsEmbedding()) {
-            ColumnDataEntry::AppendEmbedding(column_data_entry.get(), data, write_row, parser_context->delimiter_);
+            ColumnDataEntry::AppendEmbedding(column_data_entry.get(), str_view, write_row, parser_context->delimiter_);
         } else {
-            ColumnDataEntry::Append(column_data_entry.get(), data, write_row);
+            ColumnDataEntry::Append(column_data_entry.get(), str_view, write_row);
         }
     }
 

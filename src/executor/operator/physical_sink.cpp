@@ -115,11 +115,25 @@ PhysicalSink::Execute(QueryContext* query_context, SinkState* sink_state) {
                             MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
                     };
                 }
-
             }
-        }
-        case SinkStateType::kMessage:
             break;
+        }
+        case SinkStateType::kMessage: {
+            MessageSinkState* message_sink_state = static_cast<MessageSinkState*>(sink_state);
+            switch(sink_state->prev_output_state_->operator_type_) {
+                case PhysicalOperatorType::kImport: {
+                    auto* import_output_state = static_cast<ImportOutputState*>(sink_state->prev_output_state_);
+                    message_sink_state->message_ = std::move(import_output_state->result_msg_);
+                    break;
+                }
+                default: {
+                    NotImplementError(fmt::format("{} isn't supported here.",
+                                                  PhysicalOperatorToString(sink_state->prev_output_state_->operator_type_)));
+                    break;
+                }
+            }
+            break;
+        }
     }
 }
 

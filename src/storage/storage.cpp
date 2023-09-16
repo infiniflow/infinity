@@ -72,17 +72,17 @@ Storage::GetLatestCatalog(const String& dir) {
     SharedPtr<DirEntry> latest;
     const std::regex catalog_file_regex("META_[0-9]+\\.json");
     for(const auto& dir_entry_ptr: dir_array) {
+        LOG_TRACE("Candidate file name: {}", dir_entry_ptr->path().c_str());
         if(dir_entry_ptr->is_regular_file()) {
+            String current_file_name = dir_entry_ptr->path().filename();
+            if(!std::regex_match(current_file_name, catalog_file_regex)) {
+                continue;
+            }
+
             if(latest == nullptr) {
                 latest = dir_entry_ptr;
             } else {
-
-                String current_file_name = dir_entry_ptr->path();
-                if(!std::regex_match(current_file_name, catalog_file_regex)) {
-                    continue;
-                }
-
-                if(dir_entry_ptr->path() > latest->path()) {
+                if(dir_entry_ptr->path().filename() > latest->path().filename()) {
                     latest = dir_entry_ptr;
                 }
             }

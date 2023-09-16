@@ -46,6 +46,42 @@ BuildSerialTaskStateTemplate(Vector<PhysicalOperator*>& fragment_operators,
     }
 }
 
+template<>
+void
+BuildSerialTaskStateTemplate<ImportInputState, ImportOutputState>(Vector<PhysicalOperator*>& fragment_operators,
+                                                                  Vector<UniquePtr<FragmentTask>>& tasks,
+                                                                  i64 operator_id,
+                                                                  i64 operator_count) {
+    if(tasks.size() != 1) {
+        SchedulerError("Serial fragment type will only have one task")
+    }
+
+    FragmentTask* task_ptr = tasks.back().get();
+    SourceState* source_ptr = tasks.back()->source_state_.get();
+    SinkState* sink_ptr = tasks.back()->sink_state_.get();
+
+    task_ptr->operator_input_state_[operator_id] = MakeUnique<ImportInputState>();
+    auto input_state = (ImportInputState*)(task_ptr->operator_input_state_[operator_id].get());
+    task_ptr->operator_output_state_[operator_id] = MakeUnique<ImportOutputState>();
+    auto output_state = (ImportOutputState*)(task_ptr->operator_output_state_[operator_id].get());
+//    output_state->data_block_ = DataBlock::Make();
+//    output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
+    if(operator_id == 0) {
+        // First operator must get data source node
+        source_ptr->SetNextState(input_state);
+    }
+
+    if(operator_id > 0 && operator_id < operator_count) {
+        OutputState* prev_output_state = task_ptr->operator_output_state_[operator_id - 1].get();
+        input_state->input_data_block_ = prev_output_state->data_block_.get();
+    }
+
+    if(operator_id == operator_count - 1) {
+        // Last operator
+        sink_ptr->SetPrevState(output_state);
+    }
+}
+
 template<typename InputStateType, typename OutputStateType>
 void
 BuildParallelTaskStateTemplate(Vector<PhysicalOperator*>& fragment_operators,

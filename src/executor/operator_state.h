@@ -305,7 +305,7 @@ struct ImportOutputState : public OutputState {
     Vector<SharedPtr<DataBlock>> output_{};
     SharedPtr<TableDef> table_def_{};
     // For insert, update, delete, update
-    SharedPtr<String> result_msg_{};
+    UniquePtr<String> result_msg_{};
 };
 
 // Export
