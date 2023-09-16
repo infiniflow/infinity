@@ -42,13 +42,22 @@ TableCollectionEntry::Append(TableCollectionEntry* table_entry, Txn* txn_ptr, vo
 
         // Need double-check
         if(table_entry->unsealed_segment_ == nullptr) {
-            u64 next_segment_id = TableCollectionEntry::GetNextSegmentID(table_entry);
-            SharedPtr<SegmentEntry> new_segment = SegmentEntry::MakeNewSegmentEntry(table_entry,
-                                                                                    table_entry->txn_id_,
-                                                                                    next_segment_id,
-                                                                                    buffer_mgr);
-            table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
-            table_entry->unsealed_segment_ = new_segment.get();
+            // Note: if there is uncommitted segment, we should use it first, otherwise we should create a new segment
+            if (!txn_store_ptr->uncommitted_segments_.empty()){
+                auto new_segment=txn_store_ptr->uncommitted_segments_[0];
+                txn_store_ptr->uncommitted_segments_.erase(txn_store_ptr->uncommitted_segments_.begin());
+                table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
+                table_entry->unsealed_segment_ = new_segment.get();
+            } else {
+                u64 next_segment_id = TableCollectionEntry::GetNextSegmentID(table_entry);
+                SharedPtr<SegmentEntry> new_segment = SegmentEntry::MakeNewSegmentEntry(table_entry,
+                                                                                        table_entry->txn_id_,
+                                                                                        next_segment_id,
+                                                                                        buffer_mgr);
+                table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
+                table_entry->unsealed_segment_ = new_segment.get();
+          }
+
 //            table_entry->unsealed_segment_->Init(this->definition_ptr_->columns(), dir_, buffer_mgr_);
             LOG_TRACE("Add a new segment");
         }
