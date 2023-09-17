@@ -35,13 +35,15 @@ Binding::MakeBinding(BindingType binding_type,
                      u64 table_index,
                      TableCollectionEntry* table_ptr,
                      SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                     SharedPtr<Vector<String>> column_names) {
+                     SharedPtr<Vector<String>> column_names,
+                     SharedPtr<Vector<SegmentEntry*>> segment_entries) {
     auto binding = MakeBinding(binding_type,
                                binding_alias,
                                table_index,
                                std::move(column_types),
                                std::move(column_names));
     binding->table_collection_entry_ptr_ = table_ptr;
+    binding->segment_entries_ = segment_entries;
 //    binding->logical_node_ptr_ = std::move(logical_node_ptr);
 //    binding->logical_node_id_ = logical_node_id;
     return binding;

@@ -232,7 +232,7 @@ QueryBinder::BuildTable(QueryContext* query_context,
     // else the table will be checked in catalog
 
     String schema_name{};
-    if(from_table->schema_name_.empty()) {
+    if(from_table->db_name_.empty()) {
         // Before find the table meta from catalog, Attempt to get CTE info from bind context which saved CTE info into before.
         if(SharedPtr<TableRef> cte_ref = BuildCTE(query_context, from_table->table_name_); cte_ref != nullptr) {
             return cte_ref;
@@ -341,39 +341,45 @@ SharedPtr<TableRef>
 QueryBinder::BuildBaseTable(QueryContext* query_context,
                             const TableReference* from_table) {
     String schema_name;
-    if(from_table->schema_name_.empty()) {
+    if(from_table->db_name_.empty()) {
         schema_name = "default";
     } else {
-        schema_name = from_table->schema_name_;
+        schema_name = from_table->db_name_;
     }
     EntryResult result = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_);
     if(result.err_ != nullptr) {
         PlannerError(*result.err_);
     }
-    TableCollectionEntry* table_entry = static_cast<TableCollectionEntry*>(result.entry_);
-    if(table_entry->table_collection_type_ == TableCollectionType::kCollectionEntry) {
+    TableCollectionEntry* table_collection_entry = static_cast<TableCollectionEntry*>(result.entry_);
+    if(table_collection_entry->table_collection_type_ == TableCollectionType::kCollectionEntry) {
         PlannerError("Currently, collection isn't supported.");
     }
-
 
     String alias = from_table->GetTableName();
     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
     SharedPtr<Vector<String>> names_ptr = MakeShared<Vector<String>>();
     Vector<SizeT> columns;
 
-    SizeT column_count = table_entry->columns_.size();
+    SizeT column_count = table_collection_entry->columns_.size();
     types_ptr->reserve(column_count);
     names_ptr->reserve(column_count);
     columns.reserve(column_count);
     for(SizeT idx = 0; idx < column_count; ++ idx) {
-        const ColumnDef* column_def = table_entry->columns_[idx].get();
+        const ColumnDef* column_def = table_collection_entry->columns_[idx].get();
         types_ptr->emplace_back(column_def->column_type_);
         names_ptr->emplace_back(column_def->name_);
         columns.emplace_back(idx);
     }
 
-    SharedPtr<TableScanFunction> scan_function = TableScanFunction::Make(query_context->storage()->catalog(), "seq_scan");
-    SharedPtr<TableScanFunctionData> function_data = MakeShared<TableScanFunctionData>(table_entry, columns);
+    u64 txn_id = query_context->GetTxn()->TxnID();
+    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
+
+    SharedPtr<SeqScanFunction> scan_function = SeqScanFunction::Make(query_context->storage()->catalog(), "seq_scan");
+    SharedPtr<Vector<SegmentEntry*>> segment_entries = TableCollectionEntry::GetSegmentEntries(table_collection_entry, txn_id, begin_ts);
+    SharedPtr<SeqScanFunctionData> function_data
+        = MakeShared<SeqScanFunctionData>(table_collection_entry,
+                                            segment_entries,
+                                            columns);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(scan_function,
@@ -384,7 +390,7 @@ QueryBinder::BuildBaseTable(QueryContext* query_context,
                                               types_ptr);
 
     // Insert the table in the binding context
-    this->bind_context_ptr_->AddTableBinding(alias, table_index, table_entry, types_ptr, names_ptr);
+    this->bind_context_ptr_->AddTableBinding(alias, table_index, table_collection_entry, types_ptr, names_ptr, segment_entries);
 
     return table_ref;
 }
@@ -393,7 +399,7 @@ SharedPtr<TableRef>
 QueryBinder::BuildView(QueryContext* query_context,
                        const TableReference* from_table) {
 
-    EntryResult result = query_context->GetTxn()->GetViewByName(from_table->schema_name_, from_table->table_name_);
+    EntryResult result = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_);
     if(result.err_ != nullptr) {
         PlannerError(*result.err_);
     }

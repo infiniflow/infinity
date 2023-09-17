@@ -16,7 +16,7 @@ public:
 };
 
 using TableFunctionType
-    = std::function<void(QueryContext* query_context, SharedPtr<TableFunctionData> data, DataBlock &output)>;
+    = std::function<void(QueryContext* query_context, TableFunctionData* data, DataBlock &output)>;
 
 
 class TableFunction : public Function {

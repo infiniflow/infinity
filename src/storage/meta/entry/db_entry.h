@@ -10,6 +10,7 @@
 #include "common/types/internal_types.h"
 #include "table_collection_entry.h"
 #include "storage/meta/table_collection_meta.h"
+#include "storage/common/table_collection_detail.h"
 
 namespace infinity {
 
@@ -60,6 +61,11 @@ public:
     TableCollections(DBEntry* db_entry,
                      u64 txn_id,
                      TxnTimeStamp begin_ts);
+
+    static Vector<TableCollectionDetail>
+    GetTableCollectionsDetail(DBEntry* db_entry,
+                              u64 txn_id,
+                              TxnTimeStamp);
 
     static SharedPtr<String>
     ToString(DBEntry* db_entry);

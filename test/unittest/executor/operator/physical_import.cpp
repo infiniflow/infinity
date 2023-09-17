@@ -6,7 +6,7 @@
 #include "bin/compilation_config.h"
 #include "common/types/data_type.h"
 #include "common/types/internal_types.h"
-#include "function/table/table_scan.h"
+#include "function/table/seq_scan.h"
 #include "main/infinity.h"
 #include "main/query_context.h"
 #include "main/stats/global_resource_usage.h"

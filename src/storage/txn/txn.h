@@ -61,7 +61,7 @@ public:
     EntryResult
     GetDatabase(const String& db_name);
 
-    Vector<TableCollectionEntry*>
+    Vector<TableCollectionDetail>
     GetTableCollections(const String& db_name);
 
     EntryResult

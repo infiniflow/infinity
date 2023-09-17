@@ -296,7 +296,7 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
     }
 
     NewCatalog* catalog = query_context_->storage()->catalog();
-    SharedPtr<TableScanFunction> scan_function = TableScanFunction::Make(catalog, "seq_scan");
+    SharedPtr<SeqScanFunction> scan_function = SeqScanFunction::Make(catalog, "seq_scan");
 
     SharedPtr<LogicalTableScan> logical_table_scan = MakeShared<LogicalTableScan>(
             bind_context_ptr_->GetNewLogicalNodeId(),
@@ -306,7 +306,8 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
             table_index,
             column_ids,
             column_names,
-            column_types);
+            column_types,
+            table_binding_ptr->segment_entries_);
 
     // Generate cross product
     u64 logical_node_id = bind_context_ptr_->GetNewLogicalNodeId();

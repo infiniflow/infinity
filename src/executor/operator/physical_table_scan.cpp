@@ -13,7 +13,21 @@ PhysicalTableScan::Init() {
 
 void
 PhysicalTableScan::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+    auto* table_scan_input_state = static_cast<TableScanInputState*>(input_state);
+    auto* table_scan_output_state = static_cast<TableScanOutputState*>(output_state);
 
+    Vector<u64>& segment_entry_index_array = *table_scan_input_state->segment_entry_indexes_;
+    for(const u64 segment_idx: segment_entry_index_array) {
+        SegmentEntry* segment_entry = table_scan_function_data_ptr_->segment_entries_->at(segment_idx);
+        LOG_TRACE("Segment Entry ID: {}", segment_entry->segment_id_);
+    }
+
+    table_scan_output_state->data_block_ = MakeShared<DataBlock>();
+    table_scan_output_state->data_block_->Init(*column_types_);
+
+    table_scan_func_ptr_->main_function_(query_context,
+                                         table_scan_function_data_ptr_.get(),
+                                         *table_scan_output_state->data_block_);
 }
 
 void
@@ -43,7 +57,7 @@ PhysicalTableScan::Execute(QueryContext* query_context) {
          output_block->Init(*column_types_);
          table_scan_func_ptr_->main_function_(
                  query_context,
-                 table_scan_function_data_ptr_,
+                 table_scan_function_data_ptr_.get(),
                  *output_block);
         if(output_block->row_count() > 0) {
             output_->Append(output_block);
@@ -53,9 +67,18 @@ PhysicalTableScan::Execute(QueryContext* query_context) {
     }
 }
 
-Vector<Vector<u64>>
-PhysicalTableScan::GetSegmentIDs(i64 parallel_count) const {
-    Vector<Vector<u64>> result(parallel_count, Vector<u64>());
+Vector<SharedPtr<Vector<u64>>>
+PhysicalTableScan::PlanSegmentEntries(i64 parallel_count) const {
+    SizeT segment_count = table_scan_function_data_ptr_->segment_entries_->size();
+    Vector<SharedPtr<Vector<u64>>> result(parallel_count, nullptr);
+    for(SizeT task_id = 0; task_id < parallel_count; ++ task_id) {
+        result[task_id] = MakeShared<Vector<u64>>();
+    }
+
+    for(SizeT idx = 0; idx < segment_count; ++ idx) {
+        u64 task_id = idx % parallel_count;
+        result[task_id]->emplace_back(idx);
+    }
     return result;
 }
 

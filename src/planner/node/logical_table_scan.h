@@ -6,7 +6,7 @@
 
 #include "planner/logical_node.h"
 
-#include "function/table/table_scan.h"
+#include "function/table/seq_scan.h"
 
 #include "storage/table.h"
 
@@ -17,12 +17,13 @@ public:
     explicit
     LogicalTableScan(u64 node_id,
                      TableCollectionEntry* table_ptr,
-                     SharedPtr<TableScanFunction> table_scan_func,
+                     SharedPtr<SeqScanFunction> seq_scan_func,
                      String table_alias,
                      u64 table_index,
                      Vector<SizeT> column_ids,
                      SharedPtr<Vector<String>> column_names,
-                     SharedPtr<Vector<SharedPtr<DataType>>> column_types);
+                     SharedPtr<Vector<SharedPtr<DataType>>> column_types,
+                     SharedPtr<Vector<SegmentEntry*>> segment_entries);
 
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final;
@@ -56,8 +57,9 @@ public:
 
     SharedPtr<Vector<String>> column_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
+    SharedPtr<Vector<SegmentEntry*>> segment_entries_{};
 
-    SharedPtr<TableScanFunction> table_scan_func_ptr_{nullptr};
+    SharedPtr<SeqScanFunction> table_scan_func_ptr_{nullptr};
 private:
     TableCollectionEntry* table_collection_ptr_{};
 

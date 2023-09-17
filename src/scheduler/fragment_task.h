@@ -39,9 +39,6 @@ enum class FragmentTaskState {
 class FragmentTask {
 public:
 
-
-public:
-
     explicit
     FragmentTask(bool terminator = true) : is_terminator_(terminator) {}
 

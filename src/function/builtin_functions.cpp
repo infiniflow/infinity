@@ -42,7 +42,7 @@
 #include "function/scalar/substring.h"
 
 // Table function
-#include "table/table_scan.h"
+#include "table/seq_scan.h"
 #include "function/scalar/not.h"
 
 namespace infinity {
@@ -108,7 +108,7 @@ BuiltinFunctions::RegisterScalarFunction() {
 void
 BuiltinFunctions::RegisterTableFunction() {
 
-    RegisterTableScanFunction(catalog_ptr_);
+    RegisterSeqScanFunction(catalog_ptr_);
 }
 
 }

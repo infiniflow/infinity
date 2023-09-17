@@ -86,6 +86,9 @@ FragmentScheduler::Schedule(QueryContext* query_context, PlanFragment* plan_frag
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
     Vector<UniquePtr<FragmentTask>>& tasks = plan_fragment->CreateTasks(query_context);
+
+    LOG_TRACE("Create {} tasks", tasks.size());
+
     for(const auto& fragment_task: tasks) {
         ScheduleTask(fragment_task.get());
     }

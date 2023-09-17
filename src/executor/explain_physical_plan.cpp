@@ -952,9 +952,9 @@ ExplainPhysicalPlan::Explain(const PhysicalShow* show_node,
             show_str += "(" + std::to_string(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
 
-            String show_column_schema_str = String(intent_size, ' ') + " - schema: ";
-            show_column_schema_str += show_node->schema_name();
-            result->emplace_back(MakeShared<String>(show_column_schema_str));
+            String show_column_db_str = String(intent_size, ' ') + " - schema: ";
+            show_column_db_str += show_node->db_name();
+            result->emplace_back(MakeShared<String>(show_column_db_str));
 
             String show_column_table_str = String(intent_size, ' ') + " - table/collection: ";
             show_column_table_str += show_node->object_name();

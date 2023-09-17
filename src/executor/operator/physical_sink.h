@@ -59,6 +59,16 @@ public:
     }
 
 private:
+    void
+    FillSinkStateFromLastOutputState(GeneralSinkState* common_sink_state, OutputState* task_output_state);
+
+    void
+    FillSinkStateFromLastOutputState(ResultSinkState* common_sink_state, OutputState* task_output_state);
+
+    void
+    FillSinkStateFromLastOutputState(MessageSinkState* common_sink_state, OutputState* task_output_state);
+
+private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
     SinkType type_{SinkType::kInvalid};

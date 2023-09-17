@@ -386,8 +386,8 @@ Statement::BuildBaseTableRef(const BaseTableReference* base_table_ref,
         case TableRefType::kTable: {
             from_str = String(intent_size, ' ') + "table: ";
             auto *table_reference = (TableReference *) base_table_ref;
-            if (!table_reference->schema_name_.empty()) {
-                from_str += table_reference->schema_name_ + ".";
+            if (!table_reference->db_name_.empty()) {
+                from_str += table_reference->db_name_ + ".";
             }
             from_str += table_reference->table_name_;
             if (table_reference->alias_ != nullptr) {

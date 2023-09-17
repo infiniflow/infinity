@@ -18,7 +18,7 @@ public:
     String
     ToString() override;
 
-    String schema_name_{"default"};
+    String db_name_{"default"};
     String table_name_{};
 
     [[nodiscard]] String

@@ -1,6 +1,7 @@
 //
-// Created by JinHai on 2022/9/14.
+// Created by jinhai on 23-9-17.
 //
+
 
 #pragma once
 //#include <utility>
@@ -18,19 +19,20 @@ RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 class TableScanFunctionData: public TableFunctionData {
 public:
-    TableScanFunctionData(TableCollectionEntry* table_entry_ptr, Vector<SizeT> column_ids)
-        : table_entry_ptr_(table_entry_ptr),
-        column_ids_(std::move(column_ids))
+    TableScanFunctionData(const Vector<SegmentEntry*>* segment_entries_ptr,
+                          const SharedPtr<Vector<u64>>& segment_indexes,
+                          const Vector<SizeT>& column_ids)
+            : segment_entries_ptr_(segment_entries_ptr),
+            segment_indexes_(segment_indexes),
+            column_ids_(column_ids)
     {}
 
-    TableCollectionEntry* table_entry_ptr_;
-    Vector<SizeT> column_ids_;
-
-    // How many segments are scanned.
-    i64 segment_count_{0};
+    const Vector<SegmentEntry*>* segment_entries_ptr_{};
+    const SharedPtr<Vector<u64>>& segment_indexes_{};
+    const Vector<SizeT>& column_ids_{};
 
     i64 current_segment_id_{INITIAL_SEGMENT_ID};
-    SizeT read_offset_{0};
+    SizeT current_read_offset{0};
 };
 
 class TableScanFunction : public TableFunction {
@@ -44,16 +46,16 @@ public:
 
 public:
     explicit
-    TableScanFunction(std::string name, TableFunctionType function)
-        : TableFunction(std::move(name), {}, std::move(function))
-        {}
+    TableScanFunction(String name, TableFunctionType function)
+            : TableFunction(std::move(name), {}, std::move(function))
+    {}
 
 private:
 };
 
 static void
 TableScanFunc(QueryContext* query_context,
-              const SharedPtr<TableFunctionData>& table_function_data_ptr,
+              TableFunctionData* table_function_data_ptr,
               DataBlock &output);
 
 }

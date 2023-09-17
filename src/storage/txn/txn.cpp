@@ -282,7 +282,7 @@ Txn::GetDatabase(const String& db_name) {
     return NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
 }
 
-Vector<TableCollectionEntry*>
+Vector<TableCollectionDetail>
 Txn::GetTableCollections(const String& db_name) {
     EntryResult entry_result = GetDatabase(db_name);
     if(entry_result.err_ != nullptr) {
@@ -290,9 +290,8 @@ Txn::GetTableCollections(const String& db_name) {
     }
 
     DBEntry* db_entry = (DBEntry*)entry_result.entry_;
-    return DBEntry::TableCollections(db_entry, txn_id_, txn_context_.GetBeginTS());
+    return DBEntry::GetTableCollectionsDetail(db_entry, txn_id_, txn_context_.GetBeginTS());
 }
-
 
 EntryResult
 Txn::CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def, ConflictType conflict_type) {

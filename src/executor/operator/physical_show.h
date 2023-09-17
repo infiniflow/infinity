@@ -17,12 +17,12 @@ class PhysicalShow : public PhysicalOperator {
 public:
     explicit PhysicalShow(u64 id,
                           ShowType type,
-                          String schema_name,
+                          String db_name,
                           String object_name,
                           u64 table_index)
             : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id),
             scan_type_(type),
-            schema_name_(std::move(schema_name)),
+            db_name_(std::move(db_name)),
             object_name_(std::move(object_name)),
             table_index_(table_index)
             {}
@@ -54,8 +54,8 @@ public:
     }
 
     inline const String&
-    schema_name() const {
-        return schema_name_;
+    db_name() const {
+        return db_name_;
     };
 
     inline const String&
@@ -95,7 +95,7 @@ private:
 
 private:
     ShowType scan_type_{ShowType::kInvalid};
-    String schema_name_{};
+    String db_name_{};
     String object_name_{};
     u64 table_index_{};
 

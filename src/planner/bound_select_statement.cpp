@@ -143,7 +143,8 @@ BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef>& table_ref,
                                            base_table_ref->table_index_,
                                            base_table_ref->table_scan_function_data_->column_ids_,
                                            base_table_ref->column_names_,
-                                           base_table_ref->column_types_);
+                                           base_table_ref->column_types_,
+                                           base_table_ref->table_scan_function_data_->segment_entries_);
     return table_scan_node;
 }
 

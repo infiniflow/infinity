@@ -7,7 +7,7 @@
 #include "common/types/data_type.h"
 #include "common/types/internal_types.h"
 #include "common/types/logical_type.h"
-#include "function/table/table_scan.h"
+#include "function/table/seq_scan.h"
 #include "main/config.h"
 #include "main/infinity.h"
 #include "main/session.h"
@@ -43,7 +43,7 @@ TEST_F(TableScanTest, block_read_test) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     auto catalog = MakeUnique<NewCatalog>(MakeShared<String>("/tmp/infinity"));
-    RegisterTableScanFunction(catalog);
+    RegisterSeqScanFunction(catalog);
 
     Config config;
     config.Init(nullptr);
@@ -115,14 +115,16 @@ TEST_F(TableScanTest, block_read_test) {
         }
 
         Vector<SizeT> column_ids  {0};
-        auto table_scan_func = MakeShared<TableScanFunctionData>(&entry, column_ids);
+        auto table_scan_func = MakeShared<SeqScanFunctionData>(&entry,
+                                                                 nullptr,
+                                                                 column_ids);
         int times = 0; 
         while (true) {
 
             DataBlock output;
             output.Init(column_types, 1024);
             auto func = NewCatalog::GetTableFunctionByName(catalog.get(), "seq_scan");
-            func->main_function_(query_context.get(), table_scan_func, output);
+            func->main_function_(query_context.get(), table_scan_func.get(), output);
             if (output.row_count() == 0) {
                 break;
             }
@@ -147,14 +149,16 @@ TEST_F(TableScanTest, block_read_test) {
         }
 
         Vector<SizeT> column_ids  {0};
-        auto table_scan_func = MakeShared<TableScanFunctionData>(&entry, column_ids);
+        auto table_scan_func = MakeShared<SeqScanFunctionData>(&entry,
+                                                                 nullptr,
+                                                                 column_ids);
         int times = 0; 
         while (true) {
 
             DataBlock output;
             output.Init(column_types, 1024);
             auto func = NewCatalog::GetTableFunctionByName(catalog.get(), "seq_scan");
-            func->main_function_(query_context.get(), table_scan_func, output);
+            func->main_function_(query_context.get(), table_scan_func.get(), output);
             if (output.row_count() == 0) {
                 break;
             }
@@ -178,14 +182,16 @@ TEST_F(TableScanTest, block_read_test) {
         }
 
         Vector<SizeT> column_ids  {0};
-        auto table_scan_func = MakeShared<TableScanFunctionData>(&entry, column_ids);
+        auto table_scan_func = MakeShared<SeqScanFunctionData>(&entry,
+                                                                 nullptr,
+                                                                 column_ids);
         int times = 0; 
         while (true) {
 
             DataBlock output;
             output.Init(column_types, 1024);
             auto func = NewCatalog::GetTableFunctionByName(catalog.get(), "seq_scan");
-            func->main_function_(query_context.get(), table_scan_func, output);
+            func->main_function_(query_context.get(), table_scan_func.get(), output);
             if (output.row_count() == 0) {
                 break;
             }

@@ -36,15 +36,15 @@ TEST_F(FragmentTest, test_build_fragment) {
     /// DDL
     auto result0=SQLRunner::RunV2("create table t1(a bigint)", true);
     EXPECT_EQ(result0->definition_ptr_.get()->columns()[0]->name_,"OK");
-    auto result1= SQLRunner::RunV2("create schema s1", true);
+    auto result1= SQLRunner::RunV2("create database db1", true);
     EXPECT_EQ(result1->definition_ptr_.get()->columns()[0]->name_,"OK");
-    auto result2=SQLRunner::RunV2("create table s1.t1(a bigint)", true);
+    auto result2=SQLRunner::RunV2("create table db1.t1(a bigint)", true);
     EXPECT_EQ(result2->definition_ptr_.get()->columns()[0]->name_,"OK");
     auto result3=SQLRunner::RunV2("create table t2(a bigint)", true);
     EXPECT_EQ(result3->definition_ptr_.get()->columns()[0]->name_,"OK");
     auto result4=SQLRunner::RunV2("create table t3(c1 embedding(bit,10))", true);
     EXPECT_EQ(result4->definition_ptr_.get()->columns()[0]->name_,"OK");
-    auto result5= SQLRunner::RunV2("drop schema s1", true);
+    auto result5= SQLRunner::RunV2("drop database db1", true);
     EXPECT_EQ(result5->definition_ptr_.get()->columns()[0]->name_,"OK");
     auto result6=SQLRunner::RunV2("drop table t1", true);
     EXPECT_EQ(result6->definition_ptr_.get()->columns()[0]->name_,"OK");

@@ -8,6 +8,7 @@
 #include "storage/table.h"
 #include "physical_operator_type.h"
 #include "scheduler/fragment_data_queue.h"
+#include "storage/meta/entry/segment_entry.h"
 
 namespace infinity {
 
@@ -75,6 +76,8 @@ struct UnionAllOutputState : public OutputState {
 struct TableScanInputState : public InputState {
     inline explicit
     TableScanInputState(): InputState(PhysicalOperatorType::kTableScan) {}
+
+    SharedPtr<Vector<u64>> segment_entry_indexes_{};
 };
 
 struct TableScanOutputState : public OutputState {
@@ -475,7 +478,7 @@ struct FlushOutputState : public OutputState {
 // Sink
 enum class SinkStateType {
     kInvalid,
-    kCommon,
+    kGeneral,
     kResult,
     kMessage,
 };
@@ -499,9 +502,9 @@ struct SinkState {
     SinkStateType state_type_{SinkStateType::kInvalid};
 };
 
-struct CommonSinkState: public SinkState {
+struct GeneralSinkState: public SinkState {
     inline explicit
-    CommonSinkState() : SinkState(SinkStateType::kCommon) {}
+    GeneralSinkState() : SinkState(SinkStateType::kGeneral) {}
 
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
     SharedPtr<Vector<String>> column_names_{};
@@ -571,10 +574,10 @@ struct AggregateSourceState : public SourceState {
 
 struct TableScanSourceState : public SourceState {
     explicit
-    TableScanSourceState(Vector<u64> segment_ids)
-            : SourceState(SourceStateType::kAggregate), segment_ids_(std::move(segment_ids)) {}
+    TableScanSourceState(SharedPtr<Vector<u64>> segment_ids)
+            : SourceState(SourceStateType::kTableScan), segment_entries_(std::move(segment_ids)) {}
 
-    Vector<u64> segment_ids_;
+    SharedPtr<Vector<u64>> segment_entries_;
 };
 
 struct EmptySourceState : public SourceState {

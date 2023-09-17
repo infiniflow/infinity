@@ -24,7 +24,7 @@ FragmentTask::OnExecute(i64 worker_id) {
     source_op->Execute(fragment_context->query_context(), source_state_.get());
 
     Vector<PhysicalOperator*>& operator_refs = fragment_context->GetOperators();
-    for(SizeT op_idx = 0; op_idx < operator_count_; ++ op_idx) {
+    for(i64 op_idx = operator_count_ - 1; op_idx >= 0; -- op_idx) {
         operator_refs[op_idx]->Execute(fragment_context->query_context(),
                                        operator_input_state_[op_idx].get(),
                                        operator_output_state_[op_idx].get());

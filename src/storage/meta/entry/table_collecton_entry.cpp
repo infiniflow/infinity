@@ -172,6 +172,31 @@ TableCollectionEntry::GetDBEntry(const TableCollectionEntry* table_entry) {
     return (DBEntry*)table_meta->db_entry_;
 }
 
+SharedPtr<Vector<SegmentEntry*>>
+TableCollectionEntry::GetSegmentEntries(TableCollectionEntry* table_collection_entry,
+                                        u64 txn_id,
+                                        TxnTimeStamp begin_ts) {
+    SharedPtr<Vector<SegmentEntry*>> result = MakeShared<Vector<SegmentEntry*>>();
+    std::shared_lock<RWMutex> rw_locker(table_collection_entry->rw_locker_); // prevent another read conflict with this append operation
+
+    result->reserve(table_collection_entry->segments_.size() + 1);
+    for(const auto& segment_pair : table_collection_entry->segments_) {
+        SegmentEntry* segment_entry = segment_pair.second.get();
+        if(txn_id >= segment_entry->start_txn_id_) {
+            result->emplace_back(segment_entry);
+        }
+    }
+
+    SegmentEntry* unsealed_segment = table_collection_entry->unsealed_segment_;
+    if(unsealed_segment != nullptr) {
+        if(txn_id > unsealed_segment->start_txn_id_) {
+            result->emplace_back(unsealed_segment);
+        }
+    }
+
+    return result;
+}
+
 nlohmann::json
 TableCollectionEntry::Serialize(const TableCollectionEntry* table_entry) {
     nlohmann::json json_res;

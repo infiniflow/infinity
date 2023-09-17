@@ -26,13 +26,13 @@ PhysicalShow::Init() {
             output_names_->reserve(7);
             output_types_->reserve(7);
 
-            output_names_->emplace_back("schema");
+            output_names_->emplace_back("database");
             output_names_->emplace_back("table");
             output_names_->emplace_back("type");
             output_names_->emplace_back("column_count");
             output_names_->emplace_back("row_count");
-            output_names_->emplace_back("block_count");
-            output_names_->emplace_back("block_size");
+            output_names_->emplace_back("segment_count");
+            output_names_->emplace_back("segment_capacity");
 
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -101,61 +101,47 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
-    auto column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "schema", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "table", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "type", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(3, bigint_type, "column_count", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(4, bigint_type, "row_count", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(5, bigint_type, "block_count", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(6, bigint_type, "block_size", HashSet<ConstraintType>()),
-    };
-
-    auto table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    // Init the table definition
-
     // Get tables from catalog
     Txn* txn = query_context->GetTxn();
-    Vector<TableCollectionEntry*> entries = txn->GetTableCollections(schema_name_);
 
-    // TODO: Check the entry size, and split to many data blocks
-
+    Vector<TableCollectionDetail> table_collections_detail = txn->GetTableCollections(db_name_);
 
     // Prepare the output data block
-    auto output_block_ptr = DataBlock::Make();
+    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
     Vector<SharedPtr<DataType>> column_types {
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        bigint_type,
-        bigint_type,
-        bigint_type,
-        bigint_type
+            varchar_type,
+            varchar_type,
+            varchar_type,
+            bigint_type,
+            bigint_type,
+            bigint_type,
+            bigint_type
     };
 
     output_block_ptr->Init(column_types);
 
-    for(auto& table_collection_entry: entries) {
-        TableCollectionType table_type = table_collection_entry->table_collection_type_;
+    for(auto& table_collection_detail: table_collections_detail) {
+
         SizeT column_id = 0;
         {
-            // Append schema name to the 1 column
-            const String& schema_name = schema_name_;
-            Value value = Value::MakeVarchar(schema_name);
+            // Append schema name to the 0 column
+            const String* db_name = table_collection_detail.db_name_.get();
+            Value value = Value::MakeVarchar(*db_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++ column_id;
         {
-            // Append table name to the 0 column
-            const String& table_name = *table_collection_entry->table_collection_name_;
-            Value value = Value::MakeVarchar(table_name);
+            // Append table name to the 1 column
+            const String* table_name = table_collection_detail.table_collection_name_.get();
+            Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++ column_id;
+        TableCollectionType table_type = table_collection_detail.table_collection_type_;
         {
             // Append base table type to the 2 column
             const String& base_table_type_str = ToString(table_type);
@@ -169,7 +155,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
             // Append column count the 3 column
             switch(table_type) {
                 case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_entry->columns_.size()));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.column_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -182,7 +168,6 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
                     break;
                 }
             }
-
         }
 
         ++ column_id;
@@ -190,7 +175,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
             // Append row count the 4 column
             switch(table_type) {
                 case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_entry->row_count_));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.row_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -210,10 +195,10 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
 
         ++ column_id;
         {
-            // Append block count the 5 column
+            // Append segment count the 5 column
             switch(table_type) {
                 case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_entry->segments_.size()));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.segment_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -234,7 +219,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
         ++ column_id;
         {
             // Append block limit the 6 column
-            SizeT default_row_size = query_context->global_config()->default_row_size();
+            SizeT default_row_size = table_collection_detail.segment_capacity_;
             Value value = Value::MakeBigInt(default_row_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -257,7 +242,7 @@ PhysicalShow::ExecuteShowColumns(QueryContext *query_context,
                                  ShowOutputState *output_state) {
 
     auto txn = query_context->GetTxn();
-    auto result = txn->GetTableByName(schema_name_, object_name_);
+    auto result = txn->GetTableByName(db_name_, object_name_);
     output_state->error_message_= std::move(result.err_);
     if (result.entry_!= nullptr){
         auto table_collection_entry= dynamic_cast<TableCollectionEntry*>(result.entry_);
@@ -375,7 +360,8 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
     // Get tables from catalog
     // TODO: Use context to carry runtime information, such as current schema
     Txn* txn = query_context->GetTxn();
-    Vector<TableCollectionEntry*> entries = txn->GetTableCollections(schema_name_);
+
+    Vector<TableCollectionDetail> table_collections_detail = txn->GetTableCollections(db_name_);
 
     // Prepare the output data block
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
@@ -391,28 +377,28 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
 
     output_block_ptr->Init(column_types);
 
-    for(auto& table_collection_entry: entries) {
+    for(auto& table_collection_detail: table_collections_detail) {
 
-        TableCollectionType table_type = table_collection_entry->table_collection_type_;
         SizeT column_id = 0;
         {
-            // Append schema name to the 1 column
-            const String& schema_name = schema_name_;
-            Value value = Value::MakeVarchar(schema_name);
+            // Append schema name to the 0 column
+            const String* db_name = table_collection_detail.db_name_.get();
+            Value value = Value::MakeVarchar(*db_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++ column_id;
         {
-            // Append table name to the 0 column
-            const String& table_name = *table_collection_entry->table_collection_name_;
-            Value value = Value::MakeVarchar(table_name);
+            // Append table name to the 1 column
+            const String* table_name = table_collection_detail.table_collection_name_.get();
+            Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++ column_id;
+        TableCollectionType table_type = table_collection_detail.table_collection_type_;
         {
             // Append base table type to the 2 column
             const String& base_table_type_str = ToString(table_type);
@@ -426,7 +412,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
             // Append column count the 3 column
             switch(table_type) {
                 case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_entry->columns_.size()));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.column_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -447,7 +433,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
             // Append row count the 4 column
             switch(table_type) {
                 case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_entry->row_count_));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.row_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -467,10 +453,10 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
 
         ++ column_id;
         {
-            // Append block count the 5 column
+            // Append segment count the 5 column
             switch(table_type) {
                 case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_entry->segments_.size()));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.segment_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -491,7 +477,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
         ++ column_id;
         {
             // Append block limit the 6 column
-            SizeT default_row_size = query_context->global_config()->default_row_size();
+            SizeT default_row_size = table_collection_detail.segment_capacity_;
             Value value = Value::MakeBigInt(default_row_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -520,7 +506,7 @@ PhysicalShow::ExecuteShowViews(QueryContext* query_context) {
     // Get tables from catalog
     // TODO: Use context to carry runtime information, such as current schema
     Txn* txn = query_context->GetTxn();
-    Vector<BaseEntry*> views = txn->GetViews(schema_name_);
+    Vector<BaseEntry*> views = txn->GetViews(db_name_);
 
     // Prepare the output data block
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
@@ -538,8 +524,8 @@ PhysicalShow::ExecuteShowViews(QueryContext* query_context) {
         SizeT column_id = 0;
         {
             // Append schema name to the first column
-            String schema_name = schema_name_;
-            Value value = Value::MakeVarchar(schema_name);
+            String& db_name = db_name_;
+            Value value = Value::MakeVarchar(db_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -570,7 +556,7 @@ void
 PhysicalShow::ExecuteShowColumns(QueryContext* query_context) {
 
     Txn* txn = query_context->GetTxn();
-    EntryResult result = txn->GetTableByName(schema_name_, object_name_);
+    EntryResult result = txn->GetTableByName(db_name_, object_name_);
     if(result.err_ != nullptr) {
         ExecutorError(*result.err_);
     } else {
@@ -580,7 +566,7 @@ PhysicalShow::ExecuteShowColumns(QueryContext* query_context) {
         }
     }
 
-    result = txn->GetViewByName(schema_name_, object_name_);
+    result = txn->GetViewByName(db_name_, object_name_);
     if(result.err_ != nullptr) {
         ExecutorError(*result.err_);
     }
@@ -589,7 +575,7 @@ PhysicalShow::ExecuteShowColumns(QueryContext* query_context) {
 
     ExecuteShowViewDetail(query_context, view_entry->column_types(), view_entry->column_names());
 
-    ExecutorError(fmt::format("No table, collection, or view name is {}.{}", this->schema_name_, this->object_name_));
+    ExecutorError(fmt::format("No table, collection, or view name is {}.{}", this->db_name_, this->object_name_));
 }
 
 void

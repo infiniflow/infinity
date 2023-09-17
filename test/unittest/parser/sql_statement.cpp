@@ -304,11 +304,11 @@ TEST_F(StatementParsingTest, good_test1) {
             EXPECT_EQ(select_statement->set_op_, SetOperatorType::kExcept);
             TableReference* t1 = (TableReference*)select_statement->table_ref_;
             EXPECT_EQ(t1->table_name_, "t1");
-            EXPECT_EQ(t1->schema_name_, "default");
+            EXPECT_EQ(t1->db_name_, "default");
 
             TableReference* t2 = (TableReference*)select_statement->nested_select_->table_ref_;
             EXPECT_EQ(t2->table_name_, "t2");
-            EXPECT_EQ(t2->schema_name_, "default");
+            EXPECT_EQ(t2->db_name_, "default");
         }
         result->Reset();
     }
@@ -326,16 +326,16 @@ TEST_F(StatementParsingTest, good_test1) {
             EXPECT_EQ(select_statement->set_op_, SetOperatorType::kIntersect);
             TableReference* t1 = (TableReference*)select_statement->table_ref_;
             EXPECT_EQ(t1->table_name_, "t1");
-            EXPECT_EQ(t1->schema_name_, "default");
+            EXPECT_EQ(t1->db_name_, "default");
 
             TableReference* t2 = (TableReference*)select_statement->nested_select_->table_ref_;
             EXPECT_EQ(t2->table_name_, "t2");
-            EXPECT_EQ(t2->schema_name_, "default");
+            EXPECT_EQ(t2->db_name_, "default");
 
             EXPECT_EQ(select_statement->nested_select_->set_op_, SetOperatorType::kUnionAll);
             TableReference* t3 = (TableReference*)select_statement->nested_select_->nested_select_->table_ref_;
             EXPECT_EQ(t3->table_name_, "t3");
-            EXPECT_EQ(t3->schema_name_, "default");
+            EXPECT_EQ(t3->db_name_, "default");
         }
         result->Reset();
     }

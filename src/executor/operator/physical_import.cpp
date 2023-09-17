@@ -78,11 +78,10 @@ PhysicalImport::ImportCSVHelper(QueryContext* query_context, ParserContext &pars
                                                                     parser_context.txn_));
 
 
-    parser_context.segment_entry_ = SegmentEntry::MakeNewSegmentEntry(
-        table_collection_entry_,
-        parser_context.txn_->TxnID(),
-        TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
-        parser_context.txn_->GetBufferMgr());
+    parser_context.segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
+                                                                      parser_context.txn_->TxnID(),
+                                                                      TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
+                                                                      parser_context.txn_->GetBufferMgr());
     parser_context.delimiter_ = delimiter_;
 
     const String &table_name = *table_collection_entry_->table_collection_name_;
@@ -237,7 +236,7 @@ PhysicalImport::CSVRowHandler(void *context) {
     auto txn_store = txn->GetTxnTableStore(*table->table_collection_name_);
 
     auto segment_entry = parser_context->segment_entry_;
-    // we have already eat all space in the segment
+    // we have already used all space of the segment
     if (segment_entry->AvailableCapacity() == 0) {
         // flush the segment entry
         SegmentEntry::PrepareFlush(segment_entry.get());
@@ -248,8 +247,10 @@ PhysicalImport::CSVRowHandler(void *context) {
 
         // create new segment entry
         // TODO the segment_id is wrong
-        parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(
-            table, txn->TxnID(), TableCollectionEntry::GetNextSegmentID(table), txn->GetBufferMgr());
+        parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table,
+                                                                           txn->TxnID(),
+                                                                           TableCollectionEntry::GetNextSegmentID(table),
+                                                                           txn->GetBufferMgr());
         segment_entry = parser_context->segment_entry_;
     }
 

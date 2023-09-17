@@ -39,7 +39,7 @@ TEST_F(SelectStatementParsingTest, good_test1) {
             EXPECT_EQ(select_statement->where_expr_, nullptr);
             EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
             auto* table_ref = (TableReference*)(select_statement->table_ref_);
-            EXPECT_EQ(table_ref->schema_name_, "default");
+            EXPECT_EQ(table_ref->db_name_, "default");
             EXPECT_EQ(table_ref->table_name_, "t1");
             EXPECT_EQ(table_ref->alias_, nullptr);
 
@@ -113,7 +113,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto* table_ref_ptr = (TableReference*)(select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
                 EXPECT_EQ(table_ref_ptr->table_name_, "t1");
-                EXPECT_EQ(table_ref_ptr->schema_name_, "default");
+                EXPECT_EQ(table_ref_ptr->db_name_, "default");
             }
 
             EXPECT_EQ(select_statement->group_by_list_, nullptr);
@@ -190,7 +190,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto* table_ref_ptr = (TableReference*)(select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
                 EXPECT_EQ(table_ref_ptr->table_name_, "t2");
-                EXPECT_EQ(table_ref_ptr->schema_name_, "default");
+                EXPECT_EQ(table_ref_ptr->db_name_, "default");
             }
 
             EXPECT_EQ(select_statement->group_by_list_, nullptr);
@@ -302,7 +302,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto* table_ref_ptr = (TableReference*)(select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
                 EXPECT_EQ(table_ref_ptr->table_name_, "t1");
-                EXPECT_EQ(table_ref_ptr->schema_name_, "default");
+                EXPECT_EQ(table_ref_ptr->db_name_, "default");
             }
 
             EXPECT_NE(select_statement->group_by_list_, nullptr);
@@ -376,7 +376,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
-                EXPECT_EQ(table_ref_ptr->schema_name_, "s1");
+                EXPECT_EQ(table_ref_ptr->db_name_, "s1");
                 EXPECT_EQ(table_ref_ptr->table_name_, "t1");
             }
         }
@@ -400,7 +400,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
-                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->db_name_, "s3");
                 EXPECT_EQ(table_ref_ptr->table_name_, "t2");
             }
 
@@ -441,7 +441,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
-                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->db_name_, "s3");
                 EXPECT_EQ(table_ref_ptr->table_name_, "t2");
             }
 
@@ -494,7 +494,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
-                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->db_name_, "s3");
                 EXPECT_EQ(table_ref_ptr->table_name_, "t2");
             }
 
@@ -558,7 +558,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
-                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->db_name_, "s3");
                 EXPECT_EQ(table_ref_ptr->table_name_, "t2");
             }
 
@@ -646,7 +646,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
-                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->db_name_, "s3");
                 EXPECT_EQ(table_ref_ptr->table_name_, "tx");
             }
 
@@ -703,7 +703,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
-                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->db_name_, "s3");
                 EXPECT_EQ(table_ref_ptr->table_name_, "tx");
             }
 
@@ -773,7 +773,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
-                EXPECT_EQ(table_ref_ptr->schema_name_, "s3");
+                EXPECT_EQ(table_ref_ptr->db_name_, "s3");
                 EXPECT_EQ(table_ref_ptr->table_name_, "tx");
             }
 

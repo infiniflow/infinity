@@ -21,6 +21,8 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
     new_entry->segment_id_ = segment_id;
     new_entry->status_ = DataSegmentStatus::kOpen;
     new_entry->segment_version_ = MakeUnique<SegmentVersion>(segment_row);
+    new_entry->start_txn_id_ = MAX_TXN_ID;
+    new_entry->end_txn_id_ = MAX_TXN_ID;
 
     const auto* table_ptr = (const TableCollectionEntry*)table_entry;
     // column directory: txn_id/table_name/segment_id/col_id
@@ -156,6 +158,23 @@ SegmentEntry::CommitAppend(SegmentEntry* segment_entry, Txn* txn_ptr, u64 start_
     for(SizeT i = start_pos; i < end_pos; ++ i) {
         create_vector[i] = txn_ptr->CommitTS();
     }
+
+    if(segment_entry->start_txn_id_ == MAX_TXN_ID) {
+        segment_entry->start_txn_id_ = txn_ptr->TxnID();
+    }
+
+    if(txn_ptr->TxnID() < segment_entry->start_txn_id_) {
+        segment_entry->start_txn_id_ = txn_ptr->TxnID();
+    }
+}
+
+void
+SegmentEntry::CommitDelete(SegmentEntry* segment_entry, Txn* txn_ptr, u64 start_pos, u64 row_count) {
+    u64 end_pos = start_pos + row_count;
+    Vector<au64>& deleted_vector = segment_entry->segment_version_->deleted_;
+    for(SizeT i = start_pos; i < end_pos; ++ i) {
+        deleted_vector[i] = txn_ptr->CommitTS();
+    }
 }
 
 bool
@@ -194,8 +213,8 @@ SegmentEntry::Serialize(const SegmentEntry* segment_entry) {
     for(const auto& column: segment_entry->columns_) {
         json_res["columns"].emplace_back(column->Serialize(column.get()));
     }
-    json_res["start_txn_id"] = segment_entry->start_txn_id_;
-    json_res["end_txn_id"] = segment_entry->end_txn_id_;
+    json_res["start_txn_id"] = segment_entry->start_txn_id_.load();
+    json_res["end_txn_id"] = segment_entry->end_txn_id_.load();
 
     json_res["begin_ts"] = segment_entry->begin_ts_;
     json_res["commit_ts"] = segment_entry->commit_ts_.load();

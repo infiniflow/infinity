@@ -28,6 +28,11 @@ enum DataSegmentStatus : i8 {
 struct SegmentVersion {
     explicit
     SegmentVersion(SizeT capacity) : created_(capacity), deleted_(capacity), txn_ptr_(capacity) {
+        for(SizeT i = 0; i < capacity; ++ i) {
+            created_[i] = MAX_TXN_ID;
+            deleted_[i] = MAX_TXN_ID;
+            txn_ptr_[i] = (u64)(nullptr);
+        }
     }
     Vector<au64> created_{};
     Vector<au64> deleted_{};
@@ -58,10 +63,11 @@ public:
 
     UniquePtr<SegmentVersion> segment_version_{};
 
-    u64 start_txn_id_{};
-    u64 end_txn_id_{};
+    au64 start_txn_id_{};
+    au64 end_txn_id_{};   // Indicate when the segment is removed.
+
 public:
-    inline SizeT
+    [[nodiscard]] inline SizeT
     AvailableCapacity() const {
         return row_capacity_ - current_row_;
     }
@@ -79,6 +85,9 @@ public:
 
     static void
     CommitAppend(SegmentEntry* segment_entry, Txn* txn_ptr, u64 start_pos, u64 row_count);
+
+    static void
+    CommitDelete(SegmentEntry* segment_entry, Txn* txn_ptr, u64 start_pos, u64 row_count);
 
     static bool
     PrepareFlush(SegmentEntry* segment_entry);

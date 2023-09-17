@@ -170,13 +170,15 @@ BindContext::AddTableBinding(const String& table_alias,
                              u64 table_index,
                              TableCollectionEntry* table_collection_entry_ptr,
                              SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                             SharedPtr<Vector<String>> column_names) {
+                             SharedPtr<Vector<String>> column_names,
+                             SharedPtr<Vector<SegmentEntry*>> segment_entries) {
     auto binding = Binding::MakeBinding(BindingType::kTable,
                                         table_alias,
                                         table_index,
                                         table_collection_entry_ptr,
                                         std::move(column_types),
-                                        std::move(column_names));
+                                        std::move(column_names),
+                                        std::move(segment_entries));
     AddBinding(binding);
     table_names_.emplace_back(table_alias);
     table_name2table_index_[table_alias] = table_index;

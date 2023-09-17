@@ -51,7 +51,8 @@ public:
 
     static UniquePtr<String>
     Scan(TableCollectionEntry* table_entry,
-         Txn* txn_ptr, const ScanState& scan_state,
+         Txn* txn_ptr,
+         const ScanState& scan_state,
          BufferManager* buffer_mgr);
 
     static void
@@ -106,6 +107,11 @@ public:
     GetTableMeta(const TableCollectionEntry* table_entry) {
         return (TableCollectionMeta*)table_entry->table_collection_meta_;
     }
+
+    static SharedPtr<Vector<SegmentEntry*>>
+    GetSegmentEntries(TableCollectionEntry* table_entry,
+                      u64 txn_id,
+                      TxnTimeStamp begin_ts);
 
     static nlohmann::json
     Serialize(const TableCollectionEntry* table_entry);

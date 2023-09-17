@@ -23,6 +23,7 @@ class PlanFragment;
 //    kFinish,
 //};
 enum class FragmentType {
+    kInvalid,
     kSerialMaterialize,
     kParallelMaterialize,
     kParallelStream,
@@ -53,13 +54,22 @@ public:
     Vector<PhysicalOperator*>&
     GetOperators();
 
+    bool
+    HasChild() const;
+
+    i64
+    GetChildParallelCount() const;
+
+    i64
+    GetParallelCount() const;
+
     PhysicalSink*
     GetSinkOperator() const;
 
     PhysicalSource*
     GetSourceOperator() const;
 
-    Vector<UniquePtr<FragmentTask>>&
+    void
     CreateTasks(i64 parallel_count, i64 operator_count);
 
     inline Vector<UniquePtr<FragmentTask>>&
@@ -108,7 +118,7 @@ protected:
     i64 finished_task_count_{};
     Vector<SharedPtr<DataBlock>> data_array_{};
 
-    FragmentType fragment_type_{FragmentType::kSerialMaterialize};
+    FragmentType fragment_type_{FragmentType::kInvalid};
     QueryContext* query_context_{};
 };
 

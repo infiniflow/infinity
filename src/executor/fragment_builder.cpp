@@ -64,7 +64,9 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
         }
         case PhysicalOperatorType::kExplain: {
             LOG_INFO("Fragment Builder: Explain");
-            return BuildExplain(phys_op, current_fragment_ptr);
+            BuildExplain(phys_op, current_fragment_ptr);
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            return ;
         }
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCreateTable:
@@ -89,6 +91,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
                                                 SourceType::kEmpty,
                                                 phys_op->GetOutputNames(),
                                                 phys_op->GetOutputTypes());
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             return ;
         }
         case PhysicalOperatorType::kAggregate: {
@@ -107,6 +110,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
                                             phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op, next_plan_fragment.get());
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
+            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
             return ;
         }
         case PhysicalOperatorType::kParallelAggregate:
@@ -121,6 +125,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
             }
             current_fragment_ptr->AddOperator(phys_op);
             BuildFragments(phys_op->left().get(), current_fragment_ptr);
+            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
             break;
         }
         case PhysicalOperatorType::kMergeParallelAggregate:
@@ -143,6 +148,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
                                             phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op->left().get(), next_plan_fragment.get());
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             return ;
         }
         case PhysicalOperatorType::kUnionAll:
@@ -167,6 +173,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
                                                 SourceType::kTable,
                                                 phys_op->GetOutputNames(),
                                                 phys_op->GetOutputTypes());
+            current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
             return ;
         }
 
@@ -177,8 +184,10 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
                                                     SourceType::kEmpty,
                                                     phys_op->GetOutputNames(),
                                                     phys_op->GetOutputTypes());
+                current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
             } else {
                 BuildFragments(phys_op->left().get(), current_fragment_ptr);
+                current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
             }
             return ;
         }

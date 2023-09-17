@@ -278,7 +278,7 @@ struct SQL_LTYPE {
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT
 %token EXCEPT FLUSH
-%token SCHEMA TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL VIEW INDEX ANALYZE VIEWS
+%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL VIEW INDEX ANALYZE VIEWS
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
@@ -409,8 +409,8 @@ explainable_statement : create_statement { $$ = $1; }
  * CREATE STATEMENT
  */
 
-/* CREATE SCHEMA schema_name; */
-create_statement : CREATE SCHEMA if_not_exists IDENTIFIER {
+/* CREATE DATABASE schema_name; */
+create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
     $$ = new infinity::CreateStatement();
     std::shared_ptr<infinity::CreateSchemaInfo> create_schema_info = std::make_shared<infinity::CreateSchemaInfo>();
 
@@ -840,8 +840,8 @@ update_expr : IDENTIFIER '=' expr {
  * DROP STATEMENT
  */
 
-/* DROP SCHEMA schema_name; */
-drop_statement: DROP SCHEMA if_exists IDENTIFIER {
+/* DROP DATABASE schema_name; */
+drop_statement: DROP DATABASE if_exists IDENTIFIER {
     $$ = new infinity::DropStatement();
     std::shared_ptr<infinity::DropSchemaInfo> drop_schema_info = std::make_shared<infinity::DropSchemaInfo>();
 
@@ -917,7 +917,7 @@ drop_statement: DROP SCHEMA if_exists IDENTIFIER {
 /*
  * COPY STATEMENT
  */
-// COPY schema.table TO file_path WITH (FORMAT csv, DELIMITER ',', HEADER TRUE)
+// COPY database.table TO file_path WITH (FORMAT csv, DELIMITER ',', HEADER TRUE)
 copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     $$ = new infinity::CopyStatement();
 
@@ -1190,7 +1190,7 @@ table_reference_unit : table_reference_name | join_clause;
 table_reference_name : table_name table_alias {
     infinity::TableReference* table_ref = new infinity::TableReference();
     if($1->schema_name_ptr_ != nullptr) {
-        table_ref->schema_name_ = $1->schema_name_ptr_;
+        table_ref->db_name_ = $1->schema_name_ptr_;
         free($1->schema_name_ptr_);
     }
     table_ref->table_name_ = $1->table_name_ptr_;

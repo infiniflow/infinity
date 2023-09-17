@@ -199,7 +199,8 @@ public:
                     u64 table_index,
                     TableCollectionEntry* table_collection_entry_ptr,
                     SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                    SharedPtr<Vector<String>> column_names);
+                    SharedPtr<Vector<String>> column_names,
+                    SharedPtr<Vector<SegmentEntry*>> segment_entries);
 
     // Merge input bind context into this bind context
     void

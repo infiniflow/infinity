@@ -127,7 +127,7 @@ PRIMARY         { return PRIMARY; }
 RAW             { return RAW; }
 REAL            { return REAL; }
 RIGHT           { return RIGHT; }
-SCHEMA          { return SCHEMA; }
+DATABASE        { return DATABASE; }
 SECOND          { return SECOND; }
 SECONDS         { return SECONDS; }
 SELECT          { return SELECT; }

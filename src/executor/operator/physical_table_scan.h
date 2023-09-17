@@ -5,7 +5,7 @@
 #pragma once
 
 #include "executor/physical_operator.h"
-#include "function/table/table_scan.h"
+#include "function/table/seq_scan.h"
 
 #include <utility>
 
@@ -19,8 +19,8 @@ public:
                       u64 table_index,
                       SharedPtr<Vector<String>> column_names,
                       SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                      SharedPtr<TableScanFunction> table_scan_function_ptr,
-                      SharedPtr<TableScanFunctionData> table_scan_function_data_ptr)
+                      SharedPtr<SeqScanFunction> table_scan_function_ptr,
+                      SharedPtr<SeqScanFunctionData> table_scan_function_data_ptr)
         : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id),
           table_alias_(std::move(table_alias)),
           table_index_(table_index),
@@ -51,15 +51,15 @@ public:
         return column_types_;
     }
 
-    Vector<Vector<u64>>
-    GetSegmentIDs(i64 parallel_count) const;
+    Vector<SharedPtr<Vector<u64>>>
+    PlanSegmentEntries(i64 parallel_count) const;
 
     inline String
     table_alias() const {
         return table_alias_;
     }
 
-    inline const SharedPtr<TableScanFunctionData>&
+    inline const SharedPtr<SeqScanFunctionData>&
     function_data() const {
         return table_scan_function_data_ptr_;
     }
@@ -84,8 +84,8 @@ private:
     u64 table_index_{};
     SharedPtr<Vector<String>> column_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
-    SharedPtr<TableScanFunction> table_scan_func_ptr_{nullptr};
-    SharedPtr<TableScanFunctionData> table_scan_function_data_ptr_{};
+    SharedPtr<SeqScanFunction> table_scan_func_ptr_{nullptr};
+    SharedPtr<SeqScanFunctionData> table_scan_function_data_ptr_{};
 };
 
 

@@ -11,12 +11,13 @@ namespace infinity {
 
 LogicalTableScan::LogicalTableScan(u64 node_id,
                                    TableCollectionEntry* table_ptr,
-                                   SharedPtr<TableScanFunction> table_scan_func,
+                                   SharedPtr<SeqScanFunction> table_scan_func,
                                    String table_alias,
                                    u64 table_index,
                                    Vector<SizeT> column_ids,
                                    SharedPtr<Vector<String>> column_names,
-                                   SharedPtr<Vector<SharedPtr<DataType>>> column_types)
+                                   SharedPtr<Vector<SharedPtr<DataType>>> column_types,
+                                   SharedPtr<Vector<SegmentEntry*>> segment_entries)
     : LogicalNode(node_id, LogicalNodeType::kTableScan),
     table_collection_ptr_(std::move(table_ptr)),
     table_scan_func_ptr_(std::move(table_scan_func)),
@@ -24,7 +25,8 @@ LogicalTableScan::LogicalTableScan(u64 node_id,
     table_index_(table_index),
     column_ids_(std::move(column_ids)),
     column_names_(std::move(column_names)),
-    column_types_(std::move(column_types)) {
+    column_types_(std::move(column_types)),
+    segment_entries_(std::move(segment_entries)) {
 
     // FIXME: Disable the code: initialize column names and columns ?
 //    size_t column_count = table_ptr_->table_def()->column_count();

@@ -154,6 +154,34 @@ DBEntry::TableCollections(DBEntry* db_entry,
     return results;
 }
 
+Vector<TableCollectionDetail>
+DBEntry::GetTableCollectionsDetail(DBEntry* db_entry,
+                                   u64 txn_id,
+                                   TxnTimeStamp begin_ts) {
+
+    Vector<TableCollectionEntry*> table_collection_entries = DBEntry::TableCollections(db_entry, txn_id, begin_ts);
+    Vector<TableCollectionDetail> results;
+    results.reserve(table_collection_entries.size());
+    for(TableCollectionEntry* table_collection_entry: table_collection_entries) {
+        TableCollectionDetail table_collection_detail;
+        table_collection_detail.db_name_ = db_entry->db_name_;
+        table_collection_detail.table_collection_name_ = table_collection_entry->table_collection_name_;
+        table_collection_detail.table_collection_type_ = table_collection_entry->table_collection_type_;
+        table_collection_detail.column_count_ = table_collection_entry->columns_.size();
+        table_collection_detail.row_count_ = table_collection_entry->row_count_;
+        table_collection_detail.segment_capacity_ = DEFAULT_SEGMENT_CAPACITY;
+
+        SharedPtr<Vector<SegmentEntry*>> segment_entries = TableCollectionEntry::GetSegmentEntries(table_collection_entry,
+                                                                                                   txn_id,
+                                                                                                   begin_ts);
+
+        table_collection_detail.segment_count_ = segment_entries->size();
+        results.emplace_back(table_collection_detail);
+    }
+
+    return results;
+}
+
 SharedPtr<String>
 DBEntry::ToString(DBEntry* db_entry) {
     std::shared_lock<RWMutex> r_locker(db_entry->rw_locker_);
