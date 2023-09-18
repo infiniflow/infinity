@@ -11,6 +11,8 @@
 #include "planner/node/logical_aggregate.h"
 #include "function/scalar_function_set.h"
 #include "planner/node/logical_join.h"
+#include "function/table/table_scan.h"
+#include "planner/bound/base_table_ref.h"
 
 namespace infinity {
 
@@ -296,18 +298,20 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
     }
 
     NewCatalog* catalog = query_context_->storage()->catalog();
-    SharedPtr<SeqScanFunction> scan_function = SeqScanFunction::Make(catalog, "seq_scan");
+    SharedPtr<TableScanFunction> scan_function = TableScanFunction::Make(catalog, "table_scan");
+
+    SharedPtr<BaseTableRef> base_table_ref = MakeShared<BaseTableRef>(scan_function,
+                                                                      table_binding_ptr->table_collection_entry_ptr_,
+                                                                      column_ids,
+                                                                      table_binding_ptr->segment_entries_,
+                                                                      table_binding_ptr->table_name_,
+                                                                      table_index,
+                                                                      column_names,
+                                                                      column_types);
 
     SharedPtr<LogicalTableScan> logical_table_scan = MakeShared<LogicalTableScan>(
             bind_context_ptr_->GetNewLogicalNodeId(),
-            table_binding_ptr->table_collection_entry_ptr_,
-            scan_function,
-            table_binding_ptr->table_name_,
-            table_index,
-            column_ids,
-            column_names,
-            column_types,
-            table_binding_ptr->segment_entries_);
+            base_table_ref);
 
     // Generate cross product
     u64 logical_node_id = bind_context_ptr_->GetNewLogicalNodeId();

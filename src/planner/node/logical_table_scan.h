@@ -6,42 +6,32 @@
 
 #include "planner/logical_node.h"
 
-#include "function/table/seq_scan.h"
-
-#include "storage/table.h"
-
 namespace infinity {
 
+class BaseTableRef;
 class LogicalTableScan : public LogicalNode {
 public:
     explicit
     LogicalTableScan(u64 node_id,
-                     TableCollectionEntry* table_ptr,
-                     SharedPtr<SeqScanFunction> seq_scan_func,
-                     String table_alias,
-                     u64 table_index,
-                     Vector<SizeT> column_ids,
-                     SharedPtr<Vector<String>> column_names,
-                     SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                     SharedPtr<Vector<SegmentEntry*>> segment_entries);
+                     SharedPtr<BaseTableRef> base_table_ref);
 
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>>
-    GetOutputNames() const final {
-        return column_names_;
-    }
+    [[nodiscard]] SharedPtr<Vector<String>>
+    GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final {
-        return column_types_;
-    }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>>
+    GetOutputTypes() const final;
 
     [[nodiscard]] TableCollectionEntry*
-    table_collection_ptr() const {
-        return table_collection_ptr_;
-    }
+    table_collection_ptr() const;
+
+    [[nodiscard]] String
+    TableAlias() const;
+
+    [[nodiscard]] u64
+    TableIndex() const;
 
     String
     ToString(i64& space) final;
@@ -51,17 +41,7 @@ public:
         return "LogicalTableScan";
     }
 
-    String table_alias_{};
-    u64 table_index_{};
-    Vector<SizeT> column_ids_{};
-
-    SharedPtr<Vector<String>> column_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
-    SharedPtr<Vector<SegmentEntry*>> segment_entries_{};
-
-    SharedPtr<SeqScanFunction> table_scan_func_ptr_{nullptr};
-private:
-    TableCollectionEntry* table_collection_ptr_{};
+    SharedPtr<BaseTableRef> base_table_ref_{};
 
 };
 

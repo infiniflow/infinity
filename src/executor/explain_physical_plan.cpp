@@ -626,11 +626,11 @@ ExplainPhysicalPlan::Explain(const PhysicalTableScan* table_scan_node,
     result->emplace_back(MakeShared<String>(table_scan_header));
 
     // Table alias and name
-    DBEntry* db_entry = TableCollectionEntry::GetDBEntry(table_scan_node->function_data()->table_entry_ptr_);
+    DBEntry* db_entry = TableCollectionEntry::GetDBEntry(table_scan_node->TableEntry());
 
     String table_name = String(intent_size, ' ') + " - table name: " + table_scan_node->table_alias() + "(";
     table_name += *db_entry->db_name_ + ".";
-    table_name += *table_scan_node->function_data()->table_entry_ptr_->table_collection_name_ + ")";
+    table_name += *table_scan_node->TableEntry()->table_collection_name_ + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index

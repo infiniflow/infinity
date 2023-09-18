@@ -3,7 +3,6 @@
 //
 
 #include "physical_aggregate.h"
-#include "executor/expression/expression_executor.h"
 #include "executor/expression/expression_evaluator.h"
 #include "common/utility/utility.h"
 
@@ -20,11 +19,12 @@ PhysicalAggregate::Execute(QueryContext* query_context, InputState* input_state,
 
 void
 PhysicalAggregate::Execute(QueryContext* query_context) {
+#if 0
     input_table_ = left_->output();
     ExecutorAssert(input_table_ != nullptr, "No left input.");
 
     // 1. Execute group-by expressions to generate unique key.
-    ExpressionExecutor groupby_executor;
+    ExpressionEvaluator groupby_executor;
     groupby_executor.Init(groups_);
 
     Vector<SharedPtr<ColumnDef>> groupby_columns;
@@ -167,6 +167,7 @@ PhysicalAggregate::Execute(QueryContext* query_context) {
 
     // 4. generate the result to output
     this->output_ = output_groupby_table;
+#endif
 }
 
 void
@@ -538,6 +539,7 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
 
 void
 PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
+#if 0
     SizeT aggregates_count = aggregates_.size();
     ExecutorAssert(aggregates_count > 0, "Simple Aggregate without aggregate expression");
 
@@ -607,6 +609,7 @@ PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
 
     output_data_block->Finalize();
     output_table->Append(output_data_block);
+#endif
 }
 
 SharedPtr<Vector<String>>

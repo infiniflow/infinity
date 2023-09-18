@@ -13,55 +13,55 @@ namespace infinity {
 class ExpressionEvaluator {
 public:
     void
-    Init(const Vector<SharedPtr<DataBlock>>& input_data_block);
+    Init(const DataBlock* input_data_block);
 
     void
     Execute(const SharedPtr<BaseExpression>& expr,
             SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
+            SharedPtr<ColumnVector>& output_column_vector);
 
     void
     Execute(const SharedPtr<AggregateExpression>& expr,
             SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
+            SharedPtr<ColumnVector>& output_column_vector);
 
     void
     Execute(const SharedPtr<CastExpression>& expr,
             SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
+            SharedPtr<ColumnVector>& output_column_vector);
 
     void
     Execute(const SharedPtr<CaseExpression>& expr,
             SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
+            SharedPtr<ColumnVector>& output_column_vector);
 
     void
     Execute(const SharedPtr<ColumnExpression>& expr,
             SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vecto);
+            SharedPtr<ColumnVector>& output_column_vecto);
 
     void
     Execute(const SharedPtr<FunctionExpression>& expr,
             SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
+            SharedPtr<ColumnVector>& output_column_vector);
 
     void
     Execute(const SharedPtr<ValueExpression>& expr,
             SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
+            SharedPtr<ColumnVector>& output_column_vector);
 
     void
     Execute(const SharedPtr<ReferenceExpression>& expr,
             SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
+            SharedPtr<ColumnVector>& output_column_vector);
 
     void
     Execute(const SharedPtr<InExpression>& expr,
             SharedPtr<ExpressionState>& state,
-            Vector<SharedPtr<ColumnVector>>& output_column_vector);
+            SharedPtr<ColumnVector>& output_column_vector);
 
 private:
-    Vector<SharedPtr<DataBlock>> input_data_blocks_;
+    const DataBlock* input_data_block_{};
     bool in_aggregate_{false};
 };
 

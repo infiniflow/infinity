@@ -6,7 +6,7 @@
 
 #include "expression/base_expression.h"
 #include "executor/physical_operator.h"
-#include "executor/expression/expression_executor.h"
+#include "executor/expression/expression_evaluator.h"
 
 namespace infinity {
 
@@ -58,7 +58,6 @@ private:
     GetOrderTable() const;
 
 private:
-    ExpressionExecutor executor_;
     SharedPtr<Table> input_table_{};
     u64 input_table_index_{};
 };

@@ -20,6 +20,7 @@
 #include "planner/binder/project_binder.h"
 #include "planner/binder/order_binder.h"
 #include "planner/binder/limit_binder.h"
+#include "function/table/table_scan.h"
 
 namespace infinity {
 
@@ -374,16 +375,15 @@ QueryBinder::BuildBaseTable(QueryContext* query_context,
     u64 txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
-    SharedPtr<SeqScanFunction> scan_function = SeqScanFunction::Make(query_context->storage()->catalog(), "seq_scan");
+    SharedPtr<TableScanFunction> table_scan_function = TableScanFunction::Make(query_context->storage()->catalog(),
+                                                                               "table_scan");
     SharedPtr<Vector<SegmentEntry*>> segment_entries = TableCollectionEntry::GetSegmentEntries(table_collection_entry, txn_id, begin_ts);
-    SharedPtr<SeqScanFunctionData> function_data
-        = MakeShared<SeqScanFunctionData>(table_collection_entry,
-                                            segment_entries,
-                                            columns);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
-    auto table_ref = MakeShared<BaseTableRef>(scan_function,
-                                              function_data,
+    auto table_ref = MakeShared<BaseTableRef>(table_scan_function,
+                                              table_collection_entry,
+                                              columns,
+                                              segment_entries,
                                               alias,
                                               table_index,
                                               names_ptr,

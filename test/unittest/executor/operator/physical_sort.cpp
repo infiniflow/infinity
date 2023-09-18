@@ -9,7 +9,6 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
-#include "executor/expression/expression_executor.h"
 
 #include "storage/catalog.h"
 #include "function/scalar/subtract.h"

@@ -5,30 +5,21 @@
 #pragma once
 
 #include "executor/physical_operator.h"
-#include "function/table/seq_scan.h"
 
 #include <utility>
 
 namespace infinity {
 
+class TableScanFunction;
+class BaseTableRef;
 class PhysicalTableScan : public PhysicalOperator {
 public:
     explicit
     PhysicalTableScan(u64 id,
-                      String table_alias,
-                      u64 table_index,
-                      SharedPtr<Vector<String>> column_names,
-                      SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                      SharedPtr<SeqScanFunction> table_scan_function_ptr,
-                      SharedPtr<SeqScanFunctionData> table_scan_function_data_ptr)
+                      SharedPtr<BaseTableRef> base_table_ref)
         : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id),
-          table_alias_(std::move(table_alias)),
-          table_index_(table_index),
-          column_names_(std::move(column_names)),
-          column_types_(std::move(column_types)),
-          table_scan_func_ptr_(std::move(table_scan_function_ptr)),
-          table_scan_function_data_ptr_(std::move(table_scan_function_data_ptr))
-          {}
+        base_table_ref_(std::move(base_table_ref))
+        {}
 
     ~PhysicalTableScan() override = default;
 
@@ -42,32 +33,31 @@ public:
     Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
 
     SharedPtr<Vector<String>>
-    GetOutputNames() const final {
-        return column_names_;
-    }
+    GetOutputNames() const final;
 
     SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final {
-        return column_types_;
-    }
+    GetOutputTypes() const final;
 
     Vector<SharedPtr<Vector<u64>>>
     PlanSegmentEntries(i64 parallel_count) const;
 
-    inline String
-    table_alias() const {
-        return table_alias_;
-    }
+    String
+    table_alias() const;
 
-    inline const SharedPtr<SeqScanFunctionData>&
-    function_data() const {
-        return table_scan_function_data_ptr_;
-    }
+    u64
+    TableIndex() const;
 
-    inline u64
-    TableIndex() const {
-        return table_index_;
-    }
+    TableCollectionEntry*
+    TableEntry() const;
+
+    SizeT
+    SegmentEntryCount() const;
+
+    Vector<SegmentEntry*>*
+    SegmentEntriesPtr() const;
+
+    Vector<SizeT>&
+    ColumnIDs() const;
 
     bool
     ParallelExchange() const override {
@@ -80,12 +70,7 @@ public:
     }
 
 private:
-    String table_alias_{};
-    u64 table_index_{};
-    SharedPtr<Vector<String>> column_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
-    SharedPtr<SeqScanFunction> table_scan_func_ptr_{nullptr};
-    SharedPtr<SeqScanFunctionData> table_scan_function_data_ptr_{};
+    SharedPtr<BaseTableRef> base_table_ref_{};
 };
 
 

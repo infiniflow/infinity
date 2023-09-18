@@ -648,7 +648,7 @@ ExplainLogicalPlan::Explain(const LogicalTableScan* table_scan_node,
     result->emplace_back(MakeShared<String>(table_scan_header));
 
     // Table alias and name
-    String table_name = String(intent_size, ' ') + " - table name: " + table_scan_node->table_alias_ + "(";
+    String table_name = String(intent_size, ' ') + " - table name: " + table_scan_node->TableAlias() + "(";
 
     DBEntry* db_entry = TableCollectionEntry::GetDBEntry(table_scan_node->table_collection_ptr());
 
@@ -657,19 +657,19 @@ ExplainLogicalPlan::Explain(const LogicalTableScan* table_scan_node,
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index
-    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(table_scan_node->table_index_);
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(table_scan_node->TableIndex());
     result->emplace_back(MakeShared<String>(table_index));
 
     // Output columns
     String output_columns = String(intent_size, ' ') + " - output columns: [";
-    SizeT column_count = table_scan_node->column_names_->size();
+    SizeT column_count = table_scan_node->GetOutputNames()->size();
     if(column_count == 0) {
-        PlannerError(fmt::format("No column in table: {}.", table_scan_node->table_alias_));
+        PlannerError(fmt::format("No column in table: {}.", table_scan_node->TableAlias()));
     }
     for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
-        output_columns += table_scan_node->column_names_->at(idx) + ", ";
+        output_columns += table_scan_node->GetOutputNames()->at(idx) + ", ";
     }
-    output_columns += table_scan_node->column_names_->back();
+    output_columns += table_scan_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 

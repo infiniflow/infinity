@@ -6,34 +6,12 @@
 #pragma once
 //#include <utility>
 
-#include "common/types/internal_types.h"
-#include "function/table_function.h"
-#include "function/function_data.h"
-#include "storage/meta/catalog.h"
-#include "storage/txn/constants.h"
+#include "table_scan_data.h"
 
 namespace infinity {
 
 void
 RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
-
-class TableScanFunctionData: public TableFunctionData {
-public:
-    TableScanFunctionData(const Vector<SegmentEntry*>* segment_entries_ptr,
-                          const SharedPtr<Vector<u64>>& segment_indexes,
-                          const Vector<SizeT>& column_ids)
-            : segment_entries_ptr_(segment_entries_ptr),
-            segment_indexes_(segment_indexes),
-            column_ids_(column_ids)
-    {}
-
-    const Vector<SegmentEntry*>* segment_entries_ptr_{};
-    const SharedPtr<Vector<u64>>& segment_indexes_{};
-    const Vector<SizeT>& column_ids_{};
-
-    i64 current_segment_id_{INITIAL_SEGMENT_ID};
-    SizeT current_read_offset{0};
-};
 
 class TableScanFunction : public TableFunction {
 public:

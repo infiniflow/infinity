@@ -9,6 +9,7 @@
 #include "physical_operator_type.h"
 #include "scheduler/fragment_data_queue.h"
 #include "storage/meta/entry/segment_entry.h"
+#include "function/table/table_scan_data.h"
 
 namespace infinity {
 
@@ -77,7 +78,7 @@ struct TableScanInputState : public InputState {
     inline explicit
     TableScanInputState(): InputState(PhysicalOperatorType::kTableScan) {}
 
-    SharedPtr<Vector<u64>> segment_entry_indexes_{};
+    UniquePtr<TableScanFunctionData> table_scan_function_data_{};
 };
 
 struct TableScanOutputState : public OutputState {
@@ -575,9 +576,9 @@ struct AggregateSourceState : public SourceState {
 struct TableScanSourceState : public SourceState {
     explicit
     TableScanSourceState(SharedPtr<Vector<u64>> segment_ids)
-            : SourceState(SourceStateType::kTableScan), segment_entries_(std::move(segment_ids)) {}
+            : SourceState(SourceStateType::kTableScan), segment_entry_ids_(std::move(segment_ids)) {}
 
-    SharedPtr<Vector<u64>> segment_entries_;
+    SharedPtr<Vector<u64>> segment_entry_ids_;
 };
 
 struct EmptySourceState : public SourceState {

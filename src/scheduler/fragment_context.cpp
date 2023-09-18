@@ -118,6 +118,59 @@ BuildParallelTaskStateTemplate(Vector<PhysicalOperator*>& fragment_operators,
     }
 }
 
+template<>
+void
+BuildParallelTaskStateTemplate<TableScanInputState, TableScanOutputState>(Vector<PhysicalOperator*>& fragment_operators,
+                                                                          Vector<UniquePtr<FragmentTask>>& tasks,
+                                                                          i64 operator_id,
+                                                                          i64 operator_count,
+                                                                          i64 real_parallel_size) {
+
+    // TableScan must be the first operator of the fragment
+    if(operator_id != operator_count - 1) {
+        SchedulerError("Table scan operator must be the first operator of the fragment.")
+    }
+
+    if(operator_id == 0) {
+        SchedulerError("Table scan shouldn't be the last operator of the fragment.")
+    }
+
+    PhysicalOperator* physical_op = fragment_operators[operator_id];
+    if(physical_op->operator_type() != PhysicalOperatorType::kTableScan) {
+        SchedulerError("Expect table scan physical operator")
+    }
+    auto* physical_table_scan = static_cast<PhysicalTableScan*>(physical_op);
+
+    for(i64 task_id = 0; task_id < real_parallel_size; ++ task_id) {
+        FragmentTask* task_ptr = tasks[task_id].get();
+        SourceState* source_ptr = tasks[task_id]->source_state_.get();
+//        SinkState* sink_ptr = tasks[task_id]->sink_state_.get();
+
+        if(source_ptr->state_type_ != SourceStateType::kTableScan) {
+            SchedulerError("Expect table scan source state")
+        }
+
+        auto* table_scan_source_state = static_cast<TableScanSourceState*>(source_ptr);
+        task_ptr->operator_input_state_[operator_id] = MakeUnique<TableScanInputState>();
+        auto table_scan_input_state = (TableScanInputState*)(task_ptr->operator_input_state_[operator_id].get());
+
+//        if(table_scan_source_state->segment_entry_ids_->empty()) {
+//            SchedulerError("Empty segment entry ids")
+//        }
+
+        table_scan_input_state->table_scan_function_data_ = MakeUnique<TableScanFunctionData>(physical_table_scan->SegmentEntriesPtr(),
+                                                                                              table_scan_source_state->segment_entry_ids_,
+                                                                                              physical_table_scan->ColumnIDs());
+
+        task_ptr->operator_output_state_[operator_id] = MakeUnique<TableScanOutputState>();
+        auto output_state = (TableScanOutputState*)(task_ptr->operator_output_state_[operator_id].get());
+        output_state->data_block_ = DataBlock::Make();
+        output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
+
+        source_ptr->SetNextState(table_scan_input_state);
+    }
+}
+
 UniquePtr<FragmentContext>
 FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* fragment_ptr) {
     Vector<PhysicalOperator*>& fragment_operators = fragment_ptr->GetOperators();
@@ -440,7 +493,10 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             case PhysicalOperatorType::kTableScan: {
                 auto* table_scan_operator = static_cast<PhysicalTableScan*>(first_operator);
                 parallel_count = std::min(parallel_count,
-                                          (i64)(table_scan_operator->function_data()->segment_entries_->size()));
+                                          (i64)(table_scan_operator->SegmentEntryCount()));
+                if(parallel_count == 0) {
+                    parallel_count = 1;
+                }
                 break;
             }
             case PhysicalOperatorType::kProjection: {

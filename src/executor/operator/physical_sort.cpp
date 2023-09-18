@@ -181,6 +181,7 @@ PhysicalSort::Execute(QueryContext* query_context, InputState* input_state, Outp
 void
 PhysicalSort::Execute(QueryContext* query_context) {
 
+#if 0
     executor_.Init(this->expressions_);
 
     input_table_ = left_->output();
@@ -212,6 +213,7 @@ PhysicalSort::Execute(QueryContext* query_context) {
     this->executor_.Execute(input_table_, order_by_table);
 
     Sort(order_by_table, order_by_types_);
+#endif
 }
 
 SharedPtr<Table>

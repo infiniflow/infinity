@@ -3,7 +3,7 @@
 //
 
 #include "expression_selector.h"
-#include "expression_evaluator.h"
+#include "executor/expression/expression_evaluator.h"
 
 namespace infinity {
 
@@ -47,15 +47,13 @@ ExpressionSelector::Select(const SharedPtr<BaseExpression>& expr,
                            SharedPtr<Selection>& output_true_select) {
     SharedPtr<ColumnVector> bool_column = MakeShared<ColumnVector>(MakeShared<DataType>(LogicalType::kBoolean));
     bool_column->Initialize();
-    Vector<SharedPtr<ColumnVector>> outputs;
-    outputs.emplace_back(bool_column);
 
     ExpressionEvaluator expr_evaluator;
-    expr_evaluator.Init({input_data_});
-    expr_evaluator.Execute(expr, state, outputs);
+    expr_evaluator.Init(input_data_.get());
+    expr_evaluator.Execute(expr, state, bool_column);
 
-    const auto* bool_column_ptr = (const u8*)(outputs[0]->data_ptr_);
-    SharedPtr<Bitmask>& null_mask = outputs[0]->nulls_ptr_;
+    const auto* bool_column_ptr = (const u8*)(bool_column->data_ptr_);
+    SharedPtr<Bitmask>& null_mask = bool_column->nulls_ptr_;
 
     Select(bool_column_ptr, null_mask, count, output_true_select, true);
 }

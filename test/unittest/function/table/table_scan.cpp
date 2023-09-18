@@ -18,6 +18,7 @@
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/entry/column_data_entry.h"
 #include "storage/storage.h"
+#include "function/table/table_scan.h"
 #include <math.h>
 
 class TableScanTest : public BaseTest {
@@ -44,6 +45,7 @@ TEST_F(TableScanTest, block_read_test) {
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     auto catalog = MakeUnique<NewCatalog>(MakeShared<String>("/tmp/infinity"));
     RegisterSeqScanFunction(catalog);
+    RegisterTableScanFunction(catalog);
 
     Config config;
     config.Init(nullptr);

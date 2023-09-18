@@ -137,14 +137,7 @@ BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef>& table_ref,
 
     SharedPtr<LogicalTableScan> table_scan_node
             = MakeShared<LogicalTableScan>(bind_context->GetNewLogicalNodeId(),
-                                           base_table_ref->table_scan_function_data_->table_entry_ptr_,
-                                           base_table_ref->table_scan_func_,
-                                           base_table_ref->alias_,
-                                           base_table_ref->table_index_,
-                                           base_table_ref->table_scan_function_data_->column_ids_,
-                                           base_table_ref->column_names_,
-                                           base_table_ref->column_types_,
-                                           base_table_ref->table_scan_function_data_->segment_entries_);
+                                           base_table_ref);
     return table_scan_node;
 }
 

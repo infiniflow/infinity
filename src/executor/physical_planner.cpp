@@ -541,18 +541,8 @@ PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) 
 //        }
 //    }
 
-    SharedPtr<SeqScanFunctionData> table_scan_function_data_ptr
-        = MakeShared<SeqScanFunctionData>(logical_table_scan->table_collection_ptr(),
-                                            logical_table_scan->segment_entries_,
-                                            logical_table_scan->column_ids_);
-
     return MakeShared<PhysicalTableScan>(logical_operator->node_id(),
-                                         logical_table_scan->table_alias_,
-                                         logical_table_scan->table_index_,
-                                         logical_table_scan->column_names_,
-                                         logical_table_scan->column_types_,
-                                         logical_table_scan->table_scan_func_ptr_,
-                                         table_scan_function_data_ptr);
+                                         logical_table_scan->base_table_ref_);
 }
 
 SharedPtr<PhysicalOperator>

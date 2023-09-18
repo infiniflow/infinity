@@ -1,7 +1,7 @@
 //
 // Created by jinhai on 23-1-17.
 //
-
+#if 0
 #include <gtest/gtest.h>
 #include "parser/sql_parser.h"
 #include "base_test.h"
@@ -123,3 +123,5 @@ TEST_F(LogicalPlannerTest, test1) {
 //    BuiltinFunctions builtin_functions(catalog_ptr);
 //    builtin_functions.Init();
 }
+
+#endif

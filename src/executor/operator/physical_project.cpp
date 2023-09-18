@@ -24,7 +24,34 @@ PhysicalProject::Init() {
 
 void
 PhysicalProject::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+    auto* project_input_state = static_cast<ProjectionInputState*>(input_state);
+    auto* project_output_state = static_cast<ProjectionOutputState*>(output_state);
 
+    // FIXME: need to handle statement like: SELECT 1;
+
+
+    project_output_state->data_block_->Reset();
+
+    // Loop aggregate expression
+    ExpressionEvaluator evaluator;
+    evaluator.Init(project_input_state->input_data_block_);
+
+    SizeT expression_count = expressions_.size();
+
+    // Prepare the expression states
+    Vector<SharedPtr<ExpressionState>> expr_states;
+    expr_states.reserve(expression_count);
+
+
+    for(SizeT expr_idx = 0; expr_idx < expression_count; ++ expr_idx) {
+//        Vector<SharedPtr<ColumnVector>> blocks_column;
+//        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
+        evaluator.Execute(expressions_[expr_idx],
+                          expr_states[expr_idx],
+                          project_output_state->data_block_->column_vectors[expr_idx]);
+    }
+
+    project_output_state->data_block_->Finalize();
 }
 
 void
@@ -72,18 +99,14 @@ PhysicalProject::Execute(QueryContext* query_context) {
         SharedPtr<DataBlock> output_data_block = DataBlock::Make();
         output_data_block->Init(output_types);
         ExpressionEvaluator evaluator;
-        evaluator.Init(empty_input_blocks);
+        evaluator.Init(nullptr);
         for(SizeT expr_idx = 0; expr_idx < expression_count; ++ expr_idx) {
             Vector<SharedPtr<ColumnVector>> blocks_column;
             blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
             evaluator.Execute(expressions_[expr_idx],
                               expr_states[expr_idx],
-                              blocks_column);
-            if(blocks_column[0].get() != output_data_block->column_vectors[expr_idx].get()) {
-                // column vector in blocks column might be changed to the column vector from column reference.
-                // This check and assignment is to make sure the right column vector are assign to output_data_block
-                output_data_block->column_vectors[expr_idx] = blocks_column[0];
-            }
+                              output_data_block->column_vectors[expr_idx]);
+
         }
         output_data_block->Finalize();
         projection_table->Append(output_data_block);
@@ -98,17 +121,15 @@ PhysicalProject::Execute(QueryContext* query_context) {
         for(SizeT block_idx = 0; block_idx < input_block_count; ++ block_idx) {
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_types);
-            Vector<SharedPtr<DataBlock>> input_blocks{input_table->GetDataBlockById(block_idx)};
 
             // Loop aggregate expression
             ExpressionEvaluator evaluator;
-            evaluator.Init(input_blocks);
+            evaluator.Init(input_table->GetDataBlockById(block_idx).get());
             for(SizeT expr_idx = 0; expr_idx < expression_count; ++ expr_idx) {
                 Vector<SharedPtr<ColumnVector>> blocks_column;
-                blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
                 evaluator.Execute(expressions_[expr_idx],
                                   expr_states[expr_idx],
-                                  blocks_column);
+                                  output_data_block->column_vectors[expr_idx]);
                 if(blocks_column[0].get() != output_data_block->column_vectors[expr_idx].get()) {
                     // column vector in blocks column might be changed to the column vector from column reference.
                     // This check and assignment is to make sure the right column vector are assign to output_data_block

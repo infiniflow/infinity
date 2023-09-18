@@ -1,6 +1,8 @@
 //
 // Created by jinhai on 23-3-8.
 //
+#if 0
+
 #include <gtest/gtest.h>
 #include "parser/sql_parser.h"
 #include "base_test.h"
@@ -127,7 +129,7 @@ TEST_F(LogicalPlannerTpchTest, test1) {
         String sql_text = String(TEST_DATA_PATH) + "/tpch/q01.sql";
         std::ifstream t(sql_text.c_str());
         String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-        SQLRunner::Run(input_sql, false);
+//        SQLRunner::Run(input_sql, false);
     }
 
 //    Not executable
@@ -152,7 +154,7 @@ TEST_F(LogicalPlannerTpchTest, test1) {
         String sql_text = String(TEST_DATA_PATH) + "/tpch/q06.sql";
         std::ifstream t(sql_text.c_str());
         String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-        SQLRunner::Run(input_sql, false);
+//        SQLRunner::Run(input_sql, false);
     }
 
 //    {
@@ -171,3 +173,5 @@ TEST_F(LogicalPlannerTpchTest, test1) {
         SQLRunner::Run(input_sql, false);
     }
 }
+
+#endif

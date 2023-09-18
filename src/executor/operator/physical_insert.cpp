@@ -81,16 +81,15 @@ PhysicalInsert::Execute(QueryContext* query_context) {
 
     SharedPtr<DataBlock> output_block = DataBlock::Make();
     output_block->Init(output_types);
-    Vector<SharedPtr<DataBlock>> input_blocks{};
 
     ExpressionEvaluator evaluator;
-    evaluator.Init(input_blocks);
+    evaluator.Init(nullptr);
     for(SizeT expr_idx = 0; expr_idx < column_count; ++ expr_idx) {
         Vector<SharedPtr<ColumnVector>> blocks_column;
         blocks_column.emplace_back(output_block->column_vectors[expr_idx]);
         evaluator.Execute(value_list_[expr_idx],
                           expr_states[expr_idx],
-                          blocks_column);
+                          output_block->column_vectors[expr_idx]);
         if(blocks_column[0].get() != output_block->column_vectors[expr_idx].get()) {
             ExecutorError("Unexpected error");
         }
