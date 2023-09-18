@@ -1,0 +1,33 @@
+statement ok
+CREATE TABLE NATION (
+    N_NATIONKEY  INT NOT NULL,
+    N_NAME       CHAR(25) NOT NULL,
+    N_REGIONKEY  INT NOT NULL,
+    N_COMMENT    VARCHAR(152)
+);
+
+# copy data from tbl file
+query I
+COPY NATION FROM 'test/sql/copy/nation.tbl' WHITH ( DELIMITER '|' );
+----
+IMPORT 4 ROWS
+
+query I
+SELECT N_NATIONKEY FROM NATION;
+----
+0
+1
+2
+3
+
+# test COPY TO
+query I
+COPY NATION TO '__TEST_DIR__/nation.csv';
+----
+4
+
+# copy back into the table
+query I
+COPY NATION FROM '__TEST_DIR__/nation.csv';
+----
+4
