@@ -42,6 +42,10 @@ PhysicalProject::Execute(QueryContext* query_context, InputState* input_state, O
     Vector<SharedPtr<ExpressionState>> expr_states;
     expr_states.reserve(expression_count);
 
+    for(const auto& expr: expressions_) {
+        // expression state
+        expr_states.emplace_back(ExpressionState::CreateState(expr));
+    }
 
     for(SizeT expr_idx = 0; expr_idx < expression_count; ++ expr_idx) {
 //        Vector<SharedPtr<ColumnVector>> blocks_column;
