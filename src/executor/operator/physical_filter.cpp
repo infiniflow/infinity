@@ -30,7 +30,19 @@ PhysicalFilter::Init() {
 
 void
 PhysicalFilter::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+    SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
 
+    auto* filter_input_state = static_cast<FilterInputState*>(input_state);
+    auto* filter_output_state = static_cast<FilterOutputState*>(output_state);
+
+    SizeT selected_count = selector_.Select(condition_,
+                                            condition_state,
+                                            filter_input_state->input_data_block_,
+                                            filter_output_state->data_block_.get(),
+                                            filter_input_state->input_data_block_->row_count());
+
+    LOG_TRACE("{} rows after filter", selected_count);
+    return ;
 }
 
 void
@@ -74,8 +86,8 @@ PhysicalFilter::Execute(QueryContext* query_context) {
 
         SizeT selected_count = selector_.Select(condition_,
                                                 condition_state,
-                                                input_data_block,
-                                                output_data_block,
+                                                input_data_block.get(),
+                                                output_data_block.get(),
                                                 row_count);
 
         if(selected_count > 0) {

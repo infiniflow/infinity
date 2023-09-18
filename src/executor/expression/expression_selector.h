@@ -15,8 +15,8 @@ public:
     SizeT
     Select(const SharedPtr<BaseExpression>& expr,
            SharedPtr<ExpressionState>& state,
-           const SharedPtr<DataBlock>& input_data_block,
-           SharedPtr<DataBlock>& output_data_block,
+           const DataBlock* input_data_block,
+           DataBlock* output_data_block,
            SizeT count);
 
     void
@@ -41,7 +41,7 @@ public:
            bool nullable);
 
 private:
-    SharedPtr<DataBlock> input_data_{nullptr};
+    const DataBlock* input_data_{nullptr};
 };
 
 }

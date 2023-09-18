@@ -10,8 +10,8 @@ namespace infinity {
 SizeT
 ExpressionSelector::Select(const SharedPtr<BaseExpression>& expr,
                            SharedPtr<ExpressionState>& state,
-                           const SharedPtr<DataBlock>& input_data_block,
-                           SharedPtr<DataBlock>& output_data_block,
+                           const DataBlock* input_data_block,
+                           DataBlock* output_data_block,
                            SizeT count) {
     this->input_data_ = input_data_block;
     SharedPtr<Selection> input_select = nullptr;
@@ -21,6 +21,7 @@ ExpressionSelector::Select(const SharedPtr<BaseExpression>& expr,
 
     Select(expr, state, count, input_select, output_true_select, output_false_select);
 
+    output_data_block->UnInit();
     // Shrink the input data block into output data block
     output_data_block->Init(input_data_block, output_true_select);
     return output_true_select->Size();
@@ -49,7 +50,7 @@ ExpressionSelector::Select(const SharedPtr<BaseExpression>& expr,
     bool_column->Initialize();
 
     ExpressionEvaluator expr_evaluator;
-    expr_evaluator.Init(input_data_.get());
+    expr_evaluator.Init(input_data_);
     expr_evaluator.Execute(expr, state, bool_column);
 
     const auto* bool_column_ptr = (const u8*)(bool_column->data_ptr_);

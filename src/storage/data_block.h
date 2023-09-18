@@ -24,6 +24,9 @@ public:
     DataBlock() = default;
 
     void
+    Init(const DataBlock* input, const SharedPtr<Selection>& input_select);
+
+    void
     Init(const SharedPtr<DataBlock>& input, const SharedPtr<Selection>& input_select);
 
     void
@@ -34,6 +37,9 @@ public:
 
     void
     Init(const Vector<SharedPtr<ColumnVector>>& column_vectors);
+
+    void
+    UnInit();
 
     [[nodiscard]] inline bool
     Initialized() const {

@@ -7,7 +7,7 @@
 namespace infinity {
 
 void
-DataBlock::Init(const SharedPtr<DataBlock>& input, const SharedPtr<Selection>& input_select) {
+DataBlock::Init(const DataBlock* input, const SharedPtr<Selection>& input_select) {
     StorageAssert(!initialized, "Data block was initialized before.");
     StorageAssert(input != nullptr && input_select != nullptr, "Invalid input data block or select")
     column_count_ = input->column_count();
@@ -20,6 +20,11 @@ DataBlock::Init(const SharedPtr<DataBlock>& input, const SharedPtr<Selection>& i
     capacity_ = column_vectors[0]->capacity();
     initialized = true;
     this->Finalize();
+}
+
+void
+DataBlock::Init(const SharedPtr<DataBlock>& input, const SharedPtr<Selection>& input_select) {
+    Init(input.get(), input_select);
 }
 
 void
@@ -62,6 +67,20 @@ DataBlock::Init(const Vector<SharedPtr<ColumnVector>>& input_vectors) {
     capacity_ = column_vectors[0]->capacity();
     initialized = true;
     Finalize();
+}
+
+void
+DataBlock::UnInit() {
+    if(!initialized) {
+        // Already in un-initialized state
+        return;
+    }
+
+    column_vectors.clear();
+
+    row_count_ = 0;
+    initialized = false;
+    finalized = false;
 }
 
 void
