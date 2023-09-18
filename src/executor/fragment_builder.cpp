@@ -108,7 +108,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
                                             SinkType::kLocalQueue,
                                             phys_op->left()->GetOutputNames(),
                                             phys_op->left()->GetOutputTypes());
-            BuildFragments(phys_op, next_plan_fragment.get());
+            BuildFragments(phys_op->left().get(), next_plan_fragment.get());
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
             return ;
