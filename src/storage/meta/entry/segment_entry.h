@@ -5,12 +5,15 @@
 
 #pragma once
 
+#include <mutex>
 #include <utility>
 
 #include "base_entry.h"
 #include "column_data_entry.h"
+#include "common/default_values.h"
 #include "common/types/internal_types.h"
 #include "common/utility/infinity_assert.h"
+#include "common/utility/random.h"
 #include "data_access_state.h"
 
 namespace infinity {
@@ -79,6 +82,13 @@ public:
                         u64 segment_id,
                         BufferManager* buffer_mgr,
                         SizeT segment_row = DEFAULT_SEGMENT_ROW);
+    
+    void
+    ShuffleFileName(u32 seed = 0) {
+        std::lock_guard<RWMutex> lock(rw_locker_);
+        char *ptr = base_dir_->data() + base_dir_->size() - DEFAULT_SEGMENT_FILE_NAME_LEN;
+        RandomString(ptr, DEFAULT_SEGMENT_FILE_NAME_LEN, seed);
+    }
 
     static void
     AppendData(SegmentEntry* segment_entry, Txn* txn_ptr, AppendState* append_state_ptr, BufferManager* buffer_mgr);

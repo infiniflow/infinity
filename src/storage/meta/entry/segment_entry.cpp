@@ -3,6 +3,7 @@
 //
 
 #include "segment_entry.h"
+#include "common/default_values.h"
 #include "common/utility/defer_op.h"
 #include "storage/txn/txn.h"
 
@@ -25,8 +26,10 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
     new_entry->end_txn_id_ = MAX_TXN_ID;
 
     const auto* table_ptr = (const TableCollectionEntry*)table_entry;
-    // column directory: txn_id/table_name/segment_id/col_id
-    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + "/seg_id" + std::to_string(segment_id));
+
+    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + "/txn_" + std::to_string(txn_id));
+    // new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + '/' + String(DEFAULT_SEGMENT_FILE_NAME_LEN, '\0'));
+    // new_entry->ShuffleFileName();
 
     const Vector<SharedPtr<ColumnDef>>& columns = table_ptr->columns_;
     new_entry->columns_.reserve(columns.size());

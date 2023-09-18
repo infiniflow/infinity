@@ -279,7 +279,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             {
                 EXPECT_EQ((*select_statement->select_list_)[4]->type_, ParsedExprType::kConstant);
                 auto *col0_expr = (ConstantExpr *) (*select_statement->select_list_)[4];
-                EXPECT_EQ(col0_expr->integer_value_, -9223372036854775808L);
+                EXPECT_EQ(col0_expr->integer_value_, -9223372036854775808ll);
             }
         }
         result->Reset();
