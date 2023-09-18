@@ -9,7 +9,10 @@
 #include "storage/meta/entry/table_collection_entry.h"
 #include "txn_store.h"
 #include "storage/table/meta_state.h"
+#include "storage/wal/wal_entry.h"
 #include "txn_context.h"
+#include <mutex>
+#include <condition_variable>
 
 namespace infinity {
 
@@ -45,6 +48,9 @@ public:
 
     void
     CommitTxn(TxnTimeStamp commit_ts);
+
+    void
+    CommitTxnBottom();
 
     void
     RollbackTxn();
@@ -161,6 +167,9 @@ private:
     UniquePtr<String>
     GetTableEntry(const String& db_name, const String& table_name, TableCollectionEntry*& table_entry);
 
+    SharedPtr<WALEntry>
+    GetWALEntry();
+
 private:
     NewCatalog* catalog_{};
     u64 txn_id_{};
@@ -180,6 +189,11 @@ private:
 
     // Handled database
     String db_name_;
+
+    // WALManager notify the  commit bottom half is done
+    std::mutex m;
+    std::condition_variable cv;
+    bool done_bottom_{false};
 
     TxnManager* txn_mgr_{};
 };

@@ -7,6 +7,7 @@
 #include "meta/catalog.h"
 #include "main/config.h"
 #include "txn/txn_manager.h"
+#include <memory>
 #include <string>
 
 
@@ -14,6 +15,7 @@ namespace infinity {
 
 class Infinity;
 class BufferManager;
+class WalManager;
 
 class Storage {
 public:
@@ -54,6 +56,7 @@ private:
     UniquePtr<NewCatalog> new_catalog_{};
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<TxnManager> txn_mgr_{};
+    SharedPtr<WalManager> wal_mgr_{};
 };
 
 }

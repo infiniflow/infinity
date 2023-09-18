@@ -487,7 +487,25 @@ Txn::CommitTxn() {
 void
 Txn::CommitTxn(TxnTimeStamp commit_ts) {
     txn_context_.SetTxnCommitting(commit_ts);
+    //TODO: serializability validation. ASSUMES always valid for now.
+    //put wal entry to the manager
+    SharedPtr<WALEntry> entry = GetWALEntry();
+    txn_mgr_->PutWalEntry(entry);
+    // Wait until wal has been persisted.
+    std::unique_lock lk(m);
+    cv.wait(lk, [this]{return done_bottom_;});
+}
 
+SharedPtr<WALEntry>
+Txn::GetWALEntry(){
+    SharedPtr<WALEntry> entry = std::make_shared<WALEntry>();
+    entry->txn_id = txn_id_;
+    //TODO: fill wal entry
+    return entry;
+}
+
+void
+Txn::CommitTxnBottom(){
     bool is_read_only_txn = true;
     {
         // prepare to commit txn local data into table
@@ -499,6 +517,7 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
     }
 
     txn_context_.SetTxnCommitted();
+    TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
     // Commit databases in catalog
     for(auto* db_entry: txn_dbs_) {
@@ -530,6 +549,11 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
     // Reset the LSN of WAL
 
     LOG_TRACE("Txn: {} is committed.", txn_id_);
+
+    // Notify the top half
+    std::unique_lock lk(m);
+    done_bottom_ = true;
+    cv.notify_one();
 }
 
 void
