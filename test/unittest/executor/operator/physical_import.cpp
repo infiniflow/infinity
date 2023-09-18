@@ -120,6 +120,7 @@ TEST_F(PhysicalImportTest, test1) {
         0, table_collection_entry.get(), file_path, false, ',', CopyFileType::kCSV);
     
     physical_import->ImportCSV(query_context.get());
+    physical_import->ImportCSV(query_context.get());
 
     auto store = txn->GetTxnTableStore(*table_collection_name.get());
     auto segment = store->uncommitted_segments_[0];

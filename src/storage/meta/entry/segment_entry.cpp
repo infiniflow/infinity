@@ -5,6 +5,7 @@
 #include "segment_entry.h"
 #include "common/default_values.h"
 #include "common/utility/defer_op.h"
+#include "storage/io/local_file_system.h"
 #include "storage/txn/txn.h"
 
 namespace infinity {
@@ -27,9 +28,9 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
 
     const auto* table_ptr = (const TableCollectionEntry*)table_entry;
 
-    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + "/txn_" + std::to_string(txn_id));
-    // new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + '/' + String(DEFAULT_SEGMENT_FILE_NAME_LEN, '\0'));
-    // new_entry->ShuffleFileName();
+    // reserve an empty space for random name of segment directory.
+    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + '/' + String(DEFAULT_SEGMENT_FILE_NAME_LEN, '\0'));
+    new_entry->finish_shuffle = false;
 
     const Vector<SharedPtr<ColumnDef>>& columns = table_ptr->columns_;
     new_entry->columns_.reserve(columns.size());
@@ -42,6 +43,18 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
         ));
     }
     return new_entry;
+}
+
+void
+SegmentEntry::ShuffleFileName() {
+    std::lock_guard<RWMutex> lock(rw_locker_);
+    char *ptr = base_dir_->data() + base_dir_->size() - DEFAULT_SEGMENT_FILE_NAME_LEN;
+    LocalFileSystem fs;
+    u32 seed = 0;
+    do {
+        RandomString(ptr, DEFAULT_SEGMENT_FILE_NAME_LEN, seed++);
+    } while (fs.Exists(*base_dir_.get()));
+    finish_shuffle = true;
 }
 
 void
@@ -189,6 +202,7 @@ SegmentEntry::PrepareFlush(SegmentEntry* segment_entry) {
 UniquePtr<String>
 SegmentEntry::Flush(SegmentEntry* segment_entry) {
     LOG_TRACE("DataSegment: {} is being flushed", segment_entry->segment_id_);
+    segment_entry->ShuffleFileName();
     for(SizeT column_id = 0; const auto& column_data: segment_entry->columns_) {
         column_data->Flush(column_data.get(), segment_entry->current_row_);
         LOG_TRACE("ColumnData: {} is flushed", column_id);
@@ -208,6 +222,9 @@ nlohmann::json
 SegmentEntry::Serialize(const SegmentEntry* segment_entry) {
     nlohmann::json json_res;
 
+    if (!segment_entry->finish_shuffle) {
+        StorageError("Segment has not finish its base_dir");
+    }
     json_res["base_dir"] = *segment_entry->base_dir_;
     json_res["row_capacity"] = segment_entry->row_capacity_;
     i64 status_value = segment_entry->status_;
