@@ -101,9 +101,6 @@ void ColumnDataEntry::AppendEmbedding(ColumnDataEntry *column_data_entry, const 
     auto embedding_info = dynamic_cast<EmbeddingInfo *>(type_info);
     auto dimension = embedding_info->Dimension();
     switch (embedding_info->Type()) {
-        case kElemBit:
-            DataType::WriteEmbedding<BooleanT>(ptr, data, dimension, delimiter);
-            break;
         case kElemInt8:
             DataType::WriteEmbedding<TinyIntT>(ptr, data, dimension, delimiter);
             break;
@@ -122,6 +119,7 @@ void ColumnDataEntry::AppendEmbedding(ColumnDataEntry *column_data_entry, const 
         case kElemDouble:
             DataType::WriteEmbedding<DoubleT>(ptr, data, dimension, delimiter);
             break;
+        case kElemBit:
         case kElemInvalid:
             NotImplementError("not support data type");
     }

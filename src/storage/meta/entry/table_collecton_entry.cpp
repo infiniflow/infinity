@@ -2,6 +2,7 @@
 // Created by jinhai on 23-8-18.
 //
 
+#include "main/logger.h"
 #include "table_collection_entry.h"
 #include "storage/txn/txn_store.h"
 #include "storage/txn/txn.h"
@@ -36,6 +37,10 @@ TableCollectionEntry::Append(TableCollectionEntry* table_entry, Txn* txn_ptr, vo
     TxnTableStore* txn_store_ptr = (TxnTableStore*)txn_store;
     Txn* transaction_ptr = (Txn*)txn_ptr;
     AppendState* append_state_ptr = txn_store_ptr->append_state_.get();
+    if (append_state_ptr->Finished()) {
+        LOG_TRACE("No append is done.");
+        return;
+    }
     if(table_entry->unsealed_segment_ == nullptr) {
         // No segment at all.
         std::unique_lock<RWMutex> rw_locker(table_entry->rw_locker_); // prevent another read conflict with this append operation

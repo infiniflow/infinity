@@ -5,12 +5,15 @@
 
 #pragma once
 
+#include <mutex>
 #include <utility>
 
 #include "base_entry.h"
 #include "column_data_entry.h"
+#include "common/default_values.h"
 #include "common/types/internal_types.h"
 #include "common/utility/infinity_assert.h"
+#include "common/utility/random.h"
 #include "data_access_state.h"
 
 namespace infinity {
@@ -66,6 +69,7 @@ public:
     au64 start_txn_id_{};
     au64 end_txn_id_{};   // Indicate when the segment is removed.
 
+    bool finish_shuffle{true};
 public:
     [[nodiscard]] inline SizeT
     AvailableCapacity() const {
@@ -79,6 +83,9 @@ public:
                         u64 segment_id,
                         BufferManager* buffer_mgr,
                         SizeT segment_row = DEFAULT_SEGMENT_ROW);
+    
+    void
+    ShuffleFileName();
 
     static void
     AppendData(SegmentEntry* segment_entry, Txn* txn_ptr, AppendState* append_state_ptr, BufferManager* buffer_mgr);

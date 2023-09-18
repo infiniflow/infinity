@@ -11,7 +11,11 @@ namespace infinity {
 
 LocalFileHandler::~LocalFileHandler() {
     if(fd_ != -1) {
-        close(fd_);
+        int ret = close(fd_);
+        if (ret != 0) {
+            assert(0);
+            // StorageError(fmt::format("Close file failed: {}", strerror(errno)));
+        }
         fd_ = -1;
     }
 }
@@ -74,7 +78,10 @@ LocalFileSystem::OpenFile(const String& path, u8 flags, FileLockType lock_type) 
 
 void
 LocalFileSystem::Close(FileHandler& file_handler) {
-    i32 fd = ((LocalFileHandler&)file_handler).fd_;
+    auto local_file_handler = dynamic_cast<LocalFileHandler *>(&file_handler);
+    i32 fd = local_file_handler->fd_;
+    // set fd to -1 so that destructor of `LocalFileHandler` will not close the file.
+    local_file_handler->fd_ = -1;
     if(close(fd) != 0) {
         StorageError(fmt::format("Can't close file: {}, {}", file_handler.path_.string(), strerror(errno)));
     }
