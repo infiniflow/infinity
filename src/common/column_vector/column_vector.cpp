@@ -878,7 +878,18 @@ ColumnVector::ToString(SizeT row_index) const {
             TypeError("Not implemented");
         }
         case kEmbedding: {
-            TypeError("Not implemented");
+//            TypeError("Not implemented");
+            if(data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
+                TypeError("Unmatched embedding data type")
+            }
+            EmbeddingInfo* embedding_info = static_cast<EmbeddingInfo*>(data_type_->type_info().get());
+            EmbeddingT embedding_element(nullptr);
+            embedding_element.ptr = (data_ptr_ + row_index * data_type_->type_info()->Size());
+            String embedding_str = EmbeddingT::Embedding2String(embedding_element,
+                                                                embedding_info->Type(),
+                                                                embedding_info->Dimension());
+            embedding_element.SetNull();
+            return embedding_str;
         }
         case kMixed: {
             TypeError("Not implemented");
