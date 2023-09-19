@@ -1,0 +1,40 @@
+# name: test/sql/basic.slt
+# description: Test basic sql statement for sample
+# group: [basic]
+
+# Expecting IDENTIFIER or PRIMARY or UNIQUE
+statement error
+CREATE TABLE NATION (
+    N_NATIONKEY  INT NOT NULL,
+    N_REGIONKEY  INT NOT NULL,
+);
+
+# Parse error More commas
+statement error
+CREATE TABLE NATION (
+    N_NATIONKEY  INT,
+    N_REGIONKEY  INT,
+);
+
+# Parse only support
+statement ok
+CREATE TABLE NATION (N_NATIONKEY  INT, N_REGIONKEY INT );
+
+# copy data from tbl file
+query I
+COPY NATION FROM 'test/sql/copy/nation.csv' WITH ( DELIMITER ',' );
+----
+
+query I
+SELECT N_NATIONKEY FROM NATION;
+----
+0
+1
+2
+3
+
+# Clean up
+statement ok
+DROP TABLE NATION;
+
+

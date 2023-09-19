@@ -1,0 +1,44 @@
+# name: test/sql/ddl/ddl.slt
+# description: Test ddl statements
+# group: [ddl]
+
+statement ok
+CREATE TABLE INTEGERS(i INTEGER);
+
+statement ok
+CREATE TABLE names(id BIGINT PRIMARY KEY, name VARCHAR(255), age INTEGER);
+
+statement ok
+CREATE TABLE a(i INTEGER);
+
+statement ok
+INSERT INTO a VALUES (42);
+
+query I
+SELECT COUNT(*) FROM a;
+----
+1
+
+query T
+SHOW TABLES
+----
+default names Table 3 0 0 128
+default integers Table 1 0 0 128
+
+statement error
+CREATE TABLE INTEGERS(i INTEGER);
+
+statement error
+CREATE TABLE NAMES(id BIGINT PRIMARY KEY, name VARCHAR(255), age INTEGER);
+
+statement ok
+DROP TABLE INTEGERS;
+
+statement ok
+DROP TABLE NAMES;
+
+statement ok
+CREATE DATABASE s1;
+
+statement ok
+DROP DATABASE s1;
