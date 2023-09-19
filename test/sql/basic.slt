@@ -1,3 +1,7 @@
+# name: test/sql/basic.slt
+# description: Test basic sql statement for sample
+# group: [basic]
+
 # Expecting IDENTIFIER or PRIMARY or UNIQUE
 statement error
 CREATE TABLE NATION (
@@ -18,7 +22,7 @@ CREATE TABLE NATION (N_NATIONKEY  INT, N_REGIONKEY INT );
 
 # copy data from tbl file
 query I
-COPY NATION FROM '/home/xwg/infinity/test/sql/copy/nation.csv' WITH ( DELIMITER ',' );
+COPY NATION FROM 'test/sql/copy/nation.csv' WITH ( DELIMITER ',' );
 ----
 
 query I

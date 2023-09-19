@@ -1,3 +1,7 @@
+# name: test/sql/ddl/ddl.slt
+# description: Test ddl statements
+# group: [ddl]
+
 statement ok
 CREATE TABLE INTEGERS(i INTEGER);
 

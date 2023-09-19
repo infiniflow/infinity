@@ -1,0 +1,26 @@
+# name: test/sql/ddl/drop/test_drop.slt
+# description: Test DROP statements
+# group: [drop]
+
+# test: 1
+# description: Test DROP TABLE
+# expect: success
+
+statement ok
+CREATE TABLE a (i INTEGER);
+
+# crash!
+#statement ok
+#INSERT INTO a VALUES (42);
+
+
+statement error
+SELECT COUNT(*) FROM a;
+
+
+query I
+SELECT * FROM a;
+----
+
+statement ok
+DROP TABLE a;

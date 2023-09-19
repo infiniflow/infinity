@@ -1,3 +1,8 @@
+# name: test/sql/copy/csv.slt
+# description: Test COPY TO/FROM CSV
+# group: [copy]
+# cite: https://github.com/risinglightdb/risinglight/blob/main/tests/sql/copy/csv.slt
+
 statement ok
 CREATE TABLE NATION (
     N_NATIONKEY  INT NOT NULL,
@@ -8,7 +13,7 @@ CREATE TABLE NATION (
 
 # copy data from tbl file
 query I
-COPY NATION FROM 'test/sql/copy/nation.tbl' WHITH ( DELIMITER '|' );
+COPY NATION FROM 'test/sql/copy/nation.tbl' WITH ( DELIMITER '|' );
 ----
 IMPORT 4 ROWS
 
