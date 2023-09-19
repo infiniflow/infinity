@@ -18,6 +18,8 @@ class PlanFragment {
 public:
     PlanFragment() = default;
 
+    explicit PlanFragment(u64 fragment_id) : fragment_id_(fragment_id) {}
+
     virtual
     ~PlanFragment() = default;
 

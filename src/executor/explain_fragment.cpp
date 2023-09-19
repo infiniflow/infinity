@@ -30,11 +30,19 @@ ExplainFragment::Explain(PlanFragment* fragment_ptr,
     }
 
     Vector<PhysicalOperator*>& fragment_operators = fragment_ptr->GetOperators();
-    PhysicalOperator* first_phys_op = fragment_operators[0];
-    ExplainPhysicalPlan::Explain(first_phys_op, result, intent_size);
+    for (auto & fragment_operator : fragment_operators) {
+        ExplainPhysicalPlan::Explain(fragment_operator, result, true, intent_size);
+    }
 
     if(fragment_ptr->GetSourceNode()) {
         ExplainPhysicalPlan::Explain(fragment_ptr->GetSourceNode(), result, intent_size);
+    }
+
+    // NOTE: recursive call this function to explain child fragment
+    if (!fragment_ptr->Children().empty()){
+        for (auto& child : fragment_ptr->Children()) {
+            ExplainFragment::Explain(child.get(), result);
+        }
     }
 }
 
