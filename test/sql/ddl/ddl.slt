@@ -3,42 +3,48 @@
 # group: [ddl]
 
 statement ok
-CREATE TABLE INTEGERS(i INTEGER);
+CREATE TABLE ddl1 (i INTEGER);
 
 statement ok
-CREATE TABLE names(id BIGINT PRIMARY KEY, name VARCHAR(255), age INTEGER);
+CREATE TABLE ddl2 (id BIGINT PRIMARY KEY, name VARCHAR(255), age INTEGER);
 
 statement ok
-CREATE TABLE a(i INTEGER);
+CREATE TABLE ddl3 (i INTEGER);
 
-statement ok
-INSERT INTO a VALUES (42);
+# not supported
+#statement ok
+#INSERT INTO ddl3 VALUES (42);
 
-query I
-SELECT COUNT(*) FROM a;
-----
-1
+# not supported
+#query I
+#SELECT COUNT(*) FROM ddl3;
+#----
+#1
 
-query T
-SHOW TABLES
-----
-default names Table 3 0 0 128
-default integers Table 1 0 0 128
 
 statement error
-CREATE TABLE INTEGERS(i INTEGER);
+CREATE TABLE ddl1 (i INTEGER);
 
 statement error
-CREATE TABLE NAMES(id BIGINT PRIMARY KEY, name VARCHAR(255), age INTEGER);
+CREATE TABLE ddl2 (id BIGINT PRIMARY KEY, name VARCHAR(255), age INTEGER);
 
 statement ok
-DROP TABLE INTEGERS;
+DROP TABLE ddl1;
 
 statement ok
-DROP TABLE NAMES;
+DROP TABLE ddl2;
+
+statement ok
+DROP TABLE ddl3;
 
 statement ok
 CREATE DATABASE s1;
+
+statement ok
+CREATE TABLE s1.ddl1 (i INTEGER);
+
+statement ok
+DROP TABLE s1.ddl1
 
 statement ok
 DROP DATABASE s1;

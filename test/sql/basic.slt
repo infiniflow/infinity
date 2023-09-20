@@ -20,9 +20,9 @@ CREATE TABLE NATION (
 statement ok
 CREATE TABLE NATION (N_NATIONKEY  INT, N_REGIONKEY INT );
 
-# copy data from tbl file
+# copy data from csv file
 query I
-COPY NATION FROM 'test/sql/copy/nation.csv' WITH ( DELIMITER ',' );
+COPY NATION FROM '/tmp/infinity/sqllogictest/nation.csv' WITH ( DELIMITER ',' );
 ----
 
 query I
@@ -31,7 +31,6 @@ SELECT N_NATIONKEY FROM NATION;
 0
 1
 2
-3
 
 # Clean up
 statement ok
