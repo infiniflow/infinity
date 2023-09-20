@@ -9,7 +9,10 @@
 #include "storage/meta/entry/table_collection_entry.h"
 #include "txn_store.h"
 #include "storage/table/meta_state.h"
+#include "storage/wal/wal_entry.h"
 #include "txn_context.h"
+#include <mutex>
+#include <condition_variable>
 
 namespace infinity {
 
@@ -32,7 +35,7 @@ struct ScanParam {
 class Txn {
 public:
     explicit
-    Txn(TxnManager* txn_mgr, NewCatalog* catalog, u32 txn_id) : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id) {}
+    Txn(TxnManager* txn_mgr, NewCatalog* catalog, u32 txn_id) : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(std::make_shared<WalEntry>()) {}
 
     void
     BeginTxn();
@@ -45,6 +48,9 @@ public:
 
     void
     CommitTxn(TxnTimeStamp commit_ts);
+
+    void
+    CommitTxnBottom();
 
     void
     RollbackTxn();
@@ -180,6 +186,13 @@ private:
 
     // Handled database
     String db_name_;
+
+    // WalEntry
+    SharedPtr<WalEntry> wal_entry_;
+    // WalManager notify the  commit bottom half is done
+    std::mutex m;
+    std::condition_variable cv;
+    bool done_bottom_{false};
 
     TxnManager* txn_mgr_{};
 };

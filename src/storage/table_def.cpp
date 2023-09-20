@@ -34,4 +34,18 @@ TableDef::UnionWith(const SharedPtr<TableDef>& other) {
     }
 }
 
+int32_t
+TableDef::GetSizeInBytes() const {
+    return 0;
+}
+
+int32_t TableDef::Write(char* buf, int32_t maxbytes) const {
+    //TODO: implement, possibly using https://github.com/felixguendling/cista/
+    return 0;
+}
+
+int32_t TableDef::Read(char* buf, int32_t maxbytes, TableDef& table_def){
+    return 0;
+}
+
 }

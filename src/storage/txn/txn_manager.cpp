@@ -18,6 +18,13 @@ TxnManager::CreateTxn() {
     return res;
 }
 
+void
+TxnManager::DestroyTxn(u64 txn_id) {
+    rw_locker_.lock();
+    txn_map_.erase(txn_id);
+    rw_locker_.unlock();
+}
+
 Txn*
 TxnManager::GetTxn(u64 txn_id) {
     rw_locker_.lock_shared();
