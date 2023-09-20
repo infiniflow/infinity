@@ -44,13 +44,11 @@ public:
            const SharedPtr<ColumnVector>& column_vector,
            SizeT block_start_offset,
            SizeT column_start_offset,
-           SizeT rows);
-    
-    static void
-    Append(ColumnDataEntry* column_data_entry, const StringView& data, SizeT offset);
+           SizeT row_n);
+
 
     static void
-    AppendEmbedding(ColumnDataEntry* column_data_entry, const StringView& data, SizeT offset, char delimiter);
+    AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_row_offset, SizeT dst_ele_offset, ptr_t src_ptr, SizeT data_size);
 
     static void
     Flush(ColumnDataEntry* column_data_entry,

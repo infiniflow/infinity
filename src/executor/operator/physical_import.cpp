@@ -3,7 +3,11 @@
 //
 
 #include "physical_import.h"
+#include "common/types/data_type.h"
 #include "common/types/internal_types.h"
+#include "common/types/logical_type.h"
+#include "common/utility/exception.h"
+#include "common/utility/infinity_assert.h"
 #include "executor/operator_state.h"
 #include "main/query_context.h"
 #include "storage/meta/entry/column_data_entry.h"
@@ -223,6 +227,43 @@ PhysicalImport::CSVHeaderHandler(void *context) {
     zsv_set_row_handler(parser_context->parser_, CSVRowHandler);
 }
 
+namespace {
+Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
+    SizeT data_size = data.size();
+    if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
+        TypeAssert(false, "Embedding data must be surrounded by [ and ]");
+    }
+    Vector<StringView> ret;
+    SizeT i = 1, j = 1;
+    while (true) {
+        if (data[i] == delimiter || i == data_size - 1) {
+            ret.emplace_back(data.begin() + j, data.begin() + i);
+        }
+        if (i == data_size - 1) {
+            break;
+        }
+        j = i++;
+    }
+    return ret;
+}
+
+template<typename T>
+void AppendSimpleData(ColumnDataEntry *column_data_entry, const StringView &str_view, SizeT row_idx) {
+    T ele = DataType::StringToValue<T>(str_view);
+    ColumnDataEntry::AppendRaw(column_data_entry, row_idx, 0, reinterpret_cast<ptr_t>(&ele), sizeof(T));
+}
+
+template<typename T>
+void AppendArrayData(ColumnDataEntry *column_data_entry, const Vector<StringView> &ele_str_views, SizeT row_idx) {
+    for (SizeT ele_idx = 0; auto &ele_str_view : ele_str_views) {
+        T ele = DataType::StringToValue<T>(ele_str_view);
+        ColumnDataEntry::AppendRaw(column_data_entry, row_idx, ele_idx, reinterpret_cast<ptr_t>(&ele), sizeof(T));
+        ele_idx++;
+    }
+}
+
+}
+
 void
 PhysicalImport::CSVRowHandler(void *context) {
     ParserContext *parser_context = static_cast<ParserContext*>(context);
@@ -256,12 +297,90 @@ PhysicalImport::CSVRowHandler(void *context) {
         if (cell.len) {
             str_view = StringView((char *)cell.str, cell.len);
         }
-
         auto column_data_entry = segment_entry->columns_[column_idx];
-        if (segment_entry->columns_[column_idx]->column_type_->IsEmbedding()) {
-            ColumnDataEntry::AppendEmbedding(column_data_entry.get(), str_view, write_row, parser_context->delimiter_);
+        auto column_type = column_data_entry->column_type_.get();
+        if (column_type->IsEmbedding() || column_type->IsVarchar()) {
+            Vector<StringView> res;
+            auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
+            if (column_type->IsEmbedding()) {
+                auto embedding_type = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
+                ExecutorAssert(embedding_type->Dimension() >= ele_str_views.size(), "Embbeding data size exceeds dimension");
+                switch (embedding_type->Type()) {
+                    case kElemBit: {
+                        NotImplementError("Embedding bit type is not implemented.");
+                    }
+                    case kElemInt8: {
+                        AppendArrayData<TinyIntT>(column_data_entry.get(), ele_str_views, write_row);
+                        break;
+                    }
+                    case kElemInt16: {
+                        AppendArrayData<SmallIntT>(column_data_entry.get(), ele_str_views, write_row);
+                        break;
+                    }
+                    case kElemInt32: {
+                        AppendArrayData<IntegerT>(column_data_entry.get(), ele_str_views, write_row);
+                        break;
+                    }
+                    case kElemInt64: {
+                        AppendArrayData<BigIntT>(column_data_entry.get(), ele_str_views, write_row);
+                        break;
+                    }
+                    case kElemFloat: {
+                        AppendArrayData<FloatT>(column_data_entry.get(), ele_str_views, write_row);
+                        break;
+                    }
+                    case kElemDouble: {
+                        AppendArrayData<DoubleT>(column_data_entry.get(), ele_str_views, write_row);
+                        break;
+                    }
+                    case kElemInvalid: {
+                        ExecutorError("Embedding element type is invalid.")
+                    }
+                }
+            } else {
+                // TODO shenyuyshi
+                NotImplementError("1")
+            }
         } else {
-            ColumnDataEntry::Append(column_data_entry.get(), str_view, write_row);
+            switch (column_type->type()) {
+                case kBoolean: {
+                    AppendSimpleData<BooleanT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kTinyInt: {
+                    AppendSimpleData<TinyIntT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kSmallInt: {
+                    AppendSimpleData<SmallIntT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kInteger: {
+                    AppendSimpleData<IntegerT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kBigInt: {
+                    AppendSimpleData<BigIntT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kFloat: {
+                    AppendSimpleData<FloatT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kDouble: {
+                    AppendSimpleData<DoubleT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kVarchar:
+                case kMissing:
+                case kInvalid:
+                case kEmbedding: {
+                    ExecutorError("Invalid data type")
+                }
+                default: {
+                    NotImplementError("Not supported now in append data in column")
+                }
+            }
         }
     }
 

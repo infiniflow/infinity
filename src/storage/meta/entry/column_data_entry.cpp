@@ -5,12 +5,14 @@
 #include "column_data_entry.h"
 #include "common/types/complex/embedding_type.h"
 #include "common/types/data_type.h"
+#include "common/types/info/embedding_info.h"
 #include "common/types/internal_types.h"
 #include "common/types/logical_type.h"
 #include "common/utility/infinity_assert.h"
 #include "segment_entry.h"
 #include "storage/buffer/buffer_manager.h"
 #include <cstddef>
+#include <cstring>
 #include <string>
 
 namespace infinity {
@@ -47,84 +49,6 @@ ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, BufferManager
     return ObjectHandle(column_data_entry->buffer_handle_);
 }
 
-/**
- * @brief Convert data to coressponding type and append to column data entry
- * 
- * @param column_data_entry column data need to be inserted
- * @param data data to be inserted, represented by string
- * @param offset offset of column data
- */
-void
-ColumnDataEntry::Append(ColumnDataEntry* column_data_entry, const StringView& data, SizeT offset) {
-    if (column_data_entry->buffer_handle_ == nullptr) {
-        StorageError("Not initialize buffer handle");
-    }
-    ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
-    auto type_size = column_data_entry->column_type_->Size();
-    ptr += offset * type_size;
-    switch (column_data_entry->column_type_->type()) {
-        case kBoolean:
-            DataType::WriteData<BooleanT>(ptr, data);
-            break;
-        case kTinyInt:
-            DataType::WriteData<TinyIntT>(ptr, data);
-            break;
-        case kSmallInt:
-            DataType::WriteData<SmallIntT>(ptr, data);
-            break;
-        case kInteger:
-            DataType::WriteData<IntegerT>(ptr, data);
-            break;
-        case kBigInt:
-            DataType::WriteData<BigIntT>(ptr, data);
-            break;
-        case kFloat:
-            DataType::WriteData<FloatT>(ptr, data);
-            break;
-        case kDouble: 
-            DataType::WriteData<DoubleT>(ptr, data);
-            break;
-        default:
-            NotImplementError("not support data type");
-    }
-}
-
-void ColumnDataEntry::AppendEmbedding(ColumnDataEntry *column_data_entry, const StringView &data, SizeT offset, char delimiter) {
-    if (column_data_entry->buffer_handle_ == nullptr) {
-        StorageError("Not initialize buffer handle");
-    }
-    ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
-    auto type_size = column_data_entry->column_type_->Size();
-    ptr += offset * type_size;
-
-    auto type_info = column_data_entry->column_type_->type_info().get();
-    auto embedding_info = dynamic_cast<EmbeddingInfo *>(type_info);
-    auto dimension = embedding_info->Dimension();
-    switch (embedding_info->Type()) {
-        case kElemInt8:
-            DataType::WriteEmbedding<TinyIntT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemInt16:
-            DataType::WriteEmbedding<SmallIntT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemInt32:
-            DataType::WriteEmbedding<IntegerT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemInt64:
-            DataType::WriteEmbedding<BigIntT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemFloat:
-            DataType::WriteEmbedding<FloatT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemDouble:
-            DataType::WriteEmbedding<DoubleT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemBit:
-        case kElemInvalid:
-            NotImplementError("not support data type");
-    }
-}
-
 // copy data *from* `column_vector` (offset `block_start_offset`).
 // *to* `column_data_entry`'s buffer (offset column_start_offset).
 void
@@ -132,7 +56,7 @@ ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
        const SharedPtr<ColumnVector>& column_vector,
        SizeT block_start_offset,
        SizeT column_start_offset,
-       SizeT rows) {
+       SizeT row_n) {
     if(column_data_entry->buffer_handle_ == nullptr) {
         StorageError("Not initialize buffer handle")
     }
@@ -143,44 +67,71 @@ ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
         case kSmallInt:
         case kInteger:
         case kBigInt:
-        case kHugeInt:
-        case kDecimal:
         case kFloat:
         case kDouble:
-        case kDate:
-        case kTime:
-        case kDateTime:
-        case kTimestamp:
-        case kInterval:
-        case kPoint:
-        case kLine:
-        case kLineSeg:
-        case kBox:
-        case kCircle:
-        case kBitmap:
-        case kUuid:
         case kEmbedding: {
             ptr_t src_ptr = column_vector->data() + block_start_offset * column_vector->data_type_size_;
-            ptr_t dst_ptr = ptr + column_start_offset * column_vector->data_type_size_;
-            memcpy(dst_ptr, src_ptr, rows *  column_vector->data_type_size_);
+            // ColumnDataEntry::AppendRaw(column_data_entry, column_start_offset, src_ptr, row_n, 0);
+            SizeT data_size = row_n * column_vector->data_type_size_;
+            ColumnDataEntry::AppendRaw(column_data_entry, column_start_offset, 0, src_ptr, data_size);
             break;
         }
-
-        case kVarchar:
-        case kArray:
-        case kTuple:
-        case kPath:
-        case kPolygon:
-        case kBlob:
-        case kMixed:
-        case kNull: {
-            LOG_ERROR("{} isn't supported", column_vector->data_type()->ToString())
-            NotImplementError("Not supported now in append data in column")
+        case kVarchar: {
+            // TODO shenyushi
+            NotImplementError("AppendRaw: Not implement the varchar.")
+            break;
         }
         case kMissing:
         case kInvalid: {
             LOG_ERROR("Invalid data type {}", column_vector->data_type()->ToString())
             StorageError("Invalid data type")
+        }
+        default: {
+            LOG_ERROR("{} isn't supported", column_vector->data_type()->ToString())
+            NotImplementError("Not supported now in append data in column")
+        }
+    }
+}
+
+void
+ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_row_offset, SizeT dst_ele_offset, ptr_t src_ptr, SizeT data_size) {
+    auto column_type = column_data_entry->column_type_;
+    switch (column_type->type()) {
+        case kBoolean:
+        case kTinyInt:
+        case kSmallInt:
+        case kInteger:
+        case kBigInt:
+        case kFloat:
+        case kDouble: {
+            if (dst_ele_offset != 0) {
+                StorageError("AppendRaw: Not support set offset in simple type");
+            }
+            ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
+            SizeT type_size = column_type->Size(); // Is it right?
+            ptr_t dst_ptr = ptr + dst_row_offset * type_size;
+            memcpy(dst_ptr, src_ptr, data_size);
+            break;
+        }
+        case kEmbedding: {
+            ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
+            auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
+            ptr_t dst_ptr = ptr + dst_row_offset * embedding_info->Size() + dst_ele_offset * embedding_info->DataSize();
+            memcpy(dst_ptr, src_ptr, data_size);
+            break;
+        }
+        case kVarchar: {
+            // TODO shenyushi
+            NotImplementError("AppendRaw: Not implement the varchar.")
+            break;
+        }
+        case kNull:
+        case kMissing:
+        case kInvalid: {
+            StorageError("AppendRaw: Error type.")
+        }
+        default: {
+            NotImplementError("AppendRaw: Not implement the type.")
         }
     }
 }
