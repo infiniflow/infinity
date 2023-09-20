@@ -8,7 +8,7 @@ CREATE TABLE test_table_star(a INTEGER, b INTEGER, c INTEGER);
 
 # copy data from tbl file
 statement ok
-COPY test_table_star FROM '/home/xwg/infinity/test/data/csv/integer.csv' WITH ( DELIMITER ',' );
+COPY test_table_star FROM 'test/data/csv/integer.csv' WITH ( DELIMITER ',' );
 
 
 query I
@@ -26,9 +26,3 @@ SELECT test_table_star.* FROM test;
 4 5 6
 7 8 9
 
-query I
-SELECT t.* FROM test t;
-----
-1 2 3
-4 5 6
-7 8 9

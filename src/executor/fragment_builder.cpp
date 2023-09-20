@@ -10,7 +10,7 @@ namespace infinity {
 
 UniquePtr<PlanFragment>
 FragmentBuilder::BuildFragment(PhysicalOperator* phys_op) {
-    auto plan_fragment = MakeUnique<PlanFragment>();
+    auto plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
     plan_fragment->AddSinkNode(query_context_ptr_,
                                SinkType::kResult,
                                phys_op->GetOutputNames(),
@@ -103,7 +103,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
             if(phys_op->left() == nullptr) {
                 SchedulerError("No input node of aggregate operator")
             }
-            auto next_plan_fragment = MakeUnique<PlanFragment>();
+            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
             next_plan_fragment->AddSinkNode(query_context_ptr_,
                                             SinkType::kLocalQueue,
                                             phys_op->left()->GetOutputNames(),
@@ -141,7 +141,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
             if(phys_op->left() == nullptr) {
                 SchedulerError(fmt::format("No input node of {}", phys_op->GetName()));
             }
-            auto next_plan_fragment = MakeUnique<PlanFragment>();
+            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
             next_plan_fragment->AddSinkNode(query_context_ptr_,
                                             SinkType::kLocalQueue,
                                             phys_op->left()->GetOutputNames(),

@@ -28,8 +28,14 @@ private:
     void
     BuildExplain(PhysicalOperator* phys_op, PlanFragment* current_fragment_ptr);
 
+    idx_t
+    GetFragmentId() {
+        return fragment_id_++;
+    }
+
 private:
     QueryContext* query_context_ptr_{};
+    idx_t fragment_id_{};
 };
 
 }
