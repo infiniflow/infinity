@@ -1,11 +1,14 @@
 #pragma once
 
-#include "storage/data_block.h"
+#include "common/types/internal_types.h"
 #include <roaring/roaring.hh>
 #include <cstdint>
 namespace infinity {
 
-enum class WALCommandType : uint8_t {
+class TableDef;
+class DataBlock;
+
+enum class WalCommandType : uint8_t {
 	INVALID = 0,
 	// -----------------------------
 	// Catalog
@@ -28,7 +31,7 @@ enum class WALCommandType : uint8_t {
 };
 
 
-struct WALEntryHeader {
+struct WalEntryHeader {
     int64_t lsn;  // each entry's lsn(Log Sequence Number) is strictly
                   // increasing by one.
     int32_t size; // size of payload, excluding the header, round to multi
@@ -40,20 +43,22 @@ struct WALEntryHeader {
 };
 
 
-struct WALEntry : WALEntryHeader {
+struct WalEntry : WalEntryHeader {
     Vector<String> dropped_databases_{};
     Vector<std::pair<String, String>> dropped_tables_{};
-    //TODO: create database, table
+    Vector<String> created_databases_{};
+    Vector<std::pair<String, SharedPtr<TableDef>>> created_tables_{};
+    //TODO: create table
     //TODO: alter database, table
     HashMap<u64, SharedPtr<roaring::Roaring>> deleted_rows_{};
     Vector<SharedPtr<DataBlock>> blocks_{};
     int64_t max_lsn_{};
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
     int32_t GetSizeInBytes() const ;
-    // Write WALEntry to a char buffer, return the actual size in bytes.
+    // Write WalEntry to a char buffer, return the actual size in bytes.
     int32_t Write(char* buf, int32_t maxbytes) const;
-    // Read a WALEntry from a serialized version, reading no more than maxbytes bytes, return the actual read bytes, -1 on failure.
-    static int32_t Read(char* buf, int32_t maxbytes, WALEntry& entry);
+    // Read a WalEntry from a serialized version, reading no more than maxbytes bytes, return the actual read bytes, -1 on failure.
+    static int32_t Read(char* buf, int32_t maxbytes, WalEntry& entry);
 };
 
 

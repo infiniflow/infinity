@@ -43,7 +43,7 @@ enum class WALType : uint8_t {
     WAL_FLUSH = 100
 };
 
-struct WALEntry {
+struct WalEntry {
     int64_t lsn;   // each entry's lsn(Log Sequence Number) is strictly
                    // increasing by one.
     int32_t size;  // size of payload, excluding the header, round to multi
@@ -62,7 +62,7 @@ struct WALEntry {
     GetSize() = 0;  // size of the entry, excluding the 4 bytes pad.
 };
 
-struct WALInsertTuple : WALEntry {
+struct WALInsertTuple : WalEntry {
     int16_t columnId;
     int64_t row_start;
     int64_t len;
@@ -70,14 +70,14 @@ struct WALInsertTuple : WALEntry {
     virtual int32_t GetSize() { return sizeof(WALInsertTuple) + size; }
 };
 
-struct WALDeleteTuple : WALEntry {
+struct WALDeleteTuple : WalEntry {
     int16_t columnId;
     int64_t row_start;
     int64_t count;
     virtual int32_t GetSize() { return sizeof(WALDeleteTuple); }
 };
 
-struct WALUpdateTuple : WALEntry {
+struct WALUpdateTuple : WalEntry {
     int16_t columnId;
     int64_t row_start;
     int64_t len;
@@ -85,7 +85,7 @@ struct WALUpdateTuple : WALEntry {
     virtual int32_t GetSize() { return sizeof(WALUpdateTuple) + size; }
 };
 
-struct CheckpointEntry : WALEntry {
+struct CheckpointEntry : WalEntry {
     virtual int32_t GetSize() { return sizeof(CheckpointEntry); }
 };
 
@@ -168,7 +168,7 @@ class WalManager {
 
     // Session request to persist an entry. Assuming txn_id of the entry has
     // been initialized.
-    void WriteEntry(std::shared_ptr<WALEntry> entry) {
+    void WriteEntry(std::shared_ptr<WalEntry> entry) {
         if (running_.load()) {
             mutex_.lock();
             que_.push(entry);
@@ -194,7 +194,7 @@ class WalManager {
         que_.swap(que2_);
         mutex_.unlock();
         while (!que2_.empty()) {
-            std::shared_ptr<WALEntry> entry = que2_.front();
+            std::shared_ptr<WalEntry> entry = que2_.front();
             size_pad = entry->GetSize();
             entry->lsn = lsn_gen_.Generate();
             max_lsn = entry->lsn;
@@ -229,7 +229,7 @@ class WalManager {
                 "WalManager::Flush {} done syncing wal for {} transactions",
                 seq, written);
             while (!que3_.empty()) {
-                std::shared_ptr<WALEntry> entry = que3_.front();
+                std::shared_ptr<WalEntry> entry = que3_.front();
                 // Commit sequently so they get visible in the same order with
                 // wal.
                 TxnManager::GetInstance()->CommitTxn(entry->txn_id, entry->lsn);
@@ -301,7 +301,7 @@ class WalManager {
     atomic<int> seq_;
     boost::asio::io_context& ioc_;
     mutex mutex_;
-    queue<std::shared_ptr<WALEntry>> que_, que2_, que3_;
+    queue<std::shared_ptr<WalEntry>> que_, que2_, que3_;
     boost::asio::stream_file stream_file_;
     SeqGenerator lsn_gen_;
     int pending_checkpoint_;

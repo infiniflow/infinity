@@ -230,6 +230,7 @@ Txn::CreateDatabase(const String& db_name, ConflictType conflict_type) {
     auto* db_entry = static_cast<DBEntry*>(res.entry_);
     txn_dbs_.insert(db_entry);
     db_names_.insert(db_name);
+    wal_entry_->created_databases_.push_back(db_name);
     return res;
 }
 
@@ -264,7 +265,7 @@ Txn::DropDatabase(const String& db_name, ConflictType conflict_type) {
     } else {
         db_names_.insert(db_name);
     }
-
+    wal_entry_->dropped_databases_.push_back(db_name);
     return res;
 }
 
@@ -333,6 +334,7 @@ Txn::CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def, Co
     auto* table_entry = static_cast<TableCollectionEntry*>(res.entry_);
     txn_tables_.insert(table_entry);
     table_names_.insert(*table_def->table_name());
+    wal_entry_->created_tables_.push_back(std::make_pair(db_name, table_def));
     return res;
 }
 
@@ -374,7 +376,7 @@ Txn::DropTableCollectionByName(const String& db_name, const String& table_name, 
     } else {
         table_names_.insert(table_name);
     }
-
+    wal_entry_->dropped_tables_.push_back(std::make_pair(db_name, table_name));
     return res;
 }
 
@@ -489,19 +491,11 @@ Txn::CommitTxn(TxnTimeStamp commit_ts) {
     txn_context_.SetTxnCommitting(commit_ts);
     //TODO: serializability validation. ASSUMES always valid for now.
     //put wal entry to the manager
-    SharedPtr<WALEntry> entry = GetWALEntry();
-    txn_mgr_->PutWalEntry(entry);
+    wal_entry_->txn_id = txn_id_;
+    txn_mgr_->PutWalEntry(wal_entry_);
     // Wait until wal has been persisted.
     std::unique_lock lk(m);
     cv.wait(lk, [this]{return done_bottom_;});
-}
-
-SharedPtr<WALEntry>
-Txn::GetWALEntry(){
-    SharedPtr<WALEntry> entry = std::make_shared<WALEntry>();
-    entry->txn_id = txn_id_;
-    //TODO: fill wal entry
-    return entry;
 }
 
 void

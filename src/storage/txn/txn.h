@@ -35,7 +35,7 @@ struct ScanParam {
 class Txn {
 public:
     explicit
-    Txn(TxnManager* txn_mgr, NewCatalog* catalog, u32 txn_id) : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id) {}
+    Txn(TxnManager* txn_mgr, NewCatalog* catalog, u32 txn_id) : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(std::make_shared<WalEntry>()) {}
 
     void
     BeginTxn();
@@ -167,9 +167,6 @@ private:
     UniquePtr<String>
     GetTableEntry(const String& db_name, const String& table_name, TableCollectionEntry*& table_entry);
 
-    SharedPtr<WALEntry>
-    GetWALEntry();
-
 private:
     NewCatalog* catalog_{};
     u64 txn_id_{};
@@ -190,7 +187,9 @@ private:
     // Handled database
     String db_name_;
 
-    // WALManager notify the  commit bottom half is done
+    // WalEntry
+    SharedPtr<WalEntry> wal_entry_;
+    // WalManager notify the  commit bottom half is done
     std::mutex m;
     std::condition_variable cv;
     bool done_bottom_{false};

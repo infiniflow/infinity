@@ -9,7 +9,7 @@
 
 namespace infinity {
 
-using PutWalEntryFn = std::function<void(std::shared_ptr<WALEntry>)>;
+using PutWalEntryFn = std::function<void(std::shared_ptr<WalEntry>)>;
 
 class BufferManager;
 class TxnManager {
@@ -54,7 +54,7 @@ public:
         return std::chrono::high_resolution_clock::now().time_since_epoch().count();
     }
 
-    void PutWalEntry(std::shared_ptr<WALEntry> entry) {
+    void PutWalEntry(std::shared_ptr<WalEntry> entry) {
         if (put_wal_entry_ != nullptr)
             put_wal_entry_(entry);
     }

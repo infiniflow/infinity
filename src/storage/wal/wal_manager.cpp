@@ -61,7 +61,7 @@ void WalManager::Stop() {
 
 // Session request to persist an entry. Assuming txn_id of the entry has
 // been initialized.
-int WalManager::PutEntry(std::shared_ptr<WALEntry> entry) {
+int WalManager::PutEntry(std::shared_ptr<WalEntry> entry) {
     if (!running_.load()) {
         return -1;
     }
@@ -78,8 +78,6 @@ int WalManager::PutEntry(std::shared_ptr<WALEntry> entry) {
 void WalManager::Flush() {
     int64_t seq = 0;
     while (running_.load()) {
-        seq++;
-        LOG_TRACE("WalManager::Flush {} enter", seq);
         int written = 0;
         int32_t size_pad = 0;
         int64_t max_lsn = lsn_gen_.GetLast();
@@ -87,37 +85,36 @@ void WalManager::Flush() {
         que_.swap(que2_);
         mutex_.unlock();
         while (!que2_.empty()) {
-            std::shared_ptr<WALEntry> entry = que2_.front();
+            std::shared_ptr<WalEntry> entry = que2_.front();
             entry->lsn = lsn_gen_.Generate();
             max_lsn = entry->lsn;
             LOG_TRACE(
-                "WalManager::Flush {} begin writing wal for transaction {}",
-                seq, entry->txn_id);
+                "WalManager::Flush begin writing wal for transaction {}",
+                entry->txn_id);
             int32_t size = entry->GetSizeInBytes();
             vector<char> buf(size);
             size = entry->Write(buf.data(), size);
             ofs_.write(buf.data(), size);
             LOG_TRACE(
-                "WalManager::Flush {} done writing wal for transaction {}", seq,
+                "WalManager::Flush done writing wal for transaction {}",
                 entry->txn_id);
             que2_.pop();
             que3_.push(entry);
             written++;
         }
         if (written == 0) {
-            LOG_TRACE("WalManager::Flush {} schedule a delayed run", seq);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         } else {
             LOG_TRACE(
-                "WalManager::Flush {} begin syncing wal for {} transactions",
-                seq, written);
+                "WalManager::Flush begin syncing wal for {} transactions",
+                written);
             ofs_.flush();
             LOG_TRACE(
-                "WalManager::Flush {} done syncing wal for {} transactions",
+                "WalManager::Flush done syncing wal for {} transactions",
                 seq, written);
             TxnManager *txn_mgr = storage_->txn_manager();
             while (!que3_.empty()) {
-                std::shared_ptr<WALEntry> entry = que3_.front();
+                std::shared_ptr<WalEntry> entry = que3_.front();
                 // Commit sequently so they get visible in the same order
                 // with wal.
                 Txn *txn = txn_mgr->GetTxn(entry->txn_id);
@@ -127,9 +124,7 @@ void WalManager::Flush() {
                 que3_.pop();
             }
             lsn_pend_chk_.store(max_lsn);
-            LOG_TRACE("WalManager::Flush {} schedule an immediate run", seq);
         }
-        LOG_TRACE("WalManager::Flush {} quit", seq);
     }
 }
 

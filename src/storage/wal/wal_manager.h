@@ -39,7 +39,7 @@ class WalManager {
 
     // Session request to persist an entry. Assuming txn_id of the entry has
     // been initialized.
-    int PutEntry(std::shared_ptr<WALEntry> entry);
+    int PutEntry(std::shared_ptr<WalEntry> entry);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
@@ -60,7 +60,7 @@ class WalManager {
     std::thread checkpoint_thread_;
 
     std::mutex mutex_; // protect que_ and ofs_
-    std::queue<std::shared_ptr<WALEntry>> que_, que2_, que3_;
+    std::queue<std::shared_ptr<WalEntry>> que_, que2_, que3_;
     std::ofstream ofs_;
 
     SeqGenerator lsn_gen_;
