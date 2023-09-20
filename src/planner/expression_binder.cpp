@@ -237,6 +237,19 @@ ExpressionBinder::BuildFuncExpr(const FunctionExpr& expr,
             // SharedPtr<ScalarFunctionSet> scalar_function_set_ptr
             auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
+
+            for (SizeT idx = 0; idx < arguments.size(); ++idx) {
+                    // check if the argument types are matched to the scalar function parameter types
+                    // if not match, add the cast function to the input parameter.
+                    if (arguments[idx]->Type() == scalar_function.parameter_types_[idx]) {
+                        continue;
+                    }
+                    String name = arguments[idx]->Name();
+                    arguments[idx] = CastExpression::AddCastToType(arguments[idx], scalar_function.parameter_types_[idx]);
+                    // reset the alias name
+                    arguments[idx]->alias_ = name;
+            }
+
             SharedPtr<FunctionExpression> function_expr_ptr
                 = MakeShared<FunctionExpression>(scalar_function, arguments);
             return function_expr_ptr;
