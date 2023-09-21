@@ -38,12 +38,6 @@ ObjectHandle& ObjectHandle::operator=(ObjectHandle &&other) {
     return *this;
 }
 
-ObjectHandle::~ObjectHandle() {
-    if (buffer_handle_) {
-        buffer_handle_->UnloadData();
-    }
-}
-
 ptr_t
 ObjectHandle::GetData() {
     if(ptr_ == nullptr) {

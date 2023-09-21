@@ -26,9 +26,9 @@ public:
 
     ptr_t GetAll();
 
-    Pair<ptr_t, SizeT> GetAt(SizeT row_idx);
+    Pair<ptr_t, SizeT> GetVarcharAt(SizeT row_idx);
 
-    Pair<ptr_t, SizeT> GetAtPrefix(SizeT row_idx);
+    Pair<ptr_t, SizeT> GetVarcharAtPrefix(SizeT row_idx);
 
 };
 }

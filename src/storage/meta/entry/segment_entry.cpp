@@ -7,6 +7,7 @@
 #include "common/utility/defer_op.h"
 #include "storage/io/local_file_system.h"
 #include "storage/txn/txn.h"
+#include <ctime>
 
 namespace infinity {
 
@@ -29,7 +30,7 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
     const auto* table_ptr = (const TableCollectionEntry*)table_entry;
 
     // reserve an empty space for random name of segment directory.
-    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + String(DEFAULT_SEGMENT_FILE_NAME_LEN, '_') + '/');
+    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + '/' + String(DEFAULT_SEGMENT_FILE_NAME_LEN, '_'));
     new_entry->finish_shuffle = false;
 
     const Vector<SharedPtr<ColumnDef>>& columns = table_ptr->columns_;
@@ -50,7 +51,7 @@ SegmentEntry::ShuffleFileName() {
     std::lock_guard<RWMutex> lock(rw_locker_);
     char *ptr = base_dir_->data() + base_dir_->size() - DEFAULT_SEGMENT_FILE_NAME_LEN;
     LocalFileSystem fs;
-    u32 seed = 0;
+    u32 seed = time(nullptr);
     do {
         RandomString(ptr, DEFAULT_SEGMENT_FILE_NAME_LEN, seed++);
     } while (fs.Exists(*base_dir_.get()));
@@ -180,7 +181,8 @@ SegmentEntry::Serialize(const SegmentEntry* segment_entry) {
     json_res["status"] = status_value;
     json_res["segment_id"] = segment_entry->segment_id_;
     for(const auto& column: segment_entry->columns_) {
-        json_res["columns"].emplace_back(column->Serialize(column.get()));
+        // TODO shenyushi, tmp annotation.
+        // json_res["columns"].emplace_back(column->Serialize(column.get()));
     }
     json_res["start_txn_id"] = segment_entry->start_txn_id_.load();
     json_res["end_txn_id"] = segment_entry->end_txn_id_.load();
@@ -208,8 +210,9 @@ SegmentEntry::Deserialize(const nlohmann::json& table_entry_json, TableCollectio
     segment_entry->current_row_ = table_entry_json["current_row"];
 
     for(const auto& column_json: table_entry_json["columns"]) {
-        SharedPtr<ColumnDataEntry> column_data_entry = ColumnDataEntry::Deserialize(column_json, segment_entry.get(), buffer_mgr);
-        segment_entry->columns_.emplace_back(column_data_entry);
+        // TODO shenyushi, tmp annotation.
+        // SharedPtr<ColumnDataEntry> column_data_entry = ColumnDataEntry::Deserialize(column_json, segment_entry.get(), buffer_mgr);
+        // segment_entry->columns_.emplace_back(column_data_entry);
     }
 
     return segment_entry;

@@ -7,7 +7,6 @@
 #include "common/types/info/varchar_info.h"
 #include "common/types/internal_types.h"
 #include "common/types/logical_type.h"
-#include "common/utility/exception.h"
 #include "common/utility/infinity_assert.h"
 #include "executor/operator_state.h"
 #include "main/query_context.h"
@@ -309,11 +308,11 @@ PhysicalImport::CSVRowHandler(void *context) {
         }
         auto column_data_entry = segment_entry->columns_[column_idx];
         auto column_type = column_data_entry->column_type_.get();
-        if (column_type->IsVarchar()) {
+        if (column_type->type() == kVarchar) {
             auto varchar_info = dynamic_cast<VarcharInfo *>(column_type->type_info().get()); // TODO shenyushi
             ExecutorAssert(varchar_info->dimension() >= str_view.size(), "Varchar data size exceeds dimension.");
             AppendVarcharData(column_data_entry.get(), str_view, write_row);
-        } else if (column_type->IsEmbedding()) {
+        } else if (column_type->type() == kEmbedding) {
             Vector<StringView> res;
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
             auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
@@ -380,10 +379,8 @@ PhysicalImport::CSVRowHandler(void *context) {
                     AppendSimpleData<DoubleT>(column_data_entry.get(), str_view, write_row);
                     break;
                 }
-                case kVarchar:
                 case kMissing:
-                case kInvalid:
-                case kEmbedding: {
+                case kInvalid: {
                     ExecutorError("Invalid data type")
                 }
                 default: {

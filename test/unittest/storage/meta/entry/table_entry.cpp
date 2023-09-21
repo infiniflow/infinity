@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 #include "base_test.h"
+#include "storage/buffer/column_buffer.h"
 #include "storage/table_def.h"
 #include "storage/table/data_table.h"
 #include "storage/txn/txn_manager.h"
@@ -217,15 +218,15 @@ TEST_F(TableEntryTest, test2) {
                 ColumnDataEntry *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
                 SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
-                i8 *col0_ptr = (i8 *) (col0_obj.GetData());
+                ColumnBuffer col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
+                i8 *col0_ptr = (i8 *) (col0_obj.GetAll());
                 for (SizeT row = 0; row < row_count; ++row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                     EXPECT_EQ(col0_ptr[row], (i8) (row));
                 }
 
-                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
-                f64 *col2_ptr = (f64 *) (col2_obj.GetData());
+                ColumnBuffer col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
+                f64 *col2_ptr = (f64 *) (col2_obj.GetAll());
                 for (SizeT row = 0; row < row_count; ++row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                 }
@@ -296,15 +297,15 @@ TEST_F(TableEntryTest, test2) {
                 ColumnDataEntry* column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
                 SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
-                i8* col0_ptr = (i8*)(col0_obj.GetData());
+                ColumnBuffer col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
+                i8* col0_ptr = (i8*)(col0_obj.GetAll());
                 for(SizeT row = 0; row < row_count; ++ row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                     EXPECT_EQ(col0_ptr[row], (i8)(row));
                 }
 
-                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
-                f64* col2_ptr = (f64*)(col2_obj.GetData());
+                ColumnBuffer col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
+                f64* col2_ptr = (f64*)(col2_obj.GetAll());
                 for(SizeT row = 0; row < row_count; ++ row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                 }
@@ -341,15 +342,15 @@ TEST_F(TableEntryTest, test2) {
                 ColumnDataEntry *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
                 SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-                ObjectHandle col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
-                i8 *col0_ptr = (i8 *) (col0_obj.GetData());
+                ColumnBuffer col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
+                i8 *col0_ptr = (i8 *) (col0_obj.GetAll());
                 for (SizeT row = 0; row < row_count; ++row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                     EXPECT_EQ(col0_ptr[row], (i8) (row));
                 }
 
-                ObjectHandle col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
-                f64 *col2_ptr = (f64 *) (col2_obj.GetData());
+                ColumnBuffer col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
+                f64 *col2_ptr = (f64 *) (col2_obj.GetAll());
                 for (SizeT row = 0; row < row_count; ++row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                 }

@@ -44,11 +44,6 @@ public:
     }
 
     [[nodiscard]] inline SizeT
-    DataSize() const {
-        return EmbeddingType::EmbeddingDataWidth(Type());
-    }
-
-    [[nodiscard]] inline SizeT
     Dimension() const noexcept {
         return dimension_;
     }

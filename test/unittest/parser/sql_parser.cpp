@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "base_test.h"
+#include "common/types/info/varchar_info.h"
 #include "main/logger.h"
 #include "common/types/internal_types.h"
 #include "parser/parser_result.h"
@@ -317,7 +318,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto& column_def = create_table_info->column_defs_[22];
                 EXPECT_EQ(column_def->name_, "w");
-                DataType column_type(LogicalType::kVarchar);
+                DataType column_type(LogicalType::kVarchar, VarcharInfo::Make(100));
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0);
             }

@@ -1,18 +1,16 @@
+#include "executor/operator/physical_import.h"
 #include <gtest/gtest.h>
 #include <fstream>
 
-#include "executor/operator/physical_import.h"
 #include "base_test.h"
-#include "bin/compilation_config.h"
-#include "common/types/data_type.h"
 #include "common/types/internal_types.h"
-#include "function/table/seq_scan.h"
 #include "main/infinity.h"
 #include "main/query_context.h"
-#include "main/stats/global_resource_usage.h"
 #include "main/session.h"
-#include "parser/statement/extra/create_table_info.h"
-#include "storage/meta/catalog.h"
+#include "main/stats/global_resource_usage.h"
+#include "parser/statement/statement_common.h"
+#include "storage/meta/entry/db_entry.h"
+#include "storage/meta/table_collection_meta.h"
 #include "storage/txn/txn.h"
 
 
@@ -77,20 +75,35 @@ TEST_F(PhysicalImportTest, test1) {
     Storage storage(&config);
     storage.Init();
 
-    String catalog_dir = *config.data_dir() + "/catalog";
-    auto catalog = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir));
+    auto resource_manager = MakeUnique<ResourceManager>(
+        config.total_cpu_number(), config.total_memory_size()
+    );
 
     auto session_ptr = MakeUnique<Session>();
     auto txn_mgr = storage.txn_manager();
-    auto txn = MakeUnique<Txn>(txn_mgr, catalog.get(), 0);
+    auto txn = MakeUnique<Txn>(txn_mgr, nullptr, 0);
     session_ptr->txn_ = txn.get();
 
-    auto resource_manager = MakeUnique<ResourceManager>(
-        config.total_cpu_number(), config.total_memory_size());
     auto query_context = MakeUnique<QueryContext>();
-    query_context->Init(session_ptr.get(), &config,
-     nullptr, &storage, resource_manager.get());
+    query_context->Init(
+        session_ptr.get(), &config, nullptr, &storage, resource_manager.get()
+    );
 
+    //----------------------//
+
+    auto db_name = MakeShared<String>("default");
+    auto base_dir1 = MakeShared<String>("/tmp/infinity/data/default");
+    u64 txn_id = 0;
+    TxnTimeStamp timestamp = 0;
+    auto db_entry = MakeUnique<DBEntry>(
+        base_dir1, db_name, txn_id, timestamp
+    );
+
+    auto table_name = MakeShared<String>("t1");
+    auto base_dir2 = MakeShared<String>("/tmp/infinity/data/default/txn_2");
+    auto table_meta = MakeUnique<TableCollectionMeta>(
+        base_dir2, table_name, db_entry.get()
+    );
 
     Vector<SharedPtr<ColumnDef>> columns;
     {
@@ -99,7 +112,7 @@ TEST_F(PhysicalImportTest, test1) {
         auto col_def = MakeShared<ColumnDef>(0, col_type, col_name, HashSet<ConstraintType>());
         columns.emplace_back(col_def);
 
-        SizeT dimension = 2;
+        SizeT dimension = 3;
         auto type_info = MakeShared<EmbeddingInfo>(kElemInt32, dimension);
         col_type = MakeShared<DataType>(LogicalType::kEmbedding, type_info);
         col_name = "col2";
@@ -107,26 +120,22 @@ TEST_F(PhysicalImportTest, test1) {
         columns.emplace_back(col_def);
     }
 
-    auto base_dir = MakeShared<String>(*config.data_dir());
-    auto table_collection_name = MakeShared<String>("table1");
-    auto entry_dir = MakeShared<String>(*base_dir + "/test/");
-    // auto meta_dir = MakeShared<String>(*base_dir + "/catalog");
-    auto table_collection_meta = MakeUnique<TableCollectionMeta>(base_dir, table_collection_name, nullptr);
-    auto table_collection_entry = MakeUnique<TableCollectionEntry>(
-        entry_dir, table_collection_name, columns, TableCollectionType::kTableEntry, table_collection_meta.get(), 0, 0);
+    auto table_entry = MakeUnique<TableCollectionEntry>(
+        base_dir2, table_name, columns, TableCollectionType::kCollectionEntry,
+        table_meta.get(), txn_id, timestamp
+    );
 
-    String file_path = String(TEST_DATA_PATH) + "/csv/embedding1.csv";
+    uint64_t id = 0;
+    // String file_path = "test/data/csv/embedding1.csv";
+    String file_path = "../../../test/data/csv/embedding1.csv";
+    bool header = false;
+    char delimiter = ',';
+    auto file_type = CopyFileType::kCSV;
     auto physical_import = MakeUnique<PhysicalImport>(
-        0, table_collection_entry.get(), file_path, false, ',', CopyFileType::kCSV);
-    
-    physical_import->ImportCSV(query_context.get());
-    physical_import->ImportCSV(query_context.get());
+        id, table_entry.get(), std::move(file_path),
+        header, delimiter, file_type
+    );
 
-    auto store = txn->GetTxnTableStore(*table_collection_name.get());
-    auto segment = store->uncommitted_segments_[0];
-    
-    // for (int idx = 0; auto &column : segment->columns_) {
-        // TODO: add test
-    //     idx++;
-    // }
+    physical_import->ImportCSV(query_context.get());
+    return;
 }

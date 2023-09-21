@@ -1773,8 +1773,8 @@ ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, SizeT row
         }
 
         case kVarchar: {
-            for (SizeT row_idx = 0; row_idx < row_count; row_idx++) {
-                auto [src_ptr, data_size] = column_buffer.GetAt(row_idx);
+            for (SizeT row_idx = 0; row_idx < appended_rows; row_idx++) {
+                auto [src_ptr, data_size] = column_buffer.GetVarcharAt(row_idx);
                 auto varchar_type = reinterpret_cast<VarcharT *>(data_ptr_) + tail_index_;
                 varchar_type->Initialize(src_ptr, data_size);
                 this->tail_index_++;

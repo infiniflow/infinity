@@ -126,7 +126,7 @@ public:
     AppendWith(const ColumnVector &other, SizeT from, SizeT count);
 
     // input parameter:
-    // ptr - input raw data
+    // column_buffer - input column
     // start_row - start row number of ptr
     // row_count - total row count to be copied
     // return value: appended rows actually

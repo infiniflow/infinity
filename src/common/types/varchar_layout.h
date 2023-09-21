@@ -7,7 +7,7 @@ namespace infinity {
 
 #pragma pack (1)
 
-struct VarcharStore {
+struct VarcharLayout {
     u16 length_{};
 
     struct ShortInfo {
@@ -32,7 +32,7 @@ struct VarcharStore {
     } u;
 };
 
-static_assert(sizeof(VarcharStore) == sizeof(VarcharT));
+static_assert(sizeof(VarcharLayout) == sizeof(VarcharT));
 
 #pragma pack ()
 

@@ -3,6 +3,8 @@
 //
 
 #include "data_type.h"
+#include "common/types/logical_type.h"
+#include "common/types/type_info.h"
 #include "function/cast/cast_table.h"
 #include "common/utility/infinity_assert.h"
 #include "info/bitmap_info.h"
@@ -156,9 +158,12 @@ DataType::Size() const {
         StorageError("Invalid logical data type.");
     }
 
+    // embedding, varchar data can get data here. 
     if(type_info_ != nullptr) {
         return type_info_->Size();
     }
+
+    // StorageAssert(type_ != kEmbedding && type_ != kVarchar, "This ype should have type info");
 
     return type_size[type_];
 }

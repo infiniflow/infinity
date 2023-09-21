@@ -7,22 +7,19 @@
 #include "common/types/data_type.h"
 #include "common/types/internal_types.h"
 #include "common/types/logical_type.h"
+#include "common/types/varchar_layout.h"
 #include "common/utility/infinity_assert.h"
 #include "segment_entry.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/column_buffer.h"
-#include "storage/varchar_store.h"
 #include <cstring>
 #include <string>
 
 namespace infinity {
 
 SharedPtr<ColumnDataEntry>
-ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry *segment_entry,
-                                        u64 column_id,
-                                        u64 row_capacity,
-                                        const SharedPtr<DataType>& data_type,
-                                        BufferManager* buffer_mgr) {
+ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry* segment_entry, u64 column_id, u64 row_capacity,
+    const SharedPtr<DataType>& data_type, BufferManager* buffer_mgr) {
     SharedPtr<ColumnDataEntry> column_data_entry = MakeShared<ColumnDataEntry>(segment_entry);
     const auto* segment_ptr = (const SegmentEntry*)segment_entry;
     column_data_entry->base_dir_ = segment_ptr->base_dir_;
@@ -88,18 +85,18 @@ ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset,
             break;
         }
         case kVarchar: {
-            auto inline_p = reinterpret_cast<VarcharStore *>(dst_ptr);
+            auto inline_p = reinterpret_cast<VarcharLayout *>(dst_ptr);
             auto src_ptr = reinterpret_cast<VarcharT *>(src_p);
             SizeT row_n = data_size / sizeof(VarcharT);
             for (SizeT row_idx = 0; row_idx < row_n; row_idx++) {
                 auto varchar_type = src_ptr + row_idx;
-                VarcharStore *varchar_store = inline_p + row_idx;
+                VarcharLayout *varchar_layout = inline_p + row_idx;
                 if (varchar_type->IsInlined()) {
-                    auto &short_info = varchar_store->u.short_info_;
-                    varchar_store->length_ = varchar_type->length;
+                    auto &short_info = varchar_layout->u.short_info_;
+                    varchar_layout->length_ = varchar_type->length;
                     memcpy(short_info.data.data(), varchar_type->prefix, varchar_type->length);
                 } else {
-                    auto &long_info = varchar_store->u.long_info_;
+                    auto &long_info = varchar_layout->u.long_info_;
                     auto outline_info = column_data_entry->outline_info_.get();
                     if (outline_info->current_buffer_handler_ == nullptr) {
                         auto file_name = ColumnDataEntry::GetOutlineFilename(outline_info->next_file_idx++);
@@ -115,7 +112,7 @@ ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset,
                     ptr_t src_ptr = varchar_type->ptr;
                     memcpy(dst_ptr, src_ptr, data_size);
 
-                    varchar_store->length_ = varchar_type->length;
+                    varchar_layout->length_ = varchar_type->length;
                     memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
                     long_info.file_idx_ = outline_info->next_file_idx - 1; // TODO shenyushi
                     long_info.file_offset_ = outline_info->current_buffer_offset_;

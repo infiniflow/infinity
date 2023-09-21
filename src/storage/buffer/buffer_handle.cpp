@@ -46,9 +46,9 @@ BufferHandle::LoadData() {
                     // Restore the data from disk
                     String file_path;
                     if(current_dir_ == nullptr or current_dir_->empty()) {
-                        file_path = *base_dir_  + *file_name_;
+                        file_path = *base_dir_ + '/' + *file_name_;
                     } else {
-                        file_path = *current_dir_ + *file_name_;
+                        file_path = *current_dir_ + '/' + *file_name_;
                     }
 
                     LOG_TRACE("Read data from spilled file from: {}", file_path);

@@ -17,6 +17,7 @@ class ObjectHandle {
 public:
     explicit
     ObjectHandle() {}
+
     explicit
     ObjectHandle(BufferHandle *buffer_handle)
             : buffer_handle_(buffer_handle) {}
@@ -29,7 +30,11 @@ public:
 
     ObjectHandle& operator=(ObjectHandle &&other);
 
-    ~ObjectHandle();
+    ~ObjectHandle() {
+        if (buffer_handle_) {
+            buffer_handle_->UnloadData();
+        }
+    }
 
     [[nodiscard]] ptr_t
     GetData();
@@ -40,5 +45,6 @@ private:
     ptr_t ptr_{};
 
 };
+
 
 }

@@ -147,16 +147,6 @@ public:
         }
     }
 
-    inline bool
-    IsVarchar() const {
-        return type_ == kVarchar;
-    }
-
-    inline bool
-    IsEmbedding() const {
-        return type_ == kEmbedding;
-    }
-
     nlohmann::json
     Serialize();
 

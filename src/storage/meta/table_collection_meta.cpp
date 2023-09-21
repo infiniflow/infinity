@@ -23,7 +23,7 @@ TableCollectionMeta::CreateNewEntry(TableCollectionMeta* table_meta,
     TableCollectionEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(table_meta->rw_locker_);
     const String& table_collection_name = *table_collection_name_ptr;
-    SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + *table_meta->table_collection_name_ + '/');
+    SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + *table_meta->table_collection_name_);
 
     if(table_meta->entry_list_.empty()) {
         // Insert a dummy entry.
