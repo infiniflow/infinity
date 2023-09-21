@@ -15,6 +15,7 @@
 #include "common/utility/infinity_assert.h"
 #include "expression_binder.h"
 #include "query_binder.h"
+#include "expression/knn_expression.h"
 
 namespace infinity {
 
@@ -74,6 +75,9 @@ ExpressionBinder::BuildExpression(const ParsedExpr& expr,
         }
         case ParsedExprType::kIn: {
             return BuildInExpr((const InExpr&)expr, bind_context_ptr, depth, root);
+        }
+        case ParsedExprType::kKnn: {
+            return BuildKnnExpr((const KnnExpr&)expr, bind_context_ptr, depth, root);
         }
         default: {
             PlannerError("Unexpected expression type.");
@@ -174,6 +178,12 @@ ExpressionBinder::BuildValueExpr(const ConstantExpr& expr,
         case LiteralType::kBoolean: {
             Value value = Value::MakeBool(expr.bool_value_);
             return MakeShared<ValueExpression>(value);
+        }
+        case LiteralType::kIntegerArray: {
+            PlannerError("Unexpected literal type: integer array.");
+        }
+        case LiteralType::kDoubleArray: {
+            PlannerError("Unexpected literal type: float array.");
         }
         case LiteralType::kNull: {
             Value value = Value::MakeNull();
@@ -382,6 +392,34 @@ ExpressionBinder::BuildInExpr(const InExpr& expr,
     }
     SharedPtr<InExpression> in_expression_ptr = MakeShared<InExpression>(in_type, bound_left_expr, arguments);
     return in_expression_ptr;
+}
+
+SharedPtr<BaseExpression>
+ExpressionBinder::BuildKnnExpr(const KnnExpr& parsed_knn_expr,
+                               BindContext* bind_context_ptr,
+                               i64 depth,
+                               bool root) {
+
+    // Bind KNN expression
+    Vector<SharedPtr<BaseExpression>> arguments;
+    arguments.reserve(1);
+
+    // Bind query column
+    auto expr_ptr = BuildExpression(*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
+    arguments.emplace_back(expr_ptr);
+
+    // Create query embedding
+    EmbeddingT query_embedding((ptr_t) parsed_knn_expr.embedding_data_ptr_);
+    const_cast<KnnExpr&>(parsed_knn_expr).embedding_data_ptr_ = nullptr;
+
+    SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(parsed_knn_expr.embedding_data_type_,
+                                                                        parsed_knn_expr.dimension_,
+                                                                        parsed_knn_expr.distance_type_,
+                                                                        std::move(query_embedding),
+                                                                        arguments);
+
+    return bound_knn_expr;
+
 }
 
 // Bind subquery expression.

@@ -21,6 +21,7 @@ enum class ParsedExprType {
     kCase,
     kCast,
     kIn,
+    kKnn,
 };
 
 class ParsedExpr {

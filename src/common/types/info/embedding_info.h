@@ -21,7 +21,8 @@ public:
         return MakeShared<EmbeddingInfo>(embedding_data_type, dimension);
     }
 
-    explicit EmbeddingInfo(EmbeddingDataType type, SizeT dimension):
+    explicit
+    EmbeddingInfo(EmbeddingDataType type, SizeT dimension):
             TypeInfo(TypeInfoType::kEmbedding),
             embedding_data_type_(type),
             dimension_(dimension)

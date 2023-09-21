@@ -24,6 +24,7 @@ class PhysicalCreateView;
 class PhysicalDropView;
 class PhysicalCreateSchema;
 class PhysicalCreateTable;
+class PhysicalCreateTable;
 class PhysicalCreateCollection;
 class PhysicalDropSchema;
 class PhysicalDropTable;

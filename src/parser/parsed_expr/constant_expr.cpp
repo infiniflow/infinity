@@ -58,6 +58,30 @@ ConstantExpr::ToString() const {
                 }
             }
         }
+        case LiteralType::kIntegerArray: {
+            std::stringstream ss;
+            SizeT len = long_array_.size();
+            if(len <= 0) {
+                PlannerError("Invalid long array length")
+            }
+            for(SizeT i = 0; i < len - 1; ++ i) {
+                ss << long_array_[i] << ',';
+            }
+            ss << long_array_.back();
+            return ss.str();
+        }
+        case LiteralType::kDoubleArray: {
+            std::stringstream ss;
+            SizeT len = double_array_.size();
+            if(len <= 0) {
+                PlannerError("Invalid double array length")
+            }
+            for(SizeT i = 0; i < len - 1; ++ i) {
+                ss << double_array_[i] << ',';
+            }
+            ss << double_array_.back();
+            return ss.str();
+        }
     }
     PlannerError("Unexpected branch");
 }

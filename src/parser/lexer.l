@@ -98,6 +98,7 @@ INTO            { return INTO; }
 IS              { return IS; }
 JOIN            { return JOIN; }
 KEY             { return KEY; }
+KNN             { return KNN; }
 LEFT            { return LEFT; }
 LIKE            { return LIKE; }
 LIMIT           { return LIMIT; }

@@ -12,3 +12,4 @@
 #include "parsed_expr/cast_expr.h"
 #include "parsed_expr/case_expr.h"
 #include "parsed_expr/in_expr.h"
+#include "parsed_expr/knn_expr.h"

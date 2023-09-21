@@ -8,15 +8,23 @@
 #include "common/types/internal_types.h"
 #include "parser/parser_result.h"
 #include "parser/sql_parser.h"
+#include "main/infinity.h"
 
 
 class SelectStatementParsingTest : public BaseTest {
     void
     SetUp() override {
+        infinity::GlobalResourceUsage::Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::Infinity::instance().Init(config_path);
     }
 
     void
     TearDown() override {
+        infinity::Infinity::instance().UnInit();
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
     }
 };
 
@@ -419,6 +427,66 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto *func_expr = (FunctionExpr *) (*select_statement->select_list_)[1];
                 EXPECT_EQ(func_expr->func_name_, "count");
                 EXPECT_EQ(func_expr->distinct_, false);
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SELECT KNN(c1, [1, 2], 2, 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_NE(select_statement->where_expr_, nullptr);
+            {
+                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
+                auto *function_expr = (FunctionExpr *) (select_statement->where_expr_);
+                EXPECT_EQ(function_expr->func_name_, ">");
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(0);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kColumn);
+                    auto *arg0_col_expr = (ColumnExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_col_expr->names_[0], "a");
+                }
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(1);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kConstant);
+                    auto *arg0_const_expr = (ConstantExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_const_expr->integer_value_, 0);
+                }
+            }
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->db_name_, "default");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t1");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kKnn);
+                auto *knn_expr = (KnnExpr *) (*select_statement->select_list_)[0];
+                EXPECT_EQ(knn_expr->distance_type_, KnnDistanceType::kL2);
+
+                auto *arg0_col_expr = (ColumnExpr *) (knn_expr->column_expr_);
+                EXPECT_EQ(arg0_col_expr->names_[0], "c1");
+
+                EXPECT_EQ(knn_expr->column_expr_->type_, ParsedExprType::kColumn);
+                EXPECT_EQ(knn_expr->dimension_, 2);
+                EXPECT_EQ(knn_expr->embedding_data_type_, EmbeddingDataType::kElemInt32);
+
+                EXPECT_EQ(((i32*)knn_expr->embedding_data_ptr_)[0], 1);
+                EXPECT_EQ(((i32*)knn_expr->embedding_data_ptr_)[1], 2);
             }
         }
         result->Reset();

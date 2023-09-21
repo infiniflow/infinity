@@ -16,6 +16,8 @@ enum class LiteralType {
     kInteger,
     kNull,
     kDate,
+    kIntegerArray,
+    kDoubleArray,
     kInterval,
 };
 
@@ -34,10 +36,12 @@ public:
 
     bool bool_value_{false};
     i64 integer_value_{0};
-    double double_value_{0};
+    f64 double_value_{0};
     char* str_value_{nullptr};
     TimeUnit interval_type_{TimeUnit::kInvalidUnit};
     char* date_value_{nullptr};
+    Vector<i64> long_array_{};
+    Vector<f64> double_array_{};
 };
 
 }

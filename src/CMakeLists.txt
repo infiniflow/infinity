@@ -12,7 +12,7 @@ bison_target(PARSER
             ${CMAKE_CURRENT_SOURCE_DIR}/parser/parser.cpp
             DEFINES_FILE
             ${CMAKE_CURRENT_SOURCE_DIR}/parser/parser.h
-            COMPILE_FLAGS "-d -v")
+            COMPILE_FLAGS "-d -v -Wcounterexamples")
 
 ADD_FLEX_BISON_DEPENDENCY(LEXER PARSER)
 
