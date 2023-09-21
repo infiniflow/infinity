@@ -21,10 +21,11 @@ using TableFunctionType
 
 class TableFunction : public Function {
 public:
-    explicit TableFunction(String name,
-                           Vector<LogicalType> argument_types,
-                           TableFunctionType function
-                           );
+    explicit
+    TableFunction(String name,
+                  Vector<LogicalType> argument_types,
+                  TableFunctionType function
+                  );
 
     [[nodiscard]] String
     ToString() const override;

@@ -60,5 +60,4 @@ ScalarFunction::ToString() const {
     return ss.str();
 }
 
-
 }

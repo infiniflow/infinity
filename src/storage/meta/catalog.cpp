@@ -188,7 +188,7 @@ NewCatalog::AddTableFunction(NewCatalog* catalog, const SharedPtr<TableFunction>
     String name = table_function->name();
     StringToLower(name);
     if(catalog->table_functions_.contains(name)) {
-        CatalogError("Trying to add duplicated table function table_name into catalog: " + name);
+        CatalogError("Trying to add duplicated table function into catalog: " + name);
     }
     catalog->table_functions_.emplace(name, table_function);
 }

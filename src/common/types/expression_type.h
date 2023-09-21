@@ -81,6 +81,7 @@ enum class ExpressionType {
     kWindowRowNumber,
 
     // Misc.
+    kKnn,
     kDistinctFrom, // ??
     kNotDistinctFrom, // ??
     kPlaceholder,

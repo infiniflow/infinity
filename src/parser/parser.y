@@ -125,6 +125,7 @@ struct SQL_LTYPE {
     infinity::ExplainType             explain_type_t;
 
     infinity::ParsedExpr*             expr_t;
+    infinity::ConstantExpr*           const_expr_t;
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
 
     std::vector<infinity::WhenThen*>*     case_check_array_t;
@@ -234,6 +235,10 @@ struct SQL_LTYPE {
 } <expr_t>
 
 %destructor {
+    delete ($$);
+} <const_expr_t>
+
+%destructor {
     fprintf(stderr, "destroy table alias\n");
     delete ($$);
 } <table_alias_t>
@@ -287,6 +292,7 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER
+%token KNN
 
 %token NUMBER
 
@@ -326,9 +332,11 @@ struct SQL_LTYPE {
 %type <set_operator_t>          set_operator
 %type <explain_type_t>          explain_type
 
-%type <expr_t>                  expr expr_alias constant_expr interval_expr column_expr function_expr subquery_expr
+%type <expr_t>                  expr expr_alias column_expr function_expr subquery_expr knn_expr
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
 %type <expr_t>                  conjunction_expr cast_expr case_expr
+%type <const_expr_t>            constant_expr interval_expr
+%type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <expr_array_t>            expr_array group_by_clause
 %type <update_expr_t>           update_expr;
 %type <update_expr_array_t>     update_expr_array;
@@ -1408,11 +1416,121 @@ operand: '(' expr ')' {
     subquery_expr->select_ = $2;
     $$ = subquery_expr;
 }
-| constant_expr
+| constant_expr {
+    $$ = $1;
+}
 | column_expr
 | function_expr
 | case_expr
 | cast_expr
+| knn_expr
+
+knn_expr : KNN '(' expr ',' array_expr ',' LONG_VALUE ',' STRING ',' STRING ')' {
+    infinity::KnnExpr* knn_expr = new infinity::KnnExpr();
+
+    // KNN search column
+    knn_expr->column_expr_ = $3;
+
+    // KNN search data dimension
+    knn_expr->dimension_ = $7;
+
+    // KNN distance type
+    ParserHelper::ToLower($11);
+    if(strcmp($11, "l2") == 0) {
+        knn_expr->distance_type_ = infinity::KnnDistanceType::kL2;
+    } else if(strcmp($11, "ip") == 0) {
+        knn_expr->distance_type_ = infinity::KnnDistanceType::kInnerProduct;
+    } else if(strcmp($11, "cosine") == 0) {
+        knn_expr->distance_type_ = infinity::KnnDistanceType::kCosine;
+    } else if(strcmp($11, "hamming") == 0) {
+        knn_expr->distance_type_ = infinity::KnnDistanceType::kHamming;
+    } else {
+        yyerror(&yyloc, scanner, result, "Invalid knn distance type");
+        YYERROR;
+    }
+
+    // KNN data type
+    ParserHelper::ToLower($9);
+    if(strcmp($9, "float") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
+
+        knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemFloat;
+
+        float* float_data_ptr = new float[knn_expr->dimension_];
+        for(long i = 0; i < knn_expr->dimension_; ++ i) {
+            ((float*)(knn_expr->embedding_data_ptr_))[i] = $5->double_array_[i];
+        }
+
+    } else if(strcmp($9, "tinyint") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
+        knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt8;
+        knn_expr->embedding_data_ptr_ = new char[knn_expr->dimension_];
+
+        for(long i = 0; i < knn_expr->dimension_; ++ i) {
+            ((char*)knn_expr->embedding_data_ptr_)[i] = $5->long_array_[i];
+        }
+    } else if(strcmp($9, "smallint") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
+        knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt16;
+        knn_expr->embedding_data_ptr_ = new short int[knn_expr->dimension_];
+
+        for(long i = 0; i < knn_expr->dimension_; ++ i) {
+            ((short int*)knn_expr->embedding_data_ptr_)[i] = $5->long_array_[i];
+        }
+    } else if(strcmp($9, "integer") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
+        knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt32;
+        knn_expr->embedding_data_ptr_ = new int[knn_expr->dimension_];
+
+        for(long i = 0; i < knn_expr->dimension_; ++ i) {
+            ((int*)knn_expr->embedding_data_ptr_)[i] = $5->long_array_[i];
+        }
+
+    } else if(strcmp($9, "bigint") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
+        knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt64;
+        knn_expr->embedding_data_ptr_ = new long[knn_expr->dimension_];
+
+        memcpy(knn_expr->embedding_data_ptr_,
+               (void*)$5->long_array_.data(),
+               knn_expr->dimension_ * sizeof(long));
+    } else if(strcmp($9, "bit") == 0 and knn_expr->distance_type_ == infinity::KnnDistanceType::kHamming) {
+
+        if(knn_expr->dimension_ % 8 == 0) {
+            knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemBit;
+            long embedding_size = knn_expr->dimension_ / 8;
+            knn_expr->embedding_data_ptr_ = new char[embedding_size];
+
+            for(long i = 0; i < embedding_size; ++ i) {
+                char embedding_unit = 0;
+                for(long bit_idx = 0; bit_idx < 8; ++ bit_idx) {
+                    if($5->long_array_[i * 8 + bit_idx] == 1) {
+                        char temp = embedding_unit << 1;
+                        temp &= 1;
+                        embedding_unit = temp;
+                    } else if($5->long_array_[i * 8 + bit_idx] == 0) {
+                        embedding_unit <<= 0;
+                    } else {
+                        yyerror(&yyloc, scanner, result, "Invalid bit embedding type data");
+                        YYERROR;
+                    }
+                }
+                ((char*)knn_expr->embedding_data_ptr_)[i] = embedding_unit;
+            }
+        } else {
+            yyerror(&yyloc, scanner, result, "KNN data type is bit which length should be aligned with 8");
+            YYERROR;
+        }
+
+    } else if(strcmp($9, "double") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
+        knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemDouble;
+        knn_expr->embedding_data_ptr_ = new double[knn_expr->dimension_];
+
+        memcpy(knn_expr->embedding_data_ptr_,
+               (void*)$5->double_array_.data(),
+               knn_expr->dimension_ * sizeof(double));
+    } else {
+        yyerror(&yyloc, scanner, result, "Invalid knn data type");
+        YYERROR;
+    }
+
+    $$ = knn_expr;
+}
 
 function_expr : IDENTIFIER '(' ')' {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
@@ -1809,7 +1927,50 @@ constant_expr: STRING {
 }
 | interval_expr {
     $$ = $1;
+}
+/*
+| long_array_expr {
+    $$ = $1;
+}
+| double_array_expr {
+    $$ = $1;
 };
+*/
+
+array_expr: long_array_expr {
+    $$ = $1;
+}
+| double_array_expr {
+    $$ = $1;
+}
+
+long_array_expr: unclosed_long_array_expr ']' {
+    $$ = $1;
+};
+
+unclosed_long_array_expr: '[' LONG_VALUE {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kIntegerArray);
+    const_expr->long_array_.emplace_back($2);
+    $$ = const_expr;
+}
+| unclosed_long_array_expr ',' LONG_VALUE {
+    $1->long_array_.emplace_back($3);
+    $$ = $1;
+}
+
+double_array_expr: unclosed_double_array_expr ']' {
+    $$ = $1;
+};
+
+unclosed_double_array_expr: '[' DOUBLE_VALUE {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDoubleArray);
+    const_expr->double_array_.emplace_back($2);
+    $$ = const_expr;
+}
+| unclosed_double_array_expr ',' DOUBLE_VALUE {
+    $1->double_array_.emplace_back($3);
+    $$ = $1;
+}
 
 interval_expr: LONG_VALUE SECONDS {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);

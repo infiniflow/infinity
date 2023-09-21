@@ -1,0 +1,22 @@
+statement ok
+CREATE TABLE select1 (id INTEGER PRIMARY KEY, name VARCHAR(50), age INTEGER);
+
+statement ok
+CREATE TABLE select2 (id INTEGER , age INTEGER);
+
+# copy data from csv file
+query I
+COPY select2 FROM '/tmp/infinity/sqllogictest/nation.csv' WITH ( DELIMITER ',' );
+----
+
+#query ITI
+#SELECT * FROM select1 ORDER by age ASC;
+#----
+#2 Jane 25
+#1 John 30
+
+statement ok
+DROP TABLE select1;
+
+statement ok
+DROP TABLE select2;

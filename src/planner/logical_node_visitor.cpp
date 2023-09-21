@@ -200,6 +200,17 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
             }
             break;
         }
+        case ExpressionType::kKnn: {
+            auto knn_expression = std::static_pointer_cast<KnnExpression>(expression);
+
+            VisitExpression(knn_expression->arguments()[0]);
+
+            result = VisitReplace(knn_expression);
+            if(result != nullptr) {
+                expression = result;
+            }
+            break;
+        }
         default: {
             PlannerError("Unexpected expression type: " + expression->Name())
         }
@@ -355,6 +366,11 @@ LogicalNodeVisitor::VisitReplace(const SharedPtr<InExpression>& expression) {
 
 SharedPtr<BaseExpression>
 LogicalNodeVisitor::VisitReplace(const SharedPtr<SubqueryExpression>& expression) {
+    return nullptr;
+}
+
+SharedPtr<BaseExpression>
+LogicalNodeVisitor::VisitReplace(const SharedPtr<KnnExpression>& expression) {
     return nullptr;
 }
 

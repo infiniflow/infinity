@@ -41,7 +41,6 @@ Connection::Run() {
             pg_handler_->send_error_response(error_message_map);
             pg_handler_->send_ready_for_query();
         }
-
     }
 }
 
@@ -155,14 +154,14 @@ Connection::SendTableDescription(const SharedPtr<Table>& result_table) {
                 object_width = 1;
                 break;
             }
-            case LogicalType::kSmallInt: {
-                object_id = 21;
-                object_width = 2;
-                break;
-            }
             case LogicalType::kTinyInt: {
                 object_id = 18; // char
                 object_width = 1;
+                break;
+            }
+            case LogicalType::kSmallInt: {
+                object_id = 21;
+                object_width = 2;
                 break;
             }
             case LogicalType::kInteger: {
@@ -203,6 +202,55 @@ Connection::SendTableDescription(const SharedPtr<Table>& result_table) {
             case LogicalType::kInterval: {
                 object_id = 1186;
                 object_width = 16;
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                if(column_type->type_info()->type() != TypeInfoType::kEmbedding) {
+                    TypeError("Not embedding type")
+                }
+
+                EmbeddingInfo* embedding_info = static_cast<EmbeddingInfo*>(column_type->type_info().get());
+                switch(embedding_info->Type()) {
+
+                    case kElemBit: {
+                        object_id = 1000;
+                        object_width = 1;
+                        break;
+                    }
+                    case kElemInt8: {
+                        object_id = 1002;
+                        object_width = 1;
+                        break;
+                    }
+                    case kElemInt16: {
+                        object_id = 1005;
+                        object_width = 2;
+                        break;
+                    }
+                    case kElemInt32: {
+                        object_id = 1007;
+                        object_width = 4;
+                        break;
+                    }
+                    case kElemInt64: {
+                        object_id = 1016;
+                        object_width = 8;
+                        break;
+                    }
+                    case kElemFloat: {
+                        object_id = 1021;
+                        object_width = 4;
+                        break;
+                    }
+                    case kElemDouble: {
+                        object_id = 1022;
+                        object_width = 8;
+                        break;
+                    }
+                    case kElemInvalid: {
+                        TypeError("Invalid embedding data type")
+                    }
+                }
                 break;
             }
             default: {

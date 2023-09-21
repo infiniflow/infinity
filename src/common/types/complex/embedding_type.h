@@ -48,6 +48,29 @@ public:
     }
 
     static inline String
+    EmbeddingDataType2String(EmbeddingDataType type) {
+        switch(type) {
+            case kElemBit:
+                return "BIT";
+            case kElemInt8:
+                return "INT8";
+            case kElemInt16:
+                return "INT16";
+            case kElemInt32:
+                return "INT32";
+            case kElemInt64:
+                return "INT64";
+            case kElemFloat:
+                return "FLOAT32";
+            case kElemDouble:
+                return "FLOAT64";
+            default: {
+                TypeError("Unexpected embedding type");
+            }
+        }
+    }
+
+    static inline String
     Embedding2String(const EmbeddingType& embedding, EmbeddingDataType type, size_t dimension) {
         switch(type) {
             case kElemBit:
@@ -148,6 +171,9 @@ public:
         other.ptr = nullptr;
         return *this;
     }
+
+    void
+    Init(const void* ptr, SizeT size);
 
     bool
     operator==(const EmbeddingType& other) const = delete;

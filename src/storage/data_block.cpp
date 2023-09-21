@@ -211,6 +211,19 @@ DataBlock::AppendWith(const SharedPtr<DataBlock>& other, SizeT from, SizeT count
     }
 }
 
+
+
+int32_t DataBlock::GetSizeInBytes() const{
+
 }
 
+int32_t DataBlock::Write(char* buf, int32_t maxbytes) const{
+    //TODO: implement, possibly using https://github.com/felixguendling/cista/
+    return 0;
+}
 
+int32_t DataBlock::Read(char* buf, int32_t maxbytes, DataBlock& block){
+    return 0;
+}
+
+}

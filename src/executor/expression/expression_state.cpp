@@ -23,6 +23,9 @@ ExpressionState::CreateState(const SharedPtr<BaseExpression> &expression) {
             return CreateState(std::static_pointer_cast<ValueExpression>(expression));
         case ExpressionType::kReference:
             return CreateState(std::static_pointer_cast<ReferenceExpression>(expression));
+        case ExpressionType::kKnn: {
+            ExecutorError("Unexpected expression type: KNN");
+        }
         default:
             ExecutorError("Unknown expression type: " + expression->Name());
     }

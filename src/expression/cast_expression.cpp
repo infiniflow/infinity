@@ -27,95 +27,85 @@ CastExpression::AddCastToType(const SharedPtr<BaseExpression>& source_expr_ptr, 
 
 bool
 CastExpression::CanCast(const DataType& source, const DataType& target) {
-    return true;
-#if 0
-    switch(target.GetTypeId()) {
-        case LogicalTypeId::kNull:
-        case LogicalTypeId::kAny:
-        case LogicalTypeId::kInvalid:
+    switch(target.type()) {
+        case LogicalType::kNull:
+        case LogicalType::kInvalid:
             PlannerError("Invalid data type");
         default:
             ;
     }
 
-    switch(source.GetTypeId()) {
-        case LogicalTypeId::kBoolean:
-        case LogicalTypeId::kTinyInt:
-        case LogicalTypeId::kSmallInt:
-        case LogicalTypeId::kInteger:
-        case LogicalTypeId::kBigInt:
-        case LogicalTypeId::kFloat:
-        case LogicalTypeId::kDouble:
-        case LogicalTypeId::kDecimal:
-            switch(target.GetTypeId()) {
-                case LogicalTypeId::kBoolean:
-                case LogicalTypeId::kTinyInt:
-                case LogicalTypeId::kSmallInt:
-                case LogicalTypeId::kInteger:
-                case LogicalTypeId::kBigInt:
-                case LogicalTypeId::kFloat:
-                case LogicalTypeId::kDouble:
-                case LogicalTypeId::kDecimal:
-                case LogicalTypeId::kText:
+    switch(source.type()) {
+        case LogicalType::kBoolean:
+        case LogicalType::kTinyInt:
+        case LogicalType::kSmallInt:
+        case LogicalType::kInteger:
+        case LogicalType::kBigInt:
+        case LogicalType::kFloat:
+        case LogicalType::kDouble:
+        case LogicalType::kDecimal:
+            switch(target.type()) {
+                case LogicalType::kBoolean:
+                case LogicalType::kTinyInt:
+                case LogicalType::kSmallInt:
+                case LogicalType::kInteger:
+                case LogicalType::kBigInt:
+                case LogicalType::kFloat:
+                case LogicalType::kDouble:
+                case LogicalType::kDecimal:
                     return true;
                 default:
                     return false;
             }
-        case LogicalTypeId::kDate:
-            switch(target.GetTypeId()) {
-                case LogicalTypeId::kDate:
-                case LogicalTypeId::kDateTime:
-                case LogicalTypeId::kVarchar:
-                case LogicalTypeId::kText:
+        case LogicalType::kDate:
+            switch(target.type()) {
+                case LogicalType::kDate:
+                case LogicalType::kDateTime:
+                case LogicalType::kVarchar:
                     return true;
                 default:
                     return false;
             }
-        case LogicalTypeId::kTime:
-            switch(target.GetTypeId()) {
-                case LogicalTypeId::kTime:
-                case LogicalTypeId::kVarchar:
-                case LogicalTypeId::kText:
+        case LogicalType::kTime:
+            switch(target.type()) {
+                case LogicalType::kTime:
+                case LogicalType::kVarchar:
                     return true;
                 default:
                     return false;
             }
-        case LogicalTypeId::kDateTime:
-            switch(target.GetTypeId()) {
-                case LogicalTypeId::kDate:
-                case LogicalTypeId::kDateTime:
-                case LogicalTypeId::kVarchar:
-                case LogicalTypeId::kText:
+        case LogicalType::kDateTime:
+            switch(target.type()) {
+                case LogicalType::kDate:
+                case LogicalType::kDateTime:
+                case LogicalType::kVarchar:
                     return true;
                 default:
                     return false;
             }
-        case LogicalTypeId::kInterval:
-            switch(target.GetTypeId()) {
-                case LogicalTypeId::kInterval:
-                case LogicalTypeId::kVarchar:
-                case LogicalTypeId::kText:
+        case LogicalType::kInterval:
+            switch(target.type()) {
+                case LogicalType::kInterval:
+                case LogicalType::kVarchar:
                     return true;
                 default:
                     return false;
             }
-        case LogicalTypeId::kVarchar:
-        case LogicalTypeId::kText:
-            switch(target.GetTypeId()) {
-                case LogicalTypeId::kBoolean:
-                case LogicalTypeId::kTinyInt:
-                case LogicalTypeId::kSmallInt:
-                case LogicalTypeId::kInteger:
-                case LogicalTypeId::kBigInt:
-                case LogicalTypeId::kFloat:
-                case LogicalTypeId::kDouble:
-                case LogicalTypeId::kDecimal:
-                case LogicalTypeId::kDate:
-                case LogicalTypeId::kTime:
-                case LogicalTypeId::kDateTime:
-                case LogicalTypeId::kInterval:
-                case LogicalTypeId::kVarchar:
-                case LogicalTypeId::kText:
+        case LogicalType::kVarchar:
+            switch(target.type()) {
+                case LogicalType::kBoolean:
+                case LogicalType::kTinyInt:
+                case LogicalType::kSmallInt:
+                case LogicalType::kInteger:
+                case LogicalType::kBigInt:
+                case LogicalType::kFloat:
+                case LogicalType::kDouble:
+                case LogicalType::kDecimal:
+                case LogicalType::kDate:
+                case LogicalType::kTime:
+                case LogicalType::kDateTime:
+                case LogicalType::kInterval:
+                case LogicalType::kVarchar:
                     return true;
                 default:
                     return false;
@@ -123,7 +113,6 @@ CastExpression::CanCast(const DataType& source, const DataType& target) {
         default:
             PlannerError("Invalid data type");
     }
-#endif
 }
 
 String

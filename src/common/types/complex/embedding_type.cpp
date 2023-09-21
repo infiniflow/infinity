@@ -17,4 +17,10 @@ EmbeddingType::embedding_type_width[] = {
         8,  // double64
 };
 
+void
+EmbeddingType::Init(const void* from_ptr, SizeT size) {
+    // User need to guarantee the size is matched.
+    memcpy(ptr, from_ptr, size);
+}
+
 }

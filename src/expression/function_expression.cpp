@@ -10,7 +10,7 @@
 namespace infinity {
 
 FunctionExpression::FunctionExpression(ScalarFunction function,
-                                       std::vector<std::shared_ptr<BaseExpression>> arguments)
+                                       Vector<SharedPtr<BaseExpression>> arguments)
    : BaseExpression(ExpressionType::kFunction, std::move(arguments)), func_(std::move(function)) {}
 
 String

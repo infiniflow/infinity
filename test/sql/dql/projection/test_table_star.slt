@@ -1,0 +1,27 @@
+# name: test/sql/dql/projection/test_table_star.slt
+# description: Test table star expressions
+# group: [projection]
+# cite: duckdb
+
+statement ok
+CREATE TABLE test_table_star(a INTEGER, b INTEGER, c INTEGER);
+
+# copy data from tbl file
+statement ok
+COPY test_table_star FROM '/tmp/infinity/sqllogictest/integer.csv' WITH ( DELIMITER ',' );
+
+
+query I
+SELECT * FROM test_table_star;
+----
+1 2 3
+4 5 6
+7 8 9
+
+
+statement error
+SELECT test_table_star.* FROM test;
+
+
+statement ok
+DROP TABLE test_table_star;

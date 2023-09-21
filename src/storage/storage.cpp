@@ -2,12 +2,13 @@
 // Created by JinHai on 2022/9/14.
 //
 
-#include <regex>
 #include "storage.h"
+#include "storage/wal/wal_manager.h"
 #include "schema_definition.h"
 #include "catalog.h"
 #include "function/builtin_functions.h"
 #include "storage/io/local_file_system.h"
+#include <regex>
 
 namespace infinity {
 
@@ -24,17 +25,19 @@ Storage::Init() {
 
     // Check the data dir to get latest catalog file.
     String catalog_dir = *config_ptr_->data_dir() + "/catalog";
+    wal_mgr_ = MakeShared<WalManager>(this, *config_ptr_->wal_dir() + "/wal.log");
+    wal_mgr_->Start();
     SharedPtr<DirEntry> catalog_file_entry = GetLatestCatalog(catalog_dir);
     if(catalog_file_entry == nullptr) {
         // No catalog file at all
         new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir));
-        txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get());
+        txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get(), std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
 
         Storage::InitCatalog(new_catalog_.get(), txn_mgr_.get());
     } else {
         // load catalog file.
         new_catalog_ = NewCatalog::LoadFromFile(catalog_file_entry, buffer_mgr_.get());
-        txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get());
+        txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get(), std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
     }
 
     // Check current schema/catalog to default database.
@@ -54,6 +57,7 @@ Storage::Init() {
 
 void
 Storage::Uninit() {
+    wal_mgr_->Stop();
     txn_mgr_.reset();
     new_catalog_.reset();
     buffer_mgr_.reset();
