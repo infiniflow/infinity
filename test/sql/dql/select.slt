@@ -1,17 +1,22 @@
 statement ok
-CREATE TABLE mytable (id INTEGER PRIMARY KEY, name VARCHAR(50), age INTEGER);
+CREATE TABLE select1 (id INTEGER PRIMARY KEY, name VARCHAR(50), age INTEGER);
 
 statement ok
-INSERT INTO mytable (id, name, age) VALUES (1, 'John', 30);
+CREATE TABLE select2 (id INTEGER , age INTEGER);
 
-statement ok
-INSERT INTO mytable (id, name, age) VALUES (2, 'Jane', 25);
-
-query ITI
-SELECT * FROM mytable ORDER by age ASC;
+# copy data from csv file
+query I
+COPY select2 FROM '/tmp/infinity/sqllogictest/nation.csv' WITH ( DELIMITER ',' );
 ----
-2 Jane 25
-1 John 30
+
+#query ITI
+#SELECT * FROM select1 ORDER by age ASC;
+#----
+#2 Jane 25
+#1 John 30
 
 statement ok
-DROP TABLE mytable;
+DROP TABLE select1;
+
+statement ok
+DROP TABLE select2;

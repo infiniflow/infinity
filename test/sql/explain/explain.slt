@@ -1,0 +1,35 @@
+# name: test/sql/explain/explain.slt
+# description: Test explain on various statements
+# group: [explain]
+
+
+statement ok
+explain CREATE TABLE explain1 (i INTEGER);
+
+statement error
+explain SELECT * FROM explain1;
+
+
+statement ok
+CREATE TABLE explain1 (i INTEGER);
+
+statement ok
+explain SELECT * FROM explain1;
+
+query I
+COPY explain1 FROM '/tmp/infinity/sqllogictest/one.csv' WITH ( DELIMITER ',');
+----
+
+query O
+SELECT * FROM explain1;
+----
+1
+2
+3
+4
+5
+
+
+# Cleanup
+statement ok
+DROP TABLE explain1;

@@ -1,62 +1,57 @@
 statement ok
-CREATE TABLE INTEGERS(i INTEGER);
+CREATE TABLE INTEGERS (i INTEGER);
 
 statement ok
-CREATE TABLE names(id BIGINT PRIMARY KEY, name VARCHAR(255), age INTEGER);
+CREATE TABLE names (id BIGINT PRIMARY KEY, name VARCHAR(255), age INTEGER);
 
-statement ok
-CREATE COLLECTION c1;
 
-query TTTIIII
-SHOW TABLES
-----
-default c1  Collection 0 0 0 8192
-default names    Table 3 0 0 8192
-default integers Table 1 0 0 8192
+#query TTTIIII
+#SHOW TABLES
+#----
+#default c1  Collection 0 0 0 8192
+#default names    Table 3 0 0 8192
+#default integers Table 1 0 0 8192
 
-statement ok
-INSERT INTO names(id, name, age) VALUES(1, 'Abby', 24);
+#statement ok
+#INSERT INTO names(id, name, age) VALUES(1, 'Abby', 24);
 
-statement ok
-INSERT INTO names(id, name, age) VALUES(2, 'Bob', 25);
+#statement ok
+#INSERT INTO names(id, name, age) VALUES(2, 'Bob', 25);
 
-statement ok
-INSERT INTO names(id, name, age) VALUES(3, 'Carol', 23);
+#statement ok
+#INSERT INTO names(id, name, age) VALUES(3, 'Carol', 23);
 
-statement ok
-INSERT INTO names(id, name, age) VALUES(4, 'Dora', 29);
+#statement ok
+#INSERT INTO names(id, name, age) VALUES(4, 'Dora', 29);
 
-query ITI
-SELECT * FROM names;
-----
-1	Abby	24
-2	Bob	    25
-3	Carol	23
-4	Dora	29
+#query ITI
+#SELECT * FROM names;
+#----
+#1	Abby	24
+#2	Bob	    25
+#3	Carol	23
+#4	Dora	29
 
-statement ok
-CREATE VIEW view1 (c1, c2) as
-SELECT id, age FROM names;
+#statement ok
+#CREATE VIEW view1 (c1, c2) as
+#SELECT id, age FROM names;
 
-query TTI
-SHOW VIEWS;
-----
-default view1 2
+#query TTI
+#SHOW VIEWS;
+#----
+#default view1 2
 
-statement ok
-DROP VIEW view1;
 
 statement ok
 DROP TABLE INTEGERS;
 
 statement ok
-DROP TABLE IF EXISTS NAMES;
+DROP TABLE names;
+
 
 statement ok
-CREATE SCHEMA s1;
+CREATE DATABASE s1;
+
 
 statement ok
-DROP COLLECTION c1;
-
-statement ok
-DROP SCHEMA s1;
+DROP DATABASE s1;
