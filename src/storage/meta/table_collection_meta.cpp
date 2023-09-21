@@ -312,15 +312,15 @@ TableCollectionMeta::Deserialize(const nlohmann::json& table_meta_json, DBEntry*
     SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
     LOG_TRACE("load table {}", *table_name);
     UniquePtr<TableCollectionMeta> res = MakeUnique<TableCollectionMeta>(base_dir, table_name, db_entry);
-    UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
-    dummy_entry->deleted_ = true;
-    res->entry_list_.emplace_back(std::move(dummy_entry));
     if(table_meta_json.contains("entries")) {
         for(const auto& table_entry_json: table_meta_json["entries"]) {
             UniquePtr<TableCollectionEntry> table_entry = TableCollectionEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
-            res->entry_list_.emplace_front(std::move(table_entry));
+            res->entry_list_.emplace_back(std::move(table_entry));
         }
     }
+    UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+    dummy_entry->deleted_ = true;
+    res->entry_list_.emplace_front(std::move(dummy_entry));
 
     return res;
 }
