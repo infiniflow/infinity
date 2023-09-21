@@ -15,7 +15,8 @@ public:
                               const SharedPtr<BindContext>& bind_context_ptr);
 
 public:
-    explicit OrderBinder(QueryContext* query_context) : ExpressionBinder(query_context) {}
+    explicit
+    OrderBinder(QueryContext* query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
     SharedPtr<BaseExpression>

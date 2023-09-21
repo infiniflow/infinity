@@ -328,7 +328,8 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
         return parent_->ResolveColumnId(column_identifier, depth + 1);
     }
 
-    PlannerError(column_identifier.ToString() + " isn't found.");
+    return nullptr;
+//    PlannerError(column_identifier.ToString() + " isn't found.");
 }
 
 void

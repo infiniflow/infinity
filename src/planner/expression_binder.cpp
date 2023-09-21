@@ -201,7 +201,7 @@ ExpressionBinder::BuildColExpr(const ColumnExpr& expr,
                                bool root) {
     ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, expr);
     SharedPtr<ColumnExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, depth);
-    if(column_expr->IsCorrelated()) {
+    if(column_expr != nullptr && column_expr->IsCorrelated()) {
         // Correlated column expression
         LOG_TRACE("Has correlated expr {}", column_expr->column_name());
         bind_context_ptr->AddCorrelatedColumnExpr(column_expr);

@@ -160,4 +160,12 @@ GroupBinder::BuildSubquery(const SubqueryExpr& select,
     PlannerError("Subquery isn't supported in group by list.");
 }
 
+SharedPtr<BaseExpression>
+GroupBinder::BuildKnnExpr(const KnnExpr& expr,
+                          BindContext* bind_context_ptr,
+                          i64 depth,
+                          bool root) {
+    PlannerError("KNN expression isn't supported in group by list")
+}
+
 }

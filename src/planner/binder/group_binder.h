@@ -58,6 +58,12 @@ public:
                   SubqueryType subquery_type,
                   i64 depth,
                   bool root) final;
+
+    SharedPtr<BaseExpression>
+    BuildKnnExpr(const KnnExpr& expr,
+                 BindContext* bind_context_ptr,
+                 i64 depth,
+                 bool root) override;
 private:
 
     const SharedPtr<BindAliasProxy>& bind_alias_proxy_;
