@@ -21,5 +21,7 @@ constexpr SizeT DEFAULT_READER_COMMIT_QUEUE_SIZE = 1024;
 constexpr SizeT DEFAULT_WRITER_COMMIT_QUEUE_SIZE = 1024;
 
 constexpr u64 MAX_TXN_ID = std::numeric_limits<u64>::max();
-constexpr SizeT DEFAULT_SEGMENT_FILE_NAME_LEN = 20;
+
+constexpr SizeT DEFAULT_SEGMENT_FILE_NAME_LEN = 10;
+constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 1024 * 1024 * 16;
 }

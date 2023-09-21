@@ -6,6 +6,7 @@
 
 #include <utility>
 #include "common/utility/infinity_assert.h"
+#include "storage/buffer/column_buffer.h"
 
 namespace infinity {
 
@@ -1718,7 +1719,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
 }
 
 SizeT
-ColumnVector::AppendWith(const ptr_t ptr, SizeT start_row, SizeT row_count) {
+ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, SizeT row_count) {
     if(row_count == 0) {
         return 0;
     }
@@ -1752,13 +1753,23 @@ ColumnVector::AppendWith(const ptr_t ptr, SizeT start_row, SizeT row_count) {
         case kBitmap:
         case kUuid:
         case kEmbedding: {
+            ptr_t ptr = column_buffer.GetAll();
             ptr_t src_ptr = ptr + start_row * data_type_size_;
             ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
             memcpy(dst_ptr, src_ptr, appended_rows * data_type_size_);
+            this->tail_index_ += appended_rows;
             break;
         }
 
-        case kVarchar:
+        case kVarchar: {
+            for (SizeT row_idx = 0; row_idx < row_count; row_idx++) {
+                auto [src_ptr, data_size] = column_buffer.GetAt(row_idx);
+                ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
+                memcpy(dst_ptr, src_ptr, data_size);
+                this->tail_index_++;
+            }
+            break;
+        }
         case kArray:
         case kTuple:
         case kPath:
@@ -1779,7 +1790,6 @@ ColumnVector::AppendWith(const ptr_t ptr, SizeT start_row, SizeT row_count) {
             // Null/Missing/Invalid
         }
     }
-    this->tail_index_ += appended_rows;
     return appended_rows;
 }
 

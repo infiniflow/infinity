@@ -29,7 +29,7 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
     const auto* table_ptr = (const TableCollectionEntry*)table_entry;
 
     // reserve an empty space for random name of segment directory.
-    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + '/' + String(DEFAULT_SEGMENT_FILE_NAME_LEN, '\0'));
+    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + String(DEFAULT_SEGMENT_FILE_NAME_LEN, '_') + '/');
     new_entry->finish_shuffle = false;
 
     const Vector<SharedPtr<ColumnDef>>& columns = table_ptr->columns_;
@@ -72,98 +72,47 @@ SegmentEntry::AppendData(SegmentEntry* segment_entry,
     });
 
     SizeT available_capacity = segment_entry->row_capacity_ - segment_entry->current_row_;
-    if(available_capacity >= append_state_ptr->total_count_) {
-        // All appended data will be inserted into this segment;
-        SizeT block_count = append_state_ptr->blocks_.size();
-        SizeT column_count = segment_entry->columns_.size();
+    SizeT block_count = append_state_ptr->blocks_.size();
+    SizeT column_count = segment_entry->columns_.size();
 
-        while(append_state_ptr->current_block_ < block_count) {
+    bool full = false;
+    while(append_state_ptr->current_block_ < block_count) {
+        const SharedPtr<DataBlock>& input_block = append_state_ptr->blocks_[append_state_ptr->current_block_];
 
-            const SharedPtr<DataBlock>& input_block = append_state_ptr->blocks_[append_state_ptr->current_block_];
+        u64 range_segment_id = segment_entry->segment_id_;
+        u64 range_segment_start_pos = segment_entry->current_row_;
+        u64 range_segment_row_count = input_block->row_count();
+        append_state_ptr->append_ranges_.emplace_back(range_segment_id, range_segment_start_pos, range_segment_row_count);
 
-            u64 range_segment_id = segment_entry->segment_id_;
-            u64 range_segment_start_pos = segment_entry->current_row_;
-            u64 range_segment_row_count = input_block->row_count();
-            append_state_ptr->append_ranges_.emplace_back(range_segment_id,
-                                                          range_segment_start_pos,
-                                                          range_segment_row_count);
+        SizeT to_copy_rows = input_block->row_count();
+        if(segment_entry->current_row_ + input_block->row_count() > segment_entry->row_capacity_) {
+            to_copy_rows = segment_entry->row_capacity_ - segment_entry->current_row_;
+            full = true;
+        }
 
-            for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
-                ColumnDataEntry::Append(segment_entry->columns_[column_id].get(),
-                                        input_block->column_vectors[column_id],
-                                        append_state_ptr->current_block_offset_,
-                                        segment_entry->current_row_,
-                                        input_block->row_count());
-                LOG_TRACE("Column: {} is appended with {} rows", column_id, input_block->row_count())
-            }
+        for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+            ColumnDataEntry::Append(segment_entry->columns_[column_id].get(),
+                                    input_block->column_vectors[column_id],
+                                    append_state_ptr->current_block_offset_,
+                                    segment_entry->current_row_,
+                                    to_copy_rows);
 
-            for(SizeT i = 0; i < input_block->row_count(); ++ i) {
-                segment_entry->segment_version_->txn_ptr_[i] = (u64)txn_ptr;
-            }
+            LOG_TRACE("Column: {} is appended with {} rows", column_id, to_copy_rows)
+        }
 
-            ++ append_state_ptr->current_block_;
+        for(SizeT i = 0; i < to_copy_rows; ++ i) {
+            segment_entry->segment_version_->txn_ptr_[i] = (u64)txn_ptr;
+        }
+
+        segment_entry->current_row_ += to_copy_rows;
+        append_state_ptr->current_count_ += to_copy_rows;
+        if (!full) {
+            append_state_ptr->current_block_++;
             append_state_ptr->current_block_offset_ = 0;
-            segment_entry->current_row_ += input_block->row_count();
+        } else {
+            append_state_ptr->current_block_offset_ += to_copy_rows;
+            break;
         }
-
-        append_state_ptr->current_count_ = append_state_ptr->total_count_;
-    } else {
-        SizeT block_count = append_state_ptr->blocks_.size();
-        SizeT column_count = segment_entry->columns_.size();
-        while(append_state_ptr->current_block_ < block_count) {
-
-            const SharedPtr<DataBlock>& input_block = append_state_ptr->blocks_[append_state_ptr->current_block_];
-
-            u64 range_segment_id = segment_entry->segment_id_;
-            u64 range_segment_start_pos = segment_entry->current_row_;
-            u64 range_segment_row_count = input_block->row_count();
-            append_state_ptr->append_ranges_.emplace_back(range_segment_id,
-                                                          range_segment_start_pos,
-                                                          range_segment_row_count);
-
-            if(segment_entry->current_row_ + input_block->row_count() <= segment_entry->row_capacity_) {
-                for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
-                    ColumnDataEntry::Append(segment_entry->columns_[column_id].get(),
-                                            input_block->column_vectors[column_id],
-                                            append_state_ptr->current_block_offset_,
-                                            segment_entry->current_row_,
-                                            input_block->row_count());
-
-                    LOG_TRACE("Column: {} is appended with {} rows", column_id, input_block->row_count())
-                }
-
-                for(SizeT i = 0; i < input_block->row_count(); ++ i) {
-                    segment_entry->segment_version_->txn_ptr_[i] = (u64)txn_ptr;
-                }
-
-                ++ append_state_ptr->current_block_;
-                append_state_ptr->current_block_offset_ = 0;
-                segment_entry->current_row_ += input_block->row_count();
-            } else {
-
-                SizeT to_copy_rows = segment_entry->row_capacity_ - segment_entry->current_row_;
-
-                for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
-                    ColumnDataEntry::Append(segment_entry->columns_[column_id].get(),
-                                            input_block->column_vectors[column_id],
-                                            append_state_ptr->current_block_offset_,
-                                            segment_entry->current_row_,
-                                            to_copy_rows);
-
-                    LOG_TRACE("Column: {} is appended with {} rows", column_id, to_copy_rows)
-                }
-
-                for(SizeT i = 0; i < to_copy_rows; ++ i) {
-                    segment_entry->segment_version_->txn_ptr_[i] = (u64)txn_ptr;
-                }
-
-                segment_entry->current_row_ += to_copy_rows;
-                append_state_ptr->current_block_offset_ += to_copy_rows;
-
-                break;
-            }
-        }
-        append_state_ptr->current_count_ += segment_entry->row_capacity_;
     }
 }
 

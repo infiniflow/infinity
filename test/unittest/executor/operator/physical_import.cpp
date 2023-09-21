@@ -109,7 +109,7 @@ TEST_F(PhysicalImportTest, test1) {
 
     auto base_dir = MakeShared<String>(*config.data_dir());
     auto table_collection_name = MakeShared<String>("table1");
-    auto entry_dir = MakeShared<String>(*base_dir + "/test");
+    auto entry_dir = MakeShared<String>(*base_dir + "/test/");
     // auto meta_dir = MakeShared<String>(*base_dir + "/catalog");
     auto table_collection_meta = MakeUnique<TableCollectionMeta>(base_dir, table_collection_name, nullptr);
     auto table_collection_entry = MakeUnique<TableCollectionEntry>(

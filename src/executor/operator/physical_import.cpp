@@ -238,11 +238,12 @@ Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
     while (true) {
         if (data[i] == delimiter || i == data_size - 1) {
             ret.emplace_back(data.begin() + j, data.begin() + i);
+            j = i + 1;
         }
         if (i == data_size - 1) {
             break;
         }
-        j = i++;
+        i++;
     }
     return ret;
 }
@@ -250,16 +251,28 @@ Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
 template<typename T>
 void AppendSimpleData(ColumnDataEntry *column_data_entry, const StringView &str_view, SizeT row_idx) {
     T ele = DataType::StringToValue<T>(str_view);
-    ColumnDataEntry::AppendRaw(column_data_entry, row_idx, 0, reinterpret_cast<ptr_t>(&ele), sizeof(T));
+    ColumnDataEntry::AppendRaw(column_data_entry, row_idx * sizeof(T), reinterpret_cast<ptr_t>(&ele), sizeof(T));
 }
 
 template<typename T>
-void AppendArrayData(ColumnDataEntry *column_data_entry, const Vector<StringView> &ele_str_views, SizeT row_idx) {
+void AppendEmbeddingData(ColumnDataEntry *column_data_entry, const Vector<StringView> &ele_str_views, SizeT row_idx) {
+    SizeT arr_len = ele_str_views.size();
+    auto tmp_buffer = MakeUnique<T []>(arr_len);
     for (SizeT ele_idx = 0; auto &ele_str_view : ele_str_views) {
         T ele = DataType::StringToValue<T>(ele_str_view);
-        ColumnDataEntry::AppendRaw(column_data_entry, row_idx, ele_idx, reinterpret_cast<ptr_t>(&ele), sizeof(T));
-        ele_idx++;
+        tmp_buffer[ele_idx++] = ele;
     }
+    ColumnDataEntry::AppendRaw(column_data_entry, row_idx * arr_len * sizeof(T), reinterpret_cast<ptr_t>(tmp_buffer.get()), sizeof(T) * arr_len);
+}
+
+void AppendVarcharData(ColumnDataEntry *column_data_entry, const Vector<StringView> &ele_str_views, SizeT row_idx) {
+    auto tmp_buffer = MakeUnique<TinyIntT []>(ele_str_views.size());
+    for (SizeT ele_idx = 0; auto &ele_str_view : ele_str_views) {
+        char_t ele = DataType::StringToValue<TinyIntT>(ele_str_view);
+        tmp_buffer[ele_idx++] = ele;
+    }
+    auto varchar_type = MakeUnique<VarcharT>((const char *)tmp_buffer.get(), ele_str_views.size());
+    ColumnDataEntry::AppendRaw(column_data_entry, row_idx * sizeof(VarcharT), reinterpret_cast<ptr_t>(varchar_type.get()), sizeof(VarcharT));
 }
 
 }
@@ -303,34 +316,34 @@ PhysicalImport::CSVRowHandler(void *context) {
             Vector<StringView> res;
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
             if (column_type->IsEmbedding()) {
-                auto embedding_type = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
-                ExecutorAssert(embedding_type->Dimension() >= ele_str_views.size(), "Embbeding data size exceeds dimension");
-                switch (embedding_type->Type()) {
+                auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
+                ExecutorAssert(embedding_info->Dimension() >= ele_str_views.size(), "Embbeding data size exceeds dimension");
+                switch (embedding_info->Type()) {
                     case kElemBit: {
                         NotImplementError("Embedding bit type is not implemented.");
                     }
                     case kElemInt8: {
-                        AppendArrayData<TinyIntT>(column_data_entry.get(), ele_str_views, write_row);
+                        AppendEmbeddingData<TinyIntT>(column_data_entry.get(), ele_str_views, write_row);
                         break;
                     }
                     case kElemInt16: {
-                        AppendArrayData<SmallIntT>(column_data_entry.get(), ele_str_views, write_row);
+                        AppendEmbeddingData<SmallIntT>(column_data_entry.get(), ele_str_views, write_row);
                         break;
                     }
                     case kElemInt32: {
-                        AppendArrayData<IntegerT>(column_data_entry.get(), ele_str_views, write_row);
+                        AppendEmbeddingData<IntegerT>(column_data_entry.get(), ele_str_views, write_row);
                         break;
                     }
                     case kElemInt64: {
-                        AppendArrayData<BigIntT>(column_data_entry.get(), ele_str_views, write_row);
+                        AppendEmbeddingData<BigIntT>(column_data_entry.get(), ele_str_views, write_row);
                         break;
                     }
                     case kElemFloat: {
-                        AppendArrayData<FloatT>(column_data_entry.get(), ele_str_views, write_row);
+                        AppendEmbeddingData<FloatT>(column_data_entry.get(), ele_str_views, write_row);
                         break;
                     }
                     case kElemDouble: {
-                        AppendArrayData<DoubleT>(column_data_entry.get(), ele_str_views, write_row);
+                        AppendEmbeddingData<DoubleT>(column_data_entry.get(), ele_str_views, write_row);
                         break;
                     }
                     case kElemInvalid: {
@@ -339,7 +352,7 @@ PhysicalImport::CSVRowHandler(void *context) {
                 }
             } else {
                 // TODO shenyuyshi
-                NotImplementError("1")
+                AppendVarcharData(column_data_entry.get(), ele_str_views, write_row);
             }
         } else {
             switch (column_type->type()) {
@@ -382,6 +395,7 @@ PhysicalImport::CSVRowHandler(void *context) {
                 }
             }
         }
+
     }
 
     ++parser_context->row_count_;
