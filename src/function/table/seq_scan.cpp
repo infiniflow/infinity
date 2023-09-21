@@ -43,7 +43,6 @@ SeqScanFunc(QueryContext* query_context,
         auto write_size = std::min(write_capacity, remaining);
         SizeT output_column_ids = 0;
         for (auto column_id : column_ids) {
-            // TODO shenyushi
             ColumnBuffer column_buffer = ColumnDataEntry::GetColumnData(segment_entry->columns_[column_id].get(),
                                                                      query_context->storage()->buffer_manager());
             output.column_vectors[output_column_ids++]->AppendWith(column_buffer, read_offset, write_size);

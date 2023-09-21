@@ -1,13 +1,10 @@
 #include "wal_entry.h"
 #include "storage/data_block.h"
-#include "storage/table_def.h"
 #include "common/utility/crc.hpp"
-#include <concepts>
+#include "storage/table_def.h"
 #include <cstdint>
 #include <cstring>
 #include <string>
-#include <iostream>
-#include <format>
 #include <type_traits>
 
 namespace infinity {

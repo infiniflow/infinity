@@ -102,12 +102,12 @@ ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset,
                     auto &long_info = varchar_store->u.long_info_;
                     auto outline_info = column_data_entry->outline_info_.get();
                     if (outline_info->current_buffer_handler_ == nullptr) {
-                        auto file_name = MakeShared<String>("hello");
+                        auto file_name = ColumnDataEntry::GetOutlineFilename(outline_info->next_file_idx++);
                         outline_info->current_buffer_handler_ = outline_info->buffer_mgr_->AllocateBufferHandle(column_data_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
                     } else if (outline_info->current_buffer_offset_ + varchar_type->length > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
                         outline_info->full_buffers_.emplace_back(outline_info->current_buffer_handler_, outline_info->current_buffer_offset_);
                         outline_info->current_buffer_offset_ = 0;
-                        auto file_name = MakeShared<String>("hello1");
+                        auto file_name = ColumnDataEntry::GetOutlineFilename(outline_info->next_file_idx++);
                         outline_info->current_buffer_handler_ = outline_info->buffer_mgr_->AllocateBufferHandle(column_data_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
                     }
                     ptr_t dst_ptr = outline_info->current_buffer_handler_->LoadData() + outline_info->current_buffer_offset_;
@@ -117,7 +117,7 @@ ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset,
 
                     varchar_store->length_ = varchar_type->length;
                     memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
-                    long_info.file_idx_ = 0; // TODO shenyushi
+                    long_info.file_idx_ = outline_info->next_file_idx - 1; // TODO shenyushi
                     long_info.file_offset_ = outline_info->current_buffer_offset_;
                     outline_info->current_buffer_offset_ += varchar_type->length;
                 }
@@ -213,7 +213,10 @@ ColumnDataEntry::Serialize(const ColumnDataEntry* column_data_entry) {
     json_res["commit_ts"] = column_data_entry->commit_ts_.load();
     json_res["txn_id"] = column_data_entry->txn_id_.load();
     json_res["deleted"] = column_data_entry->deleted_;
-    // TODO shenyushi
+    if (column_data_entry->outline_info_) {
+        auto &outline_info = column_data_entry->outline_info_;
+        json_res["next_outline_idx"] = outline_info->next_file_idx;
+    }
     return json_res;
 }
 
@@ -234,7 +237,10 @@ ColumnDataEntry::Deserialize(const nlohmann::json& column_data_json, SegmentEntr
 //                                                                         column_data_entry->file_name_,
 //                                                                         column_data_entry->column_type_ * column_data_entry->row_capacity_);
 
-    // TODO shenyushi
+    if (column_data_entry->outline_info_ != nullptr) {
+        auto outline_info = column_data_entry->outline_info_.get();
+        outline_info->next_file_idx = column_data_json["next_outline_idx"];
+    }
     return column_data_entry;
 }
 

@@ -12,6 +12,8 @@ struct OutlineBuffer {
     BufferManager *buffer_mgr_{};
     SizeT current_file_idx_{std::numeric_limits<SizeT>::max()};
     ObjectHandle outline_ele_{};
+
+    OutlineBuffer(BufferManager *buffer_mgr, SharedPtr<String> file_dir) : buffer_mgr_(buffer_mgr), file_dir_(file_dir) {}
 };
 
 

@@ -4,6 +4,7 @@
 
 #include "physical_import.h"
 #include "common/types/data_type.h"
+#include "common/types/info/varchar_info.h"
 #include "common/types/internal_types.h"
 #include "common/types/logical_type.h"
 #include "common/utility/exception.h"
@@ -265,13 +266,9 @@ void AppendEmbeddingData(ColumnDataEntry *column_data_entry, const Vector<String
     ColumnDataEntry::AppendRaw(column_data_entry, row_idx * arr_len * sizeof(T), reinterpret_cast<ptr_t>(tmp_buffer.get()), sizeof(T) * arr_len);
 }
 
-void AppendVarcharData(ColumnDataEntry *column_data_entry, const Vector<StringView> &ele_str_views, SizeT row_idx) {
-    auto tmp_buffer = MakeUnique<TinyIntT []>(ele_str_views.size());
-    for (SizeT ele_idx = 0; auto &ele_str_view : ele_str_views) {
-        char_t ele = DataType::StringToValue<TinyIntT>(ele_str_view);
-        tmp_buffer[ele_idx++] = ele;
-    }
-    auto varchar_type = MakeUnique<VarcharT>((const char *)tmp_buffer.get(), ele_str_views.size());
+void AppendVarcharData(ColumnDataEntry *column_data_entry, const StringView &str_view, SizeT row_idx) {
+    const char_t *tmp_buffer = str_view.data();
+    auto varchar_type = MakeUnique<VarcharT>(str_view.data(), str_view.size());
     ColumnDataEntry::AppendRaw(column_data_entry, row_idx * sizeof(VarcharT), reinterpret_cast<ptr_t>(varchar_type.get()), sizeof(VarcharT));
 }
 
@@ -293,7 +290,7 @@ PhysicalImport::CSVRowHandler(void *context) {
         txn_store->Import(segment_entry);
 
         // create new segment entry
-        // TODO the segment_id is wrong
+        // TODO shenyushi: segment id
         parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table,
                                                                            txn->TxnID(),
                                                                            TableCollectionEntry::GetNextSegmentID(table),
@@ -312,47 +309,46 @@ PhysicalImport::CSVRowHandler(void *context) {
         }
         auto column_data_entry = segment_entry->columns_[column_idx];
         auto column_type = column_data_entry->column_type_.get();
-        if (column_type->IsEmbedding() || column_type->IsVarchar()) {
+        if (column_type->IsVarchar()) {
+            auto varchar_info = dynamic_cast<VarcharInfo *>(column_type->type_info().get()); // TODO shenyushi
+            ExecutorAssert(varchar_info->dimension() >= str_view.size(), "Varchar data size exceeds dimension.");
+            AppendVarcharData(column_data_entry.get(), str_view, write_row);
+        } else if (column_type->IsEmbedding()) {
             Vector<StringView> res;
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
-            if (column_type->IsEmbedding()) {
-                auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
-                ExecutorAssert(embedding_info->Dimension() >= ele_str_views.size(), "Embbeding data size exceeds dimension");
-                switch (embedding_info->Type()) {
-                    case kElemBit: {
-                        NotImplementError("Embedding bit type is not implemented.");
-                    }
-                    case kElemInt8: {
-                        AppendEmbeddingData<TinyIntT>(column_data_entry.get(), ele_str_views, write_row);
-                        break;
-                    }
-                    case kElemInt16: {
-                        AppendEmbeddingData<SmallIntT>(column_data_entry.get(), ele_str_views, write_row);
-                        break;
-                    }
-                    case kElemInt32: {
-                        AppendEmbeddingData<IntegerT>(column_data_entry.get(), ele_str_views, write_row);
-                        break;
-                    }
-                    case kElemInt64: {
-                        AppendEmbeddingData<BigIntT>(column_data_entry.get(), ele_str_views, write_row);
-                        break;
-                    }
-                    case kElemFloat: {
-                        AppendEmbeddingData<FloatT>(column_data_entry.get(), ele_str_views, write_row);
-                        break;
-                    }
-                    case kElemDouble: {
-                        AppendEmbeddingData<DoubleT>(column_data_entry.get(), ele_str_views, write_row);
-                        break;
-                    }
-                    case kElemInvalid: {
-                        ExecutorError("Embedding element type is invalid.")
-                    }
+            auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
+            ExecutorAssert(embedding_info->Dimension() >= ele_str_views.size(), "Embbeding data size exceeds dimension.");
+            switch (embedding_info->Type()) {
+                case kElemBit: {
+                    NotImplementError("Embedding bit type is not implemented.");
                 }
-            } else {
-                // TODO shenyuyshi
-                AppendVarcharData(column_data_entry.get(), ele_str_views, write_row);
+                case kElemInt8: {
+                    AppendEmbeddingData<TinyIntT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemInt16: {
+                    AppendEmbeddingData<SmallIntT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemInt32: {
+                    AppendEmbeddingData<IntegerT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemInt64: {
+                    AppendEmbeddingData<BigIntT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemFloat: {
+                    AppendEmbeddingData<FloatT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemDouble: {
+                    AppendEmbeddingData<DoubleT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemInvalid: {
+                    ExecutorError("Embedding element type is invalid.")
+                }
             }
         } else {
             switch (column_type->type()) {

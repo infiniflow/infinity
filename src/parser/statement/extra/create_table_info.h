@@ -13,6 +13,7 @@
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/bitmap_info.h"
 #include "common/types/info/embedding_info.h"
+#include "common/types/info/varchar_info.h"
 
 namespace infinity {
 

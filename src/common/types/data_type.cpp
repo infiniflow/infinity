@@ -8,6 +8,7 @@
 #include "info/bitmap_info.h"
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/embedding_info.h"
+#include "common/types/info/varchar_info.h"
 #include <charconv>
 
 namespace infinity {
@@ -246,6 +247,9 @@ DataType::Deserialize(const nlohmann::json& data_type_json) {
             case LogicalType::kEmbedding: {
                 type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
                 break;
+            }
+            case LogicalType::kVarchar: {
+                type_info = VarcharInfo::Make(type_info_json["dimension"]);
             }
             default: {
                 TypeError("Unexpected type here.")

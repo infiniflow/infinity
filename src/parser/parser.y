@@ -562,6 +562,10 @@ IDENTIFIER column_type {
             type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
             break;
         }
+        case infinity::LogicalType::kVarchar: {
+            type_info_ptr = infinity::VarcharInfo::Make($2.width);
+            break;
+        }
         default: {
             break;
         }
@@ -590,6 +594,10 @@ IDENTIFIER column_type {
         }
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
+            break;
+        }
+        case infinity::LogicalType::kVarchar: {
+            type_info_ptr = infinity::VarcharInfo::Make($2.width);
             break;
         }
         default: {
@@ -635,9 +643,9 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean}; }
 | CIRCLE { $$ = infinity::ColumnType{infinity::LogicalType::kCircle}; }
 // Variable types
 | CHAR { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar}; }
-| CHAR '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar}; }
+| CHAR '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar, $3}; }
 | VARCHAR { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar}; }
-| VARCHAR '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar}; }
+| VARCHAR '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar, $3}; }
 | DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, $3, $5}; }
 | DECIMAL '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, $3, 0}; }
 | DECIMAL { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, 0, 0}; }
@@ -1825,6 +1833,10 @@ cast_expr: CAST '(' expr AS column_type ')' {
         }
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($5.embedding_type_, $5.width);
+            break;
+        }
+        case infinity::LogicalType::kVarchar: {
+            type_info_ptr = infinity::VarcharInfo::Make($5.width);
             break;
         }
         default: {

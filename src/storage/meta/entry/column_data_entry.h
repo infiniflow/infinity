@@ -20,6 +20,7 @@ struct OutlineInfo {
     BufferHandle *current_buffer_handler_{};
     SizeT current_buffer_offset_{};
     BufferManager *buffer_mgr_{};
+    SizeT next_file_idx{};
 
     OutlineInfo() {}
     OutlineInfo(BufferManager *buffer_mgr) : buffer_mgr_(buffer_mgr) {}
@@ -76,7 +77,7 @@ public:
 
     static SharedPtr<String>
     GetOutlineFilename(SizeT file_idx) {
-        return MakeShared<String>("out/" + std::to_string(file_idx));
+        return MakeShared<String>("out_" + std::to_string(file_idx));
     }
 };
 
