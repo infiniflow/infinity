@@ -26,12 +26,19 @@ public:
             column_name2id_[columns_[idx]->name()] = idx;
         }
     }
+
+    bool
+    operator==(const TableDef& other) const;
+
+    bool
+    operator!=(const TableDef& other) const;
+
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
     int32_t GetSizeInBytes() const;
-    // Write TableDef to a char buffer, return the actual size in bytes.
-    int32_t Write(char* buf, int32_t maxbytes) const;
-    // Read a TableDef from a serialized version, reading no more than maxbytes bytes, return the actual read bytes, -1 on failure.
-    static int32_t Read(char* buf, int32_t maxbytes, TableDef& table_def);
+    // Write to a char buffer
+    void WriteAdv(char* &buf) const;
+    // Read from a serialized version
+    static SharedPtr<TableDef> ReadAdv(char* &buf, int32_t maxbytes);
 
     [[nodiscard]] inline const Vector<SharedPtr<ColumnDef>>&
     columns() const {

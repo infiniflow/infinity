@@ -132,3 +132,44 @@ TEST_F(DataTypeTest, Serialize) {
     String bool_type_str = bool_type.Serialize().dump();
     LOG_TRACE("{}", bool_type_str);
 }
+
+TEST_F(DataTypeTest, ReadWrite) {
+    using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(),
+              test_info_->name());
+
+    SharedPtr<TypeInfo> type_info_bitmap = BitmapInfo::Make(1024);
+    SharedPtr<TypeInfo> type_info_decimal = DecimalInfo::Make(i64(38), i64(3));
+    SharedPtr<TypeInfo> type_info_embedding =
+        EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 256);
+    EXPECT_NE(type_info_bitmap, nullptr);
+    EXPECT_NE(type_info_decimal, nullptr);
+    EXPECT_NE(type_info_embedding, nullptr);
+
+    std::vector<SharedPtr<DataType>> data_types = {
+        MakeShared<DataType>(LogicalType::kTinyInt),
+        MakeShared<DataType>(LogicalType::kFloat),
+        MakeShared<DataType>(LogicalType::kVarchar),
+        MakeShared<DataType>(LogicalType::kTuple),
+        MakeShared<DataType>(LogicalType::kBitmap, type_info_bitmap),
+        MakeShared<DataType>(LogicalType::kDecimal, type_info_decimal),
+        MakeShared<DataType>(LogicalType::kEmbedding, type_info_embedding)};
+
+    for (int i = 0; i < data_types.size(); i++) {
+        SharedPtr<DataType> &data_type = data_types[i];
+        const SharedPtr<TypeInfo>& ti = data_type->type_info();
+        LOG_TRACE("{}", data_type->Serialize().dump());
+        int32_t exp_size = data_type->GetSizeInBytes();
+        std::vector<char> buf(exp_size);
+        char *buf_beg = buf.data();
+        char *ptr = buf_beg;
+        data_type->WriteAdv(ptr);
+        EXPECT_EQ(ptr - buf_beg, exp_size);
+
+        ptr = buf_beg;
+        SharedPtr<DataType> data_type2 = DataType::ReadAdv(ptr, exp_size);
+        EXPECT_NE(data_type2, nullptr);
+        EXPECT_EQ(*data_type2, *data_type);
+        EXPECT_EQ(ptr - buf_beg, exp_size);
+    }
+}

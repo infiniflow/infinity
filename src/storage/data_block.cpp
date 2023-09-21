@@ -217,13 +217,12 @@ int32_t DataBlock::GetSizeInBytes() const{
 
 }
 
-int32_t DataBlock::Write(char* buf, int32_t maxbytes) const{
-    //TODO: implement, possibly using https://github.com/felixguendling/cista/
-    return 0;
+void DataBlock::WriteAdv(char* &buf) const{
+    return;
 }
 
-int32_t DataBlock::Read(char* buf, int32_t maxbytes, DataBlock& block){
-    return 0;
+SharedPtr<DataBlock> DataBlock::ReadAdv(char* &buf){
+    return nullptr;
 }
 
 }

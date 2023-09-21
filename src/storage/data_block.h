@@ -21,10 +21,10 @@ public:
 
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
     int32_t GetSizeInBytes() const;
-    // Write DataBlock to a char buffer, return the actual size in bytes.
-    int32_t Write(char* buf, int32_t maxbytes) const;
-    // Read a DataBlock from a serialized version, reading no more than maxbytes bytes, return the actual read bytes, -1 on failure.
-    static int32_t Read(char* buf, int32_t maxbytes, DataBlock& block);
+    // Write to a char buffer
+    void WriteAdv(char* &buf) const;
+    // Read from a serialized version
+    static SharedPtr<DataBlock> ReadAdv(char* &buf);
 
 public:
 

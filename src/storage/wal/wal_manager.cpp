@@ -14,8 +14,7 @@ namespace infinity {
 using namespace std;
 namespace fs = std::filesystem;
 
-WalManager::WalManager(Storage *storage,
-                       const std::string &wal_path)
+WalManager::WalManager(Storage *storage, const std::string &wal_path)
     : storage_(storage), wal_path_(wal_path), running_(false) {}
 
 WalManager::~WalManager() {
@@ -88,16 +87,20 @@ void WalManager::Flush() {
             std::shared_ptr<WalEntry> entry = que2_.front();
             entry->lsn = lsn_gen_.Generate();
             max_lsn = entry->lsn;
-            LOG_TRACE(
-                "WalManager::Flush begin writing wal for transaction {}",
-                entry->txn_id);
-            int32_t size = entry->GetSizeInBytes();
-            vector<char> buf(size);
-            size = entry->Write(buf.data(), size);
-            ofs_.write(buf.data(), size);
-            LOG_TRACE(
-                "WalManager::Flush done writing wal for transaction {}",
-                entry->txn_id);
+            LOG_TRACE("WalManager::Flush begin writing wal for transaction {}",
+                      entry->txn_id);
+            int32_t exp_size = entry->GetSizeInBytes();
+            vector<char> buf(exp_size);
+            char *ptr = buf.data();
+            entry->WriteAdv(ptr);
+            int32_t act_size = ptr - buf.data();
+            if (exp_size != act_size)
+                LOG_ERROR("WalManager::Flush WalEntry estimated size {} differ "
+                          "with the actual one {}",
+                          exp_size, act_size);
+            ofs_.write(buf.data(), ptr - buf.data());
+            LOG_TRACE("WalManager::Flush done writing wal for transaction {}",
+                      entry->txn_id);
             que2_.pop();
             que3_.push(entry);
             written++;
@@ -105,13 +108,11 @@ void WalManager::Flush() {
         if (written == 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         } else {
-            LOG_TRACE(
-                "WalManager::Flush begin syncing wal for {} transactions",
-                written);
+            LOG_TRACE("WalManager::Flush begin syncing wal for {} transactions",
+                      written);
             ofs_.flush();
-            LOG_TRACE(
-                "WalManager::Flush done syncing wal for {} transactions",
-                seq, written);
+            LOG_TRACE("WalManager::Flush done syncing wal for {} transactions",
+                      seq, written);
             TxnManager *txn_mgr = storage_->txn_manager();
             while (!que3_.empty()) {
                 std::shared_ptr<WalEntry> entry = que3_.front();

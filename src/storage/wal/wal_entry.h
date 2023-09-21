@@ -44,21 +44,25 @@ struct WalEntryHeader {
 
 
 struct WalEntry : WalEntryHeader {
+    bool
+    operator==(const WalEntry& other) const;
+    bool
+    operator!=(const WalEntry& other) const;
+
     Vector<String> dropped_databases_{};
     Vector<std::pair<String, String>> dropped_tables_{};
     Vector<String> created_databases_{};
     Vector<std::pair<String, SharedPtr<TableDef>>> created_tables_{};
-    //TODO: create table
     //TODO: alter database, table
     HashMap<u64, SharedPtr<roaring::Roaring>> deleted_rows_{};
     Vector<SharedPtr<DataBlock>> blocks_{};
     int64_t max_lsn_{};
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
-    int32_t GetSizeInBytes() const ;
-    // Write WalEntry to a char buffer, return the actual size in bytes.
-    int32_t Write(char* buf, int32_t maxbytes) const;
-    // Read a WalEntry from a serialized version, reading no more than maxbytes bytes, return the actual read bytes, -1 on failure.
-    static int32_t Read(char* buf, int32_t maxbytes, WalEntry& entry);
+    int32_t GetSizeInBytes() const;
+    // Write to a char buffer
+    void WriteAdv(char* &buf) const;
+    // Read from a serialized version
+    static SharedPtr<WalEntry> ReadAdv(char* &buf, int32_t maxbytes);
 };
 
 

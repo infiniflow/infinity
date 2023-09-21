@@ -10,6 +10,7 @@
 #include "info/bitmap_info.h"
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/embedding_info.h"
+#include "common/utility/serializable.h"
 #include "common/types/info/varchar_info.h"
 #include <charconv>
 
@@ -215,6 +216,101 @@ DataType::MaxDataType(const DataType& right) {
     }
 
     NotImplementError(fmt::format("Max type of left: {} and right: {}", this->ToString(), right.ToString()));
+}
+
+int32_t DataType::GetSizeInBytes() const{
+    int32_t size = sizeof(LogicalType);
+    if (this->type_info_!=nullptr) {
+        switch(this->type_){
+            case LogicalType::kArray: {
+                NotImplementError("Array isn't implemented here.");
+                break;
+            }
+            case LogicalType::kBitmap: {
+                size += sizeof(i64);
+                break;
+            }
+            case LogicalType::kDecimal: {
+                size += sizeof(i64) * 2;
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                size += sizeof(EmbeddingDataType);
+                size += sizeof(int32_t);
+                break;
+            }
+            default: {
+                TypeError("Unexpected type here.")
+            }
+        }
+    }
+    return size;
+}
+
+void DataType::WriteAdv(char* &ptr) const{
+    WriteBufAdv<LogicalType>(ptr, this->type_);
+    if (this->type_info_!=nullptr) {
+        switch(this->type_){
+            case LogicalType::kArray: {
+                NotImplementError("Array isn't implemented here.");
+                break;
+            }
+            case LogicalType::kBitmap: {
+                const BitmapInfo* bi = dynamic_cast<BitmapInfo *>(this->type_info_.get());
+                WriteBufAdv<i64>(ptr, i64(bi->length_limit()));
+                break;
+            }
+            case LogicalType::kDecimal: {
+                const DecimalInfo* di = dynamic_cast<DecimalInfo *>(this->type_info_.get());
+                WriteBufAdv<i64>(ptr, i64(di->precision()));
+                WriteBufAdv<i64>(ptr, i64(di->scale()));
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                const EmbeddingInfo* ei = dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
+                WriteBufAdv<EmbeddingDataType>(ptr, ei->Type());
+                WriteBufAdv<int32_t>(ptr, int32_t(ei->Dimension()));
+                break;
+            }
+            default: {
+                TypeError("Unexpected type here.")
+            }
+        }
+    }
+    return;
+}
+
+
+SharedPtr<DataType>
+DataType::ReadAdv(char* &ptr, int32_t maxbytes){
+    LogicalType type = ReadBufAdv<LogicalType>(ptr);
+    SharedPtr<TypeInfo> type_info {nullptr};
+    switch (type) {
+    case LogicalType::kArray: {
+        NotImplementError("Array isn't implemented here.");
+        break;
+    }
+    case LogicalType::kBitmap: {
+        i64 limit = ReadBufAdv<i64>(ptr);
+        type_info = BitmapInfo::Make(limit);
+        break;
+    }
+    case LogicalType::kDecimal: {
+        i64 precision = ReadBufAdv<i64>(ptr);
+        i64 scale = ReadBufAdv<i64>(ptr);
+        type_info = DecimalInfo::Make(precision, scale);
+        break;
+    }
+    case LogicalType::kEmbedding: {
+        EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
+        int32_t dimension = ReadBufAdv<int32_t>(ptr);
+        type_info = EmbeddingInfo::Make(EmbeddingDataType(embedding_type), dimension);
+        break;
+    }
+    default:
+    }
+    SharedPtr<DataType> data_type = MakeShared<DataType>(type, type_info);
+    return data_type;
 }
 
 nlohmann::json
