@@ -32,6 +32,12 @@ public:
                  i64 depth,
                  bool root) final;
 
+
+    SharedPtr<BaseExpression>
+    BuildKnnExpr(const KnnExpr& expr,
+                 BindContext* bind_context_ptr,
+                 i64 depth,
+                 bool root) final;
 private:
 };
 

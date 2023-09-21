@@ -18,10 +18,12 @@ AggregateBinder::BuildExpression(const ParsedExpr& expr,
     return result;
 }
 
-//SharedPtr<BaseExpression>
-//AggregateBinder::BuildColRefExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
-//    SharedPtr<BaseExpression> column_expr = ExpressionBinder::BuildColRefExpr(expr, bind_context_ptr);
-//    return column_expr;
-//}
+SharedPtr<BaseExpression>
+AggregateBinder::BuildKnnExpr(const KnnExpr& expr,
+             BindContext* bind_context_ptr,
+             i64 depth,
+             bool root) {
+    PlannerError("KNN expression isn't supported in in aggregate function")
+}
 
 }
