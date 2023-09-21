@@ -845,15 +845,18 @@ ParallelMaterializedFragmentCtx::GetResultInternal() {
 
     SharedPtr<Table> result_table = nullptr;
 
-    auto* common_sink_state = static_cast<GeneralSinkState*>(tasks_[0]->sink_state_.get());
+    auto* first_common_sink_state = static_cast<GeneralSinkState*>(tasks_[0]->sink_state_.get());
+    if(first_common_sink_state->error_message_ != nullptr) {
+        ExecutorError(*first_common_sink_state->error_message_)
+    }
 
     Vector<SharedPtr<ColumnDef>> column_defs;
-    SizeT column_count = common_sink_state->column_names_->size();
+    SizeT column_count = first_common_sink_state->column_names_->size();
     column_defs.reserve(column_count);
     for(SizeT col_idx = 0; col_idx < column_count; ++ col_idx) {
         column_defs.emplace_back(MakeShared<ColumnDef>(col_idx,
-                                                       common_sink_state->column_types_->at(col_idx),
-                                                       common_sink_state->column_names_->at(col_idx),
+                                                       first_common_sink_state->column_types_->at(col_idx),
+                                                       first_common_sink_state->column_names_->at(col_idx),
                                                        HashSet<ConstraintType>()));
     }
 
@@ -863,7 +866,9 @@ ParallelMaterializedFragmentCtx::GetResultInternal() {
         }
 
         auto* common_sink_state = static_cast<GeneralSinkState*>(task->sink_state_.get());
-
+        if(common_sink_state->error_message_ != nullptr) {
+            ExecutorError(*common_sink_state->error_message_)
+        }
 
         if(result_table == nullptr) {
             result_table = Table::MakeResultTable(column_defs);

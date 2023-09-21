@@ -41,7 +41,6 @@ Connection::Run() {
             pg_handler_->send_error_response(error_message_map);
             pg_handler_->send_ready_for_query();
         }
-
     }
 }
 

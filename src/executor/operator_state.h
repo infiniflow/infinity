@@ -19,6 +19,7 @@ struct OutputState {
 
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     SharedPtr<DataBlock> data_block_{};
+    UniquePtr<String> error_message_{};
 };
 
 struct InputState {
@@ -305,7 +306,6 @@ struct ImportOutputState : public OutputState {
     inline explicit
     ImportOutputState(): OutputState(PhysicalOperatorType::kImport) {}
 
-    UniquePtr<String> error_message_{};
     Vector<SharedPtr<DataBlock>> output_{};
     SharedPtr<TableDef> table_def_{};
     // For insert, update, delete, update
@@ -343,8 +343,6 @@ struct CreateTableInputState : public InputState {
 struct CreateTableOutputState : public OutputState {
     inline explicit
     CreateTableOutputState(): OutputState(PhysicalOperatorType::kCreateTable) {}
-
-    UniquePtr<String> error_message_{};
 };
 
 // Create Collection
@@ -356,8 +354,6 @@ struct CreateCollectionInputState : public InputState {
 struct CreateCollectionOutputState : public OutputState {
     inline explicit
     CreateCollectionOutputState(): OutputState(PhysicalOperatorType::kCreateCollection) {}
-
-    UniquePtr<String> error_message_{};
 };
 
 // Create Database
@@ -369,8 +365,6 @@ struct CreateDatabaseInputState : public InputState {
 struct CreateDatabaseOutputState : public OutputState {
     inline explicit
     CreateDatabaseOutputState(): OutputState(PhysicalOperatorType::kCreateDatabase) {}
-
-    UniquePtr<String> error_message_{};
 };
 
 // Create View
@@ -382,8 +376,6 @@ struct CreateViewInputState : public InputState {
 struct CreateViewOutputState : public OutputState {
     inline explicit
     CreateViewOutputState(): OutputState(PhysicalOperatorType::kCreateView) {}
-
-    UniquePtr<String> error_message_{};
 };
 
 // Drop Table
@@ -395,8 +387,6 @@ struct DropTableInputState : public InputState {
 struct DropTableOutputState : public OutputState {
     inline explicit
     DropTableOutputState(): OutputState(PhysicalOperatorType::kDropTable) {}
-
-    UniquePtr<String> error_message_{};
 };
 
 // Drop Collection
@@ -408,8 +398,6 @@ struct DropCollectionInputState : public InputState {
 struct DropCollectionOutputState : public OutputState {
     inline explicit
     DropCollectionOutputState(): OutputState(PhysicalOperatorType::kDropCollection) {}
-
-    UniquePtr<String> error_message_{};
 };
 
 // Drop Database
@@ -421,8 +409,6 @@ struct DropDatabaseInputState : public InputState {
 struct DropDatabaseOutputState : public OutputState {
     inline explicit
     DropDatabaseOutputState(): OutputState(PhysicalOperatorType::kDropDatabase) {}
-
-    UniquePtr<String> error_message_{};
 };
 
 // Drop View
@@ -434,8 +420,6 @@ struct DropViewInputState : public InputState {
 struct DropViewOutputState : public OutputState {
     inline explicit
     DropViewOutputState(): OutputState(PhysicalOperatorType::kDropView) {}
-
-    UniquePtr<String> error_message_{};
 };
 
 // Explain
@@ -447,8 +431,6 @@ struct ExplainInputState : public InputState {
 struct ExplainOutputState : public OutputState {
     inline explicit
     ExplainOutputState(): OutputState(PhysicalOperatorType::kExplain) {}
-
-    UniquePtr<String> error_message_{};
 };
 
 // Show
@@ -461,7 +443,6 @@ struct ShowOutputState : public OutputState {
     inline explicit
     ShowOutputState(): OutputState(PhysicalOperatorType::kShow) {}
 
-    UniquePtr<String> error_message_{};
     Vector<SharedPtr<DataBlock>> output_{};
 };
 
@@ -501,6 +482,7 @@ struct SinkState {
 
     OutputState* prev_output_state_{};
     SinkStateType state_type_{SinkStateType::kInvalid};
+    UniquePtr<String> error_message_{};
 };
 
 struct GeneralSinkState: public SinkState {
@@ -517,7 +499,6 @@ struct ResultSinkState: public SinkState {
     ResultSinkState() : SinkState(SinkStateType::kResult) {}
 
     SharedPtr<ColumnDef> result_def_{};
-    UniquePtr<String> error_message_{};
 };
 
 struct MessageSinkState: public SinkState {

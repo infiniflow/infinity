@@ -16,6 +16,7 @@
 #include "expression/value_expression.h"
 #include "expression/in_expression.h"
 #include "expression/subquery_expression.h"
+#include "expression/knn_expression.h"
 
 namespace infinity {
 
@@ -65,6 +66,10 @@ public:
 
     virtual SharedPtr<BaseExpression>
     VisitReplace(const SharedPtr<SubqueryExpression>& expression);
+
+    virtual SharedPtr<BaseExpression>
+    VisitReplace(const SharedPtr<KnnExpression>& expression);
+
 };
 
 }

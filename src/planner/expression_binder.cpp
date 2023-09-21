@@ -405,6 +405,9 @@ ExpressionBinder::BuildKnnExpr(const KnnExpr& parsed_knn_expr,
     arguments.reserve(1);
 
     // Bind query column
+    if(parsed_knn_expr.column_expr_->type_ != ParsedExprType::kColumn) {
+        PlannerError("Knn expression expect a column expression");
+    }
     auto expr_ptr = BuildExpression(*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
     arguments.emplace_back(expr_ptr);
 
