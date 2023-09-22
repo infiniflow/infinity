@@ -1454,8 +1454,8 @@ knn_expr : KNN '(' expr ',' array_expr ',' LONG_VALUE ',' STRING ',' STRING ')' 
     if(strcmp($9, "float") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
 
         knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemFloat;
+        knn_expr->embedding_data_ptr_ = new float[knn_expr->dimension_];
 
-        float* float_data_ptr = new float[knn_expr->dimension_];
         for(long i = 0; i < knn_expr->dimension_; ++ i) {
             ((float*)(knn_expr->embedding_data_ptr_))[i] = $5->double_array_[i];
         }
@@ -1528,6 +1528,10 @@ knn_expr : KNN '(' expr ',' array_expr ',' LONG_VALUE ',' STRING ',' STRING ')' 
         yyerror(&yyloc, scanner, result, "Invalid knn data type");
         YYERROR;
     }
+
+    free($9);
+    free($11);
+    delete $5;
 
     $$ = knn_expr;
 }

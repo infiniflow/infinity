@@ -1337,3 +1337,434 @@ TEST_F(SelectStatementParsingTest, good_test4) {
         result->Reset();
     }
 }
+
+TEST_F(SelectStatementParsingTest, good_knn_test) {
+
+    using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+
+    {
+        // integer with l2
+        String input_sql = "SELECT KNN(c1, [1, 2], 2, 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_NE(select_statement->where_expr_, nullptr);
+            {
+                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
+                auto *function_expr = (FunctionExpr *) (select_statement->where_expr_);
+                EXPECT_EQ(function_expr->func_name_, ">");
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(0);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kColumn);
+                    auto *arg0_col_expr = (ColumnExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_col_expr->names_[0], "a");
+                }
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(1);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kConstant);
+                    auto *arg0_const_expr = (ConstantExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_const_expr->integer_value_, 0);
+                }
+            }
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->db_name_, "default");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t1");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kKnn);
+                auto *knn_expr = (KnnExpr *) (*select_statement->select_list_)[0];
+                EXPECT_EQ(knn_expr->distance_type_, KnnDistanceType::kL2);
+
+                auto *arg0_col_expr = (ColumnExpr *) (knn_expr->column_expr_);
+                EXPECT_EQ(arg0_col_expr->names_[0], "c1");
+
+                EXPECT_EQ(knn_expr->column_expr_->type_, ParsedExprType::kColumn);
+                EXPECT_EQ(knn_expr->dimension_, 2);
+                EXPECT_EQ(knn_expr->embedding_data_type_, EmbeddingDataType::kElemInt32);
+
+                EXPECT_EQ(((i32*)knn_expr->embedding_data_ptr_)[0], 1);
+                EXPECT_EQ(((i32*)knn_expr->embedding_data_ptr_)[1], 2);
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        // bigint with cosine
+        String input_sql = "SELECT KNN(c1, [3, 10, 1111], 3, 'bigint', 'cosine') AS distance1 FROM t1 WHERE a < 0 ORDER BY distance1 LIMIT 2;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_NE(select_statement->where_expr_, nullptr);
+            {
+                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
+                auto *function_expr = (FunctionExpr *) (select_statement->where_expr_);
+                EXPECT_EQ(function_expr->func_name_, "<");
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(0);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kColumn);
+                    auto *arg0_col_expr = (ColumnExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_col_expr->names_[0], "a");
+                }
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(1);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kConstant);
+                    auto *arg0_const_expr = (ConstantExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_const_expr->integer_value_, 0);
+                }
+            }
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->db_name_, "default");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t1");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kKnn);
+                auto *knn_expr = (KnnExpr *) (*select_statement->select_list_)[0];
+                EXPECT_EQ(knn_expr->distance_type_, KnnDistanceType::kCosine);
+
+                auto *arg0_col_expr = (ColumnExpr *) (knn_expr->column_expr_);
+                EXPECT_EQ(arg0_col_expr->names_[0], "c1");
+
+                EXPECT_EQ(knn_expr->column_expr_->type_, ParsedExprType::kColumn);
+                EXPECT_EQ(knn_expr->dimension_, 3);
+                EXPECT_EQ(knn_expr->embedding_data_type_, EmbeddingDataType::kElemInt64);
+
+                EXPECT_EQ(((i64*)knn_expr->embedding_data_ptr_)[0], 3);
+                EXPECT_EQ(((i64*)knn_expr->embedding_data_ptr_)[1], 10);
+                EXPECT_EQ(((i64*)knn_expr->embedding_data_ptr_)[2], 1111);
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        // double with cosine
+        String input_sql = "SELECT KNN(c1, [1.0, 2.0], 2, 'double', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_NE(select_statement->where_expr_, nullptr);
+            {
+                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
+                auto *function_expr = (FunctionExpr *) (select_statement->where_expr_);
+                EXPECT_EQ(function_expr->func_name_, ">");
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(0);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kColumn);
+                    auto *arg0_col_expr = (ColumnExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_col_expr->names_[0], "a");
+                }
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(1);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kConstant);
+                    auto *arg0_const_expr = (ConstantExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_const_expr->integer_value_, 0);
+                }
+            }
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->db_name_, "default");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t1");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kKnn);
+                auto *knn_expr = (KnnExpr *) (*select_statement->select_list_)[0];
+                EXPECT_EQ(knn_expr->distance_type_, KnnDistanceType::kCosine);
+
+                auto *arg0_col_expr = (ColumnExpr *) (knn_expr->column_expr_);
+                EXPECT_EQ(arg0_col_expr->names_[0], "c1");
+
+                EXPECT_EQ(knn_expr->column_expr_->type_, ParsedExprType::kColumn);
+                EXPECT_EQ(knn_expr->dimension_, 2);
+                EXPECT_EQ(knn_expr->embedding_data_type_, EmbeddingDataType::kElemDouble);
+
+                EXPECT_EQ(((f64*)knn_expr->embedding_data_ptr_)[0], 1);
+                EXPECT_EQ(((f64*)knn_expr->embedding_data_ptr_)[1], 2);
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        // double with inner product
+        String input_sql = "SELECT KNN(c1, [1.00, 2.00], 2, 'double', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_NE(select_statement->where_expr_, nullptr);
+            {
+                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
+                auto *function_expr = (FunctionExpr *) (select_statement->where_expr_);
+                EXPECT_EQ(function_expr->func_name_, ">");
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(0);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kColumn);
+                    auto *arg0_col_expr = (ColumnExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_col_expr->names_[0], "a");
+                }
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(1);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kConstant);
+                    auto *arg0_const_expr = (ConstantExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_const_expr->integer_value_, 0);
+                }
+            }
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->db_name_, "default");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t1");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kKnn);
+                auto *knn_expr = (KnnExpr *) (*select_statement->select_list_)[0];
+
+                EXPECT_EQ(knn_expr->distance_type_, KnnDistanceType::kInnerProduct);
+
+                auto *arg0_col_expr = (ColumnExpr *) (knn_expr->column_expr_);
+                EXPECT_EQ(arg0_col_expr->names_[0], "c1");
+
+                EXPECT_EQ(knn_expr->column_expr_->type_, ParsedExprType::kColumn);
+                EXPECT_EQ(knn_expr->dimension_, 2);
+                EXPECT_EQ(knn_expr->embedding_data_type_, EmbeddingDataType::kElemDouble);
+
+                EXPECT_EQ(((f64 *)knn_expr->embedding_data_ptr_)[0], 1.0);
+                EXPECT_EQ(((f64 *)knn_expr->embedding_data_ptr_)[1], 2.0);
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        // bit with hamming
+        String input_sql = "SELECT KNN(c1, [1,0,1,0,1,1,0,0], 8, 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_NE(select_statement->where_expr_, nullptr);
+            {
+                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
+                auto *function_expr = (FunctionExpr *) (select_statement->where_expr_);
+                EXPECT_EQ(function_expr->func_name_, ">");
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(0);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kColumn);
+                    auto *arg0_col_expr = (ColumnExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_col_expr->names_[0], "a");
+                }
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(1);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kConstant);
+                    auto *arg0_const_expr = (ConstantExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_const_expr->integer_value_, 0);
+                }
+            }
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->db_name_, "default");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t1");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kKnn);
+                auto *knn_expr = (KnnExpr *) (*select_statement->select_list_)[0];
+
+                EXPECT_EQ(knn_expr->distance_type_, KnnDistanceType::kHamming);
+
+                auto *arg0_col_expr = (ColumnExpr *) (knn_expr->column_expr_);
+                EXPECT_EQ(arg0_col_expr->names_[0], "c1");
+
+                EXPECT_EQ(knn_expr->column_expr_->type_, ParsedExprType::kColumn);
+                EXPECT_EQ(knn_expr->dimension_, 8);
+                EXPECT_EQ(knn_expr->embedding_data_type_, EmbeddingDataType::kElemBit);
+                // [1,0,1,0,1,1,0,0], 8
+                long embedding_size = knn_expr->dimension_ / 8;
+                Vector<i64> vec= {1,0,1,0,1,1,0,0};
+                for (long i = 0; i < embedding_size; ++i) {
+                    char embedding_unit = 0;
+                    for (long bit_idx = 0; bit_idx < 8; ++bit_idx) {
+                        if (vec[i * 8 + bit_idx] == 1) {
+                            char temp = embedding_unit << 1;
+                            temp &= 1;
+                            embedding_unit = temp;
+                        } else if (vec[i * 8 + bit_idx] == 0) {
+                            embedding_unit <<= 0;
+                        }
+                    }
+                    EXPECT_EQ(((char *) knn_expr->embedding_data_ptr_)[i], embedding_unit);
+                }
+            }
+        }
+        result->Reset();
+    }
+
+    {
+        // float with inner product
+        String input_sql = "SELECT KNN(c1, [1.00, 2.00], 2, 'float', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement: *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kSelect);
+            auto *select_statement = (SelectStatement *) (statement);
+            EXPECT_NE(select_statement->where_expr_, nullptr);
+            {
+                EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
+                auto *function_expr = (FunctionExpr *) (select_statement->where_expr_);
+                EXPECT_EQ(function_expr->func_name_, ">");
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(0);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kColumn);
+                    auto *arg0_col_expr = (ColumnExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_col_expr->names_[0], "a");
+                }
+                {
+                    auto *arg0_expr = function_expr->arguments_->at(1);
+                    EXPECT_EQ(arg0_expr->type_, ParsedExprType::kConstant);
+                    auto *arg0_const_expr = (ConstantExpr *) (arg0_expr);
+                    EXPECT_EQ(arg0_const_expr->integer_value_, 0);
+                }
+            }
+
+            EXPECT_NE(select_statement->table_ref_, nullptr);
+            EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
+            {
+                auto *table_ref_ptr = (TableReference *) (select_statement->table_ref_);
+                EXPECT_EQ(table_ref_ptr->alias_, nullptr);
+                EXPECT_EQ(table_ref_ptr->db_name_, "default");
+                EXPECT_EQ(table_ref_ptr->table_name_, "t1");
+            }
+
+            EXPECT_EQ(select_statement->select_distinct_, false);
+            EXPECT_NE(select_statement->select_list_, nullptr);
+            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            {
+                EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kKnn);
+                auto *knn_expr = (KnnExpr *) (*select_statement->select_list_)[0];
+
+                EXPECT_EQ(knn_expr->distance_type_, KnnDistanceType::kInnerProduct);
+
+                auto *arg0_col_expr = (ColumnExpr *) (knn_expr->column_expr_);
+                EXPECT_EQ(arg0_col_expr->names_[0], "c1");
+
+                EXPECT_EQ(knn_expr->column_expr_->type_, ParsedExprType::kColumn);
+                EXPECT_EQ(knn_expr->dimension_, 2);
+                EXPECT_EQ(knn_expr->embedding_data_type_, EmbeddingDataType::kElemFloat);
+
+                Vector<f64> vec = {1.00, 2.00};
+                for (long i = 0; i < knn_expr->dimension_; ++i) {
+                    EXPECT_EQ(((f32 *) knn_expr->embedding_data_ptr_)[i], vec[i]);
+                }
+            }
+        }
+        result->Reset();
+    }
+
+}
+
+
+TEST_F(SelectStatementParsingTest, bad_knn_test){
+
+    using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+
+    {
+        // bad dimension type double not match hamming
+        String input_sql = "SELECT KNN(c1, [1.0, 2.0], 2, 'double', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        parser->Parse(input_sql, result);
+        EXPECT_FALSE(result->error_message_.empty());
+        EXPECT_TRUE(result->statements_ptr_ == nullptr);
+    }
+
+    {
+        // bit which length should be aligned with 8
+        String input_sql = "SELECT KNN(c1, [1,0,1,0,1,1,0], 7, 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        parser->Parse(input_sql, result);
+        EXPECT_FALSE(result->error_message_.empty());
+        EXPECT_TRUE(result->statements_ptr_ == nullptr);
+
+    }
+
+    {
+        // bit only support hamming
+        String input_sql = "SELECT KNN(c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 18, 'bit', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        parser->Parse(input_sql, result);
+        std::cout<<result->error_message_<<std::endl;
+        EXPECT_FALSE(result->error_message_.empty());
+        EXPECT_TRUE(result->statements_ptr_ == nullptr);
+    }
+}

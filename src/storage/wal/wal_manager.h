@@ -65,8 +65,8 @@ class WalManager {
 
     SeqGenerator lsn_gen_;
     std::atomic<int64_t> lsn_pend_chk_;
-    int64_t lsn_done_chk_;
-    int64_t checkpoint_ts_;
+    int64_t lsn_done_chk_{};
+    int64_t checkpoint_ts_{};
 
     Storage *storage_;
 };
