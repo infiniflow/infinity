@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(infinity VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Print CMake version and project name
 message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION}")
@@ -22,6 +23,34 @@ message(STATUS "Commit-id = ${GIT_COMMIT_ID}")
 
 set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
+
+
+
+# SET CLANG PATH AND TOOLS PATH
+set(TOOLS_PATH "${CMAKE_SOURCE_DIR}/tools")
+
+# add search path for clang, if it is not found in the default path
+set(CLANG_SEARCH_PATH "/usr/local/bin" "/usr/bin" "/usr/local/opt/llvm/bin" "/usr/local/opt/llvm@18/bin" "/opt/homebrew/opt/llvm@18/bin")
+
+# Make Sure you have clang-format and clang-tidy installed
+find_program(CLANG_FORMAT_BIN clang-format
+  HINTS ${CLANG_SEARCH_PATH}
+  DOC "Path to clang-format executable")
+
+if (NOT CLANG_FORMAT_BIN)
+  message(FATAL_ERROR "clang-format not found.")
+endif()
+
+find_program(CLANG_TIDY_BIN clang-tidy
+  HINTS ${CLANG_SEARCH_PATH}
+  DOC "Path to clang-tidy executable")
+
+if (NOT CLANG_TIDY_BIN)
+  message(FATAL_ERROR "clang-tidy not found.")
+endif()
+
+# Generate compile_commands.json for clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   MESSAGE("${CMAKE_CXX_COMPILER_ID}")
@@ -61,3 +90,39 @@ add_subdirectory(test/unittest)
 
 # Compile benchmark
 add_subdirectory(benchmark)
+
+
+#########################
+# format and tidy
+#########################
+string(CONCAT FORMAT_DIR "${CMAKE_SOURCE_DIR}/src,"
+                         "${CMAKE_SOURCE_DIR}/test,")   
+
+add_custom_target(format ${TOOLS_PATH}/clang_format.py
+  ${CLANG_FORMAT_BIN}
+  ${TOOLS_PATH}/exclusion_files.txt
+  --source_dirs ${FORMAT_DIR}
+  --fix
+  --quiet
+)
+
+add_custom_target(check-format ${TOOLS_PATH}/clang_format.py
+  ${CLANG_FORMAT_BIN}
+  ${TOOLS_PATH}/exclusion_files.txt
+  --source_dirs ${FORMAT_DIR}
+  --quiet
+)
+
+add_custom_target(tidy ${TOOLS_PATH}/run_clang_tidy.py
+  -clang-tidy-binary ${CLANG_TIDY_BIN}
+  -p ${CMAKE_BINARY_DIR}
+  -extra-arg=-std=c++20
+)
+
+add_custom_target(fix-tidy ${TOOLS_PATH}/run_clang_tidy.py
+  -clang-tidy-binary ${CLANG_TIDY_BIN}
+  -p ${CMAKE_BINARY_DIR}
+  -extra-arg=-std=c++20
+  -fix
+)
+

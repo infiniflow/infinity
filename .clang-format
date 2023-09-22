@@ -1,0 +1,4 @@
+# See Details in https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+BasedOnStyle: Google
+ColumnLimit: 120
+IndentWidth: 4

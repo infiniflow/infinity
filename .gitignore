@@ -70,3 +70,4 @@ parser.h
 
 tools/tttt
 tools/sqllogictest
+tools/__pycache__
