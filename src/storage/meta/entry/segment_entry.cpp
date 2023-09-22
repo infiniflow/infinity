@@ -5,6 +5,7 @@
 #include "segment_entry.h"
 #include "common/default_values.h"
 #include "common/utility/defer_op.h"
+#include "common/utility/random.h"
 #include "storage/io/local_file_system.h"
 #include "storage/txn/txn.h"
 #include <ctime>
@@ -30,8 +31,11 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
     const auto* table_ptr = (const TableCollectionEntry*)table_entry;
 
     // reserve an empty space for random name of segment directory.
-    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + '/' + String(DEFAULT_SEGMENT_FILE_NAME_LEN, '_'));
-    new_entry->finish_shuffle = false;
+    u32 seed = time(nullptr);
+    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + std::to_string(segment_id));
+    String base_dir = *table_ptr->base_dir_ + "/seg_id" + std::to_string(segment_id);
+
+    // new_entry->finish_shuffle = false;
 
     const Vector<SharedPtr<ColumnDef>>& columns = table_ptr->columns_;
     new_entry->columns_.reserve(columns.size());
@@ -44,18 +48,6 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
         ));
     }
     return new_entry;
-}
-
-void
-SegmentEntry::ShuffleFileName() {
-    std::lock_guard<RWMutex> lock(rw_locker_);
-    char *ptr = base_dir_->data() + base_dir_->size() - DEFAULT_SEGMENT_FILE_NAME_LEN;
-    LocalFileSystem fs;
-    u32 seed = time(nullptr);
-    do {
-        RandomString(ptr, DEFAULT_SEGMENT_FILE_NAME_LEN, seed++);
-    } while (fs.Exists(*base_dir_.get()));
-    finish_shuffle = true;
 }
 
 void
@@ -152,7 +144,16 @@ SegmentEntry::PrepareFlush(SegmentEntry* segment_entry) {
 UniquePtr<String>
 SegmentEntry::Flush(SegmentEntry* segment_entry) {
     LOG_TRACE("DataSegment: {} is being flushed", segment_entry->segment_id_);
-    segment_entry->ShuffleFileName();
+    bool create_directory_success = false;
+    LocalFileSystem fs;
+    while (1) {
+        // segment_entry->ShuffleFileName(); this is for duplicate directory test
+        bool exist = fs.CreateDirectoryCheckIfExist(*segment_entry->base_dir_);
+        if (!exist) {
+            break;
+        }
+        segment_entry->ShuffleFileName();
+    }
     for(SizeT column_id = 0; const auto& column_data: segment_entry->columns_) {
         column_data->Flush(column_data.get(), segment_entry->current_row_);
         LOG_TRACE("ColumnData: {} is flushed", column_id);
@@ -172,17 +173,16 @@ nlohmann::json
 SegmentEntry::Serialize(const SegmentEntry* segment_entry) {
     nlohmann::json json_res;
 
-    if (!segment_entry->finish_shuffle) {
-        StorageError("Segment has not finish its base_dir");
-    }
+    // if (!segment_entry->finish_shuffle) {
+    //     StorageError("Segment has not finish its base_dir");
+    // }
     json_res["base_dir"] = *segment_entry->base_dir_;
     json_res["row_capacity"] = segment_entry->row_capacity_;
     i64 status_value = segment_entry->status_;
     json_res["status"] = status_value;
     json_res["segment_id"] = segment_entry->segment_id_;
     for(const auto& column: segment_entry->columns_) {
-        // TODO shenyushi, tmp annotation.
-        // json_res["columns"].emplace_back(column->Serialize(column.get()));
+        json_res["columns"].emplace_back(column->Serialize(column.get()));
     }
     json_res["start_txn_id"] = segment_entry->start_txn_id_.load();
     json_res["end_txn_id"] = segment_entry->end_txn_id_.load();
@@ -210,13 +210,45 @@ SegmentEntry::Deserialize(const nlohmann::json& table_entry_json, TableCollectio
     segment_entry->current_row_ = table_entry_json["current_row"];
 
     for(const auto& column_json: table_entry_json["columns"]) {
-        // TODO shenyushi, tmp annotation.
-        // SharedPtr<ColumnDataEntry> column_data_entry = ColumnDataEntry::Deserialize(column_json, segment_entry.get(), buffer_mgr);
-        // segment_entry->columns_.emplace_back(column_data_entry);
+        SharedPtr<ColumnDataEntry> column_data_entry = ColumnDataEntry::Deserialize(column_json, segment_entry.get(), buffer_mgr);
+        segment_entry->columns_.emplace_back(column_data_entry);
     }
 
     return segment_entry;
 }
+// /tmp/infinity/data/default/txn_2/t1/xw8y9pWPfq_seg_0
+namespace {
+// Hard code here. **UGLY CODE!!!**
+static void SegIdChange(String &s, const String &new_seg_id) {
+    auto ret = s.find("_seg");
+    StorageAssert(ret != std::string::npos, "Cannot find \"_seg\" in segment id change.");
+    auto start_pos = ret - DEFAULT_RANDOM_SEGMENT_NAME_LEN;
+    std::copy(new_seg_id.begin(), new_seg_id.end(), s.begin() + start_pos);
+}
+}
+
+void
+SegmentEntry::ShuffleFileName() {
+    u32 seed = time(nullptr);
+    String new_seg_id = RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed);
+    for (auto column_entry : columns_) {
+        if (column_entry->outline_info_) {
+            auto outline_info  = column_entry->outline_info_.get();
+            for (auto [bufferhandle_ptr, buffer_size] : outline_info->full_buffers_) {
+                auto s = bufferhandle_ptr->current_dir_;
+                SegIdChange(*s, new_seg_id);
+            }
+            if (outline_info->current_buffer_handler_) {
+                auto s = outline_info->current_buffer_handler_->current_dir_;
+                SegIdChange(*s, new_seg_id);
+            }
+        }
+        auto s = column_entry->buffer_handle_->current_dir_;
+        SegIdChange(*s, new_seg_id);
+    }
+    SegIdChange(*base_dir_, new_seg_id);
+}
+
 
 }
 

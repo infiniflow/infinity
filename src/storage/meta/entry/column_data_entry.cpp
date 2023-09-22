@@ -12,6 +12,7 @@
 #include "segment_entry.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/column_buffer.h"
+#include <algorithm>
 #include <cstring>
 #include <string>
 
@@ -172,6 +173,8 @@ ColumnDataEntry::Flush(ColumnDataEntry* column_data_entry,
             auto outline_info = column_data_entry->outline_info_.get();
             if (outline_info->current_buffer_offset_ > 0) {
                 outline_info->full_buffers_.emplace_back(outline_info->current_buffer_handler_, outline_info->current_buffer_offset_);
+                outline_info->current_buffer_handler_ = nullptr;
+                outline_info->current_buffer_offset_ = 0;
             }
             for (auto [outline_buffer_handle, outline_size] : outline_info->full_buffers_) {
                 outline_buffer_handle->WriteFile(outline_size);
@@ -240,5 +243,4 @@ ColumnDataEntry::Deserialize(const nlohmann::json& column_data_json, SegmentEntr
     }
     return column_data_entry;
 }
-
 }

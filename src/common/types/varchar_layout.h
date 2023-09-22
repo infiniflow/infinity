@@ -3,7 +3,7 @@
 #include "common/types/data_type.h"
 #include "common/types/internal_types.h"
 namespace infinity {
-// TODO shenyushi: move to a seperate file.
+// TODO shenyushi: Is this file in an appropriate location?
 
 #pragma pack (1)
 

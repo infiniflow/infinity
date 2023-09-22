@@ -309,7 +309,7 @@ PhysicalImport::CSVRowHandler(void *context) {
         auto column_data_entry = segment_entry->columns_[column_idx];
         auto column_type = column_data_entry->column_type_.get();
         if (column_type->type() == kVarchar) {
-            auto varchar_info = dynamic_cast<VarcharInfo *>(column_type->type_info().get()); // TODO shenyushi
+            auto varchar_info = dynamic_cast<VarcharInfo *>(column_type->type_info().get());
             ExecutorAssert(varchar_info->dimension() >= str_view.size(), "Varchar data size exceeds dimension.");
             AppendVarcharData(column_data_entry.get(), str_view, write_row);
         } else if (column_type->type() == kEmbedding) {

@@ -255,6 +255,7 @@ DataType::Deserialize(const nlohmann::json& data_type_json) {
             }
             case LogicalType::kVarchar: {
                 type_info = VarcharInfo::Make(type_info_json["dimension"]);
+                break;
             }
             default: {
                 TypeError("Unexpected type here.")
