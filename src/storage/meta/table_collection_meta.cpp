@@ -12,6 +12,18 @@ namespace infinity {
 
 class TxnManager;
 
+/**
+ * @brief Create a new table entry.
+ *        LIST: [👇(insert a new).... table_entry2 , table_entry1 , dummy_entry] insert new table entry from front.
+ * @param table_meta
+ * @param table_collection_type
+ * @param table_collection_name_ptr
+ * @param columns
+ * @param txn_id
+ * @param begin_ts
+ * @param txn_mgr
+ * @return EntryResult
+ */
 EntryResult
 TableCollectionMeta::CreateNewEntry(TableCollectionMeta* table_meta,
                                     TableCollectionType table_collection_type,
@@ -236,6 +248,18 @@ TableCollectionMeta::DeleteNewEntry(TableCollectionMeta* table_meta,
     table_meta->entry_list_.erase(removed_iter, table_meta->entry_list_.end());
 }
 
+/**
+ * @brief Get the table entry object
+ *        LIST: [👇(a new entry).... table_entry2 , table_entry1 , dummy_entry]
+ *        Get the first valid table entry from the front.
+ *        The table entry is valid if:
+ *          1. committed and commit_ts < begin_ts.
+ *          2. not dummy entry.
+ * @param table_meta
+ * @param txn_id
+ * @param begin_ts
+ * @return EntryResult
+ */
 EntryResult
 TableCollectionMeta::GetEntry(TableCollectionMeta* table_meta,
                               u64 txn_id,
@@ -304,6 +328,18 @@ TableCollectionMeta::Serialize(const TableCollectionMeta* table_meta) {
     return json_res;
 }
 
+/**
+ * @brief Deserialize the table meta from json.
+ *        The table meta is a list of table entries.
+ *        Same as CreateNewEntry, the last entry is a dummy entry.
+ *        LIST: [👇(a new entry).... table_entry2 , table_entry1 , dummy_entry]
+ *        The raw catalog is json, so the dummy entry is not included.
+ *        The dummy entry is added during the deserialization.
+ * @param table_meta_json
+ * @param db_entry
+ * @param buffer_mgr
+ * @return UniquePtr<TableCollectionMeta>
+ */
 UniquePtr<TableCollectionMeta>
 TableCollectionMeta::Deserialize(const nlohmann::json& table_meta_json, DBEntry* db_entry, BufferManager* buffer_mgr) {
     nlohmann::json json_res;
@@ -320,7 +356,7 @@ TableCollectionMeta::Deserialize(const nlohmann::json& table_meta_json, DBEntry*
     }
     UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
     dummy_entry->deleted_ = true;
-    res->entry_list_.emplace_front(std::move(dummy_entry));
+    res->entry_list_.emplace_back(std::move(dummy_entry));
 
     return res;
 }
