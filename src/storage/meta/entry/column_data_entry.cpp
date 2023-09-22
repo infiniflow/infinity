@@ -3,24 +3,24 @@
 //
 
 #include "column_data_entry.h"
-#include "common/types/complex/embedding_type.h"
+#include "common/default_values.h"
 #include "common/types/data_type.h"
 #include "common/types/internal_types.h"
 #include "common/types/logical_type.h"
+#include "common/types/varchar_layout.h"
 #include "common/utility/infinity_assert.h"
 #include "segment_entry.h"
 #include "storage/buffer/buffer_manager.h"
-#include <cstddef>
+#include "storage/buffer/column_buffer.h"
+#include <algorithm>
+#include <cstring>
 #include <string>
 
 namespace infinity {
 
 SharedPtr<ColumnDataEntry>
-ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry *segment_entry,
-                                        u64 column_id,
-                                        u64 row_capacity,
-                                        const SharedPtr<DataType>& data_type,
-                                        BufferManager* buffer_mgr) {
+ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry* segment_entry, u64 column_id, u64 row_capacity,
+    const SharedPtr<DataType>& data_type, BufferManager* buffer_mgr) {
     SharedPtr<ColumnDataEntry> column_data_entry = MakeShared<ColumnDataEntry>(segment_entry);
     const auto* segment_ptr = (const SegmentEntry*)segment_entry;
     column_data_entry->base_dir_ = segment_ptr->base_dir_;
@@ -31,10 +31,14 @@ ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry *segment_entry,
     column_data_entry->buffer_handle_ = buffer_mgr->AllocateBufferHandle(column_data_entry->base_dir_,
                                                                          column_data_entry->file_name_,
                                                                          data_type->Size() * row_capacity);
+    if (data_type->type() == kVarchar) {
+        // auto out_dir = MakeShared<String>(*segment_ptr->base_dir_ + "outline/");
+        column_data_entry->outline_info_ = MakeUnique<OutlineInfo>(buffer_mgr);
+    }
     return column_data_entry;
 }
 
-ObjectHandle
+ColumnBuffer
 ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, BufferManager* buffer_mgr) {
     if(column_data_entry->buffer_handle_ == nullptr) {
         // Get buffer handle from buffer manager
@@ -44,143 +48,87 @@ ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, BufferManager
     }
 
 //    ptr_t ptr = buffer_handle_->LoadData();
-    return ObjectHandle(column_data_entry->buffer_handle_);
+    bool outline = column_data_entry->column_type_->type() == kVarchar;
+    return ColumnBuffer(column_data_entry->buffer_handle_, buffer_mgr, outline);
 }
 
-/**
- * @brief Convert data to coressponding type and append to column data entry
- * 
- * @param column_data_entry column data need to be inserted
- * @param data data to be inserted, represented by string
- * @param offset offset of column data
- */
-void
-ColumnDataEntry::Append(ColumnDataEntry* column_data_entry, const StringView& data, SizeT offset) {
-    if (column_data_entry->buffer_handle_ == nullptr) {
-        StorageError("Not initialize buffer handle");
-    }
-    ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
-    auto type_size = column_data_entry->column_type_->Size();
-    ptr += offset * type_size;
-    switch (column_data_entry->column_type_->type()) {
-        case kBoolean:
-            DataType::WriteData<BooleanT>(ptr, data);
-            break;
-        case kTinyInt:
-            DataType::WriteData<TinyIntT>(ptr, data);
-            break;
-        case kSmallInt:
-            DataType::WriteData<SmallIntT>(ptr, data);
-            break;
-        case kInteger:
-            DataType::WriteData<IntegerT>(ptr, data);
-            break;
-        case kBigInt:
-            DataType::WriteData<BigIntT>(ptr, data);
-            break;
-        case kFloat:
-            DataType::WriteData<FloatT>(ptr, data);
-            break;
-        case kDouble: 
-            DataType::WriteData<DoubleT>(ptr, data);
-            break;
-        default:
-            NotImplementError("not support data type");
-    }
-}
-
-void ColumnDataEntry::AppendEmbedding(ColumnDataEntry *column_data_entry, const StringView &data, SizeT offset, char delimiter) {
-    if (column_data_entry->buffer_handle_ == nullptr) {
-        StorageError("Not initialize buffer handle");
-    }
-    ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
-    auto type_size = column_data_entry->column_type_->Size();
-    ptr += offset * type_size;
-
-    auto type_info = column_data_entry->column_type_->type_info().get();
-    auto embedding_info = dynamic_cast<EmbeddingInfo *>(type_info);
-    auto dimension = embedding_info->Dimension();
-    switch (embedding_info->Type()) {
-        case kElemInt8:
-            DataType::WriteEmbedding<TinyIntT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemInt16:
-            DataType::WriteEmbedding<SmallIntT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemInt32:
-            DataType::WriteEmbedding<IntegerT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemInt64:
-            DataType::WriteEmbedding<BigIntT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemFloat:
-            DataType::WriteEmbedding<FloatT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemDouble:
-            DataType::WriteEmbedding<DoubleT>(ptr, data, dimension, delimiter);
-            break;
-        case kElemBit:
-        case kElemInvalid:
-            NotImplementError("not support data type");
-    }
-}
-
-// copy data *from* `column_vector` (offset `block_start_offset`).
-// *to* `column_data_entry`'s buffer (offset column_start_offset).
+// Note!!!: caller of `Append` should guarantee the buffer_handler has enough place to append `row_n` rows.
 void
 ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
        const SharedPtr<ColumnVector>& column_vector,
        SizeT block_start_offset,
        SizeT column_start_offset,
-       SizeT rows) {
+       SizeT row_n) {
     if(column_data_entry->buffer_handle_ == nullptr) {
         StorageError("Not initialize buffer handle")
     }
     ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
-    switch(column_vector->data_type()->type()) {
+    ptr_t src_ptr = column_vector->data() + block_start_offset * column_vector->data_type_size_;
+    SizeT data_size = row_n * column_vector->data_type_size_;
+    SizeT dst_offset = column_start_offset * column_vector->data_type_size_;
+    ColumnDataEntry::AppendRaw(column_data_entry, dst_offset, src_ptr, data_size);
+}
+
+void
+ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset, ptr_t src_p, SizeT data_size) {
+    auto column_type = column_data_entry->column_type_;
+    ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
+    switch (column_type->type()) {
         case kBoolean:
         case kTinyInt:
         case kSmallInt:
         case kInteger:
         case kBigInt:
-        case kHugeInt:
-        case kDecimal:
         case kFloat:
         case kDouble:
-        case kDate:
-        case kTime:
-        case kDateTime:
-        case kTimestamp:
-        case kInterval:
-        case kPoint:
-        case kLine:
-        case kLineSeg:
-        case kBox:
-        case kCircle:
-        case kBitmap:
-        case kUuid:
         case kEmbedding: {
-            ptr_t src_ptr = column_vector->data() + block_start_offset * column_vector->data_type_size_;
-            ptr_t dst_ptr = ptr + column_start_offset * column_vector->data_type_size_;
-            memcpy(dst_ptr, src_ptr, rows *  column_vector->data_type_size_);
+            memcpy(dst_ptr, src_p, data_size);
             break;
         }
+        case kVarchar: {
+            auto inline_p = reinterpret_cast<VarcharLayout *>(dst_ptr);
+            auto src_ptr = reinterpret_cast<VarcharT *>(src_p);
+            SizeT row_n = data_size / sizeof(VarcharT);
+            for (SizeT row_idx = 0; row_idx < row_n; row_idx++) {
+                auto varchar_type = src_ptr + row_idx;
+                VarcharLayout *varchar_layout = inline_p + row_idx;
+                if (varchar_type->IsInlined()) {
+                    auto &short_info = varchar_layout->u.short_info_;
+                    varchar_layout->length_ = varchar_type->length;
+                    memcpy(short_info.data.data(), varchar_type->prefix, varchar_type->length);
+                } else {
+                    auto &long_info = varchar_layout->u.long_info_;
+                    auto outline_info = column_data_entry->outline_info_.get();
+                    if (outline_info->current_buffer_handler_ == nullptr) {
+                        auto file_name = ColumnDataEntry::GetOutlineFilename(outline_info->next_file_idx++);
+                        outline_info->current_buffer_handler_ = outline_info->buffer_mgr_->AllocateBufferHandle(column_data_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                    } else if (outline_info->current_buffer_offset_ + varchar_type->length > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
+                        outline_info->full_buffers_.emplace_back(outline_info->current_buffer_handler_, outline_info->current_buffer_offset_);
+                        outline_info->current_buffer_offset_ = 0;
+                        auto file_name = ColumnDataEntry::GetOutlineFilename(outline_info->next_file_idx++);
+                        outline_info->current_buffer_handler_ = outline_info->buffer_mgr_->AllocateBufferHandle(column_data_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                    }
+                    ptr_t dst_ptr = outline_info->current_buffer_handler_->LoadData() + outline_info->current_buffer_offset_;
+                    SizeT data_size = varchar_type->length;
+                    ptr_t src_ptr = varchar_type->ptr;
+                    memcpy(dst_ptr, src_ptr, data_size);
 
-        case kVarchar:
-        case kArray:
-        case kTuple:
-        case kPath:
-        case kPolygon:
-        case kBlob:
-        case kMixed:
-        case kNull: {
-            LOG_ERROR("{} isn't supported", column_vector->data_type()->ToString())
-            NotImplementError("Not supported now in append data in column")
+                    varchar_layout->length_ = varchar_type->length;
+                    memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
+                    long_info.file_idx_ = outline_info->next_file_idx - 1; // TODO shenyushi
+                    long_info.file_offset_ = outline_info->current_buffer_offset_;
+                    outline_info->current_buffer_offset_ += varchar_type->length;
+                }
+            }
+            break;
         }
+        case kNull:
         case kMissing:
         case kInvalid: {
-            LOG_ERROR("Invalid data type {}", column_vector->data_type()->ToString())
-            StorageError("Invalid data type")
+            StorageError("AppendRaw: Error type.")
+        }
+        default: {
+            NotImplementError("AppendRaw: Not implement the type.")
         }
     }
 }
@@ -188,7 +136,6 @@ ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
 void
 ColumnDataEntry::Flush(ColumnDataEntry* column_data_entry,
                        SizeT row_count) {
-    SizeT buffer_size{0};
     switch(column_data_entry->column_type_->type()) {
         case kBoolean:
         case kTinyInt:
@@ -212,11 +159,30 @@ ColumnDataEntry::Flush(ColumnDataEntry* column_data_entry,
         case kBitmap:
         case kUuid:
         case kEmbedding: {
-            buffer_size = row_count * column_data_entry->column_type_->Size();
+            SizeT buffer_size = row_count * column_data_entry->column_type_->Size();
+            column_data_entry->buffer_handle_->WriteFile(buffer_size);
+            column_data_entry->buffer_handle_->SyncFile();
+            column_data_entry->buffer_handle_->CloseFile();
             break;
         }
-
-        case kVarchar:
+        case kVarchar: {
+            SizeT buffer_size = row_count * column_data_entry->column_type_->Size();
+            column_data_entry->buffer_handle_->WriteFile(buffer_size);
+            column_data_entry->buffer_handle_->SyncFile();
+            column_data_entry->buffer_handle_->CloseFile();
+            auto outline_info = column_data_entry->outline_info_.get();
+            if (outline_info->current_buffer_offset_ > 0) {
+                outline_info->full_buffers_.emplace_back(outline_info->current_buffer_handler_, outline_info->current_buffer_offset_);
+                outline_info->current_buffer_handler_ = nullptr;
+                outline_info->current_buffer_offset_ = 0;
+            }
+            for (auto [outline_buffer_handle, outline_size] : outline_info->full_buffers_) {
+                outline_buffer_handle->WriteFile(outline_size);
+                outline_buffer_handle->SyncFile();
+                outline_buffer_handle->CloseFile();
+            }
+            break;
+        }
         case kArray:
         case kTuple:
         case kPath:
@@ -233,10 +199,6 @@ ColumnDataEntry::Flush(ColumnDataEntry* column_data_entry,
             StorageError("Invalid data type")
         }
     }
-
-    column_data_entry->buffer_handle_->WriteFile(buffer_size);
-    column_data_entry->buffer_handle_->SyncFile();
-    column_data_entry->buffer_handle_->CloseFile();
 }
 
 nlohmann::json
@@ -251,6 +213,10 @@ ColumnDataEntry::Serialize(const ColumnDataEntry* column_data_entry) {
     json_res["commit_ts"] = column_data_entry->commit_ts_.load();
     json_res["txn_id"] = column_data_entry->txn_id_.load();
     json_res["deleted"] = column_data_entry->deleted_;
+    if (column_data_entry->outline_info_) {
+        auto &outline_info = column_data_entry->outline_info_;
+        json_res["next_outline_idx"] = outline_info->next_file_idx;
+    }
     return json_res;
 }
 
@@ -271,7 +237,10 @@ ColumnDataEntry::Deserialize(const nlohmann::json& column_data_json, SegmentEntr
 //                                                                         column_data_entry->file_name_,
 //                                                                         column_data_entry->column_type_ * column_data_entry->row_capacity_);
 
+    if (column_data_entry->outline_info_ != nullptr) {
+        auto outline_info = column_data_entry->outline_info_.get();
+        outline_info->next_file_idx = column_data_json["next_outline_idx"];
+    }
     return column_data_entry;
 }
-
 }

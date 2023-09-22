@@ -37,6 +37,12 @@ inline UniquePtr<T> MakeUnique(Args &&...args) {
     return std::make_unique<T>(std::forward<Args>(args)...);
 }
 
+template<typename T1, typename T2>
+using Pair = std::pair<T1, T2>;
+
+template<typename T, std::size_t N>
+using Array = std::array<T, N>;
+
 template<typename T>
 using Vector = std::vector<T>;
 

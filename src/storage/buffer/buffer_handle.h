@@ -29,6 +29,7 @@ enum class BufferStatus {
 using BufferReadFN = void(*)(const String& path, DataType data_type);
 using BufferWriteFN = void(*)(const String& path, DataType data_type);
 
+// BufferHandle is never destructed
 class BufferHandle {
 public:
     explicit
@@ -46,6 +47,10 @@ public:
 
     void
     UnloadData();
+
+    void
+    AddRefCount();
+
 
     [[nodiscard]] inline bool
     IsFree() const {

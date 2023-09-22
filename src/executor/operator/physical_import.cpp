@@ -3,7 +3,11 @@
 //
 
 #include "physical_import.h"
+#include "common/types/data_type.h"
+#include "common/types/info/varchar_info.h"
 #include "common/types/internal_types.h"
+#include "common/types/logical_type.h"
+#include "common/utility/infinity_assert.h"
 #include "executor/operator_state.h"
 #include "main/query_context.h"
 #include "storage/meta/entry/column_data_entry.h"
@@ -223,6 +227,52 @@ PhysicalImport::CSVHeaderHandler(void *context) {
     zsv_set_row_handler(parser_context->parser_, CSVRowHandler);
 }
 
+namespace {
+Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
+    SizeT data_size = data.size();
+    if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
+        TypeAssert(false, "Embedding data must be surrounded by [ and ]");
+    }
+    Vector<StringView> ret;
+    SizeT i = 1, j = 1;
+    while (true) {
+        if (data[i] == delimiter || i == data_size - 1) {
+            ret.emplace_back(data.begin() + j, data.begin() + i);
+            j = i + 1;
+        }
+        if (i == data_size - 1) {
+            break;
+        }
+        i++;
+    }
+    return ret;
+}
+
+template<typename T>
+void AppendSimpleData(ColumnDataEntry *column_data_entry, const StringView &str_view, SizeT row_idx) {
+    T ele = DataType::StringToValue<T>(str_view);
+    ColumnDataEntry::AppendRaw(column_data_entry, row_idx * sizeof(T), reinterpret_cast<ptr_t>(&ele), sizeof(T));
+}
+
+template<typename T>
+void AppendEmbeddingData(ColumnDataEntry *column_data_entry, const Vector<StringView> &ele_str_views, SizeT row_idx) {
+    SizeT arr_len = ele_str_views.size();
+    auto tmp_buffer = MakeUnique<T []>(arr_len);
+    for (SizeT ele_idx = 0; auto &ele_str_view : ele_str_views) {
+        T ele = DataType::StringToValue<T>(ele_str_view);
+        tmp_buffer[ele_idx++] = ele;
+    }
+    ColumnDataEntry::AppendRaw(column_data_entry, row_idx * arr_len * sizeof(T), reinterpret_cast<ptr_t>(tmp_buffer.get()), sizeof(T) * arr_len);
+}
+
+void AppendVarcharData(ColumnDataEntry *column_data_entry, const StringView &str_view, SizeT row_idx) {
+    const char_t *tmp_buffer = str_view.data();
+    auto varchar_type = MakeUnique<VarcharT>(str_view.data(), str_view.size());
+    ColumnDataEntry::AppendRaw(column_data_entry, row_idx * sizeof(VarcharT), reinterpret_cast<ptr_t>(varchar_type.get()), sizeof(VarcharT));
+}
+
+}
+
 void
 PhysicalImport::CSVRowHandler(void *context) {
     ParserContext *parser_context = static_cast<ParserContext*>(context);
@@ -239,7 +289,7 @@ PhysicalImport::CSVRowHandler(void *context) {
         txn_store->Import(segment_entry);
 
         // create new segment entry
-        // TODO the segment_id is wrong
+        // TODO shenyushi: segment id
         parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table,
                                                                            txn->TxnID(),
                                                                            TableCollectionEntry::GetNextSegmentID(table),
@@ -256,13 +306,89 @@ PhysicalImport::CSVRowHandler(void *context) {
         if (cell.len) {
             str_view = StringView((char *)cell.str, cell.len);
         }
-
         auto column_data_entry = segment_entry->columns_[column_idx];
-        if (segment_entry->columns_[column_idx]->column_type_->IsEmbedding()) {
-            ColumnDataEntry::AppendEmbedding(column_data_entry.get(), str_view, write_row, parser_context->delimiter_);
+        auto column_type = column_data_entry->column_type_.get();
+        if (column_type->type() == kVarchar) {
+            auto varchar_info = dynamic_cast<VarcharInfo *>(column_type->type_info().get());
+            ExecutorAssert(varchar_info->dimension() >= str_view.size(), "Varchar data size exceeds dimension.");
+            AppendVarcharData(column_data_entry.get(), str_view, write_row);
+        } else if (column_type->type() == kEmbedding) {
+            Vector<StringView> res;
+            auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
+            auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
+            ExecutorAssert(embedding_info->Dimension() >= ele_str_views.size(), "Embbeding data size exceeds dimension.");
+            switch (embedding_info->Type()) {
+                case kElemBit: {
+                    NotImplementError("Embedding bit type is not implemented.");
+                }
+                case kElemInt8: {
+                    AppendEmbeddingData<TinyIntT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemInt16: {
+                    AppendEmbeddingData<SmallIntT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemInt32: {
+                    AppendEmbeddingData<IntegerT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemInt64: {
+                    AppendEmbeddingData<BigIntT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemFloat: {
+                    AppendEmbeddingData<FloatT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemDouble: {
+                    AppendEmbeddingData<DoubleT>(column_data_entry.get(), ele_str_views, write_row);
+                    break;
+                }
+                case kElemInvalid: {
+                    ExecutorError("Embedding element type is invalid.")
+                }
+            }
         } else {
-            ColumnDataEntry::Append(column_data_entry.get(), str_view, write_row);
+            switch (column_type->type()) {
+                case kBoolean: {
+                    AppendSimpleData<BooleanT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kTinyInt: {
+                    AppendSimpleData<TinyIntT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kSmallInt: {
+                    AppendSimpleData<SmallIntT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kInteger: {
+                    AppendSimpleData<IntegerT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kBigInt: {
+                    AppendSimpleData<BigIntT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kFloat: {
+                    AppendSimpleData<FloatT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kDouble: {
+                    AppendSimpleData<DoubleT>(column_data_entry.get(), str_view, write_row);
+                    break;
+                }
+                case kMissing:
+                case kInvalid: {
+                    ExecutorError("Invalid data type")
+                }
+                default: {
+                    NotImplementError("Not supported now in append data in column")
+                }
+            }
         }
+
     }
 
     ++parser_context->row_count_;

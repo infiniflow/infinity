@@ -7,7 +7,6 @@
 #include <cstring>
 #include <string>
 #include <iostream>
-#include <format>
 #include <type_traits>
 
 namespace infinity {

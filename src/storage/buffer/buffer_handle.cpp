@@ -221,6 +221,11 @@ BufferHandle::UnloadData() {
     }
 }
 
+void BufferHandle::AddRefCount() {
+    std::unique_lock<RWMutex> w_locker(rw_locker_);
+    reference_count_++;
+}
+
 void
 BufferHandle::FreeData() {
     std::unique_lock<RWMutex> w_locker(rw_locker_);

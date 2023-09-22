@@ -6,6 +6,7 @@
 
 #include "base_entry.h"
 #include "common/types/internal_types.h"
+#include "storage/buffer/column_buffer.h"
 #include "storage/buffer/object_handle.h"
 #include "common/column_vector/column_vector.h"
 
@@ -13,6 +14,18 @@ namespace infinity {
 
 class BufferManager;
 class SegmentEntry;
+
+struct OutlineInfo {
+    Vector<Pair<BufferHandle *, SizeT>> full_buffers_{};
+    BufferHandle *current_buffer_handler_{};
+    SizeT current_buffer_offset_{};
+    BufferManager *buffer_mgr_{};
+    SizeT next_file_idx{};
+
+    OutlineInfo() {}
+    OutlineInfo(BufferManager *buffer_mgr) : buffer_mgr_(buffer_mgr) {}
+};
+
 struct ColumnDataEntry : public BaseEntry {
 public:
     explicit
@@ -28,6 +41,8 @@ public:
     SizeT row_capacity_{};
 
     BufferHandle* buffer_handle_{};
+
+    UniquePtr<OutlineInfo> outline_info_;
 public:
     static SharedPtr<ColumnDataEntry>
     MakeNewColumnDataEntry(const SegmentEntry* segment_entry,
@@ -36,7 +51,7 @@ public:
                            const SharedPtr<DataType>& data_type,
                            BufferManager* buffer_mgr);
 
-    static ObjectHandle
+    static ColumnBuffer
     GetColumnData(ColumnDataEntry* column_data_entry, BufferManager* buffer_mgr);
 
     static void
@@ -44,13 +59,11 @@ public:
            const SharedPtr<ColumnVector>& column_vector,
            SizeT block_start_offset,
            SizeT column_start_offset,
-           SizeT rows);
-    
-    static void
-    Append(ColumnDataEntry* column_data_entry, const StringView& data, SizeT offset);
+           SizeT row_n);
+
 
     static void
-    AppendEmbedding(ColumnDataEntry* column_data_entry, const StringView& data, SizeT offset, char delimiter);
+    AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset, ptr_t src_ptr, SizeT data_size);
 
     static void
     Flush(ColumnDataEntry* column_data_entry,
@@ -61,6 +74,11 @@ public:
 
     static SharedPtr<ColumnDataEntry>
     Deserialize(const nlohmann::json& column_data_json, SegmentEntry* table_entry, BufferManager* buffer_mgr);
+
+    static SharedPtr<String>
+    GetOutlineFilename(SizeT file_idx) {
+        return MakeShared<String>("out_" + std::to_string(file_idx));
+    }
 };
 
 }

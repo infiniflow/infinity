@@ -76,7 +76,7 @@ TableCollectionEntry::Append(TableCollectionEntry* table_entry, Txn* txn_ptr, vo
                 LOG_TRACE("Add a new segment");
             }
         }
-
+        // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
         SegmentEntry::AppendData(table_entry->unsealed_segment_, txn_ptr, append_state_ptr, buffer_mgr);
         LOG_TRACE("Segment is appended with {} rows", append_state_ptr->current_count_ - current_row);
     }

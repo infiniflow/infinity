@@ -5,14 +5,16 @@
 
 namespace infinity {
 namespace {
-String chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+String available_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 }
 
-inline void RandomString(char *ptr, SizeT len, u32 seed = 0) {
+inline String RandomString(SizeT len, u32 seed = 0) {
     srand(seed);
+    String ret(len, '\0');
     for (SizeT i = 0; i < len; i++) {
-        SizeT rand_i = random() % chars.size();
-        ptr[i] = chars[rand_i];
+        SizeT rand_i = random() % available_chars.size();
+        ret[i] = available_chars[rand_i];
     }
+    return ret;
 }
 }

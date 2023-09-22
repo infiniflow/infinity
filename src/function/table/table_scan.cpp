@@ -34,9 +34,9 @@ TableScanFunc(QueryContext* query_context,
 
         SizeT output_column_id{0};
         for (auto column_id : column_ids) {
-            ObjectHandle col_object = ColumnDataEntry::GetColumnData(current_segment_entry->columns_[column_id].get(),
+            ColumnBuffer column_buffer = ColumnDataEntry::GetColumnData(current_segment_entry->columns_[column_id].get(),
                                                                      query_context->storage()->buffer_manager());
-            output.column_vectors[output_column_id ++]->AppendWith( col_object.GetData(), read_offset, write_size);
+            output.column_vectors[output_column_id ++]->AppendWith(column_buffer, read_offset, write_size);
         }
 
         // write_size = already read size = already write size

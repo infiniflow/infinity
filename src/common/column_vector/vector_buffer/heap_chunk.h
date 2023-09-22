@@ -47,6 +47,7 @@ public:
         GlobalResourceUsage::DecrObjectCount();
     }
 
+    // return pointer of required size. Allocate new chunk if current chunk is not enough.
     ptr_t
     Allocate(SizeT nbytes);
 

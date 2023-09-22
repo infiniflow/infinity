@@ -6,6 +6,7 @@
 
 #include "common/types/internal_types.h"
 #include "common/types/data_type.h"
+#include "storage/buffer/column_buffer.h"
 #include "vector_buffer/vector_buffer.h"
 #include "bitmask.h"
 #include "common/types/value.h"
@@ -125,12 +126,12 @@ public:
     AppendWith(const ColumnVector &other, SizeT from, SizeT count);
 
     // input parameter:
-    // ptr - input raw data
+    // column_buffer - input column
     // start_row - start row number of ptr
     // row_count - total row count to be copied
     // return value: appended rows actually
     SizeT
-    AppendWith(const ptr_t ptr, SizeT start_row, SizeT row_count);
+    AppendWith(ColumnBuffer &column_buffer, SizeT start_row, SizeT row_count);
 
     void
     ShallowCopy(const ColumnVector &other);
