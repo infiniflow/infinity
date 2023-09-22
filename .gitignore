@@ -67,3 +67,6 @@ lexer.cpp
 lexer.h
 parser.cpp
 parser.h
+
+tools/tttt
+tools/sqllogictest

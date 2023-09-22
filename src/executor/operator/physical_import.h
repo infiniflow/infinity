@@ -103,7 +103,7 @@ public:
         return delimiter_;
     }
 
-public:
+private:
 
     static void
     CSVHeaderHandler(void *);

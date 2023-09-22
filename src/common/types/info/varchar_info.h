@@ -26,7 +26,7 @@ public:
     dimension() const { return dimension_; }
 
     [[nodiscard]] size_t
-    Size() const override { return 8u; }
+    Size() const override { return 16u; }
 
     [[nodiscard]] nlohmann::json
     Serialize() const override;
