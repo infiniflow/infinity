@@ -14,7 +14,7 @@ string(REGEX REPLACE "\n" "" CURRENT_SYS_TIME ${CURRENT_SYS_TIME})
 message(STATUS "Build time = ${CURRENT_SYS_TIME}")
 
 # Get git branch name
-execute_process(COMMAND "git" symbolic-ref --short HEAD OUTPUT_VARIABLE GIT_BRANCH_NAME)
+execute_process(COMMAND "git" rev-parse --abbrev-ref HEAD OUTPUT_VARIABLE GIT_BRANCH_NAME)
 string(REGEX REPLACE "\n" "" GIT_BRANCH_NAME ${GIT_BRANCH_NAME})
 message(STATUS "Branch name = ${GIT_BRANCH_NAME}")
 
