@@ -62,7 +62,6 @@ private:
         std::atomic<char> is_set_ ; // if the node and its data are valid.  0- empty  , 1- set , 2 - handled
     };
     typedef char cache_line_pad[64];
-    typedef typename std::aligned_storage<sizeof(Node), std::alignment_of<cache_line_pad>::value>::type aligned_node;
 
     struct BufferList {
         BufferList()

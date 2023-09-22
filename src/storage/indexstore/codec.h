@@ -1,12 +1,10 @@
 #pragma once
 
 #include "common/types/internal_types.h"
-#include <leveldb/slice.h>
 #include <string>
 
 namespace infinity{
 
-using Slice = leveldb::Slice;
 
 class Codec{
 public:
@@ -22,7 +20,7 @@ public:
     	std::string& key);
 
     void DecodeColumnKey(
-    	const Slice& key,
+    	const std::string& key,
     	std::string& term);
 
     static void AddInt(std::string& buf, u32 value);
@@ -83,11 +81,11 @@ private:
 
     void AppendBuffer(std::string& key, const char* buffer, uint32_t size);
 
-    void RemoveFixed8(Slice& key, uint8_t& i);
+    void RemoveFixed8(std::string& key, uint8_t& i);
 
-    void RemoveFixed64(Slice& key, uint64_t& i);
+    void RemoveFixed64(std::string& key, uint64_t& i);
 
-    void RemoveBuffer(Slice& key, char* buffer, uint32_t size);
+    void RemoveBuffer(std::string& key, char* buffer, uint32_t size);
 
 
 };

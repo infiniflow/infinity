@@ -2,12 +2,10 @@
 
 #include "common/types/data_type.h"
 
-#include <leveldb/status.h>
 #include <string>
 #include <type_traits>
 
 namespace infinity {
-using Slice = leveldb::Slice;
 
 template <typename T>
 concept NotString = !std::is_same_v<std::decay_t<T>, std::string>;
@@ -337,7 +335,7 @@ public:
     }
 
     static void Encode(const void* value, std::string& buf) {
-        auto slice = reinterpret_cast<const Slice*>(value);
+        auto slice = reinterpret_cast<const std::string*>(value);
         buf.append(slice->data(), slice->size());
     }
 };

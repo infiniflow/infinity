@@ -1,6 +1,4 @@
 #include "bsi.h"
-#include "indexdb.h"
-
 
 namespace infinity {
 
@@ -49,11 +47,10 @@ double u64_to_double(u64 v) {
 }
 
 BitSlicedIndex::BitSlicedIndex(
-    IndexDB* db,
     u64 schema_id,
     u64 table_id,
     u64 column_id)
-    :db_(db),schema_id_(schema_id),
+    :schema_id_(schema_id),
      table_id_(table_id),column_id_(column_id) {
 
 }

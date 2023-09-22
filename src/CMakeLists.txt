@@ -161,7 +161,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/leveldb/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 #set_property(TARGET infinity_core PROPERTY CXX_INCLUDE_WHAT_YOU_USE /usr/bin/iwyu)
@@ -184,7 +183,6 @@ target_link_libraries(
         tlsf
         roaring
         faiss
-        leveldb
         fastpfor
         zsv_parser
         ${EXTERNAL_LIBS}
@@ -197,7 +195,6 @@ target_link_libraries(
         tlsf
         linenoise
         roaring
-        leveldb
         fastpfor
         zsv_parser
         ${EXTERNAL_LIBS}

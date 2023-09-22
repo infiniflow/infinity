@@ -10,11 +10,10 @@ namespace infinity{
 
 using Roaring = roaring::Roaring;
 
-class IndexDB;
 
 class BitSlicedIndex{
 public:
-	BitSlicedIndex(IndexDB* db, u64 schema_id, u64 table_id, u64 column_id);
+	BitSlicedIndex(u64 schema_id, u64 table_id, u64 column_id);
 
 	~BitSlicedIndex();	
 
@@ -35,7 +34,6 @@ public:
 	int DoRangeBetween(uint64_t min, uint64_t max, std::unique_ptr<Roaring>& filter);
 
 private:
-	IndexDB* db_ = nullptr;
 	u64 schema_id_;
 	u64 table_id_;
 	u64 column_id_;

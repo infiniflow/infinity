@@ -4,15 +4,9 @@
 #include "common/types/internal_types.h"
 #include "indexstore/codec.h"
 
-#include <leveldb/slice.h>
-#include <leveldb/status.h>
-
 #include <string>
 
 namespace infinity {
-
-using Slice = leveldb::Slice;
-using Status = leveldb::Status;
 
 class BlockPointer {
 public:

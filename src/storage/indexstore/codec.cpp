@@ -16,15 +16,14 @@ void Codec::EncodeColumnKey(
 }
 
 void Codec::DecodeColumnKey(
-    const Slice& key,
+    const std::string& key,
     std::string& term) {
 
-    Slice k(key);
+    term = key;
     u64 schema_id,table_id,column_id;
-    RemoveFixed64(k, schema_id);
-    RemoveFixed64(k, table_id);
-    RemoveFixed64(k, column_id);
-    term = k.ToString();
+    RemoveFixed64(term, schema_id);
+    RemoveFixed64(term, table_id);
+    RemoveFixed64(term, column_id);
 }
 
 void Codec::AppendFixed8(std::string& key, uint8_t i){
@@ -39,18 +38,18 @@ void Codec::AppendBuffer(std::string& key, const char* buffer, uint32_t size){
     key.append(buffer, size);
 }
 
-void Codec::RemoveFixed8(Slice& key, uint8_t& i) {
+void Codec::RemoveFixed8(std::string& key, uint8_t& i) {
     i = *(uint8_t*)key.data();
-    key.remove_prefix(sizeof(i));
+    key.erase(0, sizeof(i));
 }
 
-void Codec::RemoveFixed64(Slice& key, uint64_t& i) { 
-    key.remove_prefix(sizeof(i)); 
+void Codec::RemoveFixed64(std::string& key, uint64_t& i) { 
+    key.erase(0, sizeof(i)); 
 }
 
-void Codec::RemoveBuffer(Slice& key, char* buffer, uint32_t size) {
+void Codec::RemoveBuffer(std::string& key, char* buffer, uint32_t size) {
     memcpy(buffer, key.data(), size);
-    key.remove_prefix(size);
+    key.erase(size);
 }
 
 void Codec::AddInt(std::string& buf, u32 value) {
