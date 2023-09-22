@@ -33,6 +33,7 @@ class PhysicalInsert;
 class PhysicalProject;
 class PhysicalFilter;
 class PhysicalTableScan;
+class PhysicalKnnScan;
 class PhysicalAggregate;
 class PhysicalSort;
 class PhysicalLimit;
@@ -199,6 +200,12 @@ public:
 
     static void
     Explain(const PhysicalTableScan* table_scan_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            bool is_recursive,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalKnnScan* table_scan_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             bool is_recursive,
             i64 intent_size = 0);

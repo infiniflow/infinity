@@ -11,11 +11,11 @@
 
 namespace infinity {
 
-class TableScanFunction;
+class TableFunction;
 class BaseTableRef: public TableRef {
 public:
     explicit
-    BaseTableRef(SharedPtr<TableScanFunction> table_func,
+    BaseTableRef(SharedPtr<TableFunction> table_func,
                  TableCollectionEntry* table_entry_ptr,
                  Vector<SizeT> column_ids,
                  SharedPtr<Vector<SegmentEntry*>> segment_entries,
@@ -24,7 +24,7 @@ public:
                  SharedPtr<Vector<String>> column_names,
                  SharedPtr<Vector<SharedPtr<DataType>>> column_types)
         : TableRef(TableRefType::kTable, alias),
-          table_scan_func_(std::move(table_func)),
+          table_func_(std::move(table_func)),
           table_entry_ptr_(table_entry_ptr),
           column_ids_(std::move(column_ids)),
           segment_entries_(std::move(segment_entries)),
@@ -33,7 +33,7 @@ public:
           table_index_(table_index)
           {}
 
-    SharedPtr<TableScanFunction> table_scan_func_{};
+    SharedPtr<TableFunction> table_func_{};
 
     TableCollectionEntry* table_entry_ptr_{};
     Vector<SizeT> column_ids_{};

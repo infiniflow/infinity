@@ -122,8 +122,11 @@ private:
     BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const;
 
     // Flush
-    SharedPtr<PhysicalOperator>
+    [[nodiscard]] SharedPtr<PhysicalOperator>
     BuildFlush(const SharedPtr<LogicalNode>& logical_operator) const;
+
+    [[nodiscard]] SharedPtr<PhysicalOperator>
+    BuildKnn(const SharedPtr<LogicalNode>& logical_operator) const;
 
     // Explain
     [[nodiscard]] SharedPtr<PhysicalOperator>

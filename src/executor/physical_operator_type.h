@@ -27,6 +27,7 @@ enum class PhysicalOperatorType: uint8_t {
     kFilter,
     kIndexScan,
     kDummyScan,
+    kKnnScan,
 
     kHash,
     kMergeHash,

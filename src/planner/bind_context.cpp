@@ -358,6 +358,16 @@ BindContext::GetBindingFromCurrentOrParentByName(const String& binding_name) con
     return binding_iter->second.get();
 }
 
+void
+BindContext::AddKnnExpr(const SharedPtr<BaseExpression>& knn_expr) {
+    if(knn_exprs_.empty()) {
+        knn_table_index_ = GenerateTableIndex();
+    }
+
+    knn_exprs_.emplace_back(knn_expr);
+    knn_index_by_name_.emplace(knn_expr->Name(), knn_exprs_.size() - 1);
+}
+
 //void
 //BindContext::AddChild(const SharedPtr<BindContext>& child) {
 //    child->binding_context_id_ = GenerateBindingContextIndex();

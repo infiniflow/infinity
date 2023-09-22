@@ -7,7 +7,8 @@
 
 namespace infinity {
 
-class KnnExpression: public BaseExpression {
+class
+KnnExpression: public BaseExpression {
 public:
     static String
     KnnDistanceType2Str(KnnDistanceType type);

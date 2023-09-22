@@ -96,6 +96,7 @@ PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState* result_sink_stat
         case PhysicalOperatorType::kIntersect:
         case PhysicalOperatorType::kExcept:
         case PhysicalOperatorType::kTableScan:
+        case PhysicalOperatorType::kKnnScan:
         case PhysicalOperatorType::kFilter:
         case PhysicalOperatorType::kIndexScan:
         case PhysicalOperatorType::kDummyScan:

@@ -26,9 +26,9 @@ PhysicalTableScan::Execute(QueryContext* query_context, InputState* input_state,
 
     table_scan_output_state->data_block_->Reset();
 
-    base_table_ref_->table_scan_func_->main_function_(query_context,
-                                                      table_scan_input_state->table_scan_function_data_.get(),
-                                                      *table_scan_output_state->data_block_);
+    base_table_ref_->table_func_->main_function_(query_context,
+                                                 table_scan_input_state->table_scan_function_data_.get(),
+                                                 *table_scan_output_state->data_block_);
 }
 
 void
@@ -56,7 +56,7 @@ PhysicalTableScan::Execute(QueryContext* query_context) {
     while(true) {
          SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
          output_block->Init(*base_table_ref_->column_types_);
-         base_table_ref_->table_scan_func_->main_function_(
+         base_table_ref_->table_func_->main_function_(
                  query_context,
                  nullptr,
                  *output_block);

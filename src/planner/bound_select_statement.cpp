@@ -17,10 +17,11 @@
 #include "planner/node/logical_project.h"
 #include "planner/node/logical_filter.h"
 #include "planner/node/logical_dummy_scan.h"
-#include "expression/expression_transformer.h"
 #include "planner/node/logical_sort.h"
 #include "planner/node/logical_aggregate.h"
-#include "query_binder.h"
+#include "planner/node/logical_knn_scan.h"
+#include "expression/expression_transformer.h"
+//#include "query_binder.h"
 
 namespace infinity {
 
@@ -28,73 +29,139 @@ SharedPtr<LogicalNode>
 BoundSelectStatement::BuildPlan(QueryContext* query_context) {
 
     const SharedPtr<BindContext>& bind_context = this->bind_context_;
-    SharedPtr<LogicalNode> root = BuildFrom(table_ref_ptr_,
-                                            query_context,
-                                            bind_context);
-    if(!where_conditions_.empty()) {
-        SharedPtr<LogicalNode> filter = BuildFilter(root,
-                                                    where_conditions_,
-                                                    query_context,
-                                                    bind_context);
-        filter->set_left_node(root);
-        root = filter;
+    if(bind_context->knn_exprs_.empty()) {
+        // Non-knn case
+        SharedPtr<LogicalNode> root = BuildFrom(table_ref_ptr_,
+                                                query_context,
+                                                bind_context);
+        if(!where_conditions_.empty()) {
+            SharedPtr<LogicalNode> filter = BuildFilter(root,
+                                                        where_conditions_,
+                                                        query_context,
+                                                        bind_context);
+            filter->set_left_node(root);
+            root = filter;
+        }
+
+        if(!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
+            // Build logical aggregate
+            auto aggregate = MakeShared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
+                                                          group_by_expressions_,
+                                                          groupby_index_,
+                                                          aggregate_expressions_,
+                                                          aggregate_index_);
+            aggregate->set_left_node(root);
+            root = aggregate;
+        }
+
+        if(!having_expressions_.empty()) {
+            // Build logical filter
+            auto having_filter = BuildFilter(root,
+                                             having_expressions_,
+                                             query_context,
+                                             bind_context);
+            having_filter->set_left_node(root);
+            root = having_filter;
+        }
+
+        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                  projection_expressions_,
+                                                  projection_index_);
+        project->set_left_node(root);
+        root = project;
+
+        if(!order_by_expressions_.empty()) {
+            PlannerAssert(order_by_expressions_.size() == order_by_types_.size(), "Unknown error on order by expression");
+            SharedPtr<LogicalNode> sort
+                    = MakeShared<LogicalSort>(bind_context->GetNewLogicalNodeId(),
+                                              order_by_expressions_,
+                                              order_by_types_);
+            sort->set_left_node(root);
+            root = sort;
+        }
+
+        if(limit_expression_ != nullptr) {
+            SharedPtr<LogicalLimit> limit
+                    = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
+                                               limit_expression_,
+                                               offset_expression_);
+            limit->set_left_node(root);
+            root = limit;
+        }
+
+        if(!pruned_expression_.empty()) {
+            auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                             pruned_expression_,
+                                                             result_index_);
+            pruned_project->set_left_node(root);
+            root = pruned_project;
+        }
+
+        return root;
+
+    } else {
+        SharedPtr<LogicalNode> root = nullptr;
+
+        // Knn case
+        SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_,
+                                                              query_context,
+                                                              bind_context);
+        if(bind_context_->knn_orders_.size() != 1) {
+            PlannerError("Knn Scan need order by clause which should have only one expression")
+        }
+
+
+        knn_scan->order_by_type_ = bind_context_->knn_orders_[0];
+        knn_scan->limit_expression_ = limit_expression_;
+
+        // FIXME: need check if there is subquery inside the where conditions
+        auto filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);
+
+        knn_scan->filter_expression_ = filter_expr;
+        root = knn_scan;
+
+        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                  projection_expressions_,
+                                                  projection_index_);
+        project->set_left_node(root);
+        root = project;
+
+        return root;
     }
+}
 
-    if(!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
-        // Build logical aggregate
-        auto aggregate = MakeShared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
-                                                      group_by_expressions_,
-                                                      groupby_index_,
-                                                      aggregate_expressions_,
-                                                      aggregate_index_);
-        aggregate->set_left_node(root);
-        root = aggregate;
+SharedPtr<LogicalKnnScan>
+BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef>& table_ref,
+                                          QueryContext* query_context,
+                                          const SharedPtr<BindContext>& bind_context) {
+    if(table_ref == nullptr) {
+        PlannerError("Attempt to do KNN scan without table")
     }
+    switch(table_ref->type_) {
+        case TableRefType::kCrossProduct: {
+            PlannerError("KNN is not supported on CROSS PRODUCT relation, now.")
+        }
+        case TableRefType::kJoin: {
+            PlannerError("KNN is not supported on JOIN relation, now.")
+        }
+        case TableRefType::kTable: {
+            auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
 
-    if(!having_expressions_.empty()) {
-        // Build logical filter
-        auto having_filter = BuildFilter(root,
-                                         having_expressions_,
-                                         query_context,
-                                         bind_context);
-        having_filter->set_left_node(root);
-        root = having_filter;
+            SharedPtr<LogicalKnnScan> knn_scan_node
+                    = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(),
+                                                 base_table_ref);
+
+            knn_scan_node->knn_expressions_ = bind_context->knn_exprs_;
+            knn_scan_node->knn_table_index_ = bind_context->knn_table_index_;
+            return knn_scan_node;
+        }
+        case TableRefType::kSubquery: {
+            PlannerError("KNN is not supported on a SUBQUERY, now.")
+        }
+        default: {
+            PlannerError("Unexpected table type")
+        }
     }
-
-    auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
-                                              projection_expressions_,
-                                              projection_index_);
-    project->set_left_node(root);
-    root = project;
-
-    if(!order_by_expressions_.empty()) {
-        PlannerAssert(order_by_expressions_.size() == order_by_types_.size(), "Unknown error on order by expression");
-        SharedPtr<LogicalNode> sort
-                = MakeShared<LogicalSort>(bind_context->GetNewLogicalNodeId(),
-                                          order_by_expressions_,
-                                          order_by_types_);
-        sort->set_left_node(root);
-        root = sort;
-    }
-
-    if(limit_expression_ != nullptr) {
-        SharedPtr<LogicalLimit> limit
-                = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
-                                           limit_expression_,
-                                           offset_expression_);
-        limit->set_left_node(root);
-        root = limit;
-    }
-
-    if(!pruned_expression_.empty()) {
-        auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
-                                                         pruned_expression_,
-                                                         result_index_);
-        pruned_project->set_left_node(root);
-        root = pruned_project;
-    }
-
-    return root;
 }
 
 SharedPtr<LogicalNode>
@@ -122,7 +189,7 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef>& table_ref,
                 PlannerError("Unknown table reference type.");
         }
     } else {
-        // No from clause, only select constant value is OK ?
+        // No FROM-Clause, only select constant expression.
     }
 
     return nullptr;

@@ -36,7 +36,9 @@
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_flush.h"
 #include "executor/operator/physical_source.h"
+#include "executor/operator/physical_knn_scan.h"
 
+#include "expression/knn_expression.h"
 
 namespace infinity {
 
@@ -60,6 +62,10 @@ ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
         }
         case PhysicalOperatorType::kTableScan: {
             Explain((PhysicalTableScan*)op, result, is_recursive, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kKnnScan: {
+            Explain((PhysicalKnnScan*)op, result, is_recursive, intent_size);
             break;
         }
         case PhysicalOperatorType::kFilter: {
@@ -680,6 +686,89 @@ ExplainPhysicalPlan::Explain(const PhysicalTableScan* table_scan_node,
         } else {
             ExplainPhysicalPlan::Explain(table_scan_node->left().get(), result, false, intent_size);
         }
+    }
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalKnnScan* knn_scan_node,
+                             SharedPtr<Vector<SharedPtr<String>>>& result,
+                             bool is_recursive,
+                             i64 intent_size) {
+    String knn_scan_header;
+    if(intent_size != 0) {
+        knn_scan_header = String(intent_size - 2, ' ') + "-> KNN SCAN ";
+    } else {
+        knn_scan_header = "KNN SCAN ";
+    }
+
+    knn_scan_header += "(" + std::to_string(knn_scan_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(knn_scan_header));
+
+    // Table alias and name
+    String table_name = String(intent_size, ' ') + " - table name: " + knn_scan_node->TableAlias() + "(";
+
+    DBEntry* db_entry = TableCollectionEntry::GetDBEntry(knn_scan_node->table_collection_ptr());
+
+    table_name += *db_entry->db_name_+ ".";
+    table_name += *knn_scan_node->table_collection_ptr()->table_collection_name_ + ")";
+    result->emplace_back(MakeShared<String>(table_name));
+
+    // Table index
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(knn_scan_node->knn_table_index_);
+    result->emplace_back(MakeShared<String>(table_index));
+
+    for(const auto& knn_expression: knn_scan_node->knn_expressions_) {
+        KnnExpression* knn_expr_raw = static_cast<KnnExpression*>(knn_expression.get());
+        // Embedding info
+        String embedding_info =  String(intent_size, ' ')
+                                 + " - embedding info: "
+                                 + knn_expr_raw->arguments().at(0)->Name();
+        result->emplace_back(MakeShared<String>(embedding_info));
+
+        String embedding_type_str = String(intent_size + 2, ' ')
+                                    + " - element type: "
+                                    + EmbeddingT::EmbeddingDataType2String(knn_expr_raw->embedding_data_type_);
+        result->emplace_back(MakeShared<String>(embedding_type_str));
+
+        String embedding_dimension_str = String(intent_size + 2, ' ')
+                                         + " - dimension: "
+                                         + std::to_string(knn_expr_raw->dimension_);
+        result->emplace_back(MakeShared<String>(embedding_dimension_str));
+
+        String distance_type_str = String(intent_size + 2, ' ')
+                                   + " - distance type: "
+                                   + KnnExpr::KnnDistanceType2Str(knn_expr_raw->distance_type_);
+        result->emplace_back(MakeShared<String>(distance_type_str));
+
+        // Query embedding
+        String query_embedding = String(intent_size + 2, ' ') + " - query embedding: "
+                                 + EmbeddingT::Embedding2String(knn_expr_raw->query_embedding_,
+                                                                knn_expr_raw->embedding_data_type_,
+                                                                knn_expr_raw->dimension_);
+        result->emplace_back(MakeShared<String>(query_embedding));
+    }
+
+    // filter expression
+    String filter_str = String(intent_size, ' ') + " - filter: ";
+    ExplainLogicalPlan::Explain(knn_scan_node->filter_expression_.get(), filter_str);
+    result->emplace_back(MakeShared<String>(filter_str));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = knn_scan_node->GetOutputNames()->size();
+    if(column_count == 0) {
+        PlannerError(fmt::format("No column in table: {}.", knn_scan_node->TableAlias()));
+    }
+    for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+        output_columns += knn_scan_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += knn_scan_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+
+    if(knn_scan_node->left() != nullptr) {
+        intent_size += 2;
+        ExplainPhysicalPlan::Explain(knn_scan_node->left().get(), result, intent_size);
     }
 }
 
