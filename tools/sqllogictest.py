@@ -48,8 +48,9 @@ def main():
     current_path = os.getcwd()
     print(current_path)
     # get parent directory
-    parent_path = os.path.dirname(current_path)
-    print(parent_path)
+    # parent_path = os.path.dirname(current_path)
+    # print(parent_path)
+    parent_path = current_path
     src_dir = parent_path + '/test/data/csv'
 
     test_dir = parent_path + '/test/sql'
@@ -58,7 +59,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='SQL Logic Test For Infinity')
 
-    parser.add_argument('-p', '--path', help='path of sqllogictest-rs', type=str, default='sqllogictest-rs/target/debug/', dest='path')
+    parser.add_argument('-p', '--path', help='path of sqllogictest-rs', type=str, default='./tools/sqllogictest', dest='path')
     parser.add_argument('-s', '--src', help='path of src directory', type=str, default=src_dir, dest='src')
     parser.add_argument('-t', '--test', help='path of test directory', type=str, default=test_dir, dest='test')
     parser.add_argument('-d', '--dest', help='path of dest directory', type=str, default=dest_dir, dest='dest')
