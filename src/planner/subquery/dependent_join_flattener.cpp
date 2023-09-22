@@ -249,6 +249,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
         case LogicalNodeType::kDropSchema:
         case LogicalNodeType::kDropView:
         case LogicalNodeType::kViewScan:
+        case LogicalNodeType::kKnnScan:
         case LogicalNodeType::kDummyScan:
         case LogicalNodeType::kShow:
         case LogicalNodeType::kExplain:

@@ -11,6 +11,7 @@
 
 namespace infinity {
 
+class LogicalKnnScan;
 struct BoundSelectStatement final : public BoundStatement {
 public:
     static inline SharedPtr<BoundSelectStatement>
@@ -24,6 +25,11 @@ public:
 
     SharedPtr<LogicalNode>
     BuildPlan(QueryContext* query_context) final;
+
+    SharedPtr<LogicalKnnScan>
+    BuildInitialKnnScan(SharedPtr<TableRef>& table_ref,
+                        QueryContext* query_context,
+                        const SharedPtr<BindContext>& bind_context);
 
     SharedPtr<LogicalNode>
     BuildFrom(SharedPtr<TableRef>& table_ref,
@@ -117,6 +123,7 @@ public:
     u64 aggregate_index_{0};
     u64 projection_index_{0};
     u64 result_index_{0};
+    u64 knn_index_{0};
 
     // For build subquery
     bool building_subquery_{false};

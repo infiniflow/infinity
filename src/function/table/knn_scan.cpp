@@ -2,23 +2,22 @@
 // Created by jinhai on 23-9-17.
 //
 
-#include "table_scan.h"
-
+#include "knn_scan.h"
 
 namespace infinity {
 
 void
-TableScanFunc(QueryContext* query_context,
-              TableFunctionData* table_function_data_ptr,
-              DataBlock &output) {
+KnnScanFunc(QueryContext* query_context,
+            TableFunctionData* table_function_data_ptr,
+            DataBlock &output) {
 
-    TableScanFunctionData* table_scan_function_data_ptr
-            = static_cast<TableScanFunctionData*>(table_function_data_ptr);
-    const Vector<SegmentEntry*>& segment_entries = *table_scan_function_data_ptr->segment_entries_ptr_;
-    const Vector<u64>* segment_indexes = table_scan_function_data_ptr->segment_indexes_.get();
-    const Vector<SizeT>& column_ids = table_scan_function_data_ptr->column_ids_;
-    i64& segments_idx = table_scan_function_data_ptr->segment_idx_offset_;
-    SizeT& read_offset = table_scan_function_data_ptr->current_read_offset_;
+    KnnScanFunctionData* knn_scan_function_data_ptr
+            = static_cast<KnnScanFunctionData*>(table_function_data_ptr);
+    const Vector<SegmentEntry*>& segment_entries = *knn_scan_function_data_ptr->segment_entries_ptr_;
+    const Vector<u64>* segment_indexes = knn_scan_function_data_ptr->segment_indexes_.get();
+    const Vector<SizeT>& column_ids = knn_scan_function_data_ptr->column_ids_;
+    i64& segments_idx = knn_scan_function_data_ptr->segment_idx_offset_;
+    SizeT& read_offset = knn_scan_function_data_ptr->current_read_offset_;
 
     if(segments_idx >= segment_indexes->size()) {
         // No data or all data is read
@@ -54,9 +53,9 @@ TableScanFunc(QueryContext* query_context,
 }
 
 void
-RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterKnnScanFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
-    SharedPtr<TableScanFunction> table_scan_ptr = MakeShared<TableScanFunction>("table_scan", TableScanFunc);
+    SharedPtr<KnnScanFunction> table_scan_ptr = MakeShared<KnnScanFunction>("knn_scan", KnnScanFunc);
 
     NewCatalog::AddTableFunction(catalog_ptr.get(), table_scan_ptr);
 

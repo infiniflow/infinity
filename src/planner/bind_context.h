@@ -20,6 +20,7 @@ class LogicalNode;
 class Table;
 class ExpressionBinder;
 class QueryContext;
+class KnnExpression;
 
 struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(String alias, SelectStatement* select_stmt, HashSet<String> masked_name_set)
@@ -110,6 +111,11 @@ public:
 //    Vector<String> project_names_;
 //    HashMap<String, SharedPtr<BaseExpression>> project_by_name_;
     u64 result_index_{0};
+
+    u64 knn_table_index_{};
+    Vector<SharedPtr<BaseExpression>> knn_exprs_;
+    Vector<OrderType> knn_orders_;
+    HashMap<String, i64> knn_index_by_name_;
 
     // Bound CTE
     HashSet<SharedPtr<CommonTableExpressionInfo>> bound_cte_set_;
@@ -227,6 +233,9 @@ public:
 
     const Binding*
     GetBindingFromCurrentOrParentByName(const String& binding_name) const;
+
+    void
+    AddKnnExpr(const SharedPtr<BaseExpression>& knn_expr);
 
 private:
     void

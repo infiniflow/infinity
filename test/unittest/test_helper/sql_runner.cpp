@@ -5,7 +5,7 @@
 #include "sql_runner.h"
 
 namespace infinity {
-
+#if 0
 String
 SQLRunner::Run(const String& sql_text, bool print) {
     if(print) {
@@ -81,7 +81,7 @@ SQLRunner::Run(const String& sql_text, bool print) {
     query_context_ptr->CommitTxn();
     return String();
 }
-
+#endif
 
 /**
  * @brief For testing the new push based execution engine

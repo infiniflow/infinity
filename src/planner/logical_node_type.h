@@ -42,6 +42,7 @@ enum class LogicalNodeType: uint8_t {
     kTableScan,
     kViewScan,
     kDummyScan,
+    kKnnScan,
 
     // ?
     kShow,

@@ -87,6 +87,17 @@ struct TableScanOutputState : public OutputState {
     TableScanOutputState(): OutputState(PhysicalOperatorType::kTableScan) {}
 };
 
+// KnnScan
+struct KnnScanInputState : public InputState {
+    inline explicit
+    KnnScanInputState(): InputState(PhysicalOperatorType::kTableScan) {}
+};
+
+struct KnnScanOutputState : public OutputState {
+    inline explicit
+    KnnScanOutputState(): OutputState(PhysicalOperatorType::kTableScan) {}
+};
+
 // Filter
 struct FilterInputState : public InputState {
     inline explicit

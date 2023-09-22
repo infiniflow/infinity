@@ -21,11 +21,6 @@ public:
         return fragment_scheduler_.get();
     }
 
-    [[nodiscard]] inline Scheduler*
-    scheduler() noexcept {
-        return scheduler_.get();
-    }
-
     [[nodiscard]] inline Config*
     config() noexcept {
         return config_.get();
@@ -54,7 +49,6 @@ private:
     UniquePtr<Config> config_{};
     UniquePtr<ResourceManager> resource_manager_{};
     UniquePtr<FragmentScheduler> fragment_scheduler_{};
-    UniquePtr<Scheduler> scheduler_{};
     UniquePtr<Storage> storage_{};
 
     bool initialized_ {false};

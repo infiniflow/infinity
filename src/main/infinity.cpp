@@ -22,8 +22,6 @@ Infinity::Init(const SharedPtr<String>& config_path) {
 
         fragment_scheduler_ = MakeUnique<FragmentScheduler>(config_.get());
 
-        scheduler_ = MakeUnique<NaiveScheduler>();
-
         storage_ = MakeUnique<Storage>(config_.get());
         storage_->Init();
 
@@ -42,8 +40,6 @@ Infinity::UnInit() {
     storage_.reset();
 
     resource_manager_.reset();
-
-    scheduler_.reset();
 
     Logger::Shutdown();
 

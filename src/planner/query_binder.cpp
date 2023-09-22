@@ -95,6 +95,11 @@ QueryBinder::BindSelect(const SelectStatement& statement) {
                 bind_context_ptr_->select_alias2index_[select_expr->alias_] = column_index;
             }
         } else {
+            // KNN expression without alias, isn't allowed
+            if(select_expr->type_ == ParsedExprType::kKnn) {
+                PlannerError("KNN expression in select list must have an alias.")
+            }
+
             const String select_expr_name = select_expr->ToString();
             if(bind_context_ptr_->select_expr_name2index_.contains(select_expr_name)) {
                 LOG_TRACE("Same expression: {} had already been found in select list index: {}",
@@ -166,6 +171,7 @@ QueryBinder::BindSelect(const SelectStatement& statement) {
     bound_select_statement->groupby_index_ = bind_context_ptr_->group_by_table_index_;
     bound_select_statement->aggregate_index_ = bind_context_ptr_->aggregate_table_index_;
     bound_select_statement->result_index_ = bind_context_ptr_->result_index_;
+    bound_select_statement->knn_index_ = bind_context_ptr_->knn_table_index_;
 
     return bound_select_statement;
 }
@@ -786,7 +792,11 @@ void
 QueryBinder::PushOrderByToProject(QueryContext* query_context,
                                   const SelectStatement& statement) {
     for(const OrderByExpr* order_by_expr: *statement.order_by_list) {
-        OrderBinder::PushExtraExprToSelectList(order_by_expr->expr_, bind_context_ptr_);
+        if(order_by_expr->expr_->type_ == ParsedExprType::kKnn) {
+            continue;
+        } else {
+            OrderBinder::PushExtraExprToSelectList(order_by_expr->expr_, bind_context_ptr_);
+        }
     }
 }
 
@@ -845,12 +855,32 @@ QueryBinder::BuildOrderBy(QueryContext* query_context,
     bound_statement->order_by_expressions_.reserve(order_by_count);
     bound_statement->order_by_types_.reserve(order_by_count);
     for(const OrderByExpr* order_expr: *statement.order_by_list) {
-        bound_statement->order_by_types_.emplace_back(order_expr->type_);
-        auto bound_order_expr = order_binder->Bind(*order_expr->expr_,
-                                                   this->bind_context_ptr_.get(),
-                                                   0,
-                                                   true);
-        bound_statement->order_by_expressions_.emplace_back(bound_order_expr);
+
+        if(!bind_context_ptr_->knn_exprs_.empty()) {
+            // TODO: In future, we may allow to order by more than one knn exprs or mix knn and other exprs.
+            PlannerError("Only one KNN expression is allowed in order by clause")
+        }
+
+        // If order by has KNN expression, the expr need to be stored in bind_context without push to select list.
+        // TODO: now we only check the expr is KNN, but doesn't contain KNN.
+        if(order_expr->expr_->type_ == ParsedExprType::kKnn) {
+            KnnExpr* knn_expr = static_cast<KnnExpr*>(order_expr->expr_);
+            QueryBinder::CheckKnnAndOrderBy(knn_expr->distance_type_, order_expr->type_);
+            auto bound_order_expr = order_binder->Bind(*order_expr->expr_,
+                                                       this->bind_context_ptr_.get(),
+                                                       0,
+                                                       true);
+
+            bind_context_ptr_->AddKnnExpr(bound_order_expr);
+            bind_context_ptr_->knn_orders_.emplace_back(order_expr->type_);
+        } else {
+            auto bound_order_expr = order_binder->Bind(*order_expr->expr_,
+                                                       this->bind_context_ptr_.get(),
+                                                       0,
+                                                       true);
+            bound_statement->order_by_types_.emplace_back(order_expr->type_);
+            bound_statement->order_by_expressions_.emplace_back(bound_order_expr);
+        }
     }
 }
 
@@ -888,6 +918,25 @@ QueryBinder::PruneOutput(QueryContext* query_context,
                                                                     0);
         result->source_position_ = SourcePosition(bind_context_ptr_->binding_context_id_, ExprSourceType::kProjection);
         pruned_expressions.emplace_back(result);
+    }
+}
+
+void
+QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType order_type) {
+    switch(distance_type) {
+        case KnnDistanceType::kL2:
+        case KnnDistanceType::kHamming: {
+            PlannerAssert(order_type == OrderType::kAsc, "L2 need descending order");
+            break;
+        }
+        case KnnDistanceType::kInnerProduct:
+        case KnnDistanceType::kCosine: {
+            PlannerAssert(order_type == OrderType::kDesc, "L2 need descending order");
+            break;
+        }
+        default: {
+            PlannerError("Invalid KNN distance type")
+        }
     }
 }
 

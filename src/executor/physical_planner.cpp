@@ -25,6 +25,7 @@
 #include "planner/node/logical_flush.h"
 #include "planner/node/logical_import.h"
 #include "planner/node/logical_export.h"
+#include "planner/node/logical_knn_scan.h"
 
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_aggregate.h"
@@ -59,6 +60,7 @@
 #include "executor/operator/physical_explain.h"
 #include "executor/operator/physical_drop_schema.h"
 #include "executor/operator/physical_create_schema.h"
+#include "executor/operator/physical_knn_scan.h"
 #include "explain_physical_plan.h"
 
 #include <limits>
@@ -190,6 +192,10 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
         }
         case LogicalNodeType::kFlush: {
             result = BuildFlush(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kKnnScan: {
+            result = BuildKnn(logical_operator);
             break;
         }
         case LogicalNodeType::kExplain: {
@@ -561,6 +567,20 @@ SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildFlush(const SharedPtr<LogicalNode>& logical_operator) const {
     LogicalFlush* logical_flush = (LogicalFlush*)(logical_operator.get());
     return MakeShared<PhysicalFlush>(logical_flush->flush_type(), logical_flush->node_id());
+}
+
+SharedPtr<PhysicalOperator>
+PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNode>& logical_operator) const {
+    auto* logical_knn_scan = (LogicalKnnScan*)(logical_operator.get());
+    return MakeShared<PhysicalKnnScan>(logical_knn_scan->node_id(),
+                                       logical_knn_scan->base_table_ref_,
+                                       logical_knn_scan->knn_expressions_,
+                                       logical_knn_scan->limit_expression_,
+                                       logical_knn_scan->filter_expression_,
+                                       logical_knn_scan->order_by_type_,
+                                       logical_knn_scan->GetOutputNames(),
+                                       logical_knn_scan->GetOutputTypes(),
+                                       logical_knn_scan->knn_table_index_);
 }
 
 SharedPtr<PhysicalOperator>

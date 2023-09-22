@@ -164,6 +164,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
             SchedulerError(fmt::format("Not support {}.", phys_op->GetName()));
         }
         case PhysicalOperatorType::kTableScan:
+        case PhysicalOperatorType::kKnnScan:
         case PhysicalOperatorType::kIndexScan: {
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 SchedulerError(fmt::format("{} shouldn't have child.", phys_op->GetName()));

@@ -14,6 +14,7 @@
 #include "planner/node/logical_project.h"
 #include "planner/node/logical_filter.h"
 #include "planner/node/logical_table_scan.h"
+#include "planner/node/logical_knn_scan.h"
 #include "planner/node/logical_sort.h"
 #include "planner/node/logical_limit.h"
 #include "planner/node/logical_aggregate.h"
@@ -93,6 +94,11 @@ public:
 
     static void
     Explain(const LogicalTableScan* table_scan_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const LogicalKnnScan* knn_scan_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             i64 intent_size = 0);
 

@@ -111,6 +111,9 @@ private:
     PruneOutput(QueryContext* query_context,
                 i64 select_column_count,
                 SharedPtr<BoundSelectStatement>& bound_statement);
+
+    static void
+    CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType order_type);
 };
 
 }

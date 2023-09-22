@@ -7,6 +7,7 @@
 #include "fragment_data_queue.h"
 #include "executor/operator/physical_aggregate.h"
 #include "executor/operator/physical_table_scan.h"
+#include "executor/operator/physical_knn_scan.h"
 
 namespace infinity {
 
@@ -171,6 +172,59 @@ BuildParallelTaskStateTemplate<TableScanInputState, TableScanOutputState>(Vector
     }
 }
 
+template<>
+void
+BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vector<PhysicalOperator*>& fragment_operators,
+                                                                      Vector<UniquePtr<FragmentTask>>& tasks,
+                                                                      i64 operator_id,
+                                                                      i64 operator_count,
+                                                                      i64 real_parallel_size) {
+
+    // TableScan must be the first operator of the fragment
+    if(operator_id != operator_count - 1) {
+        SchedulerError("Table scan operator must be the first operator of the fragment.")
+    }
+
+    if(operator_id == 0) {
+        SchedulerError("Table scan shouldn't be the last operator of the fragment.")
+    }
+
+    PhysicalOperator* physical_op = fragment_operators[operator_id];
+    if(physical_op->operator_type() != PhysicalOperatorType::kKnnScan) {
+        SchedulerError("Expect table scan physical operator")
+    }
+    auto* physical_knn_scan = static_cast<PhysicalKnnScan*>(physical_op);
+
+    for(i64 task_id = 0; task_id < real_parallel_size; ++ task_id) {
+        FragmentTask* task_ptr = tasks[task_id].get();
+        SourceState* source_ptr = tasks[task_id]->source_state_.get();
+//        SinkState* sink_ptr = tasks[task_id]->sink_state_.get();
+
+        if(source_ptr->state_type_ != SourceStateType::kTableScan) {
+            SchedulerError("Expect table scan source state")
+        }
+
+        auto* table_scan_source_state = static_cast<TableScanSourceState*>(source_ptr);
+        task_ptr->operator_input_state_[operator_id] = MakeUnique<TableScanInputState>();
+        auto table_scan_input_state = (TableScanInputState*)(task_ptr->operator_input_state_[operator_id].get());
+
+//        if(table_scan_source_state->segment_entry_ids_->empty()) {
+//            SchedulerError("Empty segment entry ids")
+//        }
+
+        table_scan_input_state->table_scan_function_data_ = MakeUnique<TableScanFunctionData>(physical_knn_scan->SegmentEntriesPtr(),
+                                                                                              table_scan_source_state->segment_entry_ids_,
+                                                                                              physical_knn_scan->ColumnIDs());
+
+        task_ptr->operator_output_state_[operator_id] = MakeUnique<TableScanOutputState>();
+        auto output_state = (TableScanOutputState*)(task_ptr->operator_output_state_[operator_id].get());
+        output_state->data_block_ = DataBlock::Make();
+        output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
+
+        source_ptr->SetNextState(table_scan_input_state);
+    }
+}
+
 UniquePtr<FragmentContext>
 FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* fragment_ptr) {
     Vector<PhysicalOperator*>& fragment_operators = fragment_ptr->GetOperators();
@@ -260,6 +314,14 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
                                                                                           operator_id,
                                                                                           operator_count,
                                                                                           real_parallel_size);
+                break;
+            }
+            case PhysicalOperatorType::kKnnScan: {
+                BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(fragment_operators,
+                                                                                      tasks,
+                                                                                      operator_id,
+                                                                                      operator_count,
+                                                                                      real_parallel_size);
                 break;
             }
             case PhysicalOperatorType::kFilter: {
@@ -499,6 +561,15 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                 }
                 break;
             }
+            case PhysicalOperatorType::kKnnScan: {
+                auto* knn_scan_operator = static_cast<PhysicalKnnScan*>(first_operator);
+                parallel_count = std::min(parallel_count,
+                                          (i64)(knn_scan_operator->SegmentEntryCount()));
+                if(parallel_count == 0) {
+                    parallel_count = 1;
+                }
+                break;
+            }
             case PhysicalOperatorType::kProjection: {
                 // Serial Materialize
                 parallel_count = 1;
@@ -621,6 +692,25 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kKnnScan: {
+            if(fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kParallelStream) {
+                SchedulerError(fmt::format("{} should in parallel materialized/stream fragment",
+                                           PhysicalOperatorToString(first_operator->operator_type())));
+            }
+
+            if(tasks_.size() != parallel_count) {
+                SchedulerError(fmt::format("{} task count isn't correct.",
+                                           PhysicalOperatorToString(first_operator->operator_type())));
+            }
+
+            // Partition the hash range to each source state
+            auto* knn_scan_operator = (PhysicalKnnScan*)first_operator;
+            Vector<SharedPtr<Vector<u64>>> segment_id_group = knn_scan_operator->PlanSegmentEntries(parallel_count);
+            for(i64 task_id = 0; task_id < parallel_count; ++ task_id) {
+                tasks_[task_id]->source_state_ = MakeUnique<TableScanSourceState>(segment_id_group[task_id]);
+            }
+            break;
+        }
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:
@@ -707,6 +797,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             break;
         }
         case PhysicalOperatorType::kTableScan:
+        case PhysicalOperatorType::kKnnScan:
         case PhysicalOperatorType::kFilter:
         case PhysicalOperatorType::kIndexScan:
         case PhysicalOperatorType::kProjection: {
@@ -829,9 +920,14 @@ SerialMaterializedFragmentCtx::GetResultInternal() {
         }
         case SinkStateType::kMessage: {
             auto* message_sink_state = static_cast<MessageSinkState*>(tasks_[0]->sink_state_.get());
+            if(message_sink_state->error_message_ != nullptr) {
+                throw Exception(*message_sink_state->error_message_);
+            }
+
             if(message_sink_state->message_ == nullptr) {
                 SchedulerError("No response message")
             }
+
             SharedPtr<Table> result_table = Table::MakeEmptyResultTable();
             result_table->SetResultMsg(std::move(message_sink_state->message_));
             return result_table;

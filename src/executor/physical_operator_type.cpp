@@ -103,6 +103,8 @@ PhysicalOperatorToString(PhysicalOperatorType type){
             return "Intersect";
         case PhysicalOperatorType::kExcept:
             return "Except";
+        case PhysicalOperatorType::kKnnScan:
+            return "KnnScan";
     }
     throw NotImplementException("Unknown physical operator type");
 }

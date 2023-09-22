@@ -314,13 +314,19 @@ PhysicalImport::CSVRowHandler(void *context) {
         SizeT dst_offset = write_row * column_type->Size();
         if (column_type->type() == kVarchar) {
             auto varchar_info = dynamic_cast<VarcharInfo *>(column_type->type_info().get());
-            ExecutorAssert(varchar_info->dimension() >= str_view.size(), "Varchar data size exceeds dimension.");
-            AppendVarcharData(column_data_entry.get(), str_view, dst_offset);
+            if(varchar_info->dimension() < str_view.size()) {
+                ExecutorError("Varchar data size exceeds dimension.");
+            }
+
+            AppendVarcharData(column_data_entry.get(), str_view, write_row);
         } else if (column_type->type() == kEmbedding) {
             Vector<StringView> res;
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
             auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
-            ExecutorAssert(embedding_info->Dimension() >= ele_str_views.size(), "Embbeding data size exceeds dimension.");
+            if(embedding_info->Dimension() < ele_str_views.size()) {
+                ExecutorError("Embedding data size exceeds dimension.");
+            }
+
             switch (embedding_info->Type()) {
                 case kElemBit: {
                     NotImplementError("Embedding bit type is not implemented.");
