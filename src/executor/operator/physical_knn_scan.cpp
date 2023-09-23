@@ -20,21 +20,19 @@ PhysicalKnnScan::Execute(QueryContext* query_context) {
 
 void
 PhysicalKnnScan::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
-    auto* table_scan_input_state = static_cast<TableScanInputState*>(input_state);
-    auto* table_scan_output_state = static_cast<TableScanOutputState*>(output_state);
+    auto* knn_scan_input_state = static_cast<KnnScanInputState*>(input_state);
+    auto* knn_scan_output_state = static_cast<KnnScanOutputState*>(output_state);
 
-    Vector<u64>& segment_entry_index_array = *table_scan_input_state->table_scan_function_data_->segment_indexes_;
-    for(const u64 segment_idx: segment_entry_index_array) {
-        SegmentEntry* segment_entry = base_table_ref_->segment_entries_->at(segment_idx);
-        LOG_TRACE("Segment Entry ID: {}", segment_entry->segment_id_);
-    }
-
-    table_scan_output_state->data_block_->Reset();
+//    Vector<u64>& segment_entry_index_array = *knn_scan_input_state->knn_scan_function_data_->segment_indexes_;
+//    for(const u64 segment_idx: segment_entry_index_array) {
+//        SegmentEntry* segment_entry = base_table_ref_->segment_entries_->at(segment_idx);
+//        LOG_TRACE("Segment Entry ID: {}", segment_entry->segment_id_);
+//    }
 
     KnnScanFunction* knn_scan_func = (KnnScanFunction*)base_table_ref_->table_func_.get();
     knn_scan_func->main_function_(query_context,
-                                  table_scan_input_state->table_scan_function_data_.get(),
-                                  *table_scan_output_state->data_block_);
+                                  knn_scan_input_state->knn_scan_function_data_.get(),
+                                  *knn_scan_output_state->data_block_);
 }
 
 TableCollectionEntry*

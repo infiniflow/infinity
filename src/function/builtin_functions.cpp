@@ -45,6 +45,7 @@
 #include "table/seq_scan.h"
 #include "function/scalar/not.h"
 #include "function/table/table_scan.h"
+#include "function/table/knn_scan.h"
 
 namespace infinity {
 
@@ -111,6 +112,7 @@ BuiltinFunctions::RegisterTableFunction() {
 
     RegisterSeqScanFunction(catalog_ptr_);
     RegisterTableScanFunction(catalog_ptr_);
+    RegisterKnnScanFunction(catalog_ptr_);
 }
 
 }

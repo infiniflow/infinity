@@ -8,6 +8,9 @@
 #include "executor/operator/physical_aggregate.h"
 #include "executor/operator/physical_table_scan.h"
 #include "executor/operator/physical_knn_scan.h"
+#include "expression/column_expression.h"
+#include "expression/knn_expression.h"
+#include "expression/value_expression.h"
 
 namespace infinity {
 
@@ -182,16 +185,16 @@ BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vector<Phy
 
     // TableScan must be the first operator of the fragment
     if(operator_id != operator_count - 1) {
-        SchedulerError("Table scan operator must be the first operator of the fragment.")
+        SchedulerError("Knn scan operator must be the first operator of the fragment.")
     }
 
     if(operator_id == 0) {
-        SchedulerError("Table scan shouldn't be the last operator of the fragment.")
+        SchedulerError("Knn scan shouldn't be the last operator of the fragment.")
     }
 
     PhysicalOperator* physical_op = fragment_operators[operator_id];
     if(physical_op->operator_type() != PhysicalOperatorType::kKnnScan) {
-        SchedulerError("Expect table scan physical operator")
+        SchedulerError("Expect knn scan physical operator")
     }
     auto* physical_knn_scan = static_cast<PhysicalKnnScan*>(physical_op);
 
@@ -200,28 +203,47 @@ BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vector<Phy
         SourceState* source_ptr = tasks[task_id]->source_state_.get();
 //        SinkState* sink_ptr = tasks[task_id]->sink_state_.get();
 
-        if(source_ptr->state_type_ != SourceStateType::kTableScan) {
-            SchedulerError("Expect table scan source state")
+        if(source_ptr->state_type_ != SourceStateType::kKnnScan) {
+            SchedulerError("Expect knn scan source state")
         }
 
-        auto* table_scan_source_state = static_cast<TableScanSourceState*>(source_ptr);
-        task_ptr->operator_input_state_[operator_id] = MakeUnique<TableScanInputState>();
-        auto table_scan_input_state = (TableScanInputState*)(task_ptr->operator_input_state_[operator_id].get());
+        auto* knn_scan_source_state = static_cast<KnnScanSourceState*>(source_ptr);
+        task_ptr->operator_input_state_[operator_id] = MakeUnique<KnnScanInputState>();
+        auto knn_scan_input_state = (KnnScanInputState*)(task_ptr->operator_input_state_[operator_id].get());
 
 //        if(table_scan_source_state->segment_entry_ids_->empty()) {
 //            SchedulerError("Empty segment entry ids")
 //        }
+        if(physical_knn_scan->knn_expressions_.size() == 1) {
+            KnnExpression* knn_expr = static_cast<KnnExpression*>(physical_knn_scan->knn_expressions_[0].get());
+            SchedulerAssert(knn_expr->arguments().size() == 1, "Expect one expression");
+            ColumnExpression* column_expr = static_cast<ColumnExpression*>(knn_expr->arguments()[0].get());
 
-        table_scan_input_state->table_scan_function_data_ = MakeUnique<TableScanFunctionData>(physical_knn_scan->SegmentEntriesPtr(),
-                                                                                              table_scan_source_state->segment_entry_ids_,
-                                                                                              physical_knn_scan->ColumnIDs());
 
-        task_ptr->operator_output_state_[operator_id] = MakeUnique<TableScanOutputState>();
-        auto output_state = (TableScanOutputState*)(task_ptr->operator_output_state_[operator_id].get());
+            Vector<SizeT> knn_column_ids = {column_expr->binding().column_idx};
+            ValueExpression* limit_expr = static_cast<ValueExpression*>(physical_knn_scan->limit_expression_.get());
+            i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
+
+            knn_scan_input_state->knn_scan_function_data_ = MakeUnique<KnnScanFunctionData>(physical_knn_scan->SegmentEntriesPtr(),
+                                                                                            knn_scan_source_state->segment_entry_ids_,
+                                                                                            physical_knn_scan->ColumnIDs(),
+                                                                                            knn_column_ids,
+                                                                                            topk,
+                                                                                            knn_expr->dimension_,
+                                                                                            1,
+                                                                                            knn_expr->query_embedding_.ptr,
+                                                                                            knn_expr->embedding_data_type_,
+                                                                                            knn_expr->distance_type_);
+        } else {
+            SchedulerError("Currently, we only support one knn column case")
+        }
+
+        task_ptr->operator_output_state_[operator_id] = MakeUnique<KnnScanOutputState>();
+        auto output_state = (KnnScanOutputState*)(task_ptr->operator_output_state_[operator_id].get());
         output_state->data_block_ = DataBlock::Make();
         output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
 
-        source_ptr->SetNextState(table_scan_input_state);
+        source_ptr->SetNextState(knn_scan_input_state);
     }
 }
 
@@ -707,7 +729,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             auto* knn_scan_operator = (PhysicalKnnScan*)first_operator;
             Vector<SharedPtr<Vector<u64>>> segment_id_group = knn_scan_operator->PlanSegmentEntries(parallel_count);
             for(i64 task_id = 0; task_id < parallel_count; ++ task_id) {
-                tasks_[task_id]->source_state_ = MakeUnique<TableScanSourceState>(segment_id_group[task_id]);
+                tasks_[task_id]->source_state_ = MakeUnique<KnnScanSourceState>(segment_id_group[task_id]);
             }
             break;
         }

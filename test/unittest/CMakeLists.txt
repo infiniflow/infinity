@@ -86,6 +86,7 @@ target_link_libraries(test_main
         tlsf
         zsv_parser
         roaring
+        faiss
         )
 
 target_include_directories(test_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")

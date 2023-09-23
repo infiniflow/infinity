@@ -127,7 +127,7 @@ TEST_F(PhysicalImportTest, test1) {
 
     uint64_t id = 0;
     // String file_path = "test/data/csv/embedding1.csv";
-    String file_path = "../../../test/data/csv/embedding1.csv";
+    String file_path = "../../../test/data/csv/embedding_int_dim3.csv";
     bool header = false;
     char delimiter = ',';
     auto file_type = CopyFileType::kCSV;

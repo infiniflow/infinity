@@ -61,6 +61,7 @@
 #include "executor/operator/physical_drop_schema.h"
 #include "executor/operator/physical_create_schema.h"
 #include "executor/operator/physical_knn_scan.h"
+#include "planner/bound/base_table_ref.h"
 #include "explain_physical_plan.h"
 
 #include <limits>
@@ -578,8 +579,8 @@ PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNode>& logical_operator) const 
                                        logical_knn_scan->limit_expression_,
                                        logical_knn_scan->filter_expression_,
                                        logical_knn_scan->order_by_type_,
-                                       logical_knn_scan->GetOutputNames(),
-                                       logical_knn_scan->GetOutputTypes(),
+                                       logical_knn_scan->base_table_ref_->column_names_,
+                                       logical_knn_scan->base_table_ref_->column_types_,
                                        logical_knn_scan->knn_table_index_);
 }
 
