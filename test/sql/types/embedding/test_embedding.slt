@@ -9,7 +9,7 @@ CREATE TABLE test_embedding_type ( c1 int, c2 embedding(int,3));
 
 # copy data from tbl file
 query I
-COPY test_embedding_type FROM '/home/ttg/Documents/GitHub/infiniflow/infinity/test/data/csv/embedding1.csv' WITH ( DELIMITER ',' );
+COPY test_embedding_type FROM '/home/shenyushi/Documents/GitHub/infiniflow/infinity/test/data/csv/embedding1.csv' WITH ( DELIMITER ',' );
 ----
 
 query II

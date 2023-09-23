@@ -91,7 +91,8 @@ DBEntry::DropTableCollection(DBEntry* db_entry,
                                                         txn_id,
                                                         begin_ts,
                                                         txn_mgr,
-                                                        table_collection_name);
+                                                        table_collection_name,
+                                                        conflict_type);
 
     return res;
 }

@@ -254,7 +254,7 @@ VarcharType::Initialize(const char* input_ptr) {
 
 void
 VarcharType::Initialize(const char* input_ptr, size_t input_len) {
-    TypeAssert(input_len < std::numeric_limits<i16>::max(),
+    TypeAssert(input_len <= std::numeric_limits<u16>::max(),
                "Attempt to write string with length exceed 65535 into value");
     TypeAssert(this->length == 0, "Varchar type was already initialized.")
 

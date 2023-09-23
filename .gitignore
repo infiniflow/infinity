@@ -68,5 +68,4 @@ lexer.h
 parser.cpp
 parser.h
 
-tools/tttt
-tools/sqllogictest
+test/big_sql/tmp
