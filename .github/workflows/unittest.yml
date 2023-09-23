@@ -22,7 +22,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install xmllint
+    - name: Install boost
       run: sudo apt-get install -y libboost-all-dev
 
     - name: Configure CMake
@@ -31,8 +31,9 @@ jobs:
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
     - name: Build
+      working-directory: ${{github.workspace}}/build
       # Build your program with the given configuration
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      run: make -j2
 
     - name: Test
       working-directory: ${{github.workspace}}/build/test/unittest
