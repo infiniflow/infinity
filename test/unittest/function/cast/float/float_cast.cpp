@@ -101,8 +101,8 @@ TEST_F(FloatCastTest, float_cast0) {
         EXPECT_EQ(source, target);
 
         source = static_cast<FloatT>(std::numeric_limits<IntegerT>::max());
-        EXPECT_FALSE(FloatTryCastToFixlen::Run(source, target));
-//        EXPECT_FLOAT_EQ(source, target);
+        EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));
+        EXPECT_FLOAT_EQ(source, target);
 
         source = static_cast<FloatT>(std::numeric_limits<IntegerT>::min());
         EXPECT_TRUE(FloatTryCastToFixlen::Run(source, target));

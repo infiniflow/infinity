@@ -202,7 +202,7 @@ FloatTryCastToFixlen::Run(DoubleT source, IntegerT &target) {
 template<>
 inline bool
 FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
-    if(source < -9223372036854775808.0f || source > 9223372036854775807.0f) {
+    if(source < -9223372036854775808.0L || source > 9223372036854775807.0L) {
         return false;
     }
     target = std::nearbyint(source);
