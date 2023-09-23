@@ -357,7 +357,7 @@ Txn::DropTableCollectionByName(const String& db_name, const String& table_name, 
 
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
 
-    EntryResult res = DBEntry::DropTableCollection(db_entry, table_name, txn_id_, begin_ts, txn_mgr_);
+    EntryResult res = DBEntry::DropTableCollection(db_entry, table_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
 
     if(res.entry_ == nullptr) {
         return res;

@@ -3,6 +3,7 @@
 //
 
 #include "db_entry.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 
 namespace infinity {
 
@@ -65,6 +66,7 @@ DBEntry::CreateTableCollection(DBEntry* db_entry,
 EntryResult
 DBEntry::DropTableCollection(DBEntry* db_entry,
                              const String& table_collection_name,
+                             ConflictType conflict_type,
                              u64 txn_id,
                              TxnTimeStamp begin_ts,
                              TxnManager* txn_mgr) {
@@ -76,6 +78,10 @@ DBEntry::DropTableCollection(DBEntry* db_entry,
     }
     db_entry->rw_locker_.unlock_shared();
     if(table_meta == nullptr) {
+        if (conflict_type == ConflictType::kIgnore) {
+            LOG_TRACE("Ignore drop a not existed table/collection entry {}", table_collection_name);
+            return {nullptr, nullptr};
+        }
         LOG_TRACE("Attempt to drop not existed table/collection entry {}", table_collection_name);
         return {nullptr, MakeUnique<String>("Attempt to drop not existed table/collection entry")};
     }
