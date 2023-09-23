@@ -13,8 +13,8 @@
 namespace infinity {
 
 // Value maker
-auto
-Value::MakeValue(DataType type) -> Value {
+Value
+Value::MakeValue(DataType type) {
     Value value(type.type(), type.type_info());
     value.is_null_ = true;
     return value;
