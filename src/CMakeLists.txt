@@ -196,6 +196,7 @@ target_link_libraries(
         tlsf
         linenoise
         roaring
+        faiss
         fastpfor
         zsv_parser
         ${EXTERNAL_LIBS}
