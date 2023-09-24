@@ -214,14 +214,19 @@ DataBlock::AppendWith(const SharedPtr<DataBlock>& other, SizeT from, SizeT count
 
 
 int32_t DataBlock::GetSizeInBytes() const{
-
+    //FIXME
+    return 0;
 }
 
-void DataBlock::WriteAdv(char* &buf) const{
+void DataBlock::WriteAdv(char* &ptr) const{
+    //FIXME
     return;
 }
 
-SharedPtr<DataBlock> DataBlock::ReadAdv(char* &buf){
+SharedPtr<DataBlock> DataBlock::ReadAdv(char* &ptr, int32_t maxbytes){
+    char *const ptr_end = ptr + maxbytes;
+    StorageAssert(ptr <= ptr_end,
+                  "ptr goes out of range when reading DataBlock");
     return nullptr;
 }
 

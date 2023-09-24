@@ -70,16 +70,16 @@ SharedPtr<TableDef> MockTableDesc2() {
 
 TEST_F(WalEntryTest, ReadWrite) {
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
-    entry->dropped_databases_.push_back("db1");
-    entry->dropped_databases_.push_back("db2");
-    //	entry->dropped_tables_.push_back(std::make_pair("db1", "tbl1"));
-    //    entry->dropped_tables_.push_back(std::make_pair("db2", "tbl2"));
-    roaring::Roaring bm = roaring::Roaring::bitmapOf(1, 2, 3, 4, 5);
-    entry->deleted_rows_.insert(
-        std::make_pair(1, std::make_shared<roaring::Roaring>(bm)));
-    SharedPtr<TableDef> table_def = MockTableDesc2();
-    entry->created_tables_.push_back(
-        std::pair<String, SharedPtr<TableDef>>(String("db1"), table_def));
+
+    entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
+    entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1"));
+    entry->cmds.push_back(
+        MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
+    entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
+    entry->cmds.push_back(MakeShared<WalCmdInsertDataBlock>("db1", "tbl1"));
+    entry->cmds.push_back(MakeShared<WalCmdDeleteRows>("db1", "tbl1"));
+
+    entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123)));
 
     int32_t exp_size = entry->GetSizeInBytes();
     std::vector<char> buf(exp_size, char(0));
@@ -91,6 +91,6 @@ TEST_F(WalEntryTest, ReadWrite) {
     ptr = buf_beg;
     SharedPtr<WalEntry> entry2 = WalEntry::ReadAdv(ptr, exp_size);
     EXPECT_NE(entry2, nullptr);
-    EXPECT_EQ(*entry==*entry2, true);
+    EXPECT_EQ(*entry == *entry2, true);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 }

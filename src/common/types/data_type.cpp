@@ -283,6 +283,7 @@ void DataType::WriteAdv(char* &ptr) const{
 
 SharedPtr<DataType>
 DataType::ReadAdv(char* &ptr, int32_t maxbytes){
+    char *const ptr_end = ptr + maxbytes;
     LogicalType type = ReadBufAdv<LogicalType>(ptr);
     SharedPtr<TypeInfo> type_info {nullptr};
     switch (type) {
@@ -309,6 +310,8 @@ DataType::ReadAdv(char* &ptr, int32_t maxbytes){
     }
     default:
     }
+    StorageAssert(ptr <= ptr_end,
+                  "ptr goes out of range when reading DataType");
     SharedPtr<DataType> data_type = MakeShared<DataType>(type, type_info);
     return data_type;
 }

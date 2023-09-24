@@ -24,7 +24,7 @@ public:
     // Write to a char buffer
     void WriteAdv(char* &buf) const;
     // Read from a serialized version
-    static SharedPtr<DataBlock> ReadAdv(char* &buf);
+    static SharedPtr<DataBlock> ReadAdv(char* &buf, int32_t maxbytes);
 
 public:
 

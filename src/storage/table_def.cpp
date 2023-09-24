@@ -122,17 +122,17 @@ void TableDef::WriteAdv(char* &ptr) const {
 }
 
 SharedPtr<TableDef> TableDef::ReadAdv(char* &ptr, int32_t maxbytes){
-    char *const saved_ptr = ptr;
-    StorageAssert(maxbytes>0, "buffer is exhausted when reading TableDef");
+    char *const ptr_end = ptr + maxbytes;
+    StorageAssert(maxbytes>0, "ptr goes out of range when reading TableDef");
     String schema_name = ReadBufAdv<String>(ptr);
     String table_name = ReadBufAdv<String>(ptr);
     int32_t columns_size = ReadBufAdv<int32_t>(ptr);
     Vector<SharedPtr<ColumnDef>> columns;
     for(int32_t i=0; i<columns_size; i++){
         i64 id = ReadBufAdv<i64>(ptr);
-        int32_t maxbytes2 = saved_ptr + maxbytes - ptr;
-        StorageAssert(maxbytes2>0, "buffer is exhausted when reading TableDef");
-        SharedPtr<DataType> column_type = DataType::ReadAdv(ptr, maxbytes2);
+        maxbytes = ptr_end - ptr;
+        StorageAssert(maxbytes>0, "ptr goes out of range when reading TableDef");
+        SharedPtr<DataType> column_type = DataType::ReadAdv(ptr, maxbytes);
         String column_name = ReadBufAdv<String>(ptr);
         int32_t constraints_size = ReadBufAdv<int32_t>(ptr);
         HashSet<ConstraintType> constraints;
@@ -143,6 +143,8 @@ SharedPtr<TableDef> TableDef::ReadAdv(char* &ptr, int32_t maxbytes){
         SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints);
         columns.push_back(cd);
     }
+    StorageAssert(ptr <= ptr_end,
+                  "ptr goes out of ranged when reading DataType");
     return TableDef::Make(MakeShared<String>(schema_name), MakeShared<String>(table_name), columns);
 }
 
