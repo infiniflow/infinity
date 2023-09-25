@@ -1,6 +1,7 @@
 #include "column_buffer.h"
 #include "common/types/data_type.h"
 #include "common/types/varchar_layout.h"
+#include "common/utility/infinity_assert.h"
 #include "storage/buffer/buffer_handle.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/object_handle.h"
@@ -15,8 +16,10 @@ ColumnBuffer::ColumnBuffer(BufferHandle *buffer_handle, BufferManager *buffer_mg
 }
 
 ptr_t ColumnBuffer::GetAll() {
-    // StorageAssert(outline_buffer_ == nullptr, "Cannot get whole data of an outline column");
-    return inline_col_.GetData();
+    if (outline_buffer_ == nullptr) {
+        return inline_col_.GetData();
+    }
+    NotImplementError("Cannot get all data of an outline column");
 }
 
 Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {

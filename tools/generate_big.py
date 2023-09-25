@@ -2,17 +2,17 @@ import os
 import random
 import subprocess
 
-cur_dir = os.path.dirname(os.path.realpath(__file__))
 
-
-def generate_test_varchar(slt_path: str):
-    csv_path = cur_dir + "/tmp/test_varchar.csv"
-    # if os.path.exists(slt_path) and os.path.exists(csv_path):
-    #     return
-    row_n = 8192
-    length = 65534
+def generate_test_varchar(slt_path: str, csv_path: str):
+    if os.path.exists(slt_path) and os.path.exists(csv_path):
+        print("The target {} and {} already exists. Return.".format(slt_path, csv_path))
+        return
+    # row_n = 8192
+    # length = 65534
+    row_n = 1000
+    length = 1000
     low, high = 0, 100
-    table_name = "test_varchar_table"
+    table_name = "big_varchar_table"
     with open(slt_path, "w") as slt_file, open(csv_path, "w") as csv_file:
         slt_file.write("statement ok\n")
         slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name))
@@ -50,14 +50,14 @@ def generate_test_varchar(slt_path: str):
         slt_file.write("DROP TABLE {};\n".format(table_name))
 
 
-def generate_test_embedding(slt_path: str):
-    csv_path = cur_dir + "/tmp/test_embedding.csv"
+def generate_test_embedding(slt_path: str, csv_path: str):
     if os.path.exists(slt_path) and os.path.exists(csv_path):
+        print("The target {} and {} already exists. Return.".format(slt_path, csv_path))
         return
-    row_n = 8192
-    dimension = 100
+    row_n = 1000
+    dimension = 1000
     low, high = 0, 1000
-    table_name = "test_embedding_table"
+    table_name = "big_embedding_table"
     with open(slt_path, "w") as slt_file, open(csv_path, "w") as csv_file:
         slt_file.write("statement ok\n")
         slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name))
@@ -100,22 +100,24 @@ def generate_test_embedding(slt_path: str):
         slt_file.write("DROP TABLE {};\n".format(table_name))
 
 
-def execute_slt(slt_path: str, log_path: str):
-    with open(log_path, "w") as log_file:
-        log_file = open(log_path, "w")
-        Popen = subprocess.Popen(
-            ["sqllogictest", slt_path], stdout=log_file, stderr=log_file
-        )
-        Popen.wait()
+# def execute_slt(slt_path: str, log_path: str):
+#     with open(log_path, "w") as log_file:
+#         log_file = open(log_path, "w")
+#         Popen = subprocess.Popen(
+#             ["sqllogictest", slt_path], stdout=log_file, stderr=log_file
+#         )
+#         Popen.wait()
 
 
 if __name__ == "__main__":
-    # slt_path = cur_dir + "/tmp/test_embedding.slt"
-    # log_path = cur_dir + "/tmp/test_embedding.log"
-    # generate_test_embedding(slt_path)
-    # execute_slt(slt_path, log_path)
+    print("Note: this script must be run under root directory of the project!")
 
-    slt_path = cur_dir + "/tmp/test_varchar.slt"
-    log_path = cur_dir + "/tmp/test_varchar.log"
-    generate_test_varchar(slt_path)
-    execute_slt(slt_path, log_path)
+    slt_dir = "./test/sql/types"
+    csv_dir = "./test/data/csv"
+    slt_path = slt_dir + "/embedding/big_test_embedding.slt"
+    csv_path = csv_dir + "/big_embedding.csv"
+    generate_test_embedding(slt_path, csv_path)
+
+    slt_path = slt_dir + "/varchar/big_test_varchar.slt"
+    csv_path = csv_dir + "/big_varchar.csv"
+    generate_test_varchar(slt_path, csv_path)
