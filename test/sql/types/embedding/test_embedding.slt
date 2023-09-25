@@ -2,6 +2,9 @@
 # description: Test embedding sql
 # group: [types, embedding]
 
+statement ok
+DROP TABLE IF EXISTS test_embedding_type;
+
 # Expecting IDENTIFIER or PRIMARY or UNIQUE
 statement ok
 CREATE TABLE test_embedding_type ( c1 int, c2 embedding(int,3));
