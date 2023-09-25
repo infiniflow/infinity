@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "common/types/internal_types.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 #include "storage/meta/entry/base_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
 #include "parser/statement/extra/create_table_info.h"
@@ -39,7 +40,8 @@ public:
                  u64 txn_id,
                  TxnTimeStamp begin_ts,
                  TxnManager* txn_mgr,
-                 const String& table_name);
+                 const String& table_name,
+                 ConflictType conflict_type);
 
     static void
     DeleteNewEntry(TableCollectionMeta* table_meta,

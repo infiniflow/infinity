@@ -16,13 +16,12 @@ class BufferManager;
 class SegmentEntry;
 
 struct OutlineInfo {
-    Vector<Pair<BufferHandle *, SizeT>> full_buffers_{};
-    BufferHandle *current_buffer_handler_{};
-    SizeT current_buffer_offset_{};
+    Vector<Pair<BufferHandle *, SizeT>> written_buffers_{};
+
     BufferManager *buffer_mgr_{};
+
     SizeT next_file_idx{};
 
-    OutlineInfo() {}
     OutlineInfo(BufferManager *buffer_mgr) : buffer_mgr_(buffer_mgr) {}
 };
 
@@ -76,7 +75,7 @@ public:
     Deserialize(const nlohmann::json& column_data_json, SegmentEntry* table_entry, BufferManager* buffer_mgr);
 
     static SharedPtr<String>
-    GetOutlineFilename(SizeT file_idx) {
+    OutlineFilename(SizeT file_idx) {
         return MakeShared<String>("out_" + std::to_string(file_idx));
     }
 };

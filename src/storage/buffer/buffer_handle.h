@@ -29,8 +29,11 @@ enum class BufferStatus {
 using BufferReadFN = void(*)(const String& path, DataType data_type);
 using BufferWriteFN = void(*)(const String& path, DataType data_type);
 
+class ObjectHandle;
+
 // BufferHandle is never destructed
 class BufferHandle {
+    friend ObjectHandle;
 public:
     explicit
     BufferHandle(void* buffer_mgr);
@@ -42,9 +45,11 @@ public:
         id_ = id;
     }
 
+private:
     ptr_t
     LoadData();
 
+public:
     void
     UnloadData();
 

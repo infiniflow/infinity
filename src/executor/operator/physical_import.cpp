@@ -318,7 +318,7 @@ PhysicalImport::CSVRowHandler(void *context) {
                 ExecutorError("Varchar data size exceeds dimension.");
             }
 
-            AppendVarcharData(column_data_entry.get(), str_view, write_row);
+            AppendVarcharData(column_data_entry.get(), str_view, dst_offset);
         } else if (column_type->type() == kEmbedding) {
             Vector<StringView> res;
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);

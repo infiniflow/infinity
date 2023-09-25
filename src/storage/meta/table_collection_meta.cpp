@@ -4,6 +4,7 @@
 
 #include "table_collection_meta.h"
 #include "main/logger.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 #include "storage/meta/entry/table_collection_entry.h"
 #include "common/utility/defer_op.h"
 #include "storage/txn/txn_manager.h"
@@ -166,7 +167,8 @@ TableCollectionMeta::DropNewEntry(TableCollectionMeta* table_meta,
                                   u64 txn_id,
                                   TxnTimeStamp begin_ts,
                                   TxnManager* txn_mgr,
-                                  const String& table_name) {
+                                  const String& table_name,
+                                  ConflictType conflict_type) {
     TableCollectionEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(table_meta->rw_locker_);
     if(table_meta->entry_list_.empty()) {
@@ -189,6 +191,10 @@ TableCollectionMeta::DropNewEntry(TableCollectionMeta* table_meta,
         if(begin_ts > header_table_entry->commit_ts_) {
             // No conflict
             if(header_table_entry->deleted_) {
+                if (conflict_type == ConflictType::kIgnore) {
+                    LOG_TRACE("Ignore drop a not existed table entry {}", table_name);
+                    return {nullptr, nullptr};
+                }
                 LOG_TRACE("Table was dropped before.")
                 return {nullptr, MakeUnique<String>("Table was dropped before.")};
             }

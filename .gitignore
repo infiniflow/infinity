@@ -68,5 +68,5 @@ lexer.h
 parser.cpp
 parser.h
 
-tools/tttt
-tools/sqllogictest
+test/data/csv/big_*.csv
+test/sql/**/big_*.slt
