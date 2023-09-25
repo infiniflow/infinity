@@ -15,6 +15,13 @@ ObjectHandle::ObjectHandle(ObjectHandle &&other) : buffer_handle_(other.buffer_h
     other.buffer_handle_ = nullptr;
 }
 
+
+ObjectHandle::~ObjectHandle() {
+    if (buffer_handle_) {
+        buffer_handle_->UnloadData();
+    }
+}
+
 // ObjectHandle& ObjectHandle::operator=(const ObjectHandle &other) {
 //     if (buffer_handle_) {
 //         buffer_handle_->UnloadData();

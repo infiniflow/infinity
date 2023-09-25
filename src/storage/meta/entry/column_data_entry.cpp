@@ -12,7 +12,6 @@
 #include "segment_entry.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/column_buffer.h"
-#include <algorithm>
 #include <cstring>
 #include <string>
 
@@ -32,7 +31,6 @@ ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry* segment_entry, u64 c
                                                                          column_data_entry->file_name_,
                                                                          data_type->Size() * row_capacity);
     if (data_type->type() == kVarchar) {
-        // auto out_dir = MakeShared<String>(*segment_ptr->base_dir_ + "outline/");
         column_data_entry->outline_info_ = MakeUnique<OutlineInfo>(buffer_mgr);
     }
     return column_data_entry;
@@ -47,7 +45,6 @@ ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, BufferManager
                                                                         BufferType::kFile);
     }
 
-//    ptr_t ptr = buffer_handle_->LoadData();
     bool outline = column_data_entry->column_type_->type() == kVarchar;
     return ColumnBuffer(column_data_entry->buffer_handle_, buffer_mgr, outline);
 }
@@ -62,7 +59,6 @@ ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
     if(column_data_entry->buffer_handle_ == nullptr) {
         StorageError("Not initialize buffer handle")
     }
-    ptr_t ptr = column_data_entry->buffer_handle_->LoadData();
     ptr_t src_ptr = column_vector->data() + block_start_offset * column_vector->data_type_size_;
     SizeT data_size = row_n * column_vector->data_type_size_;
     SizeT dst_offset = column_start_offset * column_vector->data_type_size_;
@@ -72,7 +68,10 @@ ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
 void
 ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset, ptr_t src_p, SizeT data_size) {
     auto column_type = column_data_entry->column_type_;
-    ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
+    ObjectHandle object_handle(column_data_entry->buffer_handle_);
+    ptr_t dst_ptr = object_handle.GetData() + dst_offset;
+    // ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
+    
     switch (column_type->type()) {
         case kBoolean:
         case kTinyInt:
@@ -99,25 +98,23 @@ ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset,
                 } else {
                     auto &long_info = varchar_layout->u.long_info_;
                     auto outline_info = column_data_entry->outline_info_.get();
-                    if (outline_info->current_buffer_handler_ == nullptr) {
-                        auto file_name = ColumnDataEntry::GetOutlineFilename(outline_info->next_file_idx++);
-                        outline_info->current_buffer_handler_ = outline_info->buffer_mgr_->AllocateBufferHandle(column_data_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
-                    } else if (outline_info->current_buffer_offset_ + varchar_type->length > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
-                        outline_info->full_buffers_.emplace_back(outline_info->current_buffer_handler_, outline_info->current_buffer_offset_);
-                        outline_info->current_buffer_offset_ = 0;
-                        auto file_name = ColumnDataEntry::GetOutlineFilename(outline_info->next_file_idx++);
-                        outline_info->current_buffer_handler_ = outline_info->buffer_mgr_->AllocateBufferHandle(column_data_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                    if (outline_info->written_buffers_.empty() || outline_info->written_buffers_.back().second + varchar_type->length > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
+                        auto file_name = ColumnDataEntry::OutlineFilename(outline_info->next_file_idx++);
+                        auto buffer_handle = outline_info->buffer_mgr_->AllocateBufferHandle(column_data_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                        outline_info->written_buffers_.emplace_back(buffer_handle, 0);
                     }
-                    ptr_t dst_ptr = outline_info->current_buffer_handler_->LoadData() + outline_info->current_buffer_offset_;
+                    auto &[current_buffer_handle, current_buffer_offset] = outline_info->written_buffers_.back();
+                    ObjectHandle out_object_handle(current_buffer_handle);
+                    ptr_t dst_ptr = out_object_handle.GetData() + current_buffer_offset;
                     SizeT data_size = varchar_type->length;
                     ptr_t src_ptr = varchar_type->ptr;
                     memcpy(dst_ptr, src_ptr, data_size);
 
                     varchar_layout->length_ = varchar_type->length;
                     memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
-                    long_info.file_idx_ = outline_info->next_file_idx - 1; // TODO shenyushi
-                    long_info.file_offset_ = outline_info->current_buffer_offset_;
-                    outline_info->current_buffer_offset_ += varchar_type->length;
+                    long_info.file_idx_ = outline_info->next_file_idx - 1;
+                    long_info.file_offset_ = current_buffer_offset;
+                    current_buffer_offset += varchar_type->length;
                 }
             }
             break;
@@ -171,12 +168,7 @@ ColumnDataEntry::Flush(ColumnDataEntry* column_data_entry,
             column_data_entry->buffer_handle_->SyncFile();
             column_data_entry->buffer_handle_->CloseFile();
             auto outline_info = column_data_entry->outline_info_.get();
-            if (outline_info->current_buffer_offset_ > 0) {
-                outline_info->full_buffers_.emplace_back(outline_info->current_buffer_handler_, outline_info->current_buffer_offset_);
-                outline_info->current_buffer_handler_ = nullptr;
-                outline_info->current_buffer_offset_ = 0;
-            }
-            for (auto [outline_buffer_handle, outline_size] : outline_info->full_buffers_) {
+            for (auto [outline_buffer_handle, outline_size] : outline_info->written_buffers_) {
                 outline_buffer_handle->WriteFile(outline_size);
                 outline_buffer_handle->SyncFile();
                 outline_buffer_handle->CloseFile();
