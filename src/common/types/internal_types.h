@@ -18,7 +18,9 @@
 #include <unordered_set>
 #include <sstream>
 #include <thread>
+#include <mutex>
 #include <shared_mutex>
+#include <condition_variable>
 
 namespace infinity {
 

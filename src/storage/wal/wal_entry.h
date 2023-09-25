@@ -122,23 +122,22 @@ struct WalCmdDeleteRows : public WalCmd {
 };
 
 struct WalCmdCheckpoint : public WalCmd {
-    WalCmdCheckpoint(int64_t max_lsn_) : max_lsn(max_lsn_) {}
+    WalCmdCheckpoint(int64_t max_commit_ts_) : max_commit_ts(max_commit_ts_) {}
     virtual WalCommandType GetType() { return WalCommandType::CHECKPOINT; }
     virtual bool operator==(const WalCmd &other) const;
     virtual int32_t GetSizeInBytes() const;
     virtual void WriteAdv(char *&buf) const;
-    int64_t max_lsn;
+    int64_t max_commit_ts;
 };
 
 struct WalEntryHeader {
-    int64_t lsn;  // each entry's lsn(Log Sequence Number) is strictly
-                  // increasing by one.
     int32_t size; // size of payload, excluding the header, round to multi
                   // of 4. There's 4 bytes pad just after the payload storing
                   // the same value to assist backward iterating.
     uint32_t checksum; // crc32 of the entry, including the header and the
                        // payload. User shall populate it before writing to wal.
-    int64_t txn_id; // txn id of the entry, 0 if it contains CHECKPOINT command.
+    int64_t txn_id; // txn id of the entry
+    int64_t commit_ts; // commit timestamp of the txn
 };
 
 struct WalEntry : WalEntryHeader {

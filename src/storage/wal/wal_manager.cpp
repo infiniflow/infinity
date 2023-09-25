@@ -75,18 +75,16 @@ int WalManager::PutEntry(std::shared_ptr<WalEntry> entry) {
 // ~10s. So it's necessary to sync for a batch of transactions, and to
 // checkpoint for a batch of sync.
 void WalManager::Flush() {
-    int64_t seq = 0;
     while (running_.load()) {
         int written = 0;
         int32_t size_pad = 0;
-        int64_t max_lsn = lsn_gen_.GetLast();
+        int64_t max_commit_ts = 0;
         mutex_.lock();
         que_.swap(que2_);
         mutex_.unlock();
         while (!que2_.empty()) {
             std::shared_ptr<WalEntry> entry = que2_.front();
-            entry->lsn = lsn_gen_.Generate();
-            max_lsn = entry->lsn;
+            max_commit_ts = entry->commit_ts;
             LOG_TRACE("WalManager::Flush begin writing wal for transaction {}",
                       entry->txn_id);
             int32_t exp_size = entry->GetSizeInBytes();
@@ -112,7 +110,7 @@ void WalManager::Flush() {
                       written);
             ofs_.flush();
             LOG_TRACE("WalManager::Flush done syncing wal for {} transactions",
-                      seq, written);
+                      written);
             TxnManager *txn_mgr = storage_->txn_manager();
             while (!que3_.empty()) {
                 std::shared_ptr<WalEntry> entry = que3_.front();
@@ -124,7 +122,7 @@ void WalManager::Flush() {
                 }
                 que3_.pop();
             }
-            lsn_pend_chk_.store(max_lsn);
+            lsn_pend_chk_.store(max_commit_ts);
         }
     }
 }

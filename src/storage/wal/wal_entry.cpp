@@ -81,8 +81,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, int32_t maxbytes) {
         break;
     }
     case WalCommandType::CHECKPOINT: {
-        int64_t max_lsn = ReadBufAdv<int64_t>(ptr);
-        cmd = MakeShared<WalCmdCheckpoint>(max_lsn);
+        int64_t max_commit_ts = ReadBufAdv<int64_t>(ptr);
+        cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts);
         break;
     }
     default:
@@ -135,7 +135,7 @@ bool WalCmdDeleteRows::operator==(const WalCmd &other) const {
 
 bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCheckpoint *>(&other);
-    return other_cmd != nullptr && max_lsn == other_cmd->max_lsn;
+    return other_cmd != nullptr && max_commit_ts == other_cmd->max_commit_ts;
 }
 
 int32_t WalCmdCreateDatabase::GetSizeInBytes() const {
@@ -226,11 +226,11 @@ void WalCmdDeleteRows::WriteAdv(char *&buf) const {
 
 void WalCmdCheckpoint::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CHECKPOINT);
-    WriteBufAdv(buf, this->max_lsn);
+    WriteBufAdv(buf, this->max_commit_ts);
 }
 
 bool WalEntry::operator==(const WalEntry &other) const {
-    if (this->lsn != other.lsn || this->txn_id != other.txn_id ||
+    if (this->txn_id != other.txn_id || this->commit_ts != other.commit_ts ||
         this->cmds.size() != other.cmds.size()) {
         return false;
     }
@@ -287,10 +287,10 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t maxbytes) {
     StorageAssert(maxbytes > 0, "buffer is exhausted when reading WalEntry");
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     WalEntryHeader *header = (WalEntryHeader *)ptr;
-    entry->lsn = header->lsn;
     entry->size = header->size;
     entry->checksum = header->checksum;
     entry->txn_id = header->txn_id;
+    entry->commit_ts = header->commit_ts;
     int32_t size2 = *(int32_t *)(ptr + entry->size - sizeof(int32_t));
     if (entry->size != size2) {
         return nullptr;

@@ -6,11 +6,15 @@
 
 #include "txn.h"
 #include "storage/wal/wal_entry.h"
+#include <mutex>
+#include <condition_variable>
+#include <set>
 
 namespace infinity {
 
 using PutWalEntryFn = std::function<void(std::shared_ptr<WalEntry>)>;
 
+class WalEntry;
 class BufferManager;
 class TxnManager {
 public:
@@ -49,15 +53,12 @@ public:
         return buffer_mgr_;
     }
 
-    static inline TxnTimeStamp
-    GetTimestamp() {
-        return std::chrono::high_resolution_clock::now().time_since_epoch().count();
-    }
+    TxnTimeStamp
+    GetTimestamp(bool prepare_wal=false);
 
-    void PutWalEntry(std::shared_ptr<WalEntry> entry) {
-        if (put_wal_entry_ != nullptr)
-            put_wal_entry_(entry);
-    }
+    void Invalidate(TxnTimeStamp commit_ts);
+
+    void PutWalEntry(std::shared_ptr<WalEntry> entry);
 
 private:
     u64
@@ -70,6 +71,11 @@ private:
     BufferManager* buffer_mgr_{};
     HashMap<u64, UniquePtr<Txn>> txn_map_{};
     PutWalEntryFn put_wal_entry_{};
+
+    // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
+    std::mutex mutex_;
+    TxnTimeStamp txn_ts_{};
+    std::map<TxnTimeStamp, std::shared_ptr<WalEntry>> priority_que_;   //TODO: use C++23 std::flat_map?
 };
 
 }

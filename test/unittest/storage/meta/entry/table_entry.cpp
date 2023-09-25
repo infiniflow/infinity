@@ -99,7 +99,7 @@ TEST_F(TableEntryTest, test2) {
     Txn* new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
-    new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    new_txn->BeginTxn();
 
     // Txn1: Create db1, OK
     create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
@@ -149,14 +149,14 @@ TEST_F(TableEntryTest, test2) {
     EXPECT_NE(table1_res.entry_, nullptr);
 
     // Txn1: Commit, OK
-    new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    new_txn->CommitTxn();
 
     {
         // Txn2: Create, OK
         new_txn = txn_mgr->CreateTxn();
 
         // Txn2: Begin, OK
-        new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        new_txn->BeginTxn();
 
         // Txn2: Get db1, OK
         get_res = new_txn->GetTableByName("db1", "tbl1");
@@ -191,7 +191,7 @@ TEST_F(TableEntryTest, test2) {
         new_txn->Append("db1", "tbl1", input_block);
 
         // Txn2: Commit, OK
-        new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        new_txn->CommitTxn();
     }
 
     {
@@ -199,7 +199,7 @@ TEST_F(TableEntryTest, test2) {
         new_txn = txn_mgr->CreateTxn();
 
         // Txn2: Begin, OK
-        new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        new_txn->BeginTxn();
 
         {
             // Get column 0 and column 2 from global storage;
@@ -314,7 +314,7 @@ TEST_F(TableEntryTest, test2) {
 
         {
             // Txn2: Rollback, OK
-            new_txn->RollbackTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+            new_txn->RollbackTxn();
         }
     }
 
@@ -323,7 +323,7 @@ TEST_F(TableEntryTest, test2) {
         new_txn = txn_mgr->CreateTxn();
 
         // Txn3: Begin, OK
-        new_txn->BeginTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        new_txn->BeginTxn();
 
         {
             // Get column 0 and column 2 from global storage;
@@ -358,6 +358,6 @@ TEST_F(TableEntryTest, test2) {
         }
 
         // Txn3: Commit, OK
-        new_txn->CommitTxn(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        new_txn->CommitTxn();
     }
 }

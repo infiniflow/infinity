@@ -477,23 +477,21 @@ Txn::BeginTxn() {
 }
 
 void
-Txn::BeginTxn(TxnTimeStamp begin_ts) {
-    txn_context_.BeginCommit(begin_ts);
-}
-
-void
 Txn::CommitTxn() {
-    CommitTxn(TxnManager::GetTimestamp());
-}
-
-void
-Txn::CommitTxn(TxnTimeStamp commit_ts) {
+    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
     txn_context_.SetTxnCommitting(commit_ts);
     //TODO: serializability validation. ASSUMES always valid for now.
-    //put wal entry to the manager
+    bool valid = true;
+    if(!valid) {
+        txn_mgr_->Invalidate(commit_ts);
+        txn_context_.SetTxnRollbacked();
+        return;
+    }
+    // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id = txn_id_;
+    wal_entry_->commit_ts = commit_ts;
     txn_mgr_->PutWalEntry(wal_entry_);
-    // Wait until wal has been persisted.
+    // Wait until CommitTxnBottom is done.
     std::unique_lock lk(m);
     cv.wait(lk, [this]{return done_bottom_;});
 }
@@ -552,12 +550,7 @@ Txn::CommitTxnBottom(){
 
 void
 Txn::RollbackTxn() {
-    RollbackTxn(TxnManager::GetTimestamp());
-}
-
-void
-Txn::RollbackTxn(TxnTimeStamp abort_ts) {
-
+    TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
     txn_context_.SetTxnRollbacking(abort_ts);
 
     for(const auto& base_entry: txn_tables_) {
