@@ -3,13 +3,16 @@
 //
 
 #include "physical_import.h"
+#include "common/default_values.h"
 #include "common/types/data_type.h"
 #include "common/types/info/varchar_info.h"
 #include "common/types/internal_types.h"
 #include "common/types/logical_type.h"
+#include "common/utility/defer_op.h"
 #include "common/utility/infinity_assert.h"
 #include "executor/operator_state.h"
 #include "main/query_context.h"
+#include "storage/io/local_file_system.h"
 #include "storage/meta/entry/column_data_entry.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/txn/txn_store.h"
@@ -36,7 +39,6 @@ PhysicalImport::Init() {
  */
 void
 PhysicalImport::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
-
     auto import_input_state = static_cast<ImportInputState*>(input_state);
     auto import_output_state = static_cast<ImportOutputState*>(output_state);
     switch(file_type_) {
@@ -46,8 +48,10 @@ PhysicalImport::Execute(QueryContext* query_context, InputState* input_state, Ou
         case CopyFileType::kJSON: {
             return ImportJSON(query_context);
         }
+        case CopyFileType::kFVECS: {
+            return ImportFVECS(query_context, import_input_state, import_output_state);
+        }
     }
-
 }
 
 void
@@ -59,7 +63,84 @@ PhysicalImport::Execute(QueryContext* query_context) {
         case CopyFileType::kJSON: {
             return ImportJSON(query_context);
         }
+        case CopyFileType::kFVECS: {
+            return ImportFVECS(query_context);
+        }
     }
+}
+
+SizeT
+PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
+    if (table_collection_entry_->columns_.size() != 1) {
+        ExecutorError("FVECS file must have only one column.");
+    }
+    auto& column_type = table_collection_entry_->columns_[0]->column_type_;
+    if (column_type->type() != kEmbedding) {
+        ExecutorError("FVECS file must have only one embedding column.");
+    }
+    auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+    if (embedding_info->Type() != kElemFloat) {
+        ExecutorError("FVECS file must have only one embedding column with float element.");
+    }
+    
+    LocalFileSystem fs;
+
+    UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    DeferFn defer_fn([&]() {
+        fs.Close(*file_handler);
+    });
+
+    int dimension = 0;
+    i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
+    if (nbytes != sizeof(dimension)) {
+        ExecutorError(fmt::format("Read dimension which length isn't {}.", nbytes));
+    }
+    if (embedding_info->Dimension() != dimension) {
+        ExecutorError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).",
+                                  dimension, embedding_info->Dimension()));
+    }
+    SizeT file_size = fs.GetFileSize(*file_handler);
+    if (file_size % ((dimension + 1) * sizeof(float)) != 0) {
+        ExecutorError("Weird file size.");
+    }
+    SizeT vector_n = file_size / ((dimension + 1) * sizeof(float));
+
+    Txn *txn = query_context->GetTxn();
+    const String &table_name = *table_collection_entry_->table_collection_name_;
+    txn->AddTxnTableStore(table_name, MakeUnique<TxnTableStore>(table_name,
+                                                                table_collection_entry_,
+                                                                txn));
+    TxnTableStore *txn_store = txn->GetTxnTableStore(table_name);
+    
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
+                                                          query_context->GetTxn()->TxnID(),
+                                                          TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
+                                                          query_context->GetTxn()->GetBufferMgr());
+
+    SizeT wait_write = vector_n;
+
+    assert(wait_write);
+    while (true) {
+        ColumnDataEntry *column_data_entry = segment_entry->columns_[0].get();
+        SizeT to_write = std::min(wait_write, DEFAULT_SEGMENT_ROW);
+        ObjectHandle object_handle(column_data_entry->buffer_handle_);
+        ptr_t dst_ptr = object_handle.GetData() + 0 * sizeof(FloatT) * dimension;
+        SizeT nbytes = to_write * sizeof(FloatT) * dimension;
+        fs.Read(*file_handler, dst_ptr, nbytes);
+        
+        wait_write -= to_write;
+        txn_store->Import(segment_entry);
+        if (wait_write) {
+            segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
+                                                              query_context->GetTxn()->TxnID(),
+                                                              TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
+                                                              query_context->GetTxn()->GetBufferMgr());
+        } else {
+            break;
+        }
+    }
+    segment_entry->current_row_ = vector_n;
+    return vector_n;
 }
 
 void
@@ -127,6 +208,26 @@ PhysicalImport::ImportCSVHelper(QueryContext* query_context, ParserContext &pars
         }
     }
     table_collection_entry_->row_count_ += parser_context.row_count_;
+}
+
+void
+PhysicalImport::ImportFVECS(QueryContext* query_context) {
+    SizeT row_count = ImportFVECSHelper(query_context);
+
+    Vector<SharedPtr<ColumnDef>> column_defs;
+    SharedPtr<TableDef> result_table_def_ptr
+        = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
+
+    UniquePtr<String> result_msg = MakeUnique<String>(fmt::format("IMPORTED {} Rows", row_count));
+    output_->SetResultMsg(std::move(result_msg));
+}
+
+void
+PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
+    SizeT row_count = ImportFVECSHelper(query_context);
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
+    output_state->result_msg_ = std::move(result_msg);
 }
 
 void
@@ -275,6 +376,7 @@ void AppendVarcharData(ColumnDataEntry *column_data_entry, const StringView &str
 }
 
 }
+
 
 void
 PhysicalImport::CSVRowHandler(void *context) {

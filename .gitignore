@@ -70,3 +70,4 @@ parser.h
 
 test/data/csv/big_*.csv
 test/sql/**/big_*.slt
+test/data/fvecs/

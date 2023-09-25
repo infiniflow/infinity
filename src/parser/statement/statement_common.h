@@ -11,6 +11,7 @@ namespace infinity {
 enum class CopyFileType {
     kCSV,
     kJSON,
+    kFVECS,
 };
 
 inline SharedPtr<String>
@@ -20,6 +21,8 @@ copy_file_to_str(CopyFileType copy_file_type) {
             return MakeShared<String>("CSV");
         case CopyFileType::kJSON:
             return MakeShared<String>("JSON");
+        case CopyFileType::kFVECS:
+            return MakeShared<String>("FVECS");
     }
 }
 
