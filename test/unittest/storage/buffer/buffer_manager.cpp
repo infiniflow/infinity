@@ -10,6 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 #include "storage/buffer/buffer_task.h"
+#include "storage/buffer/object_handle.h"
 
 class BufferMgrTest : public BaseTest {
     void
@@ -48,7 +49,8 @@ BufferMgrTest::SetUp() {
         EXPECT_EQ(buf_handle1->GetID(), 1);
         EXPECT_EQ(buf_handle1->GetFilename(), "/tmp/infinity/_tmp/c1.col");
 
-        ptr_t buf_ptr1 = buf_handle1->LoadData();
+        ObjectHandle object_handle1(buf_handle1);
+        ptr_t buf_ptr1 = object_handle1.GetData();
         for (i64 i = 0; i < elem_count; ++i) {
             ((i64 *) buf_ptr1)[i] = i;
         }
@@ -60,7 +62,8 @@ BufferMgrTest::SetUp() {
         EXPECT_EQ(buf_handle2->GetID(), 2);
         EXPECT_EQ(buf_handle2->GetFilename(), "/tmp/infinity/_tmp/c2.col");
 
-        ptr_t buf_ptr2 = buf_handle2->LoadData();
+        ObjectHandle object_handle2(buf_handle2);
+        ptr_t buf_ptr2 = object_handle2.GetData();
         for (i32 i = 0; i < elem_count; ++i) {
             ((i32 *) buf_ptr2)[i] = i + 10;
         }
@@ -107,11 +110,13 @@ TEST_F(BufferMgrTest, test1) {
     EXPECT_EQ(buf_handle->GetID(), 1);
     EXPECT_EQ(buf_handle->GetFilename(), "/tmp/infinity/data/c1.col");
 
-    ptr_t data_ptr = buf_handle->LoadData();
+    ObjectHandle object_handle(buf_handle);
+    ptr_t data_ptr = object_handle.GetData();
     EXPECT_NE(data_ptr, nullptr);
     buf_handle->UnloadData();
 
-    ptr_t data_ptr2 = buf_handle->LoadData();
+    ObjectHandle object_handle2(buf_handle);
+    ptr_t data_ptr2 = object_handle2.GetData();
     EXPECT_EQ(data_ptr, data_ptr2);
     buf_handle->UnloadData();
 
@@ -123,7 +128,8 @@ TEST_F(BufferMgrTest, test1) {
 
     EXPECT_TRUE(buf_handle->IsFree());
 
-    ptr_t data_ptr3 = buf_handle->LoadData();
+    ObjectHandle object_handle3(buf_handle);
+    ptr_t data_ptr3 = object_handle3.GetData();
     EXPECT_NE(data_ptr3, nullptr);
     buf_handle->UnloadData();
     EXPECT_EQ(buffer_mgr.current_memory_size_, 32768);
@@ -133,12 +139,14 @@ TEST_F(BufferMgrTest, test1) {
     BufferHandle* tmp_buf = buffer_mgr.AllocateBufferHandle(tmp_base_name, tmp_buf_name, 1024);
     EXPECT_EQ(tmp_buf->GetID(), 2);
     EXPECT_EQ(tmp_buf->GetFilename(), "/tmp/infinity/_tmp/t1.col.tmp");
-    ptr_t tmp_ptr = tmp_buf->LoadData();
+    ObjectHandle tmp_object_handle(tmp_buf);
+    ptr_t tmp_ptr = tmp_object_handle.GetData();
     EXPECT_NE(tmp_ptr, nullptr);
 
     BufferHandle* tmp_buf1 = buffer_mgr.GetBufferHandle(nullptr, tmp_buf_name, BufferType::kTempFile);
     EXPECT_EQ(tmp_buf, tmp_buf1);
-    ptr_t tmp1_ptr = tmp_buf1->LoadData();
+    ObjectHandle tmp_object_handle1(tmp_buf1);
+    ptr_t tmp1_ptr = tmp_object_handle1.GetData();
     EXPECT_EQ(tmp_ptr, tmp1_ptr);
 
     EXPECT_EQ(buffer_mgr.current_memory_size_, 33792);
@@ -151,7 +159,8 @@ TEST_F(BufferMgrTest, test1) {
     EXPECT_EQ(buffer_mgr.Free(memory_limit - 1), nullptr);
     EXPECT_EQ(buffer_mgr.current_memory_size_, 0);
 
-    tmp_ptr = tmp_buf->LoadData();
+    ObjectHandle tmp_object_handle2(tmp_buf);
+    tmp_ptr = tmp_object_handle2.GetData();
     EXPECT_EQ(buffer_mgr.current_memory_size_, 1024);
     tmp_buf1->UnloadData();
     EXPECT_EQ(buffer_mgr.Free(memory_limit - 1), nullptr);
