@@ -49,5 +49,6 @@ typedef uint32_t field_len_t;
 
 constexpr optionflag_t OPTION_FLAG_ALL = of_term_payload | of_doc_payload | of_position_payload | of_position_list | of_term_frequency;
 constexpr uint32_t MAX_DOC_PER_RECORD = 128;
+constexpr uint8_t SKIP_LIST_BUFFER_SIZE = 32;
 
 }
