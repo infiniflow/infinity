@@ -56,11 +56,13 @@ Txn::Append(const String& db_name, const String& table_name, const SharedPtr<Dat
     }
     table_store = txn_tables_store_[table_name].get();
 
+    wal_entry_->cmds.push_back(MakeShared<WalCmdAppend>(db_name, table_name, input_block));
     return table_store->Append(input_block);
 }
 
 UniquePtr<String>
 Txn::Delete(const String& db_name, const String& table_name, const Vector<RowID>& row_ids) {
+    wal_entry_->cmds.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
     return nullptr;
 }
 
@@ -230,7 +232,7 @@ Txn::CreateDatabase(const String& db_name, ConflictType conflict_type) {
     auto* db_entry = static_cast<DBEntry*>(res.entry_);
     txn_dbs_.insert(db_entry);
     db_names_.insert(db_name);
-    wal_entry_->created_databases_.push_back(db_name);
+    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateDatabase>(db_name));
     return res;
 }
 
@@ -265,7 +267,7 @@ Txn::DropDatabase(const String& db_name, ConflictType conflict_type) {
     } else {
         db_names_.insert(db_name);
     }
-    wal_entry_->dropped_databases_.push_back(db_name);
+    wal_entry_->cmds.push_back(MakeShared<WalCmdDropDatabase>(db_name));
     return res;
 }
 
@@ -334,7 +336,7 @@ Txn::CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def, Co
     auto* table_entry = static_cast<TableCollectionEntry*>(res.entry_);
     txn_tables_.insert(table_entry);
     table_names_.insert(*table_def->table_name());
-    wal_entry_->created_tables_.push_back(std::make_pair(db_name, table_def));
+    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
     return res;
 }
 
@@ -376,7 +378,7 @@ Txn::DropTableCollectionByName(const String& db_name, const String& table_name, 
     } else {
         table_names_.insert(table_name);
     }
-    wal_entry_->dropped_tables_.push_back(std::make_pair(db_name, table_name));
+    wal_entry_->cmds.push_back(MakeShared<WalCmdDropTable>(db_name, table_name));
     return res;
 }
 
@@ -477,23 +479,21 @@ Txn::BeginTxn() {
 }
 
 void
-Txn::BeginTxn(TxnTimeStamp begin_ts) {
-    txn_context_.BeginCommit(begin_ts);
-}
-
-void
 Txn::CommitTxn() {
-    CommitTxn(TxnManager::GetTimestamp());
-}
-
-void
-Txn::CommitTxn(TxnTimeStamp commit_ts) {
+    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
     txn_context_.SetTxnCommitting(commit_ts);
     //TODO: serializability validation. ASSUMES always valid for now.
-    //put wal entry to the manager
+    bool valid = true;
+    if(!valid) {
+        txn_mgr_->Invalidate(commit_ts);
+        txn_context_.SetTxnRollbacked();
+        return;
+    }
+    // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id = txn_id_;
+    wal_entry_->commit_ts = commit_ts;
     txn_mgr_->PutWalEntry(wal_entry_);
-    // Wait until wal has been persisted.
+    // Wait until CommitTxnBottom is done.
     std::unique_lock lk(m);
     cv.wait(lk, [this]{return done_bottom_;});
 }
@@ -552,12 +552,7 @@ Txn::CommitTxnBottom(){
 
 void
 Txn::RollbackTxn() {
-    RollbackTxn(TxnManager::GetTimestamp());
-}
-
-void
-Txn::RollbackTxn(TxnTimeStamp abort_ts) {
-
+    TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
     txn_context_.SetTxnRollbacking(abort_ts);
 
     for(const auto& base_entry: txn_tables_) {

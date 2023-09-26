@@ -12,12 +12,15 @@
 #include <list>
 #include <limits>
 #include <cstring>
+#include <map>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <sstream>
 #include <thread>
+#include <mutex>
 #include <shared_mutex>
+#include <condition_variable>
 
 namespace infinity {
 
@@ -48,6 +51,9 @@ using Vector = std::vector<T>;
 
 template<typename T>
 using List = std::list<T>;
+
+template<typename S, typename T>
+using Map = std::map<S, T>;
 
 template<typename T>
 using Set = std::set<T>;
