@@ -1264,6 +1264,11 @@ ExplainLogicalPlan::Explain(const LogicalImport* import_node,
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kFVECS: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: FVECS");
+            result->emplace_back(file_type);
+            break;
+        }
     }
 
     if(import_node->left_node() != nullptr or import_node->right_node() != nullptr) {
@@ -1321,6 +1326,11 @@ ExplainLogicalPlan::Explain(const LogicalExport* export_node,
         }
         case CopyFileType::kJSON: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: CSV");
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kFVECS: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: FVECS");
             result->emplace_back(file_type);
             break;
         }

@@ -29,6 +29,10 @@ LogicalExport::ToString(i64& space) {
             ss << "(JSON) ";
             break;
         }
+        case CopyFileType::kFVECS: {
+            ss << "(FVECS) ";
+            break;
+        }
     }
     ss << "to " << schema_name_ << '.' << table_name_;
 

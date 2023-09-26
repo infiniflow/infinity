@@ -26,6 +26,10 @@ CopyStatement::ToString() const {
             file_format = "JSON";
             break;
         }
+        case CopyFileType::kFVECS: {
+            file_format = "FVECS";
+            break;
+        }
     }
 
     ss << "COPY: " << schema_name_

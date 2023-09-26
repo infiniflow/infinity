@@ -7,7 +7,6 @@
 #include "base_entry.h"
 #include "common/types/internal_types.h"
 #include "storage/buffer/column_buffer.h"
-#include "storage/buffer/object_handle.h"
 #include "common/column_vector/column_vector.h"
 
 namespace infinity {
