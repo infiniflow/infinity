@@ -103,7 +103,7 @@ def generate_test_embedding(slt_path: str, csv_path: str, num: int, dim: int):
 #         Popen.wait()
 
 
-if __name__ == "__main__":
+def generate():
     print("Note: this script must be run under root directory of the project!")
     parser = argparse.ArgumentParser()
 
@@ -120,3 +120,6 @@ if __name__ == "__main__":
     slt_path = args.slt_dir + "/test_big_varchar.slt"
     csv_path = args.csv_dir + "/big_varchar.csv"
     generate_test_varchar(slt_path, csv_path, args.num, args.dim)
+
+if __name__ == "__main__":
+    generate()

@@ -1,7 +1,8 @@
 import argparse
 import os
 import shutil
-
+from generate_big import generate as generate1
+from generate_fvecs import generate as generate2
 
 def _main(sqllogictest_rs_path, src_dir, test_dir, dest_dir):
     # create dest_dir if it doesn't exist
@@ -75,4 +76,8 @@ def main():
 
 # main
 if __name__ == '__main__':
+    print("generating file")
+    generate1()
+    generate2()
+    print("generate file finsh")
     main()
