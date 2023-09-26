@@ -240,7 +240,7 @@ int32_t DataType::GetSizeInBytes() const {
             break;
         default:
             TypeError(
-                std::format("Unexpected type {} here.", int(this->type_)));
+                fmt::format("Unexpected type {} here.", int(this->type_)));
         }
     }
     return size;
@@ -281,7 +281,7 @@ void DataType::WriteAdv(char *&ptr) const {
         }
         default:
             TypeError(
-                std::format("Unexpected type {} here.", int(this->type_)));
+                fmt::format("Unexpected type {} here.", int(this->type_)));
         }
     }
     return;
@@ -368,7 +368,7 @@ DataType::Deserialize(const nlohmann::json& data_type_json) {
                 break;
             }
             default: {
-                TypeError(std::format("Unexpected type {} here.", int(logical_type)));
+                TypeError(fmt::format("Unexpected type {} here.", int(logical_type)));
             }
         }
     }

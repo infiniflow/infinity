@@ -66,7 +66,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, int32_t maxbytes) {
     }
     default:
         StorageError(
-            std::format("UNIMPLEMENTED ReadAdv for command {}", int(cmd_type)));
+            fmt::format("UNIMPLEMENTED ReadAdv for command {}", int(cmd_type)));
     }
     StorageAssert(ptr <= ptr_end,
                   "ptr goes out of range when reading DataBlock");

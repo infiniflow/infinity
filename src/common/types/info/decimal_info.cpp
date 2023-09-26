@@ -14,8 +14,8 @@ DecimalInfo::Make(i64 precision, i64 scale) {
         precision = 38;
         scale = 38;
     }
-    TypeAssert(scale <= precision, std::format("Decimal scale {} is greater than precision {}.", scale, precision));
-    TypeAssert(precision <= 38, std::format("Decimal precision {} is greater than 38.", precision));
+    TypeAssert(scale <= precision, fmt::format("Decimal scale {} is greater than precision {}.", scale, precision));
+    TypeAssert(precision <= 38, fmt::format("Decimal precision {} is greater than 38.", precision));
 
     return MakeShared<DecimalInfo>(precision, scale);
 }

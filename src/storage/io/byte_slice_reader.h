@@ -74,7 +74,6 @@ private:
     size_t GetSliceDataSize(ByteSlice* byte_slice) const {
         return byte_slice->size_;
     }
-    //inline ByteSlice* PrepareSlice(ByteSlice* byte_slice);
 
 private:
     ByteSlice* current_slice_;
