@@ -32,7 +32,7 @@ u32 FastPForWrapper<Codec>::Compress(
     const u32* src,
     u32 count,
     u32* dest,
-    size_t& outsize) {
+    size_t& outsize) const {
     auto& codec = this->impl_->codec;
     codec.encodeArray(src, count, dest, outsize);
     return outsize;
@@ -43,7 +43,7 @@ const u32* FastPForWrapper<Codec>::Decompress(
     const u32* src,
     u32 count,
     u32* dest,
-    size_t& outsize) {
+    size_t& outsize) const {
     auto& codec = this->impl_->codec;
     return codec.decodeArray(src, count, dest, outsize);
 }

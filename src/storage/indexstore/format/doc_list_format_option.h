@@ -105,16 +105,18 @@ public:
         uint8_t row_count = 0;
         uint32_t offset = 0;
         {
-            PostingValue* doc_id_value = new TypedPostingValue<uint32_t>;
+            TypedPostingValue<uint32_t>* doc_id_value = new TypedPostingValue<uint32_t>;
             doc_id_value->location_ = row_count++;
             doc_id_value->offset_ = offset;
+            doc_id_value->encoder_ = GetDocIDEncoder();
             values_.push_back(doc_id_value);
             offset += sizeof(uint32_t);
         }
         if(option.HasTfList()) {
-            PostingValue* tf_value = new TypedPostingValue<uint32_t>;
+            TypedPostingValue<uint32_t>* tf_value = new TypedPostingValue<uint32_t>;
             tf_value->location_ = row_count++;
             tf_value->offset_ = offset;
+            tf_value->encoder_ = GetTFEncoder();
             values_.push_back(tf_value);
             offset += sizeof(uint32_t);
         }

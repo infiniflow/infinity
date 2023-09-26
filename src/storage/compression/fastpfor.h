@@ -18,9 +18,9 @@ struct FastPForWrapper {
 
     ~FastPForWrapper();
 
-    u32 Compress(const u32* src, u32 count, u32* dest, size_t& outsize);
+    u32 Compress(const u32* src, u32 count, u32* dest, size_t& outsize) const;
 
-    const u32* Decompress(const u32* src, u32 count, u32* dest, size_t& outsize);
+    const u32* Decompress(const u32* src, u32 count, u32* dest, size_t& outsize) const;
 
     static void ApplyDelta(u32* src, size_t count);
 

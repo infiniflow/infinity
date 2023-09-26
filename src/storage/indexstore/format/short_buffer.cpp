@@ -3,8 +3,6 @@
 
 namespace infinity {
 
-#define MEMORY_BARRIER() __asm__ __volatile__("" ::: "memory")
-
 ShortBuffer::ShortBuffer(MemoryPool* pool)
     : buffer_(nullptr)
     , capacity_(0)
@@ -47,15 +45,9 @@ bool ShortBuffer::Reallocate() {
 
     is_buffer_valid_ = false;
 
-    MEMORY_BARRIER();
-
     buffer_ = new_buffer;
 
-    MEMORY_BARRIER();
-
     capacity_ = new_capacity;
-
-    MEMORY_BARRIER();
 
     is_buffer_valid_ = true;
 
@@ -111,9 +103,6 @@ bool ShortBuffer::SnapShot(ShortBuffer& short_buffer) {
     uint8_t* buffer_snapshot = buffer_;
     do {
         snapshot_capacity = capacity_;
-
-        MEMORY_BARRIER();
-
         buffer_snapshot = buffer_;
 
         BufferMemoryCopy(

@@ -40,9 +40,10 @@ typedef uint16_t docpayload_t;
 typedef uint8_t pospayload_t;
 typedef uint32_t termpayload_t;
 typedef uint8_t optionflag_t;
+typedef uint32_t docid_t;
 typedef uint32_t pos_t;
-typedef int32_t df_t;
-typedef int32_t tf_t;
+typedef uint32_t df_t;
+typedef uint32_t tf_t;
 typedef int64_t ttf_t;
 typedef uint32_t field_len_t;
 

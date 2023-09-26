@@ -60,10 +60,15 @@ public:
     }
 
     void Clear();
+
     bool SnapShot(ShortBuffer& buffer);
 
     MemoryPool* GetPool() const {
         return pool_;
+    }
+
+    const PostingValues* GetPostingValues() const { 
+        return posting_values_; 
     }
 
 private:
