@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 
-def main():
+def generate():
     parser = argparse.ArgumentParser()
     parser.add_argument("--num", type=int, default=1000)
     parser.add_argument("--dim", type=int, default=128)
@@ -60,5 +60,4 @@ def main():
 
 
 if __name__ == "__main__":
-    random.seed(1)
-    main()
+    generate()
