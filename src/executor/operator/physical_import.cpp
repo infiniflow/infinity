@@ -92,6 +92,7 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
 
     int dimension = 0;
     i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
+    fs.Seek(*file_handler, 0);
     if (nbytes != sizeof(dimension)) {
         ExecutorError(fmt::format("Read dimension which length isn't {}.", nbytes));
     }
@@ -100,10 +101,11 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
                                   dimension, embedding_info->Dimension()));
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
-    if (file_size % ((dimension + 1) * sizeof(float)) != 0) {
+    SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
+    if (file_size % row_size != 0) {
         ExecutorError("Weird file size.");
     }
-    SizeT vector_n = file_size / ((dimension + 1) * sizeof(float));
+    SizeT vector_n = file_size / row_size;
 
     Txn *txn = query_context->GetTxn();
     const String &table_name = *table_collection_entry_->table_collection_name_;
@@ -116,30 +118,32 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
                                                           query_context->GetTxn()->TxnID(),
                                                           TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
                                                           query_context->GetTxn()->GetBufferMgr());
-
-    SizeT wait_write = vector_n;
-
-    assert(wait_write);
-    while (true) {
-        ColumnDataEntry *column_data_entry = segment_entry->columns_[0].get();
-        SizeT to_write = std::min(wait_write, DEFAULT_SEGMENT_ROW);
-        ObjectHandle object_handle(column_data_entry->buffer_handle_);
-        ptr_t dst_ptr = object_handle.GetData() + 0 * sizeof(FloatT) * dimension;
-        SizeT nbytes = to_write * sizeof(FloatT) * dimension;
-        fs.Read(*file_handler, dst_ptr, nbytes);
-        
-        wait_write -= to_write;
-        txn_store->Import(segment_entry);
-        if (wait_write) {
+    ObjectHandle object_handle(segment_entry->columns_[0]->buffer_handle_);
+    SizeT row_idx = 0;
+    while(true) {
+        int dim;
+        i64 nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
+        if (dim != dimension) {
+            ExecutorError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).",
+                                      dim, dimension));
+        }
+        ptr_t dst_ptr = object_handle.GetData() + row_idx * sizeof(FloatT) * dimension;
+        fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
+        segment_entry->current_row_++;
+        row_idx++;
+        if (row_idx == vector_n) {
+            txn_store->Import(segment_entry);
+            break;
+        }
+        if (segment_entry->AvailableCapacity() == 0) {
+            txn_store->Import(segment_entry);
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
                                                               query_context->GetTxn()->TxnID(),
                                                               TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
                                                               query_context->GetTxn()->GetBufferMgr());
-        } else {
-            break;
+            object_handle = ObjectHandle(segment_entry->columns_[0]->buffer_handle_);
         }
     }
-    segment_entry->current_row_ = vector_n;
     return vector_n;
 }
 
