@@ -56,11 +56,13 @@ Txn::Append(const String& db_name, const String& table_name, const SharedPtr<Dat
     }
     table_store = txn_tables_store_[table_name].get();
 
+    wal_entry_->cmds.push_back(MakeShared<WalCmdAppend>(db_name, table_name, input_block));
     return table_store->Append(input_block);
 }
 
 UniquePtr<String>
 Txn::Delete(const String& db_name, const String& table_name, const Vector<RowID>& row_ids) {
+    wal_entry_->cmds.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
     return nullptr;
 }
 

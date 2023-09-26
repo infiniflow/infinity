@@ -40,44 +40,23 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, int32_t maxbytes) {
         cmd = MakeShared<WalCmdDropTable>(db_name, table_name);
         break;
     }
-    case WalCommandType::INSERT_DATABLOCK: {
+    case WalCommandType::APPEND: {
         String db_name = ReadBufAdv<String>(ptr);
         String table_name = ReadBufAdv<String>(ptr);
-        auto cmd2 = MakeShared<WalCmdInsertDataBlock>(db_name, table_name);
-        int32_t cnt = ReadBufAdv<int32_t>(ptr);
-        for (int32_t i = 0; i < cnt; ++i) {
-            int32_t maxbytes2 = maxbytes;
-            StorageAssert(maxbytes2 > 0,
-                          "buffer is exhausted when reading WalEntry");
-            SharedPtr<DataBlock> block = block->ReadAdv(ptr, maxbytes2);
-            cmd2->blocks.push_back(block);
-        }
-        cmd = cmd2;
+        SharedPtr<DataBlock> block = block->ReadAdv(ptr, ptr_end - ptr);
+        cmd = MakeShared<WalCmdAppend>(db_name, table_name, block);
         break;
     }
-    case WalCommandType::DELETE_ROWS: {
+    case WalCommandType::DELETE: {
         String db_name = ReadBufAdv<String>(ptr);
         String table_name = ReadBufAdv<String>(ptr);
-        auto cmd2 = MakeShared<WalCmdDeleteRows>(db_name, table_name);
         int32_t cnt = ReadBufAdv<int32_t>(ptr);
-        try {
-            for (int32_t i = 0; i < cnt; ++i) {
-                u64 segment_id = ReadBufAdv<u64>(ptr);
-                int32_t bm_size = ReadBufAdv<int32_t>(ptr);
-                StorageAssert(maxbytes > 0,
-                              "buffer is exhausted when reading WalEntry");
-                SharedPtr<roaring::Roaring> bm =
-                    std::make_shared<roaring::Roaring>();
-                roaring::Roaring r = roaring::Roaring::read(ptr);
-                bm->swap(r);
-                ptr += bm_size;
-                cmd2->deleted_rows.insert(std::make_pair(segment_id, bm));
-            }
-            cmd = cmd2;
-        } catch (const std::exception &e) {
-            StorageError(
-                std::format("roaring::Roaring::read failed. {}", e.what()));
+        Vector<RowID> row_ids;
+        for (int32_t i = 0; i < cnt; ++i) {
+            RowID row_id = ReadBufAdv<RowID>(ptr);
+            row_ids.push_back(row_id);
         }
+        cmd = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
         break;
     }
     case WalCommandType::CHECKPOINT: {
@@ -101,33 +80,23 @@ bool WalCmdCreateTable::operator==(const WalCmd &other) const {
            *table_def == *other_cmd->table_def;
 }
 
-bool WalCmdInsertDataBlock::operator==(const WalCmd &other) const {
-    auto other_cmd = dynamic_cast<const WalCmdInsertDataBlock *>(&other);
+bool WalCmdAppend::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdAppend *>(&other);
     if (other_cmd == nullptr || db_name != other_cmd->db_name ||
-        table_name != other_cmd->table_name ||
-        blocks.size() != other_cmd->blocks.size())
+        table_name != other_cmd->table_name)
         return false;
-    for (int32_t i = 0; i < blocks.size(); i++) {
-        if (blocks[i] == nullptr || other_cmd->blocks[i] == nullptr)
-            return false;
-    }
     return true;
 }
 
-bool WalCmdDeleteRows::operator==(const WalCmd &other) const {
-    auto other_cmd = dynamic_cast<const WalCmdDeleteRows *>(&other);
+bool WalCmdDelete::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdDelete *>(&other);
     if (other_cmd == nullptr || db_name != other_cmd->db_name ||
         table_name != other_cmd->table_name ||
-        deleted_rows.size() != other_cmd->deleted_rows.size())
+        row_ids.size() != other_cmd->row_ids.size())
         return false;
-    auto it1 = deleted_rows.begin();
-    auto it2 = other_cmd->deleted_rows.begin();
-    for (size_t i = 0; i < deleted_rows.size(); i++) {
-        u64 segment_id1 = it1->first;
-        u64 segment_id2 = it2->first;
-        const SharedPtr<roaring::Roaring> &r1 = it1->second;
-        const SharedPtr<roaring::Roaring> &r2 = it2->second;
-        if (*r1 != *r2)
+    for (size_t i = 0; i < row_ids.size(); i++) {
+        if (row_ids[i].block != other_cmd->row_ids[i].block ||
+            row_ids[i].offset != other_cmd->row_ids[i].offset)
             return false;
     }
     return true;
@@ -156,24 +125,15 @@ int32_t WalCmdDropTable::GetSizeInBytes() const {
            sizeof(int32_t) + this->table_name.size();
 }
 
-int32_t WalCmdInsertDataBlock::GetSizeInBytes() const {
-    int32_t size = sizeof(WalCommandType) + sizeof(int32_t) +
-                   this->db_name.size() + sizeof(int32_t) +
-                   this->table_name.size() + sizeof(int32_t);
-    for (const auto &block : this->blocks) {
-        size += block->GetSizeInBytes();
-    }
-    return size;
+int32_t WalCmdAppend::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() +
+           sizeof(int32_t) + this->table_name.size() + block->GetSizeInBytes();
 }
 
-int32_t WalCmdDeleteRows::GetSizeInBytes() const {
-    int32_t size = sizeof(WalCommandType) + sizeof(int32_t) +
-                   this->db_name.size() + sizeof(int32_t) +
-                   this->table_name.size() + sizeof(int32_t);
-    for (const auto &item : this->deleted_rows) {
-        size += sizeof(u64) + sizeof(int32_t) + item.second->getSizeInBytes();
-    }
-    return size;
+int32_t WalCmdDelete::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() +
+           sizeof(int32_t) + this->table_name.size() + sizeof(int32_t) +
+           row_ids.size() * sizeof(RowID);
 }
 
 int32_t WalCmdCheckpoint::GetSizeInBytes() const {
@@ -202,25 +162,20 @@ void WalCmdDropTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->table_name);
 }
 
-void WalCmdInsertDataBlock::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, WalCommandType::INSERT_DATABLOCK);
+void WalCmdAppend::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::APPEND);
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
-    WriteBufAdv(buf, static_cast<int32_t>(this->blocks.size()));
-    for (const auto &block : this->blocks) {
-        block->WriteAdv(buf);
-    }
+    block->WriteAdv(buf);
 }
 
-void WalCmdDeleteRows::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, WalCommandType::DELETE_ROWS);
+void WalCmdDelete::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::DELETE);
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
-    WriteBufAdv(buf, static_cast<int32_t>(this->deleted_rows.size()));
-    for (const auto &item : this->deleted_rows) {
-        WriteBufAdv(buf, item.first); // segment id
-        const SharedPtr<roaring::Roaring> &r = item.second;
-        r->write(buf);
+    WriteBufAdv(buf, static_cast<int32_t>(this->row_ids.size()));
+    for (const auto &row_id : this->row_ids) {
+        WriteBufAdv(buf, row_id);
     }
 }
 

@@ -22,8 +22,8 @@ enum class WalCommandType : uint8_t {
     // -----------------------------
     // Data
     // -----------------------------
-    INSERT_DATABLOCK = 21,
-    DELETE_ROWS = 22,
+    APPEND = 21,
+    DELETE = 22,
     // -----------------------------
     // Flush
     // -----------------------------
@@ -97,28 +97,28 @@ struct WalCmdDropTable : public WalCmd {
     String table_name;
 };
 
-struct WalCmdInsertDataBlock : public WalCmd {
-    WalCmdInsertDataBlock(const String &db_name_, const String &table_name_)
-        : db_name(db_name_), table_name(table_name_) {}
-    virtual WalCommandType GetType() { return WalCommandType::INSERT_DATABLOCK; }
+struct WalCmdAppend : public WalCmd {
+    WalCmdAppend(const String &db_name_, const String &table_name_, const SharedPtr<DataBlock>& block_)
+        : db_name(db_name_), table_name(table_name_), block(block_) {}
+    virtual WalCommandType GetType() { return WalCommandType::APPEND; }
     virtual bool operator==(const WalCmd &other) const;
     virtual int32_t GetSizeInBytes() const;
     virtual void WriteAdv(char *&buf) const;
     String db_name;
     String table_name;
-    Vector<SharedPtr<DataBlock>> blocks;
+    SharedPtr<DataBlock> block;
 };
 
-struct WalCmdDeleteRows : public WalCmd {
-    WalCmdDeleteRows(const String &db_name_, const String &table_name_)
-        : db_name(db_name_), table_name(table_name_) {}
-    virtual WalCommandType GetType() { return WalCommandType::DELETE_ROWS; }
+struct WalCmdDelete : public WalCmd {
+    WalCmdDelete(const String &db_name_, const String &table_name_, const Vector<RowID>&row_ids_)
+        : db_name(db_name_), table_name(table_name_), row_ids(row_ids_) {}
+    virtual WalCommandType GetType() { return WalCommandType::DELETE; }
     virtual bool operator==(const WalCmd &other) const;
     virtual int32_t GetSizeInBytes() const;
     virtual void WriteAdv(char *&buf) const;
     String db_name;
     String table_name;
-    Map<u64, SharedPtr<roaring::Roaring>> deleted_rows;
+    Vector<RowID> row_ids;
 };
 
 struct WalCmdCheckpoint : public WalCmd {
