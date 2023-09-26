@@ -88,7 +88,7 @@ TEST_F(TableDefTest, ReadWrite) {
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
         auto column_def_ptr = MakeShared<ColumnDef>(column_id ++,
-                                                    MakeShared<DataType>(DataType(LogicalType::kVarchar)),
+                                                    MakeShared<DataType>(LogicalType::kVarchar, VarcharInfo::Make(8196)),
                                                     "c2",
                                                     constraints);
         columns.emplace_back(column_def_ptr);

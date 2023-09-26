@@ -142,18 +142,21 @@ TEST_F(DataTypeTest, ReadWrite) {
     SharedPtr<TypeInfo> type_info_decimal = DecimalInfo::Make(i64(38), i64(3));
     SharedPtr<TypeInfo> type_info_embedding =
         EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 256);
+    SharedPtr<TypeInfo> type_info_varchar = VarcharInfo::Make(8196);
     EXPECT_NE(type_info_bitmap, nullptr);
     EXPECT_NE(type_info_decimal, nullptr);
     EXPECT_NE(type_info_embedding, nullptr);
+    EXPECT_NE(type_info_varchar, nullptr);
 
     std::vector<SharedPtr<DataType>> data_types = {
         MakeShared<DataType>(LogicalType::kTinyInt),
         MakeShared<DataType>(LogicalType::kFloat),
-        MakeShared<DataType>(LogicalType::kVarchar),
         MakeShared<DataType>(LogicalType::kTuple),
         MakeShared<DataType>(LogicalType::kBitmap, type_info_bitmap),
         MakeShared<DataType>(LogicalType::kDecimal, type_info_decimal),
-        MakeShared<DataType>(LogicalType::kEmbedding, type_info_embedding)};
+        MakeShared<DataType>(LogicalType::kEmbedding, type_info_embedding),
+        MakeShared<DataType>(LogicalType::kVarchar, type_info_varchar),
+    };
 
     for (int i = 0; i < data_types.size(); i++) {
         SharedPtr<DataType> &data_type = data_types[i];
