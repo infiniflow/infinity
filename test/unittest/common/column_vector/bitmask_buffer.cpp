@@ -60,3 +60,32 @@ TEST_F(BitmaskBufferTest, bitmask_buffer_a) {
         EXPECT_EQ(bitmask_buffer_ptr->count_, bit_count);
     }
 }
+
+TEST_F(BitmaskBufferTest, ReadWrite) {
+    using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(),
+              test_info_->name());
+
+    constexpr size_t bit_count = 8192;
+    std::vector<SharedPtr<Bitmask>> masks = {Bitmask::Make(bit_count),
+                                             Bitmask::Make(bit_count),
+                                             Bitmask::Make(bit_count)};
+    masks[1]->SetAllFalse();
+    masks[2]->SetFalse(4096);
+
+    for (int i = 0; i < 3; i++) {
+        auto &bitmask = masks[i];
+        int32_t exp_size = bitmask->GetSizeInBytes();
+        std::vector<char> buf(exp_size);
+        char *ptr = buf.data();
+
+        bitmask->WriteAdv(ptr);
+        EXPECT_EQ(ptr - buf.data(), exp_size);
+
+        ptr = buf.data();
+        auto bitmask2 = Bitmask::ReadAdv(ptr, exp_size);
+        EXPECT_EQ(ptr - buf.data(), exp_size);
+        EXPECT_NE(bitmask2, nullptr);
+        EXPECT_EQ(*bitmask, *bitmask2);
+    }
+}

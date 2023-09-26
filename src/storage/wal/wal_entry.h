@@ -45,14 +45,9 @@ struct WalCmd {
     operator==(const WalCmd& other) const {
         return typeid(*this) == typeid(other);
     }
-    bool
-    operator!=(const WalCmd& other) { return !(*this == other); }
-
-    // Estimated serialized size in bytes, ensured be no less than Write
-    // requires, allowed be larger.
-    virtual int32_t
-    GetSizeInBytes() const = 0;
-
+    bool operator!=(const WalCmd &other) { return !(*this == other); }
+    // Estimated serialized size in bytes
+    virtual int32_t GetSizeInBytes() const = 0;
     // Write to a char buffer
     virtual void
     WriteAdv(char*& buf) const = 0;
