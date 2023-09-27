@@ -6,6 +6,7 @@
 
 #include <utility>
 #include "common/utility/infinity_assert.h"
+#include "common/utility/serializable.h"
 #include "storage/buffer/column_buffer.h"
 
 namespace infinity {
@@ -1921,6 +1922,166 @@ ColumnVector::Reset() {
 
     // 8. Reset initialized flag
     initialized = false;
+}
+
+
+bool ColumnVector::operator==(const ColumnVector &other) const {
+    // initialized, data_type_, vector_type_, data_ptr_[0..tail_index_ * data_type_size_]
+    if (!this->initialized && !other.initialized)
+        return true;
+    if (this->data_type_ == nullptr || other.data_type_ == nullptr ||
+        (*this->data_type_).operator!=(*other.data_type_) ||
+        this->data_type_size_ != other.data_type_size_ ||
+        this->vector_type_ != other.vector_type_ ||
+        this->tail_index_ != other.tail_index_)
+        return false;
+    switch(data_type_->type()) {
+        case kBoolean:
+        case kTinyInt:
+        case kSmallInt:
+        case kInteger:
+        case kBigInt:
+        case kHugeInt:
+        case kDecimal:
+        case kFloat:
+        case kDouble:
+        case kDate:
+        case kTime:
+        case kDateTime:
+        case kTimestamp:
+        case kInterval:
+        case kPoint:
+        case kLine:
+        case kLineSeg:
+        case kBox:
+        case kCircle:
+        case kBitmap:
+        case kUuid:
+        case kEmbedding: {
+            return 0==memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_ * this->data_type_size_);
+        }
+        default:
+            NotImplementError(std::format("Not supported data_type {}", int(data_type_->type())));
+    }
+    return true;
+}
+
+int32_t ColumnVector::GetSizeInBytes() const{
+    StorageAssert(initialized, "Column vector isn't initialized.")
+    NotImplementAssert(vector_type_==ColumnVectorType::kFlat || vector_type_==ColumnVectorType::kConstant, std::format("Not supported vector_type {}", int(vector_type_)));
+    int32_t size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
+    switch(data_type_->type()) {
+        case kBoolean:
+        case kTinyInt:
+        case kSmallInt:
+        case kInteger:
+        case kBigInt:
+        case kHugeInt:
+        case kDecimal:
+        case kFloat:
+        case kDouble:
+        case kDate:
+        case kTime:
+        case kDateTime:
+        case kTimestamp:
+        case kInterval:
+        case kPoint:
+        case kLine:
+        case kLineSeg:
+        case kBox:
+        case kCircle:
+        case kBitmap:
+        case kUuid:
+        case kEmbedding: {
+            size += sizeof(int32_t) + this->tail_index_ * this->data_type_size_;
+            break;
+        }
+        default:
+            NotImplementError(std::format("Not supported data_type {}", data_type_->ToString()));
+    }
+    return size;
+}
+
+void ColumnVector::WriteAdv(char *&ptr) const{
+    StorageAssert(initialized, "Column vector isn't initialized.")
+    NotImplementAssert(vector_type_==ColumnVectorType::kFlat || vector_type_==ColumnVectorType::kConstant, std::format("Not supported vector_type {}", int(vector_type_)));
+    this->data_type_->WriteAdv(ptr);
+    WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
+    switch(data_type_->type()) {
+        case kBoolean:
+        case kTinyInt:
+        case kSmallInt:
+        case kInteger:
+        case kBigInt:
+        case kHugeInt:
+        case kDecimal:
+        case kFloat:
+        case kDouble:
+        case kDate:
+        case kTime:
+        case kDateTime:
+        case kTimestamp:
+        case kInterval:
+        case kPoint:
+        case kLine:
+        case kLineSeg:
+        case kBox:
+        case kCircle:
+        case kBitmap:
+        case kUuid:
+        case kEmbedding: {
+            WriteBufAdv<int32_t>(ptr, tail_index_);
+            memcpy(ptr, this->data_ptr_, this->tail_index_ * this->data_type_size_);
+            ptr += this->tail_index_ * this->data_type_size_;
+            break;
+        }
+        default:
+            NotImplementError(std::format("Not supported data_type {}", data_type_->ToString()));
+    }
+    return;
+}
+
+SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, int32_t maxbytes){
+    const char *ptr_end = ptr + maxbytes;
+    SharedPtr<DataType> data_type = DataType::ReadAdv(ptr, maxbytes);
+    ColumnVectorType vector_type = ReadBufAdv<ColumnVectorType>(ptr);
+    SharedPtr<ColumnVector> column_vector = ColumnVector::Make(data_type);
+    column_vector->Initialize(vector_type, DEFAULT_VECTOR_SIZE);
+    switch(data_type->type()) {
+        case kBoolean:
+        case kTinyInt:
+        case kSmallInt:
+        case kInteger:
+        case kBigInt:
+        case kHugeInt:
+        case kDecimal:
+        case kFloat:
+        case kDouble:
+        case kDate:
+        case kTime:
+        case kDateTime:
+        case kTimestamp:
+        case kInterval:
+        case kPoint:
+        case kLine:
+        case kLineSeg:
+        case kBox:
+        case kCircle:
+        case kBitmap:
+        case kUuid:
+        case kEmbedding: {
+            int32_t tail_index = ReadBufAdv<int32_t>(ptr);
+            column_vector->tail_index_ = tail_index;
+            int32_t data_type_size = data_type->Size();
+            memcpy((void *)column_vector->data_ptr_, ptr, tail_index * data_type_size);
+            ptr += tail_index * data_type_size;
+            break;
+        }
+        default:
+            NotImplementError(std::format("Not supported data_type {}", data_type->ToString()));
+    }
+    StorageAssert(ptr <= ptr_end, "ptr goes out of range when reading ColumnVector");
+    return column_vector;
 }
 
 }

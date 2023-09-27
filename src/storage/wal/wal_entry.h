@@ -49,12 +49,9 @@ struct WalCmd {
     // Estimated serialized size in bytes
     virtual int32_t GetSizeInBytes() const = 0;
     // Write to a char buffer
-    virtual void
-    WriteAdv(char*& buf) const = 0;
-
+    virtual void WriteAdv(char *&ptr) const = 0;
     // Read from a serialized version
-    static SharedPtr<WalCmd>
-    ReadAdv(char*& buf, int32_t maxbytes);
+    static SharedPtr<WalCmd> ReadAdv(char *&ptr, int32_t maxbytes);
 };
 
 struct WalCmdCreateDatabase : public WalCmd {
@@ -216,12 +213,9 @@ struct WalEntry : WalEntryHeader {
     GetSizeInBytes() const;
 
     // Write to a char buffer
-    void
-    WriteAdv(char*& buf) const;
-
+    void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<WalEntry>
-    ReadAdv(char*& buf, int32_t maxbytes);
+    static SharedPtr<WalEntry> ReadAdv(char *&ptr, int32_t maxbytes);
 
     Vector<SharedPtr<WalCmd>> cmds;
 

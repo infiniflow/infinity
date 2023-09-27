@@ -260,10 +260,9 @@ WalEntry::WriteAdv(char*& ptr) const {
     return;
 }
 
-SharedPtr<WalEntry>
-WalEntry::ReadAdv(char*& ptr, int32_t maxbytes) {
-    char* const ptr_end = ptr + maxbytes;
-    StorageAssert(maxbytes > 0, "buffer is exhausted when reading WalEntry");
+SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t maxbytes) {
+    char *const ptr_end = ptr + maxbytes;
+    StorageAssert(maxbytes > 0, "ptr goes out of range when reading WalEntry");
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     WalEntryHeader* header = (WalEntryHeader*)ptr;
     entry->size = header->size;
@@ -285,12 +284,12 @@ WalEntry::ReadAdv(char*& ptr, int32_t maxbytes) {
     for(size_t i = 0; i < cnt; i++) {
         maxbytes = ptr_end - ptr;
         StorageAssert(maxbytes > 0,
-                      "buffer is exhausted when reading WalEntry");
+                      "ptr goes out of range when reading WalEntry");
         SharedPtr<WalCmd> cmd = WalCmd::ReadAdv(ptr, maxbytes);
         entry->cmds.push_back(cmd);
     }
     ptr += sizeof(int32_t);
-    StorageAssert(ptr <= ptr_end, "buffer is exhausted when reading WalEntry");
+    StorageAssert(ptr <= ptr_end, "ptr goes out of range when reading WalEntry");
     return entry;
 }
 

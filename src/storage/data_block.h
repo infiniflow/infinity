@@ -24,12 +24,9 @@ public:
     GetSizeInBytes() const;
 
     // Write to a char buffer
-    void
-    WriteAdv(char*& buf) const;
-
+    void WriteAdv(char* &ptr) const;
     // Read from a serialized version
-    static SharedPtr<DataBlock>
-    ReadAdv(char*& buf, int32_t maxbytes);
+    static SharedPtr<DataBlock> ReadAdv(char* &ptr, int32_t maxbytes);
 
 public:
 

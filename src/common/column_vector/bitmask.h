@@ -85,9 +85,9 @@ public:
     // Estimated serialized size in bytes
     int32_t GetSizeInBytes() const;
     // Write to a char buffer
-    void WriteAdv(char *&buf) const;
+    void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<Bitmask> ReadAdv(char *&buf, int32_t maxbytes);
+    static SharedPtr<Bitmask> ReadAdv(char *&ptr, int32_t maxbytes);
 
 private:
     u64* data_ptr_{nullptr};
