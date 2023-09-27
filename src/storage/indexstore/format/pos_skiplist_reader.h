@@ -4,16 +4,21 @@
 #include "storage/io/byte_slice_reader.h"
 
 namespace infinity{
-class SkipListReader{
+class PosSkipListReader{
 public:
-    SkipListReader();
-    ~SkipListReader();
+    PosSkipListReader();
+    PosSkipListReader(const PosSkipListReader& other) noexcept;
+    ~PosSkipListReader();
 public:
-    void Load(const ByteSliceList* byte_slice_list, uint32_t start, uint32_t end);
+    void Load(const ByteSliceList* byte_slice_list, uint32_t start, uint32_t end, const uint32_t& item_count);
 
-    void Load(ByteSlice* byte_slice, uint32_t start, uint32_t end);
+    void Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count);
 
-    bool SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_key, uint32_t& delta_value);
+    bool SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_key, uint32_t& value, uint32_t& delta);
+
+    bool SkipTo(uint32_t query_key, uint32_t& key, uint32_t& value, uint32_t& delta) {
+        return SkipTo(query_key, key, prev_key_, value, delta);
+    }
 
     uint32_t GetStart() const {
         return start_;
@@ -35,6 +40,10 @@ public:
         return current_key_; 
     }
 
+private:
+    void Load_(uint32_t start, uint32_t end, const uint32_t& item_count);
+
+    std::pair<int, bool> LoadBuffer();
 private:
     uint32_t start_;
     uint32_t end_;
