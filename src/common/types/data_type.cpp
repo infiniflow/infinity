@@ -144,41 +144,56 @@ DataType::GetSizeInBytes() const {
 void
 DataType::WriteAdv(char*& ptr) const {
     WriteBufAdv<LogicalType>(ptr, this->type_);
-    if(this->type_info_ != nullptr) {
-        switch(this->type_) {
-            case LogicalType::kArray:
-                NotImplementError("Array isn't implemented here.");
-                break;
-            case LogicalType::kBitmap: {
-                const BitmapInfo* bi =
-                        dynamic_cast<BitmapInfo*>(this->type_info_.get());
-                WriteBufAdv<i64>(ptr, i64(bi->length_limit()));
-                break;
-            }
-            case LogicalType::kDecimal: {
-                const DecimalInfo* di =
-                        dynamic_cast<DecimalInfo*>(this->type_info_.get());
-                WriteBufAdv<i64>(ptr, i64(di->precision()));
-                WriteBufAdv<i64>(ptr, i64(di->scale()));
-                break;
-            }
-            case LogicalType::kEmbedding: {
-                const EmbeddingInfo* ei =
-                        dynamic_cast<EmbeddingInfo*>(this->type_info_.get());
-                WriteBufAdv<EmbeddingDataType>(ptr, ei->Type());
-                WriteBufAdv<int32_t>(ptr, int32_t(ei->Dimension()));
-                break;
-            }
-            case LogicalType::kVarchar: {
-                const VarcharInfo* ei =
-                        dynamic_cast<VarcharInfo*>(this->type_info_.get());
-                WriteBufAdv<int32_t>(ptr, ei->dimension());
-                break;
-            }
-            default: {
-                TypeError(fmt::format("Unexpected type {} here.", int(this->type_)));
+    switch (this->type_) {
+    case LogicalType::kArray:
+        NotImplementError("Array isn't implemented here.");
+        break;
+    case LogicalType::kBitmap: {
+        i64 lmt = MAX_BITMAP_SIZE;
+        if (this->type_info_ != nullptr){
+            const BitmapInfo *bi =
+                dynamic_cast<BitmapInfo *>(this->type_info_.get());
+            if (bi != nullptr)
+                lmt = bi->length_limit();
+        }
+        WriteBufAdv<i64>(ptr, lmt);
+        break;
+    }
+    case LogicalType::kDecimal: {
+        i64 precision = 0;
+        i64 scale = 0;
+        if (this->type_info_ != nullptr) {
+            const DecimalInfo *di =
+            dynamic_cast<DecimalInfo *>(this->type_info_.get());
+            if (di != nullptr){
+                precision = di->precision();
+                scale = di->scale();
             }
         }
+        WriteBufAdv<i64>(ptr, precision);
+        WriteBufAdv<i64>(ptr, scale);
+        break;
+    }
+    case LogicalType::kEmbedding: {
+        const EmbeddingInfo *ei =
+            dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
+        TypeAssert(ei!=nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
+        WriteBufAdv<EmbeddingDataType>(ptr, ei->Type());
+        WriteBufAdv<int32_t>(ptr, int32_t(ei->Dimension()));
+        break;
+    }
+    case LogicalType::kVarchar: {
+        int32_t capacity = MAX_VARCHAR_SIZE;
+        if (this->type_info_ != nullptr) {
+            const VarcharInfo *vi =
+                dynamic_cast<VarcharInfo *>(this->type_info_.get());
+            if (vi != nullptr)
+                capacity = vi->dimension();
+        }
+        WriteBufAdv<int32_t>(ptr, capacity);
+        break;
+    }
+    default:
     }
     return;
 }

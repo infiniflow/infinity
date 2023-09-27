@@ -1929,39 +1929,42 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
     // initialized, data_type_, vector_type_, data_ptr_[0..tail_index_ * data_type_size_]
     if (!this->initialized && !other.initialized)
         return true;
-    if (this->data_type_ == nullptr || other.data_type_ == nullptr ||
+    if (!this->initialized || !other.initialized ||
+        this->data_type_ == nullptr || other.data_type_ == nullptr ||
         (*this->data_type_).operator!=(*other.data_type_) ||
         this->data_type_size_ != other.data_type_size_ ||
         this->vector_type_ != other.vector_type_ ||
         this->tail_index_ != other.tail_index_)
         return false;
-    switch(data_type_->type()) {
-        case kBoolean:
-        case kTinyInt:
-        case kSmallInt:
-        case kInteger:
-        case kBigInt:
-        case kHugeInt:
-        case kDecimal:
-        case kFloat:
-        case kDouble:
-        case kDate:
-        case kTime:
-        case kDateTime:
-        case kTimestamp:
-        case kInterval:
-        case kPoint:
-        case kLine:
-        case kLineSeg:
-        case kBox:
-        case kCircle:
-        case kBitmap:
-        case kUuid:
-        case kEmbedding: {
-            return 0==memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_ * this->data_type_size_);
-        }
-        default:
-            NotImplementError(std::format("Not supported data_type {}", int(data_type_->type())));
+    switch (data_type_->type()) {
+    case kBoolean:
+    case kTinyInt:
+    case kSmallInt:
+    case kInteger:
+    case kBigInt:
+    case kHugeInt:
+    case kDecimal:
+    case kFloat:
+    case kDouble:
+    case kDate:
+    case kTime:
+    case kDateTime:
+    case kTimestamp:
+    case kInterval:
+    case kPoint:
+    case kLine:
+    case kLineSeg:
+    case kBox:
+    case kCircle:
+    case kBitmap:
+    case kUuid:
+    case kEmbedding: {
+        return 0 == memcmp(this->data_ptr_, other.data_ptr_,
+                           this->tail_index_ * this->data_type_size_);
+    }
+    default:
+        NotImplementError(
+            std::format("Not supported data_type {}", int(data_type_->type())));
     }
     return true;
 }
@@ -1997,6 +2000,7 @@ int32_t ColumnVector::GetSizeInBytes() const{
             break;
         }
         default:
+            //TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
             NotImplementError(std::format("Not supported data_type {}", data_type_->ToString()));
     }
     return size;
@@ -2036,6 +2040,7 @@ void ColumnVector::WriteAdv(char *&ptr) const{
             break;
         }
         default:
+            //TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
             NotImplementError(std::format("Not supported data_type {}", data_type_->ToString()));
     }
     return;
@@ -2078,6 +2083,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, int32_t maxbytes){
             break;
         }
         default:
+            //TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
             NotImplementError(std::format("Not supported data_type {}", data_type->ToString()));
     }
     StorageAssert(ptr <= ptr_end, "ptr goes out of range when reading ColumnVector");
