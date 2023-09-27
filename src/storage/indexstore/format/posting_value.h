@@ -55,6 +55,7 @@ struct EncoderTypeTraits<uint32_t> {
 extern const Int32Encoder* GetDocIDEncoder();
 extern const Int32Encoder* GetTFEncoder();
 extern const Int16Encoder* GetDocPayloadEncoder();
+extern const Int32Encoder* GetSkipListEncoder();
 
 template<typename T>
 struct TypedPostingValue : public PostingValue {

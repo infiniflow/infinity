@@ -36,5 +36,8 @@ const Int16Encoder* GetDocPayloadEncoder() {
     return EncoderProvider::GetInstance()->GetInt16Encoder();
 }
 
+const Int32Encoder* GetSkipListEncoder() {
+    return EncoderProvider::GetInstance()->GetInt32Encoder();
+}
 
 }

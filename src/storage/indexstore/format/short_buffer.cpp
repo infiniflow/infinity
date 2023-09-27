@@ -41,7 +41,7 @@ bool ShortBuffer::Reallocate() {
     uint8_t* new_buffer = (uint8_t*)Allocate(doc_item_size);
     assert(new_buffer);
 
-    BufferMemoryCopy(new_buffer, new_capacity, (uint8_t*)buffer_, capacity_, size_);
+    BufferMemoryCopy(new_buffer, new_capacity, (uint8_t*)buffer_, capacity_, posting_values_, size_);
 
     is_buffer_valid_ = false;
 
@@ -66,12 +66,13 @@ void ShortBuffer::ReleaseBuffer(uint8_t* buffer, uint8_t capacity) {
 
 void ShortBuffer::BufferMemoryCopy(
     uint8_t* dst, uint8_t dst_col_count, 
-    uint8_t* src, uint8_t src_col_count, uint8_t src_size) {
+    uint8_t* src, uint8_t src_col_count, 
+    const PostingValues* posting_values, uint8_t src_size) {
     if (src == nullptr || src_size == 0) {
         return;
     }
-    for (uint8_t i = 0; i < posting_values_->GetSize(); ++i) {
-        const PostingValue* value = posting_values_->GetValue(i);
+    for (uint8_t i = 0; i < posting_values->GetSize(); ++i) {
+        const PostingValue* value = posting_values->GetValue(i);
         memcpy(
             GetRow(dst, dst_col_count, value), 
             GetRow(src, src_col_count, value), 
@@ -83,7 +84,7 @@ void ShortBuffer::Clear() {
     size_ = 0;
 }
 
-bool ShortBuffer::SnapShot(ShortBuffer& short_buffer) {
+bool ShortBuffer::SnapShot(ShortBuffer& short_buffer) const {
     short_buffer.Clear();
 
     if (short_buffer.GetRowCount() != posting_values_->GetSize()) {
@@ -107,7 +108,8 @@ bool ShortBuffer::SnapShot(ShortBuffer& short_buffer) {
 
         BufferMemoryCopy(
             (uint8_t*)short_buffer.buffer_, short_buffer.capacity_, 
-            (uint8_t*)buffer_snapshot, snapshot_capacity, snapshot_size);
+            (uint8_t*)buffer_snapshot, snapshot_capacity, 
+            posting_values_, snapshot_size);
     } while (!is_buffer_valid_ || buffer_ != buffer_snapshot || capacity_ > snapshot_capacity);
 
     short_buffer.size_ = snapshot_size;
@@ -125,7 +127,7 @@ void ShortBuffer::Reserve(uint8_t capacity) {
     uint8_t* new_buffer = (uint8_t*)Allocate(doc_item_size);
 
     if (buffer_ != nullptr) {
-        BufferMemoryCopy(new_buffer, capacity, (uint8_t*)buffer_, capacity_, size_);
+        BufferMemoryCopy(new_buffer, capacity, (uint8_t*)buffer_, capacity_, posting_values_, size_);
         ReleaseBuffer((uint8_t*)buffer_, capacity_);
     }
 

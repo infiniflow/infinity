@@ -3,6 +3,7 @@
 #include "storage/indexstore/index_defines.h"
 #include "posting_value.h"
 #include "short_buffer.h"
+#include "flush_info.h"
 #include "common/memory/memory_pool.h"
 #include "common/memory/byte_slice.h"
 #include "storage/io/byte_slice_writer.h"
@@ -14,12 +15,13 @@ public:
     BufferedByteSlice(MemoryPool* byte_slice_pool, MemoryPool* buffer_pool);
     virtual ~BufferedByteSlice() = default;
 
-    void Init(PostingValues* value);
+    void Init(const PostingValues* value);
 
     template <typename T>
     void PushBack(uint8_t row, T value);
 
     void EndPushBack(){
+        flush_info_.SetIsValidShortBuffer(true);
         buffer_.EndPushBack();
     }
 
@@ -30,10 +32,36 @@ public:
     const ByteSliceList* GetByteSliceList() const { 
         return posting_writer_.GetByteSliceList(); 
     }
+
+    const PostingValues* GetPostingValues() const { 
+        return buffer_.GetPostingValues(); 
+    }
+
+    void SnapShot(BufferedByteSlice* buffer) const;
+
+    bool IsShortBufferValid() const { 
+        return flush_info_.IsValidShortBuffer(); 
+    }
+
+    const ShortBuffer& GetBuffer() const { 
+        return buffer_; 
+    }
+
+    size_t GetBufferSize() const { 
+        return buffer_.Size();
+    }
+
+    FlushInfo GetFlushInfo() const { 
+        return flush_info_; 
+    }
+    
+    size_t Flush();
+
 protected:
     size_t DoFlush();
 
 protected:
+    FlushInfo flush_info_;
     ShortBuffer buffer_;
     ByteSliceWriter posting_writer_;
 };

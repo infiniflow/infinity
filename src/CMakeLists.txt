@@ -185,6 +185,7 @@ target_link_libraries(
         tlsf
         roaring
         faiss
+        gfortran
         fastpfor
         newpfor
         zsv_parser
@@ -199,6 +200,7 @@ target_link_libraries(
         linenoise
         roaring
         faiss
+        gfortran
         fastpfor
         newpfor
         zsv_parser

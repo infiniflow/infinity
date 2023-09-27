@@ -20,7 +20,7 @@ public:
     ~ShortBuffer();
 
 public:
-    void Init(PostingValues* values) {
+    void Init(const PostingValues* values) {
         posting_values_ = values;
         for (size_t i = 0; i < values->GetSize(); ++i) {
             offset_[i] = values->GetValue(i)->offset_;
@@ -61,7 +61,7 @@ public:
 
     void Clear();
 
-    bool SnapShot(ShortBuffer& buffer);
+    bool SnapShot(ShortBuffer& buffer) const;
 
     MemoryPool* GetPool() const {
         return pool_;
@@ -83,7 +83,10 @@ private:
 
     static uint8_t AllocatePlan(uint8_t curCapacity);
 
-    void BufferMemoryCopy(uint8_t* dst, uint8_t dstColCount, uint8_t* src, uint8_t srcColCount, uint8_t srcSize);
+    static void BufferMemoryCopy(
+        uint8_t* dst, uint8_t dst_col_count, 
+        uint8_t* src, uint8_t src_col_count, 
+        const PostingValues* posting_values, uint8_t srcSize);
 
     bool IsFull() const {
         return size_ >= capacity_;

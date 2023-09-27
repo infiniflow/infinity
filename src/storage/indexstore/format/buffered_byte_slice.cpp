@@ -7,7 +7,7 @@ BufferedByteSlice::BufferedByteSlice(
 
 }
 
-void BufferedByteSlice::Init(PostingValues* value) {
+void BufferedByteSlice::Init(const PostingValues* value) {
     buffer_.Init(value);
 }
 
@@ -22,4 +22,31 @@ size_t BufferedByteSlice::DoFlush() {
     return flush_size;
 }
 
+size_t BufferedByteSlice::Flush() {
+    if (buffer_.Size() == 0) {
+        return 0;
+    }
+    size_t flush_size = DoFlush();
+    FlushInfo flush_info;
+    flush_info.SetFlushCount(flush_info_.GetFlushCount() + buffer_.Size());
+    flush_info.SetFlushLength(flush_info_.GetFlushLength() + flush_size);
+    flush_info.SetIsValidShortBuffer(false);
+    flush_info_ = flush_info;
+
+    buffer_.Clear();
+    return flush_size;
+}
+
+void BufferedByteSlice::SnapShot(BufferedByteSlice* buffer) const {
+    buffer->Init(GetPostingValues());
+    buffer->flush_info_ = flush_info_;
+    posting_writer_.SnapShot(buffer->posting_writer_);
+    buffer_.SnapShot(buffer->buffer_);
+
+    if (flush_info_.GetFlushLength() > buffer->flush_info_.GetFlushLength()) {
+        buffer->buffer_.Clear();
+        buffer->flush_info_ = flush_info_;
+        posting_writer_.SnapShot(buffer->posting_writer_);
+    }
+}
 }
