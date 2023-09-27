@@ -72,3 +72,5 @@ test/data/csv/*big*.csv
 test/sql/**/*big*.slt
 test/data/fvecs/
 test/sql/**/*fvecs*.slt
+
+**/*.pyc
