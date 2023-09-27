@@ -1,12 +1,11 @@
 import os
 import random
-import argparse
 
 
 def generate_test_varchar(slt_path: str, csv_path: str, num: int, dim: int):
-    if os.path.exists(slt_path) and os.path.exists(csv_path):
-        print("file exists, exit")
-        return
+    # if os.path.exists(slt_path) and os.path.exists(csv_path):
+    #     print("file exists, exit")
+    #     return
     low, high = 0, 100
     table_name = "big_varchar_table"
     with open(slt_path, "w") as slt_file, open(csv_path, "w") as csv_file:
@@ -103,20 +102,22 @@ def generate_test_embedding(slt_path: str, csv_path: str, num: int, dim: int):
 #         Popen.wait()
 
 
-if __name__ == "__main__":
+def generate():
     print("Note: this script must be run under root directory of the project!")
-    parser = argparse.ArgumentParser()
+    row_n = 1000
+    dim = 128
+    slt_dir = "./test/sql/dml/import"
+    csv_dir = "./test/data/csv"
 
-    parser.add_argument("--num", type=int, default=1000)
-    parser.add_argument("--dim", type=int, default=128)
-    parser.add_argument("--slt_dir", type=str, default="./test/sql/dml/import")
-    parser.add_argument("--csv_dir", type=str, default="./test/data/csv")
-    args = parser.parse_args()
+    os.makedirs(slt_dir, exist_ok=True)
+    os.makedirs(csv_dir, exist_ok=True)
 
-    slt_path = args.slt_dir + "/test_big_embedding.slt"
-    csv_path = args.csv_dir + "/big_embedding.csv"
-    generate_test_embedding(slt_path, csv_path, args.num, args.dim)
+    slt_path = slt_dir + "/test_big_embedding.slt"
+    csv_path = csv_dir + "/big_embedding.csv"
+    generate_test_embedding(slt_path, csv_path, row_n, dim)
+    slt_path = slt_dir + "/test_big_varchar.slt"
+    csv_path = csv_dir + "/big_varchar.csv"
+    generate_test_varchar(slt_path, csv_path, row_n, dim)
 
-    slt_path = args.slt_dir + "/test_big_varchar.slt"
-    csv_path = args.csv_dir + "/big_varchar.csv"
-    generate_test_varchar(slt_path, csv_path, args.num, args.dim)
+if __name__ == "__main__":
+    generate()

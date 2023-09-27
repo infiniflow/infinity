@@ -12,14 +12,14 @@ struct OutlineBuffer {
 
     SizeT current_file_idx_{std::numeric_limits<SizeT>::max()};
 
-    ObjectHandle outline_ele_{};
+    CommonObjectHandle outline_ele_{};
 
     OutlineBuffer(BufferManager *buffer_mgr) : buffer_mgr_(buffer_mgr) {}
 };
 
 
 class ColumnBuffer {
-    ObjectHandle inline_col_{};
+    CommonObjectHandle inline_col_{};
 
     // is null, if the column is inline
     UniquePtr<OutlineBuffer> outline_buffer_{};

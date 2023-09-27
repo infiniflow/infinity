@@ -30,10 +30,17 @@ using BufferReadFN = void(*)(const String& path, DataType data_type);
 using BufferWriteFN = void(*)(const String& path, DataType data_type);
 
 class ObjectHandle;
+class CommonObjectHandle;
+class IndexObjectHandle;
 
 // BufferHandle is never destructed
 class BufferHandle {
     friend ObjectHandle;
+    friend CommonObjectHandle;
+    friend IndexObjectHandle;
+
+    friend class BufferMgrTest;
+
 public:
     explicit
     BufferHandle(void* buffer_mgr);
