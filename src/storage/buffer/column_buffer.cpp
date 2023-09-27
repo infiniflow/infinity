@@ -34,7 +34,7 @@ Pair<const ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
     if (outline_buffer_->current_file_idx_ != long_info.file_idx_) {
         auto filename = ColumnDataEntry::OutlineFilename(long_info.file_idx_);
         auto buffer_handle = outline_buffer_->buffer_mgr_->GetBufferHandle(inline_col_.GetDir(), filename, BufferType::kFile);
-        outline_buffer_->outline_ele_ = ObjectHandle(buffer_handle);
+        outline_buffer_->outline_ele_ = CommonObjectHandle(buffer_handle);
         outline_buffer_->current_file_idx_ = long_info.file_idx_;
     }
     ptr_t ptr = outline_buffer_->outline_ele_.GetData() + long_info.file_offset_;

@@ -12,6 +12,7 @@
 #include "common/utility/infinity_assert.h"
 #include "executor/operator_state.h"
 #include "main/query_context.h"
+#include "storage/buffer/buffer_handle.h"
 #include "storage/io/local_file_system.h"
 #include "storage/meta/entry/column_data_entry.h"
 #include "storage/meta/entry/segment_entry.h"
@@ -118,7 +119,7 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
                                                           query_context->GetTxn()->TxnID(),
                                                           TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
                                                           query_context->GetTxn()->GetBufferMgr());
-    ObjectHandle object_handle(segment_entry->columns_[0]->buffer_handle_);
+    CommonObjectHandle object_handle(segment_entry->columns_[0]->buffer_handle_);
     SizeT row_idx = 0;
     while(true) {
         int dim;
@@ -141,7 +142,7 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
                                                               query_context->GetTxn()->TxnID(),
                                                               TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
                                                               query_context->GetTxn()->GetBufferMgr());
-            object_handle = ObjectHandle(segment_entry->columns_[0]->buffer_handle_);
+            object_handle = CommonObjectHandle(segment_entry->columns_[0]->buffer_handle_);
         }
     }
     return vector_n;
