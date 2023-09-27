@@ -62,5 +62,4 @@ RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
 }
 
-
 }

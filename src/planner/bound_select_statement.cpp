@@ -21,7 +21,7 @@
 #include "planner/node/logical_aggregate.h"
 #include "planner/node/logical_knn_scan.h"
 #include "expression/expression_transformer.h"
-//#include "query_binder.h"
+#include "function/table/knn_scan.h"
 
 namespace infinity {
 
@@ -104,8 +104,8 @@ BoundSelectStatement::BuildPlan(QueryContext* query_context) {
 
         // Knn case
         SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_,
-                                                              query_context,
-                                                              bind_context);
+                                                                 query_context,
+                                                                 bind_context);
         if(bind_context_->knn_orders_.size() != 1) {
             PlannerError("Knn Scan need order by clause which should have only one expression")
         }
@@ -146,6 +146,10 @@ BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef>& table_ref,
         }
         case TableRefType::kTable: {
             auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
+
+            // Change function table to knn table scan function
+            base_table_ref->table_func_ = KnnScanFunction::Make(query_context->storage()->catalog(),
+                                                                                       "knn_scan");
 
             SharedPtr<LogicalKnnScan> knn_scan_node
                     = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(),

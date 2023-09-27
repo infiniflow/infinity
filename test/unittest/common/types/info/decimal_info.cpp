@@ -32,7 +32,7 @@ TEST_F(DecimalInfoTest, decimal_info_A) {
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     EXPECT_THROW(DecimalInfo::Make(39, 39), TypeException);
-    EXPECT_EQ(DecimalInfo::Make(38, 39), nullptr);
+    EXPECT_THROW(DecimalInfo::Make(38, 39), TypeException);
 
     auto decimal_info = DecimalInfo::Make(38, 38);
     EXPECT_EQ(decimal_info->scale(), 38);

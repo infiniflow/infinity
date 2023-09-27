@@ -23,7 +23,7 @@ constexpr SizeT DEFAULT_WRITER_COMMIT_QUEUE_SIZE = 1024;
 constexpr u64 MAX_TXN_ID = std::numeric_limits<u64>::max();
 
 constexpr SizeT DEFAULT_RANDOM_SEGMENT_NAME_LEN = 10;
-constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 1024 * 1024 * 16;
+constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;
 }

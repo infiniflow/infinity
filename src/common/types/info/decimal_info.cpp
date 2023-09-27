@@ -4,6 +4,7 @@
 
 #include "decimal_info.h"
 #include "common/types/number/decimal_type.h"
+#include <format>
 
 namespace infinity {
 
@@ -13,10 +14,8 @@ DecimalInfo::Make(i64 precision, i64 scale) {
         precision = 38;
         scale = 38;
     }
-    if(scale > precision) {
-        return nullptr;
-    }
-    TypeAssert(precision <= 38, "Decimal max precision should not more than 38.")
+    TypeAssert(scale <= precision, fmt::format("Decimal scale {} is greater than precision {}.", scale, precision));
+    TypeAssert(precision <= 38, fmt::format("Decimal precision {} is greater than 38.", precision));
 
     return MakeShared<DecimalInfo>(precision, scale);
 }

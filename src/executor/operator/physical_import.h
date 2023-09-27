@@ -58,6 +58,14 @@ public:
     }
 
     void
+    ImportFVECS(QueryContext* query_context);
+
+    void
+    ImportFVECS(QueryContext *query_context,
+                ImportInputState *input_state,
+                ImportOutputState *output_state);
+
+    void
     ImportCSV(QueryContext* query_context);
 
     /// for push based execution
@@ -66,9 +74,14 @@ public:
               ImportInputState *input_state,
               ImportOutputState *output_state);
 
+private:
+    SizeT
+    ImportFVECSHelper(QueryContext* query_context);
+
     void
     ImportCSVHelper(QueryContext* query_context, ParserContext &parser_context);
 
+public:
     void
     ImportJSON(QueryContext* query_context);
 

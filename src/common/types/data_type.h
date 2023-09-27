@@ -153,6 +153,14 @@ public:
     static SharedPtr<DataType>
     Deserialize(const nlohmann::json& data_type_json);
 
+    friend class TableDef;
+    // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
+    int32_t GetSizeInBytes() const;
+    // Write to a char buffer
+    void WriteAdv(char* &buf) const;
+    // Read from a serialized version
+    static SharedPtr<DataType> ReadAdv(char* &buf, int32_t maxbytes);
+
 private:
 
     LogicalType type_{LogicalType::kInvalid};

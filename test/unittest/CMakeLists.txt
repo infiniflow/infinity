@@ -16,7 +16,7 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
-        executor_src
+        executor_test_src
         CONFIGURE_DEPENDS
         executor/*.cpp
         )
@@ -46,7 +46,7 @@ file(GLOB_RECURSE
         )
 
 file(GLOB_RECURSE
-        storage_src
+        storage_test_src
         CONFIGURE_DEPENDS
         storage/*.cpp
         )
@@ -67,11 +67,11 @@ add_executable(test_main
         main.cpp
         ${bin_src}
         ${common_test_src}
-        ${executor_src}
+        ${executor_test_src}
         ${function_test_src}
         ${main_test_src}
         ${planner_test_src}
-        ${storage_src}
+        ${storage_test_src}
         ${parser_test_src}
         ${test_helper_src}
         ${third_party_src}
@@ -86,6 +86,9 @@ target_link_libraries(test_main
         tlsf
         zsv_parser
         roaring
+        faiss
+        fastpfor
+        newpfor
         )
 
 target_include_directories(test_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")

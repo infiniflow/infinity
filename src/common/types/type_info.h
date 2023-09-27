@@ -10,7 +10,7 @@
 
 namespace infinity {
 
-enum class TypeInfoType {
+enum class TypeInfoType : u8{
     kInvalid,
 
     // Primitive

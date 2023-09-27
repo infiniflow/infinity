@@ -31,11 +31,16 @@ LogicalKnnScan::GetColumnBindings() const {
 
 SharedPtr<Vector<String>>
 LogicalKnnScan::GetOutputNames() const {
-    SharedPtr<Vector<String>> result_names = base_table_ref_->column_names_;
+    SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
+
+    for(const auto& column_name: *base_table_ref_->column_names_) {
+        result_names->emplace_back(column_name);
+    }
+
     for(const auto& knn_expr: knn_expressions_) {
         result_names->emplace_back(knn_expr->Name());
     }
-    return base_table_ref_->column_names_;
+    return result_names;
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>>

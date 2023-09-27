@@ -28,6 +28,10 @@ LogicalImport::ToString(i64& space) {
             ss << "(JSON) ";
             break;
         }
+        case CopyFileType::kFVECS: {
+            ss << "(FVECS) ";
+            break;
+        }
     }
 
     DBEntry* db_entry

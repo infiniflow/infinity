@@ -10,6 +10,7 @@
 #include "scheduler/fragment_data_queue.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "function/table/table_scan_data.h"
+#include "function/table/knn_scan_data.h"
 
 namespace infinity {
 
@@ -91,6 +92,8 @@ struct TableScanOutputState : public OutputState {
 struct KnnScanInputState : public InputState {
     inline explicit
     KnnScanInputState(): InputState(PhysicalOperatorType::kTableScan) {}
+
+    UniquePtr<KnnScanFunctionData> knn_scan_function_data_{};
 };
 
 struct KnnScanOutputState : public OutputState {
@@ -525,6 +528,7 @@ enum class SourceStateType {
     kCommon,
     kAggregate,
     kTableScan,
+    kKnnScan,
     kEmpty
 };
 
@@ -569,6 +573,14 @@ struct TableScanSourceState : public SourceState {
     explicit
     TableScanSourceState(SharedPtr<Vector<u64>> segment_ids)
             : SourceState(SourceStateType::kTableScan), segment_entry_ids_(std::move(segment_ids)) {}
+
+    SharedPtr<Vector<u64>> segment_entry_ids_;
+};
+
+struct KnnScanSourceState : public SourceState {
+    explicit
+    KnnScanSourceState(SharedPtr<Vector<u64>> segment_ids)
+            : SourceState(SourceStateType::kKnnScan), segment_entry_ids_(std::move(segment_ids)) {}
 
     SharedPtr<Vector<u64>> segment_entry_ids_;
 };

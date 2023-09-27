@@ -162,7 +162,9 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
 #set_property(TARGET infinity_core PROPERTY CXX_INCLUDE_WHAT_YOU_USE /usr/bin/iwyu)
 
 add_executable(infinity_main
@@ -184,6 +186,7 @@ target_link_libraries(
         roaring
         faiss
         fastpfor
+        newpfor
         zsv_parser
         ${EXTERNAL_LIBS}
 )
@@ -195,7 +198,9 @@ target_link_libraries(
         tlsf
         linenoise
         roaring
+        faiss
         fastpfor
+        newpfor
         zsv_parser
         ${EXTERNAL_LIBS}
 )

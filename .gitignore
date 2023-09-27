@@ -68,6 +68,13 @@ lexer.h
 parser.cpp
 parser.h
 
+
 tools/tttt
 tools/sqllogictest
 tools/__pycache__
+
+test/data/csv/*big*.csv
+test/sql/**/*big*.slt
+test/data/fvecs/
+test/sql/**/*fvecs*.slt
+

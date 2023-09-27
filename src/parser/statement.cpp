@@ -513,6 +513,11 @@ Statement::BuildCopy(const CopyStatement* copy_statement,
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kFVECS: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: FVECS");
+            result->emplace_back(file_type);
+            break;
+        }
     }
 }
 

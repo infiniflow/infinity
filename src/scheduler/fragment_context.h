@@ -63,10 +63,10 @@ public:
     i64
     GetParallelCount() const;
 
-    PhysicalSink*
+    [[nodiscard]] PhysicalSink*
     GetSinkOperator() const;
 
-    PhysicalSource*
+    [[nodiscard]] PhysicalSource*
     GetSourceOperator() const;
 
     void

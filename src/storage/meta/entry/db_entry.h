@@ -8,6 +8,7 @@
 
 #include "base_entry.h"
 #include "common/types/internal_types.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 #include "table_collection_entry.h"
 #include "storage/meta/table_collection_meta.h"
 #include "storage/common/table_collection_detail.h"
@@ -41,6 +42,7 @@ public:
     static EntryResult
     DropTableCollection(DBEntry* db_entry,
                         const String& table_collection_name,
+                        ConflictType conflict_type,
                         u64 txn_id,
                         TxnTimeStamp begin_ts,
                         TxnManager* txn_mgr);

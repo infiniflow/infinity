@@ -234,12 +234,8 @@ SegmentEntry::ShuffleFileName() {
     for (auto column_entry : columns_) {
         if (column_entry->outline_info_) {
             auto outline_info  = column_entry->outline_info_.get();
-            for (auto [bufferhandle_ptr, buffer_size] : outline_info->full_buffers_) {
+            for (auto [bufferhandle_ptr, buffer_size] : outline_info->written_buffers_) {
                 auto s = bufferhandle_ptr->current_dir_;
-                SegIdChange(*s, new_seg_id);
-            }
-            if (outline_info->current_buffer_handler_) {
-                auto s = outline_info->current_buffer_handler_->current_dir_;
                 SegIdChange(*s, new_seg_id);
             }
         }
