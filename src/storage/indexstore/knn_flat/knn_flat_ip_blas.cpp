@@ -102,6 +102,4 @@ KnnFlatIPBlas<DistType>::End() {
     begin_ = false;
 }
 
-
-
 }
