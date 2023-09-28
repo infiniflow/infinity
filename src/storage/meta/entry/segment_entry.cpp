@@ -208,13 +208,9 @@ SegmentEntry::DetermineFilename(const String &parent_dir, u64 seg_id) {
     u32 seed = time(nullptr);
     LocalFileSystem fs;
     SharedPtr<String> base_dir;
-    while (1) {
+    do {
         base_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + std::to_string(seg_id));
-        bool exist = fs.CreateDirectoryCheckIfExist(*base_dir); // for duplicate directory test
-        if (!exist) {
-            break;
-        }
-    }
+    } while (!fs.CreateDirectoryNoExp(*base_dir));
     return base_dir;
 }
 }
