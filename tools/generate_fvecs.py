@@ -11,6 +11,7 @@ def generate():
     table_name = "test_fvecs"
     fvecs_path = fvecs_dir + "/test.fvecs"
     slt_path = slt_dir + "/test_fvecs.slt"
+    copy_path = "/tmp/infinity/sqllogictest" + "/test.fvecs"
 
     os.makedirs(fvecs_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
@@ -29,7 +30,7 @@ def generate():
         slt_file.write("query I\n")
         slt_file.write(
             "COPY {} FROM '".format(table_name)
-            + fvecs_path
+            + copy_path
             + "' WITH ( DELIMITER ',', FORMAT fvecs);\n"
         )
         slt_file.write("----\n")

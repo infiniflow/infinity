@@ -4,19 +4,18 @@ import shutil
 from generate_big import generate as generate1
 from generate_fvecs import generate as generate2
 
+
 def _main(sqllogictest_rs_path, src_dir, test_dir, dest_dir):
     # create dest_dir if it doesn't exist
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
 
     # copy all files from src_dir to dest_dir
-    for filename in os.listdir(src_dir):
-        file_path = os.path.join(src_dir, filename)
-        if (os.path.isfile(file_path)):
+    for root, dirs, files in os.walk(src_dir):
+        for file in files:
+            file_path = os.path.join(root, file)
             shutil.copy(file_path, dest_dir)
             print("copied file: " + file_path)
-        else:
-            print("skipped file: " + file_path)
 
     print(sqllogictest_rs_path)
 
@@ -52,7 +51,7 @@ def main():
     # parent_path = os.path.dirname(current_path)
     # print(parent_path)
     parent_path = current_path
-    src_dir = parent_path + '/test/data/csv'
+    src_dir = parent_path + '/test/data'
 
     test_dir = parent_path + '/test/sql'
 
@@ -60,7 +59,8 @@ def main():
 
     parser = argparse.ArgumentParser(description='SQL Logic Test For Infinity')
 
-    parser.add_argument('-p', '--path', help='path of sqllogictest-rs', type=str, default='./tools/sqllogictest', dest='path')
+    parser.add_argument('-p', '--path', help='path of sqllogictest-rs', type=str, default='./tools/sqllogictest',
+                        dest='path')
     parser.add_argument('-s', '--src', help='path of src directory', type=str, default=src_dir, dest='src')
     parser.add_argument('-t', '--test', help='path of test directory', type=str, default=test_dir, dest='test')
     parser.add_argument('-d', '--dest', help='path of dest directory', type=str, default=dest_dir, dest='dest')
