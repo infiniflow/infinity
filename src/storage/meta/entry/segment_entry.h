@@ -54,7 +54,7 @@ public:
 
     const TableCollectionEntry* table_entry_{};
 
-    SharedPtr<String> base_dir_{};
+    SharedPtr<String> segment_dir_{};
 
     SizeT row_capacity_{};
 
