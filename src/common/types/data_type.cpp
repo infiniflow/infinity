@@ -202,39 +202,37 @@ SharedPtr<DataType>
 DataType::ReadAdv(char*& ptr, int32_t maxbytes) {
     char* const ptr_end = ptr + maxbytes;
     LogicalType type = ReadBufAdv<LogicalType>(ptr);
-    SharedPtr<TypeInfo> type_info{nullptr};
-    switch(type) {
-        case LogicalType::kArray:
-            NotImplementError("Array isn't implemented here.");
-            break;
-
-        case LogicalType::kBitmap: {
-            i64 limit = ReadBufAdv<i64>(ptr);
-            type_info = BitmapInfo::Make(limit);
-            break;
-        }
-        case LogicalType::kDecimal: {
-            i64 precision = ReadBufAdv<i64>(ptr);
-            i64 scale = ReadBufAdv<i64>(ptr);
-            type_info = DecimalInfo::Make(precision, scale);
-            break;
-        }
-        case LogicalType::kEmbedding: {
-            EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
-            int32_t dimension = ReadBufAdv<int32_t>(ptr);
-            type_info = EmbeddingInfo::Make(EmbeddingDataType(embedding_type), dimension);
-            break;
-        }
-        case LogicalType::kVarchar: {
-            int32_t dimension = ReadBufAdv<int32_t>(ptr);
-            type_info = VarcharInfo::Make(dimension);
-            break;
-        }
-        default:
-            break;
+    SharedPtr<TypeInfo> type_info {nullptr};
+    switch (type) {
+    case LogicalType::kArray:
+        NotImplementError("Array isn't implemented here.");
+        break;
+    case LogicalType::kBitmap: {
+        i64 limit = ReadBufAdv<i64>(ptr);
+        type_info = BitmapInfo::Make(limit);
+        break;
     }
-
-    StorageAssert(ptr <= ptr_end,
+    case LogicalType::kDecimal: {
+        i64 precision = ReadBufAdv<i64>(ptr);
+        i64 scale = ReadBufAdv<i64>(ptr);
+        type_info = DecimalInfo::Make(precision, scale);
+        break;
+    }
+    case LogicalType::kEmbedding: {
+        EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
+        int32_t dimension = ReadBufAdv<int32_t>(ptr);
+        type_info = EmbeddingInfo::Make(EmbeddingDataType(embedding_type), dimension);
+        break;
+    }
+    case LogicalType::kVarchar: {
+        int32_t dimension = ReadBufAdv<int32_t>(ptr);
+        type_info = VarcharInfo::Make(dimension);
+        break;
+    }
+    default:
+    }
+    maxbytes = ptr_end - ptr;
+    StorageAssert(maxbytes>=0,
                   "ptr goes out of range when reading DataType");
     SharedPtr<DataType> data_type = MakeShared<DataType>(type, type_info);
     return data_type;

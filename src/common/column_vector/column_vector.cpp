@@ -1934,7 +1934,8 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
         (*this->data_type_).operator!=(*other.data_type_) ||
         this->data_type_size_ != other.data_type_size_ ||
         this->vector_type_ != other.vector_type_ ||
-        this->tail_index_ != other.tail_index_)
+        this->tail_index_ != other.tail_index_ ||
+        *this->nulls_ptr_ != *other.nulls_ptr_)
         return false;
     switch (data_type_->type()) {
     case kBoolean:
@@ -2003,6 +2004,7 @@ int32_t ColumnVector::GetSizeInBytes() const{
             //TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
             NotImplementError(std::format("Not supported data_type {}", data_type_->ToString()));
     }
+    size += this->nulls_ptr_->GetSizeInBytes();
     return size;
 }
 
@@ -2043,6 +2045,7 @@ void ColumnVector::WriteAdv(char *&ptr) const{
             //TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
             NotImplementError(std::format("Not supported data_type {}", data_type_->ToString()));
     }
+    this->nulls_ptr_->WriteAdv(ptr);
     return;
 }
 
@@ -2086,7 +2089,11 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, int32_t maxbytes){
             //TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
             NotImplementError(std::format("Not supported data_type {}", data_type->ToString()));
     }
-    StorageAssert(ptr <= ptr_end, "ptr goes out of range when reading ColumnVector");
+    maxbytes = ptr_end - ptr;
+    StorageAssert(maxbytes>0, "ptr goes out of range when reading ColumnVector");
+    column_vector->nulls_ptr_ = Bitmask::ReadAdv(ptr, maxbytes);
+    maxbytes = ptr_end - ptr;
+    StorageAssert(maxbytes>=0, "ptr goes out of range when reading ColumnVector");
     return column_vector;
 }
 

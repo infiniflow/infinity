@@ -259,7 +259,8 @@ SharedPtr<DataBlock> DataBlock::ReadAdv(char* &ptr, int32_t maxbytes){
     SharedPtr<DataBlock> block = DataBlock::Make();
     block->Init(column_vectors);
     block->Finalize();
-    StorageAssert(ptr <= ptr_end,
+    maxbytes = ptr_end - ptr;
+    StorageAssert(maxbytes>=0,
                   "ptr goes out of range when reading DataBlock");
     return block;
 }

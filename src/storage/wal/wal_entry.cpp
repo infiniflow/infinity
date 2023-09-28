@@ -18,59 +18,60 @@ WalCmd::ReadAdv(char*& ptr, int32_t maxbytes) {
     char* const ptr_end = ptr + maxbytes;
     SharedPtr<WalCmd> cmd = nullptr;
     WalCommandType cmd_type = ReadBufAdv<WalCommandType>(ptr);
-    switch(cmd_type) {
-        case WalCommandType::CREATE_DATABASE: {
-            String db_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdCreateDatabase>(db_name);
-            break;
-        }
-        case WalCommandType::DROP_DATABASE: {
-            String db_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropDatabase>(db_name);
-            break;
-        }
-        case WalCommandType::CREATE_TABLE: {
-            String db_name = ReadBufAdv<String>(ptr);
-            SharedPtr<TableDef> table_def = TableDef::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateTable>(db_name, table_def);
-            break;
-        }
-        case WalCommandType::DROP_TABLE: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropTable>(db_name, table_name);
-            break;
-        }
-        case WalCommandType::APPEND: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            SharedPtr<DataBlock> block = block->ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdAppend>(db_name, table_name, block);
-            break;
-        }
-        case WalCommandType::DELETE: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            int32_t cnt = ReadBufAdv<int32_t>(ptr);
-            Vector<RowID> row_ids;
-            for(int32_t i = 0; i < cnt; ++i) {
-                RowID row_id = ReadBufAdv<RowID>(ptr);
-                row_ids.push_back(row_id);
-            }
-            cmd = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
-            break;
-        }
-        case WalCommandType::CHECKPOINT: {
-            int64_t max_commit_ts = ReadBufAdv<int64_t>(ptr);
-            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts);
-            break;
-        }
-        default:
-            StorageError(
-                    fmt::format("UNIMPLEMENTED ReadAdv for command {}", int(cmd_type)));
+    switch (cmd_type) {
+    case WalCommandType::CREATE_DATABASE: {
+        String db_name = ReadBufAdv<String>(ptr);
+        cmd = MakeShared<WalCmdCreateDatabase>(db_name);
+        break;
     }
-    StorageAssert(ptr <= ptr_end,
-                  "ptr goes out of range when reading DataBlock");
+    case WalCommandType::DROP_DATABASE: {
+        String db_name = ReadBufAdv<String>(ptr);
+        cmd = MakeShared<WalCmdDropDatabase>(db_name);
+        break;
+    }
+    case WalCommandType::CREATE_TABLE: {
+        String db_name = ReadBufAdv<String>(ptr);
+        SharedPtr<TableDef> table_def = TableDef::ReadAdv(ptr, ptr_end - ptr);
+        cmd = MakeShared<WalCmdCreateTable>(db_name, table_def);
+        break;
+    }
+    case WalCommandType::DROP_TABLE: {
+        String db_name = ReadBufAdv<String>(ptr);
+        String table_name = ReadBufAdv<String>(ptr);
+        cmd = MakeShared<WalCmdDropTable>(db_name, table_name);
+        break;
+    }
+    case WalCommandType::APPEND: {
+        String db_name = ReadBufAdv<String>(ptr);
+        String table_name = ReadBufAdv<String>(ptr);
+        SharedPtr<DataBlock> block = block->ReadAdv(ptr, ptr_end - ptr);
+        cmd = MakeShared<WalCmdAppend>(db_name, table_name, block);
+        break;
+    }
+    case WalCommandType::DELETE: {
+        String db_name = ReadBufAdv<String>(ptr);
+        String table_name = ReadBufAdv<String>(ptr);
+        int32_t cnt = ReadBufAdv<int32_t>(ptr);
+        Vector<RowID> row_ids;
+        for (int32_t i = 0; i < cnt; ++i) {
+            RowID row_id = ReadBufAdv<RowID>(ptr);
+            row_ids.push_back(row_id);
+        }
+        cmd = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
+        break;
+    }
+    case WalCommandType::CHECKPOINT: {
+        int64_t max_commit_ts = ReadBufAdv<int64_t>(ptr);
+        cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts);
+        break;
+    }
+    default:
+        StorageError(
+            fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
+    }
+    maxbytes = ptr_end - ptr;
+    StorageAssert(maxbytes>=0,
+                  "ptr goes out of range when reading WalCmd");
     return cmd;
 }
 
@@ -289,7 +290,8 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t maxbytes) {
         entry->cmds.push_back(cmd);
     }
     ptr += sizeof(int32_t);
-    StorageAssert(ptr <= ptr_end, "ptr goes out of range when reading WalEntry");
+    maxbytes = ptr_end - ptr;
+    StorageAssert(maxbytes>=0, "ptr goes out of range when reading WalEntry");
     return entry;
 }
 
