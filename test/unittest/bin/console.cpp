@@ -13,9 +13,18 @@
 #include <fstream>
 
 class ConsoleTest : public BaseTest {
-    void SetUp() override {}
+    void SetUp() override {
+        infinity::GlobalResourceUsage::Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::Infinity::instance().Init(config_path);
+    }
 
-    void TearDown() override {}
+    void TearDown() override {
+        infinity::Infinity::instance().UnInit();
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+    }
 };
 
 void recurse_dir(const std::filesystem::path &dir_name, std::vector<std::filesystem::path> &file_names) {
