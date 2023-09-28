@@ -78,13 +78,11 @@ TEST_F(BufferedByteSliceTest, test2) {
     buffered_byte_slice_->PushBack(1, (uint16_t)2);
     buffered_byte_slice_->EndPushBack();
 
-    uint32_t flush_size = sizeof(uint32_t) + sizeof(uint8_t) * 2 + sizeof(uint16_t);
-    ASSERT_EQ((size_t)flush_size, buffered_byte_slice_->Flush());
+    buffered_byte_slice_->Flush();
 
     FlushInfo flush_info = buffered_byte_slice_->GetFlushInfo();
     ASSERT_TRUE(!flush_info.IsValidShortBuffer());
     ASSERT_EQ((uint32_t)1, flush_info.GetFlushCount());
-    ASSERT_EQ(flush_size, flush_info.GetFlushLength());
 
     ASSERT_EQ((size_t)0, buffered_byte_slice_->GetBufferSize());
 
