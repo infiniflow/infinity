@@ -153,6 +153,9 @@ struct WalEntry : WalEntryHeader {
     static SharedPtr<WalEntry> ReadAdv(char *&buf, int32_t maxbytes);
 
     Vector<SharedPtr<WalCmd>> cmds;
+
+    // the next Iterator of the entry in the wal file
+
 };
 
 } // namespace infinity

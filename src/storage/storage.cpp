@@ -2,8 +2,9 @@
 // Created by JinHai on 2022/9/14.
 //
 
-#include "storage.h"
+#include "storage/storage.h"
 #include "storage/wal/wal_manager.h"
+#include "common/constants/constants.h"
 #include "schema_definition.h"
 #include "catalog.h"
 #include "function/builtin_functions.h"
@@ -25,7 +26,8 @@ Storage::Init() {
 
     // Check the data dir to get latest catalog file.
     String catalog_dir = *config_ptr_->data_dir() + "/catalog";
-    wal_mgr_ = MakeShared<WalManager>(this, *config_ptr_->wal_dir() + "/wal.log");
+    wal_mgr_ = MakeShared<WalManager>(this, *config_ptr_->wal_dir() + kWALFileTemp);
+    auto start_time_stamp= wal_mgr_->ReplayWALFile();
     wal_mgr_->Start();
     SharedPtr<DirEntry> catalog_file_entry = GetLatestCatalog(catalog_dir);
     if(catalog_file_entry == nullptr) {
@@ -37,7 +39,7 @@ Storage::Init() {
     } else {
         // load catalog file.
         new_catalog_ = NewCatalog::LoadFromFile(catalog_file_entry, buffer_mgr_.get());
-        txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get(), std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
+        txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get(), std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),0,start_time_stamp+1);
     }
 
     // Check current schema/catalog to default database.
@@ -74,19 +76,16 @@ Storage::GetLatestCatalog(const String& dir) {
 
     Vector<SharedPtr<DirEntry>> dir_array = fs.ListDirectory(dir);
     SharedPtr<DirEntry> latest;
+    int64_t latest_version_number = -1;
     const std::regex catalog_file_regex("META_[0-9]+\\.json");
     for(const auto& dir_entry_ptr: dir_array) {
         LOG_TRACE("Candidate file name: {}", dir_entry_ptr->path().c_str());
         if(dir_entry_ptr->is_regular_file()) {
             String current_file_name = dir_entry_ptr->path().filename();
-            if(!std::regex_match(current_file_name, catalog_file_regex)) {
-                continue;
-            }
-
-            if(latest == nullptr) {
-                latest = dir_entry_ptr;
-            } else {
-                if(dir_entry_ptr->path().filename() > latest->path().filename()) {
+            if(std::regex_match(current_file_name,catalog_file_regex)) {
+                int64_t version_number = std::stoll(current_file_name.substr(5, current_file_name.size() - 10));
+                if(version_number > latest_version_number) {
+                    latest_version_number = version_number;
                     latest = dir_entry_ptr;
                 }
             }

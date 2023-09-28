@@ -5,6 +5,7 @@
 #pragma once
 
 #include "storage/txn/txn_manager.h"
+#include "common/constants/constants.h"
 #include "wal_entry.h"
 #include <atomic>
 #include <fstream>
@@ -51,6 +52,10 @@ class WalManager {
     // Checkpoint for transactions which's lsn no larger than lsn_pend_chk_.
     void Checkpoint();
 
+    void SwapWALFile(int64_t max_commit_ts);
+
+    int64_t ReplayWALFile();
+
   private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
     // and do serial writing.
@@ -69,6 +74,8 @@ class WalManager {
     int64_t checkpoint_ts_{};
 
     Storage *storage_;
+
+    Vector<String> wal_list_;
 };
 
 } // namespace infinity

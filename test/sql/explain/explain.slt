@@ -20,7 +20,7 @@ query I
 COPY explain1 FROM '/tmp/infinity/sqllogictest/one.csv' WITH ( DELIMITER ',');
 ----
 
-query O
+query I
 SELECT * FROM explain1;
 ----
 1
