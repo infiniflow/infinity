@@ -149,25 +149,25 @@ DataType::WriteAdv(char*& ptr) const {
         NotImplementError("Array isn't implemented here.");
         break;
     case LogicalType::kBitmap: {
-        i64 lmt = MAX_BITMAP_SIZE;
+        i64 limit = MAX_BITMAP_SIZE;
         if (this->type_info_ != nullptr){
-            const BitmapInfo *bi =
+            const BitmapInfo *bitmap_info =
                 dynamic_cast<BitmapInfo *>(this->type_info_.get());
-            if (bi != nullptr)
-                lmt = bi->length_limit();
+            if (bitmap_info != nullptr)
+                limit = bitmap_info->length_limit();
         }
-        WriteBufAdv<i64>(ptr, lmt);
+        WriteBufAdv<i64>(ptr, limit);
         break;
     }
     case LogicalType::kDecimal: {
         i64 precision = 0;
         i64 scale = 0;
         if (this->type_info_ != nullptr) {
-            const DecimalInfo *di =
+            const DecimalInfo *decimal_info =
             dynamic_cast<DecimalInfo *>(this->type_info_.get());
-            if (di != nullptr){
-                precision = di->precision();
-                scale = di->scale();
+            if (decimal_info != nullptr){
+                precision = decimal_info->precision();
+                scale = decimal_info->scale();
             }
         }
         WriteBufAdv<i64>(ptr, precision);
@@ -175,20 +175,20 @@ DataType::WriteAdv(char*& ptr) const {
         break;
     }
     case LogicalType::kEmbedding: {
-        const EmbeddingInfo *ei =
+        const EmbeddingInfo *embedding_info =
             dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
-        TypeAssert(ei!=nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
-        WriteBufAdv<EmbeddingDataType>(ptr, ei->Type());
-        WriteBufAdv<int32_t>(ptr, int32_t(ei->Dimension()));
+        TypeAssert(embedding_info!=nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
+        WriteBufAdv<EmbeddingDataType>(ptr, embedding_info->Type());
+        WriteBufAdv<int32_t>(ptr, int32_t(embedding_info->Dimension()));
         break;
     }
     case LogicalType::kVarchar: {
         int32_t capacity = MAX_VARCHAR_SIZE;
         if (this->type_info_ != nullptr) {
-            const VarcharInfo *vi =
+            const VarcharInfo *varchar_info =
                 dynamic_cast<VarcharInfo *>(this->type_info_.get());
-            if (vi != nullptr)
-                capacity = vi->dimension();
+            if (varchar_info != nullptr)
+                capacity = varchar_info->dimension();
         }
         WriteBufAdv<int32_t>(ptr, capacity);
         break;
