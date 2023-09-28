@@ -6,6 +6,10 @@
 
 namespace infinity {
 
+TableFunctionSet::~TableFunctionSet() {
+    functions_.clear();
+}
+
 void
 TableFunctionSet::AddFunction(TableFunction func) {
     functions_.emplace_back(func);

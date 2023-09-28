@@ -194,7 +194,7 @@ target_link_libraries(
         tlsf
         roaring
         faiss
-#        gfortran
+        gfortran
         fastpfor
         newpfor
         zsv_parser

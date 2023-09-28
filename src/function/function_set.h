@@ -24,6 +24,9 @@ public:
     explicit
     FunctionSet(String name, FunctionType type): name_(std::move(name)), type_(type) {}
 
+    virtual
+    ~FunctionSet() = default;
+
     [[nodiscard]] const String&
     name() const {
         return name_;
