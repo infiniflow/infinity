@@ -102,8 +102,25 @@ using TxnTimeStamp = u64;
 
 struct RowID {
     RowID(u32 blk, u32 off) : block(blk), offset(off) {}
-    u32 block {};
-    u32 offset {};
+
+    u32 block{};
+    u32 offset{};
+
+    bool
+    operator < (const RowID &other) const {
+        return block < other.block
+               || block == other.block && offset < other.block;
+    };
+
+    bool
+    operator > (const RowID &other) const {
+        return block > other.block
+               || block == other.block && offset > other.block;
+    };
+//    inline static bool
+//    cmp2(u32 blk1, u32 blk2, u32 offset1, u32 offset2) {
+//        return (blk1 < blk2) || ((blk1 == blk2) && (offset1 < offset2));
+//    }
 };
 
 using ColumnID = u32;

@@ -8,7 +8,8 @@
 
 #include <iostream>
 
-int main(int argc, char** argv) {
+auto
+main(int argc, char** argv)->int{
     infinity::Console console;
     console.Init();
 
