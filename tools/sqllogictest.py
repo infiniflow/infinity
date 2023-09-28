@@ -4,7 +4,6 @@ import shutil
 from generate_big import generate as generate1
 from generate_fvecs import generate as generate2
 
-
 def _main(sqllogictest_rs_path, src_dir, test_dir, dest_dir):
     # create dest_dir if it doesn't exist
     if not os.path.exists(dest_dir):
