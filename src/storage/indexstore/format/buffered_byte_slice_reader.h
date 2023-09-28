@@ -20,7 +20,7 @@ public:
     void Open(const BufferedByteSlice* buffered_byte_slice) {
         location_cursor_ = 0;
         short_buffer_cursor_ = 0;
-        byte_slice_reader_.Open(const_cast<ByteSliceList*>(buffered_byte_slice_->GetByteSliceList()));
+        byte_slice_reader_.Open(const_cast<ByteSliceList*>(buffered_byte_slice->GetByteSliceList()));
         buffered_byte_slice_ = buffered_byte_slice;
         posting_values_ = buffered_byte_slice_->GetPostingValues();
 

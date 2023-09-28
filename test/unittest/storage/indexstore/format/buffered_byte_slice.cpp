@@ -44,8 +44,7 @@ protected:
 };
 
 
-TEST_F(BufferedByteSliceTest, test1)
-{
+TEST_F(BufferedByteSliceTest, test1) {
     buffered_byte_slice_->PushBack(0, (uint32_t)1);
     buffered_byte_slice_->PushBack(1, (uint16_t)2);
     buffered_byte_slice_->EndPushBack();
@@ -62,7 +61,7 @@ TEST_F(BufferedByteSliceTest, test1)
 
     BufferedByteSliceReader reader;
     reader.Open(buffered_byte_slice_.get());
-/*
+
     size_t decode_len;
     reader.Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len);
     ASSERT_EQ((uint32_t)1, doc_id_buffer[0]);
@@ -71,11 +70,10 @@ TEST_F(BufferedByteSliceTest, test1)
     reader.Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len);
     ASSERT_EQ((uint16_t)2, doc_payload_buffer[0]);
     ASSERT_EQ((uint16_t)3, doc_payload_buffer[1]);
-    */
+
 }
 
-TEST_F(BufferedByteSliceTest, test2)
-{
+TEST_F(BufferedByteSliceTest, test2) {
     buffered_byte_slice_->PushBack(0, (uint32_t)1);
     buffered_byte_slice_->PushBack(1, (uint16_t)2);
     buffered_byte_slice_->EndPushBack();
@@ -93,8 +91,7 @@ TEST_F(BufferedByteSliceTest, test2)
     ASSERT_EQ((size_t)0, buffered_byte_slice_->Flush());
 }
 
-TEST_F(BufferedByteSliceTest, test3)
-{
+TEST_F(BufferedByteSliceTest, test3) {
     const int32_t decode_len = 5;
     const int32_t count = 11;
     for (uint32_t i = 0; i < count; ++i) {
