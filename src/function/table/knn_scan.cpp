@@ -4,7 +4,9 @@
 
 #include "knn_scan.h"
 #include "storage/indexstore/knn_flat/knn_flat_ip.h"
+#include "storage/indexstore/knn_flat/knn_flat_ip_reservoir.h"
 #include "storage/indexstore/knn_flat/knn_flat_ip_blas.h"
+#include "storage/indexstore/knn_flat/knn_flat_ip_blas_reservoir.h"
 
 namespace infinity {
 
@@ -37,10 +39,17 @@ KnnScanFunc(QueryContext* query_context,
             KnnDistance<f32>* knn_flat_ip = nullptr;
 
             if(knn_scan_function_data_ptr->query_embedding_count_ < faiss::distance_compute_blas_threshold) {
-                knn_flat_ip = static_cast<KnnDistance<f32>*>(knn_scan_function_data_ptr->knn_distance_.get());
-
+                if(knn_scan_function_data_ptr->topk_ < faiss::distance_compute_min_k_reservoir) {
+                    knn_flat_ip = static_cast<KnnFlatIP<f32>*>(knn_scan_function_data_ptr->knn_distance_.get());
+                } else {
+                    knn_flat_ip = static_cast<KnnFlatIPReservoir<f32>*>(knn_scan_function_data_ptr->knn_distance_.get());
+                }
             } else {
-                knn_flat_ip = static_cast<KnnFlatIPBlas<f32>*>(knn_scan_function_data_ptr->knn_distance_.get());
+                if(knn_scan_function_data_ptr->topk_ < faiss::distance_compute_min_k_reservoir) {
+                    knn_flat_ip = static_cast<KnnFlatIPBlas<f32>*>(knn_scan_function_data_ptr->knn_distance_.get());
+                } else {
+                    knn_flat_ip = static_cast<KnnFlatIPBlasReservoir<f32>*>(knn_scan_function_data_ptr->knn_distance_.get());
+                }
             }
 
             knn_flat_ip->Search((f32*)(column_buffer.GetAll()),

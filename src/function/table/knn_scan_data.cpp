@@ -4,7 +4,9 @@
 
 #include "knn_scan_data.h"
 #include "storage/indexstore/knn_flat/knn_flat_ip.h"
+#include "storage/indexstore/knn_flat/knn_flat_ip_reservoir.h"
 #include "storage/indexstore/knn_flat/knn_flat_ip_blas.h"
+#include "storage/indexstore/knn_flat/knn_flat_ip_blas_reservoir.h"
 
 namespace infinity {
 
@@ -35,25 +37,50 @@ KnnScanFunctionData::Init() {
                     break;
                 case kElemFloat: {
                     if(query_embedding_count_ < faiss::distance_compute_blas_threshold) {
-                        auto knn_flat_inner_product = MakeUnique<KnnFlatIP<f32>>(
-                                (f32*)query_embedding_,
-                                query_embedding_count_,
-                                topk_,
-                                dimension_,
-                                elem_type_);
+                        if(topk_ < faiss::distance_compute_min_k_reservoir) {
+                            auto knn_flat_inner_product = MakeUnique<KnnFlatIP<f32>>(
+                                    (f32*)query_embedding_,
+                                    query_embedding_count_,
+                                    topk_,
+                                    dimension_,
+                                    elem_type_);
 
-                        knn_flat_inner_product->Begin();
-                        knn_distance_ = std::move(knn_flat_inner_product);
+                            knn_flat_inner_product->Begin();
+                            knn_distance_ = std::move(knn_flat_inner_product);
+                        } else {
+                            auto knn_flat_inner_product = MakeUnique<KnnFlatIPReservoir<f32>>(
+                                    (f32*)query_embedding_,
+                                    query_embedding_count_,
+                                    topk_,
+                                    dimension_,
+                                    elem_type_);
+
+                            knn_flat_inner_product->Begin();
+                            knn_distance_ = std::move(knn_flat_inner_product);
+                        }
+
                     } else {
-                        auto knn_flat_inner_product = MakeUnique<KnnFlatIPBlas<f32>>(
-                                (f32*)query_embedding_,
-                                query_embedding_count_,
-                                topk_,
-                                dimension_,
-                                elem_type_);
+                        if(topk_ < faiss::distance_compute_min_k_reservoir) {
+                            auto knn_flat_inner_product = MakeUnique<KnnFlatIPBlas<f32>>(
+                                    (f32*)query_embedding_,
+                                    query_embedding_count_,
+                                    topk_,
+                                    dimension_,
+                                    elem_type_);
 
-                        knn_flat_inner_product->Begin();
-                        knn_distance_ = std::move(knn_flat_inner_product);
+                            knn_flat_inner_product->Begin();
+                            knn_distance_ = std::move(knn_flat_inner_product);
+                        } else {
+                            auto knn_flat_inner_product = MakeUnique<KnnFlatIPBlasReservoir<f32>>(
+                                    (f32*)query_embedding_,
+                                    query_embedding_count_,
+                                    topk_,
+                                    dimension_,
+                                    elem_type_);
+
+                            knn_flat_inner_product->Begin();
+                            knn_distance_ = std::move(knn_flat_inner_product);
+                        }
                     }
 
                     break;

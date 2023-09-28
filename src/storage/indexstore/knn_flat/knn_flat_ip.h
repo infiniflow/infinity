@@ -22,7 +22,7 @@ public:
               i64 topk,
               i64 dimension,
               EmbeddingDataType elem_data_type)
-              : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIP, elem_data_type),
+              : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIp, elem_data_type),
                 queries_(queries),
                 query_count_(query_count),
                 dimension_(dimension),
@@ -32,13 +32,6 @@ public:
 
         heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, distance_array_.get(), id_array_->data(), topk);
         single_heap_result_handler_ = MakeUnique<HeapSingleHandler>(*heap_result_handler_, query_count);
-//                            if(dimension_ < faiss::distance_compute_min_k_reservoir) {
-//                                result_handler_ = MakeUnique<HeapResultHandler>(query_count, distance_array, row_array, topk);
-//                                single_result_handler_ = MakeUnique<HeapSingleResultHandler>(*(HeapResultHandler*)result_handler_.get());
-//                            } else {
-//                                result_handler_ = MakeUnique<ReservoirResultHandler>(query_count, distance_array, row_array, topk);
-//                                single_result_handler_ = MakeUnique<ReservoirSingleResultHandler>(*(ReservoirResultHandler*)result_handler_.get());
-//                            }
     }
 
     void

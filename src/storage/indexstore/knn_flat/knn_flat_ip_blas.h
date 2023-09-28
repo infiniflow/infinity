@@ -22,7 +22,7 @@ public:
               i64 topk,
               i64 dimension,
               EmbeddingDataType elem_data_type)
-            : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIPBlas, elem_data_type),
+            : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIpBlas, elem_data_type),
               queries_(queries),
               query_count_(query_count),
               dimension_(dimension),

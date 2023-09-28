@@ -5,6 +5,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "new_partitioning.h"
 #include "new_heap.h"
 
 namespace infinity {
@@ -306,24 +307,24 @@ struct NewReservoirResultHandler : public ResultHandler {
     }
 
     /// add results for query i0..i1 and j0..j1
-    void add_results(size_t j0, size_t j1, const T* dis_tab) {
+    void add_results(size_t i_start, size_t i_end, size_t j0, size_t j1, const T* dis_tab, i32 segment_id) {
         // maybe parallel for
 //#pragma omp parallel for
-        for (int64_t i = i0; i < i1; i++) {
-            ReservoirTopN<C>& reservoir = reservoirs[i - i0];
-            const T* dis_tab_i = dis_tab + (j1 - j0) * (i - i0) - j0;
+        for (int64_t i = i_start; i < i_end; i++) {
+            ReservoirTopN<C>& reservoir = reservoirs[i - i_start];
+            const T* dis_tab_i = dis_tab + (j1 - j0) * (i - i_start) - j0;
             for (size_t j = j0; j < j1; j++) {
                 T dis = dis_tab_i[j];
-                reservoir.add(dis, j);
+                reservoir.add(dis, CompoundID(segment_id, (i32)j));
             }
         }
     }
 
     /// series of results for queries i0..i1 is done
-    void end_multiple() {
+    void end_multiple(size_t i_start, size_t i_end) {
         // maybe parallel for
-        for (size_t i = i0; i < i1; i++) {
-            reservoirs[i - i0].to_result(
+        for (size_t i = i_start; i < i_end; i++) {
+            reservoirs[i - i_start].to_result(
                     heap_dis_tab + i * k, heap_ids_tab + i * k);
         }
     }

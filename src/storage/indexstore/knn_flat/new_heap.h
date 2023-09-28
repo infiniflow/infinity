@@ -202,6 +202,54 @@ inline void heap_heapify(
     }
 }
 
+
+/*******************************************************************
+ * Add n elements to the heap
+ *******************************************************************/
+
+/* Add some elements to the heap  */
+template <class C>
+inline void heap_addn(
+        size_t k,
+        typename C::T* bh_val,
+        typename C::TI* bh_ids,
+        const typename C::T* x,
+        const typename C::TI* ids,
+        size_t n) {
+    size_t i;
+    if (ids) {
+        for (i = 0; i < n; i++) {
+            if (C::cmp(bh_val[0], x[i])) {
+                heap_replace_top<C>(k, bh_val, bh_ids, x[i], ids[i]);
+            }
+        }
+    }
+}
+
+/* Partial instanciation for heaps with TI = int64_t */
+
+template <typename T>
+inline void minheap_addn(
+        size_t k,
+        T* bh_val,
+        int64_t* bh_ids,
+        const T* x,
+        const int64_t* ids,
+        size_t n) {
+    heap_addn<faiss::CMin<T, int64_t>>(k, bh_val, bh_ids, x, ids, n);
+}
+
+template <typename T>
+inline void maxheap_addn(
+        size_t k,
+        T* bh_val,
+        int64_t* bh_ids,
+        const T* x,
+        const int64_t* ids,
+        size_t n) {
+    heap_addn<faiss::CMax<T, int64_t>>(k, bh_val, bh_ids, x, ids, n);
+}
+
 /*******************************************************************
  * Heap finalization (reorder elements)
  *******************************************************************/

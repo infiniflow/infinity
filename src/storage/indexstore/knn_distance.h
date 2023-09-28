@@ -11,8 +11,10 @@ namespace infinity {
 
 enum class KnnDistanceAlgoType {
     kInvalid,
-    kKnnFlatIP,
-    kKnnFlatIPBlas,
+    kKnnFlatIp,
+    kKnnFlatIpReservoir,
+    kKnnFlatIpBlas,
+    kKnnFlatIpBlasReservoir,
     kKnnFlatL2,
     kKnnFlatL2Blas,
 };
