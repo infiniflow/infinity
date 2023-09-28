@@ -29,7 +29,7 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
 
     const auto* table_ptr = (const TableCollectionEntry*)table_entry;
 
-    new_entry->base_dir_ = SegmentEntry::DetermineFilename(*table_entry->base_dir_, segment_id);
+    new_entry->segment_dir_ = SegmentEntry::DetermineFilename(*table_entry->table_entry_dir_, segment_id);
 
     // new_entry->finish_shuffle = false;
 
@@ -166,9 +166,9 @@ SegmentEntry::Serialize(const SegmentEntry* segment_entry) {
     nlohmann::json json_res;
 
     // if (!segment_entry->finish_shuffle) {
-    //     StorageError("Segment has not finish its base_dir");
+    //     StorageError("Segment has not finish its segment_dir");
     // }
-    json_res["base_dir"] = *segment_entry->base_dir_;
+    json_res["segment_dir"] = *segment_entry->segment_dir_;
     json_res["row_capacity"] = segment_entry->row_capacity_;
     i64 status_value = segment_entry->status_;
     json_res["status"] = status_value;
@@ -193,7 +193,7 @@ SegmentEntry::Deserialize(const nlohmann::json& table_entry_json,
                           BufferManager* buffer_mgr) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
 
-    segment_entry->base_dir_ = MakeShared<String>(table_entry_json["base_dir"]);
+    segment_entry->segment_dir_ = MakeShared<String>(table_entry_json["segment_dir"]);
     segment_entry->row_capacity_ = table_entry_json["row_capacity"];
 
     i64 status_value = table_entry_json["status"];
@@ -217,12 +217,11 @@ SharedPtr<String>
 SegmentEntry::DetermineFilename(const String& parent_dir, u64 seg_id) {
     u32 seed = time(nullptr);
     LocalFileSystem fs;
-    SharedPtr<String> base_dir;
+    SharedPtr<String> segment_dir;
     do {
-        base_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" +
-                                      std::to_string(seg_id));
-    } while(!fs.CreateDirectoryNoExp(*base_dir));
-    return base_dir;
+        segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + std::to_string(seg_id));
+    } while (!fs.CreateDirectoryNoExp(*segment_dir));
+    return segment_dir;
 }
 }
 

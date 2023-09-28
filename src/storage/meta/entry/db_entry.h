@@ -20,12 +20,13 @@ class TxnManager;
 class DBEntry : public BaseEntry {
 public:
     explicit
-    DBEntry(const SharedPtr<String>& base_dir,
+    DBEntry(const SharedPtr<String>& db_meta_dir,
             SharedPtr<String> db_name,
             u64 txn_id,
             TxnTimeStamp begin_ts)
-            : BaseEntry(EntryType::kDatabase), base_dir_(base_dir), db_name_(std::move(db_name)) {
-        // current_dir_ = MakeShared<String>(*base_dir + "/txn_" + std::to_string(txn_id));
+        : BaseEntry(EntryType::kDatabase),
+        db_entry_dir_(MakeShared<String>(*db_meta_dir + "/txn_" + std::to_string(txn_id))),
+        db_name_(std::move(db_name)) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }
@@ -82,7 +83,7 @@ public:
 
 public:
     RWMutex rw_locker_{};
-    SharedPtr<String> base_dir_{};
+    SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
     HashMap<String, UniquePtr<TableCollectionMeta>> tables_{};
 };

@@ -30,8 +30,7 @@ DBEntry::CreateTableCollection(DBEntry* db_entry,
     if(table_meta == nullptr) {
         // Create new db meta
         LOG_TRACE("Create new table/collection: {}", table_name);
-        SharedPtr<String> db_entry_dir = MakeShared<String>((*db_entry->base_dir_) + "/txn_" + std::to_string(txn_id));
-        UniquePtr<TableCollectionMeta> new_table_meta = MakeUnique<TableCollectionMeta>(db_entry_dir,
+        UniquePtr<TableCollectionMeta> new_table_meta = MakeUnique<TableCollectionMeta>(db_entry->db_entry_dir_,
                                                                                         table_collection_name,
                                                                                         db_entry);
         table_meta = new_table_meta.get();
@@ -40,7 +39,7 @@ DBEntry::CreateTableCollection(DBEntry* db_entry,
         db_entry->tables_[table_name] = std::move(new_table_meta);
         db_entry->rw_locker_.unlock();
 
-        LOG_TRACE("Add new database entry for: {} in new table meta: {} ", table_name, *db_entry->base_dir_);
+        LOG_TRACE("Add new table entry for {} in new table meta of db_entry {} ", table_name, *db_entry->db_entry_dir_);
 
         EntryResult res = TableCollectionMeta::CreateNewEntry(table_meta,
                                                               table_collection_type,
@@ -51,7 +50,7 @@ DBEntry::CreateTableCollection(DBEntry* db_entry,
                                                               txn_mgr);
         return res;
     } else {
-        LOG_TRACE("Add new database entry for: {} in existed table meta: {}", table_name, *db_entry->base_dir_);
+        LOG_TRACE("Add new table entry for {} in existed table meta of db_entry {}", table_name, *db_entry->db_entry_dir_);
         EntryResult res = TableCollectionMeta::CreateNewEntry(table_meta,
                                                               table_collection_type,
                                                               table_collection_name,
@@ -194,7 +193,7 @@ SharedPtr<String>
 DBEntry::ToString(DBEntry* db_entry) {
     std::shared_lock<RWMutex> r_locker(db_entry->rw_locker_);
     SharedPtr<String> res = MakeShared<String>(fmt::format("DBEntry, base dir: {}, txn id: {}, table count: ",
-                                                           *db_entry->base_dir_,
+                                                           *db_entry->db_entry_dir_,
                                                            db_entry->txn_id_,
                                                            db_entry->tables_.size()));
     return res;
@@ -204,7 +203,7 @@ nlohmann::json
 DBEntry::Serialize(const DBEntry* db_entry) {
     nlohmann::json json_res;
 
-    json_res["base_dir"] = *db_entry->base_dir_;
+    json_res["db_entry_dir"] = *db_entry->db_entry_dir_;
     json_res["db_name"] = *db_entry->db_name_;
     json_res["txn_id"] = db_entry->txn_id_.load();
     json_res["begin_ts"] = db_entry->begin_ts_;
@@ -222,11 +221,11 @@ DBEntry::Deserialize(const nlohmann::json& db_entry_json,
                      BufferManager* buffer_mgr) {
     nlohmann::json json_res;
 
-    SharedPtr<String> base_dir = MakeShared<String>(db_entry_json["base_dir"]);
+    SharedPtr<String> db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
     SharedPtr<String> db_name = MakeShared<String>(db_entry_json["db_name"]);
     u64 txn_id = db_entry_json["txn_id"];
     u64 begin_ts = db_entry_json["begin_ts"];
-    UniquePtr<DBEntry> res = MakeUnique<DBEntry>(base_dir, db_name, txn_id, begin_ts);
+    UniquePtr<DBEntry> res = MakeUnique<DBEntry>(db_entry_dir, db_name, txn_id, begin_ts);
 
     u64 commit_ts = db_entry_json["commit_ts"];
     bool deleted = db_entry_json["deleted"];

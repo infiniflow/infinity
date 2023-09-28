@@ -24,7 +24,7 @@ class Txn;
 struct TableCollectionEntry : public BaseEntry {
 public:
     explicit
-    TableCollectionEntry(const SharedPtr<String>& base_dir,
+    TableCollectionEntry(const SharedPtr<String>& db_entry_dir,
                          SharedPtr<String> table_collection_name,
                          const Vector<SharedPtr<ColumnDef>>& columns,
                          TableCollectionType table_collection_type,
@@ -133,7 +133,7 @@ private:
 public:
     RWMutex rw_locker_{};
 
-    SharedPtr<String> base_dir_{};
+    SharedPtr<String> table_entry_dir_{};
 
     SharedPtr<String> table_collection_name_{};
     Vector<SharedPtr<ColumnDef>> columns_{};

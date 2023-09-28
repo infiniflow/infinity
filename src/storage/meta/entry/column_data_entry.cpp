@@ -22,7 +22,7 @@ ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry* segment_entry, u64 c
                                         const SharedPtr<DataType>& data_type, BufferManager* buffer_mgr) {
     SharedPtr<ColumnDataEntry> column_data_entry = MakeShared<ColumnDataEntry>(segment_entry);
     const auto* segment_ptr = (const SegmentEntry*)segment_entry;
-    column_data_entry->base_dir_ = segment_ptr->base_dir_;
+    column_data_entry->base_dir_ = segment_ptr->segment_dir_;
     column_data_entry->row_capacity_ = row_capacity;
     column_data_entry->column_type_ = data_type;
     column_data_entry->column_id_ = column_id;
