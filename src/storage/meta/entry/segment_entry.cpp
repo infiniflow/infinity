@@ -5,7 +5,6 @@
 #include "segment_entry.h"
 #include "common/default_values.h"
 #include "common/utility/defer_op.h"
-#include "common/utility/random.h"
 #include "storage/io/local_file_system.h"
 #include "storage/txn/txn.h"
 #include <ctime>
@@ -30,10 +29,7 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry* table_entry,
 
     const auto* table_ptr = (const TableCollectionEntry*)table_entry;
 
-    // reserve an empty space for random name of segment directory.
-    u32 seed = time(nullptr);
-    new_entry->base_dir_ = MakeShared<String>(*table_ptr->base_dir_ + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + std::to_string(segment_id));
-    String base_dir = *table_ptr->base_dir_ + "/seg_id" + std::to_string(segment_id);
+    new_entry->base_dir_ = SegmentEntry::DetermineFilename(*table_entry->base_dir_, segment_id);
 
     // new_entry->finish_shuffle = false;
 
@@ -144,16 +140,6 @@ SegmentEntry::PrepareFlush(SegmentEntry* segment_entry) {
 UniquePtr<String>
 SegmentEntry::Flush(SegmentEntry* segment_entry) {
     LOG_TRACE("DataSegment: {} is being flushed", segment_entry->segment_id_);
-    bool create_directory_success = false;
-    LocalFileSystem fs;
-    while (1) {
-        // segment_entry->ShuffleFileName(); this is for duplicate directory test
-        bool exist = fs.CreateDirectoryCheckIfExist(*segment_entry->base_dir_);
-        if (!exist) {
-            break;
-        }
-        segment_entry->ShuffleFileName();
-    }
     for(SizeT column_id = 0; const auto& column_data: segment_entry->columns_) {
         column_data->Flush(column_data.get(), segment_entry->current_row_);
         LOG_TRACE("ColumnData: {} is flushed", column_id);
@@ -216,35 +202,20 @@ SegmentEntry::Deserialize(const nlohmann::json& table_entry_json, TableCollectio
 
     return segment_entry;
 }
-// /tmp/infinity/data/default/txn_2/t1/xw8y9pWPfq_seg_0
-namespace {
-// Hard code here. **UGLY CODE!!!**
-static void SegIdChange(String &s, const String &new_seg_id) {
-    auto ret = s.find("_seg");
-    StorageAssert(ret != std::string::npos, "Cannot find \"_seg\" in segment id change.");
-    auto start_pos = ret - DEFAULT_RANDOM_SEGMENT_NAME_LEN;
-    std::copy(new_seg_id.begin(), new_seg_id.end(), s.begin() + start_pos);
-}
-}
 
-void
-SegmentEntry::ShuffleFileName() {
+SharedPtr<String>
+SegmentEntry::DetermineFilename(const String &parent_dir, u64 seg_id) {
     u32 seed = time(nullptr);
-    String new_seg_id = RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed);
-    for (auto column_entry : columns_) {
-        if (column_entry->outline_info_) {
-            auto outline_info  = column_entry->outline_info_.get();
-            for (auto [bufferhandle_ptr, buffer_size] : outline_info->written_buffers_) {
-                auto s = bufferhandle_ptr->current_dir_;
-                SegIdChange(*s, new_seg_id);
-            }
+    LocalFileSystem fs;
+    SharedPtr<String> base_dir;
+    while (1) {
+        base_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + std::to_string(seg_id));
+        bool exist = fs.CreateDirectoryCheckIfExist(*base_dir); // for duplicate directory test
+        if (!exist) {
+            break;
         }
-        auto s = column_entry->buffer_handle_->current_dir_;
-        SegIdChange(*s, new_seg_id);
     }
-    SegIdChange(*base_dir_, new_seg_id);
+    return base_dir;
 }
-
-
 }
 
