@@ -73,12 +73,12 @@ MockTableDesc2() {
 
 TEST_F(WalEntryTest, ReadWrite) {
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
-
     entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
     entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1"));
     entry->cmds.push_back(
             MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
     entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
+    entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
 
     SharedPtr<DataBlock> data_block = DataBlock::Make();
     Vector<SharedPtr<DataType>> column_types;
@@ -95,7 +95,6 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
     Vector<RowID> row_ids = {{1, 2}};
     entry->cmds.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
-
     entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123)));
 
     int32_t exp_size = entry->GetSizeInBytes();

@@ -27,6 +27,7 @@ enum class WalCommandType : uint8_t {
     // -----------------------------
     // Data
     // -----------------------------
+    IMPORT = 20,
     APPEND = 21,
     DELETE = 22,
     // -----------------------------
@@ -131,6 +132,18 @@ struct WalCmdDropTable : public WalCmd {
 
     String db_name;
     String table_name;
+};
+
+struct WalCmdImport : public WalCmd {
+    WalCmdImport(const String &db_name_, const String &table_name_, const String &segment_dir_)
+        : db_name(db_name_), table_name(table_name_), segment_dir(segment_dir_) {}
+    virtual WalCommandType GetType() { return WalCommandType::IMPORT; }
+    virtual bool operator==(const WalCmd &other) const;
+    virtual int32_t GetSizeInBytes() const;
+    virtual void WriteAdv(char *&buf) const;
+    String db_name;
+    String table_name;
+    String segment_dir;
 };
 
 struct WalCmdAppend : public WalCmd {

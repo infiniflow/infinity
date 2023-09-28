@@ -490,10 +490,15 @@ Txn::CommitTxn() {
         txn_context_.SetTxnRollbacked();
         return;
     }
-    // Put wal entry to the manager in the same order as commit_ts.
-    wal_entry_->txn_id = txn_id_;
-    wal_entry_->commit_ts = commit_ts;
-    txn_mgr_->PutWalEntry(wal_entry_);
+    if (wal_entry_->cmds.empty()) {
+        // Read-only txn
+        txn_mgr_->Invalidate(commit_ts);
+    } else {
+        // Put wal entry to the manager in the same order as commit_ts.
+        wal_entry_->txn_id = txn_id_;
+        wal_entry_->commit_ts = commit_ts;
+        txn_mgr_->PutWalEntry(wal_entry_);
+    }
     // Wait until CommitTxnBottom is done.
     std::unique_lock lk(m);
     cv.wait(lk, [this] { return done_bottom_; });
@@ -578,6 +583,11 @@ Txn::RollbackTxn() {
     }
 
     LOG_TRACE("Txn: {} is dropped.", txn_id_);
+}
+
+void
+Txn::AddWalCmd(const SharedPtr<WalCmd>& cmd){
+    wal_entry_->cmds.push_back(cmd);
 }
 
 }
