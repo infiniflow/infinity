@@ -87,7 +87,7 @@ target_link_libraries(test_main
         zsv_parser
         roaring
         faiss
-        gfortran
+#        gfortran
         fastpfor
         newpfor
         )

@@ -10,6 +10,8 @@
 #include "function/function_data.h"
 #include "storage/txn/constants.h"
 #include "parser/parsed_expr/knn_expr.h"
+#include "storage/indexstore/knn_distance.h"
+#include "storage/indexstore/common/compound_id.h"
 
 namespace infinity {
 
@@ -50,7 +52,11 @@ public:
 
     i64 current_segment_idx_{0};
 
-    // TODO: TopK to be implemented, for the whole task
+    UniquePtr<KnnDistanceBase> knn_distance_{nullptr};
+
+public:
+    void
+    Init();
 
 };
 

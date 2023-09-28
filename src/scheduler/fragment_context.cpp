@@ -234,6 +234,7 @@ BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vector<Phy
                                                                                             knn_expr->query_embedding_.ptr,
                                                                                             knn_expr->embedding_data_type_,
                                                                                             knn_expr->distance_type_);
+            knn_scan_input_state->knn_scan_function_data_->Init();
         } else {
             SchedulerError("Currently, we only support one knn column case")
         }

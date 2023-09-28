@@ -69,7 +69,6 @@ public:
     au64 start_txn_id_{};
     au64 end_txn_id_{};   // Indicate when the segment is removed.
 
-    // bool finish_shuffle{true};
 public:
     [[nodiscard]] inline SizeT
     AvailableCapacity() const {
@@ -111,9 +110,8 @@ public:
     Deserialize(const nlohmann::json& table_entry_json, TableCollectionEntry* table_entry, BufferManager* buffer_mgr);
 
 private:
-    void
-    ShuffleFileName();
-
+    static SharedPtr<String>
+    DetermineFilename(const String &parent_dir, u64 seg_id);
 };
 
 }

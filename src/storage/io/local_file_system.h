@@ -55,9 +55,9 @@ public:
     void
     CreateDirectory(const String& path) final;
 
-    // return true if directory exists. throw error for other error. **UGLY CODE**.
+    // return true if successfully created directory
     bool
-    CreateDirectoryCheckIfExist(const String& path);
+    CreateDirectoryNoExp(const String& path);
 
     void
     DeleteDirectory(const String& path) final;

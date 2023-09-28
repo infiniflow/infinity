@@ -162,18 +162,10 @@ LocalFileSystem::Exists(const String& path) {
 }
 
 bool
-LocalFileSystem::CreateDirectoryCheckIfExist(const String& path) {
+LocalFileSystem::CreateDirectoryNoExp(const String& path) {
     std::error_code error_code;
     std::filesystem::path p{path};
-    bool is_success = std::filesystem::create_directories(p, error_code);
-    if(error_code.value() == 0) {
-        if(!is_success) {
-            StorageError(fmt::format("Can't create directory: {}, {}", path, strerror(errno)));
-        }
-    } else {
-        return true;
-    }
-    return false;
+    return std::filesystem::create_directories(p, error_code);
 }
 
 void
@@ -181,12 +173,8 @@ LocalFileSystem::CreateDirectory(const String& path) {
     std::error_code error_code;
     std::filesystem::path p{path};
     bool is_success = std::filesystem::create_directories(p, error_code);
-    if(error_code.value() == 0) {
-        if(!is_success) {
-            StorageError(fmt::format("Can't create directory: {}, {}", path, strerror(errno)));
-        }
-    } else {
-        StorageError(fmt::format("{} exists exception: {}", path, error_code.message()))
+    if(error_code.value() != 0) {
+        StorageError(fmt::format("{} create exception: {}", path, error_code.message()))
     }
 }
 

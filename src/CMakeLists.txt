@@ -150,6 +150,15 @@ set(INFINITY_CORE_SOURCE
 )
 
 add_library(infinity_core STATIC ${INFINITY_CORE_SOURCE})
+target_link_libraries(infinity_core PRIVATE onnxruntime_mlas)
+
+target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+#find_package(BLAS REQUIRED)
+#target_link_libraries(infinity_core PRIVATE ${BLAS_LIBRARIES})
+#
+#find_package(LAPACK REQUIRED)
+#target_link_libraries(infinity_core PRIVATE ${LAPACK_LIBRARIES})
+
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(infinity_core PUBLIC "/usr/local/include")
@@ -185,10 +194,11 @@ target_link_libraries(
         tlsf
         roaring
         faiss
-        gfortran
+#        gfortran
         fastpfor
         newpfor
         zsv_parser
+
         ${EXTERNAL_LIBS}
 )
 
