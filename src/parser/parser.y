@@ -136,6 +136,10 @@ struct SQL_LTYPE {
     infinity::TableName* table_name_t;
     infinity::CopyOption* copy_option_t;
     std::vector<infinity::CopyOption*>* copy_option_array;
+
+    infinity::CreateIndexPara*        index_para_t;
+    std::vector<infinity::CreateIndexPara*>* index_para_list_t;
+    std::vector<infinity::CreateIndexPara*>* with_index_para_list_t;
 }
 
 %destructor {
@@ -292,7 +296,7 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER
-%token KNN
+%token KNN USING
 
 %token NUMBER
 
@@ -351,6 +355,10 @@ struct SQL_LTYPE {
 %type <str_value>         file_path
 
 %type <bool_value>        if_not_exists if_exists distinct
+
+%type <index_para_t> index_para
+%type <index_para_list_t> index_para_list
+%type <with_index_para_list_t> with_index_para_list
 
 /*
  * Operator precedence, low to high
@@ -502,11 +510,11 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
     create_view_info->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     $$->create_info_ = create_view_info;
 }
-/* CREATE INDEX index_name ON table_name (column1) ; */
-| CREATE INDEX if_not_exists IDENTIFIER ON table_name '(' identifier_array ')' {
+/* CREATE INDEX index_name ON table_name (column1) USING method; */
+| CREATE INDEX if_not_exists IDENTIFIER ON table_name '(' identifier_array ')' USING IDENTIFIER with_index_para_list {
     $$ = new infinity::CreateStatement();
     std::shared_ptr<infinity::CreateIndexInfo> create_index_info = std::make_shared<infinity::CreateIndexInfo>();
-    if($6->schema_name_ptr_ != nullptr) {
+    if ($6->schema_name_ptr_ != nullptr) {
         create_index_info->schema_name_ = $6->schema_name_ptr_;
         free($6->schema_name_ptr_);
     }
@@ -520,8 +528,26 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
 
     create_index_info->column_names_ = $8;
     create_index_info->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
+
+    if (strcmp($11, "Flat") == 0) {
+        create_index_info->method_type_ = infinity::IndexMethod::kFlat;
+    } else if (strcmp($11, "IVFFlat") == 0) {
+        create_index_info->method_type_ = infinity::IndexMethod::kIVFFlat;
+    } else if (strcmp($11, "IVFSQ8") == 0) {
+        create_index_info->method_type_ = infinity::IndexMethod::kIVFSQ8;
+    } else if (strcmp($11, "Hnsw") == 0) {
+        create_index_info->method_type_ = infinity::IndexMethod::kHnsw;
+    } else {
+        yyerror(&yyloc, scanner, result, "Invalid index method type");
+        YYERROR;
+    }
+    // create_index_info->method_name_ = $11;
+    free($11);
+
+    create_index_info->index_para_list_ = $12;
     $$->create_info_ = create_index_info;
-};
+}
+;
 
 table_element_array : table_element {
     $$ = new std::vector<infinity::TableElement*>();
@@ -2118,6 +2144,34 @@ if_not_exists : IF NOT EXISTS { $$ = true; }
 semicolon : ';'
 | /* nothing */
 ;
+
+// TODO shenyushi: add null
+with_index_para_list : WITH '(' index_para_list ')' {
+    $$ = $3;
+};
+
+index_para_list : index_para {
+    $$ = new std::vector<infinity::CreateIndexPara*>();
+    $$->push_back($1);
+}
+| index_para_list ',' index_para {
+    $1->push_back($3);
+    $$ = $1; // TODO shenyushi: should use move here?
+};
+
+index_para : IDENTIFIER {
+    $$ = new infinity::CreateIndexPara();
+    $$->para_name_ = $1;
+    free($1);
+}
+| IDENTIFIER '=' IDENTIFIER {
+    $$ = new infinity::CreateIndexPara();
+    $$->para_name_ = $1;
+    free($1);
+
+    $$->para_value_ = $3;
+    free($3);
+};
 
 %%
 

@@ -9,6 +9,19 @@
 
 namespace infinity {
 
+struct CreateIndexPara {
+    String para_name_{};
+    String para_value_{};
+};
+
+enum class IndexMethod {
+    kFlat,
+    kIVFFlat,
+    kIVFSQ8,
+    kHnsw,
+    kInvalid,
+};
+
 class CreateIndexInfo final : public ExtraDDLInfo {
 public:
     explicit CreateIndexInfo() : ExtraDDLInfo(DDLType::kIndex) {}
@@ -20,8 +33,10 @@ public:
     String index_name_{};
     String schema_name_{"default"};
     String table_name_{};
+    IndexMethod method_type_{IndexMethod::kInvalid};
 
     Vector<String> *column_names_{nullptr};
+    Vector<CreateIndexPara *> *index_para_list_{nullptr};
 };
 
 } // namespace infinity
