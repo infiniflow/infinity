@@ -4,11 +4,11 @@
 #include "storage/io/byte_slice_reader.h"
 
 namespace infinity{
-class PosSkipListReader{
+class PosListSkipListReader{
 public:
-    PosSkipListReader();
-    PosSkipListReader(const PosSkipListReader& other) noexcept;
-    ~PosSkipListReader();
+    PosListSkipListReader();
+    PosListSkipListReader(const PosListSkipListReader& other) noexcept;
+    ~PosListSkipListReader();
 public:
     void Load(const ByteSliceList* byte_slice_list, uint32_t start, uint32_t end, const uint32_t& item_count);
 
@@ -43,8 +43,9 @@ public:
 private:
     void Load_(uint32_t start, uint32_t end, const uint32_t& item_count);
 
-    std::pair<int, bool> LoadBuffer();
-private:
+protected:
+    virtual std::pair<int, bool> LoadBuffer();
+protected:
     uint32_t start_;
     uint32_t end_;
     ByteSliceReader byte_slice_reader_;

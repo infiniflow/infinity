@@ -1,11 +1,11 @@
-#include "pos_skiplist_reader.h"
+#include "pos_list_skiplist_reader.h"
 #include "posting_value.h"
 #include "common/utility/infinity_assert.h"
 #include "main/logger.h"
 
 namespace infinity{
 
-PosSkipListReader::PosSkipListReader()
+PosListSkipListReader::PosListSkipListReader()
     : start_(0)
     , end_(0)
     , skipped_item_count_(-1)
@@ -18,7 +18,7 @@ PosSkipListReader::PosSkipListReader()
     , key_buffer_base_(key_buffer_)
     , value_buffer_base_(value_buffer_) {}
 
-PosSkipListReader::PosSkipListReader(const PosSkipListReader& other) noexcept
+PosListSkipListReader::PosListSkipListReader(const PosListSkipListReader& other) noexcept
     : start_(other.start_)
     , end_(other.end_)
     , byte_slice_reader_(other.byte_slice_reader_)
@@ -33,10 +33,10 @@ PosSkipListReader::PosSkipListReader(const PosSkipListReader& other) noexcept
     , value_buffer_base_(value_buffer_) {}
 
 
-PosSkipListReader::~PosSkipListReader() {
+PosListSkipListReader::~PosListSkipListReader() {
 }
 
-void PosSkipListReader::Load(const ByteSliceList* byte_slice_list, uint32_t start, uint32_t end, const uint32_t& item_count) {
+void PosListSkipListReader::Load(const ByteSliceList* byte_slice_list, uint32_t start, uint32_t end, const uint32_t& item_count) {
     start_ = start;
     end_ = end;
     byte_slice_reader_.Open(const_cast<ByteSliceList*>(byte_slice_list));
@@ -44,7 +44,7 @@ void PosSkipListReader::Load(const ByteSliceList* byte_slice_list, uint32_t star
     Load_(start, end, item_count);
 }
 
-void PosSkipListReader::Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count) {
+void PosListSkipListReader::Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count) {
     start_ = start;
     end_ = end;
     byte_slice_reader_.Open(byte_slice);
@@ -52,7 +52,7 @@ void PosSkipListReader::Load(ByteSlice* byte_slice, uint32_t start, uint32_t end
     Load_(start, end, item_count);
 }
 
-void PosSkipListReader::Load_(uint32_t start, uint32_t end , const uint32_t& item_count) {
+void PosListSkipListReader::Load_(uint32_t start, uint32_t end , const uint32_t& item_count) {
     skipped_item_count_ = -1;
     current_key_ = 0;
     current_value_ = 0;
@@ -71,7 +71,7 @@ void PosSkipListReader::Load_(uint32_t start, uint32_t end , const uint32_t& ite
     }
 }
 
-bool PosSkipListReader::SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_key, uint32_t& value, uint32_t& delta) {
+bool PosListSkipListReader::SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_key, uint32_t& value, uint32_t& delta) {
     assert(current_key_ <= query_key);
 
     uint32_t local_prev_key, local_prev_value;
@@ -122,7 +122,7 @@ bool PosSkipListReader::SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev
     return false;
 }
 
-std::pair<int, bool> PosSkipListReader::LoadBuffer() {
+std::pair<int, bool> PosListSkipListReader::LoadBuffer() {
     uint32_t end = byte_slice_reader_.Tell();
     if (end < end_) {
         key_buffer_base_ = key_buffer_;

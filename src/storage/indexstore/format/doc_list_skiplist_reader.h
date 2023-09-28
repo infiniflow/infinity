@@ -58,11 +58,12 @@ public:
 protected:
     void InitMember();
 
+    virtual std::pair<int, bool> LoadBuffer();
+
 private:
     void Load_(uint32_t start, uint32_t end, const uint32_t& item_count);
 
-    std::pair<int, bool> LoadBuffer();
-private:
+protected:
     uint32_t start_;
     uint32_t end_;
     ByteSliceReader byte_slice_reader_;

@@ -27,6 +27,9 @@ public:
     uint32_t GetLastValueInBuffer() const override;
     uint32_t GetLastKeyInBuffer() const override;
 
+protected:
+    std::pair<int, bool> LoadBuffer() override;
+
 private:
     MemoryPool* session_pool_;
     BufferedByteSlice* skiplist_buffer_;
