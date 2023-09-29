@@ -10,6 +10,7 @@
 namespace infinity {
 
 class DataBlock;
+
 struct FragmentDataQueue {
     inline void
     Enqueue(const SharedPtr<DataBlock>& data_block) {

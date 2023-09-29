@@ -243,12 +243,12 @@ TEST_F(DoubleCastTest, double_cast1) {
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kDouble);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeDouble(static_cast<DoubleT>(i));
         col_source->AppendValue(v);
         Value vx = col_source->GetValue(i);
     }
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = col_source->GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i));
@@ -266,11 +266,11 @@ TEST_F(DoubleCastTest, double_cast1) {
         CastParameters cast_parameters;
         bool result = double2tiny_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_FALSE(result);
-        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
             i32 check_value = static_cast<i32>(i);
-            if (check_value >= std::numeric_limits<i8>::min() && check_value <= std::numeric_limits<i8>::max()) {
+            if(check_value >= std::numeric_limits<i8>::min() && check_value <= std::numeric_limits<i8>::max()) {
                 EXPECT_FALSE(vx.is_null());
                 EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(check_value));
             } else {
@@ -291,7 +291,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         CastParameters cast_parameters;
         bool result = double2small_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
-        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
             i32 check_value = static_cast<i32>(i);
@@ -311,7 +311,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         CastParameters cast_parameters;
         bool result = double2integer_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
-        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
             i32 check_value = static_cast<i32>(i);
@@ -331,7 +331,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         CastParameters cast_parameters;
         bool result = double2bigint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
-        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
             i32 check_value = static_cast<i32>(i);
@@ -351,7 +351,8 @@ TEST_F(DoubleCastTest, double_cast1) {
         CastParameters cast_parameters;
 
 //        bool result = double2hugeint_ptr.function(col_float, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters);
-        EXPECT_THROW(double2hugeint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(double2hugeint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 
     // cast double column vector to float column vector
@@ -366,7 +367,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         CastParameters cast_parameters;
         bool result = double2float_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
-        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
             i32 check_value = static_cast<i32>(i);
@@ -387,7 +388,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         bool result = double2varchar_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         // Not all values are cast, then it's false.
         EXPECT_TRUE(result);
-        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             String s('a' + i % 26, 16);
 
             Value vx = col_target->GetValue(i);

@@ -97,9 +97,11 @@ TableCollectionMeta::CreateNewEntry(TableCollectionMeta* table_meta,
                 }
             } else {
                 // Write-Write conflict
-                LOG_TRACE("Write-write conflict: There is a committed table: {} which is later than current transaction.",
-                          table_collection_name)
-                return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
+                LOG_TRACE(
+                        "Write-write conflict: There is a committed table: {} which is later than current transaction.",
+                        table_collection_name)
+                return {nullptr, MakeUnique<String>(
+                        "Write-write conflict: There is a committed database which is later than current transaction.")};
             }
         } else {
 
@@ -127,14 +129,17 @@ TableCollectionMeta::CreateNewEntry(TableCollectionMeta* table_meta,
                         }
                     } else {
                         LOG_TRACE("Write-write conflict: There is a uncommitted transaction.")
-                        return {nullptr, MakeUnique<String>("Write-write conflict: There is a uncommitted transaction.")};
+                        return {nullptr,
+                                MakeUnique<String>("Write-write conflict: There is a uncommitted transaction.")};
                     }
                 }
                 case TxnState::kCommitting:
                 case TxnState::kCommitted: {
                     // Committing / Committed, report WW conflict and rollback current txn
-                    LOG_TRACE("Write-write conflict: There is a committing/committed table which is later than current transaction.")
-                    return {nullptr, MakeUnique<String>("Write-write conflict: There is a committing/committed table which is later than current transaction.")};
+                    LOG_TRACE(
+                            "Write-write conflict: There is a committing/committed table which is later than current transaction.")
+                    return {nullptr, MakeUnique<String>(
+                            "Write-write conflict: There is a committing/committed table which is later than current transaction.")};
                 }
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
@@ -191,7 +196,7 @@ TableCollectionMeta::DropNewEntry(TableCollectionMeta* table_meta,
         if(begin_ts > header_table_entry->commit_ts_) {
             // No conflict
             if(header_table_entry->deleted_) {
-                if (conflict_type == ConflictType::kIgnore) {
+                if(conflict_type == ConflictType::kIgnore) {
                     LOG_TRACE("Ignore drop a not existed table entry {}", table_name);
                     return {nullptr, nullptr};
                 }
@@ -201,7 +206,8 @@ TableCollectionMeta::DropNewEntry(TableCollectionMeta* table_meta,
 
             Vector<SharedPtr<ColumnDef>> dummy_columns;
 
-            SharedPtr<String> base_dir = MakeShared<String>(*table_meta->base_dir_ + '/' + *table_meta->table_collection_name_);
+            SharedPtr<String> base_dir = MakeShared<String>(
+                    *table_meta->base_dir_ + '/' + *table_meta->table_collection_name_);
             UniquePtr<TableCollectionEntry> table_entry = MakeUnique<TableCollectionEntry>(base_dir,
                                                                                            table_meta->table_collection_name_,
                                                                                            dummy_columns,
@@ -217,7 +223,8 @@ TableCollectionMeta::DropNewEntry(TableCollectionMeta* table_meta,
         } else {
             // Write-Write conflict
             LOG_TRACE("Write-write conflict: There is a committed database which is later than current transaction.");
-            return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
+            return {nullptr, MakeUnique<String>(
+                    "Write-write conflict: There is a committed database which is later than current transaction.")};
         }
     } else {
         // Uncommitted, check if the same txn
@@ -242,14 +249,14 @@ TableCollectionMeta::DeleteNewEntry(TableCollectionMeta* table_meta,
     std::unique_lock<RWMutex> rw_locker(table_meta->rw_locker_);
     if(table_meta->entry_list_.empty()) {
         LOG_TRACE("Empty table entry list.")
-        return ;
+        return;
     }
 
     auto removed_iter = std::remove_if(table_meta->entry_list_.begin(),
                                        table_meta->entry_list_.end(),
-                                       [&](UniquePtr<BaseEntry>& entry)->bool {
-        return entry->txn_id_ == txn_id;
-    });
+                                       [&](UniquePtr<BaseEntry>& entry) -> bool {
+                                           return entry->txn_id_ == txn_id;
+                                       });
 
     table_meta->entry_list_.erase(removed_iter, table_meta->entry_list_.end());
 }
@@ -356,7 +363,9 @@ TableCollectionMeta::Deserialize(const nlohmann::json& table_meta_json, DBEntry*
     UniquePtr<TableCollectionMeta> res = MakeUnique<TableCollectionMeta>(base_dir, table_name, db_entry);
     if(table_meta_json.contains("entries")) {
         for(const auto& table_entry_json: table_meta_json["entries"]) {
-            UniquePtr<TableCollectionEntry> table_entry = TableCollectionEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
+            UniquePtr<TableCollectionEntry> table_entry = TableCollectionEntry::Deserialize(table_entry_json,
+                                                                                            res.get(),
+                                                                                            buffer_mgr);
             res->entry_list_.emplace_back(std::move(table_entry));
         }
     }

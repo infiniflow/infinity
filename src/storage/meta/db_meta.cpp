@@ -70,7 +70,8 @@ DBMeta::CreateNewEntry(DBMeta* db_meta,
             } else {
                 // Write-Write conflict
                 LOG_TRACE("Write-write conflict: There is a committed database which is later than current transaction.")
-                return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
+                return {nullptr, MakeUnique<String>(
+                        "Write-write conflict: There is a committed database which is later than current transaction.")};
             }
         } else {
 
@@ -95,14 +96,17 @@ DBMeta::CreateNewEntry(DBMeta* db_meta,
                         }
                     } else {
                         LOG_TRACE("Write-write conflict: There is a uncommitted transaction.")
-                        return {nullptr, MakeUnique<String>("Write-write conflict: There is a uncommitted transaction.")};
+                        return {nullptr,
+                                MakeUnique<String>("Write-write conflict: There is a uncommitted transaction.")};
                     }
                 }
                 case TxnState::kCommitting:
                 case TxnState::kCommitted: {
                     // Committing / Committed, report WW conflict and rollback current txn
-                    LOG_TRACE("Write-write conflict: There is a committing/committed database which is later than current transaction.")
-                    return {nullptr, MakeUnique<String>("Write-write conflict: There is a committing/committed database which is later than current transaction.")};
+                    LOG_TRACE(
+                            "Write-write conflict: There is a committing/committed database which is later than current transaction.")
+                    return {nullptr, MakeUnique<String>(
+                            "Write-write conflict: There is a committing/committed database which is later than current transaction.")};
                 }
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
@@ -164,7 +168,8 @@ DBMeta::DropNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnMana
         } else {
             // Write-Write conflict
             LOG_TRACE("Write-write conflict: There is a committed database which is later than current transaction.");
-            return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
+            return {nullptr, MakeUnique<String>(
+                    "Write-write conflict: There is a committed database which is later than current transaction.")};
         }
     } else {
         // Uncommitted, check if the same txn
@@ -187,14 +192,14 @@ DBMeta::DeleteNewEntry(DBMeta* db_meta, u64 txn_id, TxnManager* txn_mgr) {
     std::unique_lock<RWMutex> rw_locker(db_meta->rw_locker_);
     if(db_meta->entry_list_.empty()) {
         LOG_TRACE("Empty db entry list.")
-        return ;
+        return;
     }
 
     auto removed_iter = std::remove_if(db_meta->entry_list_.begin(),
                                        db_meta->entry_list_.end(),
-                                       [&](auto& entry)->bool {
-        return entry->txn_id_ == txn_id;
-    });
+                                       [&](auto& entry) -> bool {
+                                           return entry->txn_id_ == txn_id;
+                                       });
 
     db_meta->entry_list_.erase(removed_iter, db_meta->entry_list_.end());
 }
@@ -227,8 +232,8 @@ DBMeta::GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts) {
         } else {
             // Only committed txn is visible. Committing txn isn't visble,
             // except same txn is visible
-            if(txn_id == db_entry->txn_id_ ) {
-                if (db_entry->deleted_) {
+            if(txn_id == db_entry->txn_id_) {
+                if(db_entry->deleted_) {
 //                    LOG_TRACE("DB is dropped.")
                     return {nullptr, MakeUnique<String>("DB is dropped.")};
                 } else {
@@ -261,8 +266,8 @@ DBMeta::Serialize(const DBMeta* db_meta) {
         if(base_entry->entry_type_ == EntryType::kDatabase) {
             DBEntry* db_entry = (DBEntry*)base_entry.get();
             json_res["entries"].emplace_back(DBEntry::Serialize(db_entry));
-        } else if(base_entry->entry_type_ == EntryType::kDummy) {
-            ; // LOG_TRACE("Skip dummy type entry during serialize database {} meta", *db_meta->db_name_);
+        } else if(base_entry->entry_type_ ==
+                  EntryType::kDummy) { ; // LOG_TRACE("Skip dummy type entry during serialize database {} meta", *db_meta->db_name_);
         } else {
             StorageError("Unexpected entry type");
         }

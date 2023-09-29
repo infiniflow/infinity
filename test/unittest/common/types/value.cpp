@@ -33,7 +33,7 @@ TEST_F(ValueTest, Bitmap) {
 
     Value value = Value::MakeBool(true);
 
-    for(int j = 0; j < 100; ++ j) {
+    for(int j = 0; j < 100; ++j) {
         {
             PointT point1(1.0f, 2.0f);
             CircleT circle(point1, 1.3f);
@@ -45,7 +45,7 @@ TEST_F(ValueTest, Bitmap) {
             BitmapT bt1;
             bt1.Initialize(100);
 
-            for(u64 i = 0; i < 100; ++ i) {
+            for(u64 i = 0; i < 100; ++i) {
                 if(i % 2 == 0) {
                     bt1.SetBit(i, true);
                 } else {
@@ -110,7 +110,7 @@ TEST_F(ValueTest, Blob) {
     auto blob_ptr = new char[SIZE]{0};
     GlobalResourceUsage::IncrRawMemCount();
 
-    for(i64 i = 0; i < SIZE; ++ i) {
+    for(i64 i = 0; i < SIZE; ++i) {
         blob_ptr[i] = 'a' + static_cast<char_t>(i);
     }
     blob_ptr[SIZE - 1] = 0;
@@ -134,26 +134,29 @@ TEST_F(ValueTest, MakeAndGet) {
     EXPECT_EQ(value.GetValue<BooleanT>(), false);
 
     // TinyInt
-    for(i8 input = std::numeric_limits<i8>::min(); ; ++ input) {
+    for(i8 input = std::numeric_limits<i8>::min();; ++input) {
 //        printf("%d\n", input);
         value = Value::MakeTinyInt(input);
         EXPECT_EQ(value.GetValue<TinyIntT>(), input);
-        if(input == std::numeric_limits<i8>::max()) break;
+        if(input == std::numeric_limits<i8>::max())
+            break;
     }
 
     // SmallInt
-    for(i16 input = std::numeric_limits<i16>::min(); ; ++ input) {
+    for(i16 input = std::numeric_limits<i16>::min();; ++input) {
 //        printf("%d\n", input);
         value = Value::MakeSmallInt(input);
         EXPECT_EQ(value.GetValue<SmallIntT>(), input);
-        if(input == std::numeric_limits<i16>::max()) break;
+        if(input == std::numeric_limits<i16>::max())
+            break;
     }
 
     // Integer
-    for(i32 input = std::numeric_limits<i32>::min(); ; input += std::numeric_limits<u16>::max()) {
+    for(i32 input = std::numeric_limits<i32>::min();; input += std::numeric_limits<u16>::max()) {
         value = Value::MakeInt(input);
         EXPECT_EQ(value.GetValue<IntegerT>(), input);
-        if(input == std::numeric_limits<i32>::max()) break;
+        if(input == std::numeric_limits<i32>::max())
+            break;
     }
 
     // Big Integer
@@ -207,7 +210,7 @@ TEST_F(ValueTest, MakeAndGet) {
     // Date
     {
         DateT date;
-        for(i32 i = 0; i < 365; ++ i) {
+        for(i32 i = 0; i < 365; ++i) {
             date.value = i;
             value = Value::MakeDate(date);
             EXPECT_EQ(value.GetValue<DateT>().value, i);
@@ -217,7 +220,7 @@ TEST_F(ValueTest, MakeAndGet) {
     // Time
     {
         TimeT time;
-        for(i32 i = 0; i < 3600 * 24; ++ i) {
+        for(i32 i = 0; i < 3600 * 24; ++i) {
             time.value = i;
             value = Value::MakeTime(time);
             EXPECT_EQ(value.GetValue<TimeT>().value, i);
@@ -227,7 +230,7 @@ TEST_F(ValueTest, MakeAndGet) {
     // Datetime
     {
         DateTimeT datetime;
-        for(i32 i = 0; i < 365; ++ i) {
+        for(i32 i = 0; i < 365; ++i) {
             datetime.date = i;
             datetime.time = 3600 - i;
             value = Value::MakeDateTime(datetime);
@@ -239,7 +242,7 @@ TEST_F(ValueTest, MakeAndGet) {
     // Timestamp
     {
         TimestampT timestamp;
-        for(i32 i = 0; i < 365; ++ i) {
+        for(i32 i = 0; i < 365; ++i) {
             timestamp.date = i;
             timestamp.time = 3600 - i;
             value = Value::MakeTimestamp(timestamp);
@@ -251,9 +254,9 @@ TEST_F(ValueTest, MakeAndGet) {
     // Interval
     {
         IntervalT interval;
-        for(i32 unit = 1; unit < 7; ++ unit) {
+        for(i32 unit = 1; unit < 7; ++unit) {
             interval.unit = TimeUnit::kSecond;
-            for(i32 v = 1; v < 3600; ++ v) {
+            for(i32 v = 1; v < 3600; ++v) {
                 interval.value = v;
                 value = Value::MakeInterval(interval);
                 EXPECT_EQ(value.GetValue<IntervalT>().unit, TimeUnit::kSecond);
@@ -357,7 +360,7 @@ TEST_F(ValueTest, MakeAndGet) {
         BitmapT bt1;
         bt1.Initialize(100);
 
-        for(u64 i = 0; i < 100; ++ i) {
+        for(u64 i = 0; i < 100; ++i) {
             if(i % 2 == 0) {
                 bt1.SetBit(i, true);
             } else {
@@ -386,7 +389,7 @@ TEST_F(ValueTest, MakeAndGet) {
         auto blob_ptr = new char[SIZE]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 i = 0; i < SIZE; ++ i) {
+        for(i64 i = 0; i < SIZE; ++i) {
             blob_ptr[i] = 'a' + static_cast<char_t>(i);
         }
         blob_ptr[SIZE - 1] = 0;

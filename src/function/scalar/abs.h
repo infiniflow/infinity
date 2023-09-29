@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterAbsFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterAbsFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
 }

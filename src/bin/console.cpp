@@ -28,12 +28,12 @@
 namespace infinity {
 
 Console::Console() {
-    Register("QUIT", [this](auto && placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
-    Register("EXIT", [this](auto && placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
-    Register("EXPLAIN", [this](auto && placeholder) { Explain(std::forward<decltype(placeholder)>(placeholder)); });
-    Register("VISUALIZE", [this](auto && placeholder) { Visualize(std::forward<decltype(placeholder)>(placeholder)); });
-    Register("VERFIY", [this](auto && placeholder) { VerifyScript(std::forward<decltype(placeholder)>(placeholder)); });
-    Register("RUN", [this](auto && placeholder) { RunScript(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("QUIT", [this](auto&& placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("EXIT", [this](auto&& placeholder) { Exit(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("EXPLAIN", [this](auto&& placeholder) { Explain(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("VISUALIZE", [this](auto&& placeholder) { Visualize(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("VERFIY", [this](auto&& placeholder) { VerifyScript(std::forward<decltype(placeholder)>(placeholder)); });
+    Register("RUN", [this](auto&& placeholder) { RunScript(std::forward<decltype(placeholder)>(placeholder)); });
 }
 
 void
@@ -64,7 +64,7 @@ Console::HandleCommand(const char* command) {
     }
 
     // Not handle empty input string
-    if (!input.empty()) {
+    if(!input.empty()) {
         Execute(input);
     }
 
@@ -73,18 +73,19 @@ Console::HandleCommand(const char* command) {
 
 void
 Console::Execute(const String& statement) {
-    if (statement.empty()) return;
+    if(statement.empty())
+        return;
 
     HashMap<String, std::function<void(const String&)>>::iterator iter;
 
     String command = statement.substr(0, statement.find_first_of(' '));
 
     // Transfer command to upper case
-    std::transform(command.begin(),command.end(), command.begin(), toupper);
-    if ((iter = commands_.find(command)) != std::end(commands_)) {
+    std::transform(command.begin(), command.end(), command.begin(), toupper);
+    if((iter = commands_.find(command)) != std::end(commands_)) {
         String args = statement.substr(statement.find_first_of(' ') + 1, statement.size());
         iter->second(args);
-        return ;
+        return;
     }
 
     ExecuteSQL(statement);
@@ -101,8 +102,8 @@ Console::Exit(const String& command) {
 
 void
 Console::Explain(const String& arguments) {
-    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>();
@@ -120,7 +121,7 @@ Console::Explain(const String& arguments) {
     size_t parameter_pos = arguments.find_first_of(' ');
     String parameter = arguments.substr(0, parameter_pos);
     // Transfer second parameter to upper case
-    std::transform(parameter.begin(),parameter.end(), parameter.begin(), toupper);
+    std::transform(parameter.begin(), parameter.end(), parameter.begin(), toupper);
 
     String query = arguments.substr(parameter_pos + 1, arguments.size());
 
@@ -137,7 +138,7 @@ Console::Explain(const String& arguments) {
     if(parameter == "AST") {
         std::cout << "Explain AST: " << query << std::endl;
         NotImplementError("Not implement explain AST")
-        return ;
+        return;
     }
 
     // Build unoptimized logical plan for each SQL statement.
@@ -149,7 +150,7 @@ Console::Explain(const String& arguments) {
 
         ShowLogicalPlan show_logical_plan(unoptimized_plan);
         std::cout << show_logical_plan.ToString();
-        return ;
+        return;
     }
 
     // Apply optimized rule to the logical plan
@@ -160,7 +161,7 @@ Console::Explain(const String& arguments) {
 
         ShowLogicalPlan show_logical_plan(optimized_plan);
         std::cout << show_logical_plan.ToString();
-        return ;
+        return;
     }
 
     // Build physical plan
@@ -168,7 +169,7 @@ Console::Explain(const String& arguments) {
 
     if(parameter == "PHYSICAL") {
         std::cout << "Explain PHYSICAL: " << query << std::endl;
-        return ;
+        return;
     }
 
     // Create execution pipeline
@@ -176,7 +177,7 @@ Console::Explain(const String& arguments) {
 
     if(parameter == "PIPELINE") {
         std::cout << "Explain PIPELINE: " << query << std::endl;
-        return ;
+        return;
     }
 
     GeneralError("Invalid Explain syntax: " + arguments);
@@ -184,8 +185,8 @@ Console::Explain(const String& arguments) {
 
 void
 Console::Visualize(const String& arguments) {
-    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
 
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>();
@@ -215,7 +216,7 @@ Console::Visualize(const String& arguments) {
 
     if(option == "AST") {
         std::cout << "Visualize AST: " << query << std::endl;
-        return ;
+        return;
     }
 
     // Build unoptimized logical plan for each SQL statement.
@@ -224,7 +225,7 @@ Console::Visualize(const String& arguments) {
 
     if(option == "LOGICAL") {
         std::cout << "Visualize LOGICAL: " << query << std::endl;
-        return ;
+        return;
     }
 
     // Apply optimized rule to the logical plan
@@ -232,7 +233,7 @@ Console::Visualize(const String& arguments) {
 
     if(option == "OPT") {
         std::cout << "Visualize OPTIMIZED LOGICAL: " << query << std::endl;
-        return ;
+        return;
     }
 
     // Build physical plan
@@ -240,7 +241,7 @@ Console::Visualize(const String& arguments) {
 
     if(option == "PHYSICAL") {
         std::cout << "Visualize PHYSICAL: " << query << std::endl;
-        return ;
+        return;
     }
 
     // Create execution pipeline
@@ -248,7 +249,7 @@ Console::Visualize(const String& arguments) {
 
     if(option == "PIPELINE") {
         std::cout << "Visualize PIPELINE: " << query << std::endl;
-        return ;
+        return;
     }
 
     GeneralError("Invalid VISUALIZE syntax: " + arguments);
@@ -266,8 +267,8 @@ Console::RunScript(const String& arguments) {
 
 void
 Console::ExecuteSQL(const String& sql_text) {
-    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
 
     // Parse sql
     parser->Parse(sql_text, parsed_result);
@@ -291,7 +292,7 @@ Console::ExecuteSQL(const String& sql_text) {
     Optimizer optimizer(query_context_ptr.get());
     PhysicalPlanner physical_planner(query_context_ptr.get());
 
-    for (const BaseStatement *statement : *parsed_result->statements_ptr_) {
+    for(const BaseStatement* statement: *parsed_result->statements_ptr_) {
         // Build unoptimized logical plan for each SQL statement.
         logical_planner.Build(statement);
         SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
@@ -315,7 +316,7 @@ Console::ExecuteSQL(const String& sql_text) {
 
         if(query_result.result_ == nullptr) {
             std::cout << "No result." << std::endl;
-        } else{
+        } else {
             std::cout << query_result.ToString() << std::endl;
         }
     }

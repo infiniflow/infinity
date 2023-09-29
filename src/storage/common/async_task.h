@@ -20,7 +20,7 @@ enum class AsyncTaskType {
 class AsyncTask {
 public:
     explicit
-    AsyncTask(AsyncTaskType task_type): task_type_(task_type) {}
+    AsyncTask(AsyncTaskType task_type) : task_type_(task_type) {}
 
     virtual
     ~AsyncTask() = default;

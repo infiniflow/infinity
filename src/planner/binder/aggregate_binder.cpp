@@ -20,9 +20,9 @@ AggregateBinder::BuildExpression(const ParsedExpr& expr,
 
 SharedPtr<BaseExpression>
 AggregateBinder::BuildKnnExpr(const KnnExpr& expr,
-             BindContext* bind_context_ptr,
-             i64 depth,
-             bool root) {
+                              BindContext* bind_context_ptr,
+                              i64 depth,
+                              bool root) {
     PlannerError("KNN expression isn't supported in in aggregate function")
 }
 

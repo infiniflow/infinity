@@ -13,52 +13,66 @@ namespace infinity {
 class BufferedByteSlice {
 public:
     BufferedByteSlice(MemoryPool* byte_slice_pool, MemoryPool* buffer_pool);
+
     virtual ~BufferedByteSlice() = default;
 
-    void Init(const PostingValues* value);
+    void
+    Init(const PostingValues* value);
 
-    template <typename T>
-    void PushBack(uint8_t row, T value);
+    template<typename T>
+    void
+    PushBack(uint8_t row, T value);
 
-    void EndPushBack(){
+    void
+    EndPushBack() {
         flush_info_.SetIsValidShortBuffer(true);
         buffer_.EndPushBack();
     }
 
-    bool NeedFlush(uint8_t need_flush_count = MAX_DOC_PER_RECORD) const { 
-        return buffer_.Size() == need_flush_count; 
+    bool
+    NeedFlush(uint8_t need_flush_count = MAX_DOC_PER_RECORD) const {
+        return buffer_.Size() == need_flush_count;
     }
 
-    const ByteSliceList* GetByteSliceList() const { 
-        return posting_writer_.GetByteSliceList(); 
+    const ByteSliceList*
+    GetByteSliceList() const {
+        return posting_writer_.GetByteSliceList();
     }
 
-    const PostingValues* GetPostingValues() const { 
-        return buffer_.GetPostingValues(); 
+    const PostingValues*
+    GetPostingValues() const {
+        return buffer_.GetPostingValues();
     }
 
-    void SnapShot(BufferedByteSlice* buffer) const;
+    void
+    SnapShot(BufferedByteSlice* buffer) const;
 
-    bool IsShortBufferValid() const { 
-        return flush_info_.IsValidShortBuffer(); 
+    bool
+    IsShortBufferValid() const {
+        return flush_info_.IsValidShortBuffer();
     }
 
-    const ShortBuffer& GetBuffer() const { 
-        return buffer_; 
+    const ShortBuffer&
+    GetBuffer() const {
+        return buffer_;
     }
 
-    size_t GetBufferSize() const { 
+    size_t
+    GetBufferSize() const {
         return buffer_.Size();
     }
 
-    FlushInfo GetFlushInfo() const { 
-        return flush_info_; 
+    FlushInfo
+    GetFlushInfo() const {
+        return flush_info_;
     }
-    
-    size_t Flush();
+
+    size_t
+    Flush();
 
 protected:
-    size_t DoFlush();
+    size_t
+    DoFlush();
 
 protected:
     FlushInfo flush_info_;
@@ -66,8 +80,9 @@ protected:
     ByteSliceWriter posting_writer_;
 };
 
-template <typename T>
-inline void BufferedByteSlice::PushBack(uint8_t row, T value) {
+template<typename T>
+inline void
+BufferedByteSlice::PushBack(uint8_t row, T value) {
     buffer_.PushBack(row, value);
 }
 

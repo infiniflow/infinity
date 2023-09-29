@@ -20,7 +20,7 @@ public:
 
 public:
     String func_name_{};
-    Vector<ParsedExpr*> *arguments_{nullptr};
+    Vector<ParsedExpr*>* arguments_{nullptr};
     bool distinct_{false};
 };
 

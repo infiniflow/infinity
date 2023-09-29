@@ -18,7 +18,7 @@ enum class BaseTableType {
 
 inline String
 ToString(BaseTableType type) {
-    switch (type) {
+    switch(type) {
         case BaseTableType::kTable: {
             return "Table";
         }
@@ -35,7 +35,7 @@ class BaseTable {
 public:
     explicit
     BaseTable(TableCollectionType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
-        : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
+            : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
 
     [[nodiscard]] inline TableCollectionType
     kind() const {

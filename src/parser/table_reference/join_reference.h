@@ -23,12 +23,13 @@ enum class JoinType {
 String
 ToString(JoinType type);
 
-class JoinReference: public BaseTableReference {
+class JoinReference : public BaseTableReference {
 
 public:
 
     explicit
     JoinReference() : BaseTableReference(TableRefType::kJoin) {}
+
     ~JoinReference() override;
 
     String

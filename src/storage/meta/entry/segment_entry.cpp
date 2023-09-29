@@ -71,7 +71,9 @@ SegmentEntry::AppendData(SegmentEntry* segment_entry,
         u64 range_segment_id = segment_entry->segment_id_;
         u64 range_segment_start_pos = segment_entry->current_row_;
         u64 range_segment_row_count = input_block->row_count();
-        append_state_ptr->append_ranges_.emplace_back(range_segment_id, range_segment_start_pos, range_segment_row_count);
+        append_state_ptr->append_ranges_.emplace_back(range_segment_id,
+                                                      range_segment_start_pos,
+                                                      range_segment_row_count);
 
         SizeT to_copy_rows = input_block->row_count();
         if(segment_entry->current_row_ + input_block->row_count() > segment_entry->row_capacity_) {
@@ -79,7 +81,7 @@ SegmentEntry::AppendData(SegmentEntry* segment_entry,
             full = true;
         }
 
-        for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+        for(SizeT column_id = 0; column_id < column_count; ++column_id) {
             ColumnDataEntry::Append(segment_entry->columns_[column_id].get(),
                                     input_block->column_vectors[column_id],
                                     append_state_ptr->current_block_offset_,
@@ -89,13 +91,13 @@ SegmentEntry::AppendData(SegmentEntry* segment_entry,
             LOG_TRACE("Column: {} is appended with {} rows", column_id, to_copy_rows)
         }
 
-        for(SizeT i = 0; i < to_copy_rows; ++ i) {
+        for(SizeT i = 0; i < to_copy_rows; ++i) {
             segment_entry->segment_version_->txn_ptr_[i] = (u64)txn_ptr;
         }
 
         segment_entry->current_row_ += to_copy_rows;
         append_state_ptr->current_count_ += to_copy_rows;
-        if (!full) {
+        if(!full) {
             append_state_ptr->current_block_++;
             append_state_ptr->current_block_offset_ = 0;
         } else {
@@ -109,7 +111,7 @@ void
 SegmentEntry::CommitAppend(SegmentEntry* segment_entry, Txn* txn_ptr, u64 start_pos, u64 row_count) {
     u64 end_pos = start_pos + row_count;
     Vector<au64>& create_vector = segment_entry->segment_version_->created_;
-    for(SizeT i = start_pos; i < end_pos; ++ i) {
+    for(SizeT i = start_pos; i < end_pos; ++i) {
         create_vector[i] = txn_ptr->CommitTS();
     }
 
@@ -126,7 +128,7 @@ void
 SegmentEntry::CommitDelete(SegmentEntry* segment_entry, Txn* txn_ptr, u64 start_pos, u64 row_count) {
     u64 end_pos = start_pos + row_count;
     Vector<au64>& deleted_vector = segment_entry->segment_version_->deleted_;
-    for(SizeT i = start_pos; i < end_pos; ++ i) {
+    for(SizeT i = start_pos; i < end_pos; ++i) {
         deleted_vector[i] = txn_ptr->CommitTS();
     }
 }
@@ -134,7 +136,9 @@ SegmentEntry::CommitDelete(SegmentEntry* segment_entry, Txn* txn_ptr, u64 start_
 bool
 SegmentEntry::PrepareFlush(SegmentEntry* segment_entry) {
     DataSegmentStatus expected = DataSegmentStatus::kOpen;
-    return segment_entry->status_.compare_exchange_strong(expected, DataSegmentStatus::kFlushing, std::memory_order_seq_cst);
+    return segment_entry->status_.compare_exchange_strong(expected,
+                                                          DataSegmentStatus::kFlushing,
+                                                          std::memory_order_seq_cst);
 }
 
 UniquePtr<String>
@@ -143,11 +147,13 @@ SegmentEntry::Flush(SegmentEntry* segment_entry) {
     for(SizeT column_id = 0; const auto& column_data: segment_entry->columns_) {
         column_data->Flush(column_data.get(), segment_entry->current_row_);
         LOG_TRACE("ColumnData: {} is flushed", column_id);
-        ++ column_id;
+        ++column_id;
     }
 
     DataSegmentStatus expected = DataSegmentStatus::kFlushing;
-    if(!segment_entry->status_.compare_exchange_strong(expected, DataSegmentStatus::kClosed, std::memory_order_seq_cst)) {
+    if(!segment_entry->status_.compare_exchange_strong(expected,
+                                                       DataSegmentStatus::kClosed,
+                                                       std::memory_order_seq_cst)) {
         return MakeUnique<String>("Data segment is expected as flushing status");
     }
     LOG_TRACE("DataSegment: {} is being flushed", segment_entry->segment_id_);
@@ -182,7 +188,9 @@ SegmentEntry::Serialize(const SegmentEntry* segment_entry) {
 }
 
 SharedPtr<SegmentEntry>
-SegmentEntry::Deserialize(const nlohmann::json& table_entry_json, TableCollectionEntry* table_entry, BufferManager* buffer_mgr) {
+SegmentEntry::Deserialize(const nlohmann::json& table_entry_json,
+                          TableCollectionEntry* table_entry,
+                          BufferManager* buffer_mgr) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
 
     segment_entry->base_dir_ = MakeShared<String>(table_entry_json["base_dir"]);
@@ -196,7 +204,9 @@ SegmentEntry::Deserialize(const nlohmann::json& table_entry_json, TableCollectio
     segment_entry->current_row_ = table_entry_json["current_row"];
 
     for(const auto& column_json: table_entry_json["columns"]) {
-        SharedPtr<ColumnDataEntry> column_data_entry = ColumnDataEntry::Deserialize(column_json, segment_entry.get(), buffer_mgr);
+        SharedPtr<ColumnDataEntry> column_data_entry = ColumnDataEntry::Deserialize(column_json,
+                                                                                    segment_entry.get(),
+                                                                                    buffer_mgr);
         segment_entry->columns_.emplace_back(column_data_entry);
     }
 
@@ -204,13 +214,14 @@ SegmentEntry::Deserialize(const nlohmann::json& table_entry_json, TableCollectio
 }
 
 SharedPtr<String>
-SegmentEntry::DetermineFilename(const String &parent_dir, u64 seg_id) {
+SegmentEntry::DetermineFilename(const String& parent_dir, u64 seg_id) {
     u32 seed = time(nullptr);
     LocalFileSystem fs;
     SharedPtr<String> base_dir;
     do {
-        base_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + std::to_string(seg_id));
-    } while (!fs.CreateDirectoryNoExp(*base_dir));
+        base_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" +
+                                      std::to_string(seg_id));
+    } while(!fs.CreateDirectoryNoExp(*base_dir));
     return base_dir;
 }
 }

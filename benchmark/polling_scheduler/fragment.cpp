@@ -26,7 +26,7 @@ Fragment::BuildTask(u64 parallel_size) {
         task_count = parallel_size;
     }
 
-    for(SizeT idx = 0; idx < task_count; ++ idx) {
+    for(SizeT idx = 0; idx < task_count; ++idx) {
         result.emplace_back(MakeShared<PipelineTask>());
         PipelineTask* the_task = (PipelineTask*)(result[idx].get());
         the_task->AddSink(sink_.get());

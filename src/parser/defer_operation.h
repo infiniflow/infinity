@@ -6,7 +6,7 @@
 
 #include <utility>
 
-template <class Func>
+template<class Func>
 class DeferOperation {
 public:
 

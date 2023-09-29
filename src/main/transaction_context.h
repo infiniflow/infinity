@@ -7,6 +7,7 @@
 namespace infinity {
 
 class Txn;
+
 class TransactionContext {
 public:
     void

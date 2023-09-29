@@ -10,7 +10,7 @@ namespace infinity {
 
 class BindContext;
 
-class CrossProductTableRef: public TableRef {
+class CrossProductTableRef : public TableRef {
 public:
     explicit
     CrossProductTableRef(String alias) :

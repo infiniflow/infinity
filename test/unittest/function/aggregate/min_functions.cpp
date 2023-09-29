@@ -64,7 +64,7 @@ TEST_F(MinFunctionTest, min_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
         }
         data_block.Finalize();
@@ -97,7 +97,7 @@ TEST_F(MinFunctionTest, min_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(i - std::numeric_limits<TinyIntT>::max()));
         }
         data_block.Finalize();
@@ -130,7 +130,7 @@ TEST_F(MinFunctionTest, min_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(i - std::numeric_limits<SmallIntT>::max()));
         }
         data_block.Finalize();
@@ -140,7 +140,7 @@ TEST_F(MinFunctionTest, min_func) {
         SmallIntT result;
         result = *(SmallIntT*)func.finalize_func_(func.GetState());
 
-        EXPECT_FLOAT_EQ(result, - std::numeric_limits<SmallIntT>::max());
+        EXPECT_FLOAT_EQ(result, -std::numeric_limits<SmallIntT>::max());
     }
 
     {
@@ -163,7 +163,7 @@ TEST_F(MinFunctionTest, min_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(i - std::numeric_limits<IntegerT>::max()));
         }
         data_block.Finalize();
@@ -173,7 +173,7 @@ TEST_F(MinFunctionTest, min_func) {
         IntegerT result;
         result = *(IntegerT*)func.finalize_func_(func.GetState());
 
-        EXPECT_EQ(result, - std::numeric_limits<IntegerT>::max());
+        EXPECT_EQ(result, -std::numeric_limits<IntegerT>::max());
     }
 
     {
@@ -196,7 +196,7 @@ TEST_F(MinFunctionTest, min_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(i - std::numeric_limits<BigIntT>::max()));
         }
         data_block.Finalize();
@@ -206,7 +206,7 @@ TEST_F(MinFunctionTest, min_func) {
         BigIntT result;
         result = *(BigIntT*)func.finalize_func_(func.GetState());
 
-        EXPECT_EQ(result, - std::numeric_limits<BigIntT>::max());
+        EXPECT_EQ(result, -std::numeric_limits<BigIntT>::max());
     }
 
     {
@@ -229,7 +229,7 @@ TEST_F(MinFunctionTest, min_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<FloatT>(-2 * (i64)i)));
         }
         data_block.Finalize();
@@ -262,7 +262,7 @@ TEST_F(MinFunctionTest, min_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<DoubleT>(-2 * (i64)i)));
         }
         data_block.Finalize();
@@ -295,7 +295,7 @@ TEST_F(MinFunctionTest, min_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             HugeIntT input(0, 2 * -i);
             Value v = Value::MakeHugeInt(input);
             data_block.AppendValue(0, v);

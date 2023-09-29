@@ -78,7 +78,7 @@ DBEntry::DropTableCollection(DBEntry* db_entry,
     }
     db_entry->rw_locker_.unlock_shared();
     if(table_meta == nullptr) {
-        if (conflict_type == ConflictType::kIgnore) {
+        if(conflict_type == ConflictType::kIgnore) {
             LOG_TRACE("Ignore drop a not existed table/collection entry {}", table_collection_name);
             return {nullptr, nullptr};
         }
@@ -178,9 +178,10 @@ DBEntry::GetTableCollectionsDetail(DBEntry* db_entry,
         table_collection_detail.row_count_ = table_collection_entry->row_count_;
         table_collection_detail.segment_capacity_ = DEFAULT_SEGMENT_CAPACITY;
 
-        SharedPtr<Vector<SegmentEntry*>> segment_entries = TableCollectionEntry::GetSegmentEntries(table_collection_entry,
-                                                                                                   txn_id,
-                                                                                                   begin_ts);
+        SharedPtr<Vector<SegmentEntry*>> segment_entries = TableCollectionEntry::GetSegmentEntries(
+                table_collection_entry,
+                txn_id,
+                begin_ts);
 
         table_collection_detail.segment_count_ = segment_entries->size();
         results.emplace_back(table_collection_detail);
@@ -236,7 +237,9 @@ DBEntry::Deserialize(const nlohmann::json& db_entry_json,
 
     if(db_entry_json.contains("tables")) {
         for(const auto& table_meta_json: db_entry_json["tables"]) {
-            UniquePtr<TableCollectionMeta> table_meta = TableCollectionMeta::Deserialize(table_meta_json, res.get(), buffer_mgr);
+            UniquePtr<TableCollectionMeta> table_meta = TableCollectionMeta::Deserialize(table_meta_json,
+                                                                                         res.get(),
+                                                                                         buffer_mgr);
             res->tables_.emplace(*table_meta->table_collection_name_, std::move(table_meta));
         }
     }

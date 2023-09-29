@@ -15,8 +15,7 @@ public:
                       ConflictType conflict_type)
             : LogicalNode(node_id, LogicalNodeType::kDropSchema),
               schema_name_(std::move(schema_name)),
-              conflict_type_(conflict_type)
-    {}
+              conflict_type_(conflict_type) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {

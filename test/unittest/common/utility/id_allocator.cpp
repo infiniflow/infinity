@@ -33,13 +33,13 @@ TEST_F(IDAllocatorTest, test1) {
 
     constexpr i64 thread_count = 100;
 
-    for(i64 i = 0; i < thread_count; ++ i) {
+    for(i64 i = 0; i < thread_count; ++i) {
         threads.emplace_back([&] {
             id_allocator.AllocateNewId();
         });
     }
 
-    for (auto& thread : threads) {
+    for(auto& thread: threads) {
         thread.join();
     }
 

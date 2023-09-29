@@ -14,17 +14,22 @@ namespace infinity {
 using PutWalEntryFn = std::function<void(std::shared_ptr<WalEntry>)>;
 
 class WalEntry;
+
 class BufferManager;
+
 class TxnManager {
 public:
     explicit
-    TxnManager(NewCatalog* catalog, BufferManager* buffer_mgr, PutWalEntryFn put_wal_entry_fn,  u64 start_txn_id = 0,TxnTimeStamp start_ts = 0)
-        : catalog_(catalog),
-        buffer_mgr_(buffer_mgr),
-        put_wal_entry_(put_wal_entry_fn),
-        txn_id_(start_txn_id),
-        txn_ts_(start_ts)
-        {}
+    TxnManager(NewCatalog* catalog,
+               BufferManager* buffer_mgr,
+               PutWalEntryFn put_wal_entry_fn,
+               u64 start_txn_id = 0,
+               TxnTimeStamp start_ts = 0)
+            : catalog_(catalog),
+              buffer_mgr_(buffer_mgr),
+              put_wal_entry_(put_wal_entry_fn),
+              txn_id_(start_txn_id),
+              txn_ts_(start_ts) {}
 
     Txn*
     CreateTxn();
@@ -54,11 +59,13 @@ public:
     }
 
     TxnTimeStamp
-    GetTimestamp(bool prepare_wal=false);
+    GetTimestamp(bool prepare_wal = false);
 
-    void Invalidate(TxnTimeStamp commit_ts);
+    void
+    Invalidate(TxnTimeStamp commit_ts);
 
-    void PutWalEntry(std::shared_ptr<WalEntry> entry);
+    void
+    PutWalEntry(std::shared_ptr<WalEntry> entry);
 
 private:
     u64

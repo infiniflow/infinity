@@ -17,11 +17,12 @@ public:
                             TableCollectionEntry* table_collection_entry,
                             u64 table_index,
                             Vector<SharedPtr<BaseExpression>> value_list)
-        : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr, id),
-          table_collection_entry_(table_collection_entry),
-          table_index_(table_index),
-          value_list_(std::move(value_list)) {
+            : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr, id),
+              table_collection_entry_(table_collection_entry),
+              table_index_(table_index),
+              value_list_(std::move(value_list)) {
     }
+
     ~PhysicalInsert() override = default;
 
     void

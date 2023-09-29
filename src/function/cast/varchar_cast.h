@@ -156,7 +156,7 @@ template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, TinyIntT& target) {
     i64 value{0};
-    char *endptr{nullptr};
+    char* endptr{nullptr};
     SizeT len{0};
     if(source.IsInlined()) {
         value = std::strtol(source.prefix, &endptr, 10);
@@ -177,7 +177,7 @@ template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, SmallIntT& target) {
     i64 value{0};
-    char *endptr{nullptr};
+    char* endptr{nullptr};
     SizeT len{0};
     if(source.IsInlined()) {
         value = std::strtol(source.prefix, &endptr, 10);
@@ -196,7 +196,7 @@ template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, IntegerT& target) {
     i64 value{0};
-    char *endptr{nullptr};
+    char* endptr{nullptr};
     SizeT len{0};
     if(source.IsInlined()) {
         value = std::strtol(source.prefix, &endptr, 10);
@@ -214,7 +214,7 @@ TryCastVarchar::Run(const VarcharT& source, IntegerT& target) {
 template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, i64& target) {
-    char *endptr{nullptr};
+    char* endptr{nullptr};
     SizeT len{0};
     if(source.IsInlined()) {
         target = std::strtol(source.prefix, &endptr, 10);
@@ -238,7 +238,7 @@ TryCastVarchar::Run(const VarcharT& source, HugeIntT& target) {
 template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, FloatT& target) {
-    char *endptr{nullptr};
+    char* endptr{nullptr};
     SizeT len{0};
     if(source.IsInlined()) {
         target = std::strtof(source.prefix, &endptr);
@@ -255,7 +255,7 @@ TryCastVarchar::Run(const VarcharT& source, FloatT& target) {
 template<>
 inline bool
 TryCastVarchar::Run(const VarcharT& source, DoubleT& target) {
-    char *endptr{nullptr};
+    char* endptr{nullptr};
     SizeT len{0};
     if(source.IsInlined()) {
         target = std::strtod(source.prefix, &endptr);

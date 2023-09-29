@@ -9,10 +9,11 @@
 namespace infinity {
 
 class FragmentTask;
+
 class FragmentTaskPollerQueue {
 public:
     explicit
-    FragmentTaskPollerQueue(SizeT capacity = 1024): capacity_(capacity) {
+    FragmentTaskPollerQueue(SizeT capacity = 1024) : capacity_(capacity) {
     }
 
     void

@@ -15,14 +15,18 @@
 namespace infinity {
 
 class TxnManager;
+
 class DBEntry;
+
 class BufferManager;
+
 struct TableCollectionMeta {
 public:
     explicit
     TableCollectionMeta(const SharedPtr<String>& base_dir,
                         SharedPtr<String> name,
-                        DBEntry* db_entry) : base_dir_(base_dir), table_collection_name_(std::move(name)), db_entry_(db_entry) {
+                        DBEntry* db_entry)
+            : base_dir_(base_dir), table_collection_name_(std::move(name)), db_entry_(db_entry) {
     }
 
 public:

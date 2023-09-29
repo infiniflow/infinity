@@ -24,6 +24,7 @@ public:
                     BindContext* bind_context_ptr,
                     i64 depth,
                     bool root) override;
+
 private:
 };
 

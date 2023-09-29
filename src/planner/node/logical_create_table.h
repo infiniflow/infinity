@@ -27,12 +27,11 @@ public:
                        SharedPtr<TableDef> table_def_ptr,
                        u64 table_index,
                        ConflictType conflict_type)
-        : LogicalNode(node_id, LogicalNodeType::kCreateTable),
-          schema_name_(std::move(schema_name)),
-          table_definition_(std::move(table_def_ptr)),
-          table_index_(table_index),
-          conflict_type_(conflict_type)
-          {}
+            : LogicalNode(node_id, LogicalNodeType::kCreateTable),
+              schema_name_(std::move(schema_name)),
+              table_definition_(std::move(table_def_ptr)),
+              table_index_(table_index),
+              conflict_type_(conflict_type) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {
@@ -53,7 +52,7 @@ public:
         return result_type;
     }
 
-    String 
+    String
     ToString(i64& space) final;
 
     inline String

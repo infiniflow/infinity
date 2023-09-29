@@ -13,7 +13,7 @@ namespace infinity {
 class BatchBlockingQueue {
 public:
     explicit
-    BatchBlockingQueue(SizeT capacity = 1024): capacity_(capacity) {
+    BatchBlockingQueue(SizeT capacity = 1024) : capacity_(capacity) {
     }
 
     void

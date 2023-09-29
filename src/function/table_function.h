@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include "function.h"
 #include "function_data.h"
 #include "storage/data_block.h"
@@ -16,7 +17,7 @@ public:
 };
 
 using TableFunctionType
-    = std::function<void(QueryContext* query_context, TableFunctionData* data, DataBlock &output)>;
+        = std::function<void(QueryContext* query_context, TableFunctionData* data, DataBlock& output)>;
 
 
 class TableFunction : public Function {
@@ -25,7 +26,7 @@ public:
     TableFunction(String name,
                   Vector<LogicalType> argument_types,
                   TableFunctionType function
-                  );
+    );
 
     [[nodiscard]] String
     ToString() const override;

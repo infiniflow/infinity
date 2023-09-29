@@ -16,8 +16,8 @@ class PhysicalFlush final : public PhysicalOperator {
 public:
     explicit
     PhysicalFlush(FlushType flush_type, u64 id)
-        : PhysicalOperator(PhysicalOperatorType::kFlush, nullptr, nullptr, id),
-        flush_type_(flush_type) { }
+            : PhysicalOperator(PhysicalOperatorType::kFlush, nullptr, nullptr, id),
+              flush_type_(flush_type) {}
 
     ~PhysicalFlush() override = default;
 

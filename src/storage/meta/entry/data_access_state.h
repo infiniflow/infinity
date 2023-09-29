@@ -12,7 +12,7 @@ namespace infinity {
 struct AppendRange {
     inline explicit
     AppendRange(u64 segment_id, u64 start_pos, u64 row_count)
-        : segment_id_(segment_id), start_pos_(start_pos), row_count_(row_count) {}
+            : segment_id_(segment_id), start_pos_(start_pos), row_count_(row_count) {}
 
     u64 segment_id_;
     u64 start_pos_;

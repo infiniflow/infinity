@@ -19,7 +19,9 @@ Txn::GetTableEntry(const String& db_name, const String& table_name, TableCollect
         db_name_ = db_name;
     } else {
         if(db_name_ != db_name) {
-            String err_msg = fmt::format("Attempt to insert data into another database and table {}/{}", db_name, table_name);
+            String err_msg = fmt::format("Attempt to insert data into another database and table {}/{}",
+                                         db_name,
+                                         table_name);
             LOG_ERROR(err_msg);
             return MakeUnique<String>(err_msg);
         }
@@ -50,7 +52,7 @@ Txn::Append(const String& db_name, const String& table_name, const SharedPtr<Dat
         return err_msg;
     }
 
-    TxnTableStore* table_store {nullptr};
+    TxnTableStore* table_store{nullptr};
     if(txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
         txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
     }
@@ -91,8 +93,8 @@ Txn::GetTableMeta(const String& db_name, const String& table_name, const Vector<
         StorageError(*err_msg);
     }
 
-    u64 max_segment_id =  TableCollectionEntry::GetMaxSegmentID(table_entry);
-    for(u64 segment_id = 0; segment_id < max_segment_id; ++ segment_id) {
+    u64 max_segment_id = TableCollectionEntry::GetMaxSegmentID(table_entry);
+    for(u64 segment_id = 0; segment_id < max_segment_id; ++segment_id) {
         SegmentEntry* segment_entry_ptr = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
 
         MetaSegmentState segment_state;
@@ -120,7 +122,7 @@ Txn::TableGet() {
 
 void
 Txn::AddTxnTableStore(const String& table_name, UniquePtr<TxnTableStore> txn_table_store) {
-    if (txn_tables_store_.find(table_name) != txn_tables_store_.end()) {
+    if(txn_tables_store_.find(table_name) != txn_tables_store_.end()) {
         String err_msg = fmt::format("Attempt to add duplicated table store for table: {}", table_name);
         LOG_ERROR(err_msg);
         return;
@@ -128,7 +130,7 @@ Txn::AddTxnTableStore(const String& table_name, UniquePtr<TxnTableStore> txn_tab
     txn_tables_store_[table_name] = std::move(txn_table_store);
 }
 
-TxnTableStore* 
+TxnTableStore*
 Txn::GetTxnTableStore(const String& table_name) {
     auto txn_table_iter = txn_tables_store_.find(table_name);
     if(txn_table_iter == txn_tables_store_.end()) {
@@ -170,7 +172,7 @@ Txn::Scan(ScanState* scan_state, SharedPtr<DataBlock>& output_block) {
 
     if(scan_state->scan_location_ == ScanLocation::kLocal) {
         // Scan local storage
-        TxnTableStore* local_table_store = (TxnTableStore* )scan_state->txn_table_store_;
+        TxnTableStore* local_table_store = (TxnTableStore*)scan_state->txn_table_store_;
         if(scan_state->filter_ptr_ == nullptr) {
             // No filter
 //            if(scan_state->)
@@ -307,14 +309,13 @@ Txn::CreateTable(const String& db_name, const SharedPtr<TableDef>& table_def, Co
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
-    EntryResult db_entry_result =  NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
+    EntryResult db_entry_result = NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
     if(db_entry_result.entry_ == nullptr) {
         // Error
         return db_entry_result;
     }
 
     DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
-
 
 
     EntryResult res = DBEntry::CreateTableCollection(db_entry,
@@ -495,11 +496,11 @@ Txn::CommitTxn() {
     txn_mgr_->PutWalEntry(wal_entry_);
     // Wait until CommitTxnBottom is done.
     std::unique_lock lk(m);
-    cv.wait(lk, [this]{return done_bottom_;});
+    cv.wait(lk, [this] { return done_bottom_; });
 }
 
 void
-Txn::CommitTxnBottom(){
+Txn::CommitTxnBottom() {
     bool is_read_only_txn = true;
     {
         // prepare to commit txn local data into table

@@ -39,7 +39,7 @@ FragmentBuilder::BuildExplain(PhysicalOperator* phys_op, PlanFragment* current_f
             current_fragment_ptr->AddOperator(phys_op);
             break;
         }
-        case ExplainType::kPipeline:{
+        case ExplainType::kPipeline: {
             // Build explain pipeline fragment
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
             auto explain_child_fragment = this->BuildFragment(phys_op->left().get());
@@ -57,8 +57,8 @@ FragmentBuilder::BuildExplain(PhysicalOperator* phys_op, PlanFragment* current_f
 }
 
 void
-FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current_fragment_ptr) {
-    switch (phys_op->operator_type()){
+FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current_fragment_ptr) {
+    switch(phys_op->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
             PlannerError("Invalid physical operator type")
         }
@@ -66,7 +66,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
             LOG_INFO("Fragment Builder: Explain");
             BuildExplain(phys_op, current_fragment_ptr);
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
-            return ;
+            return;
         }
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCreateTable:
@@ -92,7 +92,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
                                                 phys_op->GetOutputNames(),
                                                 phys_op->GetOutputTypes());
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
-            return ;
+            return;
         }
         case PhysicalOperatorType::kAggregate: {
             current_fragment_ptr->AddOperator(phys_op);
@@ -111,7 +111,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
             BuildFragments(phys_op->left().get(), next_plan_fragment.get());
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
-            return ;
+            return;
         }
         case PhysicalOperatorType::kParallelAggregate:
         case PhysicalOperatorType::kFilter:
@@ -149,7 +149,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
             BuildFragments(phys_op->left().get(), next_plan_fragment.get());
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
-            return ;
+            return;
         }
         case PhysicalOperatorType::kUnionAll:
         case PhysicalOperatorType::kIntersect:
@@ -166,7 +166,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
         case PhysicalOperatorType::kTableScan:
         case PhysicalOperatorType::kKnnScan:
         case PhysicalOperatorType::kIndexScan: {
-            if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
+            if(phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 SchedulerError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
             }
             current_fragment_ptr->AddOperator(phys_op);
@@ -175,7 +175,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
                                                 phys_op->GetOutputNames(),
                                                 phys_op->GetOutputTypes());
             current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
-            return ;
+            return;
         }
 
         case PhysicalOperatorType::kProjection: {
@@ -190,7 +190,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment *current
                 BuildFragments(phys_op->left().get(), current_fragment_ptr);
                 current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
             }
-            return ;
+            return;
         }
         default: {
             LOG_ERROR("Invalid operator type: {} in Fragment Builder", phys_op->GetName());

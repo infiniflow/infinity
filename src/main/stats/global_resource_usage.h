@@ -16,7 +16,8 @@ public:
 
     static inline void
     Init() {
-        if(initialized_) return ;
+        if(initialized_)
+            return;
         initialized_ = true;
 
     }
@@ -32,12 +33,12 @@ public:
 
     static inline void
     IncrObjectCount() {
-        ++ object_count_;
+        ++object_count_;
     }
 
     static void
     DecrObjectCount() {
-        -- object_count_;
+        --object_count_;
     }
 
     static i64
@@ -47,12 +48,12 @@ public:
 
     static void
     IncrRawMemCount() {
-        ++ raw_memory_count_;
+        ++raw_memory_count_;
     }
 
     static void
     DecrRawMemCount() {
-        -- raw_memory_count_;
+        --raw_memory_count_;
     }
 
     static i64

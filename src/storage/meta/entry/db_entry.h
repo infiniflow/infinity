@@ -16,6 +16,7 @@
 namespace infinity {
 
 class TxnManager;
+
 class DBEntry : public BaseEntry {
 public:
     explicit
@@ -23,7 +24,7 @@ public:
             SharedPtr<String> db_name,
             u64 txn_id,
             TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kDatabase), base_dir_(base_dir), db_name_(std::move(db_name)) {
+            : BaseEntry(EntryType::kDatabase), base_dir_(base_dir), db_name_(std::move(db_name)) {
         // current_dir_ = MakeShared<String>(*base_dir + "/txn_" + std::to_string(txn_id));
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;

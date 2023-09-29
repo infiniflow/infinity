@@ -18,7 +18,7 @@ class ColumnData {
 public:
     explicit
     ColumnData(const SharedPtr<String>& base_dir, u64 column_id, BufferManager* buffer_mgr)
-        : column_id_(column_id), buffer_mgr_(buffer_mgr), base_dir_(base_dir) {
+            : column_id_(column_id), buffer_mgr_(buffer_mgr), base_dir_(base_dir) {
         file_name_ = MakeShared<String>("col" + std::to_string(column_id));
     }
 

@@ -17,13 +17,13 @@ ScalarFunctionSet::AddFunction(const ScalarFunction& func) {
 }
 
 ScalarFunction
-ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>> &input_arguments) {
+ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>>& input_arguments) {
 
     i64 lowest_cost = std::numeric_limits<i64>::max();
     SizeT function_count = functions_.size();
     Vector<i64> candidates_index;
 
-    for(auto i = 0; i < function_count; ++ i) {
+    for(auto i = 0; i < function_count; ++i) {
         ScalarFunction& function = functions_[i];
         i64 cost = MatchFunctionCost(function, input_arguments);
         if(cost >= 0 && cost <= lowest_cost) {
@@ -75,7 +75,7 @@ ScalarFunctionSet::MatchFunctionCost(const ScalarFunction& func,
 
     auto argument_count = arguments.size();
     i64 total_cost = 0;
-    for(auto i = 0; i < argument_count; ++ i) {
+    for(auto i = 0; i < argument_count; ++i) {
         // Get the cost from argument to parameter
         i64 type_cast_cost = DataType::CastRule(arguments[i]->Type(), func.parameter_types_[i]);
         if(type_cast_cost < 0) {

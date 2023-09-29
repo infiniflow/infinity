@@ -15,7 +15,7 @@ LogicalDropView::ToString(i64& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Drop View: " << *schema_name_<< "." << *view_name_;
+    ss << String(space, ' ') << arrow_str << "Drop View: " << *schema_name_ << "." << *view_name_;
     space += arrow_str.size();
 
     return ss.str();

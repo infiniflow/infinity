@@ -8,7 +8,8 @@ namespace infinity {
 
 bool
 ArrayInfo::operator==(const TypeInfo& other) const {
-    if(other.type() != TypeInfoType::kArray) return false;
+    if(other.type() != TypeInfoType::kArray)
+        return false;
 
     auto* array_info_ptr = (ArrayInfo*)(&other);
 

@@ -21,7 +21,8 @@ BitmapInfo::Make() {
 
 bool
 BitmapInfo::operator==(const TypeInfo& other) const {
-    if(other.type() != TypeInfoType::kBitmap) return false;
+    if(other.type() != TypeInfoType::kBitmap)
+        return false;
 
     auto* varchar_info_ptr = (BitmapInfo*)(&other);
 

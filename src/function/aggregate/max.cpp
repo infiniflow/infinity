@@ -21,12 +21,12 @@ public:
     }
 
     void
-    Update(const ValueType *__restrict input, SizeT idx) {
+    Update(const ValueType* __restrict input, SizeT idx) {
         NotImplementError("Update max state.")
     }
 
     inline void
-    ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const ValueType* __restrict input, SizeT idx, SizeT count) {
         NotImplementError("Constant update max state.")
     }
 
@@ -52,13 +52,13 @@ public:
     }
 
     void
-    Update(const BooleanT *__restrict input, SizeT idx) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    Update(const BooleanT* __restrict input, SizeT idx) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const BooleanT *__restrict input, SizeT idx, SizeT count) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    ConstantUpdate(const BooleanT* __restrict input, SizeT idx, SizeT count) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline ptr_t
@@ -83,13 +83,13 @@ public:
     }
 
     void
-    Update(const TinyIntT *__restrict input, SizeT idx) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    Update(const TinyIntT* __restrict input, SizeT idx) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const TinyIntT *__restrict input, SizeT idx, SizeT count) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    ConstantUpdate(const TinyIntT* __restrict input, SizeT idx, SizeT count) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline ptr_t
@@ -114,13 +114,13 @@ public:
     }
 
     void
-    Update(const SmallIntT *__restrict input, SizeT idx) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    Update(const SmallIntT* __restrict input, SizeT idx) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT count) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    ConstantUpdate(const SmallIntT* __restrict input, SizeT idx, SizeT count) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline ptr_t
@@ -145,13 +145,13 @@ public:
     }
 
     void
-    Update(const IntegerT *__restrict input, SizeT idx) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    Update(const IntegerT* __restrict input, SizeT idx) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const IntegerT *__restrict input, SizeT idx, SizeT count) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    ConstantUpdate(const IntegerT* __restrict input, SizeT idx, SizeT count) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline ptr_t
@@ -176,13 +176,13 @@ public:
     }
 
     void
-    Update(const BigIntT *__restrict input, SizeT idx) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    Update(const BigIntT* __restrict input, SizeT idx) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const BigIntT *__restrict input, SizeT idx, SizeT count) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    ConstantUpdate(const BigIntT* __restrict input, SizeT idx, SizeT count) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline ptr_t
@@ -208,13 +208,13 @@ public:
     }
 
     void
-    Update(const HugeIntT *__restrict input, SizeT idx) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    Update(const HugeIntT* __restrict input, SizeT idx) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const HugeIntT *__restrict input, SizeT idx, SizeT count) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    ConstantUpdate(const HugeIntT* __restrict input, SizeT idx, SizeT count) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline ptr_t
@@ -239,13 +239,13 @@ public:
     }
 
     void
-    Update(const FloatT *__restrict input, SizeT idx) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    Update(const FloatT* __restrict input, SizeT idx) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const FloatT *__restrict input, SizeT idx, SizeT count) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    ConstantUpdate(const FloatT* __restrict input, SizeT idx, SizeT count) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline ptr_t
@@ -270,13 +270,13 @@ public:
     }
 
     void
-    Update(const DoubleT *__restrict input, SizeT idx) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    Update(const DoubleT* __restrict input, SizeT idx) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const DoubleT *__restrict input, SizeT idx, SizeT count) {
-        value_ = value_ < input[idx] ? input[idx]: value_;
+    ConstantUpdate(const DoubleT* __restrict input, SizeT idx, SizeT count) {
+        value_ = value_ < input[idx] ? input[idx] : value_;
     }
 
     inline ptr_t
@@ -292,7 +292,7 @@ public:
 
 
 void
-RegisterMaxFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterMaxFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "MAX";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);

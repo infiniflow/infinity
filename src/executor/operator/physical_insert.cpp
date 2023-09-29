@@ -84,7 +84,7 @@ PhysicalInsert::Execute(QueryContext* query_context) {
 
     ExpressionEvaluator evaluator;
     evaluator.Init(nullptr);
-    for(SizeT expr_idx = 0; expr_idx < column_count; ++ expr_idx) {
+    for(SizeT expr_idx = 0; expr_idx < column_count; ++expr_idx) {
         Vector<SharedPtr<ColumnVector>> blocks_column;
         blocks_column.emplace_back(output_block->column_vectors[expr_idx]);
         evaluator.Execute(value_list_[expr_idx],

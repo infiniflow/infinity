@@ -9,16 +9,16 @@ namespace infinity {
 
 JoinReference::~JoinReference() {
     if(left_ != nullptr) {
-        delete(left_);
+        delete (left_);
         left_ = nullptr;
     }
     if(right_ != nullptr) {
-        delete(right_);
+        delete (right_);
         right_ = nullptr;
     }
 
     if(condition_ != nullptr) {
-        delete(condition_);
+        delete (condition_);
         condition_ = nullptr;
     }
 
@@ -39,15 +39,24 @@ JoinReference::ToString() {
 String
 ToString(JoinType type) {
     switch(type) {
-        case JoinType::kInner: return "INNER JOIN";
-        case JoinType::kLeft: return "LEFT JOIN";
-        case JoinType::kRight: return "RIGHT JOIN";
-        case JoinType::kFull: return "FULL JOIN";
-        case JoinType::kCross: return "CROSS PRODUCT";
-        case JoinType::kNatural: return "NATURAL JOIN";
-        case JoinType::kSemi: return "SEMI JOIN";
-        case JoinType::kMark: return "MARK JOIN";
-        case JoinType::kAnti: return "ANTI JOIN";
+        case JoinType::kInner:
+            return "INNER JOIN";
+        case JoinType::kLeft:
+            return "LEFT JOIN";
+        case JoinType::kRight:
+            return "RIGHT JOIN";
+        case JoinType::kFull:
+            return "FULL JOIN";
+        case JoinType::kCross:
+            return "CROSS PRODUCT";
+        case JoinType::kNatural:
+            return "NATURAL JOIN";
+        case JoinType::kSemi:
+            return "SEMI JOIN";
+        case JoinType::kMark:
+            return "MARK JOIN";
+        case JoinType::kAnti:
+            return "ANTI JOIN";
     }
     PlannerError("Unreachable");
 }

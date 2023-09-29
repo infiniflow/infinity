@@ -17,10 +17,10 @@ public:
                  SharedPtr<PhysicalOperator> left,
                  Vector<SharedPtr<BaseExpression>> expressions,
                  Vector<OrderType> order_by_types)
-                 : PhysicalOperator(PhysicalOperatorType::kSort, std::move(left), nullptr, id),
-                   expressions_(std::move(expressions)),
-                   order_by_types_(std::move(order_by_types))
-                   {}
+            : PhysicalOperator(PhysicalOperatorType::kSort, std::move(left), nullptr, id),
+              expressions_(std::move(expressions)),
+              order_by_types_(std::move(order_by_types)) {}
+
     ~PhysicalSort() override = default;
 
     void

@@ -8,7 +8,7 @@ namespace infinity {
 
 static String
 TableTypeToString(TableType type) {
-    switch (type) {
+    switch(type) {
         case TableType::kInvalid:
             TypeError("Unexpected table type: Invalid")
         case TableType::kDataTable:
@@ -36,7 +36,7 @@ Table::ToString() const {
     ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_ << std::endl;
 
     SizeT block_count = data_blocks_.size();
-    for(SizeT idx = 0; idx < block_count; ++ idx) {
+    for(SizeT idx = 0; idx < block_count; ++idx) {
         ss << "Block " << idx << std::endl;
         ss << data_blocks_[idx]->ToString();
     }
@@ -49,7 +49,7 @@ Table::GetRowIDVector() const {
     SizeT block_count = data_blocks_.size();
     SharedPtr<Vector<RowID>> result = MakeShared<Vector<RowID>>();
     result->reserve(row_count_);
-    for(SizeT idx = 0; idx < block_count; ++ idx) {
+    for(SizeT idx = 0; idx < block_count; ++idx) {
         data_blocks_[idx]->FillRowIDVector(result, idx);
     }
     return result;
@@ -68,7 +68,7 @@ Table::UnionWith(const SharedPtr<Table>& other) {
                               other->data_blocks_.size()));
 
     SizeT block_count = this->data_blocks_.size();
-    for(SizeT idx = 0; idx < block_count; ++ idx) {
+    for(SizeT idx = 0; idx < block_count; ++idx) {
         this->data_blocks_[idx]->UnionWith(other->data_blocks_[idx]);
     }
 

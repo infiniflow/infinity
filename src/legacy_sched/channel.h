@@ -12,13 +12,16 @@ public:
 
     ~Channel() noexcept = default;
 
-    [[nodiscard]] std::uint16_t ID() const {
+    [[nodiscard]] std::uint16_t
+    ID() const {
         return id_;
     }
 
-    void Put(PipelineTaskPtr task);
+    void
+    Put(PipelineTaskPtr task);
 
-    PipelineTaskPtr Take();
+    PipelineTaskPtr
+    Take();
 
 private:
     const std::uint16_t id_;

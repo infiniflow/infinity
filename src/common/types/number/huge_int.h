@@ -14,11 +14,12 @@ public:
     HugeInt() = default;
 
     explicit HugeInt(i64 upper, i64 lower) :
-        upper(upper), lower(lower) {}
+            upper(upper), lower(lower) {}
 
     inline bool
     operator==(const HugeInt& other) const {
-        if(this == &other) return true;
+        if(this == &other)
+            return true;
         return other.upper == upper && other.lower == lower;
     }
 
@@ -29,15 +30,19 @@ public:
 
     inline bool
     operator>(const HugeInt& other) const {
-        if(this->upper > other.upper) return true;
-        if(this->upper == other.upper && this->lower > other.lower) return true;
+        if(this->upper > other.upper)
+            return true;
+        if(this->upper == other.upper && this->lower > other.lower)
+            return true;
         return false;
     }
 
     inline bool
     operator<(const HugeInt& other) const {
-        if(this->upper < other.upper) return true;
-        if(this->upper == other.upper && this->lower < other.lower) return true;
+        if(this->upper < other.upper)
+            return true;
+        if(this->upper == other.upper && this->lower < other.lower)
+            return true;
         return false;
     }
 

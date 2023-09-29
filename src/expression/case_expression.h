@@ -12,7 +12,7 @@ namespace infinity {
 
 struct CaseCheck {
     CaseCheck(SharedPtr<BaseExpression> when_expr, SharedPtr<BaseExpression> then_expr)
-        : when_expr_(std::move(when_expr)), then_expr_(std::move(then_expr)) {}
+            : when_expr_(std::move(when_expr)), then_expr_(std::move(then_expr)) {}
 
     SharedPtr<BaseExpression> when_expr_;
     SharedPtr<BaseExpression> then_expr_;

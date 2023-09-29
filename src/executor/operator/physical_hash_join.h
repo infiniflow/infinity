@@ -11,7 +11,8 @@ namespace infinity {
 class PhysicalHashJoin : public PhysicalOperator {
 public:
     explicit PhysicalHashJoin(uint64_t id)
-        : PhysicalOperator(PhysicalOperatorType::kJoinHash, nullptr, nullptr, id) {}
+            : PhysicalOperator(PhysicalOperatorType::kJoinHash, nullptr, nullptr, id) {}
+
     ~PhysicalHashJoin() override = default;
 
     void

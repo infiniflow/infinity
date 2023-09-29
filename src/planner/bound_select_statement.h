@@ -12,6 +12,7 @@
 namespace infinity {
 
 class LogicalKnnScan;
+
 struct BoundSelectStatement final : public BoundStatement {
 public:
     static inline SharedPtr<BoundSelectStatement>

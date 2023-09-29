@@ -37,7 +37,7 @@ public:
                 SharedPtr<Vector<SegmentEntry*>> segment_entries);
 
     // Binding type
-    BindingType binding_type_{ BindingType::kInvalid };
+    BindingType binding_type_{BindingType::kInvalid};
 
     // Binding table alias or name
     String table_name_{};

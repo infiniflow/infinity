@@ -8,7 +8,7 @@
 namespace infinity {
 
 SharedPtr<FunctionSet>
-FunctionSet::GetFunctionSet(NewCatalog* catalog, const FunctionExpr &expr) {
+FunctionSet::GetFunctionSet(NewCatalog* catalog, const FunctionExpr& expr) {
     String function_name = expr.func_name_;
 
     // SharedPtr<NewCatalog>& catalog
@@ -28,7 +28,7 @@ FunctionSet::ToString(const String& name, const Vector<SharedPtr<BaseExpression>
 
     } else {
         ss << "(";
-        for(auto i = 0; i < argument_count - 1; ++ i) {
+        for(auto i = 0; i < argument_count - 1; ++i) {
             ss << arguments[i]->Type().ToString() << ", ";
         }
         ss << arguments.back()->Type().ToString();

@@ -58,7 +58,7 @@ Statement::Explain(const BaseStatement* statement,
         }
     }
 
-    return ;
+    return;
 }
 
 void
@@ -77,7 +77,8 @@ Statement::BuildCreate(const CreateStatement* create_statement,
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "table_name: " + schema_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
+            String conflict =
+                    String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -90,7 +91,8 @@ Statement::BuildCreate(const CreateStatement* create_statement,
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(table_info->conflict_type_);
+            String conflict =
+                    String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(table_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             String column_names = String(intent_size, ' ') + "columns: (";
 
@@ -99,7 +101,7 @@ Statement::BuildCreate(const CreateStatement* create_statement,
                 PlannerError("Table definition without any columns");
             }
 
-            for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+            for(SizeT idx = 0; idx < column_count - 1; ++idx) {
                 column_names += table_info->column_defs_[idx]->ToString() + ", ";
             }
             column_names += table_info->column_defs_.back()->ToString();
@@ -109,7 +111,7 @@ Statement::BuildCreate(const CreateStatement* create_statement,
             SizeT constraint_count = table_info->constraints_.size();
             if(constraint_count > 0) {
                 String constraints_str = "Constraints: (";
-                for(SizeT idx = 0; idx < constraint_count - 1; ++ idx) {
+                for(SizeT idx = 0; idx < constraint_count - 1; ++idx) {
                     constraints_str += table_info->constraints_[idx]->ToString() + ", ";
                 }
                 constraints_str += table_info->constraints_.back()->ToString() + ")";
@@ -126,7 +128,8 @@ Statement::BuildCreate(const CreateStatement* create_statement,
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
+            String conflict =
+                    String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -141,8 +144,8 @@ Statement::BuildCreate(const CreateStatement* create_statement,
 
 void
 Statement::BuildInsert(const InsertStatement* insert_statement,
-            SharedPtr<Vector<SharedPtr<String>>>& result,
-            i64 intent_size) {
+                       SharedPtr<Vector<SharedPtr<String>>>& result,
+                       i64 intent_size) {
     result->emplace_back(MakeShared<String>("INSERT: "));
     intent_size += 2;
     String schema_name = String(intent_size, ' ') + "schema: " + insert_statement->schema_name_;
@@ -154,7 +157,7 @@ Statement::BuildInsert(const InsertStatement* insert_statement,
     if(value_count == 0) {
         PlannerError("Insert value list is empty");
     }
-    for(SizeT idx = 0; idx < value_count - 1; ++ idx) {
+    for(SizeT idx = 0; idx < value_count - 1; ++idx) {
         values += insert_statement->values_->at(idx)->ToString() + ", ";
     }
     values += insert_statement->values_->back()->ToString();
@@ -176,7 +179,8 @@ Statement::BuildDrop(const DropStatement* drop_statement,
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "table_name: " + schema_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
+            String conflict =
+                    String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -189,7 +193,8 @@ Statement::BuildDrop(const DropStatement* drop_statement,
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(table_info->conflict_type_);
+            String conflict =
+                    String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(table_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -202,7 +207,8 @@ Statement::BuildDrop(const DropStatement* drop_statement,
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
+            String conflict =
+                    String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -237,7 +243,7 @@ Statement::BuildSelect(const SelectStatement* select_statement,
             intent_size += 2;
 
             SizeT with_count = select_statement->with_exprs_->size();
-            for(SizeT idx = 0; idx < with_count; ++ idx) {
+            for(SizeT idx = 0; idx < with_count; ++idx) {
                 auto* with_expr = select_statement->with_exprs_->at(idx);
                 SharedPtr<String> alias_str = MakeShared<String>(with_expr->alias_);
                 BuildSelect((SelectStatement*)with_expr->select_, result, intent_size, alias_ptr);
@@ -249,11 +255,11 @@ Statement::BuildSelect(const SelectStatement* select_statement,
     {
         String projection_str = String(intent_size, ' ') + "projection: ";
         SizeT select_count = select_statement->select_list_->size();
-        if (select_count == 0) {
+        if(select_count == 0) {
             PlannerError("No select list");
         }
-        for (SizeT idx = 0; idx < select_count - 1; ++idx) {
-            ParsedExpr *expr = select_statement->select_list_->at(idx);
+        for(SizeT idx = 0; idx < select_count - 1; ++idx) {
+            ParsedExpr* expr = select_statement->select_list_->at(idx);
             projection_str += expr->ToString() + ", ";
         }
         projection_str += select_statement->select_list_->back()->ToString();
@@ -271,7 +277,7 @@ Statement::BuildSelect(const SelectStatement* select_statement,
     if(select_statement->group_by_list_ != nullptr) {
         String group_by = String(intent_size, ' ') + "groupby: ";
         SizeT group_count = select_statement->group_by_list_->size();
-        for(SizeT idx = 0; idx < group_count - 1; ++ idx) {
+        for(SizeT idx = 0; idx < group_count - 1; ++idx) {
             group_by += select_statement->group_by_list_->at(idx)->ToString() + ", ";
         }
         group_by += select_statement->group_by_list_->back()->ToString();
@@ -286,7 +292,7 @@ Statement::BuildSelect(const SelectStatement* select_statement,
     if(select_statement->order_by_list != nullptr) {
         String order_str = String(intent_size, ' ') + "groupby: ";
         SizeT order_count = select_statement->order_by_list->size();
-        for(SizeT idx = 0; idx < order_count - 1; ++ idx) {
+        for(SizeT idx = 0; idx < order_count - 1; ++idx) {
             OrderByExpr* order_expr = select_statement->order_by_list->at(idx);
             order_str += order_expr->expr_->ToString();
             if(order_expr->type_ == OrderType::kAsc) {
@@ -348,11 +354,11 @@ Statement::BuildBaseTableRef(const BaseTableReference* base_table_ref,
                              SharedPtr<Vector<SharedPtr<String>>>& result,
                              i64 intent_size) {
     String from_str;
-    switch (base_table_ref->type_) {
+    switch(base_table_ref->type_) {
         case TableRefType::kCrossProduct: {
             from_str = String(intent_size, ' ') + "cross product";
-            auto *cross_product_ref = (CrossProductReference *) base_table_ref;
-            if (cross_product_ref->alias_ != nullptr) {
+            auto* cross_product_ref = (CrossProductReference*)base_table_ref;
+            if(cross_product_ref->alias_ != nullptr) {
                 from_str += " AS " + String(cross_product_ref->alias_->alias_);
                 PlannerAssert(cross_product_ref->alias_->column_alias_array_ == nullptr,
                               "Table reference has columns alias");
@@ -362,16 +368,16 @@ Statement::BuildBaseTableRef(const BaseTableReference* base_table_ref,
             result->emplace_back(MakeShared<String>(from_str));
 
             intent_size += 2;
-            for (auto *sub_table_ref: cross_product_ref->tables_) {
+            for(auto* sub_table_ref: cross_product_ref->tables_) {
                 BuildBaseTableRef(sub_table_ref, result, intent_size);
             }
             break;
         }
         case TableRefType::kJoin: {
 
-            auto *join_reference = (JoinReference *) base_table_ref;
+            auto* join_reference = (JoinReference*)base_table_ref;
             from_str = String(intent_size, ' ') + "table join on: " + join_reference->condition_->ToString();
-            if (join_reference->alias_ != nullptr) {
+            if(join_reference->alias_ != nullptr) {
                 from_str += " AS " + String(join_reference->alias_->alias_);
                 PlannerAssert(join_reference->alias_->column_alias_array_ == nullptr,
                               "Table reference has columns alias");
@@ -385,12 +391,12 @@ Statement::BuildBaseTableRef(const BaseTableReference* base_table_ref,
         }
         case TableRefType::kTable: {
             from_str = String(intent_size, ' ') + "table: ";
-            auto *table_reference = (TableReference *) base_table_ref;
-            if (!table_reference->db_name_.empty()) {
+            auto* table_reference = (TableReference*)base_table_ref;
+            if(!table_reference->db_name_.empty()) {
                 from_str += table_reference->db_name_ + ".";
             }
             from_str += table_reference->table_name_;
-            if (table_reference->alias_ != nullptr) {
+            if(table_reference->alias_ != nullptr) {
                 from_str += " AS " + String(table_reference->alias_->alias_);
                 PlannerAssert(table_reference->alias_->column_alias_array_ == nullptr,
                               "Table reference has columns alias");
@@ -400,8 +406,8 @@ Statement::BuildBaseTableRef(const BaseTableReference* base_table_ref,
         }
         case TableRefType::kSubquery: {
             from_str = String(intent_size, ' ') + "subquery table: ";
-            auto *subquery_reference = (SubqueryReference *) base_table_ref;
-            if (subquery_reference->alias_ != nullptr) {
+            auto* subquery_reference = (SubqueryReference*)base_table_ref;
+            if(subquery_reference->alias_ != nullptr) {
                 from_str += " AS " + String(subquery_reference->alias_->alias_);
                 PlannerAssert(subquery_reference->alias_->column_alias_array_ == nullptr,
                               "Table reference has columns alias");
@@ -483,15 +489,15 @@ Statement::BuildCopy(const CopyStatement* copy_statement,
     }
 
     SharedPtr<String> schema_name
-        = MakeShared<String>(String(intent_size, ' ') + "schema: " + copy_statement->schema_name_);
+            = MakeShared<String>(String(intent_size, ' ') + "schema: " + copy_statement->schema_name_);
     result->emplace_back(schema_name);
 
     SharedPtr<String> table_name
-        = MakeShared<String>(String(intent_size, ' ') + "table: " + copy_statement->table_name_);
+            = MakeShared<String>(String(intent_size, ' ') + "table: " + copy_statement->table_name_);
     result->emplace_back(table_name);
 
     SharedPtr<String> path
-        = MakeShared<String>(String(intent_size, ' ') + "file: " + copy_statement->file_path_);
+            = MakeShared<String>(String(intent_size, ' ') + "file: " + copy_statement->file_path_);
     result->emplace_back(path);
 
     switch(copy_statement->copy_file_type_) {
@@ -500,7 +506,8 @@ Statement::BuildCopy(const CopyStatement* copy_statement,
             result->emplace_back(file_type);
 
             SharedPtr<String> header
-                    = MakeShared<String>(String(intent_size, ' ') + "header: " + (copy_statement->header_ ? "Yes": "No"));
+                    = MakeShared<String>(
+                            String(intent_size, ' ') + "header: " + (copy_statement->header_ ? "Yes" : "No"));
             result->emplace_back(header);
 
             SharedPtr<String> delimiter

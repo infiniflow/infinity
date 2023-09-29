@@ -25,9 +25,9 @@ public:
             SharedPtr<PhysicalOperator> right,
             u64 id)
             : operator_id_(id),
-            operator_type_(type),
-            left_(std::move(left)),
-            right_(std::move(right)) {}
+              operator_type_(type),
+              left_(std::move(left)),
+              right_(std::move(right)) {}
 
     virtual
     ~PhysicalOperator() = default;
@@ -78,7 +78,7 @@ public:
     GetOutputTypes() const = 0;
 
     virtual String
-    GetName () const ;
+    GetName() const;
 
 protected:
     u64 operator_id_;

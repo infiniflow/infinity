@@ -2,15 +2,16 @@
 
 namespace infinity {
 
-ByteSlice* ByteSlice::CreateSlice(size_t data_size, MemoryPool* pool) {
+ByteSlice*
+ByteSlice::CreateSlice(size_t data_size, MemoryPool* pool) {
     uint8_t* mem;
     size_t mem_size = data_size + GetHeadSize();
-    if (pool == NULL) {
+    if(pool == NULL) {
         mem = new uint8_t[mem_size];
     } else {
         mem = (uint8_t*)pool->Allocate(mem_size);
     }
-    ByteSlice* slice =  new(mem)ByteSlice;
+    ByteSlice* slice = new(mem)ByteSlice;
     slice->data_ = mem + GetHeadSize();
     slice->size_ = data_size;
     slice->data_size_ = 0;
@@ -18,11 +19,12 @@ ByteSlice* ByteSlice::CreateSlice(size_t data_size, MemoryPool* pool) {
     return slice;
 }
 
-void ByteSlice::DestroySlice(ByteSlice* slice, MemoryPool* pool) {
+void
+ByteSlice::DestroySlice(ByteSlice* slice, MemoryPool* pool) {
     slice->~ByteSlice();
-    uint8_t* mem= (uint8_t*)slice;
-    if (pool == NULL) {
-        delete []mem;
+    uint8_t* mem = (uint8_t*)slice;
+    if(pool == NULL) {
+        delete[]mem;
     } else {
         pool->Deallocate(mem, slice->size_ + GetHeadSize());
     }
@@ -35,8 +37,8 @@ ByteSliceList::ByteSliceList() {
 }
 
 ByteSliceList::ByteSliceList(ByteSlice* slice)
-    : head_(NULL), tail_(NULL), total_size_(0) {
-    if (slice != NULL) {
+        : head_(NULL), tail_(NULL), total_size_(0) {
+    if(slice != NULL) {
         Add(slice);
     }
 }
@@ -45,8 +47,9 @@ ByteSliceList::~ByteSliceList() {
     Clear(NULL);
 }
 
-void ByteSliceList::Add(ByteSlice* slice) {
-    if (tail_ == NULL) {
+void
+ByteSliceList::Add(ByteSlice* slice) {
+    if(tail_ == NULL) {
         head_ = tail_ = slice;
     } else {
         tail_->next_ = slice;
@@ -55,11 +58,12 @@ void ByteSliceList::Add(ByteSlice* slice) {
     total_size_ = total_size_ + slice->size_;
 }
 
-void ByteSliceList::Clear(MemoryPool* pool) {
+void
+ByteSliceList::Clear(MemoryPool* pool) {
     ByteSlice* slice = head_;
     ByteSlice* next = NULL;
 
-    while (slice) {
+    while(slice) {
         next = slice->next_;
         ByteSlice::DestroySlice(slice, pool);
         slice = next;
@@ -69,18 +73,20 @@ void ByteSliceList::Clear(MemoryPool* pool) {
     total_size_ = 0;
 }
 
-size_t ByteSliceList::UpdateTotalSize() {
+size_t
+ByteSliceList::UpdateTotalSize() {
     total_size_ = 0;
     ByteSlice* slice = head_;
-    while (slice) {
+    while(slice) {
         total_size_ = total_size_ + slice->size_;
         slice = slice->next_;
     }
     return total_size_;
 }
 
-void ByteSliceList::MergeWith(ByteSliceList& other) {
-    if (head_ == NULL) {
+void
+ByteSliceList::MergeWith(ByteSliceList& other) {
+    if(head_ == NULL) {
         head_ = other.head_;
         tail_ = other.tail_;
     } else {

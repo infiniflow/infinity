@@ -18,9 +18,10 @@ public:
                   SharedPtr<PhysicalOperator> left,
                   SharedPtr<BaseExpression> limit_expr,
                   SharedPtr<BaseExpression> offset_expr)
-        : PhysicalOperator(PhysicalOperatorType::kLimit, std::move(left), nullptr, id),
-          limit_expr_(std::move(limit_expr)),
-          offset_expr_(std::move(offset_expr)){}
+            : PhysicalOperator(PhysicalOperatorType::kLimit, std::move(left), nullptr, id),
+              limit_expr_(std::move(limit_expr)),
+              offset_expr_(std::move(offset_expr)) {}
+
     ~PhysicalLimit() override = default;
 
     void

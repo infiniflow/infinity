@@ -11,15 +11,16 @@
 namespace infinity {
 
 class TableScanFunction;
+
 class BaseTableRef;
+
 class PhysicalTableScan : public PhysicalOperator {
 public:
     explicit
     PhysicalTableScan(u64 id,
                       SharedPtr<BaseTableRef> base_table_ref)
-        : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id),
-        base_table_ref_(std::move(base_table_ref))
-        {}
+            : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id),
+              base_table_ref_(std::move(base_table_ref)) {}
 
     ~PhysicalTableScan() override = default;
 

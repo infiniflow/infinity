@@ -13,7 +13,8 @@ SubqueryReference::~SubqueryReference() {
     }
 }
 
-String SubqueryReference::ToString() {
+String
+SubqueryReference::ToString() {
     return "SubqueryReference";
 }
 

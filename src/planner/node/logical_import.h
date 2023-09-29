@@ -18,11 +18,11 @@ public:
                   char delimiter,
                   CopyFileType type)
             : LogicalNode(node_id, LogicalNodeType::kImport),
-            table_collection_entry_(table_collection_entry),
-            file_path_(std::move(file_path)),
-            header_(header),
-            delimiter_(delimiter),
-            file_type_(type) {}
+              table_collection_entry_(table_collection_entry),
+              file_path_(std::move(file_path)),
+              header_(header),
+              delimiter_(delimiter),
+              file_type_(type) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {
@@ -31,16 +31,16 @@ public:
 
     [[nodiscard]] inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
-        return MakeShared <Vector<String>>();
+        return MakeShared<Vector<String>>();
     }
 
     [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
-        return MakeShared <Vector<SharedPtr<DataType>>>();
+        return MakeShared<Vector<SharedPtr<DataType>>>();
     }
 
     String
-    ToString(i64 &space) final;
+    ToString(i64& space) final;
 
     inline String
     name() final {
@@ -80,7 +80,7 @@ public:
 private:
 
     TableCollectionEntry* table_collection_entry_{};
-    CopyFileType file_type_ {CopyFileType::kCSV};
+    CopyFileType file_type_{CopyFileType::kCSV};
     String file_path_{};
     bool header_{false};
     char delimiter_{','};

@@ -10,8 +10,8 @@ public:
     static SharedPtr<VarcharInfo>
     Make(i64 dimension);
 
-    explicit VarcharInfo(i64 dimension) : 
-    TypeInfo(TypeInfoType::kVarchar), dimension_(dimension) {
+    explicit VarcharInfo(i64 dimension) :
+            TypeInfo(TypeInfoType::kVarchar), dimension_(dimension) {
         // GlobalResourceUsage::IncrObjectCount();
     }
 
@@ -32,7 +32,8 @@ public:
     Serialize() const override;
 
     [[nodiscard]] inline
-    String ToString() const override {
+    String
+    ToString() const override {
         return "varchar(" + std::to_string(dimension_) + ")";
     }
 

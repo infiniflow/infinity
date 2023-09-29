@@ -47,7 +47,7 @@ PhysicalProject::Execute(QueryContext* query_context, InputState* input_state, O
         expr_states.emplace_back(ExpressionState::CreateState(expr));
     }
 
-    for(SizeT expr_idx = 0; expr_idx < expression_count; ++ expr_idx) {
+    for(SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
 //        Vector<SharedPtr<ColumnVector>> blocks_column;
 //        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
         evaluator.Execute(expressions_[expr_idx],
@@ -89,7 +89,7 @@ PhysicalProject::Execute(QueryContext* query_context) {
         // for output block
         output_types.emplace_back(data_type);
 
-        ++ idx;
+        ++idx;
     }
 
     // output table definition
@@ -104,7 +104,7 @@ PhysicalProject::Execute(QueryContext* query_context) {
         output_data_block->Init(output_types);
         ExpressionEvaluator evaluator;
         evaluator.Init(nullptr);
-        for(SizeT expr_idx = 0; expr_idx < expression_count; ++ expr_idx) {
+        for(SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
             Vector<SharedPtr<ColumnVector>> blocks_column;
             blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
             evaluator.Execute(expressions_[expr_idx],
@@ -122,14 +122,14 @@ PhysicalProject::Execute(QueryContext* query_context) {
         SizeT input_block_count = input_table->DataBlockCount();
 
         // Loop blocks
-        for(SizeT block_idx = 0; block_idx < input_block_count; ++ block_idx) {
+        for(SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_types);
 
             // Loop aggregate expression
             ExpressionEvaluator evaluator;
             evaluator.Init(input_table->GetDataBlockById(block_idx).get());
-            for(SizeT expr_idx = 0; expr_idx < expression_count; ++ expr_idx) {
+            for(SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
                 Vector<SharedPtr<ColumnVector>> blocks_column;
                 evaluator.Execute(expressions_[expr_idx],
                                   expr_states[expr_idx],
@@ -153,7 +153,7 @@ PhysicalProject::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
     SizeT expression_count = expressions_.size();
     result->reserve(expression_count);
-    for(SizeT i = 0; i < expression_count; ++ i) {
+    for(SizeT i = 0; i < expression_count; ++i) {
         result->emplace_back(expressions_[i]->Name());
     }
 
@@ -165,7 +165,7 @@ PhysicalProject::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
     SizeT expression_count = expressions_.size();
     result->reserve(expression_count);
-    for(SizeT i = 0; i < expression_count; ++ i) {
+    for(SizeT i = 0; i < expression_count; ++i) {
         result->emplace_back(MakeShared<DataType>(expressions_[i]->Type()));
     }
 

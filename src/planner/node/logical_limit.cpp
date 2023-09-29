@@ -8,7 +8,7 @@
 namespace infinity {
 
 String
-LogicalLimit::ToString(i64 &space) {
+LogicalLimit::ToString(i64& space) {
     std::stringstream ss;
     String arrow_str;
     if(space > 3) {

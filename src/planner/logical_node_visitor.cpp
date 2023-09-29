@@ -15,7 +15,7 @@
 namespace infinity {
 
 void
-LogicalNodeVisitor::VisitNodeChildren(LogicalNode &op) {
+LogicalNodeVisitor::VisitNodeChildren(LogicalNode& op) {
     if(op.left_node()) {
         VisitNode(*op.left_node());
     }
@@ -25,8 +25,8 @@ LogicalNodeVisitor::VisitNodeChildren(LogicalNode &op) {
 }
 
 void
-LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
-    switch (op.operator_type()) {
+LogicalNodeVisitor::VisitNodeExpression(LogicalNode& op) {
+    switch(op.operator_type()) {
         case LogicalNodeType::kAggregate: {
             auto& node = (LogicalAggregate&)op;
             for(auto& expression: node.groups_) {
@@ -91,7 +91,7 @@ void
 LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
 
     SharedPtr<BaseExpression> result;
-    switch (expression->type()) {
+    switch(expression->type()) {
 
         case ExpressionType::kAggregate: {
             auto aggregate_expression = std::static_pointer_cast<AggregateExpression>(expression);
@@ -219,7 +219,7 @@ LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression>& expression) {
 
 void
 LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression>& expression) {
-    switch (expression->type()) {
+    switch(expression->type()) {
 
         case ExpressionType::kAggregate: {
             auto aggregate_expression = std::static_pointer_cast<AggregateExpression>(expression);
@@ -234,7 +234,7 @@ LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression>& expressio
             break;
         case ExpressionType::kCast: {
             auto cast_expression = std::static_pointer_cast<CastExpression>(expression);
-            for (auto &argument: cast_expression->arguments()) {
+            for(auto& argument: cast_expression->arguments()) {
                 VisitExpression(argument);
             }
             break;

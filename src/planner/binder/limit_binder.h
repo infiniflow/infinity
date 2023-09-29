@@ -11,14 +11,14 @@ namespace infinity {
 
 class LimitBinder final : public ExpressionBinder {
 public:
-    explicit LimitBinder(QueryContext* query_context): ExpressionBinder(query_context) {}
+    explicit LimitBinder(QueryContext* query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
     SharedPtr<BaseExpression>
     BuildExpression(const ParsedExpr& expr,
                     BindContext* bind_context_ptr,
                     i64 depth,
-                    bool root) final ;
+                    bool root) final;
 
     SharedPtr<BaseExpression>
     BuildFuncExpr(const FunctionExpr& expr,
@@ -38,6 +38,7 @@ public:
                  BindContext* bind_context_ptr,
                  i64 depth,
                  bool root) final;
+
 private:
 };
 

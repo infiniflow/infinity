@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class LogicalCrossProduct: public LogicalNode {
+class LogicalCrossProduct : public LogicalNode {
 public:
     explicit
     LogicalCrossProduct(u64 node_id,

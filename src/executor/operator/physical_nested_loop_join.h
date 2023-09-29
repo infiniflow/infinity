@@ -19,13 +19,12 @@ public:
                                     Vector<SharedPtr<BaseExpression>> conditions,
                                     SharedPtr<PhysicalOperator> left,
                                     SharedPtr<PhysicalOperator> right)
-        : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop,
-                           std::move(left),
-                           std::move(right),
-                           id),
-          join_type_(join_type),
-          conditions_(std::move(conditions))
-        {}
+            : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop,
+                               std::move(left),
+                               std::move(right),
+                               id),
+              join_type_(join_type),
+              conditions_(std::move(conditions)) {}
 
     ~PhysicalNestedLoopJoin() override = default;
 

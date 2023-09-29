@@ -10,14 +10,14 @@ String
 CopyStatement::ToString() const {
     std::stringstream ss;
     String copy_direction;
-    if (copy_from_) {
+    if(copy_from_) {
         copy_direction = " FROM ";
     } else {
         copy_direction = " TO ";
     }
 
     String file_format;
-    switch (copy_file_type_) {
+    switch(copy_file_type_) {
         case CopyFileType::kCSV: {
             file_format = "CSV";
             break;

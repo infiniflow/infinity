@@ -21,7 +21,7 @@ public:
     String schema_name_{"default"};
     String table_name_{};
 
-    Vector<String>*      columns_{nullptr};
+    Vector<String>* columns_{nullptr};
     Vector<ParsedExpr*>* values_{nullptr};
 
     SelectStatement* select_{nullptr};

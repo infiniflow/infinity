@@ -23,10 +23,9 @@ public:
     View(SharedPtr<CreateViewInfo> create_view_info,
          SharedPtr<Vector<String>> column_names,
          SharedPtr<Vector<SharedPtr<DataType>>> column_types)
-         : create_view_info_(std::move(create_view_info)),
-         column_names_(std::move(column_names)),
-         column_types_(std::move(column_types))
-         {}
+            : create_view_info_(std::move(create_view_info)),
+              column_names_(std::move(column_names)),
+              column_types_(std::move(column_types)) {}
 
     [[nodiscard]] inline const String&
     schema_name() const {

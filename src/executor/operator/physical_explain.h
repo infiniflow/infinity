@@ -18,9 +18,8 @@ public:
                              SharedPtr<Vector<SharedPtr<String>>> text_array,
                              SharedPtr<PhysicalOperator> left)
             : PhysicalOperator(PhysicalOperatorType::kExplain, std::move(left), nullptr, id),
-            explain_type_(type),
-            texts_(std::move(text_array))
-            {}
+              explain_type_(type),
+              texts_(std::move(text_array)) {}
 
     ~PhysicalExplain() override = default;
 

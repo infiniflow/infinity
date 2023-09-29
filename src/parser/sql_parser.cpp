@@ -13,7 +13,7 @@ namespace infinity {
 SQLParser::SQLParser() {
     scanner_ = nullptr;
     state_ = nullptr;
-    if (sqllex_init(&scanner_)) {
+    if(sqllex_init(&scanner_)) {
         std::cerr << "Init lexer error" << std::endl;
     }
 }
@@ -23,11 +23,11 @@ SQLParser::~SQLParser() {
 }
 
 void
-SQLParser::Parse(const String &sql_text, SharedPtr<ParserResult> &result) {
+SQLParser::Parse(const String& sql_text, SharedPtr<ParserResult>& result) {
 
     state_ = sql_scan_string(sql_text.c_str(), scanner_);
 
-    if (sqlparse(scanner_, result.get())) {
+    if(sqlparse(scanner_, result.get())) {
         std::cerr << "Parse error: " << sql_text << std::endl;
     }
 

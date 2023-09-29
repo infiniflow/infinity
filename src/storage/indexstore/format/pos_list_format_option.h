@@ -13,15 +13,16 @@ public:
     }
     ~PositionListFormatOption() {}
 
-    inline void Init(optionflag_t option_flag) {
+    inline void
+    Init(optionflag_t option_flag) {
         has_position_list_ = option_flag & of_position_list ? 1 : 0;
-        if ((option_flag & of_position_list) && (option_flag & of_position_payload)) {
+        if((option_flag & of_position_list) && (option_flag & of_position_payload)) {
             has_position_payload_ = 1;
         } else {
             has_position_payload_ = 0;
         }
 
-        if ((option_flag & of_term_frequency) && (option_flag & of_tf_bitmap)) {
+        if((option_flag & of_term_frequency) && (option_flag & of_tf_bitmap)) {
             has_tf_bitmap_ = 1;
         } else {
             has_tf_bitmap_ = 0;
@@ -29,26 +30,30 @@ public:
         unused_ = 0;
     }
 
-    bool HasPositionList() const {
+    bool
+    HasPositionList() const {
         return has_position_list_ == 1;
     }
-    bool HasPositionPayload() const {
+    bool
+    HasPositionPayload() const {
         return has_position_payload_ == 1;
     }
-    bool HasTfBitmap() const {
+    bool
+    HasTfBitmap() const {
         return has_tf_bitmap_ == 1;
     }
-    bool operator==(const PositionListFormatOption& right) const {
+    bool
+    operator==(const PositionListFormatOption& right) const {
         return has_position_list_ == right.has_position_list_ &&
                has_position_payload_ == right.has_position_payload_ &&
                has_tf_bitmap_ == right.has_tf_bitmap_;
     }
 
 private:
-    uint8_t has_position_list_    : 1;
-    uint8_t has_position_payload_ : 1;
-    uint8_t has_tf_bitmap_        : 1;
-    uint8_t unused_               : 5;
+    uint8_t has_position_list_: 1;
+    uint8_t has_position_payload_: 1;
+    uint8_t has_tf_bitmap_: 1;
+    uint8_t unused_: 5;
 
 };
 

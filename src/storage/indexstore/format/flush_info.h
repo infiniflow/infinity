@@ -1,7 +1,7 @@
 #pragma once
 
-namespace infinity{
-class FlushInfo{
+namespace infinity {
+class FlushInfo {
 private:
 #define SET_BIT_VALUE(mask, offset, value) flush_info_ = (flush_info_ & ~mask) | ((uint64_t)value << offset)
 #define GET_BIT_VALUE(mask, offset) (flush_info_ & mask) >> offset
@@ -17,26 +17,33 @@ public:
 
     ~FlushInfo() = default;
 
-    bool IsValidShortBuffer() const {
+    bool
+    IsValidShortBuffer() const {
         return GET_BIT_VALUE(MASK_IS_VALID, OFFSET_IS_VALID);
     }
-    void SetIsValidShortBuffer(bool is_valid) {
+    void
+    SetIsValidShortBuffer(bool is_valid) {
         uint64_t is_valid_short_buffer = is_valid ? 1 : 0;
         SET_BIT_VALUE(MASK_IS_VALID, OFFSET_IS_VALID, is_valid_short_buffer);
     }
-    uint32_t GetFlushLength() const { 
-        return GET_BIT_VALUE(MASK_FLUSH_LENGTH, OFFSET_FLUSH_LENGTH); 
+    uint32_t
+    GetFlushLength() const {
+        return GET_BIT_VALUE(MASK_FLUSH_LENGTH, OFFSET_FLUSH_LENGTH);
     }
-    void SetFlushLength(uint32_t flush_length) { 
-        SET_BIT_VALUE(MASK_FLUSH_LENGTH, OFFSET_FLUSH_LENGTH, flush_length); 
+    void
+    SetFlushLength(uint32_t flush_length) {
+        SET_BIT_VALUE(MASK_FLUSH_LENGTH, OFFSET_FLUSH_LENGTH, flush_length);
     }
-    uint32_t GetFlushCount() const { 
-        return GET_BIT_VALUE(MASK_FLUSH_COUNT, OFFSET_FLUSH_COUNT); 
+    uint32_t
+    GetFlushCount() const {
+        return GET_BIT_VALUE(MASK_FLUSH_COUNT, OFFSET_FLUSH_COUNT);
     }
-    void SetFlushCount(uint32_t flush_count) { 
-        SET_BIT_VALUE(MASK_FLUSH_COUNT, OFFSET_FLUSH_COUNT, flush_count); 
+    void
+    SetFlushCount(uint32_t flush_count) {
+        SET_BIT_VALUE(MASK_FLUSH_COUNT, OFFSET_FLUSH_COUNT, flush_count);
     }
-    void Reset() {
+    void
+    Reset() {
         flush_info_ = 0;
     }
 private:

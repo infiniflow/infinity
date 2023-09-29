@@ -9,43 +9,43 @@
 
 namespace infinity {
 
-template <typename ValueType>
+template<typename ValueType>
 inline ValueType
 NullValue() {
     TypeError(DataType::TypeToString<ValueType>() + " doesn't have null value.");
 }
 
-template <>
+template<>
 inline BooleanT
 NullValue() {
     return false;
 }
 
-template <>
+template<>
 inline TinyIntT
 NullValue() {
     return std::numeric_limits<TinyIntT>::infinity();
 }
 
-template <>
+template<>
 inline SmallIntT
 NullValue() {
     return std::numeric_limits<SmallIntT>::infinity();
 }
 
-template <>
+template<>
 inline IntegerT
 NullValue() {
     return std::numeric_limits<IntegerT>::infinity();
 }
 
-template <>
+template<>
 inline BigIntT
 NullValue() {
     return std::numeric_limits<BigIntT>::infinity();
 }
 
-template <>
+template<>
 inline HugeIntT
 NullValue() {
     HugeIntT value;
@@ -54,55 +54,55 @@ NullValue() {
     return value;
 }
 
-template <>
+template<>
 inline FloatT
 NullValue() {
     return std::numeric_limits<f32>::infinity();
 }
 
-template <>
+template<>
 inline DoubleT
 NullValue() {
     return std::numeric_limits<f64>::infinity();
 }
 
-template <>
+template<>
 inline DecimalT
 NullValue() {
     return DecimalT(std::numeric_limits<i64>::infinity(), std::numeric_limits<i64>::infinity());
 }
 
-template <>
+template<>
 inline VarcharT
 NullValue() {
     return VarcharT(nullptr, 0);
 }
 
-template <>
+template<>
 inline DateT
 NullValue() {
     return DateT(std::numeric_limits<i32>::infinity());
 }
 
-template <>
+template<>
 inline TimeT
 NullValue() {
     return TimeT(std::numeric_limits<i32>::infinity());
 }
 
-template <>
+template<>
 inline DateTimeT
 NullValue() {
     return DateTimeT(std::numeric_limits<i32>::infinity(), std::numeric_limits<i32>::infinity());
 }
 
-template <>
+template<>
 inline TimestampT
 NullValue() {
     return TimestampT(std::numeric_limits<i32>::infinity(), std::numeric_limits<i32>::infinity());
 }
 
-template <>
+template<>
 inline IntervalT
 NullValue() {
     IntervalT interval;
@@ -111,13 +111,13 @@ NullValue() {
     return interval;
 }
 
-template <>
+template<>
 inline PointT
 NullValue() {
     return PointT(std::numeric_limits<f64>::infinity(), std::numeric_limits<f64>::infinity());
 }
 
-template <>
+template<>
 inline LineT
 NullValue() {
     return LineT(std::numeric_limits<f64>::infinity(),
@@ -125,7 +125,7 @@ NullValue() {
                  std::numeric_limits<f64>::infinity());
 }
 
-template <>
+template<>
 inline LineSegT
 NullValue() {
     PointT p1(std::numeric_limits<f64>::infinity(), std::numeric_limits<f64>::infinity());
@@ -133,7 +133,7 @@ NullValue() {
     return LineSegT(p1, p2);
 }
 
-template <>
+template<>
 inline BoxT
 NullValue() {
     PointT p1(std::numeric_limits<f64>::infinity(), std::numeric_limits<f64>::infinity());
@@ -141,7 +141,7 @@ NullValue() {
     return BoxT(p1, p2);
 }
 
-template <>
+template<>
 inline PathT
 NullValue() {
     PathType path(std::numeric_limits<u32>::infinity(), std::numeric_limits<i32>::infinity());
@@ -149,12 +149,12 @@ NullValue() {
     return path;
 }
 
-template <>
+template<>
 inline PolygonT
 NullValue() {
-    ptr_t ptr {};
-    u64 point_count {0}; // 65535 point are the max point count
-    BoxType bounding_box {};
+    ptr_t ptr{};
+    u64 point_count{0}; // 65535 point are the max point count
+    BoxType bounding_box{};
     PolygonT polygon;
     polygon.ptr = std::numeric_limits<ptr_t>::infinity();
     polygon.point_count = std::numeric_limits<u64>::infinity();
@@ -167,14 +167,14 @@ NullValue() {
     return polygon;
 }
 
-template <>
+template<>
 inline CircleT
 NullValue() {
     return CircleT(PointT(std::numeric_limits<f64>::infinity(), std::numeric_limits<f64>::infinity()),
                    std::numeric_limits<f64>::infinity());
 }
 
-template <>
+template<>
 inline BitmapT
 NullValue() {
     BitmapT bitmap;
@@ -183,14 +183,14 @@ NullValue() {
     return bitmap;
 }
 
-template <>
+template<>
 inline UuidT
 NullValue() {
     UuidT uuid;
     return uuid;
 }
 
-template <>
+template<>
 inline BlobT
 NullValue() {
     BlobT blob;
@@ -199,7 +199,7 @@ NullValue() {
     return blob;
 }
 
-template <>
+template<>
 inline EmbeddingT
 NullValue() {
     ptr_t ptr = std::numeric_limits<ptr_t>::infinity();
@@ -207,7 +207,7 @@ NullValue() {
     return embedding;
 }
 
-template <>
+template<>
 inline MixedT
 NullValue() {
     auto null_value = MixedT::MakeNull();

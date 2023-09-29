@@ -2,7 +2,8 @@
 
 namespace infinity {
 
-bool PolicyEnforcer::AdmitQuery(QueryContext* query_context) {
+bool
+PolicyEnforcer::AdmitQuery(QueryContext* query_context) {
     return true;
 }
 

@@ -14,7 +14,7 @@ class Task;
 class PollerQueue {
 public:
     explicit
-    PollerQueue(SizeT capacity = 1024): capacity_(capacity) {
+    PollerQueue(SizeT capacity = 1024) : capacity_(capacity) {
     }
 
     void

@@ -13,7 +13,7 @@
 namespace infinity {
 
 BufferManager::BufferManager(SizeT mem_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir)
-: mem_limit_(mem_limit), base_dir_(std::move(base_dir)), temp_dir_(std::move(temp_dir)) {}
+        : mem_limit_(mem_limit), base_dir_(std::move(base_dir)), temp_dir_(std::move(temp_dir)) {}
 
 void
 BufferManager::Init() {
@@ -54,7 +54,7 @@ BufferManager::GetBufferHandle(const SharedPtr<String>& file_dir,
         }
     }
 
-    switch (buffer_type) {
+    switch(buffer_type) {
         case BufferType::kTempFile: {
             LOG_ERROR("Temp file meta data should be stored in buffer manager")
             NotImplementError("Not implemented here")
@@ -64,7 +64,7 @@ BufferManager::GetBufferHandle(const SharedPtr<String>& file_dir,
             LOG_TRACE("Read file, Generate Buffer Handle");
             std::unique_lock<RWMutex> w_locker(rw_locker_);
             auto iter = buffer_map_.emplace(*full_name, this);
-            iter.first->second.id_ = next_buffer_id_ ++;
+            iter.first->second.id_ = next_buffer_id_++;
             iter.first->second.base_dir_ = this->base_dir_;
             iter.first->second.temp_dir_ = this->temp_dir_;
             iter.first->second.current_dir_ = file_dir;
@@ -116,7 +116,7 @@ BufferManager::AllocateBufferHandle(const SharedPtr<String>& file_dir,
     // `buffer_handle` here is newly constructed if `full_name` is not in buffer_map, or the existing one.
     BufferHandle* buffer_handle = &iter.first->second;
     bool success = iter.second;
-    buffer_handle->id_ = next_buffer_id_ ++;
+    buffer_handle->id_ = next_buffer_id_++;
     buffer_handle->base_dir_ = this->base_dir_;
     buffer_handle->temp_dir_ = this->temp_dir_;
     buffer_handle->current_dir_ = file_dir;// TODO: need to set the current dir table /segment

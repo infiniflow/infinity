@@ -20,11 +20,16 @@ public:
     }
 
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
-    int32_t GetSizeInBytes() const;
+    int32_t
+    GetSizeInBytes() const;
+
     // Write to a char buffer
-    void WriteAdv(char* &buf) const;
+    void
+    WriteAdv(char*& buf) const;
+
     // Read from a serialized version
-    static SharedPtr<DataBlock> ReadAdv(char* &buf, int32_t maxbytes);
+    static SharedPtr<DataBlock>
+    ReadAdv(char*& buf, int32_t maxbytes);
 
 public:
 
@@ -98,7 +103,8 @@ public:
     [[nodiscard]] inline SizeT
     row_count() const {
         if(!finalized) {
-            if(row_count_ == 0) return 0;
+            if(row_count_ == 0)
+                return 0;
             StorageError("Not finalized data block")
         }
         return row_count_;
@@ -113,9 +119,9 @@ public:
 
 private:
 
-    SizeT row_count_ {0};
-    SizeT column_count_ {0};
-    SizeT capacity_ {0};
+    SizeT row_count_{0};
+    SizeT column_count_{0};
+    SizeT capacity_{0};
     bool initialized = false;
     bool finalized = false;
 };

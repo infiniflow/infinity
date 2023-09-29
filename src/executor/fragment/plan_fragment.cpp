@@ -5,7 +5,7 @@
 #include "executor/fragment/plan_fragment.h"
 #include "src/scheduler/fragment_context.h"
 
-namespace infinity{
+namespace infinity {
 
 Vector<UniquePtr<FragmentTask>>&
 PlanFragment::CreateTasks(QueryContext* query_context) {
@@ -36,15 +36,15 @@ PlanFragment::AddSinkNode(QueryContext* query_context,
 }
 
 SharedPtr<Vector<String>>
-PlanFragment::ToString(){
+PlanFragment::ToString() {
     auto result = std::make_shared<Vector<String>>();
     if(source_ != nullptr) {
         result->push_back(source_->GetName());
     }
-    for(auto& op: operators_){
+    for(auto& op: operators_) {
         result->push_back(op->GetName());
     }
-    if (sink_ != nullptr) {
+    if(sink_ != nullptr) {
         result->push_back(sink_->GetName());
     }
     return result;

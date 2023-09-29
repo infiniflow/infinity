@@ -34,8 +34,8 @@ struct IntervalType {
         value = 0;
     }
 
-    TimeUnit unit {TimeUnit::kInvalidUnit};
-    i32 value {};
+    TimeUnit unit{TimeUnit::kInvalidUnit};
+    i32 value{};
 };
 
 }

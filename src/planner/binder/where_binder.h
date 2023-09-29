@@ -14,9 +14,9 @@ class WhereBinder final : public ExpressionBinder {
 public:
     explicit
     WhereBinder(QueryContext* query_context,
-                         const SharedPtr<BindAliasProxy>& bind_alias_proxy)
-        : ExpressionBinder(query_context),
-        bind_alias_proxy_(bind_alias_proxy) {}
+                const SharedPtr<BindAliasProxy>& bind_alias_proxy)
+            : ExpressionBinder(query_context),
+              bind_alias_proxy_(bind_alias_proxy) {}
 
     // Bind expression entry
     SharedPtr<BaseExpression>
@@ -33,6 +33,7 @@ public:
 
     void
     CheckFuncType(FunctionType func_type) const override;
+
 private:
     const SharedPtr<BindAliasProxy>& bind_alias_proxy_;
 };

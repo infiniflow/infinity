@@ -11,8 +11,8 @@ namespace infinity {
 
 AggregateExpression::AggregateExpression(AggregateFunction aggregate_function,
                                          Vector<SharedPtr<BaseExpression>> arguments)
-     : BaseExpression(ExpressionType::kAggregate, std::move(arguments)),
-     aggregate_function_(std::move(aggregate_function)) {}
+        : BaseExpression(ExpressionType::kAggregate, std::move(arguments)),
+          aggregate_function_(std::move(aggregate_function)) {}
 
 bool
 AggregateExpression::IsCountStar() const {
@@ -27,7 +27,7 @@ AggregateExpression::ToString() const {
         ss << ")";
     } else {
         auto arguments_count = arguments_.size();
-        for(auto i = 0; i < arguments_count - 1; ++ i) {
+        for(auto i = 0; i < arguments_count - 1; ++i) {
             ss << arguments_[i]->Name() << ", ";
         }
         ss << arguments_.back()->Name() << ")";

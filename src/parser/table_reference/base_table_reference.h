@@ -15,7 +15,7 @@ class TableAlias {
 public:
     ~TableAlias();
 
-    char *alias_{};
+    char* alias_{};
     Vector<String>* column_alias_array_{nullptr};
 };
 

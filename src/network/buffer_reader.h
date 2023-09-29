@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include "common/utility/str.h"
 #include "common/utility/infinity_assert.h"
 #include "pg_message.h"
@@ -19,14 +20,18 @@ class BufferReader {
 public:
     explicit BufferReader(std::shared_ptr<boost::asio::ip::tcp::socket> socket) : socket_(std::move(socket)) {};
 
-    [[nodiscard]] size_t size() const;
+    [[nodiscard]] size_t
+    size() const;
 
-    [[nodiscard]] static inline size_t max_capacity() { return PG_MSG_BUFFER_SIZE - 1;}
+    [[nodiscard]] static inline size_t
+    max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }
 
-    [[nodiscard]] inline bool full() const { return size() == max_capacity(); }
+    [[nodiscard]] inline bool
+    full() const { return size() == max_capacity(); }
 
     template<typename T>
-    T read_value() {
+    T
+    read_value() {
         receive_more(sizeof(T));
         T network_value{0};
         std::copy_n(start_pos_, sizeof(T), reinterpret_cast<char*>(&network_value));
@@ -47,10 +52,15 @@ public:
         NetworkAssert(false, "Try to read invalid type of data from the buffer.");
     }
 
-    std::string read_string(const size_t string_length, NullTerminator null_terminator = NullTerminator::kYes);
-    std::string read_string();
+    std::string
+    read_string(const size_t string_length, NullTerminator null_terminator = NullTerminator::kYes);
+
+    std::string
+    read_string();
+
 private:
-    void receive_more(size_t more_bytes = 1);
+    void
+    receive_more(size_t more_bytes = 1);
 
     std::array<char, PG_MSG_BUFFER_SIZE> data_{};
     RingBufferIterator start_pos_{data_};

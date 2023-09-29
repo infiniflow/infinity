@@ -32,7 +32,7 @@
 namespace infinity {
 
 // 40 types in total now.
-enum LogicalType: i8 {
+enum LogicalType : i8 {
     // Bool * 1
     kBoolean = 0,
 

@@ -14,7 +14,9 @@
 namespace infinity {
 
 class Infinity;
+
 class BufferManager;
+
 class WalManager;
 
 class Storage {

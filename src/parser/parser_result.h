@@ -14,7 +14,7 @@ public:
     ~ParserResult();
 
     void
-    SetErrorMessage(const char *msg, SizeT error_line, SizeT error_position);
+    SetErrorMessage(const char* msg, SizeT error_line, SizeT error_position);
 
     String
     ToString();
@@ -38,7 +38,7 @@ public:
         error_position_ = 0;
     }
 
-    Vector<BaseStatement*> *statements_ptr_;
+    Vector<BaseStatement*>* statements_ptr_;
     String error_message_;
     SizeT error_line_;
     SizeT error_position_;

@@ -102,13 +102,13 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
 
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
-    
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeHugeInt(HugeIntT(i, i));
         col_source->AppendValue(v);
         Value vx = col_source->GetValue(i);
     }
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = col_source->GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
         EXPECT_EQ(vx.value_.huge_int, HugeIntT(i, i));
@@ -124,7 +124,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2tiny_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(hugeint2tiny_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 
     // cast hugeint column vector to small integer column vector
@@ -137,7 +138,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2small_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(hugeint2small_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 
     // cast big int column vector to int column vector
@@ -150,7 +152,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2int_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(hugeint2int_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 
     // cast hugeint column vector to big int column vector
@@ -163,7 +166,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2bigint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(hugeint2bigint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 
     // cast hugeint column vector to float column vector
@@ -176,7 +180,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2float_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(hugeint2float_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 
     // cast hugeint column vector to double column vector
@@ -189,7 +194,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2double_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(hugeint2double_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 
     // cast big int column vector to decimal column vector
@@ -202,7 +208,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 
     // cast hugeint column vector to Varchar vector
@@ -215,7 +222,8 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(hugeint2varchar_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(hugeint2varchar_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 
     // Throw exception when cast int to other types.

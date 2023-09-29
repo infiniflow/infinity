@@ -34,7 +34,8 @@ public:
 
     [[nodiscard]] inline String
     GetName() const {
-        if(HasAlias()) return GetAlias();
+        if(HasAlias())
+            return GetAlias();
         return ToString();
     }
 

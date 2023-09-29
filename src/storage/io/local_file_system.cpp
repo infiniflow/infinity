@@ -12,7 +12,7 @@ namespace infinity {
 LocalFileHandler::~LocalFileHandler() {
     if(fd_ != -1) {
         int ret = close(fd_);
-        if (ret != 0) {
+        if(ret != 0) {
             assert(0);
             // StorageError(fmt::format("Close file failed: {}", strerror(errno)));
         }
@@ -37,17 +37,17 @@ LocalFileSystem::OpenFile(const String& path, u8 flags, FileLockType lock_type) 
 
     if(write_flag) {
         file_flags |= O_CLOEXEC; // Close fd when fork the process
-        if (flags & FileFlags::CREATE_FLAG) {
+        if(flags & FileFlags::CREATE_FLAG) {
             file_flags |= O_CREAT;
-        } else if (flags & FileFlags::TRUNCATE_CREATE) {
+        } else if(flags & FileFlags::TRUNCATE_CREATE) {
             file_flags |= O_CREAT | O_TRUNC;
         }
 
-        if (flags & FileFlags::APPEND_FLAG) {
+        if(flags & FileFlags::APPEND_FLAG) {
             file_flags |= O_APPEND;
         }
 #if defined(__linux__)
-        if (flags & FileFlags::DIRECT_IO) {
+        if(flags & FileFlags::DIRECT_IO) {
             file_flags |= O_DIRECT | O_SYNC;
         }
 #endif
@@ -78,7 +78,7 @@ LocalFileSystem::OpenFile(const String& path, u8 flags, FileLockType lock_type) 
 
 void
 LocalFileSystem::Close(FileHandler& file_handler) {
-    auto local_file_handler = dynamic_cast<LocalFileHandler *>(&file_handler);
+    auto local_file_handler = dynamic_cast<LocalFileHandler*>(&file_handler);
     i32 fd = local_file_handler->fd_;
     // set fd to -1 so that destructor of `LocalFileHandler` will not close the file.
     local_file_handler->fd_ = -1;
@@ -110,7 +110,7 @@ LocalFileSystem::Write(FileHandler& file_handler, void* data, u64 nbytes) {
 void
 LocalFileSystem::Seek(FileHandler& file_handler, i64 pos) {
     i32 fd = ((LocalFileHandler&)file_handler).fd_;
-    if (0 != lseek(fd, pos, SEEK_SET)) {
+    if(0 != lseek(fd, pos, SEEK_SET)) {
         StorageError(fmt::format("Can't seek file: {}: {}: {}", file_handler.path_.string(), pos, strerror(errno)));
     }
 }
@@ -120,7 +120,7 @@ SizeT
 LocalFileSystem::GetFileSize(FileHandler& file_handler) {
     i32 fd = ((LocalFileHandler&)file_handler).fd_;
     struct stat s{};
-    if (fstat(fd, &s) == -1) {
+    if(fstat(fd, &s) == -1) {
         return -1;
     }
     return s.st_size;

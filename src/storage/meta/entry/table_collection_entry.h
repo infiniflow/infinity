@@ -15,8 +15,11 @@
 namespace infinity {
 
 class DBEntry;
+
 class TableCollectionMeta;
+
 class BufferManager;
+
 class Txn;
 
 struct TableCollectionEntry : public BaseEntry {
@@ -87,7 +90,7 @@ public:
 
     static inline u64
     GetNextSegmentID(TableCollectionEntry* table_entry) {
-        return table_entry->next_segment_id_ ++;
+        return table_entry->next_segment_id_++;
     }
 
     static inline u64

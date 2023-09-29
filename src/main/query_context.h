@@ -17,7 +17,9 @@
 namespace infinity {
 
 class Session;
+
 class FragmentScheduler;
+
 struct QueryResult {
     SharedPtr<Table> result_;
     LogicalNodeType root_operator_type_;
@@ -72,8 +74,8 @@ public:
     }
 
     [[nodiscard]] inline const String&
-    schema_name() const { 
-        return current_schema_; 
+    schema_name() const {
+        return current_schema_;
     }
 
     [[nodiscard]] inline u64
@@ -103,7 +105,7 @@ public:
 
     inline u64
     GetNextNodeID() {
-        return ++ current_max_node_id_;
+        return ++current_max_node_id_;
     }
 
     void

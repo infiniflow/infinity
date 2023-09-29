@@ -22,7 +22,8 @@ DecimalInfo::Make(i64 precision, i64 scale) {
 
 bool
 DecimalInfo::operator==(const TypeInfo& other) const {
-    if(other.type() != TypeInfoType::kDecimal) return false;
+    if(other.type() != TypeInfoType::kDecimal)
+        return false;
 
     auto* decimal_info_ptr = (DecimalInfo*)(&other);
 

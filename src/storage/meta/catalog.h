@@ -14,9 +14,13 @@
 namespace infinity {
 
 class Txn;
+
 class TxnManager;
+
 class FunctionSet;
+
 class TableFunction;
+
 struct NewCatalog {
 public:
     explicit
@@ -123,6 +127,7 @@ public:
     SaveAsFile(const NewCatalog* catalog_ptr,
                const String& dir,
                const String& file_name);
+
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};

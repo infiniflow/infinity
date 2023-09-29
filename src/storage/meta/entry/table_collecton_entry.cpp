@@ -17,14 +17,14 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String>& base_dir,
                                            TableCollectionMeta* table_collection_meta,
                                            u64 txn_id,
                                            TxnTimeStamp begin_ts)
-                                           : BaseEntry(EntryType::kTable),
-                                           base_dir_(base_dir),
-                                           table_collection_name_(std::move(table_collection_name)),
-                                           columns_(columns),
-                                           table_collection_type_(table_collection_type),
-                                           table_collection_meta_(table_collection_meta) {
+        : BaseEntry(EntryType::kTable),
+          base_dir_(base_dir),
+          table_collection_name_(std::move(table_collection_name)),
+          columns_(columns),
+          table_collection_type_(table_collection_type),
+          table_collection_meta_(table_collection_meta) {
     SizeT column_count = columns.size();
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         name2id_[columns[idx]->name()] = idx;
     }
 
@@ -33,11 +33,14 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String>& base_dir,
 }
 
 void
-TableCollectionEntry::Append(TableCollectionEntry* table_entry, Txn* txn_ptr, void* txn_store, BufferManager* buffer_mgr) {
+TableCollectionEntry::Append(TableCollectionEntry* table_entry,
+                             Txn* txn_ptr,
+                             void* txn_store,
+                             BufferManager* buffer_mgr) {
     TxnTableStore* txn_store_ptr = (TxnTableStore*)txn_store;
     Txn* transaction_ptr = (Txn*)txn_ptr;
     AppendState* append_state_ptr = txn_store_ptr->append_state_.get();
-    if (append_state_ptr->Finished()) {
+    if(append_state_ptr->Finished()) {
         LOG_TRACE("No append is done.");
         return;
     }
@@ -62,14 +65,16 @@ TableCollectionEntry::Append(TableCollectionEntry* table_entry, Txn* txn_ptr, vo
     while(!append_state_ptr->Finished()) {
         SizeT current_row = append_state_ptr->current_count_;
 
-        if(table_entry->unsealed_segment_->AvailableCapacity() == 0 && table_entry->unsealed_segment_->row_capacity_ > 0) {
+        if(table_entry->unsealed_segment_->AvailableCapacity() == 0 &&
+           table_entry->unsealed_segment_->row_capacity_ > 0) {
             // uncommitted_segment is full
             std::unique_lock<RWMutex> rw_locker(table_entry->rw_locker_); // prevent another read conflict with this append operation
             // Need double-check
             if(table_entry->unsealed_segment_->AvailableCapacity() == 0) {
                 SharedPtr<SegmentEntry> new_segment = SegmentEntry::MakeNewSegmentEntry(table_entry,
                                                                                         table_entry->txn_id_,
-                                                                                        TableCollectionEntry::GetNextSegmentID(table_entry),
+                                                                                        TableCollectionEntry::GetNextSegmentID(
+                                                                                                table_entry),
                                                                                         buffer_mgr);
                 table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
                 table_entry->unsealed_segment_ = new_segment.get();
@@ -125,7 +130,7 @@ TableCollectionEntry::CommitAppend(TableCollectionEntry* table_entry,
     // FIXME: now all commit will trigger flush
     for(u64 segment_id: new_segments) {
         // already flushed
-        if (table_entry->segments_[segment_id]->status_.load() == DataSegmentStatus::kClosed) {
+        if(table_entry->segments_[segment_id]->status_.load() == DataSegmentStatus::kClosed) {
             continue;
         }
 
@@ -185,7 +190,7 @@ TableCollectionEntry::GetSegmentEntries(TableCollectionEntry* table_collection_e
     std::shared_lock<RWMutex> rw_locker(table_collection_entry->rw_locker_); // prevent another read conflict with this append operation
 
     result->reserve(table_collection_entry->segments_.size() + 1);
-    for(const auto& segment_pair : table_collection_entry->segments_) {
+    for(const auto& segment_pair: table_collection_entry->segments_) {
         SegmentEntry* segment_entry = segment_pair.second.get();
         if(txn_id >= segment_entry->start_txn_id_) {
             result->emplace_back(segment_entry);
@@ -238,7 +243,9 @@ TableCollectionEntry::Serialize(const TableCollectionEntry* table_entry) {
 }
 
 UniquePtr<TableCollectionEntry>
-TableCollectionEntry::Deserialize(const nlohmann::json& table_entry_json, TableCollectionMeta* table_meta, BufferManager* buffer_mgr) {
+TableCollectionEntry::Deserialize(const nlohmann::json& table_entry_json,
+                                  TableCollectionMeta* table_meta,
+                                  BufferManager* buffer_mgr) {
     nlohmann::json json_res;
 
     SharedPtr<String> base_dir = MakeShared<String>(table_entry_json["base_dir"]);

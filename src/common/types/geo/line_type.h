@@ -21,10 +21,11 @@ struct LineType {
 
     inline bool
     operator==(const LineType& other) const {
-        if(this == &other) return true;
+        if(this == &other)
+            return true;
         return (fabs(a - other.a) < std::numeric_limits<f64>::epsilon())
-            && (fabs(b - other.b) < std::numeric_limits<f64>::epsilon())
-            && (fabs(c - other.c) < std::numeric_limits<f64>::epsilon());
+               && (fabs(b - other.b) < std::numeric_limits<f64>::epsilon())
+               && (fabs(c - other.c) < std::numeric_limits<f64>::epsilon());
     }
 
     inline bool

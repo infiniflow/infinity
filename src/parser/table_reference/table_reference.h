@@ -8,11 +8,12 @@
 
 namespace infinity {
 
-class TableReference: public BaseTableReference {
+class TableReference : public BaseTableReference {
 
 public:
 
     TableReference() : BaseTableReference(TableRefType::kTable) {}
+
     ~TableReference() override = default;
 
     String

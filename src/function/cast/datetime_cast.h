@@ -39,7 +39,7 @@ BindDateTimeCast(DataType& target) {
 struct DateTimeTryCastToFixlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target) {
+    Run(SourceType source, TargetType& target) {
         FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -48,7 +48,7 @@ struct DateTimeTryCastToFixlen {
 struct DateTimeTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector>& vector_ptr){
+    Run(SourceType source, TargetType& target, const SharedPtr<ColumnVector>& vector_ptr) {
         FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -56,25 +56,25 @@ struct DateTimeTryCastToVarlen {
 
 template<>
 inline bool
-DateTimeTryCastToFixlen::Run(DateTimeT source, DateT &target) {
+DateTimeTryCastToFixlen::Run(DateTimeT source, DateT& target) {
     NotImplementError("Not implemented");
 }
 
 template<>
 inline bool
-DateTimeTryCastToFixlen::Run(DateTimeT source, TimeT &target) {
+DateTimeTryCastToFixlen::Run(DateTimeT source, TimeT& target) {
     NotImplementError("Not implemented");
 }
 
 template<>
 inline bool
-DateTimeTryCastToFixlen::Run(DateTimeT source, TimestampT &target) {
+DateTimeTryCastToFixlen::Run(DateTimeT source, TimestampT& target) {
     NotImplementError("Not implemented");
 }
 
 template<>
 inline bool
-DateTimeTryCastToVarlen::Run(DateTimeT source, VarcharType &target, const SharedPtr<ColumnVector>& vector_ptr) {
+DateTimeTryCastToVarlen::Run(DateTimeT source, VarcharType& target, const SharedPtr<ColumnVector>& vector_ptr) {
     NotImplementError("Not implemented");
 }
 

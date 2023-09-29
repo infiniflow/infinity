@@ -10,7 +10,7 @@ namespace infinity {
 void
 TableScanFunc(QueryContext* query_context,
               TableFunctionData* table_function_data_ptr,
-              DataBlock &output) {
+              DataBlock& output) {
 
     TableScanFunctionData* table_scan_function_data_ptr
             = static_cast<TableScanFunctionData*>(table_function_data_ptr);
@@ -22,7 +22,7 @@ TableScanFunc(QueryContext* query_context,
 
     if(segments_idx >= segment_indexes->size()) {
         // No data or all data is read
-        return ;
+        return;
     }
 
     // Here we assume output is a fresh data block, we have never written anything into it.
@@ -33,10 +33,10 @@ TableScanFunc(QueryContext* query_context,
         auto write_size = std::min(write_capacity, remaining_rows);
 
         SizeT output_column_id{0};
-        for (auto column_id : column_ids) {
+        for(auto column_id: column_ids) {
             ColumnBuffer column_buffer = ColumnDataEntry::GetColumnData(current_segment_entry->columns_[column_id].get(),
-                                                                     query_context->storage()->buffer_manager());
-            output.column_vectors[output_column_id ++]->AppendWith(column_buffer, read_offset, write_size);
+                                                                        query_context->storage()->buffer_manager());
+            output.column_vectors[output_column_id++]->AppendWith(column_buffer, read_offset, write_size);
         }
 
         // write_size = already read size = already write size
@@ -45,8 +45,8 @@ TableScanFunc(QueryContext* query_context,
         read_offset += write_size;
 
         // we have read all data from current segment, move to next block
-        if (remaining_rows == 0) {
-            ++ segments_idx;
+        if(remaining_rows == 0) {
+            ++segments_idx;
             read_offset = 0;
         }
     }
@@ -54,7 +54,7 @@ TableScanFunc(QueryContext* query_context,
 }
 
 void
-RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterTableScanFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
 
     SharedPtr<TableScanFunction> table_scan_ptr = MakeShared<TableScanFunction>("table_scan", TableScanFunc);
 

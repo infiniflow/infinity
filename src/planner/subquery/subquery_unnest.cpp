@@ -23,12 +23,12 @@
 namespace infinity {
 
 void
-SubqueryUnnest::UnnestSubqueries(SharedPtr<BaseExpression> &expr_ptr,
-                                 SharedPtr<LogicalNode> &root,
+SubqueryUnnest::UnnestSubqueries(SharedPtr<BaseExpression>& expr_ptr,
+                                 SharedPtr<LogicalNode>& root,
                                  QueryContext* query_context,
                                  const SharedPtr<BindContext>& bind_context) {
     // 2. Call Unnest Subquery to resolve subquery
-    if (expr_ptr->type() == ExpressionType::kSubQuery) {
+    if(expr_ptr->type() == ExpressionType::kSubQuery) {
         // Subquery, need to be unnested.
         UnnestSubquery(expr_ptr, root, query_context, bind_context);
     }
@@ -116,11 +116,11 @@ SubqueryUnnest::UnnestUncorrelated(SubqueryExpression* expr_ptr,
             root = cross_product_node;
             // Step4 Return the first column of the cross product as the result
             SharedPtr<ColumnExpression> result = ColumnExpression::Make(expr_ptr->Type(),
-                                                                          "",
-                                                                          aggregate_index,
-                                                                          first_function_expr->Name(),
-                                                                          0,
-                                                                          0);
+                                                                        "",
+                                                                        aggregate_index,
+                                                                        first_function_expr->Name(),
+                                                                        0,
+                                                                        0);
 
 
             return result;
@@ -214,7 +214,7 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
                                  QueryContext* query_context,
                                  const SharedPtr<BindContext>& bind_context) {
 
-    auto &correlated_columns = bind_context->correlated_column_exprs_;
+    auto& correlated_columns = bind_context->correlated_column_exprs_;
 
 
     PlannerAssert(!correlated_columns.empty(), "No correlated column");
@@ -222,7 +222,7 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
     // Valid the correlated columns are from one table.
     SizeT column_count = correlated_columns.size();
     SizeT table_index = correlated_columns[0]->binding().table_idx;
-    for(SizeT idx = 1; idx < column_count; ++ idx) {
+    for(SizeT idx = 1; idx < column_count; ++idx) {
         if(table_index != correlated_columns[idx]->binding().table_idx) {
             PlannerError("Correlated columns can be only from one table, now.")
         }
@@ -303,11 +303,11 @@ SubqueryUnnest::UnnestCorrelated(SubqueryExpression* expr_ptr,
             // Generate result expression
             SharedPtr<Vector<String>> right_names = dependent_join->GetOutputNames();
             SharedPtr<ColumnExpression> mark_column = ColumnExpression::Make(expr_ptr->Type(),
-                                                                        alias,
-                                                                        logical_join->mark_index_,
-                                                                        right_names->at(0),
-                                                                        0,
-                                                                        0);
+                                                                             alias,
+                                                                             logical_join->mark_index_,
+                                                                             right_names->at(0),
+                                                                             0,
+                                                                             0);
 
             // Add NOT function on the mark column
             NewCatalog* catalog = query_context->storage()->catalog();
@@ -448,10 +448,10 @@ SubqueryUnnest::GenerateJoinConditions(QueryContext* query_context,
     NewCatalog* catalog = query_context->storage()->catalog();
     SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "=");
     SizeT column_count = correlated_columns.size();
-    for (SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         auto& left_column_expr = correlated_columns[idx];
         SizeT correlated_column_index = correlated_base_index + idx;
-        if (correlated_column_index >= subplan_column_bindings.size()) {
+        if(correlated_column_index >= subplan_column_bindings.size()) {
             PlannerError(fmt::format("Column index is out of range.{}/{}",
                                      correlated_column_index, subplan_column_bindings.size()))
         }

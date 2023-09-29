@@ -10,7 +10,7 @@ namespace infinity {
 void
 Infinity::Init(const SharedPtr<String>& config_path) {
     if(initialized_) {
-        return ;
+        return;
     } else {
         // Config
         config_ = MakeUnique<Config>();

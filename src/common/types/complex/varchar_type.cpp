@@ -22,7 +22,8 @@ VarcharType::VarcharType(const char* ptr, size_t len) {
 
 VarcharType::~VarcharType() {
 //    LOG_TRACE("Destructor");
-    if(length == 0) return ;
+    if(length == 0)
+        return;
     Reset();
 }
 
@@ -49,7 +50,8 @@ VarcharType::VarcharType(VarcharType&& other) noexcept {
 VarcharType&
 VarcharType::operator=(const VarcharType& other) {
 //    LOG_TRACE("Copy assignment");
-    if(this == &other) return *this;
+    if(this == &other)
+        return *this;
 
     DeepCopy(other);
     return *this;
@@ -77,7 +79,8 @@ VarcharType::operator=(VarcharType&& other) noexcept {
 
 bool
 VarcharType::operator==(const VarcharType& other) const {
-    if(this->length != other.length) return false;
+    if(this->length != other.length)
+        return false;
     if(this->IsInlined()) {
         return strncmp(this->prefix, other.prefix, this->length) == 0;
     } else {
@@ -190,7 +193,7 @@ VarcharType::operator<(const VarcharType& other) const {
                 int res = strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH);
                 if(res > 0) {
                     return true;
-                } else if (res < 0) {
+                } else if(res < 0) {
                     return false;
                 }
 
@@ -199,7 +202,7 @@ VarcharType::operator<(const VarcharType& other) const {
                 int res = strncmp(this->prefix, other.prefix, VarcharType::PREFIX_LENGTH);
                 if(res > 0) {
                     return true;
-                } else if (res < 0) {
+                } else if(res < 0) {
                     return false;
                 }
                 return strncmp(this->ptr, other.ptr, len) > 0;
@@ -216,9 +219,8 @@ VarcharType::operator>=(const VarcharType& other) const {
 }
 
 
-
 void
-VarcharType::DeepCopy(const VarcharType &other) {
+VarcharType::DeepCopy(const VarcharType& other) {
     // Used in copy constructor and copy assignment
     if(this->length > 0) {
         Reset();
@@ -285,7 +287,7 @@ VarcharType::Reset(bool clean_memory) {
     if(!clean_memory) {
         length = 0;
         ptr = nullptr;
-        return ;
+        return;
     }
 
     if(IsInlined()) {
@@ -294,7 +296,7 @@ VarcharType::Reset(bool clean_memory) {
     } else {
         if(length == 0) {
             ptr = nullptr;
-            return ;
+            return;
         }
 
 //        LOG_TRACE("Reset: free memory: {}, {}", (void*)ptr, length);

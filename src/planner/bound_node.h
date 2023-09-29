@@ -21,7 +21,7 @@ public:
     virtual
     ~BoundNode() = default;
 
-    virtual SharedPtr<LogicalNode>
+    virtual SharedPtr <LogicalNode>
     BuildPlan() = 0;
 
     std::vector<String> names;

@@ -9,11 +9,12 @@ namespace infinity {
 
 class SelectStatement;
 
-class SubqueryReference: public BaseTableReference {
+class SubqueryReference : public BaseTableReference {
 
 public:
 
     SubqueryReference() : BaseTableReference(TableRefType::kSubquery) {}
+
     ~SubqueryReference() override;
 
     String

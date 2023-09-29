@@ -7,7 +7,7 @@
 
 namespace infinity {
 
-String 
+String
 LogicalInsert::ToString(i64& space) {
     std::stringstream ss;
     String arrow_str;

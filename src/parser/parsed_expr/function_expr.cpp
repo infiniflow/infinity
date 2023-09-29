@@ -8,7 +8,7 @@ namespace infinity {
 
 FunctionExpr::~FunctionExpr() {
     if(arguments_ != nullptr) {
-        for (auto& expr_ptr: *arguments_) {
+        for(auto& expr_ptr: *arguments_) {
             delete expr_ptr;
         }
         delete arguments_;
@@ -33,7 +33,7 @@ FunctionExpr::ToString() const {
 
     ss << func_name_ << '(';
     if(arguments_ != nullptr) {
-        for (ParsedExpr *expr_ptr: *arguments_) {
+        for(ParsedExpr* expr_ptr: *arguments_) {
             ss << expr_ptr->ToString();
         }
     }

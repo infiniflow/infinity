@@ -9,7 +9,8 @@
 namespace infinity {
 
 ParserResult::~ParserResult() {
-    if(statements_ptr_ == nullptr) return ;
+    if(statements_ptr_ == nullptr)
+        return;
     for(auto& statement: *statements_ptr_) {
         delete statement;
     }
@@ -18,7 +19,7 @@ ParserResult::~ParserResult() {
 
 
 void
-ParserResult::SetErrorMessage(const char *msg, SizeT error_line, SizeT error_position) {
+ParserResult::SetErrorMessage(const char* msg, SizeT error_line, SizeT error_position) {
     this->error_message_ = String(msg);
     this->error_line_ = error_line;
     this->error_position_ = error_position;
@@ -27,9 +28,9 @@ ParserResult::SetErrorMessage(const char *msg, SizeT error_line, SizeT error_pos
 String
 ParserResult::ToString() {
     std::stringstream ss;
-    if (error_message_.empty()) {
+    if(error_message_.empty()) {
         // Success
-        for (const auto &statement: *statements_ptr_) {
+        for(const auto& statement: *statements_ptr_) {
             ss << statement->ToString() << std::endl;
         }
         return ss.str();

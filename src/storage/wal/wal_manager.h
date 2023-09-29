@@ -18,45 +18,55 @@ namespace infinity {
 class Storage;
 
 class SeqGenerator {
-  public:
+public:
     // Begin with 1 to avoid distinguish uninitialized value and the minimal
     // valid value.
     SeqGenerator(int64_t begin = 1) : next_seq_(begin) {}
-    int64_t Generate() { return next_seq_.fetch_add(1); }
-    int64_t GetLast() { return next_seq_.load() - 1; }
+    int64_t
+    Generate() { return next_seq_.fetch_add(1); }
+    int64_t
+    GetLast() { return next_seq_.load() - 1; }
 
-  private:
+private:
     std::atomic<int64_t> next_seq_;
 };
 
 class WalManager {
-  public:
-    WalManager(Storage* storage, const std::string &wal_path);
+public:
+    WalManager(Storage* storage, const std::string& wal_path);
+
     ~WalManager();
 
-    void Start();
+    void
+    Start();
 
-    void Stop();
+    void
+    Stop();
 
     // Session request to persist an entry. Assuming txn_id of the entry has
     // been initialized.
-    int PutEntry(std::shared_ptr<WalEntry> entry);
+    int
+    PutEntry(std::shared_ptr<WalEntry> entry);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
     // ~10s. So it's necessary to sync for a batch of transactions, and to
     // checkpoint for a batch of sync.
-    void Flush();
+    void
+    Flush();
 
     // Checkpoint is scheduled regularly.
     // Checkpoint for transactions which's lsn no larger than lsn_pend_chk_.
-    void Checkpoint();
+    void
+    Checkpoint();
 
-    void SwapWALFile(int64_t max_commit_ts);
+    void
+    SwapWALFile(int64_t max_commit_ts);
 
-    int64_t ReplayWALFile();
+    int64_t
+    ReplayWALFile();
 
-  private:
+private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
     // and do serial writing.
     String wal_path_;
@@ -73,7 +83,7 @@ class WalManager {
     int64_t lsn_done_chk_{};
     int64_t checkpoint_ts_{};
 
-    Storage *storage_;
+    Storage* storage_;
 
     Vector<String> wal_list_;
 };

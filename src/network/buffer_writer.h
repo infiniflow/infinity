@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include <array>
 #include "pg_message.h"
 #include "common/utility/infinity_assert.h"
@@ -24,13 +25,14 @@ public:
         return PG_MSG_BUFFER_SIZE - 1;
     }
 
-    inline bool 
-    full() const { 
-        return size() == max_capacity(); 
+    inline bool
+    full() const {
+        return size() == max_capacity();
     }
 
     template<typename T>
-    void send_value(T host_value) {
+    void
+    send_value(T host_value) {
         try_flush(sizeof(T));
 
         T network_value;
@@ -47,14 +49,16 @@ public:
         std::advance(current_pos_, sizeof(T));
     }
 
-    void 
+    void
     send_string(const String& value, NullTerminator null_terminator = NullTerminator::kYes);
 
     // 0 means flush whole buffer.
-    void flush(size_t bytes = 0);
+    void
+    flush(size_t bytes = 0);
 
 private:
-    void try_flush(size_t bytes);
+    void
+    try_flush(size_t bytes);
 
     std::array<char, PG_MSG_BUFFER_SIZE> data_{};
     RingBufferIterator start_pos_{data_};

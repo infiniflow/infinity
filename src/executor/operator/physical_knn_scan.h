@@ -11,7 +11,9 @@
 namespace infinity {
 
 class BaseTableRef;
+
 class BaseExpression;
+
 class PhysicalKnnScan final : public PhysicalOperator {
 public:
     explicit
@@ -25,15 +27,14 @@ public:
                     SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                     u64 knn_table_index)
             : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id),
-            base_table_ref_(std::move(base_table_ref)),
-            knn_expressions_(std::move(knn_expressions)),
-            limit_expression_(std::move(limit_expression)),
-            filter_expression_(std::move(filter_expression)),
-            order_by_type_(order_by_type),
-            output_names_(std::move(output_names)),
-            output_types_(std::move(output_types)),
-            knn_table_index_(knn_table_index)
-            {}
+              base_table_ref_(std::move(base_table_ref)),
+              knn_expressions_(std::move(knn_expressions)),
+              limit_expression_(std::move(limit_expression)),
+              filter_expression_(std::move(filter_expression)),
+              order_by_type_(order_by_type),
+              output_names_(std::move(output_names)),
+              output_types_(std::move(output_types)),
+              knn_table_index_(knn_table_index) {}
 
     ~PhysicalKnnScan() override = default;
 

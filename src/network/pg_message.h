@@ -14,7 +14,7 @@ static constexpr char NULL_END = '\0';
 
 enum class NullTerminator : bool {
     kYes = true,
-    kNo  = false,
+    kNo = false,
 };
 
 // From https://www.postgresql.org/docs/14/protocol-message-formats.html

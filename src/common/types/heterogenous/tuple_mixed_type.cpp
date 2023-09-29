@@ -13,7 +13,7 @@ TupleMixedType::Reset(bool in_constructor) {
     if(in_constructor) {
         ptr = nullptr;
         count = 0;
-        return ;
+        return;
     }
 
     if(ptr != nullptr) {

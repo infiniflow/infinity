@@ -19,15 +19,15 @@ TEST(TestMPSCQueue, EnqueueDequeue) {
 TEST(TestMPSCQueue, EnqueueDequeueMultithreaded) {
     MPSCQueue<int> q;
     std::vector<std::thread> threads;
-    for (int t = 0; t < 5; t++) {
+    for(int t = 0; t < 5; t++) {
         threads.emplace_back(
-        [t, &q]() {
-            int start = t * 10000;
-            int end = start + 10000;
-            for (int i = start; i < end; i++) {
-                q.enqueue(i);
-            }
-        });
+                [t, &q]() {
+                    int start = t * 10000;
+                    int end = start + 10000;
+                    for(int i = start; i < end; i++) {
+                        q.enqueue(i);
+                    }
+                });
     }
 
     std::for_each(threads.begin(), threads.end(), [](std::thread& t) {
@@ -37,13 +37,13 @@ TEST(TestMPSCQueue, EnqueueDequeueMultithreaded) {
     std::set<int> elements;
 
     int s;
-    while (q.dequeue(s)) {
+    while(q.dequeue(s)) {
         elements.insert(s);
     }
 
     ASSERT_EQ(50000UL, elements.size());
 
-    for (int i = 0; i < 50000; i++) {
+    for(int i = 0; i < 50000; i++) {
         ASSERT_NE(elements.end(), elements.find(i));
     }
 }

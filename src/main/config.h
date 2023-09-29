@@ -23,7 +23,7 @@ struct Options {
     // General
     String version{};
     String time_zone{};
-    i32    time_zone_bias{};
+    i32 time_zone_bias{};
 
     // System
     u64 total_cpu_number{};

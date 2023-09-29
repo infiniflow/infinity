@@ -34,7 +34,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
     BitmapType bt1;
     bt1.Initialize(100);
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             bt1.SetBit(i, true);
         } else {
@@ -45,7 +45,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
     EXPECT_THROW(bt1.GetBit(100), TypeException);
     EXPECT_THROW(bt1.SetBit(100, false), TypeException);
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt1.GetBit(i), true);
         } else {
@@ -57,7 +57,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
     BitmapType bt2(100);
     bt2 = bt1;
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt2.GetBit(i), true);
         } else {
@@ -71,7 +71,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
     // copy assignment2
     BitmapType bt3(50);
 
-    for(u64 i = 0; i < 50; ++ i) {
+    for(u64 i = 0; i < 50; ++i) {
         if(i % 2 == 0) {
             bt3.SetBit(i, true);
         } else {
@@ -79,7 +79,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
         }
     }
 
-    for(u64 i = 0; i < 50; ++ i) {
+    for(u64 i = 0; i < 50; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt3.GetBit(i), true);
         } else {
@@ -92,7 +92,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
 
     bt3 = bt1;
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt3.GetBit(i), true);
         } else {
@@ -102,7 +102,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
 
     BitmapType bt4 = std::move(bt3);
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt4.GetBit(i), true);
         } else {
@@ -116,7 +116,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
     // move assignment
     BitmapType bt5(50);
 
-    for(u64 i = 0; i < 50; ++ i) {
+    for(u64 i = 0; i < 50; ++i) {
         if(i % 2 == 0) {
             bt5.SetBit(i, true);
         } else {
@@ -124,7 +124,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
         }
     }
 
-    for(u64 i = 0; i < 50; ++ i) {
+    for(u64 i = 0; i < 50; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt5.GetBit(i), true);
         } else {
@@ -137,7 +137,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
 
     bt5 = std::move(bt2);
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt5.GetBit(i), true);
         } else {
@@ -153,7 +153,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
     GlobalResourceUsage::IncrRawMemCount();
 
     BitmapType bt6(ptr, 100);
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             bt6.SetBit(i, true);
         } else {
@@ -161,7 +161,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
         }
     }
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt6.GetBit(i), true);
         } else {
@@ -182,7 +182,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
     BitmapType bt1;
     bt1.Initialize(100);
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             bt1.SetBit(i, true);
         } else {
@@ -193,7 +193,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
     EXPECT_THROW(bt1.GetBit(100), TypeException);
     EXPECT_THROW(bt1.SetBit(100, false), TypeException);
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt1.GetBit(i), true);
         } else {
@@ -205,7 +205,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
     BitmapType bt2(100);
     bt2 = bt1;
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt2.GetBit(i), true);
         } else {
@@ -219,7 +219,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
     // copy assignment2
     BitmapType bt3(50);
 
-    for(u64 i = 0; i < 50; ++ i) {
+    for(u64 i = 0; i < 50; ++i) {
         if(i % 2 == 0) {
             bt3.SetBit(i, true);
         } else {
@@ -227,7 +227,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
         }
     }
 
-    for(u64 i = 0; i < 50; ++ i) {
+    for(u64 i = 0; i < 50; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt3.GetBit(i), true);
         } else {
@@ -240,7 +240,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
 
     bt3 = bt1;
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt3.GetBit(i), true);
         } else {
@@ -250,7 +250,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
 
     BitmapType bt4 = std::move(bt3);
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt4.GetBit(i), true);
         } else {
@@ -264,7 +264,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
     // move assignment
     BitmapType bt5(50);
 
-    for(u64 i = 0; i < 50; ++ i) {
+    for(u64 i = 0; i < 50; ++i) {
         if(i % 2 == 0) {
             bt5.SetBit(i, true);
         } else {
@@ -272,7 +272,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
         }
     }
 
-    for(u64 i = 0; i < 50; ++ i) {
+    for(u64 i = 0; i < 50; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt5.GetBit(i), true);
         } else {
@@ -285,7 +285,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
 
     bt5 = std::move(bt2);
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt5.GetBit(i), true);
         } else {
@@ -301,7 +301,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
     GlobalResourceUsage::IncrRawMemCount();
 
     BitmapType bt6(ptr, 100);
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             bt6.SetBit(i, true);
         } else {
@@ -309,7 +309,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
         }
     }
 
-    for(u64 i = 0; i < 100; ++ i) {
+    for(u64 i = 0; i < 100; ++i) {
         if(i % 2 == 0) {
             EXPECT_EQ(bt6.GetBit(i), true);
         } else {

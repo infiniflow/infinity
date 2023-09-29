@@ -3,47 +3,62 @@
 #include "storage/indexstore/index_defines.h"
 #include "storage/io/byte_slice_reader.h"
 
-namespace infinity{
-class PosSkipListReader{
+namespace infinity {
+class PosSkipListReader {
 public:
     PosSkipListReader();
+
     PosSkipListReader(const PosSkipListReader& other) noexcept;
+
     ~PosSkipListReader();
+
 public:
-    void Load(const ByteSliceList* byte_slice_list, uint32_t start, uint32_t end, const uint32_t& item_count);
+    void
+    Load(const ByteSliceList* byte_slice_list, uint32_t start, uint32_t end, const uint32_t& item_count);
 
-    void Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count);
+    void
+    Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count);
 
-    bool SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_key, uint32_t& value, uint32_t& delta);
+    bool
+    SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_key, uint32_t& value, uint32_t& delta);
 
-    bool SkipTo(uint32_t query_key, uint32_t& key, uint32_t& value, uint32_t& delta) {
+    bool
+    SkipTo(uint32_t query_key, uint32_t& key, uint32_t& value, uint32_t& delta) {
         return SkipTo(query_key, key, prev_key_, value, delta);
     }
 
-    uint32_t GetStart() const {
+    uint32_t
+    GetStart() const {
         return start_;
     }
 
-    uint32_t GetEnd() const {
+    uint32_t
+    GetEnd() const {
         return end_;
     }
 
-    uint32_t GetSkippedItemCount() const {
+    uint32_t
+    GetSkippedItemCount() const {
         return skipped_item_count_;
     }
 
-    uint32_t GetPrevKey() const { 
-        return prev_key_; 
+    uint32_t
+    GetPrevKey() const {
+        return prev_key_;
     }
 
-    uint32_t GetCurrentKey() const { 
-        return current_key_; 
+    uint32_t
+    GetCurrentKey() const {
+        return current_key_;
     }
 
 private:
-    void Load_(uint32_t start, uint32_t end, const uint32_t& item_count);
+    void
+    Load_(uint32_t start, uint32_t end, const uint32_t& item_count);
 
-    std::pair<int, bool> LoadBuffer();
+    std::pair<int, bool>
+    LoadBuffer();
+
 private:
     uint32_t start_;
     uint32_t end_;

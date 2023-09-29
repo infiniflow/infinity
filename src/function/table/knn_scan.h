@@ -11,7 +11,7 @@
 namespace infinity {
 
 void
-RegisterKnnScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterKnnScanFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
 class KnnScanFunction : public TableFunction {
 public:
@@ -25,8 +25,7 @@ public:
 public:
     explicit
     KnnScanFunction(String name, TableFunctionType function)
-            : TableFunction(std::move(name), {}, std::move(function))
-    {}
+            : TableFunction(std::move(name), {}, std::move(function)) {}
 
 private:
 };
@@ -34,6 +33,6 @@ private:
 static void
 KnnScanFunc(QueryContext* query_context,
             TableFunctionData* knn_function_data_ptr,
-            DataBlock &output);
+            DataBlock& output);
 
 }

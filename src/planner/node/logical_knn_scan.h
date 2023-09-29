@@ -11,12 +11,14 @@
 namespace infinity {
 
 class KnnExpression;
+
 class BaseTableRef;
+
 class LogicalKnnScan : public LogicalNode {
 public:
     explicit
     LogicalKnnScan(u64 node_id,
-                  SharedPtr<BaseTableRef> base_table_ref);
+                   SharedPtr<BaseTableRef> base_table_ref);
 
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final;

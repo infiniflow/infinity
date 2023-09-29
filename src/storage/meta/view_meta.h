@@ -14,8 +14,11 @@
 namespace infinity {
 
 class TxnManager;
+
 class DBEntry;
+
 class BufferManager;
+
 struct ViewMeta {
 public:
     explicit

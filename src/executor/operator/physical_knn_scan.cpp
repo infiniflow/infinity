@@ -60,11 +60,11 @@ Vector<SharedPtr<Vector<u64>>>
 PhysicalKnnScan::PlanSegmentEntries(i64 parallel_count) const {
     SizeT segment_count = base_table_ref_->segment_entries_->size();
     Vector<SharedPtr<Vector<u64>>> result(parallel_count, nullptr);
-    for(SizeT task_id = 0; task_id < parallel_count; ++ task_id) {
+    for(SizeT task_id = 0; task_id < parallel_count; ++task_id) {
         result[task_id] = MakeShared<Vector<u64>>();
     }
 
-    for(SizeT idx = 0; idx < segment_count; ++ idx) {
+    for(SizeT idx = 0; idx < segment_count; ++idx) {
         u64 task_id = idx % parallel_count;
         result[task_id]->emplace_back(idx);
     }

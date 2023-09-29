@@ -39,7 +39,7 @@ TEST_F(BlobCastTest, blob_cast0) {
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -53,7 +53,7 @@ TEST_F(BlobCastTest, blob_cast0) {
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -83,12 +83,12 @@ TEST_F(BlobCastTest, blob_cast1) {
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kBlob);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -97,12 +97,12 @@ TEST_F(BlobCastTest, blob_cast1) {
         Value v = Value::MakeBlob(b1);
         col_source->AppendValue(v);
     }
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -124,12 +124,12 @@ TEST_F(BlobCastTest, blob_cast1) {
         CastParameters cast_parameters;
         EXPECT_TRUE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters));
 
-        for(i64 i = 99; i < 100; ++ i) {
+        for(i64 i = 99; i < 100; ++i) {
             i64 blob_len = i + 1;
             auto check_value = String();
             check_value.resize(blob_len);
 
-            for(i64 j = 0; j < blob_len; ++ j) {
+            for(i64 j = 0; j < blob_len; ++j) {
                 check_value[j] = 'a' + static_cast<char_t>(j);
             }
             check_value[blob_len - 1] = 0;

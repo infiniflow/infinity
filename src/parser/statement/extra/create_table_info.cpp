@@ -58,7 +58,7 @@ TableConstraint::ToString() const {
     ss << ConstrainTypeToString(constraint_) << "(";
     SizeT name_count = names_ptr_->size();
     if(name_count > 0) {
-        for(SizeT idx = 0; idx < name_count - 1; ++ idx) {
+        for(SizeT idx = 0; idx < name_count - 1; ++idx) {
             ss << names_ptr_->at(idx) << ", ";
         }
         ss << names_ptr_->back();

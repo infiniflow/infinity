@@ -21,7 +21,7 @@ class LogicalNode {
 public:
     explicit
     LogicalNode(u64 node_id, LogicalNodeType node_type)
-        : node_id_(node_id), operator_type_(node_type) {}
+            : node_id_(node_id), operator_type_(node_type) {}
 
     virtual
     ~LogicalNode() = default;
@@ -70,7 +70,8 @@ public:
         return node_id_;
     }
 
-    void set_node_id(u64 node_id) {
+    void
+    set_node_id(u64 node_id) {
         node_id_ = node_id;
     }
 

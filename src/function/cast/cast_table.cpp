@@ -7,8 +7,8 @@
 namespace infinity {
 
 CastTable::CastTable() {
-    for(i8 i = LogicalType::kBoolean; i < LogicalType::kInvalid; ++ i) {
-        for(i8 j = LogicalType::kBoolean; j < LogicalType::kInvalid; ++ j) {
+    for(i8 i = LogicalType::kBoolean; i < LogicalType::kInvalid; ++i) {
+        for(i8 j = LogicalType::kBoolean; j < LogicalType::kInvalid; ++j) {
             matrix_[i][j] = -1;
         }
     }

@@ -11,15 +11,15 @@ namespace infinity {
 struct PlusFunction {
     template<typename TA, typename TB>
     static inline bool
-    Run(TA value, TB &result) {
+    Run(TA value, TB& result) {
         NotImplementError("Not implemented plus function")
     }
 };
 
 template<>
 inline bool
-PlusFunction::Run(MixedT value, MixedT &result) {
-    if (value.type == MixedValueType::kInteger || value.type == MixedValueType::kFloat) {
+PlusFunction::Run(MixedT value, MixedT& result) {
+    if(value.type == MixedValueType::kInteger || value.type == MixedValueType::kFloat) {
         result = value;
         return true;
     } else {
@@ -29,7 +29,7 @@ PlusFunction::Run(MixedT value, MixedT &result) {
 }
 
 void
-RegisterPlusFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterPlusFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "+";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);

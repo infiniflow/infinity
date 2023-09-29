@@ -15,6 +15,7 @@ class FragmentScheduler {
 public:
     explicit
     FragmentScheduler(const Config* config_ptr);
+
     ~FragmentScheduler();
 
     void
@@ -47,7 +48,7 @@ private:
 
 private:
 
-    bool initialized_ {false};
+    bool initialized_{false};
 
     HashSet<i64> cpu_set_{};
     Vector<i64> cpu_array_{};

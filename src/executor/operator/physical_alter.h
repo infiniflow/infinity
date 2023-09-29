@@ -14,9 +14,9 @@ public:
     PhysicalAlter(SharedPtr<Vector<String>> output_names,
                   SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                   u64 id)
-                  : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id),
-                    output_names_(std::move(output_names)),
-                    output_types_(std::move(output_types)) {
+            : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id),
+              output_names_(std::move(output_names)),
+              output_types_(std::move(output_types)) {
     }
 
     ~PhysicalAlter() override = default;

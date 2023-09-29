@@ -17,7 +17,9 @@ enum class TaskState {
 namespace infinity {
 
 class Table;
+
 class QueryContext;
+
 class Pipeline : public std::enable_shared_from_this<Pipeline> {
 public:
     explicit
@@ -60,7 +62,7 @@ public:
     state() const {
         return state_;
     }
-    
+
     u64
     Id() const {
         return id_;

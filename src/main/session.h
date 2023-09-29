@@ -15,7 +15,7 @@ namespace infinity {
 class Session {
 public:
     explicit
-    Session(): current_database_("default") {}
+    Session() : current_database_("default") {}
 
     [[nodiscard]] inline String&
     current_database() {

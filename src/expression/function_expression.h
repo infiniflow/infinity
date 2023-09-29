@@ -9,7 +9,7 @@
 
 namespace infinity {
 
-class FunctionExpression: public BaseExpression {
+class FunctionExpression : public BaseExpression {
 public:
     FunctionExpression(ScalarFunction function,
                        Vector<SharedPtr<BaseExpression>> arguments);
@@ -21,6 +21,7 @@ public:
 
     String
     ToString() const override;
+
 public:
     ScalarFunction func_;
 };

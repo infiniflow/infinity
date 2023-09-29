@@ -34,15 +34,15 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kCreate);
-            auto *create_statement = (CreateStatement *) (statement);
+            auto* create_statement = (CreateStatement*)(statement);
             EXPECT_EQ(create_statement->create_info_->type_, DDLType::kTable);
             CreateTableInfo* table_info = (CreateTableInfo*)create_statement->create_info_.get();
             EXPECT_EQ(table_info->table_name_, "t1");
             EXPECT_EQ(table_info->schema_name_, "default");
-            auto *select = (SelectStatement*)(table_info->select_);
+            auto* select = (SelectStatement*)(table_info->select_);
             {
-                ColumnExpr* col0 = (ColumnExpr* )(*select->select_list_)[0];
-                ColumnExpr* col1 = (ColumnExpr* )(*select->select_list_)[1];
+                ColumnExpr* col0 = (ColumnExpr*)(*select->select_list_)[0];
+                ColumnExpr* col1 = (ColumnExpr*)(*select->select_list_)[1];
                 EXPECT_EQ(col0->names_[0], "a");
                 EXPECT_EQ(col1->names_[0], "b");
 
@@ -64,7 +64,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kUpdate);
-            auto *update_statement = (UpdateStatement *) (statement);
+            auto* update_statement = (UpdateStatement*)(statement);
             EXPECT_EQ(update_statement->table_name_, "t1");
             EXPECT_EQ(update_statement->schema_name_, "default");
             FunctionExpr* where_func = (FunctionExpr*)(update_statement->where_expr_);
@@ -94,7 +94,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kInsert);
-            auto *insert_statement = (InsertStatement *) (statement);
+            auto* insert_statement = (InsertStatement*)(statement);
             EXPECT_EQ(insert_statement->table_name_, "t1");
             EXPECT_EQ(insert_statement->schema_name_, "default");
 
@@ -116,7 +116,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kCreate);
-            auto *create_statement = (CreateStatement *) (statement);
+            auto* create_statement = (CreateStatement*)(statement);
             EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
             CreateIndexInfo* index_info = (CreateIndexInfo*)create_statement->create_info_.get();
             EXPECT_EQ(index_info->schema_name_, "default");
@@ -138,7 +138,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kDrop);
-            auto *drop_statement = (DropStatement *) (statement);
+            auto* drop_statement = (DropStatement*)(statement);
             EXPECT_EQ(drop_statement->drop_info_->type_, DDLType::kIndex);
             DropIndexInfo* drop_info = (DropIndexInfo*)drop_statement->drop_info_.get();
             EXPECT_EQ(drop_info->index_name_, "index1");
@@ -157,7 +157,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kDrop);
-            auto *drop_statement = (DropStatement *) (statement);
+            auto* drop_statement = (DropStatement*)(statement);
             EXPECT_EQ(drop_statement->drop_info_->type_, DDLType::kTable);
             DropTableInfo* drop_info = (DropTableInfo*)drop_statement->drop_info_.get();
             EXPECT_EQ(drop_info->table_name_, "t1");
@@ -177,7 +177,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kShow);
-            auto *show_statement = (ShowStatement *) (statement);
+            auto* show_statement = (ShowStatement*)(statement);
             EXPECT_EQ(show_statement->show_type_, ShowStmtType::kTables);
             EXPECT_EQ(show_statement->table_name_, "");
             EXPECT_EQ(show_statement->schema_name_, "default");
@@ -195,7 +195,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kShow);
-            auto *show_statement = (ShowStatement *) (statement);
+            auto* show_statement = (ShowStatement*)(statement);
             EXPECT_EQ(show_statement->show_type_, ShowStmtType::kColumns);
             EXPECT_EQ(show_statement->table_name_, "t1");
             EXPECT_EQ(show_statement->schema_name_, "default");
@@ -213,7 +213,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kCopy);
-            auto *copy_statement = (CopyStatement *) (statement);
+            auto* copy_statement = (CopyStatement*)(statement);
             EXPECT_EQ(copy_statement->copy_file_type_, CopyFileType::kCSV);
             EXPECT_EQ(copy_statement->copy_from_, false);
             EXPECT_EQ(copy_statement->schema_name_, "default");
@@ -235,7 +235,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kCopy);
-            auto *copy_statement = (CopyStatement *) (statement);
+            auto* copy_statement = (CopyStatement*)(statement);
             EXPECT_EQ(copy_statement->copy_file_type_, CopyFileType::kJSON);
             EXPECT_EQ(copy_statement->copy_from_, false);
             EXPECT_EQ(copy_statement->schema_name_, "default");
@@ -258,7 +258,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kCopy);
-            auto *copy_statement = (CopyStatement *) (statement);
+            auto* copy_statement = (CopyStatement*)(statement);
             EXPECT_EQ(copy_statement->copy_file_type_, CopyFileType::kCSV);
             EXPECT_EQ(copy_statement->copy_from_, true);
             EXPECT_EQ(copy_statement->schema_name_, "default");
@@ -279,7 +279,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kCopy);
-            auto *copy_statement = (CopyStatement *) (statement);
+            auto* copy_statement = (CopyStatement*)(statement);
             EXPECT_EQ(copy_statement->copy_file_type_, CopyFileType::kJSON);
             EXPECT_EQ(copy_statement->copy_from_, true);
             EXPECT_EQ(copy_statement->schema_name_, "default");
@@ -300,7 +300,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kSelect);
-            auto *select_statement = (SelectStatement *) (statement);
+            auto* select_statement = (SelectStatement*)(statement);
             EXPECT_EQ(select_statement->set_op_, SetOperatorType::kExcept);
             TableReference* t1 = (TableReference*)select_statement->table_ref_;
             EXPECT_EQ(t1->table_name_, "t1");
@@ -322,7 +322,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
         for(auto& statement: *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kSelect);
-            auto *select_statement = (SelectStatement *) (statement);
+            auto* select_statement = (SelectStatement*)(statement);
             EXPECT_EQ(select_statement->set_op_, SetOperatorType::kIntersect);
             TableReference* t1 = (TableReference*)select_statement->table_ref_;
             EXPECT_EQ(t1->table_name_, "t1");

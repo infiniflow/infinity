@@ -11,9 +11,13 @@ namespace infinity {
 
 class UnaryOperator {
 public:
-    template <typename InputType, typename ResultType, typename Operator>
+    template<typename InputType, typename ResultType, typename Operator>
     static void inline
-    Execute(const SharedPtr<ColumnVector>& input, SharedPtr<ColumnVector>& result, SizeT count, void* state_ptr, bool nullable) {
+    Execute(const SharedPtr<ColumnVector>& input,
+            SharedPtr<ColumnVector>& result,
+            SizeT count,
+            void* state_ptr,
+            bool nullable) {
         const auto* input_ptr = (const InputType*)(input->data_ptr_);
         const SharedPtr<Bitmask>& input_null = input->nulls_ptr_;
 
@@ -39,7 +43,7 @@ public:
                 }
                 // Result tail_index need to update.
                 result->tail_index_ = count;
-                return ;
+                return;
             }
             case ColumnVectorType::kConstant: {
                 StorageAssert(count == 1, "Attempting to execute more than one row of the constant column vector.")
@@ -62,10 +66,14 @@ public:
                                                                       state_ptr);
                 }
                 result->tail_index_ = 1;
-                return ;
+                return;
             }
             case ColumnVectorType::kHeterogeneous: {
-                return ExecuteHeterogeneous<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr);
+                return ExecuteHeterogeneous<InputType, ResultType, Operator>(input_ptr,
+                                                                             result_ptr,
+                                                                             result_null,
+                                                                             count,
+                                                                             state_ptr);
             }
         }
 
@@ -73,19 +81,23 @@ public:
     }
 
 private:
-    template <typename InputType, typename ResultType, typename Operator>
+    template<typename InputType, typename ResultType, typename Operator>
     static void inline
     ExecuteFlat(const InputType* __restrict input_ptr,
                 ResultType* __restrict result_ptr,
                 SharedPtr<Bitmask>& result_null,
                 SizeT count,
                 void* state_ptr) {
-        for (SizeT i = 0; i < count; i++) {
-             Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
+        for(SizeT i = 0; i < count; i++) {
+            Operator::template Execute<InputType, ResultType>(input_ptr[i],
+                                                              result_ptr[i],
+                                                              result_null.get(),
+                                                              i,
+                                                              state_ptr);
         }
     }
 
-    template <typename InputType, typename ResultType, typename Operator>
+    template<typename InputType, typename ResultType, typename Operator>
     static void inline
     ExecuteFlatWithNull(const InputType* __restrict input_ptr,
                         const SharedPtr<Bitmask>& input_null,
@@ -97,23 +109,28 @@ private:
             // Initialized all true to output null bitmask.
             result_null->SetAllTrue();
 
-            for (SizeT i = 0; i < count; i++) {
+            for(SizeT i = 0; i < count; i++) {
                 // Not valid for embedding type, since the embedding type width isn't sizeof(EmbeddingT)
-                Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
+                Operator::template Execute<InputType, ResultType>(input_ptr[i],
+                                                                  result_ptr[i],
+                                                                  result_null.get(),
+                                                                  i,
+                                                                  state_ptr);
             }
         } else {
             result_null->DeepCopy(*input_null);
 
             const u64* input_null_data = input_null->GetData();
             SizeT unit_count = BitmaskBuffer::UnitCount(count);
-            for(SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++ i, end_index += BitmaskBuffer::UNIT_BITS) {
+            for(SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS;
+                i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
                 if(input_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     while(start_index < end_index) {
                         Operator::template Execute<InputType, ResultType>(input_ptr[i],
                                                                           result_ptr[i],
                                                                           result_null.get(),
-                                                                          start_index ++,
+                                                                          start_index++,
                                                                           state_ptr);
                     }
                 } else if(input_null_data[i] == BitmaskBuffer::UNIT_MIN) {
@@ -128,7 +145,7 @@ private:
                                     input_ptr[i],
                                     result_ptr[i],
                                     result_null.get(),
-                                    start_index ++,
+                                    start_index++,
                                     state_ptr);
                         }
                     }
@@ -137,15 +154,19 @@ private:
         }
     }
 
-    template <typename InputType, typename ResultType, typename Operator>
+    template<typename InputType, typename ResultType, typename Operator>
     static void inline
     ExecuteHeterogeneous(const InputType* __restrict input_ptr,
                          ResultType* __restrict result_ptr,
                          SharedPtr<Bitmask>& result_null,
                          SizeT count,
                          void* state_ptr) {
-        for (SizeT i = 0; i < count; i++) {
-            Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
+        for(SizeT i = 0; i < count; i++) {
+            Operator::template Execute<InputType, ResultType>(input_ptr[i],
+                                                              result_ptr[i],
+                                                              result_null.get(),
+                                                              i,
+                                                              state_ptr);
         }
     }
 };

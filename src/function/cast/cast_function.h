@@ -13,16 +13,17 @@ namespace infinity {
 class CastFunction {
 public:
     static BoundCastFunc
-    GetBoundFunc(const DataType &source, const DataType &target);
+    GetBoundFunc(const DataType& source, const DataType& target);
+
 private:
     static BoundCastFunc
-    NumericCast(const DataType &source, const DataType &target);
+    NumericCast(const DataType& source, const DataType& target);
 
     static BoundCastFunc
-    DecimalCast(const DataType &source, const DataType &target);
+    DecimalCast(const DataType& source, const DataType& target);
 
     static BoundCastFunc
-    StringCast(const DataType &source, const DataType &target);
+    StringCast(const DataType& source, const DataType& target);
 
 };
 

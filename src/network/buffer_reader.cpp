@@ -12,7 +12,7 @@ namespace infinity {
 size_t
 BufferReader::size() const {
     const auto current_size = std::distance(&*start_pos_, &*current_pos_);
-    return (current_size < 0) ?  (current_size + PG_MSG_BUFFER_SIZE) : current_size;
+    return (current_size < 0) ? (current_size + PG_MSG_BUFFER_SIZE) : current_size;
 }
 
 std::string
@@ -33,11 +33,12 @@ BufferReader::read_string() {
         start_pos_ = end_pos;
     }
 
-    ++ start_pos_;
+    ++start_pos_;
     return result;
 }
 
-std::string BufferReader::read_string(const size_t string_length, NullTerminator null_terminator) {
+std::string
+BufferReader::read_string(const size_t string_length, NullTerminator null_terminator) {
     std::string result;
     result.reserve(string_length);
 
@@ -61,10 +62,11 @@ std::string BufferReader::read_string(const size_t string_length, NullTerminator
     return result;
 }
 
-void BufferReader::receive_more(size_t bytes) {
+void
+BufferReader::receive_more(size_t bytes) {
     if(size() >= bytes) {
         // Current data in buffer is enough for reading.
-        return ;
+        return;
     }
 
     // Get the available size of the buffer;
@@ -84,13 +86,14 @@ void BufferReader::receive_more(size_t bytes) {
         bytes_read = boost::asio::read(
                 *socket_,
                 std::array<boost::asio::mutable_buffer, 2>{
-                    boost::asio::buffer(&*current_pos_, std::distance(&*current_pos_, data_.end())),
-                    boost::asio::buffer(data_.begin(), std::distance(data_.begin(), &*start_pos_ - 1))
-                    },
+                        boost::asio::buffer(&*current_pos_, std::distance(&*current_pos_, data_.end())),
+                        boost::asio::buffer(data_.begin(), std::distance(data_.begin(), &*start_pos_ - 1))
+                },
                 boost::asio::transfer_at_least(bytes - size()), boost_error);
     }
 
-    if(boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_read == 0) {
+    if(boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset ||
+       bytes_read == 0) {
         ClientError("Client close the connection.");
     }
 
@@ -98,8 +101,6 @@ void BufferReader::receive_more(size_t bytes) {
 
     std::advance(current_pos_, bytes_read);
 }
-
-
 
 
 }

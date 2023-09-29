@@ -14,7 +14,7 @@ enum class ConjunctionType {
     kOr,
 };
 
-class ConjunctionExpression: public BaseExpression {
+class ConjunctionExpression : public BaseExpression {
 public:
     ConjunctionExpression(ConjunctionType conjunction_type,
                           const SharedPtr<BaseExpression>& left_operand,

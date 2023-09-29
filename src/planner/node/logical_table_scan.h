@@ -9,6 +9,7 @@
 namespace infinity {
 
 class BaseTableRef;
+
 class LogicalTableScan : public LogicalNode {
 public:
     explicit

@@ -17,12 +17,12 @@ public:
     }
 
     inline void
-    Update(const ValueType *__restrict input, SizeT idx) {
+    Update(const ValueType* __restrict input, SizeT idx) {
         NotImplementError("Update average state.")
     }
 
     inline void
-    ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const ValueType* __restrict input, SizeT idx, SizeT count) {
         NotImplementError("Constant update average state.")
     }
 
@@ -51,16 +51,16 @@ public:
     }
 
     inline void
-    Update(const TinyIntT *__restrict input, SizeT idx) {
+    Update(const TinyIntT* __restrict input, SizeT idx) {
         if(count_ == std::numeric_limits<i64>::max()) {
             ExecutorError(fmt::format("Data count exceeds: {}", count_));
         }
-        this->count_ ++;
+        this->count_++;
         value_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const TinyIntT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const TinyIntT* __restrict input, SizeT idx, SizeT count) {
         this->count_ += count;
         value_ += (input[idx] * count);
     }
@@ -91,16 +91,16 @@ public:
     }
 
     inline void
-    Update(const SmallIntT *__restrict input, SizeT idx) {
+    Update(const SmallIntT* __restrict input, SizeT idx) {
         if(count_ == std::numeric_limits<i64>::max()) {
             ExecutorError(fmt::format("Data count exceeds: {}", count_));
         }
-        this->count_ ++;
+        this->count_++;
         value_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const SmallIntT* __restrict input, SizeT idx, SizeT count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += (input[idx] * count);
@@ -132,16 +132,16 @@ public:
     }
 
     inline void
-    Update(const IntegerT *__restrict input, SizeT idx) {
+    Update(const IntegerT* __restrict input, SizeT idx) {
         if(count_ == std::numeric_limits<i64>::max()) {
             ExecutorError(fmt::format("Data count exceeds: {}", count_));
         }
-        this->count_ ++;
+        this->count_++;
         value_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const IntegerT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const IntegerT* __restrict input, SizeT idx, SizeT count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += (input[idx] * count);
@@ -173,16 +173,16 @@ public:
     }
 
     inline void
-    Update(const BigIntT *__restrict input, SizeT idx) {
+    Update(const BigIntT* __restrict input, SizeT idx) {
         if(count_ == std::numeric_limits<i64>::max()) {
             ExecutorError(fmt::format("Data count exceeds: {}", count_));
         }
-        this->count_ ++;
+        this->count_++;
         value_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const BigIntT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const BigIntT* __restrict input, SizeT idx, SizeT count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += (input[idx] * count);
@@ -214,16 +214,16 @@ public:
     }
 
     inline void
-    Update(const FloatT *__restrict input, SizeT idx) {
+    Update(const FloatT* __restrict input, SizeT idx) {
         if(count_ == std::numeric_limits<i64>::max()) {
             ExecutorError(fmt::format("Data count exceeds: {}", count_));
         }
-        this->count_ ++;
+        this->count_++;
         value_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const FloatT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const FloatT* __restrict input, SizeT idx, SizeT count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += (input[idx] * count);
@@ -255,16 +255,16 @@ public:
     }
 
     inline void
-    Update(const DoubleT *__restrict input, SizeT idx) {
+    Update(const DoubleT* __restrict input, SizeT idx) {
         if(count_ == std::numeric_limits<i64>::max()) {
             ExecutorError(fmt::format("Data count exceeds: {}", count_));
         }
-        this->count_ ++;
+        this->count_++;
         value_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const DoubleT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const DoubleT* __restrict input, SizeT idx, SizeT count) {
         // TODO: Need to check overflow.
         this->count_ += count;
         value_ += (input[idx] * count);
@@ -283,7 +283,7 @@ public:
 };
 
 void
-RegisterAvgFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterAvgFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "AVG";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);

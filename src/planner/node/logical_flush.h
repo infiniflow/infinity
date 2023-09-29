@@ -14,8 +14,8 @@ public:
     explicit
     LogicalFlush(u64 node_id,
                  FlushType type)
-                 : LogicalNode(node_id, LogicalNodeType::kFlush),
-                 flush_type_(type) {}
+            : LogicalNode(node_id, LogicalNodeType::kFlush),
+              flush_type_(type) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {
@@ -24,7 +24,7 @@ public:
 
     [[nodiscard]] inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
-        return MakeShared<Vector<String>> ();
+        return MakeShared<Vector<String>>();
     }
 
     [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
@@ -33,7 +33,7 @@ public:
     }
 
     String
-    ToString(i64 &space) final;
+    ToString(i64& space) final;
 
     inline String
     name() final {
@@ -46,7 +46,7 @@ public:
     }
 
 private:
-    FlushType flush_type_ {FlushType::kData};
+    FlushType flush_type_{FlushType::kData};
 };
 
 }

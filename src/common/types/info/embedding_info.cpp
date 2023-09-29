@@ -7,7 +7,8 @@ namespace infinity {
 
 bool
 EmbeddingInfo::operator==(const TypeInfo& other) const {
-    if(other.type() != TypeInfoType::kEmbedding) return false;
+    if(other.type() != TypeInfoType::kEmbedding)
+        return false;
 
     auto* embedding_info_ptr = (EmbeddingInfo*)(&other);
 
@@ -23,8 +24,9 @@ EmbeddingInfo::Serialize() const {
     return res;
 }
 
-String EmbeddingInfo::EmbeddingDataTypeToString(EmbeddingDataType type) {
-    switch (type) {
+String
+EmbeddingInfo::EmbeddingDataTypeToString(EmbeddingDataType type) {
+    switch(type) {
         case kElemBit:
             return "bit";
         case kElemInt8:

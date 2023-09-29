@@ -34,7 +34,10 @@ TEST_F(ColumnDefTest, test1) {
     HashSet<ConstraintType> constraints;
     constraints.insert(ConstraintType::kUnique);
     constraints.insert(ConstraintType::kNotNull);
-    auto column_def_ptr = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
+    auto column_def_ptr = MakeShared<ColumnDef>(0,
+                                                MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
+                                                "c1",
+                                                constraints);
     EXPECT_EQ(*column_def_ptr->type(), DataType(LogicalType::kTinyInt));
     EXPECT_EQ(column_def_ptr->id(), 0);
     EXPECT_STREQ(column_def_ptr->name().c_str(), "c1");

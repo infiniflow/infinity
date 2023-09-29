@@ -17,7 +17,7 @@ public:
 
 public:
     inline explicit
-    CharType(ptr_t&& from_ptr): ptr(from_ptr) {
+    CharType(ptr_t&& from_ptr) : ptr(from_ptr) {
         from_ptr = nullptr;
     }
 
@@ -46,7 +46,8 @@ public:
 
     CharType&
     operator=(const CharType& other) {
-        if(this == &other) return *this;
+        if(this == &other)
+            return *this;
         if(ptr != nullptr) {
             LOG_TRACE("Target Char isn't null, need to manually SetNull or Reset");
             Reset();
@@ -57,7 +58,8 @@ public:
 
     CharType&
     operator=(CharType&& other) noexcept {
-        if(this == &other) return *this;
+        if(this == &other)
+            return *this;
         if(ptr != nullptr) {
             LOG_TRACE("Target char type isn't null, need to manually SetNull or Reset");
             Reset();

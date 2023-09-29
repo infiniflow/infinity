@@ -12,6 +12,7 @@ namespace infinity {
 // A box is specified by two points: upper left  point and lower right point.
 struct BoxType {
     BoxType() = default;
+
     BoxType(PointType ul, PointType lr) : upper_left(ul), lower_right(lr) {};
 
     PointType upper_left;
@@ -19,7 +20,8 @@ struct BoxType {
 
     inline bool
     operator==(const BoxType& other) const {
-        if(this == &other) return true;
+        if(this == &other)
+            return true;
         return (upper_left == other.upper_left) && (lower_right == other.lower_right);
     }
 
@@ -28,7 +30,8 @@ struct BoxType {
         return !operator==(other);
     }
 
-    void Reset() {
+    void
+    Reset() {
         upper_left.Reset();
         lower_right.Reset();
     }

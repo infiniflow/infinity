@@ -15,7 +15,7 @@ struct __attribute__((packed)) IntegerMixedType : public BaseMixedType {
     i8 _dummy1{};
     i16 _dummy2{};
     i32 _dummy3{};
-    i64 value {0};
+    i64 value{0};
 };
 
 }

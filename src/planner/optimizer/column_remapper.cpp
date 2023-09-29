@@ -8,7 +8,7 @@
 namespace infinity {
 
 void
-BindingRemapper::VisitNode(LogicalNode &op) {
+BindingRemapper::VisitNode(LogicalNode& op) {
     if(op.operator_type() == LogicalNodeType::kJoin) {
         VisitNodeChildren(op);
         bindings_ = op.GetColumnBindings();
@@ -22,9 +22,9 @@ BindingRemapper::VisitNode(LogicalNode &op) {
 
 SharedPtr<BaseExpression>
 BindingRemapper::VisitReplace(const SharedPtr<ColumnExpression>& expression) {
-    SizeT binding_count= bindings_.size();
-    for (SizeT idx = 0; idx < binding_count; ++ idx) {
-        if (expression->binding() == bindings_[idx]) {
+    SizeT binding_count = bindings_.size();
+    for(SizeT idx = 0; idx < binding_count; ++idx) {
+        if(expression->binding() == bindings_[idx]) {
             return ReferenceExpression::Make(expression->Type(),
                                              expression->table_name(),
                                              expression->column_name(),

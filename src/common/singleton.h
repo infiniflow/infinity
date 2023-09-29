@@ -9,7 +9,8 @@ namespace infinity {
 template<typename T>
 class Singleton {
 public:
-    inline static T& instance() {
+    inline static T&
+    instance() {
         static T instance;
         return instance;
     }

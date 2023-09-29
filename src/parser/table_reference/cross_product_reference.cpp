@@ -8,7 +8,7 @@ namespace infinity {
 
 CrossProductReference::~CrossProductReference() {
     for(auto* table_ptr: tables_) {
-        delete(table_ptr);
+        delete (table_ptr);
     }
 }
 

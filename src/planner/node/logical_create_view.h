@@ -33,8 +33,7 @@ public:
             : LogicalNode(node_id, LogicalNodeType::kCreateView),
               names_ptr_(std::move(names_ptr)),
               types_ptr_(std::move(types_ptr)),
-              create_view_info_(std::move(create_view_info))
-    {}
+              create_view_info_(std::move(create_view_info)) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {
@@ -74,7 +73,7 @@ public:
     }
 
     [[nodiscard]] inline const SharedPtr<CreateViewInfo>&
-    create_view_info() const  {
+    create_view_info() const {
         return create_view_info_;
     }
 

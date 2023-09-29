@@ -67,15 +67,15 @@ SubstrFunction::Run(VarcharT first, BigIntT second, BigIntT third, VarcharT& res
 }
 
 void
-RegisterSubstringFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterSubstringFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "substring";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction varchar_substr(
             func_name,
-            { DataType(LogicalType::kVarchar), DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt) },
-            { DataType(LogicalType::kVarchar) },
+            {DataType(LogicalType::kVarchar), DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt)},
+            {DataType(LogicalType::kVarchar)},
             &ScalarFunction::TernaryFunctionToVarlenWithFailure<VarcharT, BigIntT, BigIntT, VarcharT, SubstrFunction>);
     function_set_ptr->AddFunction(varchar_substr);
 

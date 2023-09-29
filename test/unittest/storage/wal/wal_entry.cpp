@@ -10,13 +10,15 @@
 #include <vector>
 
 class WalEntryTest : public BaseTest {
-    void SetUp() override {
+    void
+    SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void TearDown() override {
+    void
+    TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -29,7 +31,8 @@ class WalEntryTest : public BaseTest {
 
 using namespace infinity;
 
-SharedPtr<TableDef> MockTableDesc2() {
+SharedPtr<TableDef>
+MockTableDesc2() {
     // Define columns
     Vector<SharedPtr<ColumnDef>> columns;
     {
@@ -39,27 +42,27 @@ SharedPtr<TableDef> MockTableDesc2() {
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr = MakeShared<ColumnDef>(
-                column_id++,
-                MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
-                "tiny_int_col", constraints);
+                    column_id++,
+                    MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
+                    "tiny_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
             auto column_def_ptr = MakeShared<ColumnDef>(
-                column_id++,
-                MakeShared<DataType>(DataType(LogicalType::kBigInt)),
-                "big_int_col", constraints);
+                    column_id++,
+                    MakeShared<DataType>(DataType(LogicalType::kBigInt)),
+                    "big_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr = MakeShared<ColumnDef>(
-                column_id++,
-                MakeShared<DataType>(DataType(LogicalType::kDouble)),
-                "double_col", constraints);
+                    column_id++,
+                    MakeShared<DataType>(DataType(LogicalType::kDouble)),
+                    "double_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
     }
@@ -74,7 +77,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
     entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1"));
     entry->cmds.push_back(
-        MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
+            MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
     entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
     entry->cmds.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", nullptr));
     Vector<RowID> row_ids = {{1, 2}};
@@ -84,8 +87,8 @@ TEST_F(WalEntryTest, ReadWrite) {
 
     int32_t exp_size = entry->GetSizeInBytes();
     std::vector<char> buf(exp_size, char(0));
-    char *buf_beg = buf.data();
-    char *ptr = buf_beg;
+    char* buf_beg = buf.data();
+    char* ptr = buf_beg;
     entry->WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 

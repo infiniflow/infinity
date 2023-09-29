@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class BetweenExpression: public BaseExpression {
+class BetweenExpression : public BaseExpression {
 public:
     BetweenExpression(const SharedPtr<BaseExpression>& value,
                       const SharedPtr<BaseExpression>& upper_bound,

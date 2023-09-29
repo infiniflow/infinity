@@ -12,15 +12,14 @@
 
 namespace infinity {
 
-class TableScanFunctionData: public TableFunctionData {
+class TableScanFunctionData : public TableFunctionData {
 public:
     TableScanFunctionData(const Vector<SegmentEntry*>* segment_entries_ptr,
                           const SharedPtr<Vector<u64>>& segment_indexes,
                           const Vector<SizeT>& column_ids)
             : segment_entries_ptr_(segment_entries_ptr),
               segment_indexes_(segment_indexes),
-              column_ids_(column_ids)
-    {}
+              column_ids_(column_ids) {}
 
     const Vector<SegmentEntry*>* segment_entries_ptr_{};
     const SharedPtr<Vector<u64>>& segment_indexes_{};

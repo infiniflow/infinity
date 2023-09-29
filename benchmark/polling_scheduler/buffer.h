@@ -16,15 +16,15 @@ public:
     }
 
     inline void
-    Append(const char *str) const {
+    Append(const char* str) const {
         SizeT len = std::strlen(str);
-        if (len + offset_ >= size_) {
+        if(len + offset_ >= size_) {
             throw;
         }
         memcpy(buffer_.get() + offset_, str, len);
     }
 
-    inline char *
+    inline char*
     Get() const {
         return buffer_.get();
     }

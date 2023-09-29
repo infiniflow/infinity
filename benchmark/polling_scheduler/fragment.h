@@ -63,7 +63,7 @@ enum class FragmentType {
 class Fragment {
 public:
     inline explicit
-    Fragment(u64 id, FragmentType type): id_(id), fragment_type_(type) {}
+    Fragment(u64 id, FragmentType type) : id_(id), fragment_type_(type) {}
 
     Vector<SharedPtr<Task>>
     BuildTask(u64 parallel_size);

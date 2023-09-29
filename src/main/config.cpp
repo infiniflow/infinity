@@ -115,20 +115,20 @@ Config::Init(const SharedPtr<String>& config_path) {
             auto general_config = config["general"];
 
             String infinity_version = general_config["version"].value_or("invalid");
-            if (default_version != infinity_version) {
+            if(default_version != infinity_version) {
                 return MakeShared<String>("Unmatched version in config file.");
             }
             option_.version = infinity_version;
 
             String time_zone_str = general_config["timezone"].value_or("invalid");
-            if (time_zone_str == "invalid") {
+            if(time_zone_str == "invalid") {
                 result = MakeShared<String>("Timezone isn't given in config file.");
                 return result;
             }
 
             try {
                 ParseTimeZoneStr(time_zone_str, option_.time_zone, option_.time_zone_bias);
-            } catch (...) {
+            } catch(...) {
                 result = MakeShared<String>(fmt::format("Timezone can't be recognized: {}", time_zone_str));
                 return result;
             }
@@ -141,7 +141,7 @@ Config::Init(const SharedPtr<String>& config_path) {
 
             String total_memory_size_str = system_config["total_memory_size"].value_or("8GB");
             result = ParseByteSize(total_memory_size_str, option_.total_memory_size);
-            if (result != nullptr) {
+            if(result != nullptr) {
                 return result;
             }
             if(option_.total_memory_size > default_total_memory_size) {
@@ -153,7 +153,7 @@ Config::Init(const SharedPtr<String>& config_path) {
 
             String query_memory_limit_str = system_config["query_memory_limit"].value_or("4MB");
             result = ParseByteSize(query_memory_limit_str, option_.query_memory_limit);
-            if (result != nullptr) {
+            if(result != nullptr) {
                 return result;
             }
             if(option_.query_memory_limit > default_query_memory_limit) {
@@ -169,7 +169,7 @@ Config::Init(const SharedPtr<String>& config_path) {
             // Validate the address format
             boost::system::error_code error;
             boost::asio::ip::make_address(option_.listen_address, error);
-            if (error) {
+            if(error) {
                 String err_msg = fmt::format("Not a valid IPv4 address: {}", option_.listen_address);
                 result = MakeShared<String>(err_msg);
                 return result;
@@ -190,22 +190,22 @@ Config::Init(const SharedPtr<String>& config_path) {
 
             String log_max_size_str = log_config["log_max_size"].value_or("1GB");
             result = ParseByteSize(log_max_size_str, option_.log_max_size);
-            if (result != nullptr) {
+            if(result != nullptr) {
                 return result;
             }
 
             option_.log_file_rotate_count = log_config["log_file_rotate_count"].value_or(default_log_file_rotate_count);
 
             String log_level = log_config["log_level"].value_or("invalid");
-            if (log_level == "trace") {
+            if(log_level == "trace") {
                 option_.log_level = spdlog::level::level_enum::trace;
-            } else if (log_level == "info") {
+            } else if(log_level == "info") {
                 option_.log_level = spdlog::level::level_enum::info;
-            } else if (log_level == "warning") {
+            } else if(log_level == "warning") {
                 option_.log_level = spdlog::level::level_enum::warn;
-            } else if (log_level == "error") {
+            } else if(log_level == "error") {
                 option_.log_level = spdlog::level::level_enum::err;
-            } else if (log_level == "critical") {
+            } else if(log_level == "critical") {
                 option_.log_level = spdlog::level::level_enum::critical;
             } else {
                 result = MakeShared<String>("Invalid log level in config file");
@@ -226,7 +226,7 @@ Config::Init(const SharedPtr<String>& config_path) {
             auto buffer_config = config["buffer"];
             String buffer_pool_size_str = buffer_config["buffer_pool_size"].value_or("4GB");
             result = ParseByteSize(buffer_pool_size_str, option_.buffer_pool_size);
-            if (result != nullptr) {
+            if(result != nullptr) {
                 return result;
             }
             option_.temp_dir = MakeShared<String>(buffer_config["temp_dir"].value_or("invalid"));

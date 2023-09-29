@@ -12,10 +12,9 @@ class TableRef {
 public:
     explicit
     TableRef(TableRefType type,
-             String alias):
-             type_(type),
-             alias_(std::move(alias))
-             {}
+             String alias) :
+            type_(type),
+            alias_(std::move(alias)) {}
 
     TableRefType type_{TableRefType::kTable};
     String alias_{};

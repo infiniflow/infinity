@@ -26,8 +26,8 @@ struct TimestampTZType {
         TypeError("ToString() isn't implemented");
     }
 
-    i32 date {};
-    i32 time {};
+    i32 date{};
+    i32 time{};
 };
 
 }

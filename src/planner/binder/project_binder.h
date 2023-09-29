@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class ProjectBinder final: public ExpressionBinder {
+class ProjectBinder final : public ExpressionBinder {
 public:
     explicit
     ProjectBinder(QueryContext* query_context) : ExpressionBinder(query_context) {}

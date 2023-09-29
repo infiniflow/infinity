@@ -27,8 +27,9 @@ namespace infinity {
 template<typename T>
 using SharedPtr = std::shared_ptr<T>;
 
-template <typename T, typename... Args>
-inline SharedPtr<T> MakeShared(Args &&...args) {
+template<typename T, typename... Args>
+inline SharedPtr<T>
+MakeShared(Args&& ...args) {
     return std::make_shared<T>(std::forward<Args>(args)...);
 }
 
@@ -36,7 +37,8 @@ template<typename T>
 using UniquePtr = std::unique_ptr<T>;
 
 template<typename T, typename... Args>
-inline UniquePtr<T> MakeUnique(Args &&...args) {
+inline UniquePtr<T>
+MakeUnique(Args&& ...args) {
     return std::make_unique<T>(std::forward<Args>(args)...);
 }
 
@@ -91,8 +93,8 @@ using f64 = double;
 using au64 = std::atomic_uint64_t;
 using aptr = std::atomic_uintptr_t;
 
-using ptr_t = char *;
-using const_ptr_t = const char *;
+using ptr_t = char*;
+using const_ptr_t = const char*;
 using char_t = char;
 using SizeT = size_t;
 
@@ -107,13 +109,13 @@ struct RowID {
     u32 offset{};
 
     bool
-    operator < (const RowID &other) const {
+    operator<(const RowID& other) const {
         return block < other.block
                || block == other.block && offset < other.block;
     };
 
     bool
-    operator > (const RowID &other) const {
+    operator>(const RowID& other) const {
         return block > other.block
                || block == other.block && offset > other.block;
     };

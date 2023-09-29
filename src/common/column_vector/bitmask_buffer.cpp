@@ -16,7 +16,7 @@ BitmaskBuffer::Make(size_t count) {
 }
 
 SharedPtr<BitmaskBuffer>
-BitmaskBuffer::Make(const u64 *input_ptr, size_t count) {
+BitmaskBuffer::Make(const u64* input_ptr, size_t count) {
     SharedPtr<BitmaskBuffer> buffer_ptr = MakeShared<BitmaskBuffer>();
     buffer_ptr->Initialize(input_ptr, count);
     return buffer_ptr;
@@ -36,7 +36,7 @@ BitmaskBuffer::Initialize(size_t count) {
     count_ = count;
     size_t unit_count = UnitCount(count); // u64 array length
     data_ptr_ = MakeUnique<u64[]>(unit_count);
-    for(size_t i = 0; i < unit_count; ++ i) {
+    for(size_t i = 0; i < unit_count; ++i) {
         data_ptr_[i] = UNIT_MAX;
     }
 }

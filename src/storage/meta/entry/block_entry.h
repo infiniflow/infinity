@@ -18,7 +18,7 @@ class BlockEntry : public BaseEntry {
 public:
     explicit
     BlockEntry(BlockEntryType entry_type, u64 txn_id, TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kBlock), entry_type_(entry_type) {}
+            : BaseEntry(EntryType::kBlock), entry_type_(entry_type) {}
 
 private:
     BlockEntryType entry_type_{BlockEntryType::kBlock};

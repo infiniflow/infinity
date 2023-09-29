@@ -39,23 +39,23 @@ TEST_F(BaseProfilerTest, test1) {
     usleep(1);
     profiler.End();
     EXPECT_GT(profiler.Elapsed(), 1000);
-    EXPECT_LT(profiler.Elapsed(), 1000*1000);
+    EXPECT_LT(profiler.Elapsed(), 1000 * 1000);
     EXPECT_NE(profiler.ElapsedToString().find("us"), std::string::npos);
 
     // Test the time duration larger than 1ms
     profiler.Begin();
     usleep(1000);
     profiler.End();
-    EXPECT_GT(profiler.Elapsed(), 1000*1000);
-    EXPECT_LT(profiler.Elapsed(), 1000*1000*1000);
+    EXPECT_GT(profiler.Elapsed(), 1000 * 1000);
+    EXPECT_LT(profiler.Elapsed(), 1000 * 1000 * 1000);
     EXPECT_NE(profiler.ElapsedToString().find("ms"), std::string::npos);
 
     // Test the time duration larger than 1s
     profiler.Begin();
-    usleep(1000*1000);
+    usleep(1000 * 1000);
     profiler.End();
-    EXPECT_GT(profiler.Elapsed(), 1000*1000*1000);
-    EXPECT_LT(profiler.Elapsed(), 1000*1000*1000*1000L);
+    EXPECT_GT(profiler.Elapsed(), 1000 * 1000 * 1000);
+    EXPECT_LT(profiler.Elapsed(), 1000 * 1000 * 1000 * 1000L);
     EXPECT_NE(profiler.ElapsedToString().find('s'), std::string::npos);
 
 //    std::cout << profiler.Elapsed() << std::endl;

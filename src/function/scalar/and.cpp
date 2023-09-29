@@ -21,14 +21,14 @@ GenerateAndFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr) {
     String func_name = "AND";
     ScalarFunction and_function(
             func_name,
-            { DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean) },
-            { DataType(LogicalType::kBoolean) },
+            {DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean)},
+            {DataType(LogicalType::kBoolean)},
             &ScalarFunction::BinaryFunction<BooleanT, BooleanT, BooleanT, AndFunction>);
     function_set_ptr->AddFunction(and_function);
 }
 
 void
-RegisterAndFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterAndFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "AND";
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 

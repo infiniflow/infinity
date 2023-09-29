@@ -16,6 +16,7 @@
 #include <mach-o/dyld.h>
 #include <sys/sysctl.h>
 #else
+
 #include <linux/falloc.h>
 #include <linux/fiemap.h>
 #include <linux/ioctl.h>
@@ -24,6 +25,7 @@
 #include <sys/ioctl.h>
 #include <sys/sysinfo.h>
 #include <sys/vfs.h>
+
 #endif  // defined(__APPLE__)
 
 #ifdef __APPLE__

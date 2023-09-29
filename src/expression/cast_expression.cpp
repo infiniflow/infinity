@@ -12,8 +12,8 @@
 namespace infinity {
 
 SharedPtr<BaseExpression>
-CastExpression::AddCastToType(const SharedPtr<BaseExpression>& source_expr_ptr, const DataType &target_type) {
-    if (source_expr_ptr->Type() == target_type) {
+CastExpression::AddCastToType(const SharedPtr<BaseExpression>& source_expr_ptr, const DataType& target_type) {
+    if(source_expr_ptr->Type() == target_type) {
         return source_expr_ptr;
     }
 
@@ -31,8 +31,7 @@ CastExpression::CanCast(const DataType& source, const DataType& target) {
         case LogicalType::kNull:
         case LogicalType::kInvalid:
             PlannerError("Invalid data type");
-        default:
-            ;
+        default:;
     }
 
     switch(source.type()) {

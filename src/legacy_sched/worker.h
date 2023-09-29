@@ -8,24 +8,29 @@ namespace infinity {
 class Worker {
 public:
     explicit Worker(
-        std::uint16_t id,
-        std::uint16_t cpu_id);
+            std::uint16_t id,
+            std::uint16_t cpu_id);
 
     ~Worker() noexcept = default;
 
-    void Execute();
+    void
+    Execute();
 
-    [[nodiscard]] std::uint16_t WorkerID() const noexcept {
+    [[nodiscard]] std::uint16_t
+    WorkerID() const noexcept {
         return id_;
     }
 
-    [[nodiscard]] std::uint16_t CPUID() const noexcept {
+    [[nodiscard]] std::uint16_t
+    CPUID() const noexcept {
         return cpu_id_;
     }
 
-    [[nodiscard]] Channel &GetChannel() noexcept { return channel_; }
+    [[nodiscard]] Channel&
+    GetChannel() noexcept { return channel_; }
 
-    [[nodiscard]] const Channel &GetChannel() const noexcept { return channel_; }
+    [[nodiscard]] const Channel&
+    GetChannel() const noexcept { return channel_; }
 
 private:
     const std::uint16_t id_;

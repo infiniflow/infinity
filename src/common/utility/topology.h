@@ -14,32 +14,38 @@ namespace infinity {
 class Topology {
 public:
     static const std::uint16_t MaxCores = 128U;
-    Topology(){}
+    Topology() {}
 
     virtual ~Topology() = default;
 
-    void build(std::uint16_t max_cores){
+    void
+    build(std::uint16_t max_cores) {
         std::uint16_t cores = std::min(max_cores, Topology::count_cores());
-        for(auto i = 0U; i< cores; ++i)
+        for(auto i = 0U; i < cores; ++i)
             emplace_back(i);
     }
 
-    void emplace_back(const std::uint16_t core_id) noexcept {
+    void
+    emplace_back(const std::uint16_t core_id) noexcept {
         core_ids_[size_++] = core_id;
     }
 
-    std::uint16_t operator[](const std::uint16_t index) const noexcept { 
-        return core_ids_[index]; 
+    std::uint16_t
+    operator[](const std::uint16_t index) const noexcept {
+        return core_ids_[index];
     }
 
-    [[nodiscard]] std::uint16_t size() const noexcept { return size_; }
+    [[nodiscard]] std::uint16_t
+    size() const noexcept { return size_; }
 
-    [[nodiscard]] std::uint16_t max_cpu_id() const noexcept {
+    [[nodiscard]] std::uint16_t
+    max_cpu_id() const noexcept {
         return *std::max_element(core_ids_.cbegin(), core_ids_.cbegin() + size_);
     }
 
     // return Core where the caller is running.
-    static std::uint16_t cpu_id() {
+    static std::uint16_t
+    cpu_id() {
 #if defined(__APPLE__)
         return 0;
 #else
@@ -48,7 +54,8 @@ public:
     }
 
     // return Number of available cores.
-    static std::uint16_t count_cores() {
+    static std::uint16_t
+    count_cores() {
         return std::uint16_t(std::thread::hardware_concurrency());
     }
 

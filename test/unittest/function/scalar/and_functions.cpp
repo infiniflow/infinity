@@ -50,11 +50,11 @@ TEST_F(AndFunctionsTest, and_func) {
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                "t1",
-                                                                                1,
-                                                                                "c1",
-                                                                                0,
-                                                                                0);
+                                                                                 "t1",
+                                                                                 1,
+                                                                                 "c1",
+                                                                                 0,
+                                                                                 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                  "t1",
                                                                                  1,
@@ -77,7 +77,7 @@ TEST_F(AndFunctionsTest, and_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeBool(true));
                 data_block.AppendValue(1, Value::MakeBool(false));
@@ -88,7 +88,7 @@ TEST_F(AndFunctionsTest, and_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBoolean);
@@ -107,7 +107,7 @@ TEST_F(AndFunctionsTest, and_func) {
 
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             EXPECT_EQ(v.value_.boolean, false);

@@ -17,12 +17,12 @@ public:
                       SharedPtr<Vector<String>> output_names,
                       SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                       u64 id)
-        : PhysicalOperator(PhysicalOperatorType::kDropTable, nullptr, nullptr, id),
-        schema_name_(std::move(schema_name)),
-        table_name_(std::move(tbl_name)),
-        conflict_type_(conflict_type),
-        output_names_(std::move(output_names)),
-        output_types_(std::move(output_types)){}
+            : PhysicalOperator(PhysicalOperatorType::kDropTable, nullptr, nullptr, id),
+              schema_name_(std::move(schema_name)),
+              table_name_(std::move(tbl_name)),
+              conflict_type_(conflict_type),
+              output_names_(std::move(output_names)),
+              output_types_(std::move(output_types)) {}
 
     ~PhysicalDropTable() override = default;
 

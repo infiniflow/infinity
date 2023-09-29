@@ -14,40 +14,40 @@ FileWriter::WriteByte(const u8 b) {
     data_[offset_++] = b;
 }
 
-void 
+void
 FileWriter::WriteShort(const i16 i) {
     WriteByte(static_cast<u8>(i >> 8));
     WriteByte(static_cast<u8>(i));
 }
 
-void 
+void
 FileWriter::WriteInt(const i32 i) {
     WriteByte((u8)(i >> 24));
     WriteByte((u8)(i >> 16));
-    WriteByte((u8)(i >>  8));
-    WriteByte((u8) i);
+    WriteByte((u8)(i >> 8));
+    WriteByte((u8)i);
 }
 
 void
 FileWriter::WriteVInt(const i32 vi) {
     u32 i = vi;
-    while ((i & ~0x7F) != 0) {
+    while((i & ~0x7F) != 0) {
         WriteByte((u8)((i & 0x7f) | 0x80));
         i >>= 7;
     }
     WriteByte((u8)i);
 }
 
-void 
+void
 FileWriter::WriteLong(const i64 i) {
-    WriteInt((i32) (i >> 32));
-    WriteInt((i32) i);
+    WriteInt((i32)(i >> 32));
+    WriteInt((i32)i);
 }
 
-void 
+void
 FileWriter::WriteVLong(const i64 vi) {
     u64 i = vi;
-    while ((i & ~0x7F) != 0) {
+    while((i & ~0x7F) != 0) {
         WriteByte((u8)((i & 0x7f) | 0x80));
         i >>= 7;
     }
@@ -80,7 +80,7 @@ FileWriter::Sync() {
 void
 FileWriter::Flush() {
     if(offset_ == 0) {
-        return ;
+        return;
     }
     fs_.Write(*file_handler_, data_.get(), offset_);
     total_written_ += offset_;

@@ -42,7 +42,7 @@ PhysicalFilter::Execute(QueryContext* query_context, InputState* input_state, Ou
                                             filter_input_state->input_data_block_->row_count());
 
     LOG_TRACE("{} rows after filter", selected_count);
-    return ;
+    return;
 }
 
 void
@@ -62,7 +62,7 @@ PhysicalFilter::Execute(QueryContext* query_context) {
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
 
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         SharedPtr<DataType> column_type = input_table_->GetColumnTypeById(idx);
         String column_name = input_table_->GetColumnNameById(idx);
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
@@ -79,7 +79,7 @@ PhysicalFilter::Execute(QueryContext* query_context) {
     SharedPtr<Table> selected_table = Table::Make(selected_table_def, TableType::kIntermediate);
 
     SizeT input_data_block_count = input_table_->DataBlockCount();
-    for(SizeT idx = 0; idx < input_data_block_count; ++ idx) {
+    for(SizeT idx = 0; idx < input_data_block_count; ++idx) {
         SharedPtr<DataBlock> input_data_block = input_table_->GetDataBlockById(idx);
         SizeT row_count = input_data_block->row_count();
         SharedPtr<DataBlock> output_data_block = DataBlock::Make();

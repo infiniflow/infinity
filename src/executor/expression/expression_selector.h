@@ -34,7 +34,7 @@ public:
            SharedPtr<Selection>& output_true_select);
 
     static void
-    Select(const u8 *__restrict bool_column,
+    Select(const u8* __restrict bool_column,
            const SharedPtr<Bitmask>& null_mask,
            SizeT count,
            SharedPtr<Selection>& output_true_select,

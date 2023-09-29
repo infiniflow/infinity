@@ -19,7 +19,9 @@
 namespace infinity {
 
 class BufferManager;
+
 class Txn;
+
 class TableCollectionEntry;
 
 enum DataSegmentStatus : i8 {
@@ -31,7 +33,7 @@ enum DataSegmentStatus : i8 {
 struct SegmentVersion {
     explicit
     SegmentVersion(SizeT capacity) : created_(capacity), deleted_(capacity), txn_ptr_(capacity) {
-        for(SizeT i = 0; i < capacity; ++ i) {
+        for(SizeT i = 0; i < capacity; ++i) {
             created_[i] = MAX_TXN_ID;
             deleted_[i] = MAX_TXN_ID;
             txn_ptr_[i] = (u64)(nullptr);
@@ -46,7 +48,7 @@ struct SegmentEntry : public BaseEntry {
 public:
     explicit
     SegmentEntry(const TableCollectionEntry* table_entry)
-        : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
+            : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
 
     RWMutex rw_locker_{};
 
@@ -111,7 +113,7 @@ public:
 
 private:
     static SharedPtr<String>
-    DetermineFilename(const String &parent_dir, u64 seg_id);
+    DetermineFilename(const String& parent_dir, u64 seg_id);
 };
 
 }

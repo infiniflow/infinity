@@ -11,7 +11,8 @@ namespace infinity {
 class PhysicalIndexScan : public PhysicalOperator {
 public:
     explicit PhysicalIndexScan(uint64_t id)
-        : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id) {}
+            : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id) {}
+
     ~PhysicalIndexScan() override = default;
 
     void

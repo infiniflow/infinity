@@ -12,7 +12,7 @@ namespace infinity {
 class Operator {
 public:
     explicit
-    Operator(const String &name) : op_name_(MakeUnique<String>(name)) {}
+    Operator(const String& name) : op_name_(MakeUnique<String>(name)) {}
 
     inline void
     Run(const Buffer* input_buffer, Buffer* output_buffer) {
@@ -20,13 +20,13 @@ public:
     }
 
 private:
-    UniquePtr <String> op_name_;
+    UniquePtr<String> op_name_;
 };
 
 class Sink {
 public:
     explicit
-    Sink(const String &name) : op_name_(MakeUnique<String>(name)) {}
+    Sink(const String& name) : op_name_(MakeUnique<String>(name)) {}
 
     inline void
     Run(const Buffer* input_buffer, Vector<ConcurrentQueue*>& output_buffers) {
@@ -35,7 +35,7 @@ public:
 //        output_buffer_->Append(input_buffer_->Get());
     }
 private:
-    UniquePtr <String> op_name_;
+    UniquePtr<String> op_name_;
 };
 
 enum class SourceType {
@@ -46,7 +46,7 @@ enum class SourceType {
 class Source {
 public:
     explicit
-    Source(const String &name, SourceType source_type) : op_name_(MakeUnique<String>(name)), type_(source_type) {}
+    Source(const String& name, SourceType source_type) : op_name_(MakeUnique<String>(name)), type_(source_type) {}
 
     inline void
     Run(ConcurrentQueue* input_queue, const Buffer* input_buffer, SharedPtr<Buffer>& output_buffer) {
@@ -68,7 +68,7 @@ public:
         return type_;
     }
 private:
-    UniquePtr <String> op_name_;
+    UniquePtr<String> op_name_;
     SourceType type_;
 };
 

@@ -29,7 +29,7 @@ BindUuidCast(DataType& target) {
 struct UuidTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(const SourceType& source, TargetType &target, const SharedPtr<ColumnVector>& vector_ptr){
+    Run(const SourceType& source, TargetType& target, const SharedPtr<ColumnVector>& vector_ptr) {
         FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -37,7 +37,7 @@ struct UuidTryCastToVarlen {
 
 template<>
 inline bool
-UuidTryCastToVarlen::Run(const UuidT& source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr) {
+UuidTryCastToVarlen::Run(const UuidT& source, VarcharT& target, const SharedPtr<ColumnVector>& vector_ptr) {
     target.length = UuidT::LENGTH;
     memcpy(target.prefix, source.body, VarcharT::PREFIX_LENGTH);
     TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,

@@ -63,15 +63,18 @@ struct EntryResult {
     BaseEntry* entry_;
     UniquePtr<String> err_;
 
-    bool Success() {
+    bool
+    Success() {
         return err_ == nullptr;
     }
 
-    bool Fail() {
+    bool
+    Fail() {
         return err_ != nullptr;
     }
 
-    String ToString() {
+    String
+    ToString() {
         if(err_ == nullptr) {
             return "Success";
         }

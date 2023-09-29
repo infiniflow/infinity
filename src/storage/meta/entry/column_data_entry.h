@@ -12,26 +12,27 @@
 namespace infinity {
 
 class BufferManager;
+
 class SegmentEntry;
 
 struct OutlineInfo {
-    Vector<Pair<BufferHandle *, SizeT>> written_buffers_{};
+    Vector<Pair<BufferHandle*, SizeT>> written_buffers_{};
 
-    BufferManager *buffer_mgr_{};
+    BufferManager* buffer_mgr_{};
 
     SizeT next_file_idx{};
 
-    OutlineInfo(BufferManager *buffer_mgr) : buffer_mgr_(buffer_mgr) {}
+    OutlineInfo(BufferManager* buffer_mgr) : buffer_mgr_(buffer_mgr) {}
 };
 
 struct ColumnDataEntry : public BaseEntry {
 public:
     explicit
     ColumnDataEntry(const SegmentEntry* segment_entry)
-        : BaseEntry(EntryType::kColumnData),
-        segment_entry_(segment_entry) {}
+            : BaseEntry(EntryType::kColumnData),
+              segment_entry_(segment_entry) {}
 
-    const SegmentEntry *segment_entry_{nullptr};
+    const SegmentEntry* segment_entry_{nullptr};
     SharedPtr<DataType> column_type_{};
     SharedPtr<String> base_dir_{};
     SharedPtr<String> file_name_{};

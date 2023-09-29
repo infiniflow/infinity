@@ -21,7 +21,7 @@ struct AddFunction {
 template<>
 inline bool
 AddFunction::Run(TinyIntT left, TinyIntT right, TinyIntT& result) {
-    if (__builtin_add_overflow(left, right, &result)) {
+    if(__builtin_add_overflow(left, right, &result)) {
         return false;
     }
     return true;
@@ -31,7 +31,7 @@ AddFunction::Run(TinyIntT left, TinyIntT right, TinyIntT& result) {
 template<>
 inline bool
 AddFunction::Run(SmallIntT left, SmallIntT right, SmallIntT& result) {
-    if (__builtin_add_overflow(left, right, &result)) {
+    if(__builtin_add_overflow(left, right, &result)) {
         return false;
     }
     return true;
@@ -41,7 +41,7 @@ AddFunction::Run(SmallIntT left, SmallIntT right, SmallIntT& result) {
 template<>
 inline bool
 AddFunction::Run(IntegerT left, IntegerT right, IntegerT& result) {
-    if (__builtin_add_overflow(left, right, &result)) {
+    if(__builtin_add_overflow(left, right, &result)) {
         return false;
     }
     return true;
@@ -51,7 +51,7 @@ AddFunction::Run(IntegerT left, IntegerT right, IntegerT& result) {
 template<>
 inline bool
 AddFunction::Run(BigIntT left, BigIntT right, BigIntT& result) {
-    if (__builtin_add_overflow(left, right, &result)) {
+    if(__builtin_add_overflow(left, right, &result)) {
         return false;
     }
     return true;
@@ -69,7 +69,7 @@ template<>
 inline bool
 AddFunction::Run(FloatT left, FloatT right, FloatT& result) {
     result = left + right;
-    if (std::isnan(result) || std::isinf(result)) {
+    if(std::isnan(result) || std::isinf(result)) {
         return false;
     }
     return true;
@@ -80,7 +80,7 @@ template<>
 inline bool
 AddFunction::Run(DoubleT left, DoubleT right, DoubleT& result) {
     result = left + right;
-    if (std::isnan(result) || std::isinf(result)) {
+    if(std::isnan(result) || std::isinf(result)) {
         return false;
     }
     return true;
@@ -171,7 +171,7 @@ AddFunction::Run(MixedT left, MixedT right, MixedT& result) {
 }
 
 void
-RegisterAddFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterAddFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "+";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -179,135 +179,135 @@ RegisterAddFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     // Add function
     ScalarFunction add_function_int8(
             func_name,
-            { DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt) },
-            { DataType(LogicalType::kTinyInt) },
+            {DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt)},
+            {DataType(LogicalType::kTinyInt)},
             &ScalarFunction::BinaryFunctionWithFailure<TinyIntT, TinyIntT, TinyIntT, AddFunction>);
     function_set_ptr->AddFunction(add_function_int8);
 
     ScalarFunction add_function_int16(
             func_name,
-            { DataType(LogicalType::kSmallInt), DataType(LogicalType::kSmallInt) },
-            { DataType(LogicalType::kSmallInt) },
+            {DataType(LogicalType::kSmallInt), DataType(LogicalType::kSmallInt)},
+            {DataType(LogicalType::kSmallInt)},
             &ScalarFunction::BinaryFunctionWithFailure<SmallIntT, SmallIntT, SmallIntT, AddFunction>);
     function_set_ptr->AddFunction(add_function_int16);
 
     ScalarFunction add_function_int32(
             func_name,
-            { DataType(LogicalType::kInteger), DataType(LogicalType::kInteger) },
-            { DataType(LogicalType::kInteger) },
+            {DataType(LogicalType::kInteger), DataType(LogicalType::kInteger)},
+            {DataType(LogicalType::kInteger)},
             &ScalarFunction::BinaryFunctionWithFailure<IntegerT, IntegerT, IntegerT, AddFunction>);
     function_set_ptr->AddFunction(add_function_int32);
 
     ScalarFunction add_function_int64(
             func_name,
-            { DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt) },
-            { DataType(LogicalType::kBigInt) },
+            {DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt)},
+            {DataType(LogicalType::kBigInt)},
             &ScalarFunction::BinaryFunctionWithFailure<BigIntT, BigIntT, BigIntT, AddFunction>);
     function_set_ptr->AddFunction(add_function_int64);
 
     ScalarFunction add_function_int128(
             func_name,
-            { DataType(LogicalType::kHugeInt), DataType(LogicalType::kHugeInt) },
-            { DataType(LogicalType::kHugeInt) },
+            {DataType(LogicalType::kHugeInt), DataType(LogicalType::kHugeInt)},
+            {DataType(LogicalType::kHugeInt)},
             &ScalarFunction::BinaryFunctionWithFailure<HugeIntT, HugeIntT, HugeIntT, AddFunction>);
     function_set_ptr->AddFunction(add_function_int128);
 
 
     ScalarFunction add_function_float(
             func_name,
-            { DataType(LogicalType::kFloat), DataType(LogicalType::kFloat) },
-            { DataType(LogicalType::kFloat) },
+            {DataType(LogicalType::kFloat), DataType(LogicalType::kFloat)},
+            {DataType(LogicalType::kFloat)},
             &ScalarFunction::BinaryFunctionWithFailure<FloatT, FloatT, FloatT, AddFunction>);
     function_set_ptr->AddFunction(add_function_float);
 
     ScalarFunction add_function_double(
             func_name,
-            { DataType(LogicalType::kDouble), DataType(LogicalType::kDouble) },
-            { DataType(LogicalType::kDouble) },
+            {DataType(LogicalType::kDouble), DataType(LogicalType::kDouble)},
+            {DataType(LogicalType::kDouble)},
             &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, AddFunction>);
     function_set_ptr->AddFunction(add_function_double);
 
     ScalarFunction add_function_Decimal(
             func_name,
-            { DataType(LogicalType::kDecimal), DataType(LogicalType::kDecimal) },
-            { DataType(LogicalType::kDecimal) },
+            {DataType(LogicalType::kDecimal), DataType(LogicalType::kDecimal)},
+            {DataType(LogicalType::kDecimal)},
             &ScalarFunction::BinaryFunctionWithFailure<DecimalT, DecimalT, DecimalT, AddFunction>);
     function_set_ptr->AddFunction(add_function_Decimal);
 
     ScalarFunction add_function_date_interval(
             func_name,
-            { DataType(LogicalType::kDate), DataType(LogicalType::kInterval) },
-            { DataType(LogicalType::kDate) },
+            {DataType(LogicalType::kDate), DataType(LogicalType::kInterval)},
+            {DataType(LogicalType::kDate)},
             &ScalarFunction::BinaryFunctionWithFailure<DateT, IntervalT, DateT, AddFunction>);
     function_set_ptr->AddFunction(add_function_date_interval);
 
     ScalarFunction add_function_interval_date(
             func_name,
-            { DataType(LogicalType::kInterval), DataType(LogicalType::kDate) },
-            { DataType(LogicalType::kDate) },
+            {DataType(LogicalType::kInterval), DataType(LogicalType::kDate)},
+            {DataType(LogicalType::kDate)},
             &ScalarFunction::BinaryFunctionWithFailure<DateT, IntervalT, DateT, AddFunction>);
     function_set_ptr->AddFunction(add_function_interval_date);
 
     ScalarFunction add_function_datetime_interval(
             func_name,
-            { DataType(LogicalType::kDateTime), DataType(LogicalType::kInterval) },
-            { DataType(LogicalType::kDateTime) },
+            {DataType(LogicalType::kDateTime), DataType(LogicalType::kInterval)},
+            {DataType(LogicalType::kDateTime)},
             &ScalarFunction::BinaryFunctionWithFailure<DateTimeT, IntervalT, DateTimeT, AddFunction>);
     function_set_ptr->AddFunction(add_function_datetime_interval);
 
     ScalarFunction add_function_interval_datetime(
             func_name,
-            { DataType(LogicalType::kInterval), DataType(LogicalType::kDateTime) },
-            { DataType(LogicalType::kDateTime) },
+            {DataType(LogicalType::kInterval), DataType(LogicalType::kDateTime)},
+            {DataType(LogicalType::kDateTime)},
             &ScalarFunction::BinaryFunctionWithFailure<IntervalT, DateTimeT, DateTimeT, AddFunction>);
     function_set_ptr->AddFunction(add_function_interval_datetime);
 
     ScalarFunction add_function_timestamp_interval(
             func_name,
-            { DataType(LogicalType::kTimestamp), DataType(LogicalType::kInterval) },
-            { DataType(LogicalType::kTimestamp) },
+            {DataType(LogicalType::kTimestamp), DataType(LogicalType::kInterval)},
+            {DataType(LogicalType::kTimestamp)},
             &ScalarFunction::BinaryFunctionWithFailure<TimestampT, IntervalT, TimestampT, AddFunction>);
     function_set_ptr->AddFunction(add_function_timestamp_interval);
 
     ScalarFunction add_function_interval_timestamp(
             func_name,
-            { DataType(LogicalType::kInterval), DataType(LogicalType::kTimestamp) },
-            { DataType(LogicalType::kTimestamp) },
+            {DataType(LogicalType::kInterval), DataType(LogicalType::kTimestamp)},
+            {DataType(LogicalType::kTimestamp)},
             &ScalarFunction::BinaryFunctionWithFailure<IntervalT, TimestampT, TimestampT, AddFunction>);
     function_set_ptr->AddFunction(add_function_interval_timestamp);
 
     ScalarFunction add_function_mixed_bigint(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt) },
-            { DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt)},
+            {DataType(LogicalType::kMixed)},
             &ScalarFunction::BinaryFunctionWithFailure<MixedT, BigIntT, MixedT, AddFunction>);
     function_set_ptr->AddFunction(add_function_mixed_bigint);
 
     ScalarFunction add_function_bigint_mixed(
             func_name,
-            { DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed) },
-            { DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed)},
+            {DataType(LogicalType::kMixed)},
             &ScalarFunction::BinaryFunctionWithFailure<BigIntT, MixedT, MixedT, AddFunction>);
     function_set_ptr->AddFunction(add_function_bigint_mixed);
 
     ScalarFunction add_function_mixed_double(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kDouble) },
-            { DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},
+            {DataType(LogicalType::kMixed)},
             &ScalarFunction::BinaryFunctionWithFailure<MixedT, DoubleT, MixedT, AddFunction>);
     function_set_ptr->AddFunction(add_function_mixed_double);
 
     ScalarFunction add_function_double_mixed(
             func_name,
-            { DataType(LogicalType::kDouble), DataType(LogicalType::kMixed) },
-            { DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kDouble), DataType(LogicalType::kMixed)},
+            {DataType(LogicalType::kMixed)},
             &ScalarFunction::BinaryFunctionWithFailure<DoubleT, MixedT, MixedT, AddFunction>);
     function_set_ptr->AddFunction(add_function_double_mixed);
 
     ScalarFunction add_function_mixed_mixed(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kMixed) },
-            { DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kMixed)},
+            {DataType(LogicalType::kMixed)},
             &ScalarFunction::BinaryFunctionWithFailure<MixedT, MixedT, MixedT, AddFunction>);
     function_set_ptr->AddFunction(add_function_mixed_mixed);
 

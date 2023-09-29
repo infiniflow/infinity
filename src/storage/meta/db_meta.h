@@ -18,7 +18,7 @@ public:
     explicit
     DBMeta(const SharedPtr<String>& base_dir,
            SharedPtr<String> name)
-           : db_name_(std::move(name)), base_dir_(base_dir) {
+            : db_name_(std::move(name)), base_dir_(base_dir) {
     }
 
 public:
@@ -48,6 +48,7 @@ public:
     static UniquePtr<DBMeta>
     Deserialize(const nlohmann::json& db_meta_json,
                 BufferManager* buffer_mgr);
+
 public:
     RWMutex rw_locker_{};
     SharedPtr<String> db_name_{};

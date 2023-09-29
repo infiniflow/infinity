@@ -7,7 +7,7 @@
 namespace infinity {
 
 size_t
-EmbeddingType::embedding_type_width[] = {
+        EmbeddingType::embedding_type_width[] = {
         0,   // bit
         1,   // int8
         2,  // int16

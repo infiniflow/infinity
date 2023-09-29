@@ -13,7 +13,7 @@ namespace infinity {
 void
 KnnScanFunc(QueryContext* query_context,
             TableFunctionData* table_function_data_ptr,
-            DataBlock &output) {
+            DataBlock& output) {
 
     auto* knn_scan_function_data_ptr
             = static_cast<KnnScanFunctionData*>(table_function_data_ptr);
@@ -60,12 +60,12 @@ KnnScanFunc(QueryContext* query_context,
                 // Last segment, Get the result according to the topk row.
                 knn_flat_ip->End();
 
-                for(i64 query_idx = 0; query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++ query_idx) {
+                for(i64 query_idx = 0; query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++query_idx) {
 
                     f32* top_distance = knn_flat_ip->GetDistanceByIdx(query_idx);
                     CompoundID* compound_id = knn_flat_ip->GetIDByIdx(query_idx);
 
-                    for(i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++ top_idx) {
+                    for(i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                         SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
                         LOG_TRACE("Row offset: {}: {}, distance {}",
                                   compound_id[id].segment_id_,
@@ -240,7 +240,7 @@ KnnScanFunc(QueryContext* query_context,
 }
 
 void
-RegisterKnnScanFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterKnnScanFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
 
     SharedPtr<KnnScanFunction> table_scan_ptr = MakeShared<KnnScanFunction>("knn_scan", KnnScanFunc);
 

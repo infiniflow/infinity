@@ -28,7 +28,8 @@ PolygonType::PolygonType(PolygonType&& other) noexcept {
 
 PolygonType&
 PolygonType::operator=(const PolygonType& other) {
-    if(this == &other) return *this;
+    if(this == &other)
+        return *this;
     if(point_count != other.point_count) {
         Reset();
         point_count = other.point_count;
@@ -43,7 +44,8 @@ PolygonType::operator=(const PolygonType& other) {
 
 PolygonType&
 PolygonType::operator=(PolygonType&& other) noexcept {
-    if(this == &other) return *this;
+    if(this == &other)
+        return *this;
     if(this->point_count != 0) {
         Reset();
     }

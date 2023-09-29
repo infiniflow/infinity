@@ -241,10 +241,10 @@ TEST_F(TableTxnTest, test4) {
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
 
@@ -287,7 +287,7 @@ TEST_F(TableTxnTest, test5) {
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
     // Txn1: Begin, OK
@@ -302,13 +302,13 @@ TEST_F(TableTxnTest, test5) {
     new_txn1->CommitTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->CreateTxn();
+    Txn* new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();
@@ -338,7 +338,7 @@ TEST_F(TableTxnTest, test6) {
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
     // Txn1: Begin, OK
@@ -353,13 +353,13 @@ TEST_F(TableTxnTest, test6) {
     new_txn1->CommitTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->CreateTxn();
+    Txn* new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();
@@ -384,7 +384,7 @@ TEST_F(TableTxnTest, test7) {
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
     // Txn1: Begin, OK
@@ -403,7 +403,7 @@ TEST_F(TableTxnTest, test7) {
     new_txn1->RollbackTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
@@ -425,7 +425,7 @@ TEST_F(TableTxnTest, test8) {
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
     // Txn1: Begin, OK
@@ -440,7 +440,7 @@ TEST_F(TableTxnTest, test8) {
     new_txn1->CommitTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
@@ -453,7 +453,7 @@ TEST_F(TableTxnTest, test8) {
     new_txn2->RollbackTxn();
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->CreateTxn();
+    Txn* new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();
@@ -481,7 +481,7 @@ TEST_F(TableTxnTest, test9) {
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
     // Txn1: Begin, OK
@@ -496,7 +496,7 @@ TEST_F(TableTxnTest, test9) {
     new_txn1->CommitTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
@@ -506,7 +506,7 @@ TEST_F(TableTxnTest, test9) {
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->CreateTxn();
+    Txn* new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();
@@ -538,7 +538,7 @@ TEST_F(TableTxnTest, test10) {
     EntryResult create1_res, create2_res, create3_res, dropped1_res, get_res;
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn1->BeginTxn();
@@ -552,10 +552,10 @@ TEST_F(TableTxnTest, test10) {
     new_txn1->CommitTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->CreateTxn();
+    Txn* new_txn3 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();

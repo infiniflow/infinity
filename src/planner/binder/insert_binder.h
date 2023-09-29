@@ -13,7 +13,7 @@ public:
 
     // Bind expression entry
     SharedPtr<BaseExpression>
-    BuildExpression(const ParsedExpr &expr,
+    BuildExpression(const ParsedExpr& expr,
                     BindContext* bind_context_ptr,
                     i64 depth,
                     bool root) final;

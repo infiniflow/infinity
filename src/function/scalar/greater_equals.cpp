@@ -19,20 +19,19 @@ struct GreaterEqualsFunction {
 
 template<>
 inline void
-GreaterEqualsFunction::Run(VarcharT left, VarcharT right, bool & result) {
+GreaterEqualsFunction::Run(VarcharT left, VarcharT right, bool& result) {
     if(left.IsInlined()) {
         if(right.IsInlined()) {
             result = (memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) >= 0);
-            return ;
+            return;
         }
-    } else if(right.IsInlined()) {
-        ;
+    } else if(right.IsInlined()) { ;
     } else {
         // Both left and right are not inline
         u16 min_len = std::min(right.length, left.length);
         if(memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) >= 0) {
             result = (memcmp(left.ptr, right.ptr, min_len) >= 0);
-            return ;
+            return;
         }
     }
     result = false;
@@ -80,14 +79,14 @@ GenerateGreaterEqualsFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr, Da
     String func_name = ">=";
     ScalarFunction greater_equals_function(
             func_name,
-            { data_type, data_type },
-            { DataType(LogicalType::kBoolean) },
+            {data_type, data_type},
+            {DataType(LogicalType::kBoolean)},
             &ScalarFunction::BinaryFunction<CompareType, CompareType, BooleanT, GreaterEqualsFunction>);
     function_set_ptr->AddFunction(greater_equals_function);
 }
 
 void
-RegisterGreaterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterGreaterEqualsFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = ">=";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
@@ -118,42 +117,42 @@ RegisterGreaterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
     ScalarFunction mix_greater_equals_bigint(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, BigIntT, BooleanT, GreaterEqualsFunction>);
     function_set_ptr->AddFunction(mix_greater_equals_bigint);
 
     ScalarFunction bigint_greater_equals_mixed(
             func_name,
-            { DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<BigIntT, MixedT, BooleanT, GreaterEqualsFunction>);
     function_set_ptr->AddFunction(bigint_greater_equals_mixed);
 
     ScalarFunction mix_greater_equals_double(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kDouble) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, DoubleT, BooleanT, GreaterEqualsFunction>);
     function_set_ptr->AddFunction(mix_greater_equals_double);
 
     ScalarFunction double_greater_equals_mixed(
             func_name,
-            { DataType(LogicalType::kDouble), DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kDouble), DataType(LogicalType::kMixed)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<DoubleT, MixedT, BooleanT, GreaterEqualsFunction>);
     function_set_ptr->AddFunction(double_greater_equals_mixed);
 
     ScalarFunction mix_greater_equals_varchar(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, VarcharT, BooleanT, GreaterEqualsFunction>);
     function_set_ptr->AddFunction(mix_greater_equals_varchar);
 
     ScalarFunction varchar_greater_equals_mixed(
             func_name,
-            { DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, GreaterEqualsFunction>);
     function_set_ptr->AddFunction(varchar_greater_equals_mixed);

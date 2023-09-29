@@ -45,7 +45,7 @@ TEST_F(FirstFunctionTest, first_func) {
     SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     SharedPtr<AggregateFunctionSet> aggregate_function_set
-        = std::static_pointer_cast<AggregateFunctionSet>(function_set);
+            = std::static_pointer_cast<AggregateFunctionSet>(function_set);
     {
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
@@ -66,7 +66,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
         }
         data_block.Finalize();
@@ -74,7 +74,7 @@ TEST_F(FirstFunctionTest, first_func) {
         func.init_func_(func.GetState());
         func.update_func_(func.GetState(), data_block.column_vectors[0]);
         BooleanT result;
-        result = *(BooleanT *) func.finalize_func_(func.GetState());
+        result = *(BooleanT*)func.finalize_func_(func.GetState());
 
         EXPECT_EQ(result, true);
     }
@@ -99,7 +99,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<TinyIntT>(i)));
         }
         data_block.Finalize();
@@ -132,7 +132,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<SmallIntT>(i)));
         }
         data_block.Finalize();
@@ -165,7 +165,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<IntegerT>(i)));
         }
         data_block.Finalize();
@@ -198,7 +198,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<BigIntT>(i)));
         }
         data_block.Finalize();
@@ -231,7 +231,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeHugeInt(HugeIntT(i, i)));
         }
         data_block.Finalize();
@@ -265,7 +265,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<FloatT>(2 * i)));
         }
         data_block.Finalize();
@@ -298,7 +298,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<DoubleT>(2 * i)));
         }
         data_block.Finalize();
@@ -314,11 +314,11 @@ TEST_F(FirstFunctionTest, first_func) {
     {
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
+                                                                                "t1",
+                                                                                1,
+                                                                                "c1",
+                                                                                0,
+                                                                                0);
 
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("FIRST(Varchar)->Varchar", func.ToString().c_str());
@@ -331,7 +331,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT idx = 0; idx < row_count; ++idx) {
+        for(SizeT idx = 0; idx < row_count; ++idx) {
             String s = "hello" + std::to_string(idx);
             VarcharT varchar_value(s);
             Value v = Value::MakeVarchar(varchar_value);
@@ -367,7 +367,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDate(static_cast<DateT>(2 * i)));
         }
         data_block.Finalize();
@@ -400,7 +400,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTime(static_cast<TimeT>(2 * i)));
         }
         data_block.Finalize();
@@ -433,7 +433,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDateTime(DateTimeT(i, i)));
         }
         data_block.Finalize();
@@ -467,7 +467,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTimestamp(TimestampT(i, i)));
         }
         data_block.Finalize();
@@ -501,7 +501,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             IntervalT interval(i);
             interval.unit = TimeUnit::kDay;
             data_block.AppendValue(0, Value::MakeInterval(interval));
@@ -537,7 +537,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakePoint(PointT(static_cast<float>(i), static_cast<float>(i))));
         }
         data_block.Finalize();
@@ -571,7 +571,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeLine(LineT(static_cast<float>(i),
                                                             static_cast<float>(i + 1),
                                                             static_cast<float>(i + 2))));
@@ -607,7 +607,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             PointT p1(static_cast<f64>(i), static_cast<f64>(i));
             PointT p2(static_cast<f64>(i + 1), static_cast<f64>(i + 1));
             data_block.AppendValue(0, Value::MakeLineSegment(LineSegT(p1, p2)));
@@ -644,7 +644,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             PointT p1(static_cast<f64>(i), static_cast<f64>(i));
             PointT p2(static_cast<f64>(i + 1), static_cast<f64>(i + 1));
             data_block.AppendValue(0, Value::MakeBox(BoxT(p1, p2)));
@@ -681,7 +681,7 @@ TEST_F(FirstFunctionTest, first_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             PointT p1(static_cast<f64>(i), static_cast<f64>(i));
             f64 d1 = static_cast<f64>(i);
             data_block.AppendValue(0, Value::MakeCircle(CircleT(p1, d1)));

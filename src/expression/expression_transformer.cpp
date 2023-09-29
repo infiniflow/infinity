@@ -13,18 +13,19 @@
 namespace infinity {
 
 Vector<SharedPtr<BaseExpression>>
-SplitExpressionByDelimiter(const SharedPtr<BaseExpression> &expression, ConjunctionType delimiter) {
+SplitExpressionByDelimiter(const SharedPtr<BaseExpression>& expression, ConjunctionType delimiter) {
     Vector<SharedPtr<BaseExpression>> result;
 
-    std::function<VisitControlType(SharedPtr<BaseExpression> &child)> func
-        = [&](const SharedPtr<BaseExpression> &expr_ptr) -> VisitControlType {
-        if(expr_ptr->type() == ExpressionType::kConjunction) {
-            const auto conjunction_expr_ptr = std::static_pointer_cast<ConjunctionExpression>(expr_ptr);
-            if(conjunction_expr_ptr->conjunction_type() == delimiter) return VisitControlType::kVisit;
-        }
-        result.emplace_back(expr_ptr);
-        return VisitControlType::kNotVisit;
-    };
+    std::function<VisitControlType(SharedPtr<BaseExpression>& child)> func
+            = [&](const SharedPtr<BaseExpression>& expr_ptr) -> VisitControlType {
+                if(expr_ptr->type() == ExpressionType::kConjunction) {
+                    const auto conjunction_expr_ptr = std::static_pointer_cast<ConjunctionExpression>(expr_ptr);
+                    if(conjunction_expr_ptr->conjunction_type() == delimiter)
+                        return VisitControlType::kVisit;
+                }
+                result.emplace_back(expr_ptr);
+                return VisitControlType::kNotVisit;
+            };
 
     VisitExpression(expression, func);
 
@@ -33,13 +34,13 @@ SplitExpressionByDelimiter(const SharedPtr<BaseExpression> &expression, Conjunct
 
 SharedPtr<BaseExpression>
 ComposeExpressionWithDelimiter(const Vector<SharedPtr<BaseExpression>>& expressions,
-                             ConjunctionType conjunction_type) {
+                               ConjunctionType conjunction_type) {
     auto expr_count = expressions.size();
     if(expr_count == 0) {
         return nullptr;
     }
     SharedPtr<BaseExpression> result = expressions[0];
-    for(auto i = 1; i < expr_count; ++ i) {
+    for(auto i = 1; i < expr_count; ++i) {
         result = MakeShared<ConjunctionExpression>(conjunction_type, result, expressions[i]);
     }
     return result;
@@ -47,11 +48,11 @@ ComposeExpressionWithDelimiter(const Vector<SharedPtr<BaseExpression>>& expressi
 
 void
 VisitExpression(const SharedPtr<BaseExpression>& expression,
-                const std::function<VisitControlType(SharedPtr<BaseExpression> &child)>& visitor) {
+                const std::function<VisitControlType(SharedPtr<BaseExpression>& child)>& visitor) {
     std::queue<SharedPtr<BaseExpression>> queue;
     queue.push(expression);
 
-    while (!queue.empty()) {
+    while(!queue.empty()) {
         auto expr = queue.front();
         queue.pop();
 
@@ -65,7 +66,7 @@ VisitExpression(const SharedPtr<BaseExpression>& expression,
 
 void
 VisitExpression(const SharedPtr<BaseExpression>& expression,
-                const std::function<void(SharedPtr<BaseExpression> &child)>& visitor) {
+                const std::function<void(SharedPtr<BaseExpression>& child)>& visitor) {
     switch(expression->type()) {
         case ExpressionType::kAggregate: {
             AggregateExpression* agg_expr = (AggregateExpression*)expression.get();
@@ -81,7 +82,7 @@ VisitExpression(const SharedPtr<BaseExpression>& expression,
             }
             break;
         }
-        case ExpressionType::kCast:  {
+        case ExpressionType::kCast: {
             CastExpression* cast_expr = (CastExpression*)expression.get();
             for(auto& argument: cast_expr->arguments()) {
                 visitor(argument);

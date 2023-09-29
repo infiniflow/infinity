@@ -13,8 +13,8 @@ class PhysicalMergeSort final : public PhysicalOperator {
 public:
     explicit
     PhysicalMergeSort(SharedPtr<Vector<String>> output_names,
-                   SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                   u64 id)
+                      SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                      u64 id)
             : PhysicalOperator(PhysicalOperatorType::kMergeSort, nullptr, nullptr, id),
               output_names_(std::move(output_names)),
               output_types_(std::move(output_types)) {

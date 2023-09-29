@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-template <typename FN>
+template<typename FN>
 class DeferFn {
 public:
     explicit

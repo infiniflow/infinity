@@ -22,7 +22,7 @@ public:
 
 public:
     explicit
-    FunctionSet(String name, FunctionType type): name_(std::move(name)), type_(type) {}
+    FunctionSet(String name, FunctionType type) : name_(std::move(name)), type_(type) {}
 
     virtual
     ~FunctionSet() = default;

@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include <utility>
 #include <map>
 #include <optional>
@@ -41,7 +42,7 @@ public:
     String
     read_command_body();
 
-    void 
+    void
     send_error_response(const HashMap<PGMessageType, String>& error_response_map);
 //
 //    String read_query_packet();

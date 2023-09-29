@@ -21,7 +21,7 @@ public:
 
 public:
     ParsedExpr* left_{nullptr};
-    Vector<ParsedExpr*> *arguments_{nullptr};
+    Vector<ParsedExpr*>* arguments_{nullptr};
     bool not_in_{false};
 };
 

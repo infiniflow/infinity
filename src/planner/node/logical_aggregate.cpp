@@ -12,10 +12,10 @@ LogicalAggregate::GetColumnBindings() const {
     SizeT groups_count = groups_.size();
     SizeT aggregates_count = aggregates_.size();
     result.reserve(groups_count + aggregates_count);
-    for(SizeT i = 0; i < groups_count; ++ i) {
+    for(SizeT i = 0; i < groups_count; ++i) {
         result.emplace_back(groupby_index_, i);
     }
-    for(SizeT i = 0; i < aggregates_count; ++ i) {
+    for(SizeT i = 0; i < aggregates_count; ++i) {
         result.emplace_back(aggregate_index_, i);
     }
     return result;
@@ -27,10 +27,10 @@ LogicalAggregate::GetOutputNames() const {
     SizeT groups_count = groups_.size();
     SizeT aggregates_count = aggregates_.size();
     result->reserve(groups_count + aggregates_count);
-    for(SizeT i = 0; i < groups_count; ++ i) {
+    for(SizeT i = 0; i < groups_count; ++i) {
         result->emplace_back(groups_[i]->Name());
     }
-    for(SizeT i = 0; i < aggregates_count; ++ i) {
+    for(SizeT i = 0; i < aggregates_count; ++i) {
         result->emplace_back(aggregates_[i]->Name());
     }
     return result;
@@ -42,17 +42,17 @@ LogicalAggregate::GetOutputTypes() const {
     SizeT groups_count = groups_.size();
     SizeT aggregates_count = aggregates_.size();
     result->reserve(groups_count + aggregates_count);
-    for(SizeT i = 0; i < groups_count; ++ i) {
+    for(SizeT i = 0; i < groups_count; ++i) {
         result->emplace_back(MakeShared<DataType>(groups_[i]->Type()));
     }
-    for(SizeT i = 0; i < aggregates_count; ++ i) {
+    for(SizeT i = 0; i < aggregates_count; ++i) {
         result->emplace_back(MakeShared<DataType>(aggregates_[i]->Type()));
     }
     return result;
 }
 
 String
-LogicalAggregate::ToString(i64 &space) {
+LogicalAggregate::ToString(i64& space) {
 
     std::stringstream ss;
     String arrow_str;
@@ -65,7 +65,7 @@ LogicalAggregate::ToString(i64 &space) {
     if(!aggregates_.empty()) {
         ss << "Aggregate on: ";
         SizeT expression_count = aggregates_.size();
-        for(SizeT i = 0; i < expression_count - 1; ++ i) {
+        for(SizeT i = 0; i < expression_count - 1; ++i) {
             ss << aggregates_[i]->Name() << ", ";
         }
         ss << aggregates_.back()->Name();
@@ -78,7 +78,7 @@ LogicalAggregate::ToString(i64 &space) {
             ss << ", Group by: ";
         }
         SizeT expression_count = groups_.size();
-        for(SizeT i = 0; i < expression_count - 1; ++ i) {
+        for(SizeT i = 0; i < expression_count - 1; ++i) {
             ss << groups_[i]->Name() << ", ";
         }
         ss << groups_.back()->Name();

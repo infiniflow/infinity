@@ -71,7 +71,8 @@ BoundSelectStatement::BuildPlan(QueryContext* query_context) {
         root = project;
 
         if(!order_by_expressions_.empty()) {
-            PlannerAssert(order_by_expressions_.size() == order_by_types_.size(), "Unknown error on order by expression");
+            PlannerAssert(order_by_expressions_.size() == order_by_types_.size(),
+                          "Unknown error on order by expression");
             SharedPtr<LogicalNode> sort
                     = MakeShared<LogicalSort>(bind_context->GetNewLogicalNodeId(),
                                               order_by_expressions_,
@@ -149,7 +150,7 @@ BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef>& table_ref,
 
             // Change function table to knn table scan function
             base_table_ref->table_func_ = KnnScanFunction::Make(query_context->storage()->catalog(),
-                                                                                       "knn_scan");
+                                                                "knn_scan");
 
             SharedPtr<LogicalKnnScan> knn_scan_node
                     = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(),
@@ -308,10 +309,10 @@ BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode>& root,
                                     QueryContext* query_context,
                                     const SharedPtr<BindContext>& bind_context) {
     if(condition == nullptr) {
-        return ;
+        return;
     }
 
-    VisitExpression(condition, [&](SharedPtr<BaseExpression> &expr) {
+    VisitExpression(condition, [&](SharedPtr<BaseExpression>& expr) {
         BuildSubquery(root, expr, query_context, bind_context);
     });
 

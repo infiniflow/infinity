@@ -14,6 +14,7 @@
 namespace infinity {
 
 class Task;
+
 class NewScheduler {
 public:
     static void
@@ -38,6 +39,7 @@ private:
 
     static i64
     GetAvailableCPU();
+
 private:
     static HashSet<i64> cpu_set;
 
@@ -154,7 +156,7 @@ struct PipelineTask final : public Task {
         SizeT op_count = operators_.size();
         assert(op_count > 0);
         operators_[0]->Run(source_buffer_.get(), buffers_[0].get());
-        for(SizeT idx = 1; idx < op_count; ++ idx) {
+        for(SizeT idx = 1; idx < op_count; ++idx) {
             operators_[idx]->Run(buffers_[idx - 1].get(), buffers_[idx].get());
         }
 
@@ -196,7 +198,7 @@ struct PipelineTask final : public Task {
     GetResult() {
 //        wait_flag_.wait(true);
         std::unique_lock<std::mutex> locker(result_lk_);
-        result_cv_.wait(locker, [&]{
+        result_cv_.wait(locker, [&] {
             return completed_;
         });
 //        printf("Get result\n");

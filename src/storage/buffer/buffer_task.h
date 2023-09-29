@@ -22,10 +22,10 @@ public:
     OnCommit(const SharedPtr<AsyncTask>& async_task);
 };
 
-class BufferReadTask final: public AsyncTask {
+class BufferReadTask final : public AsyncTask {
 public:
     explicit
-    BufferReadTask(void* buffer_handle): AsyncTask(AsyncTaskType::kBufferRead), buffer_handle_(buffer_handle) {}
+    BufferReadTask(void* buffer_handle) : AsyncTask(AsyncTaskType::kBufferRead), buffer_handle_(buffer_handle) {}
 
     inline String
     ToString() override {
@@ -46,7 +46,7 @@ private:
 class BufferWriteTask : public AsyncTask {
 public:
     explicit
-    BufferWriteTask(void* buffer_handle): AsyncTask(AsyncTaskType::kBufferWrite), buffer_handle_(buffer_handle) {}
+    BufferWriteTask(void* buffer_handle) : AsyncTask(AsyncTaskType::kBufferWrite), buffer_handle_(buffer_handle) {}
 
     inline String
     ToString() override {

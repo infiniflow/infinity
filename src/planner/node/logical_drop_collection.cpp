@@ -15,7 +15,7 @@ LogicalDropCollection::ToString(i64& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Drop Collection: " << *schema_name_<< "." << *collection_name_;
+    ss << String(space, ' ') << arrow_str << "Drop Collection: " << *schema_name_ << "." << *collection_name_;
     space += arrow_str.size();
 
     return ss.str();

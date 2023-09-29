@@ -15,7 +15,7 @@
 
 namespace infinity {
 
-class KnnScanFunctionData: public TableFunctionData {
+class KnnScanFunctionData : public TableFunctionData {
 public:
     KnnScanFunctionData(const Vector<SegmentEntry*>* segment_entries_ptr,
                         const SharedPtr<Vector<u64>>& segment_indexes,
@@ -36,8 +36,7 @@ public:
               query_embedding_count_(query_embedding_count),
               query_embedding_(query_embedding),
               elem_type_(elem_type),
-              knn_distance_type_(knn_distance_type)
-    {}
+              knn_distance_type_(knn_distance_type) {}
 
     const Vector<SegmentEntry*>* segment_entries_ptr_{};
     const SharedPtr<Vector<u64>>& segment_indexes_{};

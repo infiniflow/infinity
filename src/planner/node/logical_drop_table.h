@@ -14,11 +14,10 @@ public:
                      SharedPtr<String> schema_name,
                      SharedPtr<String> table_name,
                      ConflictType conflict_type)
-        : LogicalNode(node_id, LogicalNodeType::kDropTable),
-          schema_name_(std::move(schema_name)),
-          table_name_(std::move(table_name)),
-          conflict_type_(conflict_type)
-          {}
+            : LogicalNode(node_id, LogicalNodeType::kDropTable),
+              schema_name_(std::move(schema_name)),
+              table_name_(std::move(table_name)),
+              conflict_type_(conflict_type) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {

@@ -11,7 +11,8 @@ namespace infinity {
 class PhysicalPreparedPlan : public PhysicalOperator {
 public:
     explicit PhysicalPreparedPlan(uint64_t id)
-        : PhysicalOperator(PhysicalOperatorType::kPreparedPlan, nullptr, nullptr, id) {}
+            : PhysicalOperator(PhysicalOperatorType::kPreparedPlan, nullptr, nullptr, id) {}
+
     ~PhysicalPreparedPlan() override = default;
 
     void

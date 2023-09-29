@@ -10,6 +10,6 @@
 namespace infinity {
 
 void
-RegisterMaxFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterMaxFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
 }

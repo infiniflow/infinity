@@ -22,11 +22,10 @@ public:
     }
 
     explicit
-    EmbeddingInfo(EmbeddingDataType type, SizeT dimension):
+    EmbeddingInfo(EmbeddingDataType type, SizeT dimension) :
             TypeInfo(TypeInfoType::kEmbedding),
             embedding_data_type_(type),
-            dimension_(dimension)
-            {}
+            dimension_(dimension) {}
 
     ~EmbeddingInfo() override = default;
 
@@ -52,13 +51,14 @@ public:
     Serialize() const override;
 
     [[nodiscard]] inline
-    String ToString() const override {
+    String
+    ToString() const override {
         return EmbeddingDataTypeToString(embedding_data_type_) + "," + std::to_string(dimension_);
     }
 
     static
-    String EmbeddingDataTypeToString(EmbeddingDataType type) ;
-
+    String
+    EmbeddingDataTypeToString(EmbeddingDataType type);
 
 
 private:

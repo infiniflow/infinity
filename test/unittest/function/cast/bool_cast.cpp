@@ -62,12 +62,12 @@ TEST_F(BoolCastTest, bool_cast1) {
     SharedPtr<ColumnVector> col_bool = MakeShared<ColumnVector>(bool_type);
     col_bool->Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeBool(i % 2 == 0);
         col_bool->AppendValue(v);
         Value vx = col_bool->GetValue(i);
     }
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = col_bool->GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, i % 2 == 0);
@@ -85,7 +85,7 @@ TEST_F(BoolCastTest, bool_cast1) {
         CastParameters cast_parameters;
         bool result = bool2varchar_ptr.function(col_bool, col_varchar_ptr, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
-        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             Value vx = col_varchar_ptr->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             String res = String(vx.value_.varchar.prefix, vx.value_.varchar.length);

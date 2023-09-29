@@ -9,7 +9,7 @@ namespace infinity {
 String
 ShowStatement::ToString() const {
     std::stringstream ss;
-    switch (show_type_) {
+    switch(show_type_) {
         case ShowStmtType::kTables: {
             ss << "Show tables, schema: " << schema_name_;
             break;

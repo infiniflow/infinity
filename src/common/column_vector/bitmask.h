@@ -19,6 +19,7 @@ struct Bitmask {
 
 public:
     Bitmask();
+
     ~Bitmask();
 
     void
@@ -72,15 +73,15 @@ public:
     CountFalse() const { return count_ - CountTrue(); }
 
     void
-    Merge(const Bitmask &other);
+    Merge(const Bitmask& other);
 
     [[nodiscard]] size_t
     count() const { return count_; }
 
 private:
-    u64* data_ptr_ {nullptr};
-    SharedPtr<BitmaskBuffer> buffer_ptr {nullptr};
-    size_t count_ {0};
+    u64* data_ptr_{nullptr};
+    SharedPtr<BitmaskBuffer> buffer_ptr{nullptr};
+    size_t count_{0};
 };
 
 }

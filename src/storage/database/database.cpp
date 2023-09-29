@@ -34,9 +34,9 @@ Database::~Database() {
 }
 
 SharedPtr<Database>
-Database::Open(const String &dir_name, FileSystemType file_system_type) {
+Database::Open(const String& dir_name, FileSystemType file_system_type) {
     SharedPtr<Database> database_ptr = MakeShared<Database>(dir_name, file_system_type);
-    database_ptr->locker_fd_ =  DatabaseHelper::CreateLockerFile(dir_name);
+    database_ptr->locker_fd_ = DatabaseHelper::CreateLockerFile(dir_name);
 
     return database_ptr;
 }

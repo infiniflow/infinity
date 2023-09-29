@@ -23,16 +23,19 @@ public:
               i64 topk,
               i64 dimension,
               EmbeddingDataType elem_data_type)
-              : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2, elem_data_type),
-                queries_(queries),
-                query_count_(query_count),
-                dimension_(dimension),
-                top_k_(topk) {
+            : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2, elem_data_type),
+              queries_(queries),
+              query_count_(query_count),
+              dimension_(dimension),
+              top_k_(topk) {
 
         id_array_ = MakeUnique<Vector<CompoundID>>(top_k_ * query_count_, CompoundID(-1, -1));
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * top_k_ * query_count_);
 
-        heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, distance_array_.get(), id_array_->data(), top_k_);
+        heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count,
+                                                             distance_array_.get(),
+                                                             id_array_->data(),
+                                                             top_k_);
         single_result_handler_ = MakeUnique<SingleResultHandler>(*heap_result_handler_, query_count);
     }
 

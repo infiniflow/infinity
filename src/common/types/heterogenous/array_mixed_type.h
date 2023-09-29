@@ -24,8 +24,8 @@ public:
     i8 _dummy1{};
     i16 _dummy2{};
     i16 _dummy3{};
-    u16 count {0};        // Array count, which limit is 65535;
-    ptr_t ptr {nullptr};  // pointer to child mixed type
+    u16 count{0};        // Array count, which limit is 65535;
+    ptr_t ptr{nullptr};  // pointer to child mixed type
 };
 
 }

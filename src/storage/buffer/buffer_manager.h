@@ -21,7 +21,7 @@ public:
     Init();
 
     BufferHandle*
-    GetBufferHandle(const SharedPtr<String>& file_dir, const SharedPtr<String> &filename, BufferType buffer_type);
+    GetBufferHandle(const SharedPtr<String>& file_dir, const SharedPtr<String>& filename, BufferType buffer_type);
 
     BufferHandle*
     AllocateBufferHandle(const SharedPtr<String>& file_dir, const SharedPtr<String>& filename, SizeT buffer_size);
@@ -58,7 +58,7 @@ private:
     SharedPtr<String> temp_dir_;
     HashMap<String, BufferHandle> buffer_map_;
 
-    moodycamel::ConcurrentQueue<BufferHandle *> queue_{};
+    moodycamel::ConcurrentQueue<BufferHandle*> queue_{};
 
 };
 

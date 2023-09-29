@@ -8,7 +8,7 @@
 namespace infinity {
 
 SharedPtr<ExpressionState>
-ExpressionState::CreateState(const SharedPtr<BaseExpression> &expression) {
+ExpressionState::CreateState(const SharedPtr<BaseExpression>& expression) {
 
     switch(expression->type()) {
         case ExpressionType::kAggregate:
@@ -101,7 +101,7 @@ ExpressionState::CreateState(const SharedPtr<FunctionExpression>& function_expr)
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     SharedPtr<DataType> function_expr_data_type = MakeShared<DataType>(function_expr->Type());
 
-    for(auto& arg : function_expr->arguments()) {
+    for(auto& arg: function_expr->arguments()) {
         result->AddChild(arg);
     }
 
@@ -160,7 +160,7 @@ ExpressionState::CreateState(const SharedPtr<InExpression>& in_expr) {
 }
 
 void
-ExpressionState::AddChild(const SharedPtr<BaseExpression> &expression) {
+ExpressionState::AddChild(const SharedPtr<BaseExpression>& expression) {
     children_.emplace_back(CreateState(expression));
 }
 

@@ -17,7 +17,9 @@
 namespace infinity {
 
 class TxnManager;
+
 class BufferManager;
+
 class NewCatalog;
 
 struct GetParam {
@@ -35,7 +37,8 @@ struct ScanParam {
 class Txn {
 public:
     explicit
-    Txn(TxnManager* txn_mgr, NewCatalog* catalog, u32 txn_id) : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(std::make_shared<WalEntry>()) {}
+    Txn(TxnManager* txn_mgr, NewCatalog* catalog, u32 txn_id)
+            : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(std::make_shared<WalEntry>()) {}
 
     void
     BeginTxn();

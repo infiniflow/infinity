@@ -11,7 +11,8 @@ namespace infinity {
 class PhysicalIndexJoin : public PhysicalOperator {
 public:
     explicit PhysicalIndexJoin(uint64_t id)
-        : PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr, id) {}
+            : PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr, id) {}
+
     ~PhysicalIndexJoin() override = default;
 
     void

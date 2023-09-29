@@ -23,9 +23,8 @@ class Function {
 public:
     explicit
     Function(String name, FunctionType type)
-        : name_(std::move(name)),
-        type_(type)
-        {}
+            : name_(std::move(name)),
+              type_(type) {}
 
     virtual
     ~Function() = default;

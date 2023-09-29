@@ -22,10 +22,10 @@ public:
                  SinkType sink_type,
                  SharedPtr<Vector<String>> names,
                  SharedPtr<Vector<SharedPtr<DataType>>> types)
-            : PhysicalOperator(PhysicalOperatorType::kSink, nullptr, nullptr,id),
-            type_(sink_type),
-            output_names_(std::move(names)),
-            output_types_(std::move(types)) {
+            : PhysicalOperator(PhysicalOperatorType::kSink, nullptr, nullptr, id),
+              type_(sink_type),
+              output_names_(std::move(names)),
+              output_types_(std::move(types)) {
 
     }
 

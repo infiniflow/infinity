@@ -12,14 +12,18 @@ public:
 
     ~PipelineExecutor() noexcept = default;
 
-    void Run();
+    void
+    Run();
 
-    bool AdmitQuery(QueryContext* query_context, const SharedPtr<Pipeline> &pipeline);
+    bool
+    AdmitQuery(QueryContext* query_context, const SharedPtr<Pipeline>& pipeline);
 
-    bool CancelQuery(QueryContext* query_context);
+    bool
+    CancelQuery(QueryContext* query_context);
 
 private:
-    void DispatchTask(std::uint16_t worker_id, PipelineTaskPtr task);
+    void
+    DispatchTask(std::uint16_t worker_id, PipelineTaskPtr task);
 
 private:
     WorkerManager worker_manager_;

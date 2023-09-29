@@ -10,7 +10,7 @@
 #include "bin/compilation_config.h"
 
 auto
-main () -> int {
+main() -> int {
 
     std::cout << std::filesystem::current_path() << std::endl;
 

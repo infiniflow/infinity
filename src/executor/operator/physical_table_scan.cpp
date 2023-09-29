@@ -36,7 +36,7 @@ PhysicalTableScan::Execute(QueryContext* query_context) {
     // Generate the result table definition
     Vector<SharedPtr<ColumnDef>> column_defs;
     size_t column_count = base_table_ref_->column_names_->size();
-    for(size_t idx = 0; idx < column_count; ++ idx) {
+    for(size_t idx = 0; idx < column_count; ++idx) {
         // Use the column id to fetch column name and type
         String& col_name_ref = base_table_ref_->column_names_->at(idx);
         SharedPtr<DataType> col_type_ref = base_table_ref_->column_types_->at(idx);
@@ -49,17 +49,19 @@ PhysicalTableScan::Execute(QueryContext* query_context) {
     }
 
     SharedPtr<TableDef> table_def_ptr
-            = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>(base_table_ref_->alias_), column_defs);
+            = MakeShared<TableDef>(MakeShared<String>("default"),
+                                   MakeShared<String>(base_table_ref_->alias_),
+                                   column_defs);
 
     output_ = MakeShared<Table>(table_def_ptr, TableType::kResult);
 
     while(true) {
-         SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
-         output_block->Init(*base_table_ref_->column_types_);
-         base_table_ref_->table_func_->main_function_(
-                 query_context,
-                 nullptr,
-                 *output_block);
+        SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
+        output_block->Init(*base_table_ref_->column_types_);
+        base_table_ref_->table_func_->main_function_(
+                query_context,
+                nullptr,
+                *output_block);
         if(output_block->row_count() > 0) {
             output_->Append(output_block);
         } else {
@@ -112,11 +114,11 @@ Vector<SharedPtr<Vector<u64>>>
 PhysicalTableScan::PlanSegmentEntries(i64 parallel_count) const {
     SizeT segment_count = base_table_ref_->segment_entries_->size();
     Vector<SharedPtr<Vector<u64>>> result(parallel_count, nullptr);
-    for(SizeT task_id = 0; task_id < parallel_count; ++ task_id) {
+    for(SizeT task_id = 0; task_id < parallel_count; ++task_id) {
         result[task_id] = MakeShared<Vector<u64>>();
     }
 
-    for(SizeT idx = 0; idx < segment_count; ++ idx) {
+    for(SizeT idx = 0; idx < segment_count; ++idx) {
         u64 task_id = idx % parallel_count;
         result[task_id]->emplace_back(idx);
     }

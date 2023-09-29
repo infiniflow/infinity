@@ -12,7 +12,7 @@ namespace infinity {
 
 
 void
-OptimizerProfiler::StartRule(const String &rule_name) {
+OptimizerProfiler::StartRule(const String& rule_name) {
     profilers_.emplace_back(rule_name);
     profilers_.back().Begin();
 }
@@ -35,14 +35,21 @@ OptimizerProfiler::ToString(SizeT intent) const {
 
 String
 QueryProfiler::QueryPhaseToString(QueryPhase phase) {
-    switch (phase) {
-        case QueryPhase::kParser: return "Parser";
-        case QueryPhase::kLogicalPlan: return "LogicalPlan";
-        case QueryPhase::kOptimizer: return "Optimizer";
-        case QueryPhase::kPhysicalPlan: return "PhysicalPlan";
-        case QueryPhase::kPipelineBuild: return "PipelineBuild";
-        case QueryPhase::kExecution: return "Execution";
-        default: GeneralError("Invalid query phase in query profiler");
+    switch(phase) {
+        case QueryPhase::kParser:
+            return "Parser";
+        case QueryPhase::kLogicalPlan:
+            return "LogicalPlan";
+        case QueryPhase::kOptimizer:
+            return "Optimizer";
+        case QueryPhase::kPhysicalPlan:
+            return "PhysicalPlan";
+        case QueryPhase::kPipelineBuild:
+            return "PipelineBuild";
+        case QueryPhase::kExecution:
+            return "Execution";
+        default:
+            GeneralError("Invalid query phase in query profiler");
     }
 }
 
@@ -54,7 +61,8 @@ QueryProfiler::StartPhase(QueryPhase phase) {
     if(current_phase_ == QueryPhase::kInvalid) {
         current_phase_ = phase;
     } else {
-        GeneralError("Can't start new query phase before current phase(" + QueryPhaseToString(current_phase_) + ") is finished");
+        GeneralError("Can't start new query phase before current phase(" + QueryPhaseToString(current_phase_) +
+                     ") is finished");
     }
 
     profilers_[phase_idx].set_name(QueryPhaseToString(phase));
@@ -79,15 +87,15 @@ QueryProfiler::ToString() const {
     constexpr SizeT profilers_count = magic_enum::enum_integer(QueryPhase::kInvalid);
 
     double cost_sum = 0;
-    for(SizeT idx = 0; idx < profilers_count; ++ idx) {
-        const BaseProfiler &profiler = profilers_[idx];
+    for(SizeT idx = 0; idx < profilers_count; ++idx) {
+        const BaseProfiler& profiler = profilers_[idx];
         cost_sum += static_cast<double>(profiler.Elapsed());
     }
 
     ss.setf(std::ios_base::fixed, std::ios_base::floatfield);
     ss.setf(std::ios_base::showpoint);
     ss.precision(2);
-    for(SizeT idx = 0; idx < profilers_count; ++ idx) {
+    for(SizeT idx = 0; idx < profilers_count; ++idx) {
         const BaseProfiler& profiler = profilers_[idx];
         ss << profiler.name() << ": " << profiler.ElapsedToString()
            << "(" << static_cast<double>(profiler.Elapsed() * 100) / cost_sum << "%)" << std::endl;

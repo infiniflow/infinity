@@ -11,11 +11,10 @@ namespace infinity {
 class RewriteCorrelatedExpressions final : public LogicalNodeVisitor {
 public:
     explicit
-    RewriteCorrelatedExpressions(const SharedPtr<BindContext> &bind_context_ptr,
+    RewriteCorrelatedExpressions(const SharedPtr<BindContext>& bind_context_ptr,
                                  ColumnBinding base_binding)
-                                 :bind_context_ptr_(bind_context_ptr),
-                                 base_binding_(base_binding)
-    {}
+            : bind_context_ptr_(bind_context_ptr),
+              base_binding_(base_binding) {}
 
     void
     VisitNode(LogicalNode& op) final;
@@ -27,7 +26,7 @@ public:
     VisitReplace(const SharedPtr<SubqueryExpression>& expression) final;
 
 private:
-    const SharedPtr<BindContext> &bind_context_ptr_;
+    const SharedPtr<BindContext>& bind_context_ptr_;
     ColumnBinding base_binding_{};
 };
 

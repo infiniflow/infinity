@@ -58,12 +58,12 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -77,7 +77,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -91,12 +91,12 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -107,14 +107,14 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     }
 
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
 
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -159,12 +159,12 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -178,12 +178,12 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -229,12 +229,12 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < 1; ++ i) {
+    for(i64 i = 0; i < 1; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -249,12 +249,12 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    for(i64 i = 0; i < 1; ++ i) {
+    for(i64 i = 0; i < 1; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -295,12 +295,12 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < 1; ++ i) {
+    for(i64 i = 0; i < 1; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -324,12 +324,12 @@ TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for (i64 j = 0; j < blob_len; ++j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -339,12 +339,12 @@ TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -356,7 +356,7 @@ TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -364,12 +364,12 @@ TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         i64 blob_len = 2 * i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -388,12 +388,12 @@ TEST_F(ColumnVectorBlobTest, blob_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for (i64 j = 0; j < blob_len; ++j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -403,12 +403,12 @@ TEST_F(ColumnVectorBlobTest, blob_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;
@@ -420,19 +420,19 @@ TEST_F(ColumnVectorBlobTest, blob_column_slice_init) {
 
     ColumnVector target_column_vector(data_type);
     i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
-    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < count; ++ i) {
+    for(i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
         i64 blob_len = src_idx + 1;
         auto blob_ptr = new char[blob_len]{0};
         GlobalResourceUsage::IncrRawMemCount();
 
-        for(i64 j = 0; j < blob_len; ++ j) {
+        for(i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
         }
         blob_ptr[blob_len - 1] = 0;

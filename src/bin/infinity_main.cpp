@@ -15,14 +15,16 @@ ParseArguments(int argc, char** argv, infinity::StartupParameter& parameters) {
 
     options.add_options()
             ("h,help", "Display this help and exit") // NOLINT
-            ("f,config", "Specify the config file path. No default config file", cxxopts::value<std::string>()->default_value("")) // NOLINT
+            ("f,config",
+             "Specify the config file path. No default config file",
+             cxxopts::value<std::string>()->default_value("")) // NOLINT
             ;
 
     cxxopts::ParseResult result = options.parse(argc, argv);
 
     if(result.count("help")) {
         std::cout << options.help() << std::endl;
-        return ;
+        return;
     }
 
     std::string config_path = result["config"].as<std::string>();

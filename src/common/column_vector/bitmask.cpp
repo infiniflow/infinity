@@ -10,7 +10,7 @@
 
 namespace infinity {
 
-Bitmask::Bitmask(): data_ptr_(nullptr), buffer_ptr(nullptr), count_(0) {
+Bitmask::Bitmask() : data_ptr_(nullptr), buffer_ptr(nullptr), count_(0) {
     GlobalResourceUsage::IncrObjectCount();
 }
 
@@ -88,11 +88,11 @@ Bitmask::ToString(SizeT from, SizeT to) {
     std::stringstream ss;
     ss << "BITMASK(" << to - from << "): ";
     if(data_ptr_ == nullptr) {
-        for(SizeT i = from; i <= to; ++ i) {
+        for(SizeT i = from; i <= to; ++i) {
             ss << 1;
         }
     } else {
-        for(SizeT i = from; i < to; ++ i) {
+        for(SizeT i = from; i < to; ++i) {
             ss << (IsTrue(i) ? 1 : 0);
         }
     }
@@ -101,12 +101,14 @@ Bitmask::ToString(SizeT from, SizeT to) {
 
 bool
 Bitmask::IsAllTrue() const {
-    if (data_ptr_ == nullptr) return true;
+    if(data_ptr_ == nullptr)
+        return true;
 
     SizeT u64_count = BitmaskBuffer::UnitCount(count_);
 
-    for(SizeT i = 0; i < u64_count; ++ i) {
-        if(data_ptr_[i] != BitmaskBuffer::UNIT_MAX) return false;
+    for(SizeT i = 0; i < u64_count; ++i) {
+        if(data_ptr_[i] != BitmaskBuffer::UNIT_MAX)
+            return false;
     }
     return true;
 }
@@ -125,7 +127,8 @@ Bitmask::IsTrue(SizeT row_index) {
 
 void
 Bitmask::SetTrue(SizeT row_index) {
-    if (data_ptr_ == nullptr) return ;
+    if(data_ptr_ == nullptr)
+        return;
 
     SizeT u64_index = row_index / BitmaskBuffer::UNIT_BITS;
     SizeT index_in_u64 = row_index - u64_index * BitmaskBuffer::UNIT_BITS;
@@ -158,7 +161,8 @@ Bitmask::Set(SizeT row_index, bool valid) {
 
 void
 Bitmask::SetAllTrue() {
-    if(data_ptr_ == nullptr) return ;
+    if(data_ptr_ == nullptr)
+        return;
     buffer_ptr.reset();
     data_ptr_ = nullptr;
 }
@@ -166,19 +170,20 @@ Bitmask::SetAllTrue() {
 void
 Bitmask::SetAllFalse() {
     SizeT u64_count = BitmaskBuffer::UnitCount(count_);
-    for(SizeT i = 0; i < u64_count; ++ i) {
+    for(SizeT i = 0; i < u64_count; ++i) {
         data_ptr_[i] = 0;
     }
 }
 
 SizeT
 Bitmask::CountTrue() const {
-    if (data_ptr_ == nullptr) return count_;
+    if(data_ptr_ == nullptr)
+        return count_;
 
     SizeT u64_count = BitmaskBuffer::UnitCount(count_);
 
     SizeT count_true = 0;
-    for(SizeT i = 0; i < u64_count; ++ i) {
+    for(SizeT i = 0; i < u64_count; ++i) {
 
         if(data_ptr_[i] == BitmaskBuffer::UNIT_MAX) {
             // All bits of u64 variable are 1.
@@ -189,7 +194,7 @@ Bitmask::CountTrue() const {
             // Count 1 of an u64 variable.
             while(elem) {
                 elem &= (elem - 1);
-                ++ count_true;
+                ++count_true;
             }
         }
     }
@@ -197,9 +202,9 @@ Bitmask::CountTrue() const {
 }
 
 void
-Bitmask::Merge(const Bitmask &other) {
-    if (other.IsAllTrue()) {
-        return ;
+Bitmask::Merge(const Bitmask& other) {
+    if(other.IsAllTrue()) {
+        return;
     }
 
     if(this->IsAllTrue()) {
@@ -209,13 +214,13 @@ Bitmask::Merge(const Bitmask &other) {
 
     if(data_ptr_ == other.data_ptr_) {
         // Totally same bitmask
-        return ;
+        return;
     }
 
     GeneralAssert(count() == other.count(), "Attempt to merge two bitmasks with different size.")
 
     SizeT u64_count = BitmaskBuffer::UnitCount(count_);
-    for(SizeT i = 0; i < u64_count; ++ i) {
+    for(SizeT i = 0; i < u64_count; ++i) {
         data_ptr_[i] &= other.data_ptr_[i];
     }
 }

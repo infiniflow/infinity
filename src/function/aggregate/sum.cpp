@@ -18,12 +18,12 @@ public:
     }
 
     inline void
-    Update(const ValueType *__restrict input, SizeT idx) {
+    Update(const ValueType* __restrict input, SizeT idx) {
         NotImplementError("Update sum state.")
     }
 
     inline void
-    ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const ValueType* __restrict input, SizeT idx, SizeT count) {
         NotImplementError("Constant update sum state.")
     }
 
@@ -49,12 +49,12 @@ public:
     }
 
     inline void
-    Update(const TinyIntT *__restrict input, SizeT idx) {
+    Update(const TinyIntT* __restrict input, SizeT idx) {
         sum_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const TinyIntT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const TinyIntT* __restrict input, SizeT idx, SizeT count) {
         sum_ += input[idx] * count;
     }
 
@@ -80,12 +80,12 @@ public:
     }
 
     inline void
-    Update(const SmallIntT *__restrict input, SizeT idx) {
+    Update(const SmallIntT* __restrict input, SizeT idx) {
         sum_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const SmallIntT* __restrict input, SizeT idx, SizeT count) {
         sum_ += input[idx] * count;
     }
 
@@ -111,12 +111,12 @@ public:
     }
 
     inline void
-    Update(const IntegerT *__restrict input, SizeT idx) {
+    Update(const IntegerT* __restrict input, SizeT idx) {
         sum_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const IntegerT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const IntegerT* __restrict input, SizeT idx, SizeT count) {
         sum_ += input[idx] * count;
     }
 
@@ -142,12 +142,12 @@ public:
     }
 
     inline void
-    Update(const BigIntT *__restrict input, SizeT idx) {
+    Update(const BigIntT* __restrict input, SizeT idx) {
         sum_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const BigIntT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const BigIntT* __restrict input, SizeT idx, SizeT count) {
         sum_ += input[idx] * count;
     }
 
@@ -173,12 +173,12 @@ public:
     }
 
     inline void
-    Update(const FloatT *__restrict input, SizeT idx) {
+    Update(const FloatT* __restrict input, SizeT idx) {
         sum_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const FloatT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const FloatT* __restrict input, SizeT idx, SizeT count) {
         sum_ += input[idx] * count;
     }
 
@@ -204,12 +204,12 @@ public:
     }
 
     inline void
-    Update(const DoubleT *__restrict input, SizeT idx) {
+    Update(const DoubleT* __restrict input, SizeT idx) {
         sum_ += input[idx];
     }
 
     inline void
-    ConstantUpdate(const DoubleT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const DoubleT* __restrict input, SizeT idx, SizeT count) {
         sum_ += input[idx] * count;
     }
 
@@ -225,7 +225,7 @@ public:
 };
 
 void
-RegisterSumFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterSumFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "SUM";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);

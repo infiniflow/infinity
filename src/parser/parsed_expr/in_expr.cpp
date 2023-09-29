@@ -13,7 +13,7 @@ InExpr::~InExpr() {
     }
 
     if(arguments_ != nullptr) {
-        for (auto& expr_ptr: *arguments_) {
+        for(auto& expr_ptr: *arguments_) {
             delete expr_ptr;
         }
         delete arguments_;
@@ -26,12 +26,12 @@ InExpr::ToString() const {
     std::stringstream ss;
     ss << left_->ToString();
     if(not_in_) {
-        ss<< "NOT IN (";
+        ss << "NOT IN (";
     } else {
         ss << "IN (";
     }
     if(arguments_ != nullptr) {
-        for (ParsedExpr *expr_ptr: *arguments_) {
+        for(ParsedExpr* expr_ptr: *arguments_) {
             ss << expr_ptr->ToString();
         }
     }

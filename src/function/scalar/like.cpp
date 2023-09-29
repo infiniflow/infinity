@@ -18,14 +18,14 @@ LikeOperator(const ptr_t left_ptr, SizeT left_len, const ptr_t right_ptr, SizeT 
         char left_char = left_ptr[left_idx];
         char right_char = right_ptr[right_idx];
         if(right_char == '_' or (left_char == right_char)) {
-            ++ left_idx;
-            ++ right_idx;
-        } else if (right_char == '%') {
-            ++ right_idx;
+            ++left_idx;
+            ++right_idx;
+        } else if(right_char == '%') {
+            ++right_idx;
 
             // If there are more than one %
             while(right_idx < right_len && right_ptr[right_idx] == '%') {
-                ++ right_idx;
+                ++right_idx;
             }
 
             // % is the last character
@@ -35,10 +35,13 @@ LikeOperator(const ptr_t left_ptr, SizeT left_len, const ptr_t right_ptr, SizeT 
 
             // Check any left part is matched with rest of right part.
             while(left_idx < left_len) {
-                if(LikeOperator(&left_ptr[left_idx], left_len - left_idx, &right_ptr[right_idx], right_len - right_idx)) {
+                if(LikeOperator(&left_ptr[left_idx],
+                                left_len - left_idx,
+                                &right_ptr[right_idx],
+                                right_len - right_idx)) {
                     return true;
                 }
-                ++ left_idx;
+                ++left_idx;
             }
 
             // Not matched
@@ -49,7 +52,7 @@ LikeOperator(const ptr_t left_ptr, SizeT left_len, const ptr_t right_ptr, SizeT 
     }
 
     while(right_idx < right_len && right_ptr[right_idx] == '%') {
-        ++ right_idx;
+        ++right_idx;
     }
 
     return left_idx == left_len && right_idx == right_len;
@@ -65,7 +68,7 @@ struct LikeFunction {
 
 template<>
 inline void
-LikeFunction::Run(VarcharT& left, VarcharT& right, bool & result) {
+LikeFunction::Run(VarcharT& left, VarcharT& right, bool& result) {
     ptr_t left_ptr = left.GetDataPtr();
     SizeT left_len = left.GetDataLen();
     ptr_t right_ptr = right.GetDataPtr();
@@ -84,7 +87,7 @@ struct NotLikeFunction {
 
 template<>
 inline void
-NotLikeFunction::Run(VarcharT& left, VarcharT& right, bool & result) {
+NotLikeFunction::Run(VarcharT& left, VarcharT& right, bool& result) {
     ptr_t left_ptr = left.GetDataPtr();
     SizeT left_len = left.GetDataLen();
     ptr_t right_ptr = right.GetDataPtr();
@@ -94,14 +97,14 @@ NotLikeFunction::Run(VarcharT& left, VarcharT& right, bool & result) {
 }
 
 void
-RegisterLikeFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterLikeFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "like";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction varchar_like_function(
             func_name,
-            { DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar) },
+            {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, LikeFunction>);
     function_set_ptr->AddFunction(varchar_like_function);
@@ -110,14 +113,14 @@ RegisterLikeFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 }
 
 void
-RegisterNotLikeFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterNotLikeFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "not_like";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction varchar_not_like_function(
             func_name,
-            { DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar) },
+            {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, NotLikeFunction>);
     function_set_ptr->AddFunction(varchar_not_like_function);

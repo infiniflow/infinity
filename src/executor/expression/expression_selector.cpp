@@ -34,7 +34,8 @@ ExpressionSelector::Select(const SharedPtr<BaseExpression>& expr,
                            const SharedPtr<Selection>& input_select,
                            SharedPtr<Selection>& output_true_select,
                            SharedPtr<Selection>& output_false_select) {
-    if(count == 0) return ; // All data are false;
+    if(count == 0)
+        return; // All data are false;
     ExecutorAssert(output_true_select != nullptr || output_false_select != nullptr,
                    "No output select column vector is given")
     ExecutorAssert(expr->Type().type() == LogicalType::kBoolean, "Attempting to select non-boolean expression")
@@ -60,14 +61,14 @@ ExpressionSelector::Select(const SharedPtr<BaseExpression>& expr,
 }
 
 void
-ExpressionSelector::Select(const u8 *__restrict bool_column,
+ExpressionSelector::Select(const u8* __restrict bool_column,
                            const SharedPtr<Bitmask>& null_mask,
                            SizeT count,
                            SharedPtr<Selection>& output_true_select,
                            bool nullable) {
     if(nullable) {
         if(null_mask->IsAllTrue()) {
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 if(bool_column[idx] > 0) {
                     output_true_select->Append(idx);
                 }
@@ -75,14 +76,15 @@ ExpressionSelector::Select(const u8 *__restrict bool_column,
         } else {
             const u64* result_null_data = null_mask->GetData();
             SizeT unit_count = BitmaskBuffer::UnitCount(count);
-            for(SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++ i, end_index += BitmaskBuffer::UNIT_BITS) {
+            for(SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS;
+                i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
                 if(result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     while(start_index < end_index) {
                         if(bool_column[start_index] > 0) {
                             output_true_select->Append(start_index);
                         }
-                        ++ start_index;
+                        ++start_index;
                     }
                 } else if(result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                     // all data of 64 rows are null
@@ -95,13 +97,13 @@ ExpressionSelector::Select(const u8 *__restrict bool_column,
                                 output_true_select->Append(start_index);
                             }
                         }
-                        ++ start_index;
+                        ++start_index;
                     }
                 }
             }
         }
     } else {
-        for(SizeT idx = 0; idx < count; ++ idx) {
+        for(SizeT idx = 0; idx < count; ++idx) {
             if(bool_column[idx] > 0) {
                 output_true_select->Append(idx);
             }

@@ -91,17 +91,17 @@ BindContext::IsTableBound(const String& table_name) const {
 
 u64
 BindContext::GetNewLogicalNodeId() {
-    return parent_ ? parent_->GetNewLogicalNodeId() : next_logical_node_id_ ++;
+    return parent_ ? parent_->GetNewLogicalNodeId() : next_logical_node_id_++;
 }
 
 u64
 BindContext::GenerateBindingContextIndex() {
-    return parent_ ? parent_->GenerateBindingContextIndex() : next_bind_context_index_ ++;
+    return parent_ ? parent_->GenerateBindingContextIndex() : next_bind_context_index_++;
 }
 
 u64
 BindContext::GenerateTableIndex() {
-    return parent_ ? parent_->GenerateTableIndex() : next_table_index_ ++;
+    return parent_ ? parent_->GenerateTableIndex() : next_table_index_++;
 }
 
 void
@@ -219,7 +219,7 @@ BindContext::AddBindContext(const SharedPtr<BindContext>& other_ptr) {
         table_table_index2table_name_[table_index] = table_index2name_pair.second;
     }
 
-    for(auto& name_binding_pair : other_ptr->binding_by_name_) {
+    for(auto& name_binding_pair: other_ptr->binding_by_name_) {
         auto& binding_name = name_binding_pair.first;
         PlannerAssert(!binding_by_name_.contains(binding_name),
                       fmt::format("Table: {} was bound before", binding_name));
@@ -322,7 +322,8 @@ BindContext::ResolveColumnId(const ColumnIdentifier& column_identifier, i64 dept
         }
     }
 
-    if(bound_column_expr != nullptr) return bound_column_expr;
+    if(bound_column_expr != nullptr)
+        return bound_column_expr;
 
     if(parent_ != nullptr) {
         return parent_->ResolveColumnId(column_identifier, depth + 1);
@@ -340,7 +341,7 @@ BindContext::AddCorrelatedColumnExpr(const SharedPtr<ColumnExpression>& correlat
 
     // Not only parent bind context need have the correlated column expression but also current bind context
     if(correlated_column_map_.contains(correlated_column->binding())) {
-        return ;
+        return;
     }
     correlated_column_map_.emplace(correlated_column->binding(), correlated_column_exprs_.size());
     correlated_column_exprs_.emplace_back(correlated_column);
