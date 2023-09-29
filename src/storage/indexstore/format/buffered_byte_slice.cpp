@@ -1,5 +1,6 @@
 #include "buffered_byte_slice.h"
 
+#include <iostream>
 namespace infinity {
 
 BufferedByteSlice::BufferedByteSlice(

@@ -62,6 +62,11 @@ public:
         return buffer_.Size();
     }
 
+    size_t 
+    GetTotalCount() const { 
+        return flush_info_.GetFlushCount() + buffer_.Size(); 
+    }
+
     FlushInfo
     GetFlushInfo() const {
         return flush_info_;
@@ -78,6 +83,8 @@ protected:
     FlushInfo flush_info_;
     ShortBuffer buffer_;
     ByteSliceWriter posting_writer_;
+
+    friend class BufferedByteSliceTest;
 };
 
 template<typename T>

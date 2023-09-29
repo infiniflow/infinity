@@ -41,7 +41,7 @@ struct ValueTypeTraits<uint32_t> {
     static const PostingValue::ValueType TYPE = PostingValue::U32;
 };
 
-typedef IntEncoder<uint32_t, SIMDBitPacking> Int32Encoder;
+typedef IntEncoder<uint32_t, NewPForDeltaCompressor> Int32Encoder;
 typedef IntEncoder<uint16_t, NewPForDeltaCompressor> Int16Encoder;
 
 template<typename T>
@@ -55,7 +55,7 @@ struct EncoderTypeTraits<uint16_t> {
 };
 template<>
 struct EncoderTypeTraits<uint32_t> {
-    typedef IntEncoder<uint32_t, SIMDBitPacking> Encoder;
+    typedef IntEncoder<uint32_t, NewPForDeltaCompressor> Encoder;
 };
 
 extern const Int32Encoder*
