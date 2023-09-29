@@ -6,7 +6,6 @@ namespace infinity {
 
 BufferedByteSlice::BufferedByteSlice(
         MemoryPool* byte_slice_pool, MemoryPool* buffer_pool) {
-
 }
 
 void
@@ -55,4 +54,4 @@ BufferedByteSlice::SnapShot(BufferedByteSlice* buffer) const {
         posting_writer_.SnapShot(buffer->posting_writer_);
     }
 }
-}
+}// namespace infinity

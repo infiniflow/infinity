@@ -2,11 +2,11 @@
 
 #include <memory>
 
+#include "common/utility/infinity_assert.h"
 #include "fastpfor.h"
+#include "new_pfordelta_compressor.h"
 #include "storage/io/byte_slice_reader.h"
 #include "storage/io/byte_slice_writer.h"
-#include "common/utility/infinity_assert.h"
-#include "new_pfordelta_compressor.h"
 
 namespace infinity {
 
@@ -17,6 +17,7 @@ class IntEncoder {
 public:
     const static size_t ENCODER_BUFFER_SIZE = 256;
     const static size_t ENCODER_BUFFER_BYTE_SIZE = ENCODER_BUFFER_SIZE * sizeof(uint32_t);
+
 public:
     IntEncoder() {}
     virtual ~IntEncoder() {}
@@ -88,4 +89,4 @@ IntEncoder<T, Compressor>::Decode(T* dest, uint32_t dest_len, ByteSliceReader& s
     return (uint32_t)compressor_.Decompress(dest, dest_len, (const uint32_t*)buf_ptr, comp_len) / sizeof(T);
 }
 
-}
+}// namespace infinity
