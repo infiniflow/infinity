@@ -349,36 +349,34 @@ struct SingleBestResultHandler : public ResultHandler {
     TI* ids_tab;
 
     SingleBestResultHandler(size_t nq, T* dis_tab, TI* ids_tab)
-            : nq(nq), dis_tab(dis_tab), ids_tab(ids_tab) {}
+            : ResultHandler(ResultHandlerType::kSingleBest), nq(nq), dis_tab(dis_tab), ids_tab(ids_tab) {}
 
     struct SingleResultHandler {
         SingleBestResultHandler& hr;
 
-        T min_dis;
-        TI min_idx;
-        size_t current_idx = 0;
+        Vector<T> min_dis;
+        Vector<TI> min_idx;
 
-        SingleResultHandler(SingleBestResultHandler& hr) : hr(hr) {}
+        SingleResultHandler(SingleBestResultHandler& hr) : hr(hr), min_dis(hr.nq), min_idx(hr.nq) {}
 
         /// begin results for query # i
         void begin(const size_t current_idx) {
-            this->current_idx = current_idx;
-            min_dis = HUGE_VALF;
-            min_idx = 0;
+            min_dis[current_idx] = HUGE_VALF;
+            min_idx[current_idx] = 0;
         }
 
         /// add one result for query i
-        void add_result(T dis, TI idx) {
-            if (C::cmp(min_dis, dis)) {
-                min_dis = dis;
-                min_idx = idx;
+        void add_result(T dis, TI idx, SizeT query_idx) {
+            if (C::cmp(min_dis[query_idx], dis)) {
+                min_dis[query_idx] = dis;
+                min_idx[query_idx] = idx;
             }
         }
 
         /// series of results for query i is done
-        void end() {
-            hr.dis_tab[current_idx] = min_dis;
-            hr.ids_tab[current_idx] = min_idx;
+        void end(SizeT query_idx) {
+            hr.dis_tab[query_idx] = min_dis[query_idx];
+            hr.ids_tab[query_idx] = min_idx[query_idx];
         }
     };
 

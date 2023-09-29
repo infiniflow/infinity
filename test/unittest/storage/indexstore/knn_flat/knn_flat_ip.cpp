@@ -77,15 +77,11 @@ TEST_F(KnnFlatIpTest, test1) {
         query_embedding[3] = 0.4;
     }
 
-//    Vector<CompoundID> id_array(top_k, CompoundID(-1, -1));
-//
-//    UniquePtr<f32[]> distance_array = MakeUnique<f32[]>(sizeof(f32) * top_k);
-
     KnnFlatIP<f32> knn_distance(query_embedding.get(),
-                           1,
-                           top_k,
-                           dimension,
-                           EmbeddingDataType::kElemFloat);
+                                1,
+                                top_k,
+                                dimension,
+                                EmbeddingDataType::kElemFloat);
 
     knn_distance.Begin();
     knn_distance.Search(base_embedding.get(),base_embedding_count, 0);

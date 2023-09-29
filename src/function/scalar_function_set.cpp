@@ -7,6 +7,10 @@
 
 namespace infinity {
 
+ScalarFunctionSet::~ScalarFunctionSet() {
+    functions_.clear();
+}
+
 void
 ScalarFunctionSet::AddFunction(const ScalarFunction& func) {
     functions_.emplace_back(func);

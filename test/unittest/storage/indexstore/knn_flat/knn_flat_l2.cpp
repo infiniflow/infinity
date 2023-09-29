@@ -14,9 +14,9 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
-#include "storage/indexstore/knn_flat/knn_flat_ip_blas_reservoir.h"
+#include "storage/indexstore/knn_flat/knn_flat_l2.h"
 
-class KnnFlatIpBlasReservoirTest : public BaseTest {
+class KnnFlatL2Test : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
@@ -33,7 +33,7 @@ class KnnFlatIpBlasReservoirTest : public BaseTest {
     }
 };
 
-TEST_F(KnnFlatIpBlasReservoirTest, test1) {
+TEST_F(KnnFlatL2Test, test1) {
     using namespace infinity;
 
     i64 dimension = 4;
@@ -77,11 +77,11 @@ TEST_F(KnnFlatIpBlasReservoirTest, test1) {
         query_embedding[3] = 0.4;
     }
 
-    KnnFlatIPBlasReservoir<f32> knn_distance(query_embedding.get(),
-                                             1,
-                                             top_k,
-                                             dimension,
-                                             EmbeddingDataType::kElemFloat);
+    KnnFlatL2<f32> knn_distance(query_embedding.get(),
+                                1,
+                                top_k,
+                                dimension,
+                                EmbeddingDataType::kElemFloat);
 
     knn_distance.Begin();
     knn_distance.Search(base_embedding.get(),base_embedding_count, 0);
@@ -89,20 +89,20 @@ TEST_F(KnnFlatIpBlasReservoirTest, test1) {
 
     f32* distance_array = knn_distance.GetDistanceByIdx(0);
     CompoundID* id_array = knn_distance.GetIDByIdx(0);
-    EXPECT_FLOAT_EQ(distance_array[0], 0.3);
+    EXPECT_FLOAT_EQ(distance_array[0], 0.20);
     EXPECT_FLOAT_EQ(id_array[0].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[0].segment_offset_, 0);
+    EXPECT_FLOAT_EQ(id_array[0].segment_offset_, 3);
 
-    EXPECT_FLOAT_EQ(distance_array[1], 0.29);
+    EXPECT_FLOAT_EQ(distance_array[1], 0.26);
     EXPECT_FLOAT_EQ(id_array[1].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[1].segment_offset_, 1);
+    EXPECT_FLOAT_EQ(id_array[1].segment_offset_, 2);
 
-    EXPECT_FLOAT_EQ(distance_array[2], 0.26);
+    EXPECT_FLOAT_EQ(distance_array[2], 0.29);
     EXPECT_FLOAT_EQ(id_array[2].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[2].segment_offset_, 2);
+    EXPECT_FLOAT_EQ(id_array[2].segment_offset_, 1);
 
-    EXPECT_FLOAT_EQ(distance_array[3], 0.20);
+    EXPECT_FLOAT_EQ(distance_array[3], 0.3);
     EXPECT_FLOAT_EQ(id_array[3].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[3].segment_offset_, 3);
+    EXPECT_FLOAT_EQ(id_array[3].segment_offset_, 0);
 
 }

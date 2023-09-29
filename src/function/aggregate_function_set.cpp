@@ -6,6 +6,10 @@
 
 namespace infinity {
 
+AggregateFunctionSet::~AggregateFunctionSet() {
+    functions_.clear();
+}
+
 void
 AggregateFunctionSet::AddFunction(const AggregateFunction& func) {
     functions_.emplace_back(func);

@@ -9,10 +9,12 @@
 
 namespace infinity {
 
-class AggregateFunctionSet: public FunctionSet {
+class AggregateFunctionSet final: public FunctionSet {
 public:
     explicit
     AggregateFunctionSet(String name): FunctionSet(std::move(name),FunctionType::kAggregate) {}
+
+    ~AggregateFunctionSet() final;
 
     void
     AddFunction(const AggregateFunction& func);

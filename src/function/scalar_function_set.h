@@ -9,10 +9,12 @@
 
 namespace infinity {
 
-class ScalarFunctionSet: public FunctionSet {
+class ScalarFunctionSet final: public FunctionSet {
 public:
     explicit
     ScalarFunctionSet(String name): FunctionSet(std::move(name), FunctionType::kScalar) {}
+
+    ~ScalarFunctionSet() final;
 
     void
     AddFunction(const ScalarFunction& func);
