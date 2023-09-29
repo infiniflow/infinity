@@ -73,8 +73,7 @@ protected:
     }
 
     std::shared_ptr<BufferedByteSliceReader> 
-    CreateReader(uint32_t doc_id[], uint16_t doc_payload[], uint32_t doc_count,
-                uint32_t flush_count) {
+    CreateReader(uint32_t doc_id[], uint16_t doc_payload[], uint32_t doc_count, uint32_t flush_count) {
         buffered_byte_slice_.reset(new BufferedByteSlice(byte_slice_pool_, buffer_pool_));
         buffered_byte_slice_->Init(doc_list_format_.get());
 
@@ -92,8 +91,7 @@ protected:
         return reader;
     }
 
-    void TestCheck(const uint32_t doc_count, uint32_t flush_count)
-    {
+    void TestCheck(const uint32_t doc_count, uint32_t flush_count) {
         std::shared_ptr<BufferedByteSliceReader> reader = CreateReader(doc_count, flush_count);
         CheckDecode(doc_count, flush_count, reader);
 
@@ -102,8 +100,7 @@ protected:
     }
 
     std::shared_ptr<BufferedByteSliceReader> 
-    CreateReader(uint32_t doc_count, uint32_t flush_count)
-    {
+    CreateReader(uint32_t doc_count, uint32_t flush_count) {
         uint32_t doc_id[doc_count];
         uint16_t payload[doc_count];
 
@@ -196,40 +193,58 @@ TEST_F(BufferedByteSliceReaderTest, test2) {
     size_t flush_size = 5;
     std::shared_ptr<BufferedByteSliceReader> reader = CreateReader(33, flush_size);
 
-    uint32_t doc_id_buffer[MAX_DOC_PER_RECORD];
-    uint16_t doc_payload_buffer[MAX_DOC_PER_RECORD];
+    docid_t doc_id_buffer[MAX_DOC_PER_RECORD];
+    docpayload_t doc_payload_buffer[MAX_DOC_PER_RECORD];
 
     size_t decode_len;
-    size_t block_size = (sizeof(uint32_t) + sizeof(uint16_t)) * flush_size + 2;
-    reader->Seek(block_size);
     ASSERT_TRUE(reader->Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
     ASSERT_EQ(flush_size, decode_len);
-    ASSERT_EQ((uint32_t)5, doc_id_buffer[0]);
-
-    reader->Seek(block_size * 3);
+    ASSERT_EQ((uint32_t)4, doc_id_buffer[4]);
+    ASSERT_TRUE(reader->Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len));
+    ASSERT_EQ(flush_size, decode_len);
+    ASSERT_EQ((uint32_t)8, doc_payload_buffer[4]);
 
     ASSERT_TRUE(reader->Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
     ASSERT_EQ(flush_size, decode_len);
-    ASSERT_EQ((uint32_t)15, doc_id_buffer[0]);
+    ASSERT_EQ((uint32_t)9, doc_id_buffer[4]);
+    ASSERT_TRUE(reader->Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len));
+    ASSERT_EQ(flush_size, decode_len);
+    ASSERT_EQ((uint32_t)18, doc_payload_buffer[4]);
+
+    ASSERT_TRUE(reader->Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
+    ASSERT_EQ(flush_size, decode_len);
+    ASSERT_EQ((uint32_t)14, doc_id_buffer[4]);
+    ASSERT_TRUE(reader->Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len));
+    ASSERT_EQ(flush_size, decode_len);
+    ASSERT_EQ((uint32_t)28, doc_payload_buffer[4]);
+
+    ASSERT_TRUE(reader->Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
+    ASSERT_EQ(flush_size, decode_len);
     ASSERT_EQ((uint32_t)19, doc_id_buffer[4]);
-
     ASSERT_TRUE(reader->Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len));
     ASSERT_EQ(flush_size, decode_len);
-    ASSERT_EQ((uint32_t)30, doc_payload_buffer[0]);
-
-    reader->Seek(block_size * 6);
+    ASSERT_EQ((uint32_t)38, doc_payload_buffer[4]);
 
     ASSERT_TRUE(reader->Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
-    ASSERT_EQ((size_t)3, decode_len);
-    ASSERT_EQ((uint32_t)30, doc_id_buffer[0]);
-    ASSERT_EQ((uint32_t)32, doc_id_buffer[2]);
-
+    ASSERT_EQ(flush_size, decode_len);
+    ASSERT_EQ((uint32_t)24, doc_id_buffer[4]);
     ASSERT_TRUE(reader->Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len));
-    ASSERT_EQ((size_t)3, decode_len);
-    ASSERT_EQ((uint32_t)60, doc_payload_buffer[0]);
+    ASSERT_EQ(flush_size, decode_len);
+    ASSERT_EQ((uint32_t)48, doc_payload_buffer[4]);
 
-    ASSERT_TRUE(!reader->Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
-    ASSERT_TRUE(!reader->Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len));
+    ASSERT_TRUE(reader->Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
+    ASSERT_EQ(flush_size, decode_len);
+    ASSERT_EQ((uint32_t)29, doc_id_buffer[4]);
+    ASSERT_TRUE(reader->Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len));
+    ASSERT_EQ(flush_size, decode_len);
+    ASSERT_EQ((uint32_t)58, doc_payload_buffer[4]);
+
+    ASSERT_TRUE(reader->Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
+    ASSERT_EQ(3, decode_len);
+    ASSERT_EQ((uint32_t)32, doc_id_buffer[2]);
+    ASSERT_TRUE(reader->Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len));
+    ASSERT_EQ(3, decode_len);
+    ASSERT_EQ((uint32_t)64, doc_payload_buffer[2]);
 }
 
 TEST_F(BufferedByteSliceReaderTest, test3) {
