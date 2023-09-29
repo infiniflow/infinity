@@ -75,16 +75,12 @@ protected:
     void
     InitMember();
 
-    virtual std::pair<int, bool> LoadBuffer();
-
-    virtual std::pair<int, bool> LoadBuffer();
+    virtual std::pair<int, bool> 
+    LoadBuffer();
 
 private:
     void
     Load_(uint32_t start, uint32_t end, const uint32_t& item_count);
-
-    std::pair<int, bool>
-    LoadBuffer();
 
 protected:
     uint32_t start_;
