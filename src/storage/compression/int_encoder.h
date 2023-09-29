@@ -31,6 +31,7 @@ public:
 private:
     Compressor compressor_;
 };
+
 /*
 template <>
 inline uint32_t
@@ -61,7 +62,7 @@ IntEncoder<uint32_t, SIMDBitPacking>::Decode(uint32_t* dest, uint32_t dest_len, 
 }
 */
 
-template <typename T, typename Compressor>
+template<typename T, typename Compressor>
 inline uint32_t
 IntEncoder<T, Compressor>::Encode(ByteSliceWriter& slice_writer, const T* src, uint32_t src_len) const {
     uint8_t buffer[ENCODER_BUFFER_BYTE_SIZE];
@@ -72,7 +73,7 @@ IntEncoder<T, Compressor>::Encode(ByteSliceWriter& slice_writer, const T* src, u
     return encode_len;
 }
 
-template <typename T, typename Compressor>
+template<typename T, typename Compressor>
 inline uint32_t
 IntEncoder<T, Compressor>::Decode(T* dest, uint32_t dest_len, ByteSliceReader& slice_reader) const {
     uint8_t buffer[ENCODER_BUFFER_BYTE_SIZE];
@@ -84,7 +85,7 @@ IntEncoder<T, Compressor>::Decode(T* dest, uint32_t dest_len, ByteSliceReader& s
     if(len != comp_len) {
         StorageError("Decode posting FAILED");
     }
-    return (uint32_t)compressor_.Decompress(dest, dest_len, (const uint32_t*)buf_ptr, comp_len)/sizeof(T);
+    return (uint32_t)compressor_.Decompress(dest, dest_len, (const uint32_t*)buf_ptr, comp_len) / sizeof(T);
 }
 
 }

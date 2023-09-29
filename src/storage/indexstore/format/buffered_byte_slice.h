@@ -62,9 +62,9 @@ public:
         return buffer_.Size();
     }
 
-    size_t 
-    GetTotalCount() const { 
-        return flush_info_.GetFlushCount() + buffer_.Size(); 
+    size_t
+    GetTotalCount() const {
+        return flush_info_.GetFlushCount() + buffer_.Size();
     }
 
     FlushInfo

@@ -7,18 +7,20 @@
 
 namespace infinity {
 
-class InMemPosListSkipListReader : public PosListSkipListReader
-{
+class InMemPosListSkipListReader : public PosListSkipListReader {
 public:
     InMemPosListSkipListReader(MemoryPool* sessionPool);
+
     ~InMemPosListSkipListReader();
 
     InMemPosListSkipListReader(const InMemPosListSkipListReader& other) = delete;
 
-    void Load(BufferedByteSlice* postingBuffer);
+    void
+    Load(BufferedByteSlice* postingBuffer);
 
 private:
-    std::pair<int, bool> LoadBuffer() override;
+    std::pair<int, bool>
+    LoadBuffer() override;
 
     MemoryPool* session_pool_;
     BufferedByteSlice* skiplist_buffer_;

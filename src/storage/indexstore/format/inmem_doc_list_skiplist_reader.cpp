@@ -13,35 +13,39 @@ InMemDocListSkipListReader::Load(BufferedByteSlice* posting_buffer) {
     skiplist_reader_.Open(skiplist_buffer_);
 }
 
-std::pair<int, bool> InMemDocListSkipListReader::LoadBuffer() {
+std::pair<int, bool>
+InMemDocListSkipListReader::LoadBuffer() {
     size_t flush_count = skiplist_buffer_->GetTotalCount();
     FlushInfo flushInfo = skiplist_buffer_->GetFlushInfo();
 
     size_t decode_count = SKIP_LIST_BUFFER_SIZE;
-    if (flushInfo.IsValidShortBuffer() == false) {
+    if(flushInfo.IsValidShortBuffer() == false) {
         decode_count = flush_count;
     }
-    if (decode_count == 0) {
+    if(decode_count == 0) {
         return std::make_pair(0, false);
     }
 
     size_t doc_num = 0;
-    if (!skiplist_reader_.Decode(doc_id_buffer_, decode_count, doc_num)) {
+    if(!skiplist_reader_.Decode(doc_id_buffer_, decode_count, doc_num)) {
         return std::make_pair(0, false);
     }
 
     size_t ttf_num = 0;
-    if (!skiplist_reader_.Decode(ttf_buffer_, decode_count, ttf_num)) {
+    if(!skiplist_reader_.Decode(ttf_buffer_, decode_count, ttf_num)) {
         return std::make_pair(0, false);
     }
 
     size_t len_num = 0;
-    if (!skiplist_reader_.Decode(offset_buffer_, decode_count, len_num)) {
+    if(!skiplist_reader_.Decode(offset_buffer_, decode_count, len_num)) {
         return std::make_pair(0, false);
     }
 
-    if (doc_num != ttf_num || ttf_num != len_num) {
-        LOG_ERROR(fmt::format("SKipList decode error, doc_num = {} ttf_num = {} len_num = {}", doc_num, ttf_num, len_num));
+    if(doc_num != ttf_num || ttf_num != len_num) {
+        LOG_ERROR(fmt::format("SKipList decode error, doc_num = {} ttf_num = {} len_num = {}",
+                              doc_num,
+                              ttf_num,
+                              len_num));
         return std::make_pair(-1, false);
     }
     num_in_buffer_ = doc_num;
@@ -49,20 +53,22 @@ std::pair<int, bool> InMemDocListSkipListReader::LoadBuffer() {
     return std::make_pair(0, true);
 }
 
-uint32_t InMemDocListSkipListReader::GetLastValueInBuffer() const {
+uint32_t
+InMemDocListSkipListReader::GetLastValueInBuffer() const {
     uint32_t last_value_in_buffer = current_offset_;
     uint32_t current_cursor = current_cursor_;
-    while (current_cursor < num_in_buffer_) {
+    while(current_cursor < num_in_buffer_) {
         last_value_in_buffer += offset_buffer_[current_cursor];
         current_cursor++;
     }
     return last_value_in_buffer;
 }
 
-uint32_t InMemDocListSkipListReader::GetLastKeyInBuffer() const {
+uint32_t
+InMemDocListSkipListReader::GetLastKeyInBuffer() const {
     uint32_t last_key_in_buffer = current_doc_id_;
     uint32_t current_cursor = current_cursor_;
-    while (current_cursor < num_in_buffer_) {
+    while(current_cursor < num_in_buffer_) {
         last_key_in_buffer += doc_id_buffer_[current_cursor];
         current_cursor++;
     }

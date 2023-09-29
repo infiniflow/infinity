@@ -24,12 +24,8 @@ namespace infinity {
 class SQLRunner {
 
 public:
-    static String
-    Run(const String& sql_text, bool print = true);
-
     static SharedPtr<Table>
-    RunV2(const String& sql_text, bool print = true);
-
+    Run(const String& sql_text, bool print = true);
 };
 
 }

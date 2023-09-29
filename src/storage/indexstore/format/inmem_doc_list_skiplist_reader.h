@@ -32,7 +32,8 @@ public:
     GetLastKeyInBuffer() const override;
 
 protected:
-    std::pair<int, bool> LoadBuffer() override;
+    std::pair<int, bool>
+    LoadBuffer() override;
 
 private:
     MemoryPool* session_pool_;

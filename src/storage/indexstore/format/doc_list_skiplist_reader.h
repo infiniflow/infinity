@@ -75,7 +75,7 @@ protected:
     void
     InitMember();
 
-    virtual std::pair<int, bool> 
+    virtual std::pair<int, bool>
     LoadBuffer();
 
 private:

@@ -147,8 +147,6 @@ public:
     SegmentEntry* unsealed_segment_{};
     au64 next_segment_id_{};
 
-    // Reserved
-//    SharedPtr<DataTable> data_table_{};
 };
 
 }
