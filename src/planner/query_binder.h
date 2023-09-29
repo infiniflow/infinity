@@ -21,8 +21,7 @@ class QueryBinder : public std::enable_shared_from_this<QueryBinder> {
 public:
     explicit
     QueryBinder(QueryContext* query_context, SharedPtr<BindContext> bind_context_ptr)
-        : query_context_ptr_(std::move(query_context)), bind_context_ptr_(std::move(bind_context_ptr))
-        {}
+            : query_context_ptr_(std::move(query_context)), bind_context_ptr_(std::move(bind_context_ptr)) {}
 
     SharedPtr<BoundSelectStatement>
     BindSelect(const SelectStatement& statement);
@@ -49,7 +48,7 @@ private:
 
     SharedPtr<TableRef>
     BuildCTE(QueryContext* query_context,
-             const String &name);
+             const String& name);
 
     SharedPtr<TableRef>
     BuildBaseTable(QueryContext* query_context,
@@ -69,7 +68,7 @@ private:
 
     void
     UnfoldStarExpression(QueryContext* query_context,
-                         const Vector<ParsedExpr *>& input_select_list,
+                         const Vector<ParsedExpr*>& input_select_list,
                          Vector<ParsedExpr*>& output_select_list);
 
     void

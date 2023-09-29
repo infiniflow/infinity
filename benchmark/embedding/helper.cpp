@@ -11,7 +11,7 @@
 float*
 fvecs_read(const char* fname, size_t* d_out, size_t* n_out) {
     FILE* f = fopen(fname, "r");
-    if (!f) {
+    if(!f) {
         fprintf(stderr, "could not open %s\n", fname);
         perror("");
         abort();
@@ -33,7 +33,7 @@ fvecs_read(const char* fname, size_t* d_out, size_t* n_out) {
     assert(nr == n * (d + 1) || !"could not read whole file");
 
     // shift array to remove row headers
-    for (size_t i = 0; i < n; i++)
+    for(size_t i = 0; i < n; i++)
         memmove(x + i * d, x + 1 + i * (d + 1), d * sizeof(*x));
 
     fclose(f);
@@ -49,13 +49,13 @@ size_t
 get_current_rss() {
     // Only for linux, copy from hnswlib
     long rss = 0L;
-    FILE *fp = NULL;
-    if ((fp = fopen("/proc/self/statm", "r")) == NULL)
-        return (size_t) 0L;      /* Can't open? */
-    if (fscanf(fp, "%*s%ld", &rss) != 1) {
+    FILE* fp = NULL;
+    if((fp = fopen("/proc/self/statm", "r")) == NULL)
+        return (size_t)0L;      /* Can't open? */
+    if(fscanf(fp, "%*s%ld", &rss) != 1) {
         fclose(fp);
-        return (size_t) 0L;      /* Can't read? */
+        return (size_t)0L;      /* Can't read? */
     }
     fclose(fp);
-    return (size_t) rss * (size_t) sysconf(_SC_PAGESIZE);
+    return (size_t)rss * (size_t)sysconf(_SC_PAGESIZE);
 }

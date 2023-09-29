@@ -11,7 +11,8 @@ namespace infinity {
 class PhysicalSortMergeJoin : public PhysicalOperator {
 public:
     explicit PhysicalSortMergeJoin(uint64_t id)
-        : PhysicalOperator(PhysicalOperatorType::kJoinMerge, nullptr, nullptr, id) {}
+            : PhysicalOperator(PhysicalOperatorType::kJoinMerge, nullptr, nullptr, id) {}
+
     ~PhysicalSortMergeJoin() override = default;
 
     void

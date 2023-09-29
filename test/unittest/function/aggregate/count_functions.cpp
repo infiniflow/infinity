@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
+
 #include "function/aggregate/count.h"
 #include "function/aggregate_function_set.h"
 #include "expression/column_expression.h"
@@ -64,7 +64,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
         }
         data_block.Finalize();
@@ -96,7 +96,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(i));
         }
         data_block.Finalize();
@@ -128,7 +128,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<SmallIntT>(i)));
         }
         data_block.Finalize();
@@ -161,7 +161,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<IntegerT>(2 * i)));
         }
         data_block.Finalize();
@@ -194,7 +194,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<BigIntT>(2 * i)));
         }
         data_block.Finalize();
@@ -227,7 +227,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             HugeIntT input(0, i);
             Value v = Value::MakeHugeInt(input);
             data_block.AppendValue(0, v);
@@ -262,7 +262,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<FloatT>(2 * i)));
         }
         data_block.Finalize();
@@ -295,7 +295,7 @@ TEST_F(CountFunctionTest, count_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<DoubleT>(2 * i)));
         }
         data_block.Finalize();

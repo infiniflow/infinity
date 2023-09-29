@@ -17,7 +17,8 @@ static const char* hnsw_index_l2_name = "hnsw_index_l2.bin";
 
 using namespace infinity;
 
-auto main () -> int {
+auto
+main() -> int {
     SizeT dimension;
     SizeT embedding_count;
     SizeT M = 16;
@@ -48,10 +49,10 @@ auto main () -> int {
         infinity::BaseProfiler profiler;
         profiler.Begin();
         // insert data into index
-        for(SizeT idx = 0; idx < embedding_count; ++ idx) {
+        for(SizeT idx = 0; idx < embedding_count; ++idx) {
             hnsw_index->addPoint(input_embeddings + idx * dimension, idx);
 
-            if (idx % 100000 == 0) {
+            if(idx % 100000 == 0) {
                 std::cout << idx << ", " << get_current_rss() / 1000000 << " MB, "
                           << profiler.ElapsedToString() << std::endl;
             }
@@ -86,7 +87,7 @@ auto main () -> int {
         assert(nq2 == number_of_queries || !"incorrect nb of ground truth entries");
 
         ground_truth = new size_t[top_k * number_of_queries];
-        for (int i = 0; i < top_k * number_of_queries; ++ i) {
+        for(int i = 0; i < top_k * number_of_queries; ++i) {
             ground_truth[i] = gt_int[i];
         }
         delete[] gt_int;
@@ -100,25 +101,27 @@ auto main () -> int {
         hnsw_index->setEf(ef_construction);
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        for (int i = 0; i < number_of_queries; i++) {
+        for(int i = 0; i < number_of_queries; i++) {
             std::priority_queue<std::pair<float, hnswlib::labeltype>> result
-                = hnsw_index->searchKnn(queries + i * dimension, top_k);
-            assert(top_k == result.size()  || !"incorrect topk value");
+                    = hnsw_index->searchKnn(queries + i * dimension, top_k);
+            assert(top_k == result.size() || !"incorrect topk value");
 
             std::unordered_set<SizeT> ground_truth_set;
-            for(int j = 0; j < top_k; ++ j) {
+            for(int j = 0; j < top_k; ++j) {
                 ground_truth_set.insert(ground_truth[i * top_k + j]);
             }
 
-            for(int j = 0; j < top_k; ++ j) {
+            for(int j = 0; j < top_k; ++j) {
                 if(ground_truth_set.contains(result.top().second)) {
-                    ++ n_valid;
+                    ++n_valid;
                 }
                 result.pop();
             }
         }
         profiler.End();
-        printf("Recall = %.4f, Spend: %s\n", n_valid / float(top_k * number_of_queries), profiler.ElapsedToString().c_str());
+        printf("Recall = %.4f, Spend: %s\n",
+               n_valid / float(top_k * number_of_queries),
+               profiler.ElapsedToString().c_str());
     }
 
     {

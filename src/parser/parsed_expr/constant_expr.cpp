@@ -9,7 +9,7 @@ namespace infinity {
 ConstantExpr::~ConstantExpr() {
     if(literal_type_ == LiteralType::kString) {
         free(str_value_);
-        return ;
+        return;
     }
     if(literal_type_ == LiteralType::kDate) {
         free(date_value_);
@@ -64,7 +64,7 @@ ConstantExpr::ToString() const {
             if(len <= 0) {
                 PlannerError("Invalid long array length")
             }
-            for(SizeT i = 0; i < len - 1; ++ i) {
+            for(SizeT i = 0; i < len - 1; ++i) {
                 ss << long_array_[i] << ',';
             }
             ss << long_array_.back();
@@ -76,7 +76,7 @@ ConstantExpr::ToString() const {
             if(len <= 0) {
                 PlannerError("Invalid double array length")
             }
-            for(SizeT i = 0; i < len - 1; ++ i) {
+            for(SizeT i = 0; i < len - 1; ++i) {
                 ss << double_array_[i] << ',';
             }
             ss << double_array_.back();

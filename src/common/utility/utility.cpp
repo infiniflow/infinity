@@ -8,14 +8,14 @@ namespace infinity {
 
 SizeT
 NextPowerOfTwo(SizeT input) {
-    -- input;
+    --input;
     input |= input >> 1;
     input |= input >> 2;
     input |= input >> 4;
     input |= input >> 8;
     input |= input >> 16;
     input |= input >> 32;
-    return ++ input;
+    return ++input;
 }
 
 }

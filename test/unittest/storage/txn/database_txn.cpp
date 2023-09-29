@@ -244,10 +244,10 @@ TEST_F(DBTxnTest, test3) {
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
 
@@ -283,9 +283,9 @@ TEST_F(DBTxnTest, test4) {
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
     // Txn2: Begin, OK
@@ -351,10 +351,10 @@ TEST_F(DBTxnTest, test6) {
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
 
@@ -384,7 +384,7 @@ TEST_F(DBTxnTest, test6) {
     new_txn2->CommitTxn();
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->CreateTxn();
+    Txn* new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();
@@ -407,10 +407,10 @@ TEST_F(DBTxnTest, test7) {
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->CreateTxn();
+    Txn* new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->CreateTxn();
+    Txn* new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped1_res, get_res;
 
@@ -444,7 +444,7 @@ TEST_F(DBTxnTest, test7) {
     new_txn2->CommitTxn();
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->CreateTxn();
+    Txn* new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();

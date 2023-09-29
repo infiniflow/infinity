@@ -10,7 +10,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
 #include "function/scalar/greater_equals.h"
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
@@ -78,13 +77,13 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
             data_block.AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i + i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kTinyInt);
@@ -97,7 +96,7 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<i8>(i) >= static_cast<i8>(i + i)) {
@@ -141,13 +140,13 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<i16>(i)));
             data_block.AppendValue(1, Value::MakeSmallInt(static_cast<i16>(i / 2)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kSmallInt);
@@ -160,7 +159,7 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<i16>(i) >= static_cast<i16>(i / 2)) {
@@ -204,13 +203,13 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<i32>(i)));
             data_block.AppendValue(1, Value::MakeInt(static_cast<i32>(i / 2)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kInteger);
@@ -223,7 +222,7 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<i32>(i) >= static_cast<i32>(i / 2)) {
@@ -267,13 +266,13 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<i64>(i)));
             data_block.AppendValue(1, Value::MakeBigInt(static_cast<i64>(i / 2)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBigInt);
@@ -286,7 +285,7 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<i64>(i) >= static_cast<i64>(i / 2)) {
@@ -330,13 +329,13 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeHugeInt(HugeIntT(static_cast<i64>(i), static_cast<i64>(i))));
             data_block.AppendValue(1, Value::MakeHugeInt(HugeIntT(static_cast<i64>(i / 2), static_cast<i64>(i / 2))));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kHugeInt);
@@ -349,10 +348,11 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-            if(HugeIntT(static_cast<i64>(i), static_cast<i64>(i)) >= HugeIntT(static_cast<i64>(i / 2), static_cast<i64>(i / 2))) {
+            if(HugeIntT(static_cast<i64>(i), static_cast<i64>(i)) >=
+               HugeIntT(static_cast<i64>(i / 2), static_cast<i64>(i / 2))) {
                 EXPECT_EQ(v.value_.boolean, true);
             } else {
                 EXPECT_EQ(v.value_.boolean, false);
@@ -393,13 +393,13 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<f32>(i)));
             data_block.AppendValue(1, Value::MakeFloat(static_cast<f32>(i) / 2));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kFloat);
@@ -412,7 +412,7 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<f32>(i) >= (static_cast<f32>(i) / 2)) {
@@ -456,13 +456,13 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<f64>(i)));
             data_block.AppendValue(1, Value::MakeDouble(static_cast<f64>(i) / 2));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kDouble);
@@ -475,7 +475,7 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(static_cast<f64>(i) >= (static_cast<f64>(i) / 2)) {
@@ -520,7 +520,7 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
                 data_block.AppendValue(1, Value::MakeVarchar("Helloworld" + std::to_string(i)));
@@ -531,7 +531,7 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
@@ -549,7 +549,7 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {

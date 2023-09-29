@@ -17,10 +17,9 @@ public:
                     u64 table_index,
                     SharedPtr<PhysicalOperator> left,
                     Vector<SharedPtr<BaseExpression>> expressions)
-                    : PhysicalOperator(PhysicalOperatorType::kProjection, std::move(left), nullptr, id),
-                    projection_table_index_(table_index),
-                    expressions_(std::move(expressions))
-                    {}
+            : PhysicalOperator(PhysicalOperatorType::kProjection, std::move(left), nullptr, id),
+              projection_table_index_(table_index),
+              expressions_(std::move(expressions)) {}
 
     ~PhysicalProject() override = default;
 

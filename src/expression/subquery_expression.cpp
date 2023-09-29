@@ -9,11 +9,11 @@
 
 namespace infinity {
 
-SubqueryExpression::SubqueryExpression(SharedPtr<BoundSelectStatement> bound_select_statement, SubqueryType subquery_type)
-    : BaseExpression(ExpressionType::kSubQuery, {}),
-    bound_select_statement_ptr_(std::move(bound_select_statement)),
-    subquery_type_(subquery_type)
-    {}
+SubqueryExpression::SubqueryExpression(SharedPtr<BoundSelectStatement> bound_select_statement,
+                                       SubqueryType subquery_type)
+        : BaseExpression(ExpressionType::kSubQuery, {}),
+          bound_select_statement_ptr_(std::move(bound_select_statement)),
+          subquery_type_(subquery_type) {}
 
 String
 SubqueryExpression::ToString() const {

@@ -17,13 +17,13 @@ public:
                             bool header,
                             char delimiter,
                             CopyFileType type)
-        : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id),
-          schema_name_(std::move(schema_name)),
-          table_name_(std::move(table_name)),
-          file_path_(std::move(file_path)),
-          header_(header),
-          delimiter_(delimiter),
-          file_type_(type) {}
+            : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id),
+              schema_name_(std::move(schema_name)),
+              table_name_(std::move(table_name)),
+              file_path_(std::move(file_path)),
+              header_(header),
+              delimiter_(delimiter),
+              file_type_(type) {}
 
     ~PhysicalExport() override = default;
 
@@ -86,7 +86,7 @@ private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
-    CopyFileType file_type_ {CopyFileType::kCSV};
+    CopyFileType file_type_{CopyFileType::kCSV};
     String file_path_{};
     String table_name_{};
     String schema_name_{"default"};

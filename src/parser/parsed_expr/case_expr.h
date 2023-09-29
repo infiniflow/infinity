@@ -10,6 +10,7 @@ namespace infinity {
 
 struct WhenThen {
     ~WhenThen();
+
     ParsedExpr* when_{nullptr};
     ParsedExpr* then_{nullptr};
 };

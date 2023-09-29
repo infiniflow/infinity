@@ -34,291 +34,291 @@ struct InputState {
 // Aggregate
 struct AggregateInputState : public InputState {
     inline explicit
-    AggregateInputState(): InputState(PhysicalOperatorType::kAggregate) {}
+    AggregateInputState() : InputState(PhysicalOperatorType::kAggregate) {}
 };
 
 struct AggregateOutputState : public OutputState {
     inline explicit
-    AggregateOutputState(): OutputState(PhysicalOperatorType::kAggregate) {}
+    AggregateOutputState() : OutputState(PhysicalOperatorType::kAggregate) {}
 };
 
 // Merge Parallel Aggregate
 struct MergeParallelAggregateInputState : public InputState {
     inline explicit
-    MergeParallelAggregateInputState(): InputState(PhysicalOperatorType::kMergeParallelAggregate) {}
+    MergeParallelAggregateInputState() : InputState(PhysicalOperatorType::kMergeParallelAggregate) {}
 };
 
 struct MergeParallelAggregateOutputState : public OutputState {
     inline explicit
-    MergeParallelAggregateOutputState(): OutputState(PhysicalOperatorType::kMergeParallelAggregate) {}
+    MergeParallelAggregateOutputState() : OutputState(PhysicalOperatorType::kMergeParallelAggregate) {}
 };
 
 // Parallel Aggregate
 struct ParallelAggregateInputState : public InputState {
     inline explicit
-    ParallelAggregateInputState(): InputState(PhysicalOperatorType::kParallelAggregate) {}
+    ParallelAggregateInputState() : InputState(PhysicalOperatorType::kParallelAggregate) {}
 };
 
 struct ParallelAggregateOutputState : public OutputState {
     inline explicit
-    ParallelAggregateOutputState(): OutputState(PhysicalOperatorType::kParallelAggregate) {}
+    ParallelAggregateOutputState() : OutputState(PhysicalOperatorType::kParallelAggregate) {}
 };
 
 // UnionAll
 struct UnionAllInputState : public InputState {
     inline explicit
-    UnionAllInputState(): InputState(PhysicalOperatorType::kUnionAll) {}
+    UnionAllInputState() : InputState(PhysicalOperatorType::kUnionAll) {}
 };
 
 struct UnionAllOutputState : public OutputState {
     inline explicit
-    UnionAllOutputState(): OutputState(PhysicalOperatorType::kUnionAll) {}
+    UnionAllOutputState() : OutputState(PhysicalOperatorType::kUnionAll) {}
 };
 
 // TableScan
 struct TableScanInputState : public InputState {
     inline explicit
-    TableScanInputState(): InputState(PhysicalOperatorType::kTableScan) {}
+    TableScanInputState() : InputState(PhysicalOperatorType::kTableScan) {}
 
     UniquePtr<TableScanFunctionData> table_scan_function_data_{};
 };
 
 struct TableScanOutputState : public OutputState {
     inline explicit
-    TableScanOutputState(): OutputState(PhysicalOperatorType::kTableScan) {}
+    TableScanOutputState() : OutputState(PhysicalOperatorType::kTableScan) {}
 };
 
 // KnnScan
 struct KnnScanInputState : public InputState {
     inline explicit
-    KnnScanInputState(): InputState(PhysicalOperatorType::kTableScan) {}
+    KnnScanInputState() : InputState(PhysicalOperatorType::kTableScan) {}
 
     UniquePtr<KnnScanFunctionData> knn_scan_function_data_{};
 };
 
 struct KnnScanOutputState : public OutputState {
     inline explicit
-    KnnScanOutputState(): OutputState(PhysicalOperatorType::kTableScan) {}
+    KnnScanOutputState() : OutputState(PhysicalOperatorType::kTableScan) {}
 };
 
 // Filter
 struct FilterInputState : public InputState {
     inline explicit
-    FilterInputState(): InputState(PhysicalOperatorType::kFilter) {}
+    FilterInputState() : InputState(PhysicalOperatorType::kFilter) {}
 };
 
 struct FilterOutputState : public OutputState {
     inline explicit
-    FilterOutputState(): OutputState(PhysicalOperatorType::kFilter) {}
+    FilterOutputState() : OutputState(PhysicalOperatorType::kFilter) {}
 };
 
 // IndexScan
 struct IndexScanInputState : public InputState {
     inline explicit
-    IndexScanInputState(): InputState(PhysicalOperatorType::kIndexScan) {}
+    IndexScanInputState() : InputState(PhysicalOperatorType::kIndexScan) {}
 };
 
 struct IndexScanOutputState : public OutputState {
     inline explicit
-    IndexScanOutputState(): OutputState(PhysicalOperatorType::kIndexScan) {}
+    IndexScanOutputState() : OutputState(PhysicalOperatorType::kIndexScan) {}
 };
 
 // Hash
 struct HashInputState : public InputState {
     inline explicit
-    HashInputState(): InputState(PhysicalOperatorType::kHash) {}
+    HashInputState() : InputState(PhysicalOperatorType::kHash) {}
 };
 
 struct HashOutputState : public OutputState {
     inline explicit
-    HashOutputState(): OutputState(PhysicalOperatorType::kHash) {}
+    HashOutputState() : OutputState(PhysicalOperatorType::kHash) {}
 };
 
 // Merge Hash
 struct MergeHashInputState : public InputState {
     inline explicit
-    MergeHashInputState(): InputState(PhysicalOperatorType::kMergeHash) {}
+    MergeHashInputState() : InputState(PhysicalOperatorType::kMergeHash) {}
 };
 
 struct MergeHashOutputState : public OutputState {
     inline explicit
-    MergeHashOutputState(): OutputState(PhysicalOperatorType::kMergeHash) {}
+    MergeHashOutputState() : OutputState(PhysicalOperatorType::kMergeHash) {}
 };
 
 // Hash Join
 struct HashJoinInputState : public InputState {
     inline explicit
-    HashJoinInputState(): InputState(PhysicalOperatorType::kJoinHash) {}
+    HashJoinInputState() : InputState(PhysicalOperatorType::kJoinHash) {}
 };
 
 struct HashJoinOutputState : public OutputState {
     inline explicit
-    HashJoinOutputState(): OutputState(PhysicalOperatorType::kJoinHash) {}
+    HashJoinOutputState() : OutputState(PhysicalOperatorType::kJoinHash) {}
 };
 
 // Nested Loop
 struct NestedLoopInputState : public InputState {
     inline explicit
-    NestedLoopInputState(): InputState(PhysicalOperatorType::kJoinNestedLoop) {}
+    NestedLoopInputState() : InputState(PhysicalOperatorType::kJoinNestedLoop) {}
 };
 
 struct NestedLoopOutputState : public OutputState {
     inline explicit
-    NestedLoopOutputState(): OutputState(PhysicalOperatorType::kJoinNestedLoop) {}
+    NestedLoopOutputState() : OutputState(PhysicalOperatorType::kJoinNestedLoop) {}
 };
 
 // Merge Join
 struct MergeJoinInputState : public InputState {
     inline explicit
-    MergeJoinInputState(): InputState(PhysicalOperatorType::kJoinMerge) {}
+    MergeJoinInputState() : InputState(PhysicalOperatorType::kJoinMerge) {}
 };
 
 struct MergeJoinOutputState : public OutputState {
     inline explicit
-    MergeJoinOutputState(): OutputState(PhysicalOperatorType::kJoinMerge) {}
+    MergeJoinOutputState() : OutputState(PhysicalOperatorType::kJoinMerge) {}
 };
 
 // Index Join
 struct IndexJoinInputState : public InputState {
     inline explicit
-    IndexJoinInputState(): InputState(PhysicalOperatorType::kJoinIndex) {}
+    IndexJoinInputState() : InputState(PhysicalOperatorType::kJoinIndex) {}
 };
 
 struct IndexJoinOutputState : public OutputState {
     inline explicit
-    IndexJoinOutputState(): OutputState(PhysicalOperatorType::kJoinIndex) {}
+    IndexJoinOutputState() : OutputState(PhysicalOperatorType::kJoinIndex) {}
 };
 
 // Cross Product
 struct CrossProductInputState : public InputState {
     inline explicit
-    CrossProductInputState(): InputState(PhysicalOperatorType::kCrossProduct) {}
+    CrossProductInputState() : InputState(PhysicalOperatorType::kCrossProduct) {}
 };
 
 struct CrossProductOutputState : public OutputState {
     inline explicit
-    CrossProductOutputState(): OutputState(PhysicalOperatorType::kCrossProduct) {}
+    CrossProductOutputState() : OutputState(PhysicalOperatorType::kCrossProduct) {}
 };
 
 // Limit
 struct LimitInputState : public InputState {
     inline explicit
-    LimitInputState(): InputState(PhysicalOperatorType::kLimit) {}
+    LimitInputState() : InputState(PhysicalOperatorType::kLimit) {}
 };
 
 struct LimitOutputState : public OutputState {
     inline explicit
-    LimitOutputState(): OutputState(PhysicalOperatorType::kLimit) {}
+    LimitOutputState() : OutputState(PhysicalOperatorType::kLimit) {}
 };
 
 // Merge Limit
 struct MergeLimitInputState : public InputState {
     inline explicit
-    MergeLimitInputState(): InputState(PhysicalOperatorType::kMergeLimit) {}
+    MergeLimitInputState() : InputState(PhysicalOperatorType::kMergeLimit) {}
 };
 
 struct MergeLimitOutputState : public OutputState {
     inline explicit
-    MergeLimitOutputState(): OutputState(PhysicalOperatorType::kMergeLimit) {}
+    MergeLimitOutputState() : OutputState(PhysicalOperatorType::kMergeLimit) {}
 };
 
 // Merge Top
 struct MergeTopInputState : public InputState {
     inline explicit
-    MergeTopInputState(): InputState(PhysicalOperatorType::kMergeTop) {}
+    MergeTopInputState() : InputState(PhysicalOperatorType::kMergeTop) {}
 };
 
 struct MergeTopOutputState : public OutputState {
     inline explicit
-    MergeTopOutputState(): OutputState(PhysicalOperatorType::kMergeTop) {}
+    MergeTopOutputState() : OutputState(PhysicalOperatorType::kMergeTop) {}
 };
 
 // Top
 struct TopInputState : public InputState {
     inline explicit
-    TopInputState(): InputState(PhysicalOperatorType::kTop) {}
+    TopInputState() : InputState(PhysicalOperatorType::kTop) {}
 };
 
 struct TopOutputState : public OutputState {
     inline explicit
-    TopOutputState(): OutputState(PhysicalOperatorType::kTop) {}
+    TopOutputState() : OutputState(PhysicalOperatorType::kTop) {}
 };
 
 // Projection
 struct ProjectionInputState : public InputState {
     inline explicit
-    ProjectionInputState(): InputState(PhysicalOperatorType::kProjection) {}
+    ProjectionInputState() : InputState(PhysicalOperatorType::kProjection) {}
 };
 
 struct ProjectionOutputState : public OutputState {
     inline explicit
-    ProjectionOutputState(): OutputState(PhysicalOperatorType::kProjection) {}
+    ProjectionOutputState() : OutputState(PhysicalOperatorType::kProjection) {}
 };
 
 // Sort
 struct SortInputState : public InputState {
     inline explicit
-    SortInputState(): InputState(PhysicalOperatorType::kSort) {}
+    SortInputState() : InputState(PhysicalOperatorType::kSort) {}
 };
 
 struct SortOutputState : public OutputState {
     inline explicit
-    SortOutputState(): OutputState(PhysicalOperatorType::kSort) {}
+    SortOutputState() : OutputState(PhysicalOperatorType::kSort) {}
 };
 
 // Merge Sort
 struct MergeSortInputState : public InputState {
     inline explicit
-    MergeSortInputState(): InputState(PhysicalOperatorType::kMergeSort) {}
+    MergeSortInputState() : InputState(PhysicalOperatorType::kMergeSort) {}
 };
 
 struct MergeSortOutputState : public OutputState {
     inline explicit
-    MergeSortOutputState(): OutputState(PhysicalOperatorType::kMergeSort) {}
+    MergeSortOutputState() : OutputState(PhysicalOperatorType::kMergeSort) {}
 };
 
 // Delete
 struct DeleteInputState : public InputState {
     inline explicit
-    DeleteInputState(): InputState(PhysicalOperatorType::kDelete) {}
+    DeleteInputState() : InputState(PhysicalOperatorType::kDelete) {}
 };
 
 struct DeleteOutputState : public OutputState {
     inline explicit
-    DeleteOutputState(): OutputState(PhysicalOperatorType::kDelete) {}
+    DeleteOutputState() : OutputState(PhysicalOperatorType::kDelete) {}
 };
 
 // Update
 struct UpdateInputState : public InputState {
     inline explicit
-    UpdateInputState(): InputState(PhysicalOperatorType::kUpdate) {}
+    UpdateInputState() : InputState(PhysicalOperatorType::kUpdate) {}
 };
 
 struct UpdateOutputState : public OutputState {
     inline explicit
-    UpdateOutputState(): OutputState(PhysicalOperatorType::kUpdate) {}
+    UpdateOutputState() : OutputState(PhysicalOperatorType::kUpdate) {}
 };
 
 // Insert
 struct InsertInputState : public InputState {
     inline explicit
-    InsertInputState(): InputState(PhysicalOperatorType::kInsert) {}
+    InsertInputState() : InputState(PhysicalOperatorType::kInsert) {}
 };
 
 struct InsertOutputState : public OutputState {
     inline explicit
-    InsertOutputState(): OutputState(PhysicalOperatorType::kInsert) {}
+    InsertOutputState() : OutputState(PhysicalOperatorType::kInsert) {}
 };
 
 // Import
 struct ImportInputState : public InputState {
     inline explicit
-    ImportInputState(): InputState(PhysicalOperatorType::kImport) {}
+    ImportInputState() : InputState(PhysicalOperatorType::kImport) {}
 };
 
 struct ImportOutputState : public OutputState {
     inline explicit
-    ImportOutputState(): OutputState(PhysicalOperatorType::kImport) {}
+    ImportOutputState() : OutputState(PhysicalOperatorType::kImport) {}
 
     Vector<SharedPtr<DataBlock>> output_{};
     SharedPtr<TableDef> table_def_{};
@@ -329,133 +329,133 @@ struct ImportOutputState : public OutputState {
 // Export
 struct ExportInputState : public InputState {
     inline explicit
-    ExportInputState(): InputState(PhysicalOperatorType::kExport) {}
+    ExportInputState() : InputState(PhysicalOperatorType::kExport) {}
 };
 
 struct ExportOutputState : public OutputState {
     inline explicit
-    ExportOutputState(): OutputState(PhysicalOperatorType::kExport) {}
+    ExportOutputState() : OutputState(PhysicalOperatorType::kExport) {}
 };
 
 // Alter
 struct AlterInputState : public InputState {
     inline explicit
-    AlterInputState(): InputState(PhysicalOperatorType::kAlter) {}
+    AlterInputState() : InputState(PhysicalOperatorType::kAlter) {}
 };
 
 struct AlterOutputState : public OutputState {
     inline explicit
-    AlterOutputState(): OutputState(PhysicalOperatorType::kAlter) {}
+    AlterOutputState() : OutputState(PhysicalOperatorType::kAlter) {}
 };
 
 // Create Table
 struct CreateTableInputState : public InputState {
     inline explicit
-    CreateTableInputState(): InputState(PhysicalOperatorType::kCreateTable) {}
+    CreateTableInputState() : InputState(PhysicalOperatorType::kCreateTable) {}
 };
 
 struct CreateTableOutputState : public OutputState {
     inline explicit
-    CreateTableOutputState(): OutputState(PhysicalOperatorType::kCreateTable) {}
+    CreateTableOutputState() : OutputState(PhysicalOperatorType::kCreateTable) {}
 };
 
 // Create Collection
 struct CreateCollectionInputState : public InputState {
     inline explicit
-    CreateCollectionInputState(): InputState(PhysicalOperatorType::kCreateCollection) {}
+    CreateCollectionInputState() : InputState(PhysicalOperatorType::kCreateCollection) {}
 };
 
 struct CreateCollectionOutputState : public OutputState {
     inline explicit
-    CreateCollectionOutputState(): OutputState(PhysicalOperatorType::kCreateCollection) {}
+    CreateCollectionOutputState() : OutputState(PhysicalOperatorType::kCreateCollection) {}
 };
 
 // Create Database
 struct CreateDatabaseInputState : public InputState {
     inline explicit
-    CreateDatabaseInputState(): InputState(PhysicalOperatorType::kCreateDatabase) {}
+    CreateDatabaseInputState() : InputState(PhysicalOperatorType::kCreateDatabase) {}
 };
 
 struct CreateDatabaseOutputState : public OutputState {
     inline explicit
-    CreateDatabaseOutputState(): OutputState(PhysicalOperatorType::kCreateDatabase) {}
+    CreateDatabaseOutputState() : OutputState(PhysicalOperatorType::kCreateDatabase) {}
 };
 
 // Create View
 struct CreateViewInputState : public InputState {
     inline explicit
-    CreateViewInputState(): InputState(PhysicalOperatorType::kCreateView) {}
+    CreateViewInputState() : InputState(PhysicalOperatorType::kCreateView) {}
 };
 
 struct CreateViewOutputState : public OutputState {
     inline explicit
-    CreateViewOutputState(): OutputState(PhysicalOperatorType::kCreateView) {}
+    CreateViewOutputState() : OutputState(PhysicalOperatorType::kCreateView) {}
 };
 
 // Drop Table
 struct DropTableInputState : public InputState {
     inline explicit
-    DropTableInputState(): InputState(PhysicalOperatorType::kDropTable) {}
+    DropTableInputState() : InputState(PhysicalOperatorType::kDropTable) {}
 };
 
 struct DropTableOutputState : public OutputState {
     inline explicit
-    DropTableOutputState(): OutputState(PhysicalOperatorType::kDropTable) {}
+    DropTableOutputState() : OutputState(PhysicalOperatorType::kDropTable) {}
 };
 
 // Drop Collection
 struct DropCollectionInputState : public InputState {
     inline explicit
-    DropCollectionInputState(): InputState(PhysicalOperatorType::kDropCollection) {}
+    DropCollectionInputState() : InputState(PhysicalOperatorType::kDropCollection) {}
 };
 
 struct DropCollectionOutputState : public OutputState {
     inline explicit
-    DropCollectionOutputState(): OutputState(PhysicalOperatorType::kDropCollection) {}
+    DropCollectionOutputState() : OutputState(PhysicalOperatorType::kDropCollection) {}
 };
 
 // Drop Database
 struct DropDatabaseInputState : public InputState {
     inline explicit
-    DropDatabaseInputState(): InputState(PhysicalOperatorType::kDropDatabase) {}
+    DropDatabaseInputState() : InputState(PhysicalOperatorType::kDropDatabase) {}
 };
 
 struct DropDatabaseOutputState : public OutputState {
     inline explicit
-    DropDatabaseOutputState(): OutputState(PhysicalOperatorType::kDropDatabase) {}
+    DropDatabaseOutputState() : OutputState(PhysicalOperatorType::kDropDatabase) {}
 };
 
 // Drop View
 struct DropViewInputState : public InputState {
     inline explicit
-    DropViewInputState(): InputState(PhysicalOperatorType::kDropView) {}
+    DropViewInputState() : InputState(PhysicalOperatorType::kDropView) {}
 };
 
 struct DropViewOutputState : public OutputState {
     inline explicit
-    DropViewOutputState(): OutputState(PhysicalOperatorType::kDropView) {}
+    DropViewOutputState() : OutputState(PhysicalOperatorType::kDropView) {}
 };
 
 // Explain
 struct ExplainInputState : public InputState {
     inline explicit
-    ExplainInputState(): InputState(PhysicalOperatorType::kExplain) {}
+    ExplainInputState() : InputState(PhysicalOperatorType::kExplain) {}
 };
 
 struct ExplainOutputState : public OutputState {
     inline explicit
-    ExplainOutputState(): OutputState(PhysicalOperatorType::kExplain) {}
+    ExplainOutputState() : OutputState(PhysicalOperatorType::kExplain) {}
 };
 
 // Show
 struct ShowInputState : public InputState {
     inline explicit
-    ShowInputState(): InputState(PhysicalOperatorType::kShow) {}
+    ShowInputState() : InputState(PhysicalOperatorType::kShow) {}
 };
 
 struct ShowOutputState : public OutputState {
     inline explicit
-    ShowOutputState(): OutputState(PhysicalOperatorType::kShow) {}
+    ShowOutputState() : OutputState(PhysicalOperatorType::kShow) {}
 
     Vector<SharedPtr<DataBlock>> output_{};
 };
@@ -463,12 +463,12 @@ struct ShowOutputState : public OutputState {
 // Flush
 struct FlushInputState : public InputState {
     inline explicit
-    FlushInputState(): InputState(PhysicalOperatorType::kFlush) {}
+    FlushInputState() : InputState(PhysicalOperatorType::kFlush) {}
 };
 
 struct FlushOutputState : public OutputState {
     inline explicit
-    FlushOutputState(): OutputState(PhysicalOperatorType::kFlush) {}
+    FlushOutputState() : OutputState(PhysicalOperatorType::kFlush) {}
 };
 
 // Sink
@@ -499,7 +499,7 @@ struct SinkState {
     UniquePtr<String> error_message_{};
 };
 
-struct GeneralSinkState: public SinkState {
+struct GeneralSinkState : public SinkState {
     inline explicit
     GeneralSinkState() : SinkState(SinkStateType::kGeneral) {}
 
@@ -508,14 +508,14 @@ struct GeneralSinkState: public SinkState {
     Vector<SharedPtr<DataBlock>> data_block_array_{};
 };
 
-struct ResultSinkState: public SinkState {
+struct ResultSinkState : public SinkState {
     inline explicit
     ResultSinkState() : SinkState(SinkStateType::kResult) {}
 
     SharedPtr<ColumnDef> result_def_{};
 };
 
-struct MessageSinkState: public SinkState {
+struct MessageSinkState : public SinkState {
     inline explicit
     MessageSinkState() : SinkState(SinkStateType::kMessage) {}
 
@@ -545,7 +545,7 @@ struct SourceState {
     SourceStateType state_type_{SourceStateType::kInvalid};
 };
 
-struct CommonSourceState: public SourceState {
+struct CommonSourceState : public SourceState {
     inline explicit
     CommonSourceState() : SourceState(SourceStateType::kCommon) {}
 
@@ -555,7 +555,7 @@ struct CommonSourceState: public SourceState {
 struct AggregateSourceState : public SourceState {
     explicit
     AggregateSourceState(i64 hash_start, i64 hash_end)
-        : SourceState(SourceStateType::kAggregate), hash_start_(hash_start), hash_end_(hash_end) {}
+            : SourceState(SourceStateType::kAggregate), hash_start_(hash_start), hash_end_(hash_end) {}
 
 
     inline SharedPtr<DataBlock>

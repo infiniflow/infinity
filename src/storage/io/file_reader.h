@@ -13,6 +13,7 @@ class FileReader {
 public:
     explicit
     FileReader(FileSystem& fs, const String& path, SizeT buffer_size);
+
     FileReader(const FileReader& other);
 
     FileSystem& fs_;
@@ -26,10 +27,10 @@ public:
     UniquePtr<FileHandler> file_handler_{};
 
 public:
-    u8 
+    u8
     ReadByte();
 
-    i16 
+    i16
     ReadShort();
 
     i32
@@ -53,10 +54,11 @@ public:
     i64
     GetFilePointer() const;
 
-    void 
+    void
     Seek(const i64 pos);
 
-    FileReader* Clone();
+    FileReader*
+    Clone();
 };
 
 }

@@ -19,20 +19,19 @@ struct LessEqualsFunction {
 
 template<>
 inline void
-LessEqualsFunction::Run(VarcharT left, VarcharT right, bool & result) {
+LessEqualsFunction::Run(VarcharT left, VarcharT right, bool& result) {
     if(left.IsInlined()) {
         if(right.IsInlined()) {
             result = (memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) <= 0);
-            return ;
+            return;
         }
-    } else if(right.IsInlined()) {
-        ;
+    } else if(right.IsInlined()) { ;
     } else {
         // Both left and right are not inline
         u16 min_len = std::min(right.length, left.length);
         if(memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) <= 0) {
             result = (memcmp(left.ptr, right.ptr, min_len) <= 0);
-            return ;
+            return;
         }
     }
     result = false;
@@ -80,14 +79,14 @@ GenerateLessEqualsFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr, DataT
     String func_name = "<=";
     ScalarFunction less_function(
             func_name,
-            { data_type, data_type },
-            { DataType(LogicalType::kBoolean) },
+            {data_type, data_type},
+            {DataType(LogicalType::kBoolean)},
             &ScalarFunction::BinaryFunction<CompareType, CompareType, BooleanT, LessEqualsFunction>);
     function_set_ptr->AddFunction(less_function);
 }
 
 void
-RegisterLessEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterLessEqualsFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "<=";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -118,42 +117,42 @@ RegisterLessEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
     ScalarFunction mix_less_equals_bigint(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, BigIntT, BooleanT, LessEqualsFunction>);
     function_set_ptr->AddFunction(mix_less_equals_bigint);
 
     ScalarFunction bigint_less_equals_mixed(
             func_name,
-            { DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<BigIntT, MixedT, BooleanT, LessEqualsFunction>);
     function_set_ptr->AddFunction(bigint_less_equals_mixed);
 
     ScalarFunction mix_less_equals_double(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kDouble) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, DoubleT, BooleanT, LessEqualsFunction>);
     function_set_ptr->AddFunction(mix_less_equals_double);
 
     ScalarFunction double_less_equals_mixed(
             func_name,
-            { DataType(LogicalType::kDouble), DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kDouble), DataType(LogicalType::kMixed)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<DoubleT, MixedT, BooleanT, LessEqualsFunction>);
     function_set_ptr->AddFunction(double_less_equals_mixed);
 
     ScalarFunction mix_less_equals_varchar(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, VarcharT, BooleanT, LessEqualsFunction>);
     function_set_ptr->AddFunction(mix_less_equals_varchar);
 
     ScalarFunction varchar_less_equals_mixed(
             func_name,
-            { DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, LessEqualsFunction>);
     function_set_ptr->AddFunction(varchar_less_equals_mixed);

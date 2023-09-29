@@ -10,6 +10,6 @@
 namespace infinity {
 
 void
-RegisterMinFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterMinFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
 }

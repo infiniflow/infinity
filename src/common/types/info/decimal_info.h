@@ -18,7 +18,7 @@ public:
     Make(i64 precision, i64 scale);
 
     explicit DecimalInfo(i64 precision, i64 scale) :
-    TypeInfo(TypeInfoType::kDecimal), precision_(precision), scale_(scale) {
+            TypeInfo(TypeInfoType::kDecimal), precision_(precision), scale_(scale) {
 //        GlobalResourceUsage::IncrObjectCount();
     }
 
@@ -42,7 +42,8 @@ public:
     Serialize() const override;
 
     [[nodiscard]] inline
-    String ToString() const override {
+    String
+    ToString() const override {
         return "decimal(" + std::to_string(precision_) + ", " + std::to_string(scale_) + ")";
     }
 

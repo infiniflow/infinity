@@ -14,11 +14,12 @@
 namespace infinity {
 
 class Txn;
+
 class TxnTableStore {
 public:
     explicit
     TxnTableStore(String table_name, TableCollectionEntry* table_entry, Txn* txn)
-        : table_name_(std::move(table_name)), table_entry_(table_entry), txn_(txn) {}
+            : table_name_(std::move(table_name)), table_entry_(table_entry), txn_(txn) {}
 
     UniquePtr<String>
     Append(const SharedPtr<DataBlock>& input_block);

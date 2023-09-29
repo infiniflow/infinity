@@ -30,8 +30,8 @@ PhysicalCrossProduct::Execute(QueryContext* query_context) {
 
     {
         i64 column_idx{0};
-        const Vector<SharedPtr<ColumnDef>> &left_column_defs = left_table_->definition_ptr_->columns();
-        for (const SharedPtr<ColumnDef> &input_col_def: left_column_defs) {
+        const Vector<SharedPtr<ColumnDef>>& left_column_defs = left_table_->definition_ptr_->columns();
+        for(const SharedPtr<ColumnDef>& input_col_def: left_column_defs) {
             SharedPtr<ColumnDef> output_col_def = MakeShared<ColumnDef>(column_idx,
                                                                         input_col_def->type(),
                                                                         input_col_def->name(),
@@ -41,8 +41,8 @@ PhysicalCrossProduct::Execute(QueryContext* query_context) {
             ++column_idx;
         }
 
-        const Vector<SharedPtr<ColumnDef>> &right_column_defs = right_table_->definition_ptr_->columns();
-        for (const SharedPtr<ColumnDef> &input_col_def: right_column_defs) {
+        const Vector<SharedPtr<ColumnDef>>& right_column_defs = right_table_->definition_ptr_->columns();
+        for(const SharedPtr<ColumnDef>& input_col_def: right_column_defs) {
             SharedPtr<ColumnDef> output_col_def = MakeShared<ColumnDef>(column_idx,
                                                                         input_col_def->type(),
                                                                         input_col_def->name(),
@@ -52,7 +52,9 @@ PhysicalCrossProduct::Execute(QueryContext* query_context) {
         }
     }
 
-    SharedPtr<TableDef> cross_product_table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("cross_product"), columns_def);
+    SharedPtr<TableDef> cross_product_table_def = TableDef::Make(MakeShared<String>("default"),
+                                                                 MakeShared<String>("cross_product"),
+                                                                 columns_def);
     SharedPtr<Table> cross_product_table = Table::Make(cross_product_table_def, TableType::kCrossProduct);
 
     // Loop left table and scan right table
@@ -64,13 +66,13 @@ PhysicalCrossProduct::Execute(QueryContext* query_context) {
             SizeT output_row_count = right_block->row_count();
 
             SizeT left_row_count = left_block->row_count();
-            for(SizeT row_idx = 0; row_idx < left_row_count; ++ row_idx) {
+            for(SizeT row_idx = 0; row_idx < left_row_count; ++row_idx) {
                 // left block column vectors
                 Vector<SharedPtr<ColumnVector>> output_columns;
                 output_columns.reserve(left_column_count + right_column_count);
 
                 // Prepare the left columns
-                for(SizeT column_idx = 0; column_idx < left_column_count; ++ column_idx) {
+                for(SizeT column_idx = 0; column_idx < left_column_count; ++column_idx) {
                     const SharedPtr<ColumnVector>& left_column_vector = left_block->column_vectors[column_idx];
 
                     // Generate output column vector
@@ -86,7 +88,7 @@ PhysicalCrossProduct::Execute(QueryContext* query_context) {
                 }
 
                 // Prepare the right columns
-                for(SizeT column_idx = 0; column_idx < right_column_count; ++ column_idx) {
+                for(SizeT column_idx = 0; column_idx < right_column_count; ++column_idx) {
                     const SharedPtr<ColumnVector>& right_column_vector = right_block->column_vectors[column_idx];
                     output_columns.emplace_back(right_column_vector);
                 }

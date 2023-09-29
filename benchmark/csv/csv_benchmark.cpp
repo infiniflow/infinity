@@ -21,8 +21,9 @@ struct my_data {
 /**
  * Our row handler is passed a pointer to our structure
  */
-void my_row_handler(void *ctx) {
-    struct my_data *data = static_cast<my_data *>(ctx);
+void
+my_row_handler(void* ctx) {
+    struct my_data* data = static_cast<my_data*>(ctx);
 
     /* get a cell count */
     size_t cell_count = zsv_cell_count(data->parser);
@@ -41,17 +42,21 @@ void my_row_handler(void *ctx) {
     printf("\n");
 
     /* print our results for this row */
-    printf("Row %zu has %zu columns of which %zu %s non-blank\n", ++data->row_num, cell_count, nonblank, nonblank == 1 ? "is" : "are");
+    printf("Row %zu has %zu columns of which %zu %s non-blank\n",
+           ++data->row_num,
+           cell_count,
+           nonblank,
+           nonblank == 1 ? "is" : "are");
 }
 
 auto
-main () -> int {
+main() -> int {
 
     std::cout << std::filesystem::current_path() << std::endl;
 
     std::string filename = std::string(CSV_DATA_PATH) + "/test/flatten.csv";
 
-    FILE *f = fopen(filename.c_str(), "rb");
+    FILE* f = fopen(filename.c_str(), "rb");
     if(!f) {
         perror(filename.c_str());
         return 1;
@@ -64,9 +69,9 @@ main () -> int {
      * delimited; header row span etc)-- for details, see
      * ../../include/zsv/api.h
      */
-    struct zsv_opts opts = { 0 };
+    struct zsv_opts opts = {0};
     opts.row_handler = my_row_handler;
-    struct my_data data = { 0 };
+    struct my_data data = {0};
     opts.ctx = &data;
     opts.stream = f;
     opts.delimiter = ',';

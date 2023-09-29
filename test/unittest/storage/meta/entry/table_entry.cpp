@@ -7,7 +7,6 @@
 #include "base_test.h"
 #include "storage/buffer/column_buffer.h"
 #include "storage/table_def.h"
-#include "storage/table/data_table.h"
 #include "storage/txn/txn_manager.h"
 #include "main/profiler/base_profiler.h"
 #include "main/logger.h"
@@ -173,15 +172,15 @@ TEST_F(TableEntryTest, test2) {
         SizeT row_count = DEFAULT_VECTOR_SIZE * 2;
         input_block->Init(column_types, row_count);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             input_block->AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
         }
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             input_block->AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
         }
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             input_block->AppendValue(2, Value::MakeDouble(static_cast<f64>(i)));
         }
 
@@ -208,26 +207,26 @@ TEST_F(TableEntryTest, test2) {
             UniquePtr<MetaTableState> read_table_meta = new_txn->GetTableMeta("db1", "tbl1", column_ids);
             EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
             EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
-            for (const auto &segment_pair: read_table_meta->segment_map_) {
+            for(const auto& segment_pair: read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
                 EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
                 EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
                 EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
                 EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-                ColumnDataEntry *column0 = segment_pair.second.column_data_map_.at(0).column_data_;
-                ColumnDataEntry *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
+                ColumnDataEntry* column0 = segment_pair.second.column_data_map_.at(0).column_data_;
+                ColumnDataEntry* column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
                 SizeT row_count = segment_pair.second.segment_entry_->current_row_;
                 ColumnBuffer col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
-                i8 *col0_ptr = (i8 *) (col0_obj.GetAll());
-                for (SizeT row = 0; row < row_count; ++row) {
+                i8* col0_ptr = (i8*)(col0_obj.GetAll());
+                for(SizeT row = 0; row < row_count; ++row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
-                    EXPECT_EQ(col0_ptr[row], (i8) (row));
+                    EXPECT_EQ(col0_ptr[row], (i8)(row));
                 }
 
                 ColumnBuffer col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
-                f64 *col2_ptr = (f64 *) (col2_obj.GetAll());
-                for (SizeT row = 0; row < row_count; ++row) {
+                f64* col2_ptr = (f64*)(col2_obj.GetAll());
+                for(SizeT row = 0; row < row_count; ++row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                 }
             }
@@ -246,15 +245,15 @@ TEST_F(TableEntryTest, test2) {
             SizeT row_count = DEFAULT_VECTOR_SIZE;
             input_block->Init(column_types, row_count);
 
-            for (SizeT i = 0; i < row_count; ++i) {
+            for(SizeT i = 0; i < row_count; ++i) {
                 input_block->AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
             }
 
-            for (SizeT i = 0; i < row_count; ++i) {
+            for(SizeT i = 0; i < row_count; ++i) {
                 input_block->AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
             }
 
-            for (SizeT i = 0; i < row_count; ++i) {
+            for(SizeT i = 0; i < row_count; ++i) {
                 input_block->AppendValue(2, Value::MakeDouble(static_cast<f64>(i)));
             }
 
@@ -280,7 +279,7 @@ TEST_F(TableEntryTest, test2) {
                 i8* col0_ptr = (i8*)(column0->data_ptr_);
                 ColumnVector* column2 = local_block_state.column_vector_map_.at(2).column_vector_;
                 f64* col2_ptr = (f64*)(column2->data_ptr_);
-                for(SizeT row = 0; row < row_count; ++ row) {
+                for(SizeT row = 0; row < row_count; ++row) {
                     EXPECT_EQ(col0_ptr[row], (i8)row);
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                 }
@@ -299,14 +298,14 @@ TEST_F(TableEntryTest, test2) {
                 SizeT row_count = segment_pair.second.segment_entry_->current_row_;
                 ColumnBuffer col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
                 i8* col0_ptr = (i8*)(col0_obj.GetAll());
-                for(SizeT row = 0; row < row_count; ++ row) {
+                for(SizeT row = 0; row < row_count; ++row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                     EXPECT_EQ(col0_ptr[row], (i8)(row));
                 }
 
                 ColumnBuffer col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
                 f64* col2_ptr = (f64*)(col2_obj.GetAll());
-                for(SizeT row = 0; row < row_count; ++ row) {
+                for(SizeT row = 0; row < row_count; ++row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                 }
             }
@@ -332,26 +331,26 @@ TEST_F(TableEntryTest, test2) {
             UniquePtr<MetaTableState> read_table_meta = new_txn->GetTableMeta("db1", "tbl1", column_ids);
             EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
             EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
-            for (const auto &segment_pair: read_table_meta->segment_map_) {
+            for(const auto& segment_pair: read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
                 EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
                 EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
                 EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
                 EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-                ColumnDataEntry *column0 = segment_pair.second.column_data_map_.at(0).column_data_;
-                ColumnDataEntry *column2 = segment_pair.second.column_data_map_.at(2).column_data_;
+                ColumnDataEntry* column0 = segment_pair.second.column_data_map_.at(0).column_data_;
+                ColumnDataEntry* column2 = segment_pair.second.column_data_map_.at(2).column_data_;
 
                 SizeT row_count = segment_pair.second.segment_entry_->current_row_;
                 ColumnBuffer col0_obj = ColumnDataEntry::GetColumnData(column0, buffer_mgr);
-                i8 *col0_ptr = (i8 *) (col0_obj.GetAll());
-                for (SizeT row = 0; row < row_count; ++row) {
+                i8* col0_ptr = (i8*)(col0_obj.GetAll());
+                for(SizeT row = 0; row < row_count; ++row) {
 //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
-                    EXPECT_EQ(col0_ptr[row], (i8) (row));
+                    EXPECT_EQ(col0_ptr[row], (i8)(row));
                 }
 
                 ColumnBuffer col2_obj = ColumnDataEntry::GetColumnData(column2, buffer_mgr);
-                f64 *col2_ptr = (f64 *) (col2_obj.GetAll());
-                for (SizeT row = 0; row < row_count; ++row) {
+                f64* col2_ptr = (f64*)(col2_obj.GetAll());
+                for(SizeT row = 0; row < row_count; ++row) {
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                 }
             }

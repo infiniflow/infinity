@@ -18,7 +18,7 @@ namespace infinity {
 /// (default policy evicts entries which are not used for a long time).
 /// Cache starts to evict entries when their total weight exceeds max_size.
 /// Value weight should not change after insertion.
-template <typename TKey, typename TMapped, typename HashFunction = std::hash<TKey>, typename WeightFunction = TrivialWeightFunction<TMapped>>
+template<typename TKey, typename TMapped, typename HashFunction = std::hash<TKey>, typename WeightFunction = TrivialWeightFunction<TMapped>>
 class CacheBase {
 public:
     using Key = TKey;
@@ -26,11 +26,11 @@ public:
     using MappedPtr = std::shared_ptr<Mapped>;
 
     CacheBase(size_t max_size, size_t max_elements_size = 0, String cache_policy_name = "", double size_ratio = 0.5) {
-        if (cache_policy_name.empty()) {
+        if(cache_policy_name.empty()) {
             cache_policy_name = default_cache_policy_name;
         }
 
-        if (cache_policy_name == "LRU") {
+        if(cache_policy_name == "LRU") {
             using LRUPolicy = LRUCachePolicy<TKey, TMapped, HashFunction, WeightFunction>;
             cache_policy = std::make_unique<LRUPolicy>(max_size, max_elements_size);
         } else {
@@ -38,10 +38,11 @@ public:
         }
     }
 
-    MappedPtr Get(const Key & key) {
+    MappedPtr
+    Get(const Key& key) {
         std::lock_guard lock(mutex);
         auto res = cache_policy->Get(key);
-        if (res)
+        if(res)
             ++hits;
         else
             ++misses;
@@ -49,7 +50,8 @@ public:
         return res;
     }
 
-    void Set(const Key & key, const MappedPtr & mapped) {
+    void
+    Set(const Key& key, const MappedPtr& mapped) {
         std::lock_guard lock(mutex);
         cache_policy->Set(key, mapped);
     }
@@ -62,31 +64,32 @@ public:
     /// set of concurrent threads will then try to call its load_func etc.
     ///
     /// Returns std::pair of the cached value and a bool indicating whether the value was produced during this call.
-    template <typename LoadFunc>
-    std::pair<MappedPtr, bool> GetOrSet(const Key & key, LoadFunc && load_func) {
+    template<typename LoadFunc>
+    std::pair<MappedPtr, bool>
+    GetOrSet(const Key& key, LoadFunc&& load_func) {
         InsertTokenHolder token_holder;
         {
             std::lock_guard cache_lock(mutex);
             auto val = cache_policy->Get(key);
-            if (val) {
+            if(val) {
                 ++hits;
                 return std::make_pair(val, false);
             }
 
-            auto & token = insert_tokens[key];
-            if (!token)
+            auto& token = insert_tokens[key];
+            if(!token)
                 token = std::make_shared<InsertToken>(*this);
 
             token_holder.acquire(&key, token, cache_lock);
         }
 
-        InsertToken * token = token_holder.token.get();
+        InsertToken* token = token_holder.token.get();
 
         std::lock_guard token_lock(token->mutex);
 
         token_holder.cleaned_up = token->cleaned_up;
 
-        if (token->value) {
+        if(token->value) {
             /// Another thread already produced the value while we waited for token->mutex.
             ++hits;
             return std::make_pair(token->value, false);
@@ -101,18 +104,19 @@ public:
         /// (The token may be absent because of a concurrent reset() call).
         bool result = false;
         auto token_it = insert_tokens.find(key);
-        if (token_it != insert_tokens.end() && token_it->second.get() == token) {
+        if(token_it != insert_tokens.end() && token_it->second.get() == token) {
             cache_policy->Set(key, token->value);
             result = true;
         }
 
-        if (!token->cleaned_up)
+        if(!token->cleaned_up)
             token_holder.cleanup(token_lock, cache_lock);
 
         return std::make_pair(token->value, result);
     }
 
-    void Reset() {
+    void
+    Reset() {
         std::lock_guard lock(mutex);
         insert_tokens.clear();
         hits = 0;
@@ -120,17 +124,20 @@ public:
         cache_policy->Reset();
     }
 
-    void Remove(const Key & key) {
+    void
+    Remove(const Key& key) {
         std::lock_guard lock(mutex);
         cache_policy->Remove(key);
     }
 
-    size_t Count() const {
+    size_t
+    Count() const {
         std::lock_guard lock(mutex);
         return cache_policy->Count();
     }
 
-    size_t MaxSize() const {
+    size_t
+    MaxSize() const {
         return cache_policy->MaxSize();
     }
 
@@ -151,13 +158,13 @@ private:
 
     /// Represents pending insertion attempt.
     struct InsertToken {
-        explicit InsertToken(CacheBase & cache_) : cache(cache_) {}
+        explicit InsertToken(CacheBase& cache_) : cache(cache_) {}
 
         std::mutex mutex;
         bool cleaned_up = false;
         MappedPtr value;
 
-        CacheBase & cache;
+        CacheBase& cache;
         size_t refcount = 0; /// Protected by the cache mutex
     };
 
@@ -167,40 +174,42 @@ private:
     /// Among several concurrent threads the first successful one is responsible for removal. But if they all
     /// fail, then the last one is responsible.
     struct InsertTokenHolder {
-        const Key * key = nullptr;
+        const Key* key = nullptr;
         std::shared_ptr<InsertToken> token;
         bool cleaned_up = false;
 
         InsertTokenHolder() = default;
 
-        void acquire(const Key * key_, const std::shared_ptr<InsertToken> & token_) {
+        void
+        acquire(const Key* key_, const std::shared_ptr<InsertToken>& token_) {
             key = key_;
             token = token_;
             ++token->refcount;
         }
 
-        void cleanup(){
+        void
+        cleanup() {
             token->cache.insert_tokens.erase(*key);
             token->cleaned_up = true;
             cleaned_up = true;
         }
 
         ~InsertTokenHolder() {
-            if (!token)
+            if(!token)
                 return;
 
-            if (cleaned_up)
+            if(cleaned_up)
                 return;
 
             std::lock_guard token_lock(token->mutex);
 
-            if (token->cleaned_up)
+            if(token->cleaned_up)
                 return;
 
             std::lock_guard cache_lock(token->cache.mutex);
 
             --token->refcount;
-            if (token->refcount == 0)
+            if(token->refcount == 0)
                 cleanup();
         }
     };

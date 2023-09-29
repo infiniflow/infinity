@@ -13,7 +13,7 @@ class LogicalExplain : public LogicalNode {
 public:
     explicit
     LogicalExplain(u64 node_id, ExplainType type)
-    : LogicalNode(node_id, LogicalNodeType::kExplain), explain_type_(type) {}
+            : LogicalNode(node_id, LogicalNodeType::kExplain), explain_type_(type) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {

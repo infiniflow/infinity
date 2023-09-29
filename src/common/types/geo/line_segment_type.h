@@ -18,7 +18,8 @@ struct LineSegmentType {
 
     inline bool
     operator==(const LineSegmentType& other) const {
-        if(this == &other) return true;
+        if(this == &other)
+            return true;
         return (point1 == other.point1) && (point2 == other.point2);
     }
 

@@ -27,9 +27,14 @@ public:
     }
 
     UuidType(const UuidType& other);
+
     UuidType(UuidType&& other) noexcept;
-    UuidType& operator=(const UuidType& other);
-    UuidType& operator=(UuidType&& other) noexcept;
+
+    UuidType&
+    operator=(const UuidType& other);
+
+    UuidType&
+    operator=(UuidType&& other) noexcept;
 
     bool
     operator==(const UuidType& other) const;

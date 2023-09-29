@@ -10,10 +10,10 @@
 
 namespace infinity {
 
-class ValueExpression: public BaseExpression {
+class ValueExpression : public BaseExpression {
 public:
     explicit
-    ValueExpression(Value value) : BaseExpression(ExpressionType::kValue, {}), value_(std::move(value)){}
+    ValueExpression(Value value) : BaseExpression(ExpressionType::kValue, {}), value_(std::move(value)) {}
 
     String
     ToString() const override;

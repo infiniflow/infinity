@@ -152,7 +152,7 @@ class ParallelStreamFragmentCtx : public FragmentContext {
 public:
     explicit
     ParallelStreamFragmentCtx(PlanFragment* fragment_ptr, QueryContext* query_context)
-        : FragmentContext(fragment_ptr, query_context) {}
+            : FragmentContext(fragment_ptr, query_context) {}
 
     SharedPtr<Table>
     GetResultInternal() final;

@@ -66,7 +66,8 @@ TEST_F(DataBlockTest, test1) {
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kInterval));
 
     // Nested types * 2
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt))));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kArray,
+                                                   ArrayInfo::Make(DataType(LogicalType::kBigInt))));
 
     // TODO: how to handle Tuple type?
     // column_types.emplace_back(LogicalType::kTuple);
@@ -86,7 +87,8 @@ TEST_F(DataBlockTest, test1) {
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kBlob));
 
     // 32 dimension * float vector
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kEmbedding,
+                                                   EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
 
     // Heterogeneous type * 1
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kMixed));
@@ -97,12 +99,12 @@ TEST_F(DataBlockTest, test1) {
 
     // Boolean: Test DataBlock::AppendValue
     constexpr SizeT BoolColumnIndex = 0;
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(BoolColumnIndex, Value::MakeBool(i % 2 == 0));
     }
 
     // Boolean: Test DataBlock::GetValue
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++i) {
         Value value = data_block.GetValue(BoolColumnIndex, i);
         EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
@@ -110,12 +112,12 @@ TEST_F(DataBlockTest, test1) {
 
     // TinyInt: Test DataBlock::AppendValue
     constexpr SizeT TinyIntColumnIndex = 1;
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(TinyIntColumnIndex, Value::MakeTinyInt(static_cast<i8>(i)));
     }
 
     // Test DataBlock::GetValue
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++i) {
         Value value = data_block.GetValue(TinyIntColumnIndex, i);
         EXPECT_EQ(value.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(value.value_.tiny_int, i8(i));
@@ -123,11 +125,11 @@ TEST_F(DataBlockTest, test1) {
 
     // Test DataBlock::Reset
     data_block.Reset();
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
 
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++i) {
         Value value = data_block.GetValue(0, i);
         EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
@@ -147,7 +149,7 @@ TEST_F(DataBlockTest, test2) {
     data_block.Init(column_types);
 
     // Test DataBlock::AppendValue
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
     EXPECT_THROW(data_block.AppendValue(1, Value::MakeBool(true)), StorageException);
@@ -162,7 +164,7 @@ TEST_F(DataBlockTest, test2) {
     SharedPtr<Vector<RowID>> row_ids = MakeShared<Vector<RowID>>();
     row_ids->reserve(row_count);
     data_block.FillRowIDVector(row_ids, 1);
-    for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
+    for(SizeT row_id = 0; row_id < row_count; ++row_id) {
         EXPECT_EQ((*row_ids)[row_id].offset, row_id);
         EXPECT_EQ((*row_ids)[row_id].block, 1);
     }
@@ -195,7 +197,7 @@ TEST_F(DataBlockTest, test3) {
 
     // Test DataBlock::AppendValue
     profiler.Begin();
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
     }
     profiler.End();
@@ -204,7 +206,7 @@ TEST_F(DataBlockTest, test3) {
     data_block.Finalize();
 
     // Validate the inserted data.
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for(SizeT i = 0; i < row_count; ++i) {
         auto v = Value::MakeTinyInt(static_cast<i8>(i));
         auto vx = data_block.GetValue(0, i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);

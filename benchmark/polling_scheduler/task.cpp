@@ -33,12 +33,12 @@ NewScheduler::PollerLoop(i64 cpu_id) {
     while(running) {
         poller_queue->DequeueBulk(local_task_list);
         auto task_iter = local_task_list.begin();
-        while (!local_task_list.empty()) {
+        while(!local_task_list.empty()) {
             Task*& task_ptr = (*task_iter);
             if(task_ptr->type() == TaskType::kTerminate) {
                 running = false;
                 local_ready_queue.emplace_back(task_ptr);
-                local_task_list.erase(task_iter ++);
+                local_task_list.erase(task_iter++);
 //                ++ task_iter;
             } else {
                 TaskState task_state = task_ptr->state_.load();
@@ -47,17 +47,17 @@ NewScheduler::PollerLoop(i64 cpu_id) {
                     case TaskState::kCancelled:
                     case TaskState::kFinished:
                     case TaskState::kReady: {
-                        local_task_list.erase(task_iter ++);
+                        local_task_list.erase(task_iter++);
                         local_ready_queue.push_back(task_ptr);
                         break;
                     }
                     case TaskState::kPending: {
-                        ++ task_iter;
+                        ++task_iter;
                     }
                 }
             }
 
-            if (local_ready_queue.empty()) {
+            if(local_ready_queue.empty()) {
                 spin_count += 1;
             } else {
                 spin_count = 0;
@@ -66,10 +66,10 @@ NewScheduler::PollerLoop(i64 cpu_id) {
                 local_ready_queue.clear();
             }
 
-            if (spin_count != 0 && spin_count % 32 == 0) {
+            if(spin_count != 0 && spin_count % 32 == 0) {
                 _mm_pause();
             }
-            if (spin_count == 6400) {
+            if(spin_count == 6400) {
                 spin_count = 0;
                 sched_yield();
             }
@@ -93,7 +93,7 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
             continue;
         }
 
-        switch (input_task->type()) {
+        switch(input_task->type()) {
             case TaskType::kTerminate: {
                 printf("terminate coordinator on CPU: %ld\n", cpu_id);
                 running = false;
@@ -118,7 +118,7 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
                     current_cpu_id = current_cpu_id % cpu_array.size();
 //                    printf("Dispatched to CPU: %ld\n", cpu_array[current_cpu_id]);
                     NewScheduler::DispatchTask(cpu_array[current_cpu_id], pipeline_task);
-                    ++ current_cpu_id;
+                    ++current_cpu_id;
                 } else {
                     NewScheduler::DispatchTask(pipeline_task->last_worker_id_, pipeline_task);
                 }
@@ -173,7 +173,7 @@ void
 NewScheduler::Init(const HashSet<i64>& input_cpu_set) {
     if(!cpu_set.empty()) {
         std::cerr << "scheduler was initialized before" << std::endl;
-        return ;
+        return;
     }
     cpu_set = input_cpu_set;
 

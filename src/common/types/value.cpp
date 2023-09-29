@@ -286,169 +286,197 @@ Value::MakeNull() {
 }
 
 // Value getter
-template <> BooleanT
+template<>
+BooleanT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kBoolean, "Not matched type: " + type_.ToString())
     return value_.boolean;
 }
-template <> TinyIntT
+template<>
+TinyIntT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kTinyInt, "Not matched type: " + type_.ToString())
     return value_.tiny_int;
 }
 
-template <> SmallIntT
+template<>
+SmallIntT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kSmallInt, "Not matched type: " + type_.ToString())
     return value_.small_int;
 }
 
-template <> IntegerT
+template<>
+IntegerT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kInteger, "Not matched type: " + type_.ToString())
     return value_.integer;
 }
 
-template <> BigIntT
+template<>
+BigIntT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kBigInt, "Not matched type: " + type_.ToString())
     return value_.big_int;
 }
 
-template <> HugeIntT
+template<>
+HugeIntT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kHugeInt, "Not matched type: " + type_.ToString())
     return value_.huge_int;
 }
 
-template <> FloatT
+template<>
+FloatT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kFloat, "Not matched type: " + type_.ToString())
     return value_.float32;
 }
 
-template <> DoubleT
+template<>
+DoubleT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kDouble, "Not matched type: " + type_.ToString())
     return value_.float64;
 }
 
-template <> DecimalT
+template<>
+DecimalT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kDecimal, "Not matched type: " + type_.ToString())
     return value_.decimal;
 }
 
-template <> VarcharT
+template<>
+VarcharT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kVarchar, "Not matched type: " + type_.ToString())
     return value_.varchar;
 }
 
-template <> DateT
+template<>
+DateT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kDate, "Not matched type: " + type_.ToString())
     return value_.date;
 }
 
-template <> TimeT
+template<>
+TimeT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kTime, "Not matched type: " + type_.ToString())
     return value_.time;
 }
 
-template <> DateTimeT
+template<>
+DateTimeT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kDateTime, "Not matched type: " + type_.ToString())
     return value_.datetime;
 }
 
-template <> TimestampT
+template<>
+TimestampT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kTimestamp, "Not matched type: " + type_.ToString())
     return value_.timestamp;
 }
 
-template <> IntervalT
+template<>
+IntervalT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kInterval, "Not matched type: " + type_.ToString())
     return value_.interval;
 }
 
-template <> ArrayT
+template<>
+ArrayT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kArray or type_.type() == LogicalType::kTuple,
                "Not matched type: " + type_.ToString())
     return array;
 }
 
-template <> PointT
+template<>
+PointT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kPoint, "Not matched type: " + type_.ToString())
     return value_.point;
 }
 
-template <> LineT
+template<>
+LineT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kLine, "Not matched type: " + type_.ToString())
     return value_.line;
 }
 
-template <> LineSegT
+template<>
+LineSegT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kLineSeg, "Not matched type: " + type_.ToString())
     return value_.line_segment;
 }
 
-template <> BoxT
+template<>
+BoxT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kBox, "Not matched type: " + type_.ToString())
     return value_.box;
 }
 
-template <> PathT
+template<>
+PathT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kPath, "Not matched type: " + type_.ToString())
     return value_.path;
 }
 
-template <> PolygonT
+template<>
+PolygonT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kPolygon, "Not matched type: " + type_.ToString())
     return value_.polygon;
 }
 
-template <> CircleT
+template<>
+CircleT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kCircle, "Not matched type: " + type_.ToString())
     return value_.circle;
 }
 
-template <> BitmapT
+template<>
+BitmapT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kBitmap, "Not matched type: " + type_.ToString())
     return value_.bitmap;
 }
 
-template <> UuidT
+template<>
+UuidT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kUuid, "Not matched type: " + type_.ToString())
     return value_.uuid;
 }
 
-template <> BlobT
+template<>
+BlobT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kBlob, "Not matched type: " + type_.ToString())
     return value_.blob;
 }
 
-template <> EmbeddingT
+template<>
+EmbeddingT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kEmbedding, "Not matched type: " + type_.ToString())
     return value_.embedding;
 }
 
-template <> MixedT
+template<>
+MixedT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kMixed, "Not matched type: " + type_.ToString())
     return value_.mixed_value;
@@ -494,20 +522,20 @@ Value::~Value() {
     GlobalResourceUsage::DecrObjectCount();
 }
 
-Value::Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr): type_(type, std::move(typeinfo_ptr)) {
+Value::Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr) : type_(type, std::move(typeinfo_ptr)) {
     GlobalResourceUsage::IncrObjectCount();
     Init(true);
 }
 
-Value::Value(const Value& other) : type_(other.type_), is_null_(other.is_null_)  {
+Value::Value(const Value& other) : type_(other.type_), is_null_(other.is_null_) {
     GlobalResourceUsage::IncrObjectCount();
     Init(true);
     CopyUnionValue(other);
 }
 
-Value::Value(Value&& other) noexcept :
-    type_(std::move(other.type_)),
-    is_null_(other.is_null_) {
+Value::Value(Value&& other) noexcept:
+        type_(std::move(other.type_)),
+        is_null_(other.is_null_) {
     GlobalResourceUsage::IncrObjectCount();
     Init(true);
     MoveUnionValue(std::forward<Value>(other));
@@ -515,7 +543,8 @@ Value::Value(Value&& other) noexcept :
 
 Value&
 Value::operator=(const Value& other) {
-    if(this == &other) return *this;
+    if(this == &other)
+        return *this;
     this->Reset();
     if(this->type_ != other.type_) {
         this->type_ = other.type_;
@@ -528,7 +557,7 @@ Value::operator=(const Value& other) {
 }
 
 Value&
-Value::operator=(Value&& other)  noexcept {
+Value::operator=(Value&& other) noexcept {
     // Clear exist value, since some type need to free the allocated heap memory.
     this->Reset();
     if(this->type_ != other.type_) {
@@ -1082,7 +1111,7 @@ Value::Reset() {
 }
 
 bool
-Value::TryCastAs(const DataType &target_type, Value &new_value) const {
+Value::TryCastAs(const DataType& target_type, Value& new_value) const {
     BoundCastFunc cast = CastFunction::GetBoundFunc(this->type_, target_type);
     SharedPtr<ColumnVector> source_ptr = MakeShared<ColumnVector>(MakeShared<DataType>(this->type_));
     source_ptr->Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);

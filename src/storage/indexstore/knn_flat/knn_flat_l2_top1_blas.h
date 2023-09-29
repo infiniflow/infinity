@@ -22,15 +22,17 @@ public:
                       i64 query_count,
                       i64 dimension,
                       EmbeddingDataType elem_data_type)
-                      : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1, elem_data_type),
-                      queries_(queries),
-                      query_count_(query_count),
-                      dimension_(dimension) {
+            : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1, elem_data_type),
+              queries_(queries),
+              query_count_(query_count),
+              dimension_(dimension) {
 
         id_array_ = MakeUnique<Vector<CompoundID>>(query_count_, CompoundID(-1, -1));
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * query_count_);
 
-        single_best_result_handler_ = MakeUnique<SingleBestResultHandler>(query_count, distance_array_.get(), id_array_->data());
+        single_best_result_handler_ = MakeUnique<SingleBestResultHandler>(query_count,
+                                                                          distance_array_.get(),
+                                                                          id_array_->data());
 //        single_result_handler_ = MakeUnique<SingleResultHandler>(*single_best_result_handler_);
 
     }
@@ -94,7 +96,7 @@ private:
             const DistType* __restrict queries,
             SizeT dimension,
             SizeT query_count) {
-        for (int64_t i = 0; i < query_count; i++) {
+        for(int64_t i = 0; i < query_count; i++) {
             nr[i] = fvec_norm_L2sqr(queries + i * dimension, dimension);
         }
     }

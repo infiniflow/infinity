@@ -135,18 +135,24 @@ PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState* result_sink_stat
                 result_sink_state->error_message_ = std::move(output_state->error_message_);
             } else {
                 result_sink_state->result_def_ = {
-                        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+                        MakeShared<ColumnDef>(0,
+                                              MakeShared<DataType>(LogicalType::kInteger),
+                                              "OK",
+                                              HashSet<ConstraintType>())
                 };
             }
             break;
         }
-        case PhysicalOperatorType::kCreateCollection:  {
+        case PhysicalOperatorType::kCreateCollection: {
             auto* output_state = static_cast<CreateCollectionOutputState*>(task_output_state);
             if(output_state->error_message_ != nullptr) {
                 result_sink_state->error_message_ = std::move(output_state->error_message_);
             } else {
                 result_sink_state->result_def_ = {
-                        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+                        MakeShared<ColumnDef>(0,
+                                              MakeShared<DataType>(LogicalType::kInteger),
+                                              "OK",
+                                              HashSet<ConstraintType>())
                 };
             }
             break;
@@ -157,7 +163,10 @@ PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState* result_sink_stat
                 result_sink_state->error_message_ = std::move(output_state->error_message_);
             } else {
                 result_sink_state->result_def_ = {
-                        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+                        MakeShared<ColumnDef>(0,
+                                              MakeShared<DataType>(LogicalType::kInteger),
+                                              "OK",
+                                              HashSet<ConstraintType>())
                 };
             }
             break;
@@ -168,7 +177,10 @@ PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState* result_sink_stat
                 result_sink_state->error_message_ = std::move(output_state->error_message_);
             } else {
                 result_sink_state->result_def_ = {
-                        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+                        MakeShared<ColumnDef>(0,
+                                              MakeShared<DataType>(LogicalType::kInteger),
+                                              "OK",
+                                              HashSet<ConstraintType>())
                 };
             }
             break;
@@ -179,7 +191,10 @@ PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState* result_sink_stat
                 result_sink_state->error_message_ = std::move(output_state->error_message_);
             } else {
                 result_sink_state->result_def_ = {
-                        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+                        MakeShared<ColumnDef>(0,
+                                              MakeShared<DataType>(LogicalType::kInteger),
+                                              "OK",
+                                              HashSet<ConstraintType>())
                 };
             }
             break;
@@ -190,7 +205,10 @@ PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState* result_sink_stat
                 result_sink_state->error_message_ = std::move(output_state->error_message_);
             } else {
                 result_sink_state->result_def_ = {
-                        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+                        MakeShared<ColumnDef>(0,
+                                              MakeShared<DataType>(LogicalType::kInteger),
+                                              "OK",
+                                              HashSet<ConstraintType>())
                 };
             }
             break;
@@ -201,7 +219,10 @@ PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState* result_sink_stat
                 result_sink_state->error_message_ = std::move(output_state->error_message_);
             } else {
                 result_sink_state->result_def_ = {
-                        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+                        MakeShared<ColumnDef>(0,
+                                              MakeShared<DataType>(LogicalType::kInteger),
+                                              "OK",
+                                              HashSet<ConstraintType>())
                 };
             }
             break;
@@ -212,7 +233,10 @@ PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState* result_sink_stat
                 result_sink_state->error_message_ = std::move(output_state->error_message_);
             } else {
                 result_sink_state->result_def_ = {
-                        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+                        MakeShared<ColumnDef>(0,
+                                              MakeShared<DataType>(LogicalType::kInteger),
+                                              "OK",
+                                              HashSet<ConstraintType>())
                 };
             }
             break;

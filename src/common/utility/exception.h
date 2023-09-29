@@ -15,7 +15,8 @@ namespace infinity {
 class Exception : public std::exception {
 public:
     explicit Exception(String message) : message_(std::move(message)) {}
-    [[nodiscard]] inline const char* what() const noexcept override {
+    [[nodiscard]] inline const char*
+    what() const noexcept override {
         return message_.c_str();
     }
 
@@ -51,82 +52,95 @@ Exception::BuildMessageInternal(std::vector<String>& values, T param, Args... pa
     return BuildMessageInternal(values, params...);
 }
 
-class ClientException: public Exception {
+class ClientException : public Exception {
 public:
     template<typename... Args>
-    explicit ClientException(Args... params) : Exception(BuildMessage(String("Client Error:"), params...)) {}
+    explicit
+    ClientException(Args... params) : Exception(BuildMessage(String("Client Error:"), params...)) {}
 };
 
-class CatalogException: public Exception {
+class CatalogException : public Exception {
 public:
     template<typename... Args>
-    explicit CatalogException(Args... params) : Exception(BuildMessage(String("Catalog Error:"), params...)) {}
+    explicit
+    CatalogException(Args... params) : Exception(BuildMessage(String("Catalog Error:"), params...)) {}
 };
 
-class NetworkException: public Exception {
+class NetworkException : public Exception {
 public:
     template<typename... Args>
-    explicit NetworkException(Args... params) : Exception(BuildMessage(String("Network Error:"), params...)) {}
+    explicit
+    NetworkException(Args... params) : Exception(BuildMessage(String("Network Error:"), params...)) {}
 };
 
-class ParserException: public Exception {
+class ParserException : public Exception {
 public:
     template<typename... Args>
-    explicit ParserException(Args... params) : Exception(BuildMessage(String("Parser Error:"), params...)) {}
+    explicit
+    ParserException(Args... params) : Exception(BuildMessage(String("Parser Error:"), params...)) {}
 };
 
-class PlannerException: public Exception {
+class PlannerException : public Exception {
 public:
     template<typename... Args>
-    explicit PlannerException(Args... params) : Exception(BuildMessage(String("Planner Error:"), params...)) {}
+    explicit
+    PlannerException(Args... params) : Exception(BuildMessage(String("Planner Error:"), params...)) {}
 };
 
-class OptimizerException: public Exception {
+class OptimizerException : public Exception {
 public:
     template<typename... Args>
-    explicit OptimizerException(Args... params) : Exception(BuildMessage(String("Optimizer Error:"), params...)) {}
+    explicit
+    OptimizerException(Args... params) : Exception(BuildMessage(String("Optimizer Error:"), params...)) {}
 };
 
-class ExecutorException: public Exception {
+class ExecutorException : public Exception {
 public:
     template<typename... Args>
-    explicit ExecutorException(Args... params) : Exception(BuildMessage(String("Executor Error:"), params...)) {}
+    explicit
+    ExecutorException(Args... params) : Exception(BuildMessage(String("Executor Error:"), params...)) {}
 };
 
-class SchedulerException: public Exception {
+class SchedulerException : public Exception {
 public:
     template<typename... Args>
-    explicit SchedulerException(Args... params) : Exception(BuildMessage(String("Scheduler Error:"), params...)) {}
+    explicit
+    SchedulerException(Args... params) : Exception(BuildMessage(String("Scheduler Error:"), params...)) {}
 };
 
-class StorageException: public Exception {
+class StorageException : public Exception {
 public:
     template<typename... Args>
-    explicit StorageException(Args... params) : Exception(BuildMessage(String("Storage Error:"), params...)) {}
+    explicit
+    StorageException(Args... params) : Exception(BuildMessage(String("Storage Error:"), params...)) {}
 };
 
-class TypeException: public Exception {
+class TypeException : public Exception {
 public:
     template<typename... Args>
-    explicit TypeException(Args... params) : Exception(BuildMessage(String("Type Error:"), params...)) {}
+    explicit
+    TypeException(Args... params) : Exception(BuildMessage(String("Type Error:"), params...)) {}
 };
 
-class FunctionException: public Exception {
+class FunctionException : public Exception {
 public:
     template<typename... Args>
-    explicit FunctionException(Args... params) : Exception(BuildMessage(String("Function Error:"), params...)) {}
+    explicit
+    FunctionException(Args... params) : Exception(BuildMessage(String("Function Error:"), params...)) {}
 };
 
-class NotImplementException: public Exception {
+class NotImplementException : public Exception {
 public:
     template<typename... Args>
-    explicit NotImplementException(Args... params) : Exception(BuildMessage(String("NotImplement Error:"), params...)) {}
+    explicit
+    NotImplementException(Args... params) : Exception(BuildMessage(String("NotImplement Error:"), params...)) {}
 };
 
-class TransactionException: public Exception {
+class TransactionException : public Exception {
 public:
     template<typename... Args>
-    explicit TransactionException(Args... params) : Exception(BuildMessage(String("Transaction Error:"), params...)) {}
+    explicit
+    TransactionException(Args... params) : Exception(BuildMessage(String("Transaction Error:"), params...)) {}
 };
 
 }

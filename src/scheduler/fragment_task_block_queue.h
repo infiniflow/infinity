@@ -11,9 +11,10 @@
 namespace infinity {
 
 class FragmentTask;
+
 struct FragmentTaskBlockQueue {
     void
-    Enqueue(FragmentTask *task) {
+    Enqueue(FragmentTask* task) {
         queue_.enqueue(task);
     }
 
@@ -24,11 +25,11 @@ struct FragmentTaskBlockQueue {
     }
 
     void
-    Dequeue(FragmentTask *&task) {
+    Dequeue(FragmentTask*& task) {
         queue_.wait_dequeue(task);
     }
 
-    moodycamel::BlockingConcurrentQueue<FragmentTask *> queue_;
+    moodycamel::BlockingConcurrentQueue<FragmentTask*> queue_;
 };
 
 }

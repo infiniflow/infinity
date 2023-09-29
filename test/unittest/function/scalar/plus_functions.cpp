@@ -10,7 +10,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
 #include "function/scalar/plus.h"
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
@@ -70,12 +69,12 @@ TEST_F(PlusFunctionsTest, plus_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kTinyInt);
             EXPECT_EQ(v1.value_.tiny_int, static_cast<i8>(i));
@@ -85,7 +84,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(i));
@@ -117,12 +116,12 @@ TEST_F(PlusFunctionsTest, plus_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<i16>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v1.value_.small_int, static_cast<i16>(i));
@@ -132,7 +131,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v.value_.small_int, static_cast<i16>(i));
@@ -164,12 +163,12 @@ TEST_F(PlusFunctionsTest, plus_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<i32>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(v1.value_.integer, static_cast<i32>(i));
@@ -179,7 +178,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(v.value_.integer, static_cast<i32>(i));
@@ -211,12 +210,12 @@ TEST_F(PlusFunctionsTest, plus_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<i64>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v1.value_.big_int, static_cast<i64>(i));
@@ -226,7 +225,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, static_cast<i64>(i));
@@ -258,12 +257,12 @@ TEST_F(PlusFunctionsTest, plus_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeHugeInt(HugeIntT(static_cast<i64>(i), static_cast<i64>(i))));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kHugeInt);
             EXPECT_EQ(v1.value_.huge_int.lower, static_cast<i64>(i));
@@ -274,7 +273,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kHugeInt);
             EXPECT_EQ(v.value_.huge_int.lower, static_cast<i64>(i));
@@ -307,12 +306,12 @@ TEST_F(PlusFunctionsTest, plus_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<f32>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(v1.value_.float32, static_cast<f32>(i));
@@ -322,7 +321,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(v.value_.float32, static_cast<f32>(i));
@@ -354,12 +353,12 @@ TEST_F(PlusFunctionsTest, plus_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<f64>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(v1.value_.float64, static_cast<f64>(i));
@@ -369,7 +368,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(v.value_.float64, static_cast<f64>(i));

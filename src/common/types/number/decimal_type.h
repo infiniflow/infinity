@@ -17,7 +17,8 @@ public:
 
     bool
     operator==(const DecimalType& other) const {
-        if(this == &other) return true;
+        if(this == &other)
+            return true;
         return other.upper == upper && other.lower == lower;
     }
 

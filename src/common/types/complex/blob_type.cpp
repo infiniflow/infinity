@@ -17,14 +17,18 @@ BlobType::BlobType(BlobType&& other) noexcept {
     other.size = 0;
 }
 
-BlobType& BlobType::operator=(const BlobType& other) {
-    if(this == &other) return *this;
+BlobType&
+BlobType::operator=(const BlobType& other) {
+    if(this == &other)
+        return *this;
     this->Copy(other.ptr, other.size);
     return *this;
 }
 
-BlobType& BlobType::operator=(BlobType&& other) noexcept {
-    if(this == &other) return *this;
+BlobType&
+BlobType::operator=(BlobType&& other) noexcept {
+    if(this == &other)
+        return *this;
     this->Move(other.ptr, other.size);
     other.ptr = nullptr;
     other.size = 0;
@@ -33,8 +37,10 @@ BlobType& BlobType::operator=(BlobType&& other) noexcept {
 
 bool
 BlobType::operator==(const BlobType& other) const {
-    if(this == &other) return true;
-    if(this->size != other.size) return false;
+    if(this == &other)
+        return true;
+    if(this->size != other.size)
+        return false;
     // TODO: Need to do benchmark of memcmp and strncmp to decide which one should be used here.
     return memcmp(this->ptr, other.ptr, other.size) == 0;
 }

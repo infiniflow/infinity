@@ -62,9 +62,9 @@ public:
     Vector<ParsedExpr*>* group_by_list_{nullptr};
     ParsedExpr* having_expr_{nullptr};
     Vector<OrderByExpr*>* order_by_list{nullptr};
-    ParsedExpr*         limit_expr_{nullptr};
-    ParsedExpr*         offset_expr_{nullptr};
-    Vector<WithExpr*>*  with_exprs_{nullptr};
+    ParsedExpr* limit_expr_{nullptr};
+    ParsedExpr* offset_expr_{nullptr};
+    Vector<WithExpr*>* with_exprs_{nullptr};
 
     SetOperatorType set_op_{SetOperatorType::kUnion};
     SelectStatement* nested_select_{nullptr};

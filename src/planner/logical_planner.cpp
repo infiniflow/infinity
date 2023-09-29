@@ -32,7 +32,7 @@ LogicalPlanner::Build(const BaseStatement* statement, SharedPtr<BindContext> bin
     if(bind_context_ptr == nullptr) {
         bind_context_ptr = BindContext::Make(nullptr);
     }
-    switch (statement->Type()) {
+    switch(statement->Type()) {
         case StatementType::kSelect: {
             BuildSelect(static_cast<const SelectStatement*>(statement), bind_context_ptr);
             break;
@@ -137,7 +137,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
     // Create value list
     Vector<SharedPtr<BaseExpression>> value_list;
     value_list.reserve(statement->values_->size());
-    for (const auto* parsed_expr : *statement->values_) {
+    for(const auto* parsed_expr: *statement->values_) {
         SharedPtr<BaseExpression> value_expr
                 = bind_context_ptr->expression_binder_->BuildExpression(*parsed_expr,
                                                                         bind_context_ptr.get(),
@@ -148,7 +148,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
 
     // Rearrange the inserted value to match the table.
     // SELECT INTO TABLE (c, a) VALUES (1, 2); => SELECT INTO TABLE (a, b, c) VALUES( 2, NULL, 1);
-    if (statement->columns_ != nullptr) {
+    if(statement->columns_ != nullptr) {
         SizeT statement_column_count = statement->columns_->size();
         PlannerAssert(statement_column_count == value_list.size(),
                       "INSERT: Target column count and input column count mismatch");
@@ -162,7 +162,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
         Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
         SizeT column_idx = 0;
-        for(const auto& column_name : *statement->columns_) {
+        for(const auto& column_name: *statement->columns_) {
             // Get table index from the inserted value column name;
             SizeT table_column_id = table_entry->GetColumnIdByName(column_name);
             const SharedPtr<DataType>& table_column_type = table_entry->columns_[table_column_id]->column_type_;
@@ -182,7 +182,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
                     rewrite_value_list[column_idx] = value_list[column_idx];
                 }
             }
-            ++ column_idx;
+            ++column_idx;
         }
 
         value_list = rewrite_value_list;
@@ -197,7 +197,7 @@ LogicalPlanner::BuildInsertValue(const InsertStatement* statement, SharedPtr<Bin
         // Create value list with table column size and null value
         Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
-        for(SizeT column_idx = 0; column_idx < table_column_count; ++ column_idx) {
+        for(SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
             const SharedPtr<DataType>& table_column_type = table_entry->columns_[column_idx]->column_type_;
             DataType value_type = value_list[column_idx]->Type();
             if(*table_column_type == value_type) {
@@ -247,7 +247,7 @@ LogicalPlanner::BuildDelete(const DeleteStatement* statement, SharedPtr<BindCont
 
 void
 LogicalPlanner::BuildCreate(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    switch (statement->ddl_type()) {
+    switch(statement->ddl_type()) {
         case DDLType::kTable: {
             BuildCreateTable(statement, bind_context_ptr);
             break;
@@ -282,7 +282,7 @@ LogicalPlanner::BuildCreateTable(const CreateStatement* statement, SharedPtr<Bin
     Vector<SharedPtr<ColumnDef>> columns;
     SizeT column_count = create_table_info->column_defs_.size();
     columns.reserve(column_count);
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(idx,
                                                                 create_table_info->column_defs_[idx]->type(),
                                                                 create_table_info->column_defs_[idx]->name(),
@@ -293,7 +293,9 @@ LogicalPlanner::BuildCreateTable(const CreateStatement* statement, SharedPtr<Bin
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_table_info->schema_name_);
 
     SharedPtr<TableDef> table_def_ptr
-            = TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns);
+            = TableDef::Make(MakeShared<String>("default"),
+                             MakeShared<String>(create_table_info->table_name_),
+                             columns);
 
     SharedPtr<LogicalNode> logical_create_table_operator
             = LogicalCreateTable::Make(bind_context_ptr->GetNewLogicalNodeId(),
@@ -424,7 +426,7 @@ LogicalPlanner::BuildDropTable(const DropStatement* statement, SharedPtr<BindCon
     SharedPtr<String> schema_name_ptr{nullptr};
     if(drop_table_info->schema_name_.empty()) {
         schema_name_ptr = MakeShared<String>("default");
-    } else{
+    } else {
         schema_name_ptr = MakeShared<String>(drop_table_info->schema_name_);
     }
 
@@ -447,7 +449,7 @@ LogicalPlanner::BuildDropCollection(const DropStatement* statement, SharedPtr<Bi
     SharedPtr<String> schema_name_ptr{nullptr};
     if(drop_collection_info->schema_name_.empty()) {
         schema_name_ptr = MakeShared<String>("default");
-    } else{
+    } else {
         schema_name_ptr = MakeShared<String>(drop_collection_info->schema_name_);
     }
 
@@ -549,7 +551,7 @@ LogicalPlanner::BuildExport(const CopyStatement* statement, SharedPtr<BindContex
 
     String to_write_path;
     if(!fs.Exists(statement->file_path_)) {
-        PlannerError("File: " + statement->file_path_ +" doesn't exist.");
+        PlannerError("File: " + statement->file_path_ + " doesn't exist.");
     }
 
     SharedPtr<LogicalNode> logical_export =
@@ -573,14 +575,14 @@ LogicalPlanner::BuildImport(const CopyStatement* statement, SharedPtr<BindContex
     if(result.entry_ == nullptr) {
         PlannerError(*result.err_);
     }
-   auto table_collection_entry = dynamic_cast<TableCollectionEntry*>(result.entry_);
+    auto table_collection_entry = dynamic_cast<TableCollectionEntry*>(result.entry_);
 
     // Check the file existence
     LocalFileSystem fs;
 
     String to_write_path;
     if(!fs.Exists(statement->file_path_)) {
-        PlannerError("File: " + statement->file_path_ +" doesn't exist.");
+        PlannerError("File: " + statement->file_path_ + " doesn't exist.");
     }
 
     SharedPtr<LogicalNode> logical_import =
@@ -675,7 +677,7 @@ void
 LogicalPlanner::BuildFlushData(const FlushStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     SharedPtr<LogicalNode> logical_flush =
             MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(),
-                                    FlushType::kData);
+                                     FlushType::kData);
     this->logical_plan_ = logical_flush;
 }
 

@@ -11,7 +11,7 @@
 #include "main/infinity.h"
 #include "src/executor/expression/expression_executor.h"
 
-#include "storage/catalog.h"
+
 #include "function/scalar/subtract.h"
 #include "function/scalar/add.h"
 #include "function/scalar_function_set.h"

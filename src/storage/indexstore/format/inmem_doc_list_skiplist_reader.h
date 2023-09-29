@@ -5,12 +5,12 @@
 #include "doc_list_skiplist_reader.h"
 #include "common/memory/memory_pool.h"
 
-namespace infinity{
+namespace infinity {
 
 class InMemDocListSkipListReader : public DocListSkipListReader {
 public:
     InMemDocListSkipListReader(MemoryPool* session_pool = nullptr)
-        :session_pool_(session_pool), skiplist_buffer_(nullptr) {}
+            : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
     ~InMemDocListSkipListReader() {
         if(session_pool_) {
             delete session_pool_;
@@ -22,10 +22,14 @@ public:
         }
     }
 
-    void Load(BufferedByteSlice* posting_buffer);
+    void
+    Load(BufferedByteSlice* posting_buffer);
 
-    uint32_t GetLastValueInBuffer() const override;
-    uint32_t GetLastKeyInBuffer() const override;
+    uint32_t
+    GetLastValueInBuffer() const override;
+
+    uint32_t
+    GetLastKeyInBuffer() const override;
 
 protected:
     std::pair<int, bool> LoadBuffer() override;

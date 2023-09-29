@@ -11,7 +11,7 @@
 namespace infinity {
 
 void
-RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterExtractFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
 }
 

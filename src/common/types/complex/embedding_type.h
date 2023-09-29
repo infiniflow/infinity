@@ -29,7 +29,7 @@ public:
     ptr_t ptr = nullptr;
 
     static size_t
-    embedding_type_width[];
+            embedding_type_width[];
 public:
     static inline size_t
     EmbeddingDataWidth(EmbeddingDataType type_index) {
@@ -39,7 +39,7 @@ public:
     static inline size_t
     EmbeddingSize(EmbeddingDataType type, size_t dimension) {
         TypeAssert(type != EmbeddingDataType::kElemInvalid, "Invalid embedding data type");
-        if (type == EmbeddingDataType::kElemBit) {
+        if(type == EmbeddingDataType::kElemBit) {
             size_t byte_count = (dimension + 7) >> 3;
             return byte_count;
         }
@@ -99,7 +99,7 @@ private:
     Embedding2StringInternal(const EmbeddingType& embedding, size_t dimension) {
         // TODO: High-performance implementation is needed here.
         std::stringstream ss;
-        for(size_t i = 0; i < dimension - 1; ++ i) {
+        for(size_t i = 0; i < dimension - 1; ++i) {
             ss << ((T*)(embedding.ptr))[i] << ',';
         }
         ss << ((T*)(embedding.ptr))[dimension - 1];
@@ -114,14 +114,14 @@ private:
 
         i64* array = (i64*)(embedding.ptr);
 
-        for(size_t i = 0; i < dimension / 8; ++ i) {
+        for(size_t i = 0; i < dimension / 8; ++i) {
             ss << std::bitset<8>(array[i]);
         }
         return ss.str();
     }
 public:
     inline explicit
-    EmbeddingType(ptr_t&& from_ptr): ptr(from_ptr) {
+    EmbeddingType(ptr_t&& from_ptr) : ptr(from_ptr) {
         from_ptr = nullptr;
     }
 
@@ -151,7 +151,8 @@ public:
 
     EmbeddingType&
     operator=(const EmbeddingType& other) {
-        if(this == &other) return *this;
+        if(this == &other)
+            return *this;
         if(ptr != nullptr) {
             LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
 //            Reset();
@@ -162,7 +163,8 @@ public:
 
     EmbeddingType&
     operator=(EmbeddingType&& other) noexcept {
-        if(this == &other) return *this;
+        if(this == &other)
+            return *this;
         if(ptr != nullptr) {
             LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
 //            Reset();
@@ -177,6 +179,7 @@ public:
 
     bool
     operator==(const EmbeddingType& other) const = delete;
+
     inline bool
     operator!=(const EmbeddingType& other) const = delete;
 

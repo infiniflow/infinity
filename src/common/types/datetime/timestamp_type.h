@@ -13,7 +13,7 @@ struct TimestampType {
     TimestampType() = default;
 
     explicit
-    TimestampType(i32 date_value, i32 time_value): date(date_value), time(time_value) {}
+    TimestampType(i32 date_value, i32 time_value) : date(date_value), time(time_value) {}
 
     inline void
     Reset() {
@@ -26,8 +26,8 @@ struct TimestampType {
         TypeError("ToString() isn't implemented");
     }
 
-    i32 date {};
-    i32 time {};
+    i32 date{};
+    i32 time{};
 };
 
 }

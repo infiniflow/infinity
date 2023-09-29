@@ -67,7 +67,7 @@ public:
     GetSinkNode() const {
         return sink_.get();
     }
-    
+
     inline void
     AddChild(UniquePtr<PlanFragment> child_fragment) {
         child_fragment->parent_ = this;

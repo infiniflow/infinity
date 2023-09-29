@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include "common/types/internal_types.h"
 
 namespace infinity {

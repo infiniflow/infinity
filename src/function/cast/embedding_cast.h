@@ -31,9 +31,9 @@ struct EmbeddingTryCastToVarlen {
     static inline bool
     Run(const SourceType& source,
         const DataType& source_type,
-        TargetType &target,
+        TargetType& target,
         const DataType& target_type,
-        const SharedPtr<ColumnVector>& vector_ptr){
+        const SharedPtr<ColumnVector>& vector_ptr) {
         FunctionError("Not support to cast from " + source_type.ToString()
                       + " to " + target_type.ToString());
     }
@@ -43,7 +43,7 @@ template<>
 inline bool
 EmbeddingTryCastToVarlen::Run(const EmbeddingT& source,
                               const DataType& source_type,
-                              VarcharT &target,
+                              VarcharT& target,
                               const DataType& target_type,
                               const SharedPtr<ColumnVector>& vector_ptr) {
     LOG_TRACE("{}", "Not support to cast from " + source_type.ToString() + " to " + target_type.ToString());
@@ -53,8 +53,8 @@ EmbeddingTryCastToVarlen::Run(const EmbeddingT& source,
 
     SharedPtr<EmbeddingInfo> embedding_info = std::static_pointer_cast<EmbeddingInfo>(source_type.type_info());
 
-    for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
-        LOG_TRACE(((float *) (source.ptr))[j]);
+    for(i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        LOG_TRACE(((float*)(source.ptr))[j]);
     }
 
     String res = EmbeddingT::Embedding2String(source,

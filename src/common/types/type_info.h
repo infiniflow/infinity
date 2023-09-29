@@ -10,7 +10,7 @@
 
 namespace infinity {
 
-enum class TypeInfoType : u8{
+enum class TypeInfoType : u8 {
     kInvalid,
 
     // Primitive
@@ -69,7 +69,7 @@ public:
     ToString() const = 0;
 
 protected:
-    TypeInfoType type_ { TypeInfoType::kInvalid };
+    TypeInfoType type_{TypeInfoType::kInvalid};
 };
 
 }

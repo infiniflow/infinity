@@ -38,7 +38,7 @@ TEST_F(FileWriteReadTest, test1) {
     String path = "/tmp/test_file1.abc";
     FileWriter file_writer(local_file_system, path, 128);
 
-    for(SizeT i = 0; i < 128; ++ i) {
+    for(SizeT i = 0; i < 128; ++i) {
         String buffer = "abc";
         file_writer.Write(buffer.c_str(), buffer.size());
     }

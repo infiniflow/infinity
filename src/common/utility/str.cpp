@@ -7,9 +7,10 @@
 namespace infinity {
 
 std::string
-TrimPath(const std::string &path) {
+TrimPath(const std::string& path) {
     const auto pos = path.find("/src/");
-    if (pos == std::string::npos) return path;
+    if(pos == std::string::npos)
+        return path;
     return path.substr(pos + 1);
 }
 

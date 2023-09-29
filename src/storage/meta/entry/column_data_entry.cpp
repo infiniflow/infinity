@@ -19,7 +19,7 @@ namespace infinity {
 
 SharedPtr<ColumnDataEntry>
 ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry* segment_entry, u64 column_id, u64 row_capacity,
-    const SharedPtr<DataType>& data_type, BufferManager* buffer_mgr) {
+                                        const SharedPtr<DataType>& data_type, BufferManager* buffer_mgr) {
     SharedPtr<ColumnDataEntry> column_data_entry = MakeShared<ColumnDataEntry>(segment_entry);
     const auto* segment_ptr = (const SegmentEntry*)segment_entry;
     column_data_entry->base_dir_ = segment_ptr->base_dir_;
@@ -30,7 +30,7 @@ ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry* segment_entry, u64 c
     column_data_entry->buffer_handle_ = buffer_mgr->AllocateBufferHandle(column_data_entry->base_dir_,
                                                                          column_data_entry->file_name_,
                                                                          data_type->Size() * row_capacity);
-    if (data_type->type() == kVarchar) {
+    if(data_type->type() == kVarchar) {
         column_data_entry->outline_info_ = MakeUnique<OutlineInfo>(buffer_mgr);
     }
     return column_data_entry;
@@ -52,10 +52,10 @@ ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, BufferManager
 // Note!!!: caller of `Append` should guarantee the buffer_handler has enough place to append `row_n` rows.
 void
 ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
-       const SharedPtr<ColumnVector>& column_vector,
-       SizeT block_start_offset,
-       SizeT column_start_offset,
-       SizeT row_n) {
+                        const SharedPtr<ColumnVector>& column_vector,
+                        SizeT block_start_offset,
+                        SizeT column_start_offset,
+                        SizeT row_n) {
     if(column_data_entry->buffer_handle_ == nullptr) {
         StorageError("Not initialize buffer handle")
     }
@@ -71,8 +71,8 @@ ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset,
     CommonObjectHandle object_handle(column_data_entry->buffer_handle_);
     ptr_t dst_ptr = object_handle.GetData() + dst_offset;
     // ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
-    
-    switch (column_type->type()) {
+
+    switch(column_type->type()) {
         case kBoolean:
         case kTinyInt:
         case kSmallInt:
@@ -85,25 +85,29 @@ ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset,
             break;
         }
         case kVarchar: {
-            auto inline_p = reinterpret_cast<VarcharLayout *>(dst_ptr);
-            auto src_ptr = reinterpret_cast<VarcharT *>(src_p);
+            auto inline_p = reinterpret_cast<VarcharLayout*>(dst_ptr);
+            auto src_ptr = reinterpret_cast<VarcharT*>(src_p);
             SizeT row_n = data_size / sizeof(VarcharT);
-            for (SizeT row_idx = 0; row_idx < row_n; row_idx++) {
+            for(SizeT row_idx = 0; row_idx < row_n; row_idx++) {
                 auto varchar_type = src_ptr + row_idx;
-                VarcharLayout *varchar_layout = inline_p + row_idx;
-                if (varchar_type->IsInlined()) {
-                    auto &short_info = varchar_layout->u.short_info_;
+                VarcharLayout* varchar_layout = inline_p + row_idx;
+                if(varchar_type->IsInlined()) {
+                    auto& short_info = varchar_layout->u.short_info_;
                     varchar_layout->length_ = varchar_type->length;
                     memcpy(short_info.data.data(), varchar_type->prefix, varchar_type->length);
                 } else {
-                    auto &long_info = varchar_layout->u.long_info_;
+                    auto& long_info = varchar_layout->u.long_info_;
                     auto outline_info = column_data_entry->outline_info_.get();
-                    if (outline_info->written_buffers_.empty() || outline_info->written_buffers_.back().second + varchar_type->length > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
+                    if(outline_info->written_buffers_.empty() ||
+                       outline_info->written_buffers_.back().second + varchar_type->length >
+                       DEFAULT_OUTLINE_FILE_MAX_SIZE) {
                         auto file_name = ColumnDataEntry::OutlineFilename(outline_info->next_file_idx++);
-                        auto buffer_handle = outline_info->buffer_mgr_->AllocateBufferHandle(column_data_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                        auto buffer_handle = outline_info->buffer_mgr_->AllocateBufferHandle(column_data_entry->base_dir_,
+                                                                                             file_name,
+                                                                                             DEFAULT_OUTLINE_FILE_MAX_SIZE);
                         outline_info->written_buffers_.emplace_back(buffer_handle, 0);
                     }
-                    auto &[current_buffer_handle, current_buffer_offset] = outline_info->written_buffers_.back();
+                    auto& [current_buffer_handle, current_buffer_offset] = outline_info->written_buffers_.back();
                     CommonObjectHandle out_object_handle(current_buffer_handle);
                     ptr_t dst_ptr = out_object_handle.GetData() + current_buffer_offset;
                     SizeT data_size = varchar_type->length;
@@ -168,7 +172,7 @@ ColumnDataEntry::Flush(ColumnDataEntry* column_data_entry,
             column_data_entry->buffer_handle_->SyncFile();
             column_data_entry->buffer_handle_->CloseFile();
             auto outline_info = column_data_entry->outline_info_.get();
-            for (auto [outline_buffer_handle, outline_size] : outline_info->written_buffers_) {
+            for(auto [outline_buffer_handle, outline_size]: outline_info->written_buffers_) {
                 outline_buffer_handle->WriteFile(outline_size);
                 outline_buffer_handle->SyncFile();
                 outline_buffer_handle->CloseFile();
@@ -205,15 +209,17 @@ ColumnDataEntry::Serialize(const ColumnDataEntry* column_data_entry) {
     json_res["commit_ts"] = column_data_entry->commit_ts_.load();
     json_res["txn_id"] = column_data_entry->txn_id_.load();
     json_res["deleted"] = column_data_entry->deleted_;
-    if (column_data_entry->outline_info_) {
-        auto &outline_info = column_data_entry->outline_info_;
+    if(column_data_entry->outline_info_) {
+        auto& outline_info = column_data_entry->outline_info_;
         json_res["next_outline_idx"] = outline_info->next_file_idx;
     }
     return json_res;
 }
 
 SharedPtr<ColumnDataEntry>
-ColumnDataEntry::Deserialize(const nlohmann::json& column_data_json, SegmentEntry* segment_entry, BufferManager* buffer_mgr) {
+ColumnDataEntry::Deserialize(const nlohmann::json& column_data_json,
+                             SegmentEntry* segment_entry,
+                             BufferManager* buffer_mgr) {
     SharedPtr<ColumnDataEntry> column_data_entry = MakeShared<ColumnDataEntry>(segment_entry);
     column_data_entry->column_type_ = DataType::Deserialize(column_data_json["column_type"]);
     column_data_entry->base_dir_ = MakeShared<String>(column_data_json["base_dir"]);
@@ -229,7 +235,7 @@ ColumnDataEntry::Deserialize(const nlohmann::json& column_data_json, SegmentEntr
 //                                                                         column_data_entry->file_name_,
 //                                                                         column_data_entry->column_type_ * column_data_entry->row_capacity_);
 
-    if (column_data_entry->outline_info_ != nullptr) {
+    if(column_data_entry->outline_info_ != nullptr) {
         auto outline_info = column_data_entry->outline_info_.get();
         outline_info->next_file_idx = column_data_json["next_outline_idx"];
     }

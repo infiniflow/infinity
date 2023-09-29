@@ -16,7 +16,7 @@ public:
     explicit
     LogicalFilter(u64 node_id,
                   SharedPtr<BaseExpression> expression)
-        : LogicalNode(node_id, LogicalNodeType::kFilter), expression_(std::move(expression)) {}
+            : LogicalNode(node_id, LogicalNodeType::kFilter), expression_(std::move(expression)) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {

@@ -57,7 +57,7 @@ PhysicalLimit::GetLimitOutput(const SharedPtr<Table>& input_table, i64 limit, i6
             start_row_id = 0;
             SizeT block_count = input_table->DataBlockCount();
             i64 total_row_count = limit;
-            for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
+            for(SizeT block_id = 0; block_id < block_count; ++block_id) {
                 SizeT block_row_count = input_table->GetDataBlockById(block_id)->row_count();
                 if(total_row_count > block_row_count) {
                     total_row_count -= block_row_count;
@@ -72,11 +72,11 @@ PhysicalLimit::GetLimitOutput(const SharedPtr<Table>& input_table, i64 limit, i6
         i64 total_row_count = offset;
         SizeT block_count = input_table->DataBlockCount();
         SizeT rest_row_count = 0;
-        for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
+        for(SizeT block_id = 0; block_id < block_count; ++block_id) {
             SizeT block_row_count = input_table->GetDataBlockById(block_id)->row_count();
             if(total_row_count >= block_row_count) {
                 total_row_count -= block_row_count;
-            } else if (total_row_count < block_row_count){
+            } else if(total_row_count < block_row_count) {
                 start_block = block_id;
                 start_row_id = total_row_count;
                 rest_row_count = block_row_count - total_row_count;
@@ -90,7 +90,7 @@ PhysicalLimit::GetLimitOutput(const SharedPtr<Table>& input_table, i64 limit, i6
             end_row_id = total_row_count;
         } else {
             total_row_count -= rest_row_count;
-            for(SizeT block_id = start_block + 1; block_id < block_count; ++ block_id) {
+            for(SizeT block_id = start_block + 1; block_id < block_count; ++block_id) {
                 SizeT block_row_count = input_table->GetDataBlockById(block_id)->row_count();
                 if(total_row_count > block_row_count) {
                     total_row_count -= block_row_count;
@@ -109,13 +109,13 @@ PhysicalLimit::GetLimitOutput(const SharedPtr<Table>& input_table, i64 limit, i6
     types.reserve(column_count);
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         SharedPtr<DataType> col_type = input_table->GetColumnTypeById(idx);
         types.emplace_back(col_type);
 
         String col_name = input_table->GetColumnNameById(idx);
 
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type,col_name, HashSet<ConstraintType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
         columns.emplace_back(col_def);
     }
 
@@ -126,7 +126,7 @@ PhysicalLimit::GetLimitOutput(const SharedPtr<Table>& input_table, i64 limit, i6
 
     const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;
 
-    for(SizeT block_id = start_block; block_id <= end_block; ++ block_id) {
+    for(SizeT block_id = start_block; block_id <= end_block; ++block_id) {
         SizeT input_start_offset = start_row_id;
         SizeT input_end_offset;
         if(end_block == block_id) {

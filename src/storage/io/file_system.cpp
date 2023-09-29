@@ -7,7 +7,7 @@
 namespace infinity {
 
 i64
-FileHandler::Read(void *data, infinity::u64 nbytes) {
+FileHandler::Read(void* data, infinity::u64 nbytes) {
     return file_system_.Read(*this, data, nbytes);
 }
 

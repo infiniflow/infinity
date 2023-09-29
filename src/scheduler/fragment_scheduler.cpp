@@ -22,7 +22,7 @@ FragmentScheduler::~FragmentScheduler() {
 void
 FragmentScheduler::Init(const Config* config_ptr) {
     u64 total_cpu_count = config_ptr->total_cpu_number();
-    for(u64 i = 0; i < total_cpu_count; ++ i) {
+    for(u64 i = 0; i < total_cpu_count; ++i) {
         cpu_set_.emplace(i);
     }
 
@@ -34,7 +34,10 @@ FragmentScheduler::Init(const Config* config_ptr) {
         cpu_array_.emplace_back(cpu_id);
 
         UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();
-        UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&FragmentScheduler::WorkerLoop, this, worker_queue.get(), cpu_id);
+        UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&FragmentScheduler::WorkerLoop,
+                                                             this,
+                                                             worker_queue.get(),
+                                                             cpu_id);
         // Pin the thread to specific cpu
         ThreadUtil::pin(*worker_thread, cpu_id);
 
@@ -125,9 +128,9 @@ FragmentScheduler::CoordinatorLoop(FragmentTaskBlockQueue* ready_queue, i64 cpu_
             i64 to_use_cpu_id = current_cpu_id_;
             do {
                 to_use_cpu_id = to_use_cpu_id % cpu_array_.size();
-            } while(!(DispatchTask(cpu_array_[to_use_cpu_id ++], fragment_task)));
+            } while(!(DispatchTask(cpu_array_[to_use_cpu_id++], fragment_task)));
 
-            ++ current_cpu_id_;
+            ++current_cpu_id_;
         } else {
             // Dispatch to the same worker
             DispatchTask(fragment_task->LastWorkerID(), fragment_task);
@@ -169,12 +172,12 @@ FragmentScheduler::PollerLoop(FragmentTaskPollerQueue* poller_queue, i64 worker_
     while(running) {
         poller_queue->DequeueBulk(local_task_list);
         auto task_iter = local_task_list.begin();
-        while (!local_task_list.empty()) {
+        while(!local_task_list.empty()) {
             FragmentTask*& task_ptr = (*task_iter);
             if(task_ptr->IsTerminator()) {
                 running = false;
                 local_ready_queue.emplace_back(task_ptr);
-                local_task_list.erase(task_iter ++);
+                local_task_list.erase(task_iter++);
             } else {
                 FragmentTaskState fragment_task_state = task_ptr->state_.load();
                 switch(fragment_task_state) {
@@ -182,17 +185,17 @@ FragmentScheduler::PollerLoop(FragmentTaskPollerQueue* poller_queue, i64 worker_
                     case FragmentTaskState::kCancelled:
                     case FragmentTaskState::kFinished:
                     case FragmentTaskState::kReady: {
-                        local_task_list.erase(task_iter ++);
+                        local_task_list.erase(task_iter++);
                         local_ready_queue.push_back(task_ptr);
                         break;
                     }
                     case FragmentTaskState::kPending: {
-                        ++ task_iter;
+                        ++task_iter;
                     }
                 }
             }
 
-            if (local_ready_queue.empty()) {
+            if(local_ready_queue.empty()) {
                 spin_count += 1;
             } else {
                 spin_count = 0;
@@ -201,10 +204,10 @@ FragmentScheduler::PollerLoop(FragmentTaskPollerQueue* poller_queue, i64 worker_
                 local_ready_queue.clear();
             }
 
-            if (spin_count != 0 && spin_count % 32 == 0) {
+            if(spin_count != 0 && spin_count % 32 == 0) {
                 _mm_pause();
             }
-            if (spin_count == 6400) {
+            if(spin_count == 6400) {
                 spin_count = 0;
                 sched_yield();
             }

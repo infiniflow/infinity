@@ -45,7 +45,8 @@ public:
     explicit
     FragmentTask(void* fragment_context,
                  i64 task_id,
-                 i64 operator_count) : fragment_context_(fragment_context), task_id_(task_id), operator_count_(operator_count) {
+                 i64 operator_count)
+            : fragment_context_(fragment_context), task_id_(task_id), operator_count_(operator_count) {
         Init();
     }
 

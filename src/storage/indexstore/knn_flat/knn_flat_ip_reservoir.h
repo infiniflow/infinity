@@ -18,10 +18,10 @@ class KnnFlatIPReservoir final : public KnnDistance<DistType> {
 public:
     explicit
     KnnFlatIPReservoir(const DistType* queries,
-              i64 query_count,
-              i64 topk,
-              i64 dimension,
-              EmbeddingDataType elem_data_type)
+                       i64 query_count,
+                       i64 topk,
+                       i64 dimension,
+                       EmbeddingDataType elem_data_type)
             : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIpReservoir, elem_data_type),
               queries_(queries),
               query_count_(query_count),
@@ -30,7 +30,10 @@ public:
         id_array_ = MakeUnique<Vector<CompoundID>>(topk * query_count_, CompoundID(-1, -1));
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * topk * query_count_);
 
-        reservoir_result_handler_ = MakeUnique<ReservoirResultHandler>(query_count, distance_array_.get(), id_array_->data(), topk);
+        reservoir_result_handler_ = MakeUnique<ReservoirResultHandler>(query_count,
+                                                                       distance_array_.get(),
+                                                                       id_array_->data(),
+                                                                       topk);
         single_reservoir_result_handler_ = MakeUnique<ReservoirSingleResultHandler>(*reservoir_result_handler_);
     }
 

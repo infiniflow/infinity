@@ -31,7 +31,7 @@ void
 Scheduler::Init(const HashSet<i64>& cpu_set) {
     if(!cpu_set_.empty()) {
         std::cerr << "scheduler was initialized before" << std::endl;
-        return ;
+        return;
     }
     cpu_set_ = cpu_set;
 

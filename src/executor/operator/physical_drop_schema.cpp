@@ -14,19 +14,19 @@ PhysicalDropSchema::Init() {
 void
 PhysicalDropSchema::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
 
-      auto txn = query_context->GetTxn();
-      auto res = txn->DropDatabase(*schema_name_, conflict_type_);
-      auto drop_database_output_state =(DropDatabaseOutputState*)(output_state);
-      drop_database_output_state->error_message_=std::move(res.err_);
+    auto txn = query_context->GetTxn();
+    auto res = txn->DropDatabase(*schema_name_, conflict_type_);
+    auto drop_database_output_state = (DropDatabaseOutputState*)(output_state);
+    drop_database_output_state->error_message_ = std::move(res.err_);
 
-      // Generate the result
-      auto column_defs = {
-          MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
-      };
+    // Generate the result
+    auto column_defs = {
+            MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
+    };
 
-      auto result_table_def_ptr
-          = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-      output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
+    auto result_table_def_ptr
+            = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 
 }
 

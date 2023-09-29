@@ -11,12 +11,12 @@
 namespace infinity {
 
 NewCatalog::NewCatalog(SharedPtr<String> dir)
-    : current_dir_(std::move(dir)) {
+        : current_dir_(std::move(dir)) {
 }
 
 // do not only use this method to create database
 // it will not record database in transaction, so when you commit transaction
-// it will lost operation
+// it will lose operation
 // use Txn::CreateDatabase instead
 EntryResult
 NewCatalog::CreateDatabase(NewCatalog* catalog,
@@ -100,7 +100,7 @@ NewCatalog::GetDatabase(NewCatalog* catalog,
         db_meta = catalog->databases_[db_name].get();
     }
     catalog->rw_locker_.unlock_shared();
-    if (db_meta==nullptr) {
+    if(db_meta == nullptr) {
         LOG_ERROR("Attempt to get not existed database {}", db_name);
         return {nullptr, MakeUnique<String>("Attempt to get not existed database")};
     }

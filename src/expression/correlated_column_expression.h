@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class CorrelatedColumnExpression: public BaseExpression {
+class CorrelatedColumnExpression : public BaseExpression {
 public:
     CorrelatedColumnExpression(DataType data_type, String column_name);
 

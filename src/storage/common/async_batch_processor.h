@@ -17,7 +17,7 @@ public:
                         SizeT commit_queue_size,
                         std::function<SharedPtr<AsyncTask>(List<SharedPtr<AsyncTask>>&)> on_prepare,
                         std::function<void(const SharedPtr<AsyncTask>&)> on_commit)
-                        : on_prepare_(std::move(on_prepare)), on_commit_(std::move(on_commit)) {
+            : on_prepare_(std::move(on_prepare)), on_commit_(std::move(on_commit)) {
         prepare_queue_ = MakeUnique<BatchBlockingQueue>(prepare_queue_size);
         commit_queue_ = MakeUnique<BatchBlockingQueue>(commit_queue_size);
     }

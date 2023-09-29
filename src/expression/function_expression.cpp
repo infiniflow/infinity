@@ -11,7 +11,7 @@ namespace infinity {
 
 FunctionExpression::FunctionExpression(ScalarFunction function,
                                        Vector<SharedPtr<BaseExpression>> arguments)
-   : BaseExpression(ExpressionType::kFunction, std::move(arguments)), func_(std::move(function)) {}
+        : BaseExpression(ExpressionType::kFunction, std::move(arguments)), func_(std::move(function)) {}
 
 String
 FunctionExpression::ToString() const {
@@ -32,12 +32,12 @@ FunctionExpression::ToString() const {
         return ss.str();
     }
 
-    ss << func_.name()<< "(";
+    ss << func_.name() << "(";
     if(arguments_.empty()) {
         ss << ")";
     } else {
         auto arguments_count = arguments_.size();
-        for(auto i = 0; i < arguments_count - 1; ++ i) {
+        for(auto i = 0; i < arguments_count - 1; ++i) {
             ss << arguments_[i]->Name() << ", ";
         }
         ss << arguments_.back()->Name() << ")";

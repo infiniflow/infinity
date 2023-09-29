@@ -25,7 +25,8 @@ PathType::PathType(PathType&& other) noexcept {
 
 PathType&
 PathType::operator=(const PathType& other) {
-    if(this == &other) return *this;
+    if(this == &other)
+        return *this;
     if(point_count != other.point_count) {
         this->Reset();
         point_count = other.point_count;
@@ -41,7 +42,8 @@ PathType::operator=(const PathType& other) {
 
 PathType&
 PathType::operator=(PathType&& other) noexcept {
-    if(this == &other) return *this;
+    if(this == &other)
+        return *this;
     if(this->point_count != 0) {
         Reset();
     }

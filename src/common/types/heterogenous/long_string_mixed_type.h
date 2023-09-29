@@ -15,9 +15,12 @@ public:
     LongStrMixedType() : BaseMixedType(MixedValueType::kLongStr) {}
 
     LongStrMixedType(const LongStrMixedType& from) = delete;
+
     LongStrMixedType(LongStrMixedType&& from) = delete;
+
     LongStrMixedType&
     operator=(const LongStrMixedType& from) = delete;
+
     LongStrMixedType&
     operator=(LongStrMixedType&& from) = delete;
 
@@ -30,7 +33,7 @@ public:
         if(in_constructor) {
             ptr = nullptr;
             length = 0;
-            return ;
+            return;
         }
         if(ptr != nullptr) {
 //            LOG_TRACE("Release the long str ptr");

@@ -39,6 +39,7 @@ cmake-build-debug-gcc/**
 cmake-build-release/**
 cmake-build-release-clang/**
 cmake-build-release-gcc/**
+Infinity.xml
 
 # OSX dir
 .DS_Store

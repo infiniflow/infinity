@@ -25,7 +25,7 @@ struct __attribute__((packed)) MixedType : public BaseMixedType {
 
     // non-static member variable
 public:
-    char_t ptr[ELEMENT_SIZE - 1] {};
+    char_t ptr[ELEMENT_SIZE - 1]{};
 public:
     static MixedType
     MakeInteger(i64 value);
@@ -112,14 +112,18 @@ public:
     }
 
     MixedType(const MixedType& other);
+
     MixedType(MixedType&& other) noexcept;
+
     MixedType&
     operator=(const MixedType& other);
+
     MixedType&
     operator=(MixedType&& other) noexcept;
 
     bool
     operator==(const MixedType& other) const;
+
     inline bool
     operator!=(const MixedType& other) const {
         return !operator==(other);
@@ -140,9 +144,6 @@ private:
     static void
     Move(MixedType&& from, MixedType& to);
 };
-
-
-
 
 
 }

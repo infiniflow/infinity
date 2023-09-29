@@ -9,28 +9,28 @@
 namespace infinity {
 
 FileReader::FileReader(FileSystem& fs, const String& path, SizeT buffer_size)
-    : fs_(fs),
-    path_(path),
-    buffer_size_(buffer_size),
-    data_(MakeUnique<char_t[]>(buffer_size)),
-    buffer_offset_(0),
-    buffer_start_(0) {
+        : fs_(fs),
+          path_(path),
+          buffer_size_(buffer_size),
+          data_(MakeUnique<char_t[]>(buffer_size)),
+          buffer_offset_(0),
+          buffer_start_(0) {
     // Fixme: These two functions might throw exception
     file_handler_ = fs_.OpenFile(path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     file_size_ = fs_.GetFileSize(*file_handler_);
 }
 
-FileReader::FileReader(const FileReader&other)
-    :fs_(other.fs_),
-    path_(other.path_),
-    buffer_size_(other.buffer_size_),
-    data_(MakeUnique<char_t[]>(buffer_size_)){
+FileReader::FileReader(const FileReader& other)
+        : fs_(other.fs_),
+          path_(other.path_),
+          buffer_size_(other.buffer_size_),
+          data_(MakeUnique<char_t[]>(buffer_size_)) {
 
 }
 
-u8 
+u8
 FileReader::ReadByte() {
-    if (buffer_offset_ >= buffer_size_) {
+    if(buffer_offset_ >= buffer_size_) {
         already_read_size_ = fs_.Read(*file_handler_, data_.get(), buffer_size_);
         if(already_read_size_ == 0) {
             StorageError(fmt::format("No enough data from file: {}", file_handler_->path_.string()));
@@ -50,7 +50,7 @@ i32
 FileReader::ReadInt() {
     i32 b = (ReadByte() << 24);
     b |= (ReadByte() << 16);
-    b |= (ReadByte() <<  8);
+    b |= (ReadByte() << 8);
     return (b | ReadByte());
 }
 
@@ -58,9 +58,9 @@ i32
 FileReader::ReadVInt() {
     u8 b = ReadByte();
     i32 i = b & 0x7F;
-    for (i32 shift = 7; (b & 0x80) != 0; shift += 7) {
-      b = ReadByte();
-      i |= (b & 0x7F) << shift;
+    for(i32 shift = 7; (b & 0x80) != 0; shift += 7) {
+        b = ReadByte();
+        i |= (b & 0x7F) << shift;
     }
     return i;
 }
@@ -75,9 +75,9 @@ i64
 FileReader::ReadVLong() {
     u8 b = ReadByte();
     i64 i = b & 0x7F;
-    for (i32 shift = 7; (b & 0x80) != 0; shift += 7) {
-      b = ReadByte();
-      i |= (((i64)b) & 0x7FL) << shift;
+    for(i32 shift = 7; (b & 0x80) != 0; shift += 7) {
+        b = ReadByte();
+        i |= (((i64)b) & 0x7FL) << shift;
     }
     return i;
 }
@@ -104,7 +104,7 @@ FileReader::Read(char_t* buffer, SizeT read_size) {
                 StorageError(fmt::format("No enough data from file: {}", file_handler_->path_.string()));
             }
         } else {
-            return ;
+            return;
         }
     }
 }
@@ -119,7 +119,7 @@ FileReader::GetFilePointer() const {
     return buffer_start_ + buffer_offset_;
 }
 
-void 
+void
 FileReader::Seek(const i64 pos) {
     if(pos >= buffer_start_ && pos < (buffer_start_ + buffer_size_)) {
         buffer_offset_ = pos - buffer_start_;
@@ -132,7 +132,7 @@ FileReader::Seek(const i64 pos) {
 }
 
 FileReader*
-FileReader::Clone(){
+FileReader::Clone() {
     return new FileReader(*this);
 }
 }

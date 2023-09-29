@@ -15,11 +15,10 @@ public:
     explicit PhysicalCrossProduct(u64 id,
                                   SharedPtr<PhysicalOperator> left,
                                   SharedPtr<PhysicalOperator> right)
-        : PhysicalOperator(PhysicalOperatorType::kCrossProduct,
-                           std::move(left),
-                           std::move(right),
-                           id)
-        {}
+            : PhysicalOperator(PhysicalOperatorType::kCrossProduct,
+                               std::move(left),
+                               std::move(right),
+                               id) {}
 
     ~PhysicalCrossProduct() override = default;
 

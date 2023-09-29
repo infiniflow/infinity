@@ -10,14 +10,14 @@
 namespace infinity {
 
 PGProtocolHandler::PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket>& socket)
-    : buffer_reader_(socket), buffer_writer_(socket) {}
+        : buffer_reader_(socket), buffer_writer_(socket) {}
 
 u32
 PGProtocolHandler::read_startup_header() {
     constexpr u32 SSL_MESSAGE_VERSION = 80877103u;
     const auto length = buffer_reader_.read_value<u32>();
     const auto version = buffer_reader_.read_value<u32>();
-    if(version == SSL_MESSAGE_VERSION)  {
+    if(version == SSL_MESSAGE_VERSION) {
         // TODO: support SSL
         // Now we said not support ssl
         buffer_writer_.send_value(static_cast<unsigned char>(PGMessageType::kSSLNo));
@@ -48,7 +48,7 @@ PGProtocolHandler::send_authentication() {
 }
 
 void
-PGProtocolHandler::send_parameter(const String &key, const String &value) {
+PGProtocolHandler::send_parameter(const String& key, const String& value) {
     buffer_writer_.send_value(PGMessageType::kParameterStatus);
     // length field size + key size + 1 null terminator + value size + 1 null terminator
     buffer_writer_.send_value<u32>(static_cast<u32>(LENGTH_FIELD_SIZE + key.size() + value.size() + 2u));
@@ -108,8 +108,8 @@ PGProtocolHandler::SendDescriptionHeader(u32 total_column_name_length, u32 colum
 
     // Length + column count + values for each columns
     u32 message_size = LENGTH_FIELD_SIZE + sizeof(u16)
-                            + column_count * (sizeof('\0') + 3 * sizeof(u32) + 3 * sizeof(u16))
-                            + total_column_name_length;
+                       + column_count * (sizeof('\0') + 3 * sizeof(u32) + 3 * sizeof(u16))
+                       + total_column_name_length;
     buffer_writer_.send_value<u32>(message_size);
     buffer_writer_.send_value<u16>(column_count);
 }
@@ -141,9 +141,9 @@ PGProtocolHandler::SendData(const Vector<std::optional<String>>& values_as_strin
     // Number of columns in row
     buffer_writer_.send_value<u16>(values_as_strings.size());
 
-    for (const std::optional<String> &value_string: values_as_strings) {
-        if (value_string.has_value()) {
-            const String &value_ref = value_string.value();
+    for(const std::optional<String>& value_string: values_as_strings) {
+        if(value_string.has_value()) {
+            const String& value_ref = value_string.value();
 
             // Value string size
             buffer_writer_.send_value<u32>(value_ref.size());

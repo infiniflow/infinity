@@ -9,10 +9,10 @@
 
 namespace infinity {
 
-class TableFunctionSet final: public FunctionSet {
+class TableFunctionSet final : public FunctionSet {
 public:
     explicit
-    TableFunctionSet(String name): FunctionSet(std::move(name), FunctionType::kTable) {}
+    TableFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kTable) {}
 
     ~TableFunctionSet() final;
 

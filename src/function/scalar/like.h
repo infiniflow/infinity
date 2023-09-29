@@ -11,9 +11,9 @@
 namespace infinity {
 
 void
-RegisterLikeFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterLikeFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
 void
-RegisterNotLikeFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterNotLikeFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
 }

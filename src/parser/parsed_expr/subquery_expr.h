@@ -29,9 +29,9 @@ public:
     ToString() const override;
 
 public:
-    SubqueryType     subquery_type_{SubqueryType::kScalar};
+    SubqueryType subquery_type_{SubqueryType::kScalar};
 
-    ParsedExpr*      left_{nullptr};
+    ParsedExpr* left_{nullptr};
     SelectStatement* select_{nullptr};
 };
 

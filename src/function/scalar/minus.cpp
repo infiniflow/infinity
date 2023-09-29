@@ -11,8 +11,9 @@ namespace infinity {
 struct MinusFunction {
     template<typename TA, typename TB>
     static inline bool
-    Run(TA value, TB &result) {
-        if(value == std::numeric_limits<TA>::min()) return false;
+    Run(TA value, TB& result) {
+        if(value == std::numeric_limits<TA>::min())
+            return false;
         result = -value;
         return true;
     }
@@ -20,35 +21,37 @@ struct MinusFunction {
 
 template<>
 inline bool
-MinusFunction::Run(HugeIntT value, HugeIntT &result) {
+MinusFunction::Run(HugeIntT value, HugeIntT& result) {
     NotImplementError("No implementation on minus big int")
 }
 
 template<>
 inline bool
-MinusFunction::Run(DecimalT value, DecimalT &result) {
+MinusFunction::Run(DecimalT value, DecimalT& result) {
     NotImplementError("No implementation on minus Decimal")
 }
 
 template<>
 inline bool
-MinusFunction::Run(FloatT value, FloatT &result) {
-    if(std::isinf(value) || std::isnan(value)) return false;
+MinusFunction::Run(FloatT value, FloatT& result) {
+    if(std::isinf(value) || std::isnan(value))
+        return false;
     result = -value;
     return true;
 }
 
 template<>
 inline bool
-MinusFunction::Run(DoubleT value, DoubleT &result) {
-    if(std::isinf(value) || std::isnan(value)) return false;
+MinusFunction::Run(DoubleT value, DoubleT& result) {
+    if(std::isinf(value) || std::isnan(value))
+        return false;
     result = -value;
     return true;
 }
 
 template<>
 inline bool
-MinusFunction::Run(MixedT value, MixedT &result) {
+MinusFunction::Run(MixedT value, MixedT& result) {
     switch(value.type) {
         case MixedValueType::kInteger: {
             auto int_value_ptr = (IntegerMixedType*)(&value);
@@ -70,7 +73,7 @@ MinusFunction::Run(MixedT value, MixedT &result) {
 }
 
 void
-RegisterMinusFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterMinusFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "-";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);

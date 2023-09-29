@@ -118,7 +118,7 @@ ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression>& expr,
     Vector<SharedPtr<ColumnVector>> arguments;
     arguments.reserve(argument_count);
 
-    for(SizeT i = 0; i < argument_count; ++ i) {
+    for(SizeT i = 0; i < argument_count; ++i) {
         SharedPtr<ExpressionState>& argument_state = state->Children()[i];
         SharedPtr<BaseExpression>& argument_expr = expr->arguments()[i];
         SharedPtr<ColumnVector>& argument_output = argument_state->OutputColumnVector();

@@ -27,7 +27,7 @@ String
 QueryResult::ToString() const {
     std::stringstream ss;
 
-    switch (root_operator_type_) {
+    switch(root_operator_type_) {
         case LogicalNodeType::kInsert: {
             return "INSERT 0 1";
         }
@@ -43,7 +43,7 @@ QueryResult::ToString() const {
     }
 
     SizeT column_count = result_->ColumnCount();
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         String end;
         if(idx != column_count - 1) {
             end = " ";
@@ -56,7 +56,7 @@ QueryResult::ToString() const {
     SizeT block_count = result_->DataBlockCount();
 
     // Iterate all blocks
-    for(SizeT idx = 0; idx < block_count; ++ idx) {
+    for(SizeT idx = 0; idx < block_count; ++idx) {
         // Get current block
         SharedPtr<DataBlock> current_block = result_->GetDataBlockById(idx);
 
@@ -67,7 +67,7 @@ QueryResult::ToString() const {
 }
 
 QueryResult
-QueryContext::Query(const String &query) {
+QueryContext::Query(const String& query) {
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
 
@@ -77,13 +77,17 @@ QueryContext::Query(const String &query) {
         ParserError(parsed_result->error_message_)
     }
 
-    LogicalPlanner logical_planner(this);
-    Optimizer optimizer(this);
-    PhysicalPlanner physical_planner(this);
-    FragmentBuilder fragment_builder(this);
+    LogicalPlanner
+    logical_planner(this);
+    Optimizer
+    optimizer(this);
+    PhysicalPlanner
+    physical_planner(this);
+    FragmentBuilder
+    fragment_builder(this);
 
     PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
-    for (BaseStatement* statement : *parsed_result->statements_ptr_) {
+    for(BaseStatement* statement: *parsed_result->statements_ptr_) {
         QueryResult query_result;
         try {
             this->CreateTxn();
@@ -117,10 +121,10 @@ QueryContext::Query(const String &query) {
             query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
             this->CommitTxn();
-        } catch (const Exception& e) {
+        } catch(const Exception& e) {
             this->RollbackTxn();
             throw Exception(e.what());
-        } catch (std::exception& e) {
+        } catch(std::exception& e) {
             throw e;
         }
         return query_result;

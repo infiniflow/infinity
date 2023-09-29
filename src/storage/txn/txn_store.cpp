@@ -19,7 +19,7 @@ TxnTableStore::Append(const SharedPtr<DataBlock>& input_block) {
     }
 
     Vector<SharedPtr<DataType>> column_types;
-    for(SizeT col_id = 0; col_id < column_count; ++ col_id) {
+    for(SizeT col_id = 0; col_id < column_count; ++col_id) {
         column_types.emplace_back(table_entry_->columns_[col_id]->type());
         if(*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
             String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
@@ -28,7 +28,7 @@ TxnTableStore::Append(const SharedPtr<DataBlock>& input_block) {
         }
     }
 
-    DataBlock* current_block {nullptr};
+    DataBlock* current_block{nullptr};
     if(blocks_.empty()) {
         blocks_.emplace_back(DataBlock::Make());
         current_block_id_ = 0;
@@ -45,7 +45,7 @@ TxnTableStore::Append(const SharedPtr<DataBlock>& input_block) {
         to_append = input_block->row_count() - input_start_pos;
         blocks_.emplace_back(DataBlock::Make());
         blocks_.back()->Init(column_types);
-        ++ current_block_id_;
+        ++current_block_id_;
         current_block = blocks_[current_block_id_].get();
         current_block->AppendWith(input_block, input_start_pos, to_append);
     } else {
@@ -95,10 +95,14 @@ TxnTableStore::PrepareCommit() {
     Txn* txn_ptr = (Txn*)txn_;
     TableCollectionEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
 
-    for (const auto& uncommitted : uncommitted_segments_) {
-        TableCollectionEntry::ImportAppendSegment(table_entry_, txn_, uncommitted, *append_state_, txn_ptr->GetBufferMgr());
+    for(const auto& uncommitted: uncommitted_segments_) {
+        TableCollectionEntry::ImportAppendSegment(table_entry_,
+                                                  txn_,
+                                                  uncommitted,
+                                                  *append_state_,
+                                                  txn_ptr->GetBufferMgr());
     }
-    
+
     LOG_TRACE("Transaction local storage table: {}, Complete commit preparing", this->table_name_);
 }
 

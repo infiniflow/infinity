@@ -28,14 +28,14 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
 //        if(task_count > 1) {
 //            printf("Get tasks count: %lu\n", task_count);
 //        }
-        for(SizeT idx = 0; idx < task_count; ++ idx) {
+        for(SizeT idx = 0; idx < task_count; ++idx) {
             Task* input_task = input_tasks[idx];
             if(__builtin_expect((input_task == nullptr), false)) {
                 printf("coordinator: null task\n");
                 continue;
             }
 
-            switch (input_task->type()) {
+            switch(input_task->type()) {
                 case TaskType::kPipeline: {
 //                printf("coordinator receives PIPELINE TASK on CPU: %ld\n", cpu_id);
                     PipelineTask* pipeline_task = (PipelineTask*)input_task;
@@ -45,7 +45,7 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
                         current_cpu_id = current_cpu_id % cpu_array.size();
 //                    printf("Dispatched to CPU: %ld\n", cpu_array[current_cpu_id]);
                         NewScheduler::DispatchTask(cpu_array[current_cpu_id], pipeline_task);
-                        ++ current_cpu_id;
+                        ++current_cpu_id;
                     } else {
                         NewScheduler::DispatchTask(pipeline_task->last_worker_id_, pipeline_task);
                     }
@@ -61,7 +61,7 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
                     if(dummy_task->last_worker_id_ == -1) {
                         // Select an available cpu
                         NewScheduler::DispatchTask(current_cpu_id % cpu_array.size(), dummy_task);
-                        ++ current_cpu_id;
+                        ++current_cpu_id;
                     } else {
                         NewScheduler::DispatchTask(dummy_task->last_worker_id_, dummy_task);
                     }
@@ -112,7 +112,7 @@ void
 NewScheduler::Init(const HashSet<i64>& input_cpu_set) {
     if(!cpu_set.empty()) {
         std::cerr << "scheduler was initialized before" << std::endl;
-        return ;
+        return;
     }
     cpu_set = input_cpu_set;
 

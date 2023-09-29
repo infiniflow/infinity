@@ -70,7 +70,8 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
 
     if(vector_type_ == ColumnVectorType::kConstant) {
         tail_index_ = other.tail_index_;
-        if(tail_index_ == 0) return ;
+        if(tail_index_ == 0)
+            return;
         CopyRow(other, 0, 0);
     } else {
         tail_index_ = input_select.Size();
@@ -608,92 +609,92 @@ ColumnVector::ToString() const {
     std::stringstream ss;
     switch(data_type_->type()) {
         case kBoolean: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << (((BooleanT *) data_ptr_)[row_index] ? "true" : "false") << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << (((BooleanT*)data_ptr_)[row_index] ? "true" : "false") << std::endl;
             }
             break;
         }
         case kTinyInt: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << (((TinyIntT *) data_ptr_)[row_index]) << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << (((TinyIntT*)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kSmallInt: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << (((SmallIntT *) data_ptr_)[row_index]) << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << (((SmallIntT*)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kInteger: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << (((IntegerT *) data_ptr_)[row_index]) << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << (((IntegerT*)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kBigInt: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << (((BigIntT *) data_ptr_)[row_index]) << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << (((BigIntT*)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kHugeInt: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((HugeIntT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((HugeIntT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kFloat: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << (((FloatT *) data_ptr_)[row_index]) << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << (((FloatT*)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kDouble: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << (((DoubleT *) data_ptr_)[row_index]) << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << (((DoubleT*)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kDecimal: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((DecimalT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((DecimalT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kVarchar: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((VarcharT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((VarcharT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kDate: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((DateT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((DateT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kTime: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((TimeT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((TimeT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kDateTime: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((DateT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((DateT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kTimestamp: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((TimestampT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((TimestampT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kInterval: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((IntervalT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((IntervalT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
@@ -704,74 +705,74 @@ ColumnVector::ToString() const {
             NotImplementError("Not implemented.")
         }
         case kPoint: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((PointT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((PointT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kLine: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((LineT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((LineT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kLineSeg: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((LineSegT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((LineSegT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kBox: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((BoxT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((BoxT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kPath: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((PathT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((PathT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kPolygon: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((PolygonT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((PolygonT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kCircle: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((CircleT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((CircleT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kBitmap: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((BitmapT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((BitmapT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kUuid: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((UuidT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((UuidT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kBlob: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((BlobT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((BlobT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kEmbedding: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((EmbeddingT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((EmbeddingT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
         case kMixed: {
-            for(SizeT row_index = 0; row_index < tail_index_; ++ row_index) {
-                ss << ((MixedT *) data_ptr_)[row_index].ToString() << std::endl;
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((MixedT*)data_ptr_)[row_index].ToString() << std::endl;
             }
             break;
         }
@@ -793,34 +794,34 @@ ColumnVector::ToString(SizeT row_index) const {
 
     switch(data_type_->type()) {
         case kBoolean: {
-            return ((BooleanT *) data_ptr_)[row_index] ? "true": "false";
+            return ((BooleanT*)data_ptr_)[row_index] ? "true" : "false";
         }
         case kTinyInt: {
-            return std::to_string(((TinyIntT *) data_ptr_)[row_index]);
+            return std::to_string(((TinyIntT*)data_ptr_)[row_index]);
         }
         case kSmallInt: {
-            return std::to_string(((SmallIntT *) data_ptr_)[row_index]);
+            return std::to_string(((SmallIntT*)data_ptr_)[row_index]);
         }
         case kInteger: {
-            return std::to_string(((IntegerT *) data_ptr_)[row_index]);
+            return std::to_string(((IntegerT*)data_ptr_)[row_index]);
         }
         case kBigInt: {
-            return std::to_string(((BigIntT *) data_ptr_)[row_index]);
+            return std::to_string(((BigIntT*)data_ptr_)[row_index]);
         }
         case kHugeInt: {
             TypeError("Not implemented");
         }
         case kFloat: {
-            return std::to_string(((FloatT *) data_ptr_)[row_index]);
+            return std::to_string(((FloatT*)data_ptr_)[row_index]);
         }
         case kDouble: {
-            return std::to_string(((DoubleT *) data_ptr_)[row_index]);
+            return std::to_string(((DoubleT*)data_ptr_)[row_index]);
         }
         case kDecimal: {
             TypeError("Not implemented");
         }
         case kVarchar: {
-            VarcharT varchar_ptr = ((VarcharT *) data_ptr_)[row_index];
+            VarcharT varchar_ptr = ((VarcharT*)data_ptr_)[row_index];
             if(varchar_ptr.IsInlined()) {
                 return {varchar_ptr.prefix, varchar_ptr.length};
             } else {
@@ -917,92 +918,92 @@ ColumnVector::GetValue(SizeT index) const {
     switch(data_type_->type()) {
 
         case kBoolean: {
-            return Value::MakeBool(((BooleanT *) data_ptr_)[index]);
+            return Value::MakeBool(((BooleanT*)data_ptr_)[index]);
         }
         case kTinyInt: {
-            return Value::MakeTinyInt(((TinyIntT *) data_ptr_)[index]);
+            return Value::MakeTinyInt(((TinyIntT*)data_ptr_)[index]);
         }
         case kSmallInt: {
-            return Value::MakeSmallInt(((SmallIntT *) data_ptr_)[index]);
+            return Value::MakeSmallInt(((SmallIntT*)data_ptr_)[index]);
         }
         case kInteger: {
-            return Value::MakeInt(((IntegerT *) data_ptr_)[index]);
+            return Value::MakeInt(((IntegerT*)data_ptr_)[index]);
         }
         case kBigInt: {
-            return Value::MakeBigInt(((BigIntT *) data_ptr_)[index]);
+            return Value::MakeBigInt(((BigIntT*)data_ptr_)[index]);
         }
         case kHugeInt: {
-            return Value::MakeHugeInt(((HugeIntT *) data_ptr_)[index]);
+            return Value::MakeHugeInt(((HugeIntT*)data_ptr_)[index]);
         }
         case kFloat: {
-            return Value::MakeFloat(((FloatT *) data_ptr_)[index]);
+            return Value::MakeFloat(((FloatT*)data_ptr_)[index]);
         }
         case kDouble: {
-            return Value::MakeDouble(((DoubleT *) data_ptr_)[index]);
+            return Value::MakeDouble(((DoubleT*)data_ptr_)[index]);
         }
         case kDecimal: {
-            return Value::MakeDecimal(((DecimalT *) data_ptr_)[index], data_type_->type_info());
+            return Value::MakeDecimal(((DecimalT*)data_ptr_)[index], data_type_->type_info());
         }
         case kVarchar: {
-            return Value::MakeVarchar(((VarcharT *) data_ptr_)[index]);
+            return Value::MakeVarchar(((VarcharT*)data_ptr_)[index]);
         }
         case kDate: {
-            return Value::MakeDate(((DateT *) data_ptr_)[index]);
+            return Value::MakeDate(((DateT*)data_ptr_)[index]);
         }
         case kTime: {
-            return Value::MakeTime(((TimeT *) data_ptr_)[index]);
+            return Value::MakeTime(((TimeT*)data_ptr_)[index]);
         }
         case kDateTime: {
-            return Value::MakeDateTime(((DateTimeT *) data_ptr_)[index]);
+            return Value::MakeDateTime(((DateTimeT*)data_ptr_)[index]);
         }
         case kTimestamp: {
-            return Value::MakeTimestamp(((TimestampT *) data_ptr_)[index]);
+            return Value::MakeTimestamp(((TimestampT*)data_ptr_)[index]);
         }
         case kInterval: {
-            return Value::MakeInterval(((IntervalT *) data_ptr_)[index]);
+            return Value::MakeInterval(((IntervalT*)data_ptr_)[index]);
         }
         case kArray: {
-            return Value::MakeArray(((ArrayT *) data_ptr_)[index]);
+            return Value::MakeArray(((ArrayT*)data_ptr_)[index]);
         }
         case kTuple: {
             TypeError("Shouldn't access tuple directly, a tuple is flatten as many columns");
         }
         case kPoint: {
-            return Value::MakePoint(((PointT *) data_ptr_)[index]);
+            return Value::MakePoint(((PointT*)data_ptr_)[index]);
         }
         case kLine: {
-            return Value::MakeLine(((LineT *) data_ptr_)[index]);
+            return Value::MakeLine(((LineT*)data_ptr_)[index]);
         }
         case kLineSeg: {
-            return Value::MakeLineSegment(((LineSegT *) data_ptr_)[index]);
+            return Value::MakeLineSegment(((LineSegT*)data_ptr_)[index]);
         }
         case kBox: {
-            return Value::MakeBox(((BoxT *) data_ptr_)[index]);
+            return Value::MakeBox(((BoxT*)data_ptr_)[index]);
         }
         case kPath: {
-            return Value::MakePath(((PathT *) data_ptr_)[index]);
+            return Value::MakePath(((PathT*)data_ptr_)[index]);
         }
         case kPolygon: {
-            return Value::MakePolygon(((PolygonT *) data_ptr_)[index]);
+            return Value::MakePolygon(((PolygonT*)data_ptr_)[index]);
         }
         case kCircle: {
-            return Value::MakeCircle(((CircleT *) data_ptr_)[index]);
+            return Value::MakeCircle(((CircleT*)data_ptr_)[index]);
         }
         case kBitmap: {
-            return Value::MakeBitmap(((BitmapT *) data_ptr_)[index]);
+            return Value::MakeBitmap(((BitmapT*)data_ptr_)[index]);
         }
         case kUuid: {
-            return Value::MakeUuid(((UuidT *) data_ptr_)[index]);
+            return Value::MakeUuid(((UuidT*)data_ptr_)[index]);
         }
         case kBlob: {
-            return Value::MakeBlob(((BlobT *) data_ptr_)[index]);
+            return Value::MakeBlob(((BlobT*)data_ptr_)[index]);
         }
         case kEmbedding: {
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
             return Value::MakeEmbedding(ptr, data_type_->type_info());
         }
         case kMixed: {
-            return Value::MakeMixedData(((MixedT *) data_ptr_)[index]);
+            return Value::MakeMixedData(((MixedT*)data_ptr_)[index]);
         }
         default: {
             TypeError("Attempt to access an unaccepted type");
@@ -1012,7 +1013,7 @@ ColumnVector::GetValue(SizeT index) const {
 }
 
 void
-ColumnVector::SetValue(SizeT index, const Value &value) {
+ColumnVector::SetValue(SizeT index, const Value& value) {
     StorageAssert(initialized, "Column vector isn't initialized.")
     StorageAssert(index <= tail_index_,
                   "Attempt to store value into unavailable row of column vector: "
@@ -1031,35 +1032,35 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         case kTinyInt: {
-            ((TinyIntT *)data_ptr_)[index] = value.GetValue<TinyIntT>();
+            ((TinyIntT*)data_ptr_)[index] = value.GetValue<TinyIntT>();
             break;
         }
         case kSmallInt: {
-            ((SmallIntT *) data_ptr_)[index] = value.GetValue<SmallIntT>();
+            ((SmallIntT*)data_ptr_)[index] = value.GetValue<SmallIntT>();
             break;
         }
         case kInteger: {
-            ((IntegerT *) data_ptr_)[index] = value.GetValue<IntegerT>();
+            ((IntegerT*)data_ptr_)[index] = value.GetValue<IntegerT>();
             break;
         }
         case kBigInt: {
-            ((BigIntT *) data_ptr_)[index] = value.GetValue<BigIntT>();
+            ((BigIntT*)data_ptr_)[index] = value.GetValue<BigIntT>();
             break;
         }
         case kHugeInt: {
-            ((HugeIntT *) data_ptr_)[index] = value.GetValue<HugeIntT>();
+            ((HugeIntT*)data_ptr_)[index] = value.GetValue<HugeIntT>();
             break;
         }
         case kFloat: {
-            ((FloatT *) data_ptr_)[index] = value.GetValue<FloatT>();
+            ((FloatT*)data_ptr_)[index] = value.GetValue<FloatT>();
             break;
         }
         case kDouble: {
-            ((DoubleT *) data_ptr_)[index] = value.GetValue<DoubleT>();
+            ((DoubleT*)data_ptr_)[index] = value.GetValue<DoubleT>();
             break;
         }
         case kDecimal: {
-            ((DecimalT *) data_ptr_)[index] = value.GetValue<DecimalT>();
+            ((DecimalT*)data_ptr_)[index] = value.GetValue<DecimalT>();
             break;
         }
         case kVarchar: {
@@ -1067,57 +1068,57 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
             u16 varchar_len = value.value_.varchar.length;
             if(varchar_len <= VarcharType::INLINE_LENGTH) {
                 // Only prefix is enough to contain all string data.
-                memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.prefix, varchar_len);
+                memcpy(((VarcharT*)data_ptr_)[index].prefix, value.value_.varchar.prefix, varchar_len);
             } else {
-                memcpy(((VarcharT *) data_ptr_)[index].prefix, value.value_.varchar.ptr, VarcharType::PREFIX_LENGTH);
+                memcpy(((VarcharT*)data_ptr_)[index].prefix, value.value_.varchar.ptr, VarcharType::PREFIX_LENGTH);
                 ptr_t ptr = this->buffer_->heap_mgr_->Allocate(varchar_len);
                 memcpy(ptr, value.value_.varchar.ptr, varchar_len);
-                ((VarcharT *) data_ptr_)[index].ptr = ptr;
+                ((VarcharT*)data_ptr_)[index].ptr = ptr;
             }
-            ((VarcharT *) data_ptr_)[index].length = varchar_len;
+            ((VarcharT*)data_ptr_)[index].length = varchar_len;
             break;
         }
         case kDate: {
-            ((DateT *) data_ptr_)[index] = value.GetValue<DateT>();
+            ((DateT*)data_ptr_)[index] = value.GetValue<DateT>();
             break;
         }
         case kTime: {
-            ((TimeT *) data_ptr_)[index] = value.GetValue<TimeT>();
+            ((TimeT*)data_ptr_)[index] = value.GetValue<TimeT>();
             break;
         }
         case kDateTime: {
-            ((DateTimeT *) data_ptr_)[index] = value.GetValue<DateTimeT>();
+            ((DateTimeT*)data_ptr_)[index] = value.GetValue<DateTimeT>();
             break;
         }
         case kTimestamp: {
-            ((TimestampT *) data_ptr_)[index] = value.GetValue<TimestampT>();
+            ((TimestampT*)data_ptr_)[index] = value.GetValue<TimestampT>();
             break;
         }
         case kInterval: {
-            ((IntervalT *) data_ptr_)[index] = value.GetValue<IntervalT>();
+            ((IntervalT*)data_ptr_)[index] = value.GetValue<IntervalT>();
             break;
         }
         case kArray: {
-            ((ArrayT *) data_ptr_)[index] = value.GetValue<ArrayT>();
+            ((ArrayT*)data_ptr_)[index] = value.GetValue<ArrayT>();
             break;
         }
         case kTuple: {
             TypeError("Shouldn't store tuple directly, a tuple is flatten as many columns");
         }
         case kPoint: {
-            ((PointT *) data_ptr_)[index] = value.GetValue<PointT>();
+            ((PointT*)data_ptr_)[index] = value.GetValue<PointT>();
             break;
         }
         case kLine: {
-            ((LineT *) data_ptr_)[index] = value.GetValue<LineT>();
+            ((LineT*)data_ptr_)[index] = value.GetValue<LineT>();
             break;
         }
         case kLineSeg: {
-            ((LineSegT *) data_ptr_)[index] = value.GetValue<LineSegT>();
+            ((LineSegT*)data_ptr_)[index] = value.GetValue<LineSegT>();
             break;
         }
         case kBox: {
-            ((BoxT *) data_ptr_)[index] = value.GetValue<BoxT>();
+            ((BoxT*)data_ptr_)[index] = value.GetValue<BoxT>();
             break;
         }
         case kPath: {
@@ -1130,9 +1131,9 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
             // Why not use value.GetValue<PathT>(); ?
             // It will call PathT operator= to allocate new memory for point area.
             // In this case, we need the point area in memory vector buffer.
-            ((PathT *) data_ptr_)[index].ptr = ptr;
-            ((PathT *) data_ptr_)[index].point_count = point_count;
-            ((PathT *) data_ptr_)[index].closed = value.value_.path.closed;
+            ((PathT*)data_ptr_)[index].ptr = ptr;
+            ((PathT*)data_ptr_)[index].point_count = point_count;
+            ((PathT*)data_ptr_)[index].closed = value.value_.path.closed;
             break;
         }
         case kPolygon: {
@@ -1146,13 +1147,13 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
             // Why not use value.GetValue<PolygonT>(); ?
             // It will call PolygonT operator= to allocate new memory for point area.
             // In this case, we need the point area in memory vector buffer.
-            ((PolygonT *) data_ptr_)[index].ptr = ptr;
-            ((PolygonT *) data_ptr_)[index].point_count = point_count;
-            ((PolygonT *) data_ptr_)[index].bounding_box = value.value_.polygon.bounding_box;
+            ((PolygonT*)data_ptr_)[index].ptr = ptr;
+            ((PolygonT*)data_ptr_)[index].point_count = point_count;
+            ((PolygonT*)data_ptr_)[index].bounding_box = value.value_.polygon.bounding_box;
             break;
         }
         case kCircle: {
-            ((CircleT *) data_ptr_)[index] = value.GetValue<CircleT>();
+            ((CircleT*)data_ptr_)[index] = value.GetValue<CircleT>();
             break;
         }
         case kBitmap: {
@@ -1163,12 +1164,12 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
             ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
             memcpy(ptr, (void*)(value.value_.bitmap.ptr), bit_area_size);
 
-            ((BitmapT *) data_ptr_)[index].ptr = (u64*)ptr;
-            ((BitmapT *) data_ptr_)[index].count = bit_count;
+            ((BitmapT*)data_ptr_)[index].ptr = (u64*)ptr;
+            ((BitmapT*)data_ptr_)[index].count = bit_count;
             break;
         }
         case kUuid: {
-            ((UuidT *) data_ptr_)[index] = value.GetValue<UuidT>();
+            ((UuidT*)data_ptr_)[index] = value.GetValue<UuidT>();
             break;
         }
         case kBlob: {
@@ -1176,8 +1177,8 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
             ptr_t ptr = this->buffer_->heap_mgr_->Allocate(blob_size);
             memcpy(ptr, (void*)(value.value_.blob.ptr), blob_size);
 
-            ((BlobT *) data_ptr_)[index].ptr = ptr;
-            ((BlobT *) data_ptr_)[index].size = blob_size;
+            ((BlobT*)data_ptr_)[index].ptr = ptr;
+            ((BlobT*)data_ptr_)[index].size = blob_size;
             break;
         }
         case kEmbedding: {
@@ -1186,7 +1187,7 @@ ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         case kMixed: {
-            ((MixedT *) data_ptr_)[index] = value.GetValue<MixedT>();
+            ((MixedT*)data_ptr_)[index] = value.GetValue<MixedT>();
             break;
         }
         default: {
@@ -1248,7 +1249,7 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             break;
         }
         case kDecimal: {
-            ((DecimalT *)data_ptr_)[index] = *(DecimalT *)(value_ptr);
+            ((DecimalT*)data_ptr_)[index] = *(DecimalT*)(value_ptr);
             break;
         }
         case kVarchar: {
@@ -1257,14 +1258,14 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             u16 varchar_len = varchar_ptr->length;
             if(varchar_len <= VarcharType::INLINE_LENGTH) {
                 // Only prefix is enough to contain all string data.
-                memcpy(((VarcharT *) data_ptr_)[index].prefix, varchar_ptr->prefix, varchar_len);
+                memcpy(((VarcharT*)data_ptr_)[index].prefix, varchar_ptr->prefix, varchar_len);
             } else {
-                memcpy(((VarcharT *) data_ptr_)[index].prefix, varchar_ptr->ptr, VarcharType::PREFIX_LENGTH);
+                memcpy(((VarcharT*)data_ptr_)[index].prefix, varchar_ptr->ptr, VarcharType::PREFIX_LENGTH);
                 ptr_t ptr = this->buffer_->heap_mgr_->Allocate(varchar_len);
                 memcpy(ptr, varchar_ptr->ptr, varchar_len);
-                ((VarcharT *) data_ptr_)[index].ptr = ptr;
+                ((VarcharT*)data_ptr_)[index].ptr = ptr;
             }
-            ((VarcharT *) data_ptr_)[index].length = varchar_len;
+            ((VarcharT*)data_ptr_)[index].length = varchar_len;
             break;
         }
         case kDate: {
@@ -1321,9 +1322,9 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             // Why not use value.GetValue<PathT>(); ?
             // It will call PathT operator= to allocate new memory for point area.
             // In this case, we need the point area in memory vector buffer.
-            ((PathT *) data_ptr_)[index].ptr = ptr;
-            ((PathT *) data_ptr_)[index].point_count = point_count;
-            ((PathT *) data_ptr_)[index].closed = point_ptr->closed;
+            ((PathT*)data_ptr_)[index].ptr = ptr;
+            ((PathT*)data_ptr_)[index].point_count = point_count;
+            ((PathT*)data_ptr_)[index].closed = point_ptr->closed;
             break;
         }
         case kPolygon: {
@@ -1337,9 +1338,9 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             // Why not use value.GetValue<PolygonT>(); ?
             // It will call PolygonT operator= to allocate new memory for point area.
             // In this case, we need the point area in memory vector buffer.
-            ((PolygonT *) data_ptr_)[index].ptr = ptr;
-            ((PolygonT *) data_ptr_)[index].point_count = point_count;
-            ((PolygonT *) data_ptr_)[index].bounding_box = polygon_ptr->bounding_box;
+            ((PolygonT*)data_ptr_)[index].ptr = ptr;
+            ((PolygonT*)data_ptr_)[index].point_count = point_count;
+            ((PolygonT*)data_ptr_)[index].bounding_box = polygon_ptr->bounding_box;
             break;
         }
         case kCircle: {
@@ -1355,8 +1356,8 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
             memcpy(ptr, (void*)(bitmap_ptr->ptr), bit_area_size);
 
-            ((BitmapT *) data_ptr_)[index].ptr = (u64*)ptr;
-            ((BitmapT *) data_ptr_)[index].count = bit_count;
+            ((BitmapT*)data_ptr_)[index].ptr = (u64*)ptr;
+            ((BitmapT*)data_ptr_)[index].count = bit_count;
             break;
         }
         case kUuid: {
@@ -1369,8 +1370,8 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             ptr_t ptr = this->buffer_->heap_mgr_->Allocate(blob_size);
             memcpy(ptr, (void*)(blob_ptr->ptr), blob_size);
 
-            ((BlobT *) data_ptr_)[index].ptr = ptr;
-            ((BlobT *) data_ptr_)[index].size = blob_size;
+            ((BlobT*)data_ptr_)[index].ptr = ptr;
+            ((BlobT*)data_ptr_)[index].size = blob_size;
             break;
         }
         case kEmbedding: {
@@ -1401,7 +1402,7 @@ ColumnVector::AppendValue(const Value& value) {
     if(tail_index_ >= capacity_) {
         StorageError(fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
     }
-    SetValue(tail_index_ ++, value);
+    SetValue(tail_index_++, value);
 }
 
 void
@@ -1413,16 +1414,16 @@ ColumnVector::AppendByPtr(const ptr_t value_ptr) {
     }
     StorageAssert(tail_index_ < capacity_,
                   fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
-    SetByPtr(tail_index_ ++, value_ptr);
+    SetByPtr(tail_index_++, value_ptr);
 }
 
 void
-ColumnVector::AppendWith(const ColumnVector &other) {
+ColumnVector::AppendWith(const ColumnVector& other) {
     return AppendWith(other, 0, other.Size());
 }
 
 void
-ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
+ColumnVector::AppendWith(const ColumnVector& other, SizeT from, SizeT count) {
     if(count == 0) {
         return;
     }
@@ -1442,7 +1443,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kBoolean: {
             auto* src_ptr = (BooleanT*)(other.data_ptr_);
             BooleanT* dst_ptr = &((BooleanT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1450,7 +1451,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kTinyInt: {
             auto* src_ptr = (TinyIntT*)(other.data_ptr_);
             TinyIntT* dst_ptr = &((TinyIntT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1458,7 +1459,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kSmallInt: {
             auto* src_ptr = (SmallIntT*)(other.data_ptr_);
             SmallIntT* dst_ptr = &((SmallIntT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1466,7 +1467,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kInteger: {
             auto* src_ptr = (IntegerT*)(other.data_ptr_);
             IntegerT* dst_ptr = &((IntegerT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1474,7 +1475,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kBigInt: {
             auto* src_ptr = (BigIntT*)(other.data_ptr_);
             BigIntT* dst_ptr = &((BigIntT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1482,7 +1483,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kHugeInt: {
             auto* src_ptr = (HugeIntT*)(other.data_ptr_);
             HugeIntT* dst_ptr = &((HugeIntT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1490,7 +1491,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kFloat: {
             auto* src_ptr = (FloatT*)(other.data_ptr_);
             FloatT* dst_ptr = &((FloatT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1498,7 +1499,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kDouble: {
             auto* src_ptr = (DoubleT*)(other.data_ptr_);
             DoubleT* dst_ptr = &((DoubleT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1506,7 +1507,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kDecimal: {
             auto* src_ptr = (DecimalT*)(other.data_ptr_);
             DecimalT* dst_ptr = &((DecimalT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1515,7 +1516,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
             // Copy string
             auto* base_src_ptr = (VarcharT*)(other.data_ptr_);
             VarcharT* base_dst_ptr = &((VarcharT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 VarcharT& src_ref = base_src_ptr[idx];
                 VarcharT& dst_ref = base_dst_ptr[idx];
                 if(src_ref.IsInlined()) {
@@ -1533,7 +1534,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kDate: {
             auto* src_ptr = (DateT*)(other.data_ptr_);
             DateT* dst_ptr = &((DateT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1541,7 +1542,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kTime: {
             auto* src_ptr = (TimeT*)(other.data_ptr_);
             TimeT* dst_ptr = &((TimeT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1549,7 +1550,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kDateTime: {
             auto* src_ptr = (DateTimeT*)(other.data_ptr_);
             DateTimeT* dst_ptr = &((DateTimeT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1557,7 +1558,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kTimestamp: {
             auto* src_ptr = (TimestampT*)(other.data_ptr_);
             TimestampT* dst_ptr = &((TimestampT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1565,7 +1566,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kInterval: {
             auto* src_ptr = (IntervalT*)(other.data_ptr_);
             IntervalT* dst_ptr = &((IntervalT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1580,7 +1581,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kPoint: {
             auto* src_ptr = (PointT*)(other.data_ptr_);
             PointT* dst_ptr = &((PointT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1588,7 +1589,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kLine: {
             auto* src_ptr = (LineT*)(other.data_ptr_);
             LineT* dst_ptr = &((LineT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1596,7 +1597,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kLineSeg: {
             auto* src_ptr = (LineSegT*)(other.data_ptr_);
             LineSegT* dst_ptr = &((LineSegT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1604,7 +1605,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kBox: {
             auto* src_ptr = (BoxT*)(other.data_ptr_);
             BoxT* dst_ptr = &((BoxT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1612,7 +1613,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kPath: {
             auto* base_src_ptr = (PathT*)(other.data_ptr_);
             PathT* base_dst_ptr = &((PathT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 PathT& src_ref = base_src_ptr[idx];
                 u32 point_count = src_ref.point_count;
                 PathT& dst_ref = base_dst_ptr[idx];
@@ -1633,7 +1634,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kPolygon: {
             auto* base_src_ptr = (PolygonT*)(other.data_ptr_);
             PolygonT* base_dst_ptr = &((PolygonT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 PolygonT& src_ref = base_src_ptr[idx];
                 u32 point_count = src_ref.point_count;
                 PolygonT& dst_ref = base_dst_ptr[idx];
@@ -1654,7 +1655,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kCircle: {
             auto* src_ptr = (CircleT*)(other.data_ptr_);
             CircleT* dst_ptr = &((CircleT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1662,7 +1663,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kBitmap: {
             auto* base_src_ptr = (BitmapT*)(other.data_ptr_);
             BitmapT* base_dst_ptr = &((BitmapT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 BitmapT& src_ref = base_src_ptr[idx];
                 u64 bit_count = src_ref.count;
                 u64 unit_count = BitmapT::UnitCount(bit_count);
@@ -1682,7 +1683,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kUuid: {
             auto* src_ptr = (UuidT*)(other.data_ptr_);
             UuidT* dst_ptr = &((UuidT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1690,7 +1691,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kBlob: {
             auto* base_src_ptr = (BlobT*)(other.data_ptr_);
             BlobT* base_dst_ptr = &((BlobT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 BlobT& src_ref = base_src_ptr[idx];
                 BlobT& dst_ref = base_dst_ptr[idx];
 
@@ -1706,7 +1707,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kEmbedding: {
             auto* base_src_ptr = (EmbeddingT*)(other.data_ptr_);
             ptr_t base_dst_ptr = data_ptr_ + this->tail_index_ * data_type_->Size();
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 ptr_t src_ptr = base_src_ptr->ptr + idx * data_type_->Size();
                 ptr_t dst_ptr = base_dst_ptr + idx * data_type_->Size();
                 memcpy(dst_ptr, src_ptr, data_type_->Size());
@@ -1716,7 +1717,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
         case kMixed: {
             auto* src_ptr = (MixedT*)(other.data_ptr_);
             MixedT* dst_ptr = &((MixedT*)(data_ptr_))[this->tail_index_];
-            for(SizeT idx = 0; idx < count; ++ idx) {
+            for(SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
             break;
@@ -1730,7 +1731,7 @@ ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
 }
 
 SizeT
-ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, SizeT row_count) {
+ColumnVector::AppendWith(ColumnBuffer& column_buffer, SizeT start_row, SizeT row_count) {
     if(row_count == 0) {
         return 0;
     }
@@ -1773,9 +1774,9 @@ ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, SizeT row
         }
 
         case kVarchar: {
-            for (SizeT row_idx = 0; row_idx < appended_rows; row_idx++) {
+            for(SizeT row_idx = 0; row_idx < appended_rows; row_idx++) {
                 auto [src_ptr, data_size] = column_buffer.GetVarcharAt(row_idx);
-                auto varchar_type = reinterpret_cast<VarcharT *>(data_ptr_) + tail_index_;
+                auto varchar_type = reinterpret_cast<VarcharT*>(data_ptr_) + tail_index_;
                 varchar_type->Initialize(src_ptr, data_size);
                 this->tail_index_++;
             }
@@ -1805,9 +1806,10 @@ ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, SizeT row
 }
 
 void
-ColumnVector::ShallowCopy(const ColumnVector &other) {
+ColumnVector::ShallowCopy(const ColumnVector& other) {
     if(*this->data_type_ != *other.data_type_) {
-        StorageError("Attempt to shallow copy: " + other.data_type_->ToString() + " column vector to: " + this->data_type_->ToString());
+        StorageError("Attempt to shallow copy: " + other.data_type_->ToString() + " column vector to: " +
+                     this->data_type_->ToString());
     }
     if(this->buffer_ != other.buffer_) {
         this->buffer_ = other.buffer_;
@@ -1827,7 +1829,8 @@ void
 ColumnVector::Reserve(SizeT new_capacity) {
     StorageAssert(vector_type_ != ColumnVectorType::kConstant, "Constant column vector can only have one value")
     StorageAssert(initialized, "Column vector isn't initialized.")
-    if(new_capacity <= capacity_) return ;
+    if(new_capacity <= capacity_)
+        return;
 
     SharedPtr<VectorBuffer> new_buffer = VectorBuffer::Make(data_type_size_, new_capacity, buffer_->buffer_type_);
     new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
@@ -1855,8 +1858,8 @@ ColumnVector::Reset() {
         // This part of memory should managed by ColumnVector, but it isn't now.
         // So, when ColumnVector is destructed, this part need to free here.
         // TODO: we are going to manage the nested object in ColumnVector.
-        for(SizeT idx = 0; idx < tail_index_; ++ idx) {
-            ((MixedT *) data_ptr_)[idx].Reset();
+        for(SizeT idx = 0; idx < tail_index_; ++idx) {
+            ((MixedT*)data_ptr_)[idx].Reset();
         }
     }
 

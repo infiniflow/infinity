@@ -6,7 +6,9 @@
 #include "common/utility/infinity_assert.h"
 
 #define FINTEGER int
-int sgemm_(
+
+int
+sgemm_(
         const char* transa,
         const char* transb,
         FINTEGER* m,
@@ -26,7 +28,8 @@ namespace infinity {
 template<typename DistType>
 void
 KnnFlatL2Top1Blas<DistType>::Begin() {
-    if(begin_ || query_count_ == 0) return ;
+    if(begin_ || query_count_ == 0)
+        return;
 
     // block sizes
     const size_t bs_x = faiss::distance_compute_blas_query_bs;
@@ -38,9 +41,9 @@ KnnFlatL2Top1Blas<DistType>::Begin() {
 
     fvec_norms_L2sqr(x_norms_.get(), queries_, dimension_, query_count_);
 
-    for (size_t i0 = 0; i0 < query_count_; i0 += bs_x) {
+    for(size_t i0 = 0; i0 < query_count_; i0 += bs_x) {
         size_t i1 = i0 + bs_x;
-        if (i1 > query_count_)
+        if(i1 > query_count_)
             i1 = query_count_;
 
         single_best_result_handler_->begin_multiple(i0, i1);
@@ -58,7 +61,7 @@ KnnFlatL2Top1Blas<DistType>::Search(const DistType* base,
     }
 
     if(base_count == 0) {
-        return ;
+        return;
     }
 
     y_norms_ = MakeUnique<DistType[]>(base_count);
@@ -68,14 +71,14 @@ KnnFlatL2Top1Blas<DistType>::Search(const DistType* base,
     const size_t bs_x = faiss::distance_compute_blas_query_bs;
     const size_t bs_y = faiss::distance_compute_blas_database_bs;
 
-    for (size_t i0 = 0; i0 < query_count_; i0 += bs_x) {
+    for(size_t i0 = 0; i0 < query_count_; i0 += bs_x) {
         size_t i1 = i0 + bs_x;
-        if (i1 > query_count_)
+        if(i1 > query_count_)
             i1 = query_count_;
 
-        for (size_t j0 = 0; j0 < base_count; j0 += bs_y) {
+        for(size_t j0 = 0; j0 < base_count; j0 += bs_y) {
             size_t j1 = j0 + bs_y;
-            if (j1 > base_count)
+            if(j1 > base_count)
                 j1 = base_count;
             /* compute the actual dot products */
             {
@@ -95,16 +98,16 @@ KnnFlatL2Top1Blas<DistType>::Search(const DistType* base,
                        ip_block_.get(),
                        &nyi);
             }
-            for (int64_t i = i0; i < i1; i++) {
-                DistType *ip_line = ip_block_.get() + (i - i0) * (j1 - j0);
+            for(int64_t i = i0; i < i1; i++) {
+                DistType* ip_line = ip_block_.get() + (i - i0) * (j1 - j0);
 
-                for (size_t j = j0; j < j1; j++) {
+                for(size_t j = j0; j < j1; j++) {
                     DistType ip = *ip_line;
                     DistType dis = x_norms_[i] + y_norms_[j] - 2 * ip;
 
                     // negative values can occur for identical vectors
                     // due to roundoff errors
-                    if (dis < 0)
+                    if(dis < 0)
                         dis = 0;
 
                     *ip_line = dis;
@@ -119,9 +122,10 @@ KnnFlatL2Top1Blas<DistType>::Search(const DistType* base,
 template<typename DistType>
 void
 KnnFlatL2Top1Blas<DistType>::End() {
-    if(!begin_) return ;
+    if(!begin_)
+        return;
 
-    for(i32 i = 0; i < query_count_; ++ i) {
+    for(i32 i = 0; i < query_count_; ++i) {
         single_best_result_handler_->end_multiple();
     }
 

@@ -8,10 +8,10 @@
 #include "common/utility/exception.h"
 
 
-namespace infinity{
+namespace infinity {
 String
-PhysicalOperatorToString(PhysicalOperatorType type){
-    switch (type) {
+PhysicalOperatorToString(PhysicalOperatorType type) {
+    switch(type) {
 
         case PhysicalOperatorType::kInvalid:
             return "Invalid";

@@ -11,7 +11,7 @@
 
 namespace infinity {
 
-enum class PhysicalOperatorType: uint8_t {
+enum class PhysicalOperatorType : uint8_t {
     kInvalid = 0,
 
     kAggregate,

@@ -21,7 +21,7 @@ struct MulFunction {
 template<>
 inline bool
 MulFunction::Run(TinyIntT left, TinyIntT right, TinyIntT& result) {
-    if (__builtin_mul_overflow(left, right, &result)) {
+    if(__builtin_mul_overflow(left, right, &result)) {
         return false;
     }
     return true;
@@ -31,7 +31,7 @@ MulFunction::Run(TinyIntT left, TinyIntT right, TinyIntT& result) {
 template<>
 inline bool
 MulFunction::Run(SmallIntT left, SmallIntT right, SmallIntT& result) {
-    if (__builtin_mul_overflow(left, right, &result)) {
+    if(__builtin_mul_overflow(left, right, &result)) {
         return false;
     }
     return true;
@@ -41,7 +41,7 @@ MulFunction::Run(SmallIntT left, SmallIntT right, SmallIntT& result) {
 template<>
 inline bool
 MulFunction::Run(IntegerT left, IntegerT right, IntegerT& result) {
-    if (__builtin_mul_overflow(left, right, &result)) {
+    if(__builtin_mul_overflow(left, right, &result)) {
         return false;
     }
     return true;
@@ -51,7 +51,7 @@ MulFunction::Run(IntegerT left, IntegerT right, IntegerT& result) {
 template<>
 inline bool
 MulFunction::Run(BigIntT left, BigIntT right, BigIntT& result) {
-    if (__builtin_mul_overflow(left, right, &result)) {
+    if(__builtin_mul_overflow(left, right, &result)) {
         return false;
     }
     return true;
@@ -122,100 +122,100 @@ MulFunction::Run(MixedT left, MixedT right, MixedT& result) {
 }
 
 void
-RegisterMulFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterMulFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "*";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction mul_function_int8(
             func_name,
-            { DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt) },
-            { DataType(LogicalType::kTinyInt) },
+            {DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt)},
+            {DataType(LogicalType::kTinyInt)},
             &ScalarFunction::BinaryFunctionWithFailure<TinyIntT, TinyIntT, TinyIntT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_int8);
 
     ScalarFunction mul_function_int16(
             func_name,
-            { DataType(LogicalType::kSmallInt), DataType(LogicalType::kSmallInt) },
-            { DataType(LogicalType::kSmallInt) },
+            {DataType(LogicalType::kSmallInt), DataType(LogicalType::kSmallInt)},
+            {DataType(LogicalType::kSmallInt)},
             &ScalarFunction::BinaryFunctionWithFailure<SmallIntT, SmallIntT, SmallIntT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_int16);
 
     ScalarFunction mul_function_int32(
             func_name,
-            { DataType(LogicalType::kInteger), DataType(LogicalType::kInteger) },
-            { DataType(LogicalType::kInteger) },
+            {DataType(LogicalType::kInteger), DataType(LogicalType::kInteger)},
+            {DataType(LogicalType::kInteger)},
             &ScalarFunction::BinaryFunctionWithFailure<IntegerT, IntegerT, IntegerT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_int32);
 
     ScalarFunction mul_function_int64(
             func_name,
-            { DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt) },
-            { DataType(LogicalType::kBigInt) },
+            {DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt)},
+            {DataType(LogicalType::kBigInt)},
             &ScalarFunction::BinaryFunctionWithFailure<BigIntT, BigIntT, BigIntT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_int64);
 
     ScalarFunction mul_function_int128(
             func_name,
-            { DataType(LogicalType::kHugeInt), DataType(LogicalType::kHugeInt) },
-            { DataType(LogicalType::kHugeInt) },
+            {DataType(LogicalType::kHugeInt), DataType(LogicalType::kHugeInt)},
+            {DataType(LogicalType::kHugeInt)},
             &ScalarFunction::BinaryFunctionWithFailure<HugeIntT, HugeIntT, HugeIntT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_int128);
 
     ScalarFunction mul_function_float(
             func_name,
-            { DataType(LogicalType::kFloat), DataType(LogicalType::kFloat) },
-            { DataType(LogicalType::kFloat) },
+            {DataType(LogicalType::kFloat), DataType(LogicalType::kFloat)},
+            {DataType(LogicalType::kFloat)},
             &ScalarFunction::BinaryFunctionWithFailure<FloatT, FloatT, FloatT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_float);
 
     ScalarFunction mul_function_double(
             func_name,
-            { DataType(LogicalType::kDouble), DataType(LogicalType::kDouble) },
-            { DataType(LogicalType::kDouble) },
+            {DataType(LogicalType::kDouble), DataType(LogicalType::kDouble)},
+            {DataType(LogicalType::kDouble)},
             &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_double);
 
     ScalarFunction mul_function_Decimal(
             func_name,
-            { DataType(LogicalType::kDecimal), DataType(LogicalType::kDecimal) },
-            { DataType(LogicalType::kDecimal) },
+            {DataType(LogicalType::kDecimal), DataType(LogicalType::kDecimal)},
+            {DataType(LogicalType::kDecimal)},
             &ScalarFunction::BinaryFunctionWithFailure<DecimalT, DecimalT, DecimalT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_Decimal);
 
 
     ScalarFunction add_function_mixed_bigint(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt) },
-            { DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt)},
+            {DataType(LogicalType::kMixed)},
             &ScalarFunction::BinaryFunctionWithFailure<MixedT, BigIntT, MixedT, MulFunction>);
     function_set_ptr->AddFunction(add_function_mixed_bigint);
 
     ScalarFunction add_function_bigint_mixed(
             func_name,
-            { DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed) },
-            { DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed)},
+            {DataType(LogicalType::kMixed)},
             &ScalarFunction::BinaryFunctionWithFailure<BigIntT, MixedT, MixedT, MulFunction>);
     function_set_ptr->AddFunction(add_function_bigint_mixed);
 
     ScalarFunction add_function_mixed_double(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kDouble) },
-            { DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},
+            {DataType(LogicalType::kMixed)},
             &ScalarFunction::BinaryFunctionWithFailure<MixedT, DoubleT, MixedT, MulFunction>);
     function_set_ptr->AddFunction(add_function_mixed_double);
 
     ScalarFunction add_function_double_mixed(
             func_name,
-            { DataType(LogicalType::kDouble), DataType(LogicalType::kMixed) },
-            { DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kDouble), DataType(LogicalType::kMixed)},
+            {DataType(LogicalType::kMixed)},
             &ScalarFunction::BinaryFunctionWithFailure<DoubleT, MixedT, MixedT, MulFunction>);
     function_set_ptr->AddFunction(add_function_double_mixed);
 
     ScalarFunction add_function_mixed_mixed(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kMixed) },
-            { DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kMixed)},
+            {DataType(LogicalType::kMixed)},
             &ScalarFunction::BinaryFunctionWithFailure<MixedT, MixedT, MixedT, MulFunction>);
     function_set_ptr->AddFunction(add_function_mixed_mixed);
 

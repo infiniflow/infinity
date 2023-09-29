@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterLessFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterLessFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
 }

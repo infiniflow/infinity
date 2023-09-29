@@ -35,7 +35,7 @@ public:
             case ColumnVectorType::kFlat: {
                 SizeT row_count = input_column_vector->Size();
                 auto* input_ptr = (InputType*)(input_column_vector->data());
-                for(SizeT idx = 0; idx < row_count; ++ idx) {
+                for(SizeT idx = 0; idx < row_count; ++idx) {
                     ((AggregateState*)state)->Update(input_ptr, idx);
                 }
                 break;
@@ -63,7 +63,7 @@ public:
     }
 };
 
-class AggregateFunction: public Function {
+class AggregateFunction : public Function {
 public:
     explicit
     AggregateFunction(String name,
@@ -73,13 +73,13 @@ public:
                       AggregateInitializeFuncType init_func,
                       AggregateUpdateFuncType update_func,
                       AggregateFinalizeFuncType finalize_func)
-                      : Function(std::move(name), FunctionType::kAggregate),
-                        argument_type_(std::move(argument_type)),
-                        return_type_(std::move(return_type)),
-                        state_size_(state_size),
-                        init_func_(std::move(init_func)),
-                        update_func_(std::move(update_func)),
-                        finalize_func_(std::move(finalize_func)) {
+            : Function(std::move(name), FunctionType::kAggregate),
+              argument_type_(std::move(argument_type)),
+              return_type_(std::move(return_type)),
+              state_size_(state_size),
+              init_func_(std::move(init_func)),
+              update_func_(std::move(update_func)),
+              finalize_func_(std::move(finalize_func)) {
         state_data_ = SharedPtr<char[]>(new char[state_size_]());
     }
 
@@ -107,12 +107,12 @@ public:
     DataType argument_type_;
     DataType return_type_;
 
-    SharedPtr<char[]> state_data_ {nullptr};
+    SharedPtr<char[]> state_data_{nullptr};
     SizeT state_size_{};
 
 };
 
-template <typename AggregateState, typename InputType, typename ResultType>
+template<typename AggregateState, typename InputType, typename ResultType>
 static inline AggregateFunction
 UnaryAggregate(const String& name,
                const DataType& input_type,

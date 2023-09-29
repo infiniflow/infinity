@@ -11,7 +11,7 @@ namespace infinity {
 class AsyncDummyTask final : public AsyncTask {
 public:
     explicit
-    AsyncDummyTask(): AsyncTask(AsyncTaskType::kDummy) {}
+    AsyncDummyTask() : AsyncTask(AsyncTaskType::kDummy) {}
 
     String
     ToString() final {

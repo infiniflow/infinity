@@ -11,11 +11,11 @@ namespace infinity {
 class IDAllocator {
 public:
     explicit
-    IDAllocator(u64 start_id = 0): id_(start_id) {}
+    IDAllocator(u64 start_id = 0) : id_(start_id) {}
 
     inline u64
     AllocateNewId() {
-        ++ id_;
+        ++id_;
         return id_;
     }
 

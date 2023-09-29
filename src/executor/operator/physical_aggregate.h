@@ -25,12 +25,11 @@ public:
                                u64 groupby_index,
                                Vector<SharedPtr<BaseExpression>> aggregates,
                                u64 aggregate_index)
-                               : PhysicalOperator(PhysicalOperatorType::kAggregate, std::move(left), nullptr, id),
-                               groups_(std::move(groups)),
-                               groupby_index_(groupby_index),
-                               aggregates_(std::move(aggregates)),
-                               aggregate_index_(aggregate_index)
-                               {}
+            : PhysicalOperator(PhysicalOperatorType::kAggregate, std::move(left), nullptr, id),
+              groups_(std::move(groups)),
+              groupby_index_(groupby_index),
+              aggregates_(std::move(aggregates)),
+              aggregate_index_(aggregate_index) {}
 
     ~PhysicalAggregate() override = default;
 

@@ -84,7 +84,7 @@ TEST_F(KnnFlatIpReservoirTest, test1) {
                                          EmbeddingDataType::kElemFloat);
 
     knn_distance.Begin();
-    knn_distance.Search(base_embedding.get(),base_embedding_count, 0);
+    knn_distance.Search(base_embedding.get(), base_embedding_count, 0);
     knn_distance.End();
 
     f32* distance_array = knn_distance.GetDistanceByIdx(0);

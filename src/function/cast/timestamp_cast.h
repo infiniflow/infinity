@@ -39,7 +39,7 @@ BindTimestampCast(DataType& target) {
 struct TimestampTryCastToFixlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target) {
+    Run(SourceType source, TargetType& target) {
         FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -48,7 +48,7 @@ struct TimestampTryCastToFixlen {
 struct TimestampTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector>& vector_ptr){
+    Run(SourceType source, TargetType& target, const SharedPtr<ColumnVector>& vector_ptr) {
         FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -56,25 +56,25 @@ struct TimestampTryCastToVarlen {
 
 template<>
 inline bool
-TimestampTryCastToFixlen::Run(TimestampT source, DateT &target) {
+TimestampTryCastToFixlen::Run(TimestampT source, DateT& target) {
     NotImplementError("Not implemented");
 }
 
 template<>
 inline bool
-TimestampTryCastToFixlen::Run(TimestampT source, TimeT &target) {
+TimestampTryCastToFixlen::Run(TimestampT source, TimeT& target) {
     NotImplementError("Not implemented");
 }
 
 template<>
 inline bool
-TimestampTryCastToFixlen::Run(TimestampT source, DateTimeT &target) {
+TimestampTryCastToFixlen::Run(TimestampT source, DateTimeT& target) {
     NotImplementError("Not implemented");
 }
 
 template<>
 inline bool
-TimestampTryCastToVarlen::Run(TimestampT source, VarcharType &target, const SharedPtr<ColumnVector>& vector_ptr) {
+TimestampTryCastToVarlen::Run(TimestampT source, VarcharType& target, const SharedPtr<ColumnVector>& vector_ptr) {
     NotImplementError("Not implemented");
 }
 

@@ -65,15 +65,15 @@ batch_run_on_cpu(faiss::Index* index,
 
     // evaluate result by hand.
     int n_1 = 0, n_10 = 0, n_100 = 0;
-    for (int i = 0; i < query_count; i++) {
+    for(int i = 0; i < query_count; i++) {
         int gt_nn = ground_truth[i * top_k];
-        for (int j = 0; j < top_k; j++) {
-            if (I[i * top_k + j] == gt_nn) {
-                if (j < 1)
+        for(int j = 0; j < top_k; j++) {
+            if(I[i * top_k + j] == gt_nn) {
+                if(j < 1)
                     n_1++;
-                if (j < 10)
+                if(j < 10)
                     n_10++;
-                if (j < 100)
+                if(j < 100)
                     n_100++;
             }
         }
@@ -105,7 +105,7 @@ single_run_on_cpu(void* index,
 
     // evaluate result by hand.
     int n_1 = 0, n_10 = 0, n_100 = 0;
-    for(SizeT query_index = 0; query_index < query_count; ++  query_index) {
+    for(SizeT query_index = 0; query_index < query_count; ++query_index) {
         float* query_vector = &query_vectors[dimension * query_index];
 
         switch(index_type) {
@@ -121,7 +121,7 @@ single_run_on_cpu(void* index,
                 hnsw_index->setEf(ef_construction);
                 std::priority_queue<std::pair<float, hnswlib::labeltype>> result
                         = hnsw_index->searchKnn(query_vector, top_k);
-                for(SizeT idx = 0; idx < top_k; ++ idx) {
+                for(SizeT idx = 0; idx < top_k; ++idx) {
                     I[idx] = result.top().second;
                     result.pop();
                 }
@@ -137,18 +137,18 @@ single_run_on_cpu(void* index,
         }
 
         int gt_nn = ground_truth[query_index * top_k];
-        for (int j = 0; j < top_k; j++) {
-            if (I[j] == gt_nn) {
-                if (j < 1)
+        for(int j = 0; j < top_k; j++) {
+            if(I[j] == gt_nn) {
+                if(j < 1)
                     n_1++;
-                if (j < 10)
+                if(j < 10)
                     n_10++;
-                if (j < 100)
+                if(j < 100)
                     n_100++;
             }
         }
 
-        if (query_index % 1000 == 0) {
+        if(query_index % 1000 == 0) {
             std::cout << query_index << ", " << get_current_rss() / 1000000 << " MB, "
                       << profiler.ElapsedToString() << std::endl;
 //            std::cout << n_1 << " " << n_10 << " " << n_100 << std::endl;
@@ -184,8 +184,7 @@ struct AnnFlatTask : public Task {
               query_vectors_(query_vectors),
               top_k_(top_k),
               result_id_(result_id),
-              result_distance_(result_distance)
-    {}
+              result_distance_(result_distance) {}
 
     void
     run(i64 worker_id) override {
@@ -212,21 +211,21 @@ private:
     faiss::Index* index_{nullptr};
     SizeT dimension_{0};
     SizeT query_count_{0};
-    f32*  query_vectors_{nullptr};
+    f32* query_vectors_{nullptr};
     SizeT top_k_{0};
-    i64*  result_id_{nullptr}; // I
-    f32*  result_distance_{nullptr}; // D
+    i64* result_id_{nullptr}; // I
+    f32* result_distance_{nullptr}; // D
 };
 
 struct AnnIVFFlatTask : public Task {
     inline explicit
     AnnIVFFlatTask(faiss::Index* index,
-                SizeT dimension,
-                SizeT query_count,
-                f32* query_vectors,
-                SizeT top_k,
-                i64*& result_id,
-                f32*& result_distance)
+                   SizeT dimension,
+                   SizeT query_count,
+                   f32* query_vectors,
+                   SizeT top_k,
+                   i64*& result_id,
+                   f32*& result_distance)
             : Task(TaskType::kAnnIVFFlat),
               index_(index),
               dimension_(dimension),
@@ -234,8 +233,7 @@ struct AnnIVFFlatTask : public Task {
               query_vectors_(query_vectors),
               top_k_(top_k),
               result_id_(result_id),
-              result_distance_(result_distance)
-    {}
+              result_distance_(result_distance) {}
 
     void
     run(i64 worker_id) override {
@@ -262,21 +260,21 @@ private:
     faiss::Index* index_{nullptr};
     SizeT dimension_{0};
     SizeT query_count_{0};
-    f32*  query_vectors_{nullptr};
+    f32* query_vectors_{nullptr};
     SizeT top_k_{0};
-    i64*  result_id_{nullptr}; // I
-    f32*  result_distance_{nullptr}; // D
+    i64* result_id_{nullptr}; // I
+    f32* result_distance_{nullptr}; // D
 };
 
 struct AnnIVFSQ8Task : public Task {
     inline explicit
     AnnIVFSQ8Task(faiss::Index* index,
-                   SizeT dimension,
-                   SizeT query_count,
-                   f32* query_vectors,
-                   SizeT top_k,
-                   i64*& result_id,
-                   f32*& result_distance)
+                  SizeT dimension,
+                  SizeT query_count,
+                  f32* query_vectors,
+                  SizeT top_k,
+                  i64*& result_id,
+                  f32*& result_distance)
             : Task(TaskType::kAnnIVFSQ8),
               index_(index),
               dimension_(dimension),
@@ -284,14 +282,13 @@ struct AnnIVFSQ8Task : public Task {
               query_vectors_(query_vectors),
               top_k_(top_k),
               result_id_(result_id),
-              result_distance_(result_distance)
-    {}
+              result_distance_(result_distance) {}
 
     void
     run(i64 worker_id) override {
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        for(SizeT idx = 0; idx < query_count_; ++ idx) {
+        for(SizeT idx = 0; idx < query_count_; ++idx) {
             f32* one_query_ptr = &query_vectors_[idx * dimension_];
             i64* one_result_ids = &result_id_[idx * top_k_];
             f32* one_result_distances = &result_distance_[idx * top_k_];
@@ -312,10 +309,10 @@ private:
     faiss::Index* index_{nullptr};
     SizeT dimension_{0};
     SizeT query_count_{0};
-    f32*  query_vectors_{nullptr};
+    f32* query_vectors_{nullptr};
     SizeT top_k_{0};
-    i64*  result_id_{nullptr}; // I
-    f32*  result_distance_{nullptr}; // D
+    i64* result_id_{nullptr}; // I
+    f32* result_distance_{nullptr}; // D
 };
 
 struct AnnHNSWTask : public Task {
@@ -334,20 +331,19 @@ struct AnnHNSWTask : public Task {
               query_vectors_(query_vectors),
               top_k_(top_k),
               result_id_(result_id),
-              result_distance_(result_distance)
-    {}
+              result_distance_(result_distance) {}
 
     void
     run(i64 worker_id) override {
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        for(SizeT idx = 0; idx < query_count_; ++ idx) {
+        for(SizeT idx = 0; idx < query_count_; ++idx) {
             f32* one_query_ptr = &query_vectors_[idx * dimension_];
             i64* one_result_ids = &result_id_[idx * top_k_];
             f32* one_result_distances = &result_distance_[idx * top_k_];
             std::priority_queue<std::pair<float, hnswlib::labeltype>> result =
                     index_->searchKnn(one_query_ptr, top_k_);
-            for(SizeT k = 0; k < top_k_; ++ k) {
+            for(SizeT k = 0; k < top_k_; ++k) {
                 one_result_ids[k] = result.top().second;
                 result.pop();
             }
@@ -367,10 +363,10 @@ private:
     hnswlib::HierarchicalNSW<float>* index_{nullptr};
     SizeT dimension_{0};
     SizeT query_count_{0};
-    f32*  query_vectors_{nullptr};
+    f32* query_vectors_{nullptr};
     SizeT top_k_{0};
-    i64*  result_id_{nullptr}; // I
-    f32*  result_distance_{nullptr}; // D
+    i64* result_id_{nullptr}; // I
+    f32* result_distance_{nullptr}; // D
 };
 
 void
@@ -391,7 +387,7 @@ scheduler_run_on_cpu(void* index,
 
     i64 cpu_count = std::thread::hardware_concurrency();
     HashSet<i64> cpu_set;
-    for(i64 idx = 0; idx < cpu_count; ++ idx) {
+    for(i64 idx = 0; idx < cpu_count; ++idx) {
         if(!cpu_mask.contains(idx)) {
             cpu_set.insert(idx);
         }
@@ -399,7 +395,7 @@ scheduler_run_on_cpu(void* index,
 
     SizeT task_count = cpu_set.size();
     if(task_count == 0) {
-        assert(false || ! "No cpu available");
+        assert(false || !"No cpu available");
     }
     SizeT base_task_size = total_query_count / task_count;
     SizeT reminder_size = total_query_count % task_count;
@@ -410,11 +406,11 @@ scheduler_run_on_cpu(void* index,
     i64* total_result_ids = new faiss::idx_t[total_query_count * top_k];
     f32* total_result_distances = new float[total_query_count * top_k];
 
-    for(SizeT idx = 0; idx < task_count; ++ idx) {
+    for(SizeT idx = 0; idx < task_count; ++idx) {
         SizeT query_count = base_task_size;
         if(reminder_size > 0) {
-            ++ query_count;
-            -- reminder_size;
+            ++query_count;
+            --reminder_size;
         }
         f32* query_vectors = &total_query_vectors[query_offset * dimension];
 
@@ -439,12 +435,12 @@ scheduler_run_on_cpu(void* index,
                 faiss::IndexIVFScalarQuantizer* ivf_sq8_index = (faiss::IndexIVFScalarQuantizer*)index;
                 ivf_sq8_index->nprobe = 32; // Default value is 1;
                 tasks.emplace_back(MakeUnique<AnnIVFSQ8Task>(ivf_sq8_index,
-                                                              dimension,
-                                                              query_count,
-                                                              query_vectors,
-                                                              top_k,
-                                                              result_ids,
-                                                              result_distances));
+                                                             dimension,
+                                                             query_count,
+                                                             query_vectors,
+                                                             top_k,
+                                                             result_ids,
+                                                             result_distances));
                 break;
             }
             case IndexType::kHnsw: {
@@ -483,15 +479,15 @@ scheduler_run_on_cpu(void* index,
     i64 task_id{0};
     for(i64 cpu_id: cpu_set) {
         scheduler.ScheduleTask(cpu_id, tasks[task_id].get());
-        ++ task_id;
+        ++task_id;
     }
 
     scheduler.Uninit();
 
     int n_1 = 0, n_10 = 0, n_100 = 0;
     HashSet<i32> gt1, gt10, gt100;
-    for (int i = 0; i < total_query_count; i++) {
-        for(int j = 0; j < top_k; ++ j) {
+    for(int i = 0; i < total_query_count; i++) {
+        for(int j = 0; j < top_k; ++j) {
             i32 gt_id = ground_truth[i * top_k + j];
             if(j < 1) {
                 gt1.insert(gt_id);
@@ -503,16 +499,16 @@ scheduler_run_on_cpu(void* index,
                 gt100.insert(gt_id);
             }
         }
-        for (int j = 0; j < top_k; j++) {
+        for(int j = 0; j < top_k; j++) {
             i32 result_id = total_result_ids[i * top_k + j];
             if(j < 1 && gt1.contains(result_id)) {
-                ++ n_1;
+                ++n_1;
             }
             if(j < 10 && gt10.contains(result_id)) {
-                ++ n_10;
+                ++n_10;
             }
             if(j < 100 && gt100.contains(result_id)) {
-                ++ n_100;
+                ++n_100;
             }
         }
     }
@@ -577,7 +573,10 @@ benchmark_flat() {
         SizeT base_vector_dimension{0};
         float* base_vectors{nullptr};
         {
-            base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count, "Base Vector");
+            base_vectors = float_vector_read(sift1m_base,
+                                             &base_vector_dimension,
+                                             &base_vector_row_count,
+                                             "Base Vector");
         }
 
         {
@@ -600,13 +599,16 @@ benchmark_flat() {
     SizeT query_vector_dimension{0};
     float* query_vectors;
     {
-        query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
+        query_vectors = float_vector_read(sift1m_query,
+                                          &query_vector_dimension,
+                                          &query_vector_row_count,
+                                          "Query Vector");
         assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
     }
 
     // Read ground truth
     SizeT top_k{0};                // number of results per query in the GT
-    i32*  ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    i32* ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
     SizeT ground_truth_row_count{0};
     {
         // load ground-truth
@@ -621,7 +623,13 @@ benchmark_flat() {
               << get_current_rss() / 1000000 << "MB" << std::endl;
 //    single_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
 //    batch_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-    scheduler_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(index,
+                         IndexType::kFlat,
+                         query_vectors,
+                         query_vector_row_count,
+                         dimension,
+                         top_k,
+                         ground_truth);
     profiler.End();
     std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
 
@@ -663,7 +671,10 @@ benchmark_ivfflat() {
         {
             infinity::BaseProfiler profiler;
             profiler.Begin();
-            float* train_vectors = float_vector_read(sift1m_train, &train_vector_dimension, &train_vector_row_count, "Train Vector");
+            float* train_vectors = float_vector_read(sift1m_train,
+                                                     &train_vector_dimension,
+                                                     &train_vector_row_count,
+                                                     "Train Vector");
             profiler.End();
 
             profiler.Begin();
@@ -678,7 +689,10 @@ benchmark_ivfflat() {
         SizeT base_vector_dimension{0};
         float* base_vectors{nullptr};
         {
-            base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count, "Base Vector");
+            base_vectors = float_vector_read(sift1m_base,
+                                             &base_vector_dimension,
+                                             &base_vector_row_count,
+                                             "Base Vector");
         }
 
         {
@@ -701,13 +715,16 @@ benchmark_ivfflat() {
     SizeT query_vector_dimension{0};
     float* query_vectors;
     {
-        query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
+        query_vectors = float_vector_read(sift1m_query,
+                                          &query_vector_dimension,
+                                          &query_vector_row_count,
+                                          "Query Vector");
         assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
     }
 
     // Read ground truth
     SizeT top_k{0};                // number of results per query in the GT
-    i32*  ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    i32* ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
     SizeT ground_truth_row_count{0};
     {
         // load ground-truth
@@ -722,7 +739,13 @@ benchmark_ivfflat() {
               << get_current_rss() / 1000000 << "MB" << std::endl;
 //    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
 //    single_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-    scheduler_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(index,
+                         IndexType::kIVFFlat,
+                         query_vectors,
+                         query_vector_row_count,
+                         dimension,
+                         top_k,
+                         ground_truth);
     profiler.End();
     std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
 
@@ -768,7 +791,10 @@ benchmark_ivfsq8() {
         {
             infinity::BaseProfiler profiler;
             profiler.Begin();
-            float* train_vectors = float_vector_read(sift1m_train, &train_vector_dimension, &train_vector_row_count, "Train Vector");
+            float* train_vectors = float_vector_read(sift1m_train,
+                                                     &train_vector_dimension,
+                                                     &train_vector_row_count,
+                                                     "Train Vector");
             profiler.End();
 
             profiler.Begin();
@@ -783,7 +809,10 @@ benchmark_ivfsq8() {
         SizeT base_vector_dimension{0};
         float* base_vectors{nullptr};
         {
-            base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count, "Base Vector");
+            base_vectors = float_vector_read(sift1m_base,
+                                             &base_vector_dimension,
+                                             &base_vector_row_count,
+                                             "Base Vector");
         }
 
         {
@@ -806,13 +835,16 @@ benchmark_ivfsq8() {
     SizeT query_vector_dimension{0};
     float* query_vectors;
     {
-        query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
+        query_vectors = float_vector_read(sift1m_query,
+                                          &query_vector_dimension,
+                                          &query_vector_row_count,
+                                          "Query Vector");
         assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
     }
 
     // Read ground truth
     SizeT top_k{0};                // number of results per query in the GT
-    i32*  ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    i32* ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
     SizeT ground_truth_row_count{0};
     {
         // load ground-truth
@@ -827,7 +859,13 @@ benchmark_ivfsq8() {
               << get_current_rss() / 1000000 << "MB" << std::endl;
 //    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
 //    single_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-    scheduler_run_on_cpu(index, IndexType::kIVFSQ8, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(index,
+                         IndexType::kIVFSQ8,
+                         query_vectors,
+                         query_vector_row_count,
+                         dimension,
+                         top_k,
+                         ground_truth);
     profiler.End();
     std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
 
@@ -862,7 +900,7 @@ benchmark_hnsw() {
         // Read base vector data
         SizeT base_vector_row_count{0};
         SizeT base_vector_dimension{0};
-        float *base_vectors{nullptr};
+        float* base_vectors{nullptr};
         {
             base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count,
                                              "Base Vector");
@@ -873,10 +911,10 @@ benchmark_hnsw() {
             infinity::BaseProfiler profiler;
             profiler.Begin();
             // insert data into index
-            for (SizeT idx = 0; idx < base_vector_row_count; ++idx) {
+            for(SizeT idx = 0; idx < base_vector_row_count; ++idx) {
                 hnsw_index->addPoint(base_vectors + idx * dimension, idx);
 
-                if (idx % 100000 == 0) {
+                if(idx % 100000 == 0) {
                     std::cout << idx << ", " << get_current_rss() / 1000000 << " MB, "
                               << profiler.ElapsedToString() << std::endl;
                 }
@@ -894,13 +932,16 @@ benchmark_hnsw() {
     SizeT query_vector_dimension{0};
     float* query_vectors;
     {
-        query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
+        query_vectors = float_vector_read(sift1m_query,
+                                          &query_vector_dimension,
+                                          &query_vector_row_count,
+                                          "Query Vector");
         assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
     }
 
     // Read ground truth
     SizeT top_k{0};                // number of results per query in the GT
-    i32*  ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    i32* ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
     SizeT ground_truth_row_count{0};
     {
         // load ground-truth
@@ -912,11 +953,17 @@ benchmark_hnsw() {
     profiler.Begin();
 
     std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: "
-            << get_current_rss() / 1000000 << "MB" << std::endl;
+              << get_current_rss() / 1000000 << "MB" << std::endl;
 
 //    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
 //    single_run_on_cpu(hnsw_index, IndexType::kHnsw, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-    scheduler_run_on_cpu(hnsw_index, IndexType::kHnsw, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(hnsw_index,
+                         IndexType::kHnsw,
+                         query_vectors,
+                         query_vector_row_count,
+                         dimension,
+                         top_k,
+                         ground_truth);
     profiler.End();
     std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
 
@@ -936,13 +983,13 @@ scheduler_test() {
     Vector<UniquePtr<DummyTask>> tasks;
     tasks.reserve(thread_count);
     HashSet<i64> cpu_set;
-    for(i64 idx = 0; idx < thread_count; ++ idx) {
+    for(i64 idx = 0; idx < thread_count; ++idx) {
         cpu_set.insert(idx);
         tasks.emplace_back(std::move(MakeUnique<DummyTask>()));
     }
 
     scheduler.Init(cpu_set);
-    for(i64 idx = 0; idx < 5; ++ idx) {
+    for(i64 idx = 0; idx < 5; ++idx) {
         for(i64 cpu_id: cpu_set) {
             scheduler.ScheduleTask(cpu_id, tasks[cpu_id].get());
         }
@@ -952,7 +999,7 @@ scheduler_test() {
 }
 
 auto
-main () -> int {
+main() -> int {
 //    benchmark_flat();
 //    benchmark_flat();
 //    benchmark_ivfflat();

@@ -22,9 +22,9 @@ public:
     ~SQLParser();
 
     void
-    Parse(const std::string &sql_text, std::shared_ptr<ParserResult> &result);
+    Parse(const std::string& sql_text, std::shared_ptr<ParserResult>& result);
 
-    void *scanner_{};
+    void* scanner_{};
     YY_BUFFER_STATE state_;
 
 };

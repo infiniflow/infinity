@@ -18,8 +18,7 @@ public:
             : LogicalNode(node_id, LogicalNodeType::kDropView),
               schema_name_(std::move(schema_name)),
               view_name_(std::move(view_name)),
-              conflict_type_(conflict_type)
-    {}
+              conflict_type_(conflict_type) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {

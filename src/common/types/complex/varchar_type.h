@@ -30,10 +30,17 @@ public:
     VarcharType(const char* ptr, size_t len);
 
     ~VarcharType();
+
     VarcharType(const VarcharType& other);
+
     VarcharType(VarcharType&& other) noexcept;
-    VarcharType& operator=(const VarcharType& other);
-    VarcharType& operator=(VarcharType&& other) noexcept;
+
+    VarcharType&
+    operator=(const VarcharType& other);
+
+    VarcharType&
+    operator=(VarcharType&& other) noexcept;
+
 public:
     bool
     operator==(const VarcharType& other) const;
@@ -92,9 +99,9 @@ public:
     ToString() const;
 
     u16 length{0};  // 65535 will be the limitation.
-    char_t prefix[PREFIX_LENGTH] {}; // prefix of the varchar
+    char_t prefix[PREFIX_LENGTH]{}; // prefix of the varchar
     // If length <= 14, ptr will be used as prefix.
-    ptr_t ptr {nullptr};   // pointer to the varchar value buffer.
+    ptr_t ptr{nullptr};   // pointer to the varchar value buffer.
 };
 
 }

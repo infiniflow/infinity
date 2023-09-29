@@ -13,7 +13,7 @@ DataBlock::Init(const DataBlock* input, const SharedPtr<Selection>& input_select
     column_count_ = input->column_count();
     StorageAssert(column_count_ > 0, "Empty column vectors.")
     column_vectors.reserve(column_count_);
-    for(SizeT idx = 0; idx < column_count_; ++ idx) {
+    for(SizeT idx = 0; idx < column_count_; ++idx) {
         column_vectors.emplace_back(MakeShared<ColumnVector>(input->column_vectors[idx]->data_type()));
         column_vectors.back()->Initialize(*(input->column_vectors[idx]), *input_select);
     }
@@ -34,7 +34,7 @@ DataBlock::Init(const SharedPtr<DataBlock>& input, SizeT start_idx, SizeT end_id
     column_count_ = input->column_count();
     StorageAssert(column_count_ > 0, "Empty column vectors.")
     column_vectors.reserve(column_count_);
-    for(SizeT idx = 0; idx < column_count_; ++ idx) {
+    for(SizeT idx = 0; idx < column_count_; ++idx) {
         column_vectors.emplace_back(MakeShared<ColumnVector>(input->column_vectors[idx]->data_type()));
         column_vectors.back()->Initialize(*(input->column_vectors[idx]), start_idx, end_idx);
     }
@@ -51,7 +51,7 @@ DataBlock::Init(const Vector<SharedPtr<DataType>>& types, SizeT capacity) {
     }
     column_count_ = types.size();
     column_vectors.reserve(column_count_);
-    for(SizeT idx = 0; idx < column_count_; ++ idx) {
+    for(SizeT idx = 0; idx < column_count_; ++idx) {
         column_vectors.emplace_back(MakeShared<ColumnVector>(types[idx]));
         column_vectors[idx]->Initialize(ColumnVectorType::kFlat, capacity);
     }
@@ -90,7 +90,7 @@ DataBlock::Reset() {
     // Reset each column into just initialized status.
     // No data is appended into any column.
 
-    for(SizeT i = 0; i < column_count_; ++ i) {
+    for(SizeT i = 0; i < column_count_; ++i) {
         column_vectors[i]->Reset();
         column_vectors[i]->Initialize();
     }
@@ -104,7 +104,7 @@ DataBlock::GetValue(SizeT column_index, SizeT row_index) const {
 }
 
 void
-DataBlock::SetValue(SizeT column_index, SizeT row_index, const Value &val) {
+DataBlock::SetValue(SizeT column_index, SizeT row_index, const Value& val) {
     StorageAssert(column_index < column_count_,
                   "Attempt to access invalid column index: " + std::to_string(column_index));
     column_vectors[column_index]->SetValue(row_index, val);
@@ -123,7 +123,7 @@ void
 DataBlock::Finalize() {
     bool first_flat_column_vector = false;
     SizeT row_count = 0;
-    for(SizeT idx = 0; idx < column_count_; ++ idx) {
+    for(SizeT idx = 0; idx < column_count_; ++idx) {
         if(column_vectors[idx]->vector_type() == ColumnVectorType::kConstant) {
             continue;
         } else {
@@ -144,7 +144,7 @@ DataBlock::Finalize() {
 String
 DataBlock::ToString() const {
     std::stringstream ss;
-    for(SizeT idx = 0; idx < column_count_; ++ idx) {
+    for(SizeT idx = 0; idx < column_count_; ++idx) {
         ss << "column " << idx << std::endl;
         ss << column_vectors[idx]->ToString() << std::endl;
     }
@@ -154,7 +154,7 @@ DataBlock::ToString() const {
 void
 DataBlock::FillRowIDVector(SharedPtr<Vector<RowID>>& row_ids, u32 block_id) const {
     StorageAssert(finalized, "DataBlock isn't finalized.")
-    for(u32 offset = 0; offset < row_count_; ++ offset) {
+    for(u32 offset = 0; offset < row_count_; ++offset) {
         row_ids->emplace_back(block_id, offset);
     }
 }
@@ -186,7 +186,7 @@ DataBlock::AppendWith(const SharedPtr<DataBlock>& other) {
     }
 
     SizeT column_count = this->column_count();
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         this->column_vectors[idx]->AppendWith(*other->column_vectors[idx]);
     }
 }
@@ -206,25 +206,27 @@ DataBlock::AppendWith(const SharedPtr<DataBlock>& other, SizeT from, SizeT count
                                  this->capacity()));
     }
     SizeT column_count = this->column_count();
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         this->column_vectors[idx]->AppendWith(*other->column_vectors[idx], from, count);
     }
 }
 
 
-
-int32_t DataBlock::GetSizeInBytes() const{
+int32_t
+DataBlock::GetSizeInBytes() const {
     //FIXME
     return 0;
 }
 
-void DataBlock::WriteAdv(char* &ptr) const{
+void
+DataBlock::WriteAdv(char*& ptr) const {
     //FIXME
     return;
 }
 
-SharedPtr<DataBlock> DataBlock::ReadAdv(char* &ptr, int32_t maxbytes){
-    char *const ptr_end = ptr + maxbytes;
+SharedPtr<DataBlock>
+DataBlock::ReadAdv(char*& ptr, int32_t maxbytes) {
+    char* const ptr_end = ptr + maxbytes;
     StorageAssert(ptr <= ptr_end,
                   "ptr goes out of range when reading DataBlock");
     return nullptr;

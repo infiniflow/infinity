@@ -35,7 +35,7 @@ RewriteCorrelatedExpressions::VisitReplace(const SharedPtr<ColumnExpression>& ex
 
 SharedPtr<BaseExpression>
 RewriteCorrelatedExpressions::VisitReplace(const SharedPtr<SubqueryExpression>& expression) {
-    if (expression->correlated_columns.empty()) {
+    if(expression->correlated_columns.empty()) {
         // Not correlated
         return nullptr;
     }

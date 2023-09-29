@@ -39,12 +39,12 @@ struct Task {
     TaskType type_{TaskType::kInvalid};
 };
 
-struct TerminateTask final: public Task {
+struct TerminateTask final : public Task {
     inline explicit
     TerminateTask() : Task(TaskType::kTerminate) {}
 };
 
-struct DummyTask final: public Task {
+struct DummyTask final : public Task {
     inline explicit
     DummyTask() : Task(TaskType::kDummy) {}
 
@@ -85,6 +85,7 @@ public:
 
     static void
     ExecuteLoop(TaskQueue* task_queue, i64 worker_id);
+
 private:
     HashSet<i64> cpu_set_{};
 

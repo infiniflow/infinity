@@ -48,7 +48,7 @@ ExpressionBinder::BuildExpression(const ParsedExpr& expr,
                                   BindContext* bind_context_ptr,
                                   i64 depth,
                                   bool root) {
-    switch (expr.type_) {
+    switch(expr.type_) {
         case ParsedExprType::kConstant: {
             return BuildValueExpr((const ConstantExpr&)expr, bind_context_ptr, depth, root);
         }
@@ -235,7 +235,7 @@ ExpressionBinder::BuildFuncExpr(const FunctionExpr& expr,
 
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(expr.arguments_->size());
-    for(const auto* arg_expr : *expr.arguments_) {
+    for(const auto* arg_expr: *expr.arguments_) {
         // The argument expression isn't root expression.
         // SharedPtr<BaseExpression> expr_ptr
         auto expr_ptr = BuildExpression(*arg_expr, bind_context_ptr, depth, false);
@@ -243,25 +243,25 @@ ExpressionBinder::BuildFuncExpr(const FunctionExpr& expr,
     }
 
     switch(function_set_ptr->type_) {
-        case FunctionType::kScalar:{
+        case FunctionType::kScalar: {
             // SharedPtr<ScalarFunctionSet> scalar_function_set_ptr
             auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
 
-            for (SizeT idx = 0; idx < arguments.size(); ++idx) {
-                    // check if the argument types are matched to the scalar function parameter types
-                    // if not match, add the cast function to the input parameter.
-                    if (arguments[idx]->Type() == scalar_function.parameter_types_[idx]) {
-                        continue;
-                    }
-                    String name = arguments[idx]->Name();
-                    arguments[idx] = CastExpression::AddCastToType(arguments[idx], scalar_function.parameter_types_[idx]);
-                    // reset the alias name
-                    arguments[idx]->alias_ = name;
+            for(SizeT idx = 0; idx < arguments.size(); ++idx) {
+                // check if the argument types are matched to the scalar function parameter types
+                // if not match, add the cast function to the input parameter.
+                if(arguments[idx]->Type() == scalar_function.parameter_types_[idx]) {
+                    continue;
+                }
+                String name = arguments[idx]->Name();
+                arguments[idx] = CastExpression::AddCastToType(arguments[idx], scalar_function.parameter_types_[idx]);
+                // reset the alias name
+                arguments[idx]->alias_ = name;
             }
 
             SharedPtr<FunctionExpression> function_expr_ptr
-                = MakeShared<FunctionExpression>(scalar_function, arguments);
+                    = MakeShared<FunctionExpression>(scalar_function, arguments);
             return function_expr_ptr;
         }
         case FunctionType::kAggregate: {
@@ -310,7 +310,7 @@ ExpressionBinder::BuildCaseExpr(const CaseExpr& expr,
         SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, function_name);
         auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
 
-        for (const WhenThen *when_then_expr : *expr.case_check_array_) {
+        for(const WhenThen* when_then_expr: *expr.case_check_array_) {
             // Construct when expression: left_expr = value_expr
             Vector<SharedPtr<BaseExpression>> arguments;
             arguments.reserve(2);
@@ -336,7 +336,7 @@ ExpressionBinder::BuildCaseExpr(const CaseExpr& expr,
         }
     } else {
         // Searched case
-        for (const WhenThen *when_then_expr : *expr.case_check_array_) {
+        for(const WhenThen* when_then_expr: *expr.case_check_array_) {
             // Construct when expression: left_expr = value_expr
             // SharedPtr<BaseExpression> when_expr
             auto when_expr_ptr = BuildExpression(*(when_then_expr->when_),
@@ -356,7 +356,7 @@ ExpressionBinder::BuildCaseExpr(const CaseExpr& expr,
     }
     // Construct else expression
     SharedPtr<BaseExpression> else_expr_ptr;
-    if (expr.else_expr_ != nullptr) {
+    if(expr.else_expr_ != nullptr) {
         else_expr_ptr = BuildExpression(*expr.else_expr_, bind_context_ptr, depth, false);
         return_type.MaxDataType(else_expr_ptr->Type());
     } else {
@@ -379,7 +379,7 @@ ExpressionBinder::BuildInExpr(const InExpr& expr,
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(argument_count);
 
-    for(SizeT idx = 0; idx < argument_count; ++ idx) {
+    for(SizeT idx = 0; idx < argument_count; ++idx) {
         auto bound_argument_expr = BuildExpression(*expr.arguments_->at(idx), bind_context_ptr, depth, false);
         arguments.emplace_back(bound_argument_expr);
     }
@@ -412,7 +412,7 @@ ExpressionBinder::BuildKnnExpr(const KnnExpr& parsed_knn_expr,
     arguments.emplace_back(expr_ptr);
 
     // Create query embedding
-    EmbeddingT query_embedding((ptr_t) parsed_knn_expr.embedding_data_ptr_);
+    EmbeddingT query_embedding((ptr_t)parsed_knn_expr.embedding_data_ptr_);
     const_cast<KnnExpr&>(parsed_knn_expr).embedding_data_ptr_ = nullptr;
 
     SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(parsed_knn_expr.embedding_data_type_,

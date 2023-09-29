@@ -85,7 +85,7 @@ TEST_F(PolygonCastTest, polygon_cast1) {
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kPolygon);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
         PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
         PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
@@ -100,7 +100,7 @@ TEST_F(PolygonCastTest, polygon_cast1) {
         col_source->AppendValue(v);
         Value vx = col_source->GetValue(i);
     }
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
         PointT p2(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.7f);
         PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
@@ -130,6 +130,7 @@ TEST_F(PolygonCastTest, polygon_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 }

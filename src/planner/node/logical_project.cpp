@@ -12,7 +12,7 @@ LogicalProject::GetColumnBindings() const {
     Vector<ColumnBinding> result;
     SizeT expression_count = expressions_.size();
     result.reserve(expression_count);
-    for(SizeT i = 0; i < expression_count; ++ i) {
+    for(SizeT i = 0; i < expression_count; ++i) {
         result.emplace_back(table_index_, i);
     }
     return result;
@@ -23,7 +23,7 @@ LogicalProject::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
     SizeT expression_count = expressions_.size();
     result->reserve(expression_count);
-    for(SizeT i = 0; i < expression_count; ++ i) {
+    for(SizeT i = 0; i < expression_count; ++i) {
         result->emplace_back(expressions_[i]->Name());
     }
 
@@ -35,7 +35,7 @@ LogicalProject::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
     SizeT column_count = expressions_.size();
     result->reserve(column_count);
-    for(SizeT i = 0; i < column_count; ++ i) {
+    for(SizeT i = 0; i < column_count; ++i) {
         result->emplace_back(MakeShared<DataType>(expressions_[i]->Type()));
     }
     return result;
@@ -51,7 +51,7 @@ LogicalProject::ToString(i64& space) {
     }
     ss << String(space, ' ') << arrow_str << "Project on: ";
     size_t expression_count = expressions_.size();
-    for(size_t i = 0; i < expression_count - 1; ++ i) {
+    for(size_t i = 0; i < expression_count - 1; ++i) {
         ss << expressions_[i]->Name() << ", ";
     }
     ss << expressions_.back()->Name();

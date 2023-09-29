@@ -20,7 +20,7 @@ Optimizer::AddRule(SharedPtr<OptimizerRule> rule) {
 
 SharedPtr<LogicalNode>
 Optimizer::optimize(const SharedPtr<LogicalNode>& unoptimized_plan) {
-    for(const auto& rule : rules_) {
+    for(const auto& rule: rules_) {
         rule->ApplyToPlan(query_context_ptr_, unoptimized_plan);
     }
 

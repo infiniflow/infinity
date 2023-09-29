@@ -9,7 +9,7 @@
 
 namespace infinity {
 
-class LogicalJoin: public LogicalNode {
+class LogicalJoin : public LogicalNode {
 public:
     explicit
     LogicalJoin(u64 node_id,

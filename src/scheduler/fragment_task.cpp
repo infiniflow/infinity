@@ -27,12 +27,12 @@ FragmentTask::OnExecute(i64 worker_id) {
 
     UniquePtr<String> err_msg = nullptr;
     try {
-        for(i64 op_idx = operator_count_ - 1; op_idx >= 0; -- op_idx) {
+        for(i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
             operator_refs[op_idx]->Execute(fragment_context->query_context(),
                                            operator_input_state_[op_idx].get(),
                                            operator_output_state_[op_idx].get());
         }
-    } catch (const std::exception& e) {
+    } catch(const std::exception& e) {
         err_msg = MakeUnique<String>(e.what());
     }
 

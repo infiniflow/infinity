@@ -10,7 +10,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
 #include "function/scalar/not.h"
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
@@ -76,7 +75,7 @@ TEST_F(NotFunctionsTest, not_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeBool(true));
             } else {
@@ -85,7 +84,7 @@ TEST_F(NotFunctionsTest, not_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
@@ -99,7 +98,7 @@ TEST_F(NotFunctionsTest, not_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {

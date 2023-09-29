@@ -58,7 +58,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_integer1 = MixedType::MakeInteger(i);
         Value v = Value::MakeMixedData(mixed_integer1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_integer1);
@@ -72,7 +72,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -86,7 +86,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kInteger);
@@ -95,9 +95,9 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     }
 
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
 
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_integer1 = MixedType::MakeInteger(i);
         Value v = Value::MakeMixedData(mixed_integer1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_integer1);
@@ -142,7 +142,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_integer1 = MixedType::MakeInteger(i);
         column_vector.AppendByPtr((ptr_t)(&mixed_integer1));
         Value vx = column_vector.GetValue(i);
@@ -154,7 +154,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.CopyRow(column_vector, 0, i);
         Value vx = column_constant.GetValue(0);
@@ -172,7 +172,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_integer1 = MixedType::MakeInteger(i);
         Value v = Value::MakeMixedData(mixed_integer1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_integer1);
@@ -180,7 +180,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kInteger);
@@ -190,7 +190,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -198,7 +198,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kInteger);
@@ -215,7 +215,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_integer1 = MixedType::MakeInteger(i);
         Value v = Value::MakeMixedData(mixed_integer1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_integer1);
@@ -223,7 +223,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kInteger);
@@ -233,13 +233,13 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_slice_init) {
 
     ColumnVector target_column_vector(data_type);
     i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
-    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < count; ++ i) {
+    for(i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
@@ -279,7 +279,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_float1 = MixedType::MakeFloat(static_cast<f64>(i));
         Value v = Value::MakeMixedData(mixed_float1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_float1);
@@ -293,7 +293,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -307,7 +307,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kFloat);
@@ -316,8 +316,8 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     }
 
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_float1 = MixedType::MakeFloat(static_cast<f64>(i));
         Value v = Value::MakeMixedData(mixed_float1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_float1);
@@ -362,7 +362,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_float1 = MixedType::MakeFloat(static_cast<f64>(i));
         column_vector.AppendByPtr((ptr_t)(&mixed_float1));
 
@@ -375,7 +375,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.CopyRow(column_vector, 0, i);
         Value vx = column_constant.GetValue(0);
@@ -393,7 +393,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_float1 = MixedType::MakeFloat(static_cast<f64>(i));
         Value v = Value::MakeMixedData(mixed_float1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_float1);
@@ -401,7 +401,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kFloat);
@@ -411,7 +411,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -419,7 +419,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kFloat);
@@ -436,7 +436,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_float1 = MixedType::MakeFloat(static_cast<f64>(i));
         Value v = Value::MakeMixedData(mixed_float1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_float1);
@@ -444,7 +444,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kFloat);
@@ -454,13 +454,13 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_slice_init) {
 
     ColumnVector target_column_vector(data_type);
     i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
-    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < count; ++ i) {
+    for(i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
@@ -500,7 +500,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = std::to_string(i);
         MixedT mixed_str1 = MixedType::MakeString(str);
         Value v = Value::MakeMixedData(mixed_str1);
@@ -516,7 +516,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -530,7 +530,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = std::to_string(i);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
@@ -541,8 +541,8 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     }
 
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         String str = std::to_string(i);
         MixedT mixed_str1 = MixedType::MakeString(str);
         Value v = Value::MakeMixedData(mixed_str1);
@@ -589,7 +589,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = std::to_string(i);
         MixedT mixed_str1 = MixedType::MakeString(str);
         column_vector.AppendByPtr((ptr_t)(&mixed_str1));
@@ -604,7 +604,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = std::to_string(i);
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.CopyRow(column_vector, 0, i);
@@ -624,7 +624,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = std::to_string(i);
         MixedT mixed_str1 = MixedType::MakeString(str);
         Value v = Value::MakeMixedData(mixed_str1);
@@ -633,7 +633,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = std::to_string(i);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
@@ -645,7 +645,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -653,7 +653,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         String str = std::to_string(2 * i);
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
@@ -672,7 +672,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = std::to_string(i);
         MixedT mixed_str1 = MixedType::MakeString(str);
         Value v = Value::MakeMixedData(mixed_str1);
@@ -681,7 +681,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = std::to_string(i);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
@@ -693,13 +693,13 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
 
     ColumnVector target_column_vector(data_type);
     i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
-    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < count; ++ i) {
+    for(i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
         String str = std::to_string(src_idx);
         Value vx = target_column_vector.GetValue(i);
@@ -741,7 +741,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
         String header(5, 'a' + i % 26);
         MixedT mixed_str1 = MixedType::MakeString(str);
@@ -763,7 +763,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -778,7 +778,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
         String header(5, 'a' + i % 26);
         Value vx = column_vector.GetValue(i);
@@ -795,8 +795,8 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     }
 
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
         String header(5, 'a' + i % 26);
         MixedT mixed_str1 = MixedType::MakeString(str);
@@ -851,7 +851,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
         String header(5, 'a' + i % 26);
         MixedT mixed_str1 = MixedType::MakeString(str);
@@ -872,7 +872,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
         String header(5, 'a' + i % 26);
 
@@ -899,7 +899,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
         String header(5, 'a' + i % 26);
         MixedT mixed_str1 = MixedType::MakeString(str);
@@ -909,7 +909,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
         String header(5, 'a' + i % 26);
         Value vx = column_vector.GetValue(i);
@@ -927,7 +927,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -935,7 +935,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         String str(20, 'a' + (2 * i) % 26);
         String header(5, 'a' + (2 * i) % 26);
         Value vx = target_column_vector.GetValue(i);
@@ -960,7 +960,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
         String header(5, 'a' + i % 26);
         MixedT mixed_str1 = MixedType::MakeString(str);
@@ -970,7 +970,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
         String header(5, 'a' + i % 26);
         Value vx = column_vector.GetValue(i);
@@ -988,13 +988,13 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_slice_init) {
 
     ColumnVector target_column_vector(data_type);
     i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
-    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < count; ++ i) {
+    for(i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
         String str(20, 'a' + src_idx % 26);
         String header(5, 'a' + src_idx % 26);
@@ -1042,7 +1042,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_null = MixedType::MakeNull();
         Value v = Value::MakeMixedData(mixed_null);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_null);
@@ -1054,7 +1054,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -1069,15 +1069,15 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kNull);
     }
 
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_null = MixedType::MakeNull();
         Value v = Value::MakeMixedData(mixed_null);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_null);
@@ -1121,7 +1121,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_null = MixedType::MakeNull();
         column_vector.AppendByPtr((ptr_t)(&mixed_null));
 
@@ -1132,7 +1132,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.CopyRow(column_vector, 0, i);
         Value vx = column_constant.GetValue(0);
@@ -1149,7 +1149,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_null = MixedType::MakeNull();
         Value v = Value::MakeMixedData(mixed_null);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_null);
@@ -1157,7 +1157,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kNull);
@@ -1165,7 +1165,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -1173,7 +1173,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kNull);
@@ -1188,7 +1188,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_null = MixedType::MakeNull();
         Value v = Value::MakeMixedData(mixed_null);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_null);
@@ -1196,7 +1196,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kNull);
@@ -1204,13 +1204,13 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_slice_init) {
 
     ColumnVector target_column_vector(data_type);
     i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
-    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < count; ++ i) {
+    for(i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
@@ -1248,7 +1248,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_missing = MixedType::MakeMissing();
         Value v = Value::MakeMixedData(mixed_missing);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_missing);
@@ -1260,7 +1260,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -1275,15 +1275,15 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kMissing);
     }
 
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_missing = MixedType::MakeMissing();
         Value v = Value::MakeMixedData(mixed_missing);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_missing);
@@ -1327,7 +1327,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_missing = MixedType::MakeMissing();
         column_vector.AppendByPtr((ptr_t)(&mixed_missing));
 
@@ -1338,7 +1338,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.CopyRow(column_vector, 0, i);
         Value vx = column_constant.GetValue(0);
@@ -1355,7 +1355,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_missing = MixedType::MakeMissing();
         Value v = Value::MakeMixedData(mixed_missing);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_missing);
@@ -1363,7 +1363,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kMissing);
@@ -1371,7 +1371,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -1379,7 +1379,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kMissing);
@@ -1394,7 +1394,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_missing = MixedType::MakeMissing();
         Value v = Value::MakeMixedData(mixed_missing);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_missing);
@@ -1402,7 +1402,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kMissing);
@@ -1410,13 +1410,13 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_slice_init) {
 
     ColumnVector target_column_vector(data_type);
     i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
-    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < count; ++ i) {
+    for(i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
@@ -1454,7 +1454,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
 
         MixedType mixed_tuple1 = MixedType::MakeTuple(7);
         mixed_tuple1.InsertIntegerIntoTuple("key1", i);
@@ -1513,61 +1513,61 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         auto* tuple_mixed_ptr = (TupleMixedType*)(&vx.value_.mixed_value);
         EXPECT_EQ(tuple_mixed_ptr->count, 7);
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key1");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key1");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-            auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+            auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
             EXPECT_EQ(integer_value_ptr->value, i);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key2");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key2");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kFloat);
-            auto *float_value_ptr = (FloatMixedType *) (value1_ptr);
+            auto* float_value_ptr = (FloatMixedType*)(value1_ptr);
             EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key3");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key3");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kShortStr);
-            auto *short_str_value_ptr = (ShortStrMixedType *) (value1_ptr);
+            auto* short_str_value_ptr = (ShortStrMixedType*)(value1_ptr);
 
             String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), short_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key4");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key4");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
-            auto *long_str_value_ptr = (LongStrMixedType *) (value1_ptr);
+            auto* long_str_value_ptr = (LongStrMixedType*)(value1_ptr);
 
             String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), long_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key5");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key5");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kNull);
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key6");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key6");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kTuple);
-            auto *tuple_value_ptr = (TupleMixedType *) (value1_ptr);
+            auto* tuple_value_ptr = (TupleMixedType*)(value1_ptr);
             EXPECT_EQ(tuple_value_ptr->count, 5);
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key61");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kInteger);
-                auto *nested_integer_value_ptr = (IntegerMixedType *) (nested_value_ptr);
+                auto* nested_integer_value_ptr = (IntegerMixedType*)(nested_value_ptr);
                 EXPECT_EQ(nested_integer_value_ptr->value, i);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key62");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kFloat);
-                auto *nested_float_value_ptr = (FloatMixedType *) (nested_value_ptr);
+                auto* nested_float_value_ptr = (FloatMixedType*)(nested_value_ptr);
                 EXPECT_FLOAT_EQ(nested_float_value_ptr->value, fvalue);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key63");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kShortStr);
-                auto *nested_short_str_ptr = (ShortStrMixedType *) (nested_value_ptr);
+                auto* nested_short_str_ptr = (ShortStrMixedType*)(nested_value_ptr);
 
                 String result(nested_short_str_ptr->ptr, nested_short_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
@@ -1576,7 +1576,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key64");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kLongStr);
-                auto *nested_long_str_ptr = (LongStrMixedType *) (nested_value_ptr);
+                auto* nested_long_str_ptr = (LongStrMixedType*)(nested_value_ptr);
 
                 String result(nested_long_str_ptr->ptr, nested_long_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -1589,43 +1589,43 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key7");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key7");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kArray);
-            auto *array_value_ptr = (ArrayMixedType *) (value1_ptr);
+            auto* array_value_ptr = (ArrayMixedType*)(value1_ptr);
             EXPECT_EQ(array_value_ptr->count, 5);
 
             {
-                auto *array_value1_ptr = value1_ptr->GetByIndex(0);
+                auto* array_value1_ptr = value1_ptr->GetByIndex(0);
                 EXPECT_EQ(array_value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (array_value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(array_value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             {
-                auto *array_value2_ptr = value1_ptr->GetByIndex(1);
+                auto* array_value2_ptr = value1_ptr->GetByIndex(1);
                 EXPECT_EQ(array_value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (array_value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(array_value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             {
-                auto *array_value3_ptr = value1_ptr->GetByIndex(2);
+                auto* array_value3_ptr = value1_ptr->GetByIndex(2);
                 EXPECT_EQ(array_value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (array_value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(array_value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // Long str
             {
-                auto *array_value4_ptr = value1_ptr->GetByIndex(3);
+                auto* array_value4_ptr = value1_ptr->GetByIndex(3);
                 EXPECT_EQ(array_value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (array_value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(array_value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // Null
             {
-                auto *array_value5_ptr = value1_ptr->GetByIndex(4);
+                auto* array_value5_ptr = value1_ptr->GetByIndex(4);
                 EXPECT_EQ(array_value5_ptr->type, MixedValueType::kNull);
             }
         }
@@ -1633,7 +1633,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -1648,7 +1648,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -1661,61 +1661,61 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         auto* tuple_mixed_ptr = (TupleMixedType*)(&vx.value_.mixed_value);
         EXPECT_EQ(tuple_mixed_ptr->count, 7);
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key1");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key1");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-            auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+            auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
             EXPECT_EQ(integer_value_ptr->value, i);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key2");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key2");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kFloat);
-            auto *float_value_ptr = (FloatMixedType *) (value1_ptr);
+            auto* float_value_ptr = (FloatMixedType*)(value1_ptr);
             EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key3");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key3");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kShortStr);
-            auto *short_str_value_ptr = (ShortStrMixedType *) (value1_ptr);
+            auto* short_str_value_ptr = (ShortStrMixedType*)(value1_ptr);
 
             String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), short_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key4");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key4");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
-            auto *long_str_value_ptr = (LongStrMixedType *) (value1_ptr);
+            auto* long_str_value_ptr = (LongStrMixedType*)(value1_ptr);
 
             String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), long_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key5");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key5");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kNull);
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key6");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key6");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kTuple);
-            auto *tuple_value_ptr = (TupleMixedType *) (value1_ptr);
+            auto* tuple_value_ptr = (TupleMixedType*)(value1_ptr);
             EXPECT_EQ(tuple_value_ptr->count, 5);
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key61");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kInteger);
-                auto *nested_integer_value_ptr = (IntegerMixedType *) (nested_value_ptr);
+                auto* nested_integer_value_ptr = (IntegerMixedType*)(nested_value_ptr);
                 EXPECT_EQ(nested_integer_value_ptr->value, i);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key62");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kFloat);
-                auto *nested_float_value_ptr = (FloatMixedType *) (nested_value_ptr);
+                auto* nested_float_value_ptr = (FloatMixedType*)(nested_value_ptr);
                 EXPECT_FLOAT_EQ(nested_float_value_ptr->value, fvalue);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key63");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kShortStr);
-                auto *nested_short_str_ptr = (ShortStrMixedType *) (nested_value_ptr);
+                auto* nested_short_str_ptr = (ShortStrMixedType*)(nested_value_ptr);
 
                 String result(nested_short_str_ptr->ptr, nested_short_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
@@ -1724,7 +1724,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key64");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kLongStr);
-                auto *nested_long_str_ptr = (LongStrMixedType *) (nested_value_ptr);
+                auto* nested_long_str_ptr = (LongStrMixedType*)(nested_value_ptr);
 
                 String result(nested_long_str_ptr->ptr, nested_long_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -1737,43 +1737,43 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key7");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key7");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kArray);
-            auto *array_value_ptr = (ArrayMixedType *) (value1_ptr);
+            auto* array_value_ptr = (ArrayMixedType*)(value1_ptr);
             EXPECT_EQ(array_value_ptr->count, 5);
 
             {
-                auto *array_value1_ptr = value1_ptr->GetByIndex(0);
+                auto* array_value1_ptr = value1_ptr->GetByIndex(0);
                 EXPECT_EQ(array_value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (array_value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(array_value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             {
-                auto *array_value2_ptr = value1_ptr->GetByIndex(1);
+                auto* array_value2_ptr = value1_ptr->GetByIndex(1);
                 EXPECT_EQ(array_value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (array_value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(array_value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             {
-                auto *array_value3_ptr = value1_ptr->GetByIndex(2);
+                auto* array_value3_ptr = value1_ptr->GetByIndex(2);
                 EXPECT_EQ(array_value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (array_value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(array_value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // Long str
             {
-                auto *array_value4_ptr = value1_ptr->GetByIndex(3);
+                auto* array_value4_ptr = value1_ptr->GetByIndex(3);
                 EXPECT_EQ(array_value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (array_value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(array_value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // Null
             {
-                auto *array_value5_ptr = value1_ptr->GetByIndex(4);
+                auto* array_value5_ptr = value1_ptr->GetByIndex(4);
                 EXPECT_EQ(array_value5_ptr->type, MixedValueType::kNull);
             }
         }
@@ -1781,8 +1781,8 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
 
 
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
 
         MixedType mixed_tuple1 = MixedType::MakeTuple(7);
         mixed_tuple1.InsertIntegerIntoTuple("key1", i);
@@ -1841,61 +1841,61 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         auto* tuple_mixed_ptr = (TupleMixedType*)(&vx.value_.mixed_value);
         EXPECT_EQ(tuple_mixed_ptr->count, 7);
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key1");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key1");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-            auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+            auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
             EXPECT_EQ(integer_value_ptr->value, i);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key2");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key2");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kFloat);
-            auto *float_value_ptr = (FloatMixedType *) (value1_ptr);
+            auto* float_value_ptr = (FloatMixedType*)(value1_ptr);
             EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key3");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key3");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kShortStr);
-            auto *short_str_value_ptr = (ShortStrMixedType *) (value1_ptr);
+            auto* short_str_value_ptr = (ShortStrMixedType*)(value1_ptr);
 
             String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), short_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key4");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key4");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
-            auto *long_str_value_ptr = (LongStrMixedType *) (value1_ptr);
+            auto* long_str_value_ptr = (LongStrMixedType*)(value1_ptr);
 
             String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), long_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key5");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key5");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kNull);
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key6");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key6");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kTuple);
-            auto *tuple_value_ptr = (TupleMixedType *) (value1_ptr);
+            auto* tuple_value_ptr = (TupleMixedType*)(value1_ptr);
             EXPECT_EQ(tuple_value_ptr->count, 5);
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key61");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kInteger);
-                auto *nested_integer_value_ptr = (IntegerMixedType *) (nested_value_ptr);
+                auto* nested_integer_value_ptr = (IntegerMixedType*)(nested_value_ptr);
                 EXPECT_EQ(nested_integer_value_ptr->value, i);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key62");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kFloat);
-                auto *nested_float_value_ptr = (FloatMixedType *) (nested_value_ptr);
+                auto* nested_float_value_ptr = (FloatMixedType*)(nested_value_ptr);
                 EXPECT_FLOAT_EQ(nested_float_value_ptr->value, fvalue);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key63");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kShortStr);
-                auto *nested_short_str_ptr = (ShortStrMixedType *) (nested_value_ptr);
+                auto* nested_short_str_ptr = (ShortStrMixedType*)(nested_value_ptr);
 
                 String result(nested_short_str_ptr->ptr, nested_short_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
@@ -1904,7 +1904,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key64");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kLongStr);
-                auto *nested_long_str_ptr = (LongStrMixedType *) (nested_value_ptr);
+                auto* nested_long_str_ptr = (LongStrMixedType*)(nested_value_ptr);
 
                 String result(nested_long_str_ptr->ptr, nested_long_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -1917,43 +1917,43 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key7");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key7");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kArray);
-            auto *array_value_ptr = (ArrayMixedType *) (value1_ptr);
+            auto* array_value_ptr = (ArrayMixedType*)(value1_ptr);
             EXPECT_EQ(array_value_ptr->count, 5);
 
             {
-                auto *array_value1_ptr = value1_ptr->GetByIndex(0);
+                auto* array_value1_ptr = value1_ptr->GetByIndex(0);
                 EXPECT_EQ(array_value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (array_value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(array_value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             {
-                auto *array_value2_ptr = value1_ptr->GetByIndex(1);
+                auto* array_value2_ptr = value1_ptr->GetByIndex(1);
                 EXPECT_EQ(array_value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (array_value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(array_value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             {
-                auto *array_value3_ptr = value1_ptr->GetByIndex(2);
+                auto* array_value3_ptr = value1_ptr->GetByIndex(2);
                 EXPECT_EQ(array_value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (array_value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(array_value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // Long str
             {
-                auto *array_value4_ptr = value1_ptr->GetByIndex(3);
+                auto* array_value4_ptr = value1_ptr->GetByIndex(3);
                 EXPECT_EQ(array_value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (array_value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(array_value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // Null
             {
-                auto *array_value5_ptr = value1_ptr->GetByIndex(4);
+                auto* array_value5_ptr = value1_ptr->GetByIndex(4);
                 EXPECT_EQ(array_value5_ptr->type, MixedValueType::kNull);
             }
         }
@@ -1994,7 +1994,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
 
         MixedType mixed_tuple1 = MixedType::MakeTuple(7);
         mixed_tuple1.InsertIntegerIntoTuple("key1", i);
@@ -2051,61 +2051,61 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         auto* tuple_mixed_ptr = (TupleMixedType*)(&vx.value_.mixed_value);
         EXPECT_EQ(tuple_mixed_ptr->count, 7);
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key1");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key1");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-            auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+            auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
             EXPECT_EQ(integer_value_ptr->value, i);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key2");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key2");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kFloat);
-            auto *float_value_ptr = (FloatMixedType *) (value1_ptr);
+            auto* float_value_ptr = (FloatMixedType*)(value1_ptr);
             EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key3");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key3");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kShortStr);
-            auto *short_str_value_ptr = (ShortStrMixedType *) (value1_ptr);
+            auto* short_str_value_ptr = (ShortStrMixedType*)(value1_ptr);
 
             String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), short_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key4");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key4");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
-            auto *long_str_value_ptr = (LongStrMixedType *) (value1_ptr);
+            auto* long_str_value_ptr = (LongStrMixedType*)(value1_ptr);
 
             String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), long_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key5");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key5");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kNull);
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key6");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key6");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kTuple);
-            auto *tuple_value_ptr = (TupleMixedType *) (value1_ptr);
+            auto* tuple_value_ptr = (TupleMixedType*)(value1_ptr);
             EXPECT_EQ(tuple_value_ptr->count, 5);
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key61");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kInteger);
-                auto *nested_integer_value_ptr = (IntegerMixedType *) (nested_value_ptr);
+                auto* nested_integer_value_ptr = (IntegerMixedType*)(nested_value_ptr);
                 EXPECT_EQ(nested_integer_value_ptr->value, i);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key62");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kFloat);
-                auto *nested_float_value_ptr = (FloatMixedType *) (nested_value_ptr);
+                auto* nested_float_value_ptr = (FloatMixedType*)(nested_value_ptr);
                 EXPECT_FLOAT_EQ(nested_float_value_ptr->value, fvalue);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key63");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kShortStr);
-                auto *nested_short_str_ptr = (ShortStrMixedType *) (nested_value_ptr);
+                auto* nested_short_str_ptr = (ShortStrMixedType*)(nested_value_ptr);
 
                 String result(nested_short_str_ptr->ptr, nested_short_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
@@ -2114,7 +2114,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key64");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kLongStr);
-                auto *nested_long_str_ptr = (LongStrMixedType *) (nested_value_ptr);
+                auto* nested_long_str_ptr = (LongStrMixedType*)(nested_value_ptr);
 
                 String result(nested_long_str_ptr->ptr, nested_long_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -2127,43 +2127,43 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key7");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key7");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kArray);
-            auto *array_value_ptr = (ArrayMixedType *) (value1_ptr);
+            auto* array_value_ptr = (ArrayMixedType*)(value1_ptr);
             EXPECT_EQ(array_value_ptr->count, 5);
 
             {
-                auto *array_value1_ptr = value1_ptr->GetByIndex(0);
+                auto* array_value1_ptr = value1_ptr->GetByIndex(0);
                 EXPECT_EQ(array_value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (array_value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(array_value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             {
-                auto *array_value2_ptr = value1_ptr->GetByIndex(1);
+                auto* array_value2_ptr = value1_ptr->GetByIndex(1);
                 EXPECT_EQ(array_value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (array_value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(array_value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             {
-                auto *array_value3_ptr = value1_ptr->GetByIndex(2);
+                auto* array_value3_ptr = value1_ptr->GetByIndex(2);
                 EXPECT_EQ(array_value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (array_value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(array_value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // Long str
             {
-                auto *array_value4_ptr = value1_ptr->GetByIndex(3);
+                auto* array_value4_ptr = value1_ptr->GetByIndex(3);
                 EXPECT_EQ(array_value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (array_value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(array_value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // Null
             {
-                auto *array_value5_ptr = value1_ptr->GetByIndex(4);
+                auto* array_value5_ptr = value1_ptr->GetByIndex(4);
                 EXPECT_EQ(array_value5_ptr->type, MixedValueType::kNull);
             }
         }
@@ -2172,7 +2172,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedType mixed_tuple1 = MixedType::MakeTuple(7);
         mixed_tuple1.InsertIntegerIntoTuple("key1", i);
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
@@ -2228,61 +2228,61 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         auto* tuple_mixed_ptr = (TupleMixedType*)(&vx.value_.mixed_value);
         EXPECT_EQ(tuple_mixed_ptr->count, 7);
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key1");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key1");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-            auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+            auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
             EXPECT_EQ(integer_value_ptr->value, i);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key2");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key2");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kFloat);
-            auto *float_value_ptr = (FloatMixedType *) (value1_ptr);
+            auto* float_value_ptr = (FloatMixedType*)(value1_ptr);
             EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key3");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key3");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kShortStr);
-            auto *short_str_value_ptr = (ShortStrMixedType *) (value1_ptr);
+            auto* short_str_value_ptr = (ShortStrMixedType*)(value1_ptr);
 
             String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), short_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key4");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key4");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
-            auto *long_str_value_ptr = (LongStrMixedType *) (value1_ptr);
+            auto* long_str_value_ptr = (LongStrMixedType*)(value1_ptr);
 
             String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), long_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key5");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key5");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kNull);
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key6");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key6");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kTuple);
-            auto *tuple_value_ptr = (TupleMixedType *) (value1_ptr);
+            auto* tuple_value_ptr = (TupleMixedType*)(value1_ptr);
             EXPECT_EQ(tuple_value_ptr->count, 5);
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key61");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kInteger);
-                auto *nested_integer_value_ptr = (IntegerMixedType *) (nested_value_ptr);
+                auto* nested_integer_value_ptr = (IntegerMixedType*)(nested_value_ptr);
                 EXPECT_EQ(nested_integer_value_ptr->value, i);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key62");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kFloat);
-                auto *nested_float_value_ptr = (FloatMixedType *) (nested_value_ptr);
+                auto* nested_float_value_ptr = (FloatMixedType*)(nested_value_ptr);
                 EXPECT_FLOAT_EQ(nested_float_value_ptr->value, fvalue);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key63");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kShortStr);
-                auto *nested_short_str_ptr = (ShortStrMixedType *) (nested_value_ptr);
+                auto* nested_short_str_ptr = (ShortStrMixedType*)(nested_value_ptr);
 
                 String result(nested_short_str_ptr->ptr, nested_short_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
@@ -2291,7 +2291,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key64");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kLongStr);
-                auto *nested_long_str_ptr = (LongStrMixedType *) (nested_value_ptr);
+                auto* nested_long_str_ptr = (LongStrMixedType*)(nested_value_ptr);
 
                 String result(nested_long_str_ptr->ptr, nested_long_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -2304,43 +2304,43 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key7");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key7");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kArray);
-            auto *array_value_ptr = (ArrayMixedType *) (value1_ptr);
+            auto* array_value_ptr = (ArrayMixedType*)(value1_ptr);
             EXPECT_EQ(array_value_ptr->count, 5);
 
             {
-                auto *array_value1_ptr = value1_ptr->GetByIndex(0);
+                auto* array_value1_ptr = value1_ptr->GetByIndex(0);
                 EXPECT_EQ(array_value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (array_value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(array_value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             {
-                auto *array_value2_ptr = value1_ptr->GetByIndex(1);
+                auto* array_value2_ptr = value1_ptr->GetByIndex(1);
                 EXPECT_EQ(array_value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (array_value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(array_value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             {
-                auto *array_value3_ptr = value1_ptr->GetByIndex(2);
+                auto* array_value3_ptr = value1_ptr->GetByIndex(2);
                 EXPECT_EQ(array_value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (array_value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(array_value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // Long str
             {
-                auto *array_value4_ptr = value1_ptr->GetByIndex(3);
+                auto* array_value4_ptr = value1_ptr->GetByIndex(3);
                 EXPECT_EQ(array_value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (array_value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(array_value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // Null
             {
-                auto *array_value5_ptr = value1_ptr->GetByIndex(4);
+                auto* array_value5_ptr = value1_ptr->GetByIndex(4);
                 EXPECT_EQ(array_value5_ptr->type, MixedValueType::kNull);
             }
         }
@@ -2356,7 +2356,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedType mixed_tuple1 = MixedType::MakeTuple(7);
         mixed_tuple1.InsertIntegerIntoTuple("key1", i);
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
@@ -2408,7 +2408,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -2421,61 +2421,61 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
         auto* tuple_mixed_ptr = (TupleMixedType*)(&vx.value_.mixed_value);
         EXPECT_EQ(tuple_mixed_ptr->count, 7);
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key1");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key1");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-            auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+            auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
             EXPECT_EQ(integer_value_ptr->value, i);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key2");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key2");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kFloat);
-            auto *float_value_ptr = (FloatMixedType *) (value1_ptr);
+            auto* float_value_ptr = (FloatMixedType*)(value1_ptr);
             EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key3");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key3");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kShortStr);
-            auto *short_str_value_ptr = (ShortStrMixedType *) (value1_ptr);
+            auto* short_str_value_ptr = (ShortStrMixedType*)(value1_ptr);
 
             String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), short_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key4");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key4");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
-            auto *long_str_value_ptr = (LongStrMixedType *) (value1_ptr);
+            auto* long_str_value_ptr = (LongStrMixedType*)(value1_ptr);
 
             String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), long_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key5");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key5");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kNull);
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key6");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key6");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kTuple);
-            auto *tuple_value_ptr = (TupleMixedType *) (value1_ptr);
+            auto* tuple_value_ptr = (TupleMixedType*)(value1_ptr);
             EXPECT_EQ(tuple_value_ptr->count, 5);
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key61");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kInteger);
-                auto *nested_integer_value_ptr = (IntegerMixedType *) (nested_value_ptr);
+                auto* nested_integer_value_ptr = (IntegerMixedType*)(nested_value_ptr);
                 EXPECT_EQ(nested_integer_value_ptr->value, i);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key62");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kFloat);
-                auto *nested_float_value_ptr = (FloatMixedType *) (nested_value_ptr);
+                auto* nested_float_value_ptr = (FloatMixedType*)(nested_value_ptr);
                 EXPECT_FLOAT_EQ(nested_float_value_ptr->value, fvalue);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key63");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kShortStr);
-                auto *nested_short_str_ptr = (ShortStrMixedType *) (nested_value_ptr);
+                auto* nested_short_str_ptr = (ShortStrMixedType*)(nested_value_ptr);
 
                 String result(nested_short_str_ptr->ptr, nested_short_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
@@ -2484,7 +2484,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key64");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kLongStr);
-                auto *nested_long_str_ptr = (LongStrMixedType *) (nested_value_ptr);
+                auto* nested_long_str_ptr = (LongStrMixedType*)(nested_value_ptr);
 
                 String result(nested_long_str_ptr->ptr, nested_long_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -2497,43 +2497,43 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key7");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key7");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kArray);
-            auto *array_value_ptr = (ArrayMixedType *) (value1_ptr);
+            auto* array_value_ptr = (ArrayMixedType*)(value1_ptr);
             EXPECT_EQ(array_value_ptr->count, 5);
 
             {
-                auto *array_value1_ptr = value1_ptr->GetByIndex(0);
+                auto* array_value1_ptr = value1_ptr->GetByIndex(0);
                 EXPECT_EQ(array_value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (array_value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(array_value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             {
-                auto *array_value2_ptr = value1_ptr->GetByIndex(1);
+                auto* array_value2_ptr = value1_ptr->GetByIndex(1);
                 EXPECT_EQ(array_value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (array_value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(array_value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             {
-                auto *array_value3_ptr = value1_ptr->GetByIndex(2);
+                auto* array_value3_ptr = value1_ptr->GetByIndex(2);
                 EXPECT_EQ(array_value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (array_value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(array_value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // Long str
             {
-                auto *array_value4_ptr = value1_ptr->GetByIndex(3);
+                auto* array_value4_ptr = value1_ptr->GetByIndex(3);
                 EXPECT_EQ(array_value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (array_value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(array_value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // Null
             {
-                auto *array_value5_ptr = value1_ptr->GetByIndex(4);
+                auto* array_value5_ptr = value1_ptr->GetByIndex(4);
                 EXPECT_EQ(array_value5_ptr->type, MixedValueType::kNull);
             }
         }
@@ -2541,7 +2541,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -2549,7 +2549,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         f64 fvalue = static_cast<f64>(2 * i) + static_cast<f64>(2 * i) / 10.0f;
         String short_str(10, 'a' + (2 * i) % 26);
         String long_str(20, 'a' + (2 * i) % 26);
@@ -2562,61 +2562,61 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
         auto* tuple_mixed_ptr = (TupleMixedType*)(&vx.value_.mixed_value);
         EXPECT_EQ(tuple_mixed_ptr->count, 7);
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key1");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key1");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-            auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+            auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
             EXPECT_EQ(integer_value_ptr->value, 2 * i);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key2");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key2");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kFloat);
-            auto *float_value_ptr = (FloatMixedType *) (value1_ptr);
+            auto* float_value_ptr = (FloatMixedType*)(value1_ptr);
             EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key3");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key3");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kShortStr);
-            auto *short_str_value_ptr = (ShortStrMixedType *) (value1_ptr);
+            auto* short_str_value_ptr = (ShortStrMixedType*)(value1_ptr);
 
             String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), short_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key4");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key4");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
-            auto *long_str_value_ptr = (LongStrMixedType *) (value1_ptr);
+            auto* long_str_value_ptr = (LongStrMixedType*)(value1_ptr);
 
             String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), long_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key5");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key5");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kNull);
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key6");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key6");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kTuple);
-            auto *tuple_value_ptr = (TupleMixedType *) (value1_ptr);
+            auto* tuple_value_ptr = (TupleMixedType*)(value1_ptr);
             EXPECT_EQ(tuple_value_ptr->count, 5);
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key61");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kInteger);
-                auto *nested_integer_value_ptr = (IntegerMixedType *) (nested_value_ptr);
+                auto* nested_integer_value_ptr = (IntegerMixedType*)(nested_value_ptr);
                 EXPECT_EQ(nested_integer_value_ptr->value, 2 * i);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key62");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kFloat);
-                auto *nested_float_value_ptr = (FloatMixedType *) (nested_value_ptr);
+                auto* nested_float_value_ptr = (FloatMixedType*)(nested_value_ptr);
                 EXPECT_FLOAT_EQ(nested_float_value_ptr->value, fvalue);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key63");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kShortStr);
-                auto *nested_short_str_ptr = (ShortStrMixedType *) (nested_value_ptr);
+                auto* nested_short_str_ptr = (ShortStrMixedType*)(nested_value_ptr);
 
                 String result(nested_short_str_ptr->ptr, nested_short_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
@@ -2625,7 +2625,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key64");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kLongStr);
-                auto *nested_long_str_ptr = (LongStrMixedType *) (nested_value_ptr);
+                auto* nested_long_str_ptr = (LongStrMixedType*)(nested_value_ptr);
 
                 String result(nested_long_str_ptr->ptr, nested_long_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -2638,43 +2638,43 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key7");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key7");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kArray);
-            auto *array_value_ptr = (ArrayMixedType *) (value1_ptr);
+            auto* array_value_ptr = (ArrayMixedType*)(value1_ptr);
             EXPECT_EQ(array_value_ptr->count, 5);
 
             {
-                auto *array_value1_ptr = value1_ptr->GetByIndex(0);
+                auto* array_value1_ptr = value1_ptr->GetByIndex(0);
                 EXPECT_EQ(array_value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (array_value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(array_value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, 2 * i);
             }
             {
-                auto *array_value2_ptr = value1_ptr->GetByIndex(1);
+                auto* array_value2_ptr = value1_ptr->GetByIndex(1);
                 EXPECT_EQ(array_value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (array_value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(array_value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             {
-                auto *array_value3_ptr = value1_ptr->GetByIndex(2);
+                auto* array_value3_ptr = value1_ptr->GetByIndex(2);
                 EXPECT_EQ(array_value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (array_value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(array_value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // Long str
             {
-                auto *array_value4_ptr = value1_ptr->GetByIndex(3);
+                auto* array_value4_ptr = value1_ptr->GetByIndex(3);
                 EXPECT_EQ(array_value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (array_value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(array_value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // Null
             {
-                auto *array_value5_ptr = value1_ptr->GetByIndex(4);
+                auto* array_value5_ptr = value1_ptr->GetByIndex(4);
                 EXPECT_EQ(array_value5_ptr->type, MixedValueType::kNull);
             }
         }
@@ -2689,7 +2689,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedType mixed_tuple1 = MixedType::MakeTuple(7);
         mixed_tuple1.InsertIntegerIntoTuple("key1", i);
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
@@ -2741,7 +2741,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -2754,61 +2754,61 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
         auto* tuple_mixed_ptr = (TupleMixedType*)(&vx.value_.mixed_value);
         EXPECT_EQ(tuple_mixed_ptr->count, 7);
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key1");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key1");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-            auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+            auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
             EXPECT_EQ(integer_value_ptr->value, i);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key2");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key2");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kFloat);
-            auto *float_value_ptr = (FloatMixedType *) (value1_ptr);
+            auto* float_value_ptr = (FloatMixedType*)(value1_ptr);
             EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key3");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key3");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kShortStr);
-            auto *short_str_value_ptr = (ShortStrMixedType *) (value1_ptr);
+            auto* short_str_value_ptr = (ShortStrMixedType*)(value1_ptr);
 
             String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), short_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key4");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key4");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
-            auto *long_str_value_ptr = (LongStrMixedType *) (value1_ptr);
+            auto* long_str_value_ptr = (LongStrMixedType*)(value1_ptr);
 
             String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), long_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key5");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key5");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kNull);
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key6");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key6");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kTuple);
-            auto *tuple_value_ptr = (TupleMixedType *) (value1_ptr);
+            auto* tuple_value_ptr = (TupleMixedType*)(value1_ptr);
             EXPECT_EQ(tuple_value_ptr->count, 5);
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key61");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kInteger);
-                auto *nested_integer_value_ptr = (IntegerMixedType *) (nested_value_ptr);
+                auto* nested_integer_value_ptr = (IntegerMixedType*)(nested_value_ptr);
                 EXPECT_EQ(nested_integer_value_ptr->value, i);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key62");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kFloat);
-                auto *nested_float_value_ptr = (FloatMixedType *) (nested_value_ptr);
+                auto* nested_float_value_ptr = (FloatMixedType*)(nested_value_ptr);
                 EXPECT_FLOAT_EQ(nested_float_value_ptr->value, fvalue);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key63");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kShortStr);
-                auto *nested_short_str_ptr = (ShortStrMixedType *) (nested_value_ptr);
+                auto* nested_short_str_ptr = (ShortStrMixedType*)(nested_value_ptr);
 
                 String result(nested_short_str_ptr->ptr, nested_short_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
@@ -2817,7 +2817,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key64");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kLongStr);
-                auto *nested_long_str_ptr = (LongStrMixedType *) (nested_value_ptr);
+                auto* nested_long_str_ptr = (LongStrMixedType*)(nested_value_ptr);
 
                 String result(nested_long_str_ptr->ptr, nested_long_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -2830,43 +2830,43 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key7");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key7");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kArray);
-            auto *array_value_ptr = (ArrayMixedType *) (value1_ptr);
+            auto* array_value_ptr = (ArrayMixedType*)(value1_ptr);
             EXPECT_EQ(array_value_ptr->count, 5);
 
             {
-                auto *array_value1_ptr = value1_ptr->GetByIndex(0);
+                auto* array_value1_ptr = value1_ptr->GetByIndex(0);
                 EXPECT_EQ(array_value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (array_value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(array_value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             {
-                auto *array_value2_ptr = value1_ptr->GetByIndex(1);
+                auto* array_value2_ptr = value1_ptr->GetByIndex(1);
                 EXPECT_EQ(array_value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (array_value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(array_value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             {
-                auto *array_value3_ptr = value1_ptr->GetByIndex(2);
+                auto* array_value3_ptr = value1_ptr->GetByIndex(2);
                 EXPECT_EQ(array_value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (array_value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(array_value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // Long str
             {
-                auto *array_value4_ptr = value1_ptr->GetByIndex(3);
+                auto* array_value4_ptr = value1_ptr->GetByIndex(3);
                 EXPECT_EQ(array_value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (array_value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(array_value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // Null
             {
-                auto *array_value5_ptr = value1_ptr->GetByIndex(4);
+                auto* array_value5_ptr = value1_ptr->GetByIndex(4);
                 EXPECT_EQ(array_value5_ptr->type, MixedValueType::kNull);
             }
         }
@@ -2874,13 +2874,13 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
 
     ColumnVector target_column_vector(data_type);
     i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
-    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < count; ++ i) {
+    for(i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
         f64 fvalue = static_cast<f64>(src_idx) + static_cast<f64>(src_idx) / 10.0f;
         String short_str(10, 'a' + src_idx % 26);
@@ -2894,61 +2894,61 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
         auto* tuple_mixed_ptr = (TupleMixedType*)(&vx.value_.mixed_value);
         EXPECT_EQ(tuple_mixed_ptr->count, 7);
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key1");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key1");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-            auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+            auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
             EXPECT_EQ(integer_value_ptr->value, src_idx);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key2");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key2");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kFloat);
-            auto *float_value_ptr = (FloatMixedType *) (value1_ptr);
+            auto* float_value_ptr = (FloatMixedType*)(value1_ptr);
             EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key3");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key3");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kShortStr);
-            auto *short_str_value_ptr = (ShortStrMixedType *) (value1_ptr);
+            auto* short_str_value_ptr = (ShortStrMixedType*)(value1_ptr);
 
             String result(short_str_value_ptr->ptr, short_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), short_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key4");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key4");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kLongStr);
-            auto *long_str_value_ptr = (LongStrMixedType *) (value1_ptr);
+            auto* long_str_value_ptr = (LongStrMixedType*)(value1_ptr);
 
             String result(long_str_value_ptr->ptr, long_str_value_ptr->length);
             EXPECT_STREQ(result.c_str(), long_str.c_str());
         }
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key5");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key5");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kNull);
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key6");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key6");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kTuple);
-            auto *tuple_value_ptr = (TupleMixedType *) (value1_ptr);
+            auto* tuple_value_ptr = (TupleMixedType*)(value1_ptr);
             EXPECT_EQ(tuple_value_ptr->count, 5);
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key61");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kInteger);
-                auto *nested_integer_value_ptr = (IntegerMixedType *) (nested_value_ptr);
+                auto* nested_integer_value_ptr = (IntegerMixedType*)(nested_value_ptr);
                 EXPECT_EQ(nested_integer_value_ptr->value, src_idx);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key62");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kFloat);
-                auto *nested_float_value_ptr = (FloatMixedType *) (nested_value_ptr);
+                auto* nested_float_value_ptr = (FloatMixedType*)(nested_value_ptr);
                 EXPECT_FLOAT_EQ(nested_float_value_ptr->value, fvalue);
             }
 
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key63");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kShortStr);
-                auto *nested_short_str_ptr = (ShortStrMixedType *) (nested_value_ptr);
+                auto* nested_short_str_ptr = (ShortStrMixedType*)(nested_value_ptr);
 
                 String result(nested_short_str_ptr->ptr, nested_short_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
@@ -2957,7 +2957,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
             {
                 auto* nested_value_ptr = value1_ptr->GetFromTuple("key64");
                 EXPECT_EQ(nested_value_ptr->type, MixedValueType::kLongStr);
-                auto *nested_long_str_ptr = (LongStrMixedType *) (nested_value_ptr);
+                auto* nested_long_str_ptr = (LongStrMixedType*)(nested_value_ptr);
 
                 String result(nested_long_str_ptr->ptr, nested_long_str_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -2970,43 +2970,43 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
         }
 
         {
-            auto *value1_ptr = tuple_ref.GetFromTuple("key7");
+            auto* value1_ptr = tuple_ref.GetFromTuple("key7");
             EXPECT_EQ(value1_ptr->type, MixedValueType::kArray);
-            auto *array_value_ptr = (ArrayMixedType *) (value1_ptr);
+            auto* array_value_ptr = (ArrayMixedType*)(value1_ptr);
             EXPECT_EQ(array_value_ptr->count, 5);
 
             {
-                auto *array_value1_ptr = value1_ptr->GetByIndex(0);
+                auto* array_value1_ptr = value1_ptr->GetByIndex(0);
                 EXPECT_EQ(array_value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (array_value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(array_value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, src_idx);
             }
             {
-                auto *array_value2_ptr = value1_ptr->GetByIndex(1);
+                auto* array_value2_ptr = value1_ptr->GetByIndex(1);
                 EXPECT_EQ(array_value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (array_value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(array_value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             {
-                auto *array_value3_ptr = value1_ptr->GetByIndex(2);
+                auto* array_value3_ptr = value1_ptr->GetByIndex(2);
                 EXPECT_EQ(array_value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (array_value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(array_value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // Long str
             {
-                auto *array_value4_ptr = value1_ptr->GetByIndex(3);
+                auto* array_value4_ptr = value1_ptr->GetByIndex(3);
                 EXPECT_EQ(array_value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (array_value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(array_value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // Null
             {
-                auto *array_value5_ptr = value1_ptr->GetByIndex(4);
+                auto* array_value5_ptr = value1_ptr->GetByIndex(4);
                 EXPECT_EQ(array_value5_ptr->type, MixedValueType::kNull);
             }
         }
@@ -3043,7 +3043,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -3109,79 +3109,79 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
         {
             // 1. Integer
             {
-                auto *value1_ptr = array_ref.GetByIndex(0);
+                auto* value1_ptr = array_ref.GetByIndex(0);
                 EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             // 2. Float
             {
-                auto *value2_ptr = array_ref.GetByIndex(1);
+                auto* value2_ptr = array_ref.GetByIndex(1);
                 EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             // 3. Short str
             {
-                auto *value3_ptr = array_ref.GetByIndex(2);
+                auto* value3_ptr = array_ref.GetByIndex(2);
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // 4. Long str
             {
-                auto *value4_ptr = array_ref.GetByIndex(3);
+                auto* value4_ptr = array_ref.GetByIndex(3);
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // 5. Null
             {
-                auto *value5_ptr = array_ref.GetByIndex(4);
+                auto* value5_ptr = array_ref.GetByIndex(4);
                 EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
             }
 
             // 6. Tuple
             {
-                auto *value6_ptr = mixed_array1.GetByIndex(5);
+                auto* value6_ptr = mixed_array1.GetByIndex(5);
                 {
                     EXPECT_EQ(value6_ptr->type, MixedValueType::kTuple);
                     {
-                        auto *tuple_ptr5 = (TupleMixedType *) (value6_ptr);
+                        auto* tuple_ptr5 = (TupleMixedType*)(value6_ptr);
                         EXPECT_EQ(tuple_ptr5->count, 5);
                     }
                     // Key51: integer
                     {
-                        auto *value1_ptr = value6_ptr->GetFromTuple("key51");
+                        auto* value1_ptr = value6_ptr->GetFromTuple("key51");
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Key52: float
                     {
-                        auto *value2_ptr = value6_ptr->GetFromTuple("key52");
+                        auto* value2_ptr = value6_ptr->GetFromTuple("key52");
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Key53: short string
                     {
-                        auto *value3_ptr = value6_ptr->GetFromTuple("key53");
+                        auto* value3_ptr = value6_ptr->GetFromTuple("key53");
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Key54: long string
                     {
-                        auto *value4_ptr = value6_ptr->GetFromTuple("key54");
+                        auto* value4_ptr = value6_ptr->GetFromTuple("key54");
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -3189,7 +3189,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
                     // Key55: null
                     {
-                        auto *value5_ptr = value6_ptr->GetFromTuple("key55");
+                        auto* value5_ptr = value6_ptr->GetFromTuple("key55");
                         EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -3197,41 +3197,41 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
             // 7. Array
             {
-                auto *value7_ptr = array_ref.GetByIndex(6);
+                auto* value7_ptr = array_ref.GetByIndex(6);
                 {
                     EXPECT_EQ(value7_ptr->type, MixedValueType::kArray);
                     {
-                        auto *nested_array_ptr1 = (ArrayMixedType *) (value7_ptr);
+                        auto* nested_array_ptr1 = (ArrayMixedType*)(value7_ptr);
                         EXPECT_EQ(nested_array_ptr1->count, 5);
                     }
                     // Integer
                     {
-                        auto *value1_ptr = value7_ptr->GetByIndex(0);
+                        auto* value1_ptr = value7_ptr->GetByIndex(0);
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Float
                     {
-                        auto *value2_ptr = value7_ptr->GetByIndex(1);
+                        auto* value2_ptr = value7_ptr->GetByIndex(1);
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Short str
                     {
-                        auto *value3_ptr = value7_ptr->GetByIndex(2);
+                        auto* value3_ptr = value7_ptr->GetByIndex(2);
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Long str
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(3);
+                        auto* value4_ptr = value7_ptr->GetByIndex(3);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -3239,7 +3239,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
                     // Null
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(4);
+                        auto* value4_ptr = value7_ptr->GetByIndex(4);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -3249,7 +3249,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE* 2);
+    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -3263,7 +3263,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -3279,79 +3279,79 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
         {
             // 1. Integer
             {
-                auto *value1_ptr = array_ref.GetByIndex(0);
+                auto* value1_ptr = array_ref.GetByIndex(0);
                 EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             // 2. Float
             {
-                auto *value2_ptr = array_ref.GetByIndex(1);
+                auto* value2_ptr = array_ref.GetByIndex(1);
                 EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             // 3. Short str
             {
-                auto *value3_ptr = array_ref.GetByIndex(2);
+                auto* value3_ptr = array_ref.GetByIndex(2);
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // 4. Long str
             {
-                auto *value4_ptr = array_ref.GetByIndex(3);
+                auto* value4_ptr = array_ref.GetByIndex(3);
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // 5. Null
             {
-                auto *value5_ptr = array_ref.GetByIndex(4);
+                auto* value5_ptr = array_ref.GetByIndex(4);
                 EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
             }
 
             // 6. Tuple
             {
-                auto *value6_ptr = array_ref.GetByIndex(5);
+                auto* value6_ptr = array_ref.GetByIndex(5);
                 {
                     EXPECT_EQ(value6_ptr->type, MixedValueType::kTuple);
                     {
-                        auto *tuple_ptr5 = (TupleMixedType *) (value6_ptr);
+                        auto* tuple_ptr5 = (TupleMixedType*)(value6_ptr);
                         EXPECT_EQ(tuple_ptr5->count, 5);
                     }
                     // Key51: integer
                     {
-                        auto *value1_ptr = value6_ptr->GetFromTuple("key51");
+                        auto* value1_ptr = value6_ptr->GetFromTuple("key51");
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Key52: float
                     {
-                        auto *value2_ptr = value6_ptr->GetFromTuple("key52");
+                        auto* value2_ptr = value6_ptr->GetFromTuple("key52");
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Key53: short string
                     {
-                        auto *value3_ptr = value6_ptr->GetFromTuple("key53");
+                        auto* value3_ptr = value6_ptr->GetFromTuple("key53");
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Key54: long string
                     {
-                        auto *value4_ptr = value6_ptr->GetFromTuple("key54");
+                        auto* value4_ptr = value6_ptr->GetFromTuple("key54");
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -3359,7 +3359,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
                     // Key55: null
                     {
-                        auto *value5_ptr = value6_ptr->GetFromTuple("key55");
+                        auto* value5_ptr = value6_ptr->GetFromTuple("key55");
                         EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -3367,41 +3367,41 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
             // 7. Array
             {
-                auto *value7_ptr = array_ref.GetByIndex(6);
+                auto* value7_ptr = array_ref.GetByIndex(6);
                 {
                     EXPECT_EQ(value7_ptr->type, MixedValueType::kArray);
                     {
-                        auto *nested_array_ptr1 = (ArrayMixedType *) (value7_ptr);
+                        auto* nested_array_ptr1 = (ArrayMixedType*)(value7_ptr);
                         EXPECT_EQ(nested_array_ptr1->count, 5);
                     }
                     // Integer
                     {
-                        auto *value1_ptr = value7_ptr->GetByIndex(0);
+                        auto* value1_ptr = value7_ptr->GetByIndex(0);
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Float
                     {
-                        auto *value2_ptr = value7_ptr->GetByIndex(1);
+                        auto* value2_ptr = value7_ptr->GetByIndex(1);
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Short str
                     {
-                        auto *value3_ptr = value7_ptr->GetByIndex(2);
+                        auto* value3_ptr = value7_ptr->GetByIndex(2);
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Long str
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(3);
+                        auto* value4_ptr = value7_ptr->GetByIndex(3);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -3409,7 +3409,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
                     // Null
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(4);
+                        auto* value4_ptr = value7_ptr->GetByIndex(4);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -3419,8 +3419,8 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
 
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2* DEFAULT_VECTOR_SIZE);
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++ i) {
+    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
+    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -3486,79 +3486,79 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
         {
             // 1. Integer
             {
-                auto *value1_ptr = array_ref.GetByIndex(0);
+                auto* value1_ptr = array_ref.GetByIndex(0);
                 EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             // 2. Float
             {
-                auto *value2_ptr = array_ref.GetByIndex(1);
+                auto* value2_ptr = array_ref.GetByIndex(1);
                 EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             // 3. Short str
             {
-                auto *value3_ptr = array_ref.GetByIndex(2);
+                auto* value3_ptr = array_ref.GetByIndex(2);
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // 4. Long str
             {
-                auto *value4_ptr = array_ref.GetByIndex(3);
+                auto* value4_ptr = array_ref.GetByIndex(3);
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // 5. Null
             {
-                auto *value5_ptr = array_ref.GetByIndex(4);
+                auto* value5_ptr = array_ref.GetByIndex(4);
                 EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
             }
 
             // 6. Tuple
             {
-                auto *value6_ptr = mixed_array1.GetByIndex(5);
+                auto* value6_ptr = mixed_array1.GetByIndex(5);
                 {
                     EXPECT_EQ(value6_ptr->type, MixedValueType::kTuple);
                     {
-                        auto *tuple_ptr5 = (TupleMixedType *) (value6_ptr);
+                        auto* tuple_ptr5 = (TupleMixedType*)(value6_ptr);
                         EXPECT_EQ(tuple_ptr5->count, 5);
                     }
                     // Key51: integer
                     {
-                        auto *value1_ptr = value6_ptr->GetFromTuple("key51");
+                        auto* value1_ptr = value6_ptr->GetFromTuple("key51");
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Key52: float
                     {
-                        auto *value2_ptr = value6_ptr->GetFromTuple("key52");
+                        auto* value2_ptr = value6_ptr->GetFromTuple("key52");
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Key53: short string
                     {
-                        auto *value3_ptr = value6_ptr->GetFromTuple("key53");
+                        auto* value3_ptr = value6_ptr->GetFromTuple("key53");
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Key54: long string
                     {
-                        auto *value4_ptr = value6_ptr->GetFromTuple("key54");
+                        auto* value4_ptr = value6_ptr->GetFromTuple("key54");
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -3566,7 +3566,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
                     // Key55: null
                     {
-                        auto *value5_ptr = value6_ptr->GetFromTuple("key55");
+                        auto* value5_ptr = value6_ptr->GetFromTuple("key55");
                         EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -3574,41 +3574,41 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
             // 7. Array
             {
-                auto *value7_ptr = array_ref.GetByIndex(6);
+                auto* value7_ptr = array_ref.GetByIndex(6);
                 {
                     EXPECT_EQ(value7_ptr->type, MixedValueType::kArray);
                     {
-                        auto *nested_array_ptr1 = (ArrayMixedType *) (value7_ptr);
+                        auto* nested_array_ptr1 = (ArrayMixedType*)(value7_ptr);
                         EXPECT_EQ(nested_array_ptr1->count, 5);
                     }
                     // Integer
                     {
-                        auto *value1_ptr = value7_ptr->GetByIndex(0);
+                        auto* value1_ptr = value7_ptr->GetByIndex(0);
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Float
                     {
-                        auto *value2_ptr = value7_ptr->GetByIndex(1);
+                        auto* value2_ptr = value7_ptr->GetByIndex(1);
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Short str
                     {
-                        auto *value3_ptr = value7_ptr->GetByIndex(2);
+                        auto* value3_ptr = value7_ptr->GetByIndex(2);
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Long str
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(3);
+                        auto* value4_ptr = value7_ptr->GetByIndex(3);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -3616,7 +3616,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
                     // Null
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(4);
+                        auto* value4_ptr = value7_ptr->GetByIndex(4);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -3659,7 +3659,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -3723,79 +3723,79 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
         {
             // 1. Integer
             {
-                auto *value1_ptr = array_ref.GetByIndex(0);
+                auto* value1_ptr = array_ref.GetByIndex(0);
                 EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             // 2. Float
             {
-                auto *value2_ptr = array_ref.GetByIndex(1);
+                auto* value2_ptr = array_ref.GetByIndex(1);
                 EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             // 3. Short str
             {
-                auto *value3_ptr = array_ref.GetByIndex(2);
+                auto* value3_ptr = array_ref.GetByIndex(2);
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // 4. Long str
             {
-                auto *value4_ptr = array_ref.GetByIndex(3);
+                auto* value4_ptr = array_ref.GetByIndex(3);
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // 5. Null
             {
-                auto *value5_ptr = array_ref.GetByIndex(4);
+                auto* value5_ptr = array_ref.GetByIndex(4);
                 EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
             }
 
             // 6. Tuple
             {
-                auto *value6_ptr = mixed_array1.GetByIndex(5);
+                auto* value6_ptr = mixed_array1.GetByIndex(5);
                 {
                     EXPECT_EQ(value6_ptr->type, MixedValueType::kTuple);
                     {
-                        auto *tuple_ptr5 = (TupleMixedType *) (value6_ptr);
+                        auto* tuple_ptr5 = (TupleMixedType*)(value6_ptr);
                         EXPECT_EQ(tuple_ptr5->count, 5);
                     }
                     // Key51: integer
                     {
-                        auto *value1_ptr = value6_ptr->GetFromTuple("key51");
+                        auto* value1_ptr = value6_ptr->GetFromTuple("key51");
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Key52: float
                     {
-                        auto *value2_ptr = value6_ptr->GetFromTuple("key52");
+                        auto* value2_ptr = value6_ptr->GetFromTuple("key52");
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Key53: short string
                     {
-                        auto *value3_ptr = value6_ptr->GetFromTuple("key53");
+                        auto* value3_ptr = value6_ptr->GetFromTuple("key53");
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Key54: long string
                     {
-                        auto *value4_ptr = value6_ptr->GetFromTuple("key54");
+                        auto* value4_ptr = value6_ptr->GetFromTuple("key54");
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -3803,7 +3803,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
                     // Key55: null
                     {
-                        auto *value5_ptr = value6_ptr->GetFromTuple("key55");
+                        auto* value5_ptr = value6_ptr->GetFromTuple("key55");
                         EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -3811,41 +3811,41 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
             // 7. Array
             {
-                auto *value7_ptr = array_ref.GetByIndex(6);
+                auto* value7_ptr = array_ref.GetByIndex(6);
                 {
                     EXPECT_EQ(value7_ptr->type, MixedValueType::kArray);
                     {
-                        auto *nested_array_ptr1 = (ArrayMixedType *) (value7_ptr);
+                        auto* nested_array_ptr1 = (ArrayMixedType*)(value7_ptr);
                         EXPECT_EQ(nested_array_ptr1->count, 5);
                     }
                     // Integer
                     {
-                        auto *value1_ptr = value7_ptr->GetByIndex(0);
+                        auto* value1_ptr = value7_ptr->GetByIndex(0);
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Float
                     {
-                        auto *value2_ptr = value7_ptr->GetByIndex(1);
+                        auto* value2_ptr = value7_ptr->GetByIndex(1);
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Short str
                     {
-                        auto *value3_ptr = value7_ptr->GetByIndex(2);
+                        auto* value3_ptr = value7_ptr->GetByIndex(2);
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Long str
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(3);
+                        auto* value4_ptr = value7_ptr->GetByIndex(3);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -3853,7 +3853,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
                     // Null
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(4);
+                        auto* value4_ptr = value7_ptr->GetByIndex(4);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -3864,7 +3864,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -3928,79 +3928,79 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
         {
             // 1. Integer
             {
-                auto *value1_ptr = array_ref.GetByIndex(0);
+                auto* value1_ptr = array_ref.GetByIndex(0);
                 EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             // 2. Float
             {
-                auto *value2_ptr = array_ref.GetByIndex(1);
+                auto* value2_ptr = array_ref.GetByIndex(1);
                 EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             // 3. Short str
             {
-                auto *value3_ptr = array_ref.GetByIndex(2);
+                auto* value3_ptr = array_ref.GetByIndex(2);
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // 4. Long str
             {
-                auto *value4_ptr = array_ref.GetByIndex(3);
+                auto* value4_ptr = array_ref.GetByIndex(3);
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // 5. Null
             {
-                auto *value5_ptr = array_ref.GetByIndex(4);
+                auto* value5_ptr = array_ref.GetByIndex(4);
                 EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
             }
 
             // 6. Tuple
             {
-                auto *value6_ptr = mixed_array1.GetByIndex(5);
+                auto* value6_ptr = mixed_array1.GetByIndex(5);
                 {
                     EXPECT_EQ(value6_ptr->type, MixedValueType::kTuple);
                     {
-                        auto *tuple_ptr5 = (TupleMixedType *) (value6_ptr);
+                        auto* tuple_ptr5 = (TupleMixedType*)(value6_ptr);
                         EXPECT_EQ(tuple_ptr5->count, 5);
                     }
                     // Key51: integer
                     {
-                        auto *value1_ptr = value6_ptr->GetFromTuple("key51");
+                        auto* value1_ptr = value6_ptr->GetFromTuple("key51");
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Key52: float
                     {
-                        auto *value2_ptr = value6_ptr->GetFromTuple("key52");
+                        auto* value2_ptr = value6_ptr->GetFromTuple("key52");
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Key53: short string
                     {
-                        auto *value3_ptr = value6_ptr->GetFromTuple("key53");
+                        auto* value3_ptr = value6_ptr->GetFromTuple("key53");
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Key54: long string
                     {
-                        auto *value4_ptr = value6_ptr->GetFromTuple("key54");
+                        auto* value4_ptr = value6_ptr->GetFromTuple("key54");
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -4008,7 +4008,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
                     // Key55: null
                     {
-                        auto *value5_ptr = value6_ptr->GetFromTuple("key55");
+                        auto* value5_ptr = value6_ptr->GetFromTuple("key55");
                         EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -4016,41 +4016,41 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
             // 7. Array
             {
-                auto *value7_ptr = array_ref.GetByIndex(6);
+                auto* value7_ptr = array_ref.GetByIndex(6);
                 {
                     EXPECT_EQ(value7_ptr->type, MixedValueType::kArray);
                     {
-                        auto *nested_array_ptr1 = (ArrayMixedType *) (value7_ptr);
+                        auto* nested_array_ptr1 = (ArrayMixedType*)(value7_ptr);
                         EXPECT_EQ(nested_array_ptr1->count, 5);
                     }
                     // Integer
                     {
-                        auto *value1_ptr = value7_ptr->GetByIndex(0);
+                        auto* value1_ptr = value7_ptr->GetByIndex(0);
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Float
                     {
-                        auto *value2_ptr = value7_ptr->GetByIndex(1);
+                        auto* value2_ptr = value7_ptr->GetByIndex(1);
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Short str
                     {
-                        auto *value3_ptr = value7_ptr->GetByIndex(2);
+                        auto* value3_ptr = value7_ptr->GetByIndex(2);
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Long str
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(3);
+                        auto* value4_ptr = value7_ptr->GetByIndex(3);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -4058,7 +4058,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
                     // Null
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(4);
+                        auto* value4_ptr = value7_ptr->GetByIndex(4);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -4076,7 +4076,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -4133,7 +4133,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -4149,79 +4149,79 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
         {
             // 1. Integer
             {
-                auto *value1_ptr = array_ref.GetByIndex(0);
+                auto* value1_ptr = array_ref.GetByIndex(0);
                 EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             // 2. Float
             {
-                auto *value2_ptr = array_ref.GetByIndex(1);
+                auto* value2_ptr = array_ref.GetByIndex(1);
                 EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             // 3. Short str
             {
-                auto *value3_ptr = array_ref.GetByIndex(2);
+                auto* value3_ptr = array_ref.GetByIndex(2);
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // 4. Long str
             {
-                auto *value4_ptr = array_ref.GetByIndex(3);
+                auto* value4_ptr = array_ref.GetByIndex(3);
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // 5. Null
             {
-                auto *value5_ptr = array_ref.GetByIndex(4);
+                auto* value5_ptr = array_ref.GetByIndex(4);
                 EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
             }
 
             // 6. Tuple
             {
-                auto *value6_ptr = array_ref.GetByIndex(5);
+                auto* value6_ptr = array_ref.GetByIndex(5);
                 {
                     EXPECT_EQ(value6_ptr->type, MixedValueType::kTuple);
                     {
-                        auto *tuple_ptr5 = (TupleMixedType *) (value6_ptr);
+                        auto* tuple_ptr5 = (TupleMixedType*)(value6_ptr);
                         EXPECT_EQ(tuple_ptr5->count, 5);
                     }
                     // Key51: integer
                     {
-                        auto *value1_ptr = value6_ptr->GetFromTuple("key51");
+                        auto* value1_ptr = value6_ptr->GetFromTuple("key51");
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Key52: float
                     {
-                        auto *value2_ptr = value6_ptr->GetFromTuple("key52");
+                        auto* value2_ptr = value6_ptr->GetFromTuple("key52");
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Key53: short string
                     {
-                        auto *value3_ptr = value6_ptr->GetFromTuple("key53");
+                        auto* value3_ptr = value6_ptr->GetFromTuple("key53");
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Key54: long string
                     {
-                        auto *value4_ptr = value6_ptr->GetFromTuple("key54");
+                        auto* value4_ptr = value6_ptr->GetFromTuple("key54");
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -4229,7 +4229,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 
                     // Key55: null
                     {
-                        auto *value5_ptr = value6_ptr->GetFromTuple("key55");
+                        auto* value5_ptr = value6_ptr->GetFromTuple("key55");
                         EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -4237,41 +4237,41 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 
             // 7. Array
             {
-                auto *value7_ptr = array_ref.GetByIndex(6);
+                auto* value7_ptr = array_ref.GetByIndex(6);
                 {
                     EXPECT_EQ(value7_ptr->type, MixedValueType::kArray);
                     {
-                        auto *nested_array_ptr1 = (ArrayMixedType *) (value7_ptr);
+                        auto* nested_array_ptr1 = (ArrayMixedType*)(value7_ptr);
                         EXPECT_EQ(nested_array_ptr1->count, 5);
                     }
                     // Integer
                     {
-                        auto *value1_ptr = value7_ptr->GetByIndex(0);
+                        auto* value1_ptr = value7_ptr->GetByIndex(0);
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Float
                     {
-                        auto *value2_ptr = value7_ptr->GetByIndex(1);
+                        auto* value2_ptr = value7_ptr->GetByIndex(1);
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Short str
                     {
-                        auto *value3_ptr = value7_ptr->GetByIndex(2);
+                        auto* value3_ptr = value7_ptr->GetByIndex(2);
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Long str
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(3);
+                        auto* value4_ptr = value7_ptr->GetByIndex(3);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -4279,7 +4279,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 
                     // Null
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(4);
+                        auto* value4_ptr = value7_ptr->GetByIndex(4);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -4289,7 +4289,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -4297,7 +4297,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         f64 fvalue = static_cast<f64>(2 * i) + static_cast<f64>(2 * i) / 10.0f;
         String short_str(10, 'a' + (2 * i) % 26);
         String long_str(20, 'a' + (2 * i) % 26);
@@ -4313,79 +4313,79 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
         {
             // 1. Integer
             {
-                auto *value1_ptr = array_ref.GetByIndex(0);
+                auto* value1_ptr = array_ref.GetByIndex(0);
                 EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, 2 * i);
             }
             // 2. Float
             {
-                auto *value2_ptr = array_ref.GetByIndex(1);
+                auto* value2_ptr = array_ref.GetByIndex(1);
                 EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             // 3. Short str
             {
-                auto *value3_ptr = array_ref.GetByIndex(2);
+                auto* value3_ptr = array_ref.GetByIndex(2);
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // 4. Long str
             {
-                auto *value4_ptr = array_ref.GetByIndex(3);
+                auto* value4_ptr = array_ref.GetByIndex(3);
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // 5. Null
             {
-                auto *value5_ptr = array_ref.GetByIndex(4);
+                auto* value5_ptr = array_ref.GetByIndex(4);
                 EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
             }
 
             // 6. Tuple
             {
-                auto *value6_ptr = array_ref.GetByIndex(5);
+                auto* value6_ptr = array_ref.GetByIndex(5);
                 {
                     EXPECT_EQ(value6_ptr->type, MixedValueType::kTuple);
                     {
-                        auto *tuple_ptr5 = (TupleMixedType *) (value6_ptr);
+                        auto* tuple_ptr5 = (TupleMixedType*)(value6_ptr);
                         EXPECT_EQ(tuple_ptr5->count, 5);
                     }
                     // Key51: integer
                     {
-                        auto *value1_ptr = value6_ptr->GetFromTuple("key51");
+                        auto* value1_ptr = value6_ptr->GetFromTuple("key51");
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, 2 * i);
                     }
                     // Key52: float
                     {
-                        auto *value2_ptr = value6_ptr->GetFromTuple("key52");
+                        auto* value2_ptr = value6_ptr->GetFromTuple("key52");
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Key53: short string
                     {
-                        auto *value3_ptr = value6_ptr->GetFromTuple("key53");
+                        auto* value3_ptr = value6_ptr->GetFromTuple("key53");
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Key54: long string
                     {
-                        auto *value4_ptr = value6_ptr->GetFromTuple("key54");
+                        auto* value4_ptr = value6_ptr->GetFromTuple("key54");
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -4393,7 +4393,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 
                     // Key55: null
                     {
-                        auto *value5_ptr = value6_ptr->GetFromTuple("key55");
+                        auto* value5_ptr = value6_ptr->GetFromTuple("key55");
                         EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -4401,41 +4401,41 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 
             // 7. Array
             {
-                auto *value7_ptr = array_ref.GetByIndex(6);
+                auto* value7_ptr = array_ref.GetByIndex(6);
                 {
                     EXPECT_EQ(value7_ptr->type, MixedValueType::kArray);
                     {
-                        auto *nested_array_ptr1 = (ArrayMixedType *) (value7_ptr);
+                        auto* nested_array_ptr1 = (ArrayMixedType*)(value7_ptr);
                         EXPECT_EQ(nested_array_ptr1->count, 5);
                     }
                     // Integer
                     {
-                        auto *value1_ptr = value7_ptr->GetByIndex(0);
+                        auto* value1_ptr = value7_ptr->GetByIndex(0);
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, 2 * i);
                     }
                     // Float
                     {
-                        auto *value2_ptr = value7_ptr->GetByIndex(1);
+                        auto* value2_ptr = value7_ptr->GetByIndex(1);
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Short str
                     {
-                        auto *value3_ptr = value7_ptr->GetByIndex(2);
+                        auto* value3_ptr = value7_ptr->GetByIndex(2);
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Long str
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(3);
+                        auto* value4_ptr = value7_ptr->GetByIndex(3);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -4443,7 +4443,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 
                     // Null
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(4);
+                        auto* value4_ptr = value7_ptr->GetByIndex(4);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -4460,7 +4460,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -4517,7 +4517,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);
         String long_str(20, 'a' + i % 26);
@@ -4533,79 +4533,79 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
         {
             // 1. Integer
             {
-                auto *value1_ptr = array_ref.GetByIndex(0);
+                auto* value1_ptr = array_ref.GetByIndex(0);
                 EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, i);
             }
             // 2. Float
             {
-                auto *value2_ptr = array_ref.GetByIndex(1);
+                auto* value2_ptr = array_ref.GetByIndex(1);
                 EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             // 3. Short str
             {
-                auto *value3_ptr = array_ref.GetByIndex(2);
+                auto* value3_ptr = array_ref.GetByIndex(2);
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // 4. Long str
             {
-                auto *value4_ptr = array_ref.GetByIndex(3);
+                auto* value4_ptr = array_ref.GetByIndex(3);
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // 5. Null
             {
-                auto *value5_ptr = array_ref.GetByIndex(4);
+                auto* value5_ptr = array_ref.GetByIndex(4);
                 EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
             }
 
             // 6. Tuple
             {
-                auto *value6_ptr = array_ref.GetByIndex(5);
+                auto* value6_ptr = array_ref.GetByIndex(5);
                 {
                     EXPECT_EQ(value6_ptr->type, MixedValueType::kTuple);
                     {
-                        auto *tuple_ptr5 = (TupleMixedType *) (value6_ptr);
+                        auto* tuple_ptr5 = (TupleMixedType*)(value6_ptr);
                         EXPECT_EQ(tuple_ptr5->count, 5);
                     }
                     // Key51: integer
                     {
-                        auto *value1_ptr = value6_ptr->GetFromTuple("key51");
+                        auto* value1_ptr = value6_ptr->GetFromTuple("key51");
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Key52: float
                     {
-                        auto *value2_ptr = value6_ptr->GetFromTuple("key52");
+                        auto* value2_ptr = value6_ptr->GetFromTuple("key52");
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Key53: short string
                     {
-                        auto *value3_ptr = value6_ptr->GetFromTuple("key53");
+                        auto* value3_ptr = value6_ptr->GetFromTuple("key53");
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Key54: long string
                     {
-                        auto *value4_ptr = value6_ptr->GetFromTuple("key54");
+                        auto* value4_ptr = value6_ptr->GetFromTuple("key54");
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -4613,7 +4613,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
 
                     // Key55: null
                     {
-                        auto *value5_ptr = value6_ptr->GetFromTuple("key55");
+                        auto* value5_ptr = value6_ptr->GetFromTuple("key55");
                         EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -4621,41 +4621,41 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
 
             // 7. Array
             {
-                auto *value7_ptr = array_ref.GetByIndex(6);
+                auto* value7_ptr = array_ref.GetByIndex(6);
                 {
                     EXPECT_EQ(value7_ptr->type, MixedValueType::kArray);
                     {
-                        auto *nested_array_ptr1 = (ArrayMixedType *) (value7_ptr);
+                        auto* nested_array_ptr1 = (ArrayMixedType*)(value7_ptr);
                         EXPECT_EQ(nested_array_ptr1->count, 5);
                     }
                     // Integer
                     {
-                        auto *value1_ptr = value7_ptr->GetByIndex(0);
+                        auto* value1_ptr = value7_ptr->GetByIndex(0);
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, i);
                     }
                     // Float
                     {
-                        auto *value2_ptr = value7_ptr->GetByIndex(1);
+                        auto* value2_ptr = value7_ptr->GetByIndex(1);
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Short str
                     {
-                        auto *value3_ptr = value7_ptr->GetByIndex(2);
+                        auto* value3_ptr = value7_ptr->GetByIndex(2);
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Long str
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(3);
+                        auto* value4_ptr = value7_ptr->GetByIndex(3);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -4663,7 +4663,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
 
                     // Null
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(4);
+                        auto* value4_ptr = value7_ptr->GetByIndex(4);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -4673,13 +4673,13 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
 
     ColumnVector target_column_vector(data_type);
     i64 start_idx = DEFAULT_VECTOR_SIZE / 4;
-    i64 end_idx =  3 * DEFAULT_VECTOR_SIZE / 4;
+    i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for (i64 i = 0; i < count; ++ i) {
+    for(i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
         f64 fvalue = static_cast<f64>(src_idx) + static_cast<f64>(src_idx) / 10.0f;
         String short_str(10, 'a' + src_idx % 26);
@@ -4696,79 +4696,79 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
         {
             // 1. Integer
             {
-                auto *value1_ptr = array_ref.GetByIndex(0);
+                auto* value1_ptr = array_ref.GetByIndex(0);
                 EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                 EXPECT_EQ(integer_value_ptr->value, src_idx);
             }
             // 2. Float
             {
-                auto *value2_ptr = array_ref.GetByIndex(1);
+                auto* value2_ptr = array_ref.GetByIndex(1);
                 EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                 EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
             }
             // 3. Short str
             {
-                auto *value3_ptr = array_ref.GetByIndex(2);
+                auto* value3_ptr = array_ref.GetByIndex(2);
                 EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                 String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), short_str.c_str());
             }
             // 4. Long str
             {
-                auto *value4_ptr = array_ref.GetByIndex(3);
+                auto* value4_ptr = array_ref.GetByIndex(3);
                 EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                 String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                 EXPECT_STREQ(result.c_str(), long_str.c_str());
             }
             // 5. Null
             {
-                auto *value5_ptr = array_ref.GetByIndex(4);
+                auto* value5_ptr = array_ref.GetByIndex(4);
                 EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
             }
 
             // 6. Tuple
             {
-                auto *value6_ptr = array_ref.GetByIndex(5);
+                auto* value6_ptr = array_ref.GetByIndex(5);
                 {
                     EXPECT_EQ(value6_ptr->type, MixedValueType::kTuple);
                     {
-                        auto *tuple_ptr5 = (TupleMixedType *) (value6_ptr);
+                        auto* tuple_ptr5 = (TupleMixedType*)(value6_ptr);
                         EXPECT_EQ(tuple_ptr5->count, 5);
                     }
                     // Key51: integer
                     {
-                        auto *value1_ptr = value6_ptr->GetFromTuple("key51");
+                        auto* value1_ptr = value6_ptr->GetFromTuple("key51");
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, src_idx);
                     }
                     // Key52: float
                     {
-                        auto *value2_ptr = value6_ptr->GetFromTuple("key52");
+                        auto* value2_ptr = value6_ptr->GetFromTuple("key52");
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Key53: short string
                     {
-                        auto *value3_ptr = value6_ptr->GetFromTuple("key53");
+                        auto* value3_ptr = value6_ptr->GetFromTuple("key53");
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Key54: long string
                     {
-                        auto *value4_ptr = value6_ptr->GetFromTuple("key54");
+                        auto* value4_ptr = value6_ptr->GetFromTuple("key54");
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -4776,7 +4776,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
 
                     // Key55: null
                     {
-                        auto *value5_ptr = value6_ptr->GetFromTuple("key55");
+                        auto* value5_ptr = value6_ptr->GetFromTuple("key55");
                         EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
                     }
                 }
@@ -4784,41 +4784,41 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
 
             // 7. Array
             {
-                auto *value7_ptr = array_ref.GetByIndex(6);
+                auto* value7_ptr = array_ref.GetByIndex(6);
                 {
                     EXPECT_EQ(value7_ptr->type, MixedValueType::kArray);
                     {
-                        auto *nested_array_ptr1 = (ArrayMixedType *) (value7_ptr);
+                        auto* nested_array_ptr1 = (ArrayMixedType*)(value7_ptr);
                         EXPECT_EQ(nested_array_ptr1->count, 5);
                     }
                     // Integer
                     {
-                        auto *value1_ptr = value7_ptr->GetByIndex(0);
+                        auto* value1_ptr = value7_ptr->GetByIndex(0);
                         EXPECT_EQ(value1_ptr->type, MixedValueType::kInteger);
-                        auto *integer_value_ptr = (IntegerMixedType *) (value1_ptr);
+                        auto* integer_value_ptr = (IntegerMixedType*)(value1_ptr);
                         EXPECT_EQ(integer_value_ptr->value, src_idx);
                     }
                     // Float
                     {
-                        auto *value2_ptr = value7_ptr->GetByIndex(1);
+                        auto* value2_ptr = value7_ptr->GetByIndex(1);
                         EXPECT_EQ(value2_ptr->type, MixedValueType::kFloat);
-                        auto *float_value_ptr = (FloatMixedType *) (value2_ptr);
+                        auto* float_value_ptr = (FloatMixedType*)(value2_ptr);
                         EXPECT_FLOAT_EQ(float_value_ptr->value, fvalue);
                     }
                     // Short str
                     {
-                        auto *value3_ptr = value7_ptr->GetByIndex(2);
+                        auto* value3_ptr = value7_ptr->GetByIndex(2);
                         EXPECT_EQ(value3_ptr->type, MixedValueType::kShortStr);
-                        auto *short_str_value_ptr = (ShortStrMixedType *) (value3_ptr);
+                        auto* short_str_value_ptr = (ShortStrMixedType*)(value3_ptr);
 
                         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), short_str.c_str());
                     }
                     // Long str
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(3);
+                        auto* value4_ptr = value7_ptr->GetByIndex(3);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kLongStr);
-                        auto *long_str_value_ptr = (LongStrMixedType *) (value4_ptr);
+                        auto* long_str_value_ptr = (LongStrMixedType*)(value4_ptr);
 
                         String result = String(long_str_value_ptr->ptr, long_str_value_ptr->length);
                         EXPECT_STREQ(result.c_str(), long_str.c_str());
@@ -4826,7 +4826,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
 
                     // Null
                     {
-                        auto *value4_ptr = value7_ptr->GetByIndex(4);
+                        auto* value4_ptr = value7_ptr->GetByIndex(4);
                         EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
                     }
                 }

@@ -30,8 +30,7 @@ public:
               schema_name_(std::move(schema_name)),
               collection_name_(std::move(collection_name_)),
               table_index_(table_index),
-              conflict_type_(conflict_type)
-    {}
+              conflict_type_(conflict_type) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {

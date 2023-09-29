@@ -9,55 +9,99 @@
 namespace infinity {
 
 class PhysicalUnionAll;
+
 class PhysicalIndexScan;
+
 class PhysicalDummyScan;
+
 class PhysicalHashJoin;
+
 class PhysicalSortMergeJoin;
+
 class PhysicalIndexJoin;
+
 class PhysicalTop;
+
 class PhysicalDelete;
+
 class PhysicalUpdate;
+
 class PhysicalImport;
+
 class PhysicalExport;
+
 class PhysicalAlter;
+
 class PhysicalCreateView;
+
 class PhysicalDropView;
+
 class PhysicalCreateSchema;
+
 class PhysicalCreateTable;
+
 class PhysicalCreateTable;
+
 class PhysicalCreateCollection;
+
 class PhysicalDropSchema;
+
 class PhysicalDropTable;
+
 class PhysicalDropCollection;
+
 class PhysicalInsert;
+
 class PhysicalProject;
+
 class PhysicalFilter;
+
 class PhysicalTableScan;
+
 class PhysicalKnnScan;
+
 class PhysicalAggregate;
+
 class PhysicalSort;
+
 class PhysicalLimit;
+
 class PhysicalCrossProduct;
+
 class PhysicalNestedLoopJoin;
+
 class PhysicalShow;
+
 class PhysicalFlush;
+
 class PhysicalSource;
+
 class PhysicalSink;
+
 class PhysicalParallelAggregate;
+
 class PhysicalMergeParallelAggregate;
+
 class PhysicalIntersect;
+
 class PhysicalExcept;
+
 class PhysicalHash;
+
 class PhysicalMergeHash;
+
 class PhysicalMergeLimit;
+
 class PhysicalMergeTop;
+
 class PhysicalMergeSort;
+
 class ExplainPhysicalPlan {
 public:
     static void
     Explain(const PhysicalOperator* op,
             SharedPtr<Vector<SharedPtr<String>>>& result,
-            bool is_recursive=false,
+            bool is_recursive = false,
             i64 intent_size = 0);
 
     static void

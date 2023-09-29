@@ -16,7 +16,8 @@ BaseProfiler::Begin() {
 
 void
 BaseProfiler::End() {
-    if(finished_) return;
+    if(finished_)
+        return;
     end_ts_ = Now();
     finished_ = true;
 }
@@ -33,9 +34,9 @@ BaseProfiler::ElapsedToString() const {
     std::stringstream ss;
     if(duration.count() <= 1000) {
         ss << duration.count() << "ns";
-    } else if(duration.count() <= 1000*1000) {
+    } else if(duration.count() <= 1000 * 1000) {
         ss << std::chrono::duration_cast<std::chrono::microseconds>(duration).count() << "us";
-    } else if(duration.count() <= 1000*1000*1000) {
+    } else if(duration.count() <= 1000 * 1000 * 1000) {
         ss << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << "ms";
     } else {
         ss << std::chrono::duration_cast<std::chrono::seconds>(duration).count() << "s";

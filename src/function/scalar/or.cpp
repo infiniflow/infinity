@@ -21,14 +21,14 @@ GenerateOrFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr) {
     String func_name = "OR";
     ScalarFunction or_function(
             func_name,
-            { DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean) },
-            { DataType(LogicalType::kBoolean) },
+            {DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean)},
+            {DataType(LogicalType::kBoolean)},
             &ScalarFunction::BinaryFunction<BooleanT, BooleanT, BooleanT, OrFunction>);
     function_set_ptr->AddFunction(or_function);
 }
 
 void
-RegisterOrFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterOrFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "OR";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);

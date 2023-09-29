@@ -10,7 +10,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
 #include "function/aggregate/avg.h"
 #include "function/aggregate_function_set.h"
 #include "expression/column_expression.h"
@@ -65,7 +64,7 @@ TEST_F(AvgFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         double sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeTinyInt(50));
                 sum += 50;
@@ -76,7 +75,7 @@ TEST_F(AvgFunctionTest, avg_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             if(i % 2 == 0) {
@@ -116,13 +115,13 @@ TEST_F(AvgFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         double sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<SmallIntT>(i)));
             sum += static_cast<double>(i);
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v.value_.small_int, static_cast<SmallIntT>(i));
@@ -158,13 +157,13 @@ TEST_F(AvgFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         double sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<IntegerT>(2 * i)));
             sum += static_cast<double>(2 * i);
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(v.value_.integer, static_cast<IntegerT>(2 * i));
@@ -200,13 +199,13 @@ TEST_F(AvgFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         double sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<BigIntT>(2 * i)));
             sum += static_cast<double>(2 * i);
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, static_cast<BigIntT>(2 * i));
@@ -242,13 +241,13 @@ TEST_F(AvgFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         double sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<FloatT>(2 * i)));
             sum += static_cast<double>(2 * i);
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(v.value_.float32, static_cast<FloatT>(2 * i));
@@ -284,13 +283,13 @@ TEST_F(AvgFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         double sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<DoubleT>(2 * i)));
             sum += static_cast<double>(2 * i);
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(v.value_.float64, static_cast<DoubleT>(2 * i));

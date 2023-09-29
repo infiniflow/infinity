@@ -22,16 +22,18 @@ public:
     }
 
     inline void
-    Update(const ValueType *__restrict input, SizeT idx) {
-        if(is_set_) return ;
+    Update(const ValueType* __restrict input, SizeT idx) {
+        if(is_set_)
+            return;
 
         is_set_ = true;
         value_ = input[idx];
     }
 
     inline void
-    ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) {
-        if(is_set_) return ;
+    ConstantUpdate(const ValueType* __restrict input, SizeT idx, SizeT count) {
+        if(is_set_)
+            return;
 
         is_set_ = true;
         value_ = input[idx];
@@ -43,7 +45,7 @@ public:
     }
 
     inline static SizeT
-    Size(const DataType &data_type) {
+    Size(const DataType& data_type) {
         return sizeof(FirstState<ValueType, ResultType>);
     }
 };
@@ -60,8 +62,9 @@ public:
     }
 
     inline void
-    Update(const VarcharT *__restrict input, SizeT idx) {
-        if(is_set_) return ;
+    Update(const VarcharT* __restrict input, SizeT idx) {
+        if(is_set_)
+            return;
 
         is_set_ = true;
         // This assignment will call varchar deep copy
@@ -69,8 +72,9 @@ public:
     }
 
     inline void
-    ConstantUpdate(const VarcharT *__restrict input, SizeT idx, SizeT count) {
-        if(is_set_) return ;
+    ConstantUpdate(const VarcharT* __restrict input, SizeT idx, SizeT count) {
+        if(is_set_)
+            return;
 
         is_set_ = true;
         // This assignment will call varchar deep copy
@@ -100,8 +104,9 @@ public:
     }
 
     inline void
-    Update(const PathT *__restrict input, SizeT idx) {
-        if(is_set_) return ;
+    Update(const PathT* __restrict input, SizeT idx) {
+        if(is_set_)
+            return;
 
         is_set_ = true;
         // This assignment will call varchar deep copy
@@ -109,8 +114,9 @@ public:
     }
 
     inline void
-    ConstantUpdate(const PathT *__restrict input, SizeT idx, SizeT count) {
-        if(is_set_) return ;
+    ConstantUpdate(const PathT* __restrict input, SizeT idx, SizeT count) {
+        if(is_set_)
+            return;
 
         is_set_ = true;
         // This assignment will call varchar deep copy
@@ -130,7 +136,7 @@ public:
 
 
 void
-RegisterFirstFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterFirstFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "FIRST";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);

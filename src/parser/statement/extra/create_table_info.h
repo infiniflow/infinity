@@ -35,7 +35,7 @@ ConstrainTypeToString(ConstraintType type);
 class TableElement {
 public:
     explicit
-    TableElement(TableElementType type): type_(type) {}
+    TableElement(TableElementType type) : type_(type) {}
 
     virtual
     ~TableElement() = default;
@@ -49,15 +49,15 @@ public:
               SharedPtr<DataType> column_type,
               String column_name,
               HashSet<ConstraintType> constraints)
-              : TableElement(TableElementType::kColumn),
+            : TableElement(TableElementType::kColumn),
               id_(id),
               column_type_(std::move(column_type)),
               name_(std::move(column_name)),
-              constraints_(std::move(constraints))
-    {}
+              constraints_(std::move(constraints)) {}
 
     ColumnDef(LogicalType logical_type, const SharedPtr<TypeInfo>& type_info_ptr)
-            : TableElement(TableElementType::kColumn), column_type_(MakeShared<DataType>(logical_type, std::move(type_info_ptr))) {}
+            : TableElement(TableElementType::kColumn),
+              column_type_(MakeShared<DataType>(logical_type, std::move(type_info_ptr))) {}
 
     inline
     ~ColumnDef() override = default;
@@ -127,8 +127,8 @@ public:
     String schema_name_{"default"};
     String table_name_{};
 
-    Vector<ColumnDef *> column_defs_{};
-    Vector<TableConstraint *> constraints_{};
+    Vector<ColumnDef*> column_defs_{};
+    Vector<TableConstraint*> constraints_{};
 
     SelectStatement* select_{nullptr};
 };

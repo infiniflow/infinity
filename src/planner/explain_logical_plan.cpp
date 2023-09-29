@@ -17,8 +17,8 @@
 namespace infinity {
 
 void
-ExplainLogicalPlan::Explain(const LogicalNode *statement,
-                            SharedPtr<Vector<SharedPtr<String>>> &result,
+ExplainLogicalPlan::Explain(const LogicalNode* statement,
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
                             i64 intent_size) {
     switch(statement->operator_type()) {
         case LogicalNodeType::kAggregate: {
@@ -141,7 +141,7 @@ ExplainLogicalPlan::Explain(const LogicalCreateSchema* create_node,
                             i64 intent_size) {
     {
         String create_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             create_header_str = String(intent_size - 2, ' ') + "-> CREATE SCHEMA ";
         } else {
             create_header_str = "CREATE SCHEMA ";
@@ -177,7 +177,7 @@ ExplainLogicalPlan::Explain(const LogicalCreateTable* create_node,
                             i64 intent_size) {
     {
         String create_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             create_header_str = String(intent_size - 2, ' ') + "-> CREATE TABLE ";
         } else {
             create_header_str = "CREATE TABLE ";
@@ -209,7 +209,7 @@ ExplainLogicalPlan::Explain(const LogicalCreateTable* create_node,
         const Vector<SharedPtr<ColumnDef>>& columns = create_node->table_definitions()->columns();
 
         String columns_str = String(intent_size, ' ') + " - columns: [";
-        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+        for(SizeT idx = 0; idx < column_count - 1; ++idx) {
             columns_str += columns[idx]->ToString() + ", ";
         }
         columns_str += columns.back()->ToString() + "]";
@@ -236,7 +236,7 @@ ExplainLogicalPlan::Explain(const LogicalCreateCollection* create_node,
                             i64 intent_size) {
     {
         String create_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             create_header_str = String(intent_size - 2, ' ') + "-> CREATE COLLECTION ";
         } else {
             create_header_str = "CREATE COLLECTION ";
@@ -254,7 +254,8 @@ ExplainLogicalPlan::Explain(const LogicalCreateCollection* create_node,
 
     // Collection name
     {
-        String collection_name_str = String(intent_size, ' ') + " - collection name: " + *create_node->collection_name();
+        String collection_name_str =
+                String(intent_size, ' ') + " - collection name: " + *create_node->collection_name();
         result->emplace_back(MakeShared<String>(collection_name_str));
     }
 
@@ -278,7 +279,7 @@ ExplainLogicalPlan::Explain(const LogicalCreateView* create_node,
                             i64 intent_size) {
     {
         String create_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             create_header_str = String(intent_size - 2, ' ') + "-> CREATE VIEW ";
         } else {
             create_header_str = "CREATE VIEW ";
@@ -298,7 +299,7 @@ ExplainLogicalPlan::Explain(const LogicalCreateView* create_node,
     // View name
     {
         String view_name_str = String(intent_size, ' ') + " - view name: "
-                                + create_node->create_view_info()->view_name_;
+                               + create_node->create_view_info()->view_name_;
         result->emplace_back(MakeShared<String>(view_name_str));
     }
 
@@ -309,8 +310,9 @@ ExplainLogicalPlan::Explain(const LogicalCreateView* create_node,
             PlannerError("No columns in the table");
         }
         String columns_str = String(intent_size, ' ') + " - columns: [";
-        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
-            columns_str += create_node->names_ptr()->at(idx) + " " + create_node->types_ptr()->at(idx)->ToString() + ", ";
+        for(SizeT idx = 0; idx < column_count - 1; ++idx) {
+            columns_str +=
+                    create_node->names_ptr()->at(idx) + " " + create_node->types_ptr()->at(idx)->ToString() + ", ";
         }
         columns_str += create_node->names_ptr()->back() + " " + create_node->types_ptr()->back()->ToString() + "]";
         result->emplace_back(MakeShared<String>(columns_str));
@@ -343,7 +345,7 @@ ExplainLogicalPlan::Explain(const LogicalDropSchema* drop_node,
                             i64 intent_size) {
     {
         String drop_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             drop_header_str = String(intent_size - 2, ' ') + "-> DROP SCHEMA ";
         } else {
             drop_header_str = "DROP SCHEMA ";
@@ -379,7 +381,7 @@ ExplainLogicalPlan::Explain(const LogicalDropTable* drop_node,
                             i64 intent_size) {
     {
         String drop_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             drop_header_str = String(intent_size - 2, ' ') + "-> DROP TABLE ";
         } else {
             drop_header_str = "DROP TABLE ";
@@ -421,7 +423,7 @@ ExplainLogicalPlan::Explain(const LogicalDropCollection* drop_node,
                             i64 intent_size) {
     {
         String drop_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             drop_header_str = String(intent_size - 2, ' ') + "-> DROP COLLECTION ";
         } else {
             drop_header_str = "DROP COLLECTION ";
@@ -463,7 +465,7 @@ ExplainLogicalPlan::Explain(const LogicalDropView* drop_node,
                             i64 intent_size) {
     {
         String drop_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             drop_header_str = String(intent_size - 2, ' ') + "-> DROP VIEW ";
         } else {
             drop_header_str = "DROP VIEW ";
@@ -505,7 +507,7 @@ ExplainLogicalPlan::Explain(const LogicalInsert* insert_node,
                             i64 intent_size) {
     {
         String insert_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             insert_header_str = String(intent_size - 2, ' ') + "-> INSERT ";
         } else {
             insert_header_str = "INSERT ";
@@ -542,7 +544,7 @@ ExplainLogicalPlan::Explain(const LogicalInsert* insert_node,
         if(value_count == 0) {
             PlannerError("No value list in insert statement");
         }
-        for(SizeT idx = 0; idx < value_count - 1; ++ idx) {
+        for(SizeT idx = 0; idx < value_count - 1; ++idx) {
             auto& value_expr = insert_node->value_list()[idx];
             insert_str += value_expr->Name() + ", ";
         }
@@ -558,11 +560,11 @@ ExplainLogicalPlan::Explain(const LogicalInsert* insert_node,
 
 void
 ExplainLogicalPlan::Explain(const LogicalProject* project_node,
-                    SharedPtr<Vector<SharedPtr<String>>>& result,
-                    i64 intent_size) {
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
     {
         String project_header;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             project_header = String(intent_size - 2, ' ') + "-> PROJECT ";
         } else {
             project_header = "PROJECT ";
@@ -583,10 +585,10 @@ ExplainLogicalPlan::Explain(const LogicalProject* project_node,
     {
         String expression_str = String(intent_size, ' ') + " - expressions: [";
         SizeT expr_count = project_node->expressions_.size();
-        if (expr_count == 0) {
+        if(expr_count == 0) {
             PlannerError("No expression list in projection node.");
         }
-        for (SizeT idx = 0; idx < expr_count - 1; ++idx) {
+        for(SizeT idx = 0; idx < expr_count - 1; ++idx) {
             Explain(project_node->expressions_[idx].get(), expression_str);
             expression_str += ", ";
         }
@@ -625,7 +627,7 @@ ExplainLogicalPlan::Explain(const LogicalFilter* filter_node,
         String output_columns_str = String(intent_size, ' ') + " - output columns: [";
         SharedPtr<Vector<String>> output_columns = filter_node->GetOutputNames();
         SizeT column_count = output_columns->size();
-        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+        for(SizeT idx = 0; idx < column_count - 1; ++idx) {
             output_columns_str += output_columns->at(idx) + ", ";
         }
         output_columns_str += output_columns->back() + "]";
@@ -657,7 +659,7 @@ ExplainLogicalPlan::Explain(const LogicalTableScan* table_scan_node,
 
     DBEntry* db_entry = TableCollectionEntry::GetDBEntry(table_scan_node->table_collection_ptr());
 
-    table_name += *db_entry->db_name_+ ".";
+    table_name += *db_entry->db_name_ + ".";
     table_name += *table_scan_node->table_collection_ptr()->table_collection_name_ + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
@@ -671,7 +673,7 @@ ExplainLogicalPlan::Explain(const LogicalTableScan* table_scan_node,
     if(column_count == 0) {
         PlannerError(fmt::format("No column in table: {}.", table_scan_node->TableAlias()));
     }
-    for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+    for(SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += table_scan_node->GetOutputNames()->at(idx) + ", ";
     }
     output_columns += table_scan_node->GetOutputNames()->back();
@@ -703,7 +705,7 @@ ExplainLogicalPlan::Explain(const LogicalKnnScan* knn_scan_node,
 
     DBEntry* db_entry = TableCollectionEntry::GetDBEntry(knn_scan_node->table_collection_ptr());
 
-    table_name += *db_entry->db_name_+ ".";
+    table_name += *db_entry->db_name_ + ".";
     table_name += *knn_scan_node->table_collection_ptr()->table_collection_name_ + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
@@ -714,9 +716,9 @@ ExplainLogicalPlan::Explain(const LogicalKnnScan* knn_scan_node,
     for(const auto& knn_expression: knn_scan_node->knn_expressions_) {
         KnnExpression* knn_expr_raw = static_cast<KnnExpression*>(knn_expression.get());
         // Embedding info
-        String embedding_info =  String(intent_size, ' ')
-                                 + " - embedding info: "
-                                 + knn_expr_raw->arguments().at(0)->Name();
+        String embedding_info = String(intent_size, ' ')
+                                + " - embedding info: "
+                                + knn_expr_raw->arguments().at(0)->Name();
         result->emplace_back(MakeShared<String>(embedding_info));
 
         String embedding_type_str = String(intent_size + 2, ' ')
@@ -730,8 +732,8 @@ ExplainLogicalPlan::Explain(const LogicalKnnScan* knn_scan_node,
         result->emplace_back(MakeShared<String>(embedding_dimension_str));
 
         String distance_type_str = String(intent_size + 2, ' ')
-                                     + " - distance type: "
-                                     + KnnExpr::KnnDistanceType2Str(knn_expr_raw->distance_type_);
+                                   + " - distance type: "
+                                   + KnnExpr::KnnDistanceType2Str(knn_expr_raw->distance_type_);
         result->emplace_back(MakeShared<String>(distance_type_str));
 
         // Query embedding
@@ -753,7 +755,7 @@ ExplainLogicalPlan::Explain(const LogicalKnnScan* knn_scan_node,
     if(column_count == 0) {
         PlannerError(fmt::format("No column in table: {}.", knn_scan_node->TableAlias()));
     }
-    for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+    for(SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += knn_scan_node->GetOutputNames()->at(idx) + ", ";
     }
     output_columns += knn_scan_node->GetOutputNames()->back();
@@ -768,8 +770,8 @@ ExplainLogicalPlan::Explain(const LogicalKnnScan* knn_scan_node,
 
 void
 ExplainLogicalPlan::Explain(const LogicalAggregate* aggregate_node,
-        SharedPtr<Vector<SharedPtr<String>>>& result,
-        i64 intent_size) {
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
     SizeT groups_count = aggregate_node->groups_.size();
     SizeT aggregates_count = aggregate_node->aggregates_.size();
     if(groups_count == 0 && aggregate_node == 0) {
@@ -778,7 +780,7 @@ ExplainLogicalPlan::Explain(const LogicalAggregate* aggregate_node,
 
     {
         String agg_header;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             agg_header = String(intent_size - 2, ' ') + "-> AGGREGATE ";
         } else {
             agg_header = "AGGREGATE ";
@@ -798,8 +800,8 @@ ExplainLogicalPlan::Explain(const LogicalAggregate* aggregate_node,
     // Aggregate expressions
     {
         String aggregate_expression_str = String(intent_size, ' ') + " - aggregate: [";
-        if (aggregates_count != 0) {
-            for (SizeT idx = 0; idx < aggregates_count - 1; ++idx) {
+        if(aggregates_count != 0) {
+            for(SizeT idx = 0; idx < aggregates_count - 1; ++idx) {
                 Explain(aggregate_node->aggregates_[idx].get(), aggregate_expression_str);
                 aggregate_expression_str += ", ";
             }
@@ -810,14 +812,14 @@ ExplainLogicalPlan::Explain(const LogicalAggregate* aggregate_node,
     }
 
     // Group by expressions
-    if (groups_count != 0) {
+    if(groups_count != 0) {
         // Group by table index
         String group_table_index = String(intent_size, ' ') + " - group by table index: #"
                                    + std::to_string(aggregate_node->groupby_index_);
         result->emplace_back(MakeShared<String>(group_table_index));
 
         String group_by_expression_str = String(intent_size, ' ') + " - group by: [";
-        for (SizeT idx = 0; idx < groups_count - 1; ++idx) {
+        for(SizeT idx = 0; idx < groups_count - 1; ++idx) {
             Explain(aggregate_node->groups_[idx].get(), group_by_expression_str);
             group_by_expression_str += ", ";
         }
@@ -834,11 +836,11 @@ ExplainLogicalPlan::Explain(const LogicalAggregate* aggregate_node,
 
 void
 ExplainLogicalPlan::Explain(const LogicalSort* sort_node,
-        SharedPtr<Vector<SharedPtr<String>>>& result,
-        i64 intent_size) {
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
     {
         String sort_header;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             sort_header = String(intent_size - 2, ' ') + "-> SORT ";
         } else {
             sort_header = "SORT ";
@@ -851,11 +853,11 @@ ExplainLogicalPlan::Explain(const LogicalSort* sort_node,
     {
         String sort_expression_str = String(intent_size, ' ') + " - expressions: [";
         SizeT order_by_count = sort_node->expressions_.size();
-        if (order_by_count == 0) {
+        if(order_by_count == 0) {
             PlannerError("ORDER BY without any expression.")
         }
 
-        for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
+        for(SizeT idx = 0; idx < order_by_count - 1; ++idx) {
             Explain(sort_node->expressions_[idx].get(), sort_expression_str);
             sort_expression_str += " " + ToString(sort_node->order_by_types_[idx]) + ", ";
         }
@@ -869,7 +871,7 @@ ExplainLogicalPlan::Explain(const LogicalSort* sort_node,
         String output_columns_str = String(intent_size, ' ') + " - output columns: [";
         SharedPtr<Vector<String>> output_columns = sort_node->GetOutputNames();
         SizeT column_count = output_columns->size();
-        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+        for(SizeT idx = 0; idx < column_count - 1; ++idx) {
             output_columns_str += output_columns->at(idx) + ", ";
         }
         output_columns_str += output_columns->back() + "]";
@@ -884,11 +886,11 @@ ExplainLogicalPlan::Explain(const LogicalSort* sort_node,
 
 void
 ExplainLogicalPlan::Explain(const LogicalLimit* limit_node,
-        SharedPtr<Vector<SharedPtr<String>>>& result,
-        i64 intent_size) {
+                            SharedPtr<Vector<SharedPtr<String>>>& result,
+                            i64 intent_size) {
     {
         String limit_header;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             limit_header = String(intent_size - 2, ' ') + "-> LIMIT ";
         } else {
             limit_header = "LIMIT ";
@@ -915,7 +917,7 @@ ExplainLogicalPlan::Explain(const LogicalLimit* limit_node,
         String output_columns_str = String(intent_size, ' ') + " - output columns: [";
         SharedPtr<Vector<String>> output_columns = limit_node->GetOutputNames();
         SizeT column_count = output_columns->size();
-        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+        for(SizeT idx = 0; idx < column_count - 1; ++idx) {
             output_columns_str += output_columns->at(idx) + ", ";
         }
         output_columns_str += output_columns->back() + "]";
@@ -934,7 +936,7 @@ ExplainLogicalPlan::Explain(const LogicalCrossProduct* cross_product_node,
                             i64 intent_size) {
     {
         String cross_product_header;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             cross_product_header = String(intent_size - 2, ' ') + "-> CROSS PRODUCT ";
         } else {
             cross_product_header = "CROSS PRODUCT ";
@@ -948,7 +950,7 @@ ExplainLogicalPlan::Explain(const LogicalCrossProduct* cross_product_node,
         String output_columns_str = String(intent_size, ' ') + " - output columns: [";
         SharedPtr<Vector<String>> output_columns = cross_product_node->GetOutputNames();
         SizeT column_count = output_columns->size();
-        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+        for(SizeT idx = 0; idx < column_count - 1; ++idx) {
             output_columns_str += output_columns->at(idx) + ", ";
         }
         output_columns_str += output_columns->back() + "]";
@@ -971,7 +973,7 @@ ExplainLogicalPlan::Explain(const LogicalJoin* join_node,
                             i64 intent_size) {
     {
         String join_header;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             join_header = String(intent_size - 2, ' ') + "-> ";
         }
         join_header += ToString(join_node->join_type_);
@@ -984,11 +986,11 @@ ExplainLogicalPlan::Explain(const LogicalJoin* join_node,
         String condition_str = String(intent_size, ' ') + " - filters: [";
 
         SizeT conditions_count = join_node->conditions_.size();
-        if (conditions_count == 0) {
+        if(conditions_count == 0) {
             PlannerError("JOIN without any condition.")
         }
 
-        for (SizeT idx = 0; idx < conditions_count - 1; ++idx) {
+        for(SizeT idx = 0; idx < conditions_count - 1; ++idx) {
             Explain(join_node->conditions_[idx].get(), condition_str);
             condition_str += ", ";
         }
@@ -1001,7 +1003,7 @@ ExplainLogicalPlan::Explain(const LogicalJoin* join_node,
         String output_columns_str = String(intent_size, ' ') + " - output columns: [";
         SharedPtr<Vector<String>> output_columns = join_node->GetOutputNames();
         SizeT column_count = output_columns->size();
-        for(SizeT idx = 0; idx < column_count - 1; ++ idx) {
+        for(SizeT idx = 0; idx < column_count - 1; ++idx) {
             output_columns_str += output_columns->at(idx) + ", ";
         }
         output_columns_str += output_columns->back() + "]";
@@ -1025,7 +1027,7 @@ ExplainLogicalPlan::Explain(const LogicalShow* show_node,
     switch(show_node->scan_type()) {
         case ShowType::kShowTables: {
             String show_str;
-            if (intent_size != 0) {
+            if(intent_size != 0) {
                 show_str = String(intent_size - 2, ' ') + "-> SHOW TABLES ";
             } else {
                 show_str = "SHOW TABLES ";
@@ -1034,13 +1036,13 @@ ExplainLogicalPlan::Explain(const LogicalShow* show_node,
             result->emplace_back(MakeShared<String>(show_str));
 
             String output_columns_str = String(intent_size, ' ') +
-                    " - output columns: [database, table, type, column_count, row_count, segment_count, segment_capacity]";
+                                        " - output columns: [database, table, type, column_count, row_count, segment_count, segment_capacity]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
         case ShowType::kShowViews: {
             String show_str;
-            if (intent_size != 0) {
+            if(intent_size != 0) {
                 show_str = String(intent_size - 2, ' ') + "-> SHOW VIEWS ";
             } else {
                 show_str = "SHOW VIEWS ";
@@ -1054,7 +1056,7 @@ ExplainLogicalPlan::Explain(const LogicalShow* show_node,
         }
         case ShowType::kShowColumn: {
             String show_str;
-            if (intent_size != 0) {
+            if(intent_size != 0) {
                 show_str = String(intent_size - 2, ' ') + "-> DESCRIBE TABLE/COLLECTION ";
             } else {
                 show_str = "DESCRIBE TABLE/COLLECTION ";
@@ -1070,7 +1072,8 @@ ExplainLogicalPlan::Explain(const LogicalShow* show_node,
             show_column_table_str += show_node->object_name();
             result->emplace_back(MakeShared<String>(show_column_table_str));
 
-            String output_columns_str = String(intent_size, ' ') + " - output columns: [column_name, column_type, constraint]";
+            String output_columns_str =
+                    String(intent_size, ' ') + " - output columns: [column_name, column_type, constraint]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
@@ -1126,8 +1129,8 @@ ExplainLogicalPlan::Explain(const BaseExpression* base_expression, String& expr_
         case ExpressionType::kColumn: {
             ColumnExpression* column_expression = (ColumnExpression*)base_expression;
             expr_str += column_expression->Name() + " (#"
-                     + std::to_string(column_expression->binding().table_idx) + "."
-                     + std::to_string(column_expression->binding().column_idx) + ")";
+                        + std::to_string(column_expression->binding().table_idx) + "."
+                        + std::to_string(column_expression->binding().column_idx) + ")";
             break;
         }
         case ExpressionType::kFunction: {
@@ -1156,7 +1159,7 @@ ExplainLogicalPlan::Explain(const BaseExpression* base_expression, String& expr_
             // More than two arguments function
             expr_str += function_expression->func_.name() + "(";
             SizeT argument_count = function_expression->arguments().size();
-            for(SizeT idx = 0; idx < argument_count - 1; ++ idx) {
+            for(SizeT idx = 0; idx < argument_count - 1; ++idx) {
                 Explain(function_expression->arguments()[idx].get(), expr_str);
                 expr_str += ", ";
             }
@@ -1166,7 +1169,8 @@ ExplainLogicalPlan::Explain(const BaseExpression* base_expression, String& expr_
         }
         case ExpressionType::kBetween: {
             BetweenExpression* between_expression = (BetweenExpression*)base_expression;
-            PlannerAssert(between_expression->arguments().size() == 3, "Between expression should have three arguments.")
+            PlannerAssert(between_expression->arguments().size() == 3,
+                          "Between expression should have three arguments.")
             Explain(between_expression->arguments()[0].get(), expr_str);
             expr_str += " BETWEEN ";
             Explain(between_expression->arguments()[1].get(), expr_str);
@@ -1178,7 +1182,7 @@ ExplainLogicalPlan::Explain(const BaseExpression* base_expression, String& expr_
             InExpression* in_expression = (InExpression*)base_expression;
             expr_str += "IN[";
             SizeT argument_count = in_expression->arguments().size();
-            for(SizeT idx = 0; idx < argument_count - 1; ++ idx) {
+            for(SizeT idx = 0; idx < argument_count - 1; ++idx) {
                 Explain(in_expression->arguments()[idx].get(), expr_str);
                 expr_str += ", ";
             }
@@ -1212,7 +1216,7 @@ ExplainLogicalPlan::Explain(const LogicalImport* import_node,
                             i64 intent_size) {
     {
         String import_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             import_header_str = String(intent_size - 2, ' ') + "-> IMPORT ";
         } else {
             import_header_str = "IMPORT ";
@@ -1226,16 +1230,16 @@ ExplainLogicalPlan::Explain(const LogicalImport* import_node,
         DBEntry* db_entry = TableCollectionMeta::GetDBEntry(import_node->table_collection_entry()->table_collection_meta_);
         SharedPtr<String> schema_name
                 = MakeShared<String>(String(intent_size, ' ')
-                        + " - schema name: "
-                        + *db_entry->db_name_);
+                                     + " - schema name: "
+                                     + *db_entry->db_name_);
         result->emplace_back(schema_name);
     }
 
     {
         SharedPtr<String> table_name
                 = MakeShared<String>(String(intent_size, ' ')
-                        + " - table name: "
-                        + *import_node->table_collection_entry()->table_collection_name_);
+                                     + " - table name: "
+                                     + *import_node->table_collection_entry()->table_collection_name_);
         result->emplace_back(table_name);
     }
 
@@ -1251,7 +1255,8 @@ ExplainLogicalPlan::Explain(const LogicalImport* import_node,
             result->emplace_back(file_type);
 
             SharedPtr<String> header
-                    = MakeShared<String>(String(intent_size, ' ') + " - header: " + (import_node->header() ? "Yes": "No"));
+                    = MakeShared<String>(
+                            String(intent_size, ' ') + " - header: " + (import_node->header() ? "Yes" : "No"));
             result->emplace_back(header);
 
             SharedPtr<String> delimiter
@@ -1282,7 +1287,7 @@ ExplainLogicalPlan::Explain(const LogicalExport* export_node,
                             i64 intent_size) {
     {
         String export_header_str;
-        if (intent_size != 0) {
+        if(intent_size != 0) {
             export_header_str = String(intent_size - 2, ' ') + "-> EXPORT ";
         } else {
             export_header_str = "EXPORT ";
@@ -1316,7 +1321,8 @@ ExplainLogicalPlan::Explain(const LogicalExport* export_node,
             result->emplace_back(file_type);
 
             SharedPtr<String> header
-                    = MakeShared<String>(String(intent_size, ' ') + " - header: " + (export_node->header() ? "Yes": "No"));
+                    = MakeShared<String>(
+                            String(intent_size, ' ') + " - header: " + (export_node->header() ? "Yes" : "No"));
             result->emplace_back(header);
 
             SharedPtr<String> delimiter
@@ -1347,7 +1353,7 @@ ExplainLogicalPlan::Explain(const LogicalFlush* flush_node,
                             i64 intent_size) {
 
     String flush_header_str;
-    if (intent_size != 0) {
+    if(intent_size != 0) {
         flush_header_str = String(intent_size - 2, ' ') + "-> FLUSH ";
     } else {
         flush_header_str = "FLUSH ";

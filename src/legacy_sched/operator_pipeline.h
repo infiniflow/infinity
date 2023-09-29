@@ -11,7 +11,7 @@ namespace infinity {
 
 //class PhysicalOperator;
 
-class OperatorPipeline: public Pipeline {
+class OperatorPipeline : public Pipeline {
 public:
     explicit
     OperatorPipeline(SharedPtr<PhysicalOperator> op);

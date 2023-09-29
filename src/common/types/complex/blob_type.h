@@ -10,8 +10,8 @@ namespace infinity {
 
 struct BlobType {
 public:
-    ptr_t ptr {nullptr};
-    u64 size {0};  // 4GB will be the limitation.
+    ptr_t ptr{nullptr};
+    u64 size{0};  // 4GB will be the limitation.
 
 public:
     inline
@@ -20,8 +20,7 @@ public:
     // The blob_ptr will also be freed by BlobType's destructor.
     inline
     BlobType(ptr_t blob_ptr, u64 blob_size)
-        : ptr(blob_ptr), size(blob_size)
-        {}
+            : ptr(blob_ptr), size(blob_size) {}
 
     inline
     ~BlobType() {

@@ -28,12 +28,12 @@ public:
                    bool header,
                    char delimiter,
                    CopyFileType type)
-        : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id),
-          table_collection_entry_(table_collection_entry),
-          file_path_(std::move(file_path)),
-          header_(header),
-          delimiter_(delimiter),
-          file_type_(type) {}
+            : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id),
+              table_collection_entry_(table_collection_entry),
+              file_path_(std::move(file_path)),
+              header_(header),
+              delimiter_(delimiter),
+              file_type_(type) {}
 
     ~PhysicalImport() override = default;
 
@@ -61,25 +61,25 @@ public:
     ImportFVECS(QueryContext* query_context);
 
     void
-    ImportFVECS(QueryContext *query_context,
-                ImportInputState *input_state,
-                ImportOutputState *output_state);
+    ImportFVECS(QueryContext* query_context,
+                ImportInputState* input_state,
+                ImportOutputState* output_state);
 
     void
     ImportCSV(QueryContext* query_context);
 
     /// for push based execution
     void
-    ImportCSV(QueryContext *query_context,
-              ImportInputState *input_state,
-              ImportOutputState *output_state);
+    ImportCSV(QueryContext* query_context,
+              ImportInputState* input_state,
+              ImportOutputState* output_state);
 
 private:
     SizeT
     ImportFVECSHelper(QueryContext* query_context);
 
     void
-    ImportCSVHelper(QueryContext* query_context, ParserContext &parser_context);
+    ImportCSVHelper(QueryContext* query_context, ParserContext& parser_context);
 
 public:
     void
@@ -87,9 +87,9 @@ public:
 
     /// for push based execution
     void
-    ImportJSON(QueryContext *query_context,
-               ImportInputState *input_state,
-               ImportOutputState *output_state);
+    ImportJSON(QueryContext* query_context,
+               ImportInputState* input_state,
+               ImportOutputState* output_state);
 
     inline const TableCollectionEntry*
     table_collection_entry() const {
@@ -119,17 +119,17 @@ public:
 private:
 
     static void
-    CSVHeaderHandler(void *);
+    CSVHeaderHandler(void*);
 
     static void
-    CSVRowHandler(void *);
+    CSVRowHandler(void*);
 
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
     TableCollectionEntry* table_collection_entry_{};
-    CopyFileType file_type_ {CopyFileType::kCSV};
+    CopyFileType file_type_{CopyFileType::kCSV};
     String file_path_{};
     bool header_{false};
     char delimiter_{','};

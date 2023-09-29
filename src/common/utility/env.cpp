@@ -6,7 +6,7 @@
 
 #define RETRY_ON_EINTR(err, expr) do { \
   static_assert(std::is_signed<decltype(err)>::value, \
-                #err " must be a signed integer"); \
+#err " must be a signed integer"); \
   (err) = (expr); \
 } while ((err) == -1 && errno == EINTR)
 

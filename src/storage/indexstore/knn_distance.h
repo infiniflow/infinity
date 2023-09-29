@@ -23,7 +23,7 @@ enum class KnnDistanceAlgoType {
 class KnnDistanceBase {
 public:
     explicit
-    KnnDistanceBase(KnnDistanceAlgoType type, EmbeddingDataType elem_type): algo_type_(type), elem_type_(elem_type) {}
+    KnnDistanceBase(KnnDistanceAlgoType type, EmbeddingDataType elem_type) : algo_type_(type), elem_type_(elem_type) {}
 
     [[nodiscard]] inline KnnDistanceAlgoType
     algo_type() const {
@@ -44,7 +44,7 @@ template<typename DistType>
 class KnnDistance : public KnnDistanceBase {
 public:
     explicit
-    KnnDistance(KnnDistanceAlgoType type, EmbeddingDataType elem_type): KnnDistanceBase(type, elem_type) {}
+    KnnDistance(KnnDistanceAlgoType type, EmbeddingDataType elem_type) : KnnDistanceBase(type, elem_type) {}
 
     virtual void
     Begin() = 0;

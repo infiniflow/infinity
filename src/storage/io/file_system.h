@@ -13,8 +13,9 @@ class FileSystem;
 
 class FileHandler {
 public:
-    FileHandler(FileSystem &file_system, String path) : file_system_(file_system), path_(std::move(path)) {}
-    FileHandler(const FileHandler &) = delete;
+    FileHandler(FileSystem& file_system, String path) : file_system_(file_system), path_(std::move(path)) {}
+
+    FileHandler(const FileHandler&) = delete;
 
     virtual
     ~FileHandler() = default;

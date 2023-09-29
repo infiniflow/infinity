@@ -29,7 +29,7 @@ BindBitmapCast(DataType& target) {
 struct BitmapTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(const SourceType& source, TargetType &target, const SharedPtr<ColumnVector>& vector_ptr){
+    Run(const SourceType& source, TargetType& target, const SharedPtr<ColumnVector>& vector_ptr) {
         FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -37,7 +37,7 @@ struct BitmapTryCastToVarlen {
 
 template<>
 inline bool
-BitmapTryCastToVarlen::Run(const BitmapT& source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr) {
+BitmapTryCastToVarlen::Run(const BitmapT& source, VarcharT& target, const SharedPtr<ColumnVector>& vector_ptr) {
     NotImplementError("Not implemented");
 }
 

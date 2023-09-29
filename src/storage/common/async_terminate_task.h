@@ -11,7 +11,7 @@ namespace infinity {
 class AsyncTerminateTask final : public AsyncTask {
 public:
     explicit
-    AsyncTerminateTask(): AsyncTask(AsyncTaskType::kTerminate) {}
+    AsyncTerminateTask() : AsyncTask(AsyncTaskType::kTerminate) {}
 
     String
     ToString() final {

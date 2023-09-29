@@ -14,17 +14,17 @@ OrderBinder::PushExtraExprToSelectList(ParsedExpr* expr, const SharedPtr<BindCon
         ConstantExpr* order_by_index = (ConstantExpr*)expr;
         PlannerAssert(order_by_index->literal_type_ == LiteralType::kInteger, "Error Order by expression")
         // Order by 1, means order by 1st select list item.
-        return ;
+        return;
     }
 
     String expr_name = expr->GetName();
 
     if(bind_context_ptr->select_alias2index_.contains(expr_name)) {
-        return ;
+        return;
     }
 
     if(bind_context_ptr->select_expr_name2index_.contains(expr_name)) {
-        return ;
+        return;
     }
 
     bind_context_ptr->select_expr_name2index_[expr_name] = bind_context_ptr->select_expression_.size();
@@ -47,10 +47,10 @@ OrderBinder::BuildExpression(const ParsedExpr& expr,
         ConstantExpr& const_expr = (ConstantExpr&)expr;
         if(const_expr.literal_type_ == LiteralType::kInteger) {
             column_id = const_expr.integer_value_;
-            if (column_id >= bind_context_ptr->project_exprs_.size()) {
+            if(column_id >= bind_context_ptr->project_exprs_.size()) {
                 PlannerError("Order by are going to use nonexistent column from select list.")
             }
-            -- column_id;
+            --column_id;
         } else {
             PlannerError("Order by non-integer constant value.")
         }
@@ -69,7 +69,6 @@ OrderBinder::BuildExpression(const ParsedExpr& expr,
             PlannerError(expr_name + " isn't found in project list.")
         }
     }
-
 
 
     const SharedPtr<BaseExpression>& project_expr = bind_context_ptr->project_exprs_[column_id];

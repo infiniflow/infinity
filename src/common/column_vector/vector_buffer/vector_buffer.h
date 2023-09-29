@@ -43,10 +43,10 @@ public:
     GetData() const { return data_.get(); }
 
 public:
-    bool initialized_ {false};
-    UniquePtr<char[]> data_ {nullptr};
-    SizeT data_size_ {0};
-    SizeT capacity_ {0};
+    bool initialized_{false};
+    UniquePtr<char[]> data_{nullptr};
+    SizeT data_size_{0};
+    SizeT capacity_{0};
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
 
     UniquePtr<StringHeapMgr> heap_mgr_{nullptr};

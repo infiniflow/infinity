@@ -14,7 +14,7 @@ struct __attribute__((packed)) FloatMixedType : public BaseMixedType {
     i8 _dummy1{};
     i16 _dummy2{};
     i32 _dummy3{};
-    f64 value {0};
+    f64 value{0};
 };
 
 }

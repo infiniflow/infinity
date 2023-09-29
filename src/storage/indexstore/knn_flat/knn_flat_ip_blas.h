@@ -18,10 +18,10 @@ class KnnFlatIPBlas final : public KnnDistance<DistType> {
 public:
     explicit
     KnnFlatIPBlas(const DistType* queries,
-              i64 query_count,
-              i64 topk,
-              i64 dimension,
-              EmbeddingDataType elem_data_type)
+                  i64 query_count,
+                  i64 topk,
+                  i64 dimension,
+                  EmbeddingDataType elem_data_type)
             : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIpBlas, elem_data_type),
               queries_(queries),
               query_count_(query_count),
@@ -30,7 +30,10 @@ public:
         id_array_ = MakeUnique<Vector<CompoundID>>(topk * query_count_, CompoundID(-1, -1));
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * topk * query_count_);
 
-        heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, distance_array_.get(), id_array_->data(), topk);
+        heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count,
+                                                             distance_array_.get(),
+                                                             id_array_->data(),
+                                                             topk);
     }
 
     void

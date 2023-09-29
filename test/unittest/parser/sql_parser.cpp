@@ -59,32 +59,52 @@ TEST_F(SQLParserTest, good_test1) {
     inputs.emplace_back("flush log;");
     inputs.emplace_back("flush buffer;");
 
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'integer', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'integer', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'integer', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'integer', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
 
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'smallint', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'smallint', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'smallint', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'smallint', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'smallint', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'smallint', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
 
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'bigint', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'bigint', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'bigint', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'bigint', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'bigint', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'bigint', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
 
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'tinyint', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'tinyint', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'tinyint', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'tinyint', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'tinyint', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1, 2], 2, 'tinyint', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
 
-    inputs.emplace_back("SELECT KNN(c1, [1.0, 2.0], 2, 'float', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1.0, 2.0], 2, 'float', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1.0, 2.0], 2, 'float', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1.0, 2.0], 2, 'float', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1.0, 2.0], 2, 'float', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1.0, 2.0], 2, 'float', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
 
-    inputs.emplace_back("SELECT KNN(c1, [1.222222222222, 2.11111111111111], 2, 'double', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1.222222222222, 2.11111111111111], 2, 'double', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1.222222222222, 2.11111111111111], 2, 'double', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1.222222222222, 2.11111111111111], 2, 'double', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1.222222222222, 2.11111111111111], 2, 'double', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1.222222222222, 2.11111111111111], 2, 'double', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
 
-    inputs.emplace_back("SELECT KNN(c1, [1,0,1,0,1,1,0,0], 8, 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
-    inputs.emplace_back("SELECT KNN(c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 32, 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1,0,1,0,1,1,0,0], 8, 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
+    inputs.emplace_back(
+            "SELECT KNN(c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 32, 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
 
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
@@ -423,16 +443,16 @@ TEST_F(SQLParserTest, good_test2) {
             EXPECT_EQ(create_table_info->constraints_.size(), 2);
             {
                 EXPECT_EQ(create_table_info->constraints_[0]->constraint_, ConstraintType::kPrimaryKey);
-                const String &column1 = (*(create_table_info->constraints_[0]->names_ptr_))[0];
-                const String &column2 = (*(create_table_info->constraints_[0]->names_ptr_))[1];
+                const String& column1 = (*(create_table_info->constraints_[0]->names_ptr_))[0];
+                const String& column2 = (*(create_table_info->constraints_[0]->names_ptr_))[1];
                 EXPECT_EQ(column1, "a");
                 EXPECT_EQ(column2, "b");
             }
 
             {
                 EXPECT_EQ(create_table_info->constraints_[1]->constraint_, ConstraintType::kUnique);
-                const String &column3 = (*(create_table_info->constraints_[1]->names_ptr_))[0];
-                const String &column4 = (*(create_table_info->constraints_[1]->names_ptr_))[1];
+                const String& column3 = (*(create_table_info->constraints_[1]->names_ptr_))[0];
+                const String& column4 = (*(create_table_info->constraints_[1]->names_ptr_))[1];
                 EXPECT_EQ(column3, "c");
                 EXPECT_EQ(column4, "d");
             }

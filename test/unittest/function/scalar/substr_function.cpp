@@ -12,7 +12,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
 #include "function/scalar/substring.h"
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
@@ -53,11 +52,11 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
 
         SharedPtr<DataType> data_type0 = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(*data_type0,
-                                                                                "t1",
-                                                                                1,
-                                                                                "c1",
-                                                                                0,
-                                                                                0);
+                                                                                 "t1",
+                                                                                 1,
+                                                                                 "c1",
+                                                                                 0,
+                                                                                 0);
 
         Value v1 = Value::MakeBigInt(1);
         SharedPtr<ValueExpression> pos_value_expr = MakeShared<ValueExpression>(v1);
@@ -89,7 +88,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         col2->Initialize(ColumnVectorType::kConstant);
         len_value_expr->AppendToChunk(col2);
 
-        for(SizeT idx = 0; idx < row_count; ++ idx) {
+        for(SizeT idx = 0; idx < row_count; ++idx) {
             String s = "hello" + std::to_string(idx);
             VarcharT varchar_value(s);
             Value v = Value::MakeVarchar(varchar_value);
@@ -113,7 +112,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT idx = 0; idx < row_count; ++ idx) {
+        for(SizeT idx = 0; idx < row_count; ++idx) {
             Value vx = result->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_TRUE(vx.value_.varchar.IsInlined());
@@ -168,7 +167,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         col2->Initialize(ColumnVectorType::kConstant);
         len_value_expr->AppendToChunk(col2);
 
-        for(SizeT idx = 0; idx < row_count; ++ idx) {
+        for(SizeT idx = 0; idx < row_count; ++idx) {
             String s = "hellohellohellohello" + std::to_string(idx);
             VarcharT varchar_value(s);
             Value v = Value::MakeVarchar(varchar_value);
@@ -192,7 +191,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT idx = 0; idx < row_count; ++ idx) {
+        for(SizeT idx = 0; idx < row_count; ++idx) {
             Value vx = result->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_TRUE(vx.value_.varchar.IsInlined());

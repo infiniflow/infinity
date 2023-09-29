@@ -104,8 +104,8 @@ SQLRunner::RunV2(const String& sql_text, bool print) {
                             Infinity::instance().resource_manager());
     query_context_ptr->set_current_schema(session_ptr->current_database());
 
-    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr <ParserResult> parsed_result = MakeShared<ParserResult>();
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
     parser->Parse(sql_text, parsed_result);
 
     if(parsed_result->IsError()) {
@@ -114,7 +114,6 @@ SQLRunner::RunV2(const String& sql_text, bool print) {
 
     query_context_ptr->CreateTxn();
     query_context_ptr->BeginTxn();
-
 
 
     LogicalPlanner logical_planner(query_context_ptr.get());

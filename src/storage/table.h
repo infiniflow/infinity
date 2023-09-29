@@ -48,11 +48,10 @@ public:
 public:
     explicit
     Table(SharedPtr<TableDef> table_def_ptr, TableType type)
-        : BaseTable(TableCollectionType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()),
-        definition_ptr_(std::move(table_def_ptr)),
-        row_count_(0),
-        type_(type)
-        {}
+            : BaseTable(TableCollectionType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()),
+              definition_ptr_(std::move(table_def_ptr)),
+              row_count_(0),
+              type_(type) {}
 
 public:
     [[nodiscard]] SizeT
@@ -93,7 +92,7 @@ public:
     [[nodiscard]] SharedPtr<DataBlock>&
     GetDataBlockById(SizeT idx) {
         StorageAssert(idx < data_blocks_.size(), "Attempt to access invalid index: " +
-                      std::to_string(idx) + "/" + std::to_string(DataBlockCount()))
+                                                 std::to_string(idx) + "/" + std::to_string(DataBlockCount()))
         return data_blocks_[idx];
     }
 
@@ -138,6 +137,7 @@ public:
     // Currently this method is used in aggregate operator.
     void
     UnionWith(const SharedPtr<Table>& other);
+
 public:
     SharedPtr<TableDef> definition_ptr_;
     SizeT row_count_{0};

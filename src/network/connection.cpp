@@ -14,9 +14,9 @@
 namespace infinity {
 
 Connection::Connection(boost::asio::io_service& io_service)
-    : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)),
-      pg_handler_(MakeShared<PGProtocolHandler>(socket())),
-      session_(MakeUnique<Session>()){}
+        : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)),
+          pg_handler_(MakeShared<PGProtocolHandler>(socket())),
+          session_(MakeUnique<Session>()) {}
 
 void
 Connection::Run() {
@@ -31,10 +31,10 @@ Connection::Run() {
     while(!terminate_connection_) {
         try {
             HandleRequest();
-        } catch (const infinity::ClientException& e) {
+        } catch(const infinity::ClientException& e) {
             LOG_TRACE("Client is closed");
-            return ;
-        } catch (const std::exception& e) {
+            return;
+        } catch(const std::exception& e) {
             HashMap<PGMessageType, String> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();
             LOG_ERROR(e.what());
@@ -62,7 +62,7 @@ Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
     UniquePtr<QueryContext> query_context_ptr
-        = MakeUnique<QueryContext>();
+            = MakeUnique<QueryContext>();
     query_context_ptr->Init(session_.get(),
                             Infinity::instance().config(),
                             Infinity::instance().fragment_scheduler(),
@@ -70,7 +70,7 @@ Connection::HandleRequest() {
                             Infinity::instance().resource_manager());
     query_context_ptr->set_current_schema(session_->current_database());
 
-    switch (cmd_type) {
+    switch(cmd_type) {
         case PGMessageType::kBindCommand: {
             LOG_TRACE("BindCommand");
             break;
@@ -133,16 +133,17 @@ void
 Connection::SendTableDescription(const SharedPtr<Table>& result_table) {
     u32 column_name_length_sum = 0;
     SizeT column_count = result_table->ColumnCount();
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         column_name_length_sum += result_table->GetColumnNameById(idx).length();
     }
 
     // No output columns, no need to send table description, just return.
-    if (column_name_length_sum == 0) return ;
+    if(column_name_length_sum == 0)
+        return;
 
     pg_handler_->SendDescriptionHeader(column_name_length_sum, column_count);
 
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         SharedPtr<DataType> column_type = result_table->GetColumnTypeById(idx);
 
         u32 object_id = 0;
@@ -269,15 +270,15 @@ Connection::SendQueryResponse(const QueryResult& query_result) {
     SizeT column_count = result_table->ColumnCount();
     auto values_as_strings = std::vector<std::optional<String>>(column_count);
     SizeT block_count = result_table->DataBlockCount();
-    for(SizeT idx = 0; idx < block_count; ++ idx) {
+    for(SizeT idx = 0; idx < block_count; ++idx) {
         auto block = result_table->GetDataBlockById(idx);
         SizeT row_count = block->row_count();
 
-        for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
+        for(SizeT row_id = 0; row_id < row_count; ++row_id) {
             SizeT string_length_sum = 0;
 
             // iterate each column_vector of the block
-            for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+            for(SizeT column_id = 0; column_id < column_count; ++column_id) {
                 auto& column_vector = block->column_vectors[column_id];
                 const String string_value = column_vector->ToString(row_id);
                 values_as_strings[column_id] = string_value;
@@ -288,7 +289,7 @@ Connection::SendQueryResponse(const QueryResult& query_result) {
     }
 
     String message;
-    switch (query_result.root_operator_type_) {
+    switch(query_result.root_operator_type_) {
         case LogicalNodeType::kInsert: {
             message = "INSERT 0 1";
             break;

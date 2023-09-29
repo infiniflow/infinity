@@ -19,12 +19,12 @@ public:
     }
 
     void
-    Update(ValueType *__restrict input, SizeT idx) {
-        count_ ++;
+    Update(ValueType* __restrict input, SizeT idx) {
+        count_++;
     }
 
     inline void
-    ConstantUpdate(ValueType *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(ValueType* __restrict input, SizeT idx, SizeT count) {
         count_ += count;
     }
 
@@ -40,7 +40,7 @@ public:
 };
 
 void
-RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterCountFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "COUNT";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -104,8 +104,8 @@ RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     {
         AggregateFunction count_function
                 = UnaryAggregate<CountState<DecimalT, BigIntT>, DecimalT, BigIntT>(func_name,
-                                                                                         DataType(LogicalType::kDecimal),
-                                                                                         DataType(LogicalType::kBigInt));
+                                                                                   DataType(LogicalType::kDecimal),
+                                                                                   DataType(LogicalType::kBigInt));
         function_set_ptr->AddFunction(count_function);
     }
     {

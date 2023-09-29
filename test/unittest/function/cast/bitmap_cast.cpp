@@ -37,7 +37,7 @@ TEST_F(BitmapCastTest, bitmap_cast0) {
     {
         BitmapT source;
         source.Initialize(128);
-        for(i64 j = 0; j < 128; ++ j) {
+        for(i64 j = 0; j < 128; ++j) {
             if(j % 2 == 0) {
                 source.SetBit(j, true);
             } else {
@@ -51,7 +51,7 @@ TEST_F(BitmapCastTest, bitmap_cast0) {
     {
         BitmapT source;
         source.Initialize(128);
-        for(i64 j = 0; j < 128; ++ j) {
+        for(i64 j = 0; j < 128; ++j) {
             if(j % 2 == 0) {
                 source.SetBit(j, true);
             } else {
@@ -83,10 +83,10 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kBitmap);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++ j) {
+        for(i64 j = 0; j <= i; ++j) {
             if(j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
@@ -97,10 +97,10 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
         col_source->AppendValue(v);
         Value vx = col_source->GetValue(i);
     }
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++ j) {
+        for(i64 j = 0; j <= i; ++j) {
             if(j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
@@ -121,6 +121,7 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters),
+                     NotImplementException);
     }
 }

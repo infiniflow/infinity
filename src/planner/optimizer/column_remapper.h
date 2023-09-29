@@ -9,10 +9,11 @@
 
 namespace infinity {
 
-class BindingRemapper: public LogicalNodeVisitor {
+class BindingRemapper : public LogicalNodeVisitor {
 public:
     void
     VisitNode(LogicalNode& op) final;
+
 private:
 
     SharedPtr<BaseExpression>
@@ -21,7 +22,7 @@ private:
     Vector<ColumnBinding> bindings_;
 };
 
-class ColumnRemapper: public OptimizerRule {
+class ColumnRemapper : public OptimizerRule {
 public:
     inline void
     ApplyToPlan(QueryContext* query_context_ptr,
@@ -37,7 +38,6 @@ public:
 private:
     BindingRemapper remapper_{};
 };
-
 
 
 }

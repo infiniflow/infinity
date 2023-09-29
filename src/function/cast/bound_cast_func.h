@@ -12,9 +12,9 @@ struct CastParameters {
     bool strict{false};
 };
 
-using cast_function_t = bool(*)(const SharedPtr<ColumnVector>& source,
-                                SharedPtr<ColumnVector>& result, size_t count,
-                                CastParameters& parameters);
+using cast_function_t = bool (*)(const SharedPtr<ColumnVector>& source,
+                                 SharedPtr<ColumnVector>& result, size_t count,
+                                 CastParameters& parameters);
 
 struct BoundCastFunc {
     explicit

@@ -19,8 +19,9 @@ namespace infinity {
  *
  * Returns the partition threshold. The elements q:n are destroyed on output.
  */
-template <class C>
-typename C::T partition_fuzzy(
+template<class C>
+typename C::T
+partition_fuzzy(
         typename C::T* vals,
         typename C::TI* ids,
         size_t n,
@@ -29,8 +30,9 @@ typename C::T partition_fuzzy(
         size_t* q_out);
 
 /** simplified interface for when the parition is not fuzzy */
-template <class C>
-inline typename C::T partition(
+template<class C>
+inline typename C::T
+partition(
         typename C::T* vals,
         typename C::TI* ids,
         size_t n,
@@ -43,7 +45,8 @@ inline typename C::T partition(
 /** 8-bin histogram of (x - min) >> shift
 * values outside the range are ignored.
 * the data table should be aligned on 32 bytes */
-void simd_histogram_8(
+void
+simd_histogram_8(
         const uint16_t* data,
         int n,
         uint16_t min,
@@ -51,7 +54,8 @@ void simd_histogram_8(
         int* hist);
 
 /** same for 16-bin histogram */
-void simd_histogram_16(
+void
+simd_histogram_16(
         const uint16_t* data,
         int n,
         uint16_t min,
@@ -65,7 +69,9 @@ struct PartitionStats {
     PartitionStats() {
         reset();
     }
-    void reset();
+
+    void
+    reset();
 };
 
 // global var that collects them all

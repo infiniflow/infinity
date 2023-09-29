@@ -23,7 +23,7 @@ Binding::MakeBinding(BindingType binding_type,
     binding->column_types_ = std::move(column_types);
     binding->column_names_ = std::move(column_names);
 
-    for(size_t idx = 0; idx < column_count; ++ idx) {
+    for(size_t idx = 0; idx < column_count; ++idx) {
         binding->name2index_[binding->column_names_->at(idx)] = static_cast<i64>(idx);
     }
     return binding;

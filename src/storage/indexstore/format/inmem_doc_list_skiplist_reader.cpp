@@ -1,9 +1,10 @@
 #include "inmem_doc_list_skiplist_reader.h"
 #include "main/logger.h"
 
-namespace infinity{
+namespace infinity {
 
-void InMemDocListSkipListReader::Load(BufferedByteSlice* posting_buffer) {
+void
+InMemDocListSkipListReader::Load(BufferedByteSlice* posting_buffer) {
     InitMember();
     BufferedByteSlice* skiplist_buffer = new BufferedByteSlice(session_pool_, session_pool_);
     posting_buffer->SnapShot(skiplist_buffer);

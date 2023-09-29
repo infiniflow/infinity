@@ -10,9 +10,10 @@
 namespace infinity {
 
 class TaskResult;
+
 struct TaskResultQueue {
     void
-    Enqueue(TaskResult *task) {
+    Enqueue(TaskResult* task) {
         queue_.enqueue(task);
     }
 
@@ -23,11 +24,11 @@ struct TaskResultQueue {
     }
 
     void
-    Dequeue(TaskResult *&task) {
+    Dequeue(TaskResult*& task) {
         queue_.wait_dequeue(task);
     }
 
-    moodycamel::BlockingConcurrentQueue<TaskResult *> queue_;
+    moodycamel::BlockingConcurrentQueue<TaskResult*> queue_;
 };
 
 }

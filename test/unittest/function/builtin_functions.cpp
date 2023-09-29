@@ -9,7 +9,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-//#include "storage/catalog.h"
+//
 //#include "func/builtin_functions.h"
 
 class BuiltinFunctionsTest : public BaseTest {

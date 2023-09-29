@@ -11,7 +11,7 @@
 namespace infinity {
 
 void
-RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterTableScanFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
 class TableScanFunction : public TableFunction {
 public:
@@ -25,8 +25,7 @@ public:
 public:
     explicit
     TableScanFunction(String name, TableFunctionType function)
-            : TableFunction(std::move(name), {}, std::move(function))
-    {}
+            : TableFunction(std::move(name), {}, std::move(function)) {}
 
 private:
 };
@@ -34,6 +33,6 @@ private:
 static void
 TableScanFunc(QueryContext* query_context,
               TableFunctionData* table_function_data_ptr,
-              DataBlock &output);
+              DataBlock& output);
 
 }

@@ -11,7 +11,6 @@
 #include "main/infinity.h"
 #include "executor/expression/expression_evaluator.h"
 
-#include "storage/catalog.h"
 #include "storage/table.h"
 #include "function/scalar/subtract.h"
 #include "function/scalar/add.h"
@@ -113,12 +112,12 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
         SharedPtr<ColumnVector> column_ptr = MakeShared<ColumnVector>(data_type);
         SizeT row_count = DEFAULT_VECTOR_SIZE;
         column_ptr->Initialize(ColumnVectorType::kFlat, row_count);
-        for(i64 i = 0; i < row_count; ++ i) {
+        for(i64 i = 0; i < row_count; ++i) {
             Value value = Value::MakeBigInt(static_cast<BigIntT>(i));
             column_ptr->AppendValue(value);
         }
         input_data_block->Init({column_ptr});
-        for(SizeT i = 0; i < row_count; ++ i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value value = input_data_block->GetValue(0, i);
             EXPECT_EQ(value.type().type(), LogicalType::kBigInt);
             EXPECT_EQ(value.value_.big_int, i64(i));
@@ -141,7 +140,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
         // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), row_count);
 
-        for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
+        for(SizeT row_id = 0; row_id < row_count; ++row_id) {
             Value value = output_column_vector->GetValue(row_id);
             EXPECT_EQ(value.value_.big_int, row_id + 1);
         }
@@ -226,7 +225,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
         SharedPtr<ColumnVector> column_ptr = MakeShared<ColumnVector>(data_type);
         SizeT row_count = DEFAULT_VECTOR_SIZE;
         column_ptr->Initialize(ColumnVectorType::kFlat, row_count);
-        for(i64 i = 0; i < row_count; ++ i) {
+        for(i64 i = 0; i < row_count; ++i) {
             Value value = Value::MakeBigInt(static_cast<BigIntT>(i));
             column_ptr->AppendValue(value);
         }
@@ -234,7 +233,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
 //        Vector<SharedPtr<DataBlock>> input_blocks;
 //        input_blocks.emplace_back(data_block);
 
-        for(SizeT i = 0; i < row_count; ++ i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value value = input_data_block->GetValue(0, i);
             EXPECT_EQ(value.type().type(), LogicalType::kBigInt);
             EXPECT_EQ(value.value_.big_int, i64(i));
@@ -253,7 +252,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
         // blocks_column[0] == output_column_vector
         EXPECT_EQ(output_column_vector->Size(), row_count);
 
-        for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
+        for(SizeT row_id = 0; row_id < row_count; ++row_id) {
             Value value = output_column_vector->GetValue(row_id);
             EXPECT_EQ(value.value_.big_int, row_count - row_id);
         }

@@ -11,7 +11,7 @@ namespace infinity {
 
 class TernaryOperator {
 public:
-    template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
+    template<typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
     static void inline
     Execute(const SharedPtr<ColumnVector>& first,
             const SharedPtr<ColumnVector>& second,
@@ -169,22 +169,22 @@ public:
                         state_ptr);
             }
             result->tail_index_ = 1;
-            return ;
+            return;
         }
     }
 
 private:
     // 1. Flat Flat Flat
-    template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
+    template<typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
     static void inline
     ExecuteFFF(const FirstType* __restrict first_ptr,
-                const SecondType* __restrict second_ptr,
-                const ThirdType* __restrict third_ptr,
-                ResultType* __restrict result_ptr,
-                SharedPtr<Bitmask>& result_null,
-                SizeT count,
-                void* state_ptr) {
-        for (SizeT i = 0; i < count; i++) {
+               const SecondType* __restrict second_ptr,
+               const ThirdType* __restrict third_ptr,
+               ResultType* __restrict result_ptr,
+               SharedPtr<Bitmask>& result_null,
+               SizeT count,
+               void* state_ptr) {
+        for(SizeT i = 0; i < count; i++) {
             Operator::template Execute<FirstType, SecondType, ThirdType, ResultType>(
                     first_ptr[i],
                     second_ptr[i],
@@ -196,7 +196,7 @@ private:
         }
     }
 
-    template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
+    template<typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
     static void inline
     ExecuteFFFWithNull(const FirstType* __restrict first_ptr,
                        const SharedPtr<Bitmask>& first_null,
@@ -210,7 +210,7 @@ private:
                        void* state_ptr) {
 
         if(first_null->IsAllTrue() && second_null->IsAllTrue() && third_null->IsAllTrue()) {
-            for (SizeT i = 0; i < count; i++) {
+            for(SizeT i = 0; i < count; i++) {
                 Operator::template Execute<FirstType, SecondType, ThirdType, ResultType>(
                         first_ptr[i],
                         second_ptr[i],
@@ -227,7 +227,8 @@ private:
 
             const u64* result_null_data = result_null->GetData();
             SizeT unit_count = BitmaskBuffer::UnitCount(count);
-            for(SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++ i, end_index += BitmaskBuffer::UNIT_BITS) {
+            for(SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS;
+                i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
                 if(result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     while(start_index < end_index) {
@@ -239,7 +240,7 @@ private:
                                 result_null.get(),
                                 start_index,
                                 state_ptr);
-                        ++ start_index;
+                        ++start_index;
                     }
                 } else if(result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                     // all data of 64 rows are null
@@ -257,7 +258,7 @@ private:
                                     result_null.get(),
                                     start_index,
                                     state_ptr);
-                            ++ start_index;
+                            ++start_index;
                         }
                     }
                 }
@@ -266,7 +267,7 @@ private:
     }
 
     // 2. Flat Constant Constant
-    template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
+    template<typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
     static void inline
     ExecuteFCC(const FirstType* __restrict first_ptr,
                const SecondType* __restrict second_ptr,
@@ -275,7 +276,7 @@ private:
                SharedPtr<Bitmask>& result_null,
                SizeT count,
                void* state_ptr) {
-        for (SizeT i = 0; i < count; i++) {
+        for(SizeT i = 0; i < count; i++) {
             Operator::template Execute<FirstType, SecondType, ThirdType, ResultType>(
                     first_ptr[i],
                     second_ptr[0],
@@ -287,7 +288,7 @@ private:
         }
     }
 
-    template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
+    template<typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
     static void inline
     ExecuteFCCWithNull(const FirstType* __restrict first_ptr,
                        const SharedPtr<Bitmask>& first_null,
@@ -301,7 +302,7 @@ private:
                        void* state_ptr) {
 
         if(first_null->IsAllTrue() && second_null->IsAllTrue() && third_null->IsAllTrue()) {
-            for (SizeT i = 0; i < count; i++) {
+            for(SizeT i = 0; i < count; i++) {
                 Operator::template Execute<FirstType, SecondType, ThirdType, ResultType>(
                         first_ptr[i],
                         second_ptr[0],
@@ -318,7 +319,8 @@ private:
 
             const u64* result_null_data = result_null->GetData();
             SizeT unit_count = BitmaskBuffer::UnitCount(count);
-            for(SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++ i, end_index += BitmaskBuffer::UNIT_BITS) {
+            for(SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS;
+                i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
                 if(result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     while(start_index < end_index) {
@@ -330,7 +332,7 @@ private:
                                 result_null.get(),
                                 start_index,
                                 state_ptr);
-                        ++ start_index;
+                        ++start_index;
                     }
                 } else if(result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                     // all data of 64 rows are null
@@ -348,7 +350,7 @@ private:
                                     result_null.get(),
                                     start_index,
                                     state_ptr);
-                            ++ start_index;
+                            ++start_index;
                         }
                     }
                 }

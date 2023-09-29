@@ -9,10 +9,10 @@
 
 namespace infinity {
 
-class AggregateFunctionSet final: public FunctionSet {
+class AggregateFunctionSet final : public FunctionSet {
 public:
     explicit
-    AggregateFunctionSet(String name): FunctionSet(std::move(name),FunctionType::kAggregate) {}
+    AggregateFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kAggregate) {}
 
     ~AggregateFunctionSet() final;
 
@@ -24,7 +24,7 @@ public:
 
 private:
     static int64_t
-    MatchFunctionCost(const AggregateFunction& func,  const SharedPtr<BaseExpression>& argument);
+    MatchFunctionCost(const AggregateFunction& func, const SharedPtr<BaseExpression>& argument);
 
     Vector<AggregateFunction> functions_;
 };

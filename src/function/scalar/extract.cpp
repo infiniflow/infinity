@@ -11,28 +11,28 @@ namespace infinity {
 struct ExtractYearFunction {
     template<typename TA, typename TB>
     static inline void
-    Run(TA input, TB &result) {
+    Run(TA input, TB& result) {
         NotImplementError("ExtractYear function isn't implemented")
     }
 };
 
 template<>
 inline void
-ExtractYearFunction::Run(DateT left, BigIntT &result) {
+ExtractYearFunction::Run(DateT left, BigIntT& result) {
     result = DateT::GetDatePart(left, TimeUnit::kYear);
 }
 
 struct ExtractMonthFunction {
     template<typename TA, typename TB>
     static inline void
-    Run(TA input, TB &result) {
+    Run(TA input, TB& result) {
         NotImplementError("ExtractMonth function isn't implemented")
     }
 };
 
 template<>
 inline void
-ExtractMonthFunction::Run(DateT left, BigIntT &result) {
+ExtractMonthFunction::Run(DateT left, BigIntT& result) {
     result = DateT::GetDatePart(left, TimeUnit::kMonth);
 }
 
@@ -40,19 +40,19 @@ ExtractMonthFunction::Run(DateT left, BigIntT &result) {
 struct ExtractDayFunction {
     template<typename TA, typename TB>
     static inline void
-    Run(TA input, TB &result) {
+    Run(TA input, TB& result) {
         NotImplementError("ExtractMonth function isn't implemented")
     }
 };
 
 template<>
 inline void
-ExtractDayFunction::Run(DateT left, BigIntT &result) {
+ExtractDayFunction::Run(DateT left, BigIntT& result) {
     result = DateT::GetDatePart(left, TimeUnit::kDay);
 }
 
 void
-RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterExtractFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     {
         String func_name = "extract_year";
         SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);

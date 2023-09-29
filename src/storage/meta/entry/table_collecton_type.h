@@ -15,7 +15,7 @@ enum TableCollectionType : i8 {
 
 inline String
 ToString(TableCollectionType type) {
-    switch (type) {
+    switch(type) {
         case TableCollectionType::kTableEntry: {
             return "Table";
         }

@@ -27,7 +27,7 @@ public:
     BaseMixedType() = default;
 
     explicit
-    BaseMixedType(MixedValueType value_type): type(value_type) {}
+    BaseMixedType(MixedValueType value_type) : type(value_type) {}
 
     MixedValueType type;
 };

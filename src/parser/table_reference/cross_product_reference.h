@@ -8,12 +8,13 @@
 
 namespace infinity {
 
-class CrossProductReference: public BaseTableReference {
+class CrossProductReference : public BaseTableReference {
 
 public:
 
     explicit
     CrossProductReference() : BaseTableReference(TableRefType::kCrossProduct) {}
+
     ~CrossProductReference() override;
 
     String

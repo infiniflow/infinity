@@ -50,13 +50,12 @@ execute_sql(infinity::Console& console, const std::string& filename) {
         try {
             std::cout << "[SQL]: " << cmd_line << std::endl;
             auto result = console.HandleCommand(cmd_line.c_str());
-        } catch (std::exception& e) {
+        } catch(std::exception& e) {
             std::cout << e.what() << std::endl;
         }
     }
     std::cout << filename << std::endl;
 }
-
 
 
 TEST_F(ConsoleTest, explain_unopt_logical) {

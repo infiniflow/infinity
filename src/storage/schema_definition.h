@@ -12,8 +12,7 @@ namespace infinity {
 class SchemaDefinition {
 public:
     SchemaDefinition(SharedPtr<String> schema_name, ConflictType conflict_type)
-            : name_(std::move(schema_name)), conflict_type_(conflict_type)
-            {}
+            : name_(std::move(schema_name)), conflict_type_(conflict_type) {}
 
     [[nodiscard]] const String&
     name() const {

@@ -11,7 +11,8 @@ namespace infinity {
 class PhysicalUnionAll : public PhysicalOperator {
 public:
     explicit PhysicalUnionAll(uint64_t id)
-        : PhysicalOperator(PhysicalOperatorType::kUnionAll, nullptr, nullptr, id) {}
+            : PhysicalOperator(PhysicalOperatorType::kUnionAll, nullptr, nullptr, id) {}
+
     ~PhysicalUnionAll() override = default;
 
     void

@@ -11,7 +11,7 @@ namespace infinity {
 
 
 void
-NaiveScheduler::Schedule(QueryContext* query_context, const SharedPtr<Pipeline> &pipeline) {
+NaiveScheduler::Schedule(QueryContext* query_context, const SharedPtr<Pipeline>& pipeline) {
     std::stack<SharedPtr<Pipeline>> pipeline_stack;
 
     SharedPtr<Pipeline> current_pipeline = nullptr;
@@ -21,7 +21,7 @@ NaiveScheduler::Schedule(QueryContext* query_context, const SharedPtr<Pipeline> 
     while(!pipeline_stack.empty()) {
         current_pipeline = pipeline_stack.top();
 
-        if( !current_pipeline->predecessors().empty() ) {
+        if(!current_pipeline->predecessors().empty()) {
             // this pipeline has predecessors
             const std::vector<SharedPtr<Pipeline>>& children = current_pipeline->predecessors();
 

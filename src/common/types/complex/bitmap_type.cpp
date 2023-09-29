@@ -17,7 +17,7 @@ BitmapType::BitmapType(const BitmapType& other) : count(other.count) {
 }
 
 BitmapType::BitmapType(BitmapType&& other) noexcept
-    : count(other.count), ptr(other.ptr) {
+        : count(other.count), ptr(other.ptr) {
     GlobalResourceUsage::IncrObjectCount();
     other.ptr = nullptr;
     other.count = 0;
@@ -25,7 +25,8 @@ BitmapType::BitmapType(BitmapType&& other) noexcept
 
 BitmapType&
 BitmapType::operator=(const BitmapType& other) {
-    if(this == &other) return *this;
+    if(this == &other)
+        return *this;
     // Check if other memory size is same as current one, then reuse current memory space
     u64 current_unit_count = UnitCount(this->count);
     u64 target_unit_count = UnitCount(other.count);
@@ -50,7 +51,8 @@ BitmapType::operator=(const BitmapType& other) {
 
 BitmapType&
 BitmapType::operator=(BitmapType&& other) noexcept {
-    if(this == &other) return *this;
+    if(this == &other)
+        return *this;
     if(count > 0) {
         // Need to release current ptr.
         Reset();
@@ -64,13 +66,16 @@ BitmapType::operator=(BitmapType&& other) noexcept {
 
 bool
 BitmapType::operator==(const BitmapType& other) const {
-    if(this == &other) return true;
-    if(this->count != other.count) return false;
+    if(this == &other)
+        return true;
+    if(this->count != other.count)
+        return false;
 
     u64 unit_count = UnitCount(this->count);
 
-    for(u64 i = 0; i < unit_count; ++ i) {
-        if(ptr[i] != other.ptr[i]) return false;
+    for(u64 i = 0; i < unit_count; ++i) {
+        if(ptr[i] != other.ptr[i])
+            return false;
     }
     return true;
 }

@@ -31,7 +31,7 @@ CaseExpr::~CaseExpr() {
             delete check_ptr;
         }
         delete case_check_array_;
-        case_check_array_= nullptr;
+        case_check_array_ = nullptr;
     }
 }
 

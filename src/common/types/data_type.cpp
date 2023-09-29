@@ -17,112 +17,112 @@
 namespace infinity {
 
 static const char* type2name[] = {
-    // Bool
-    "Boolean",
+        // Bool
+        "Boolean",
 
-    // Numeric
-    "TinyInt",
-    "SmallInt",
-    "Integer",
-    "BigInt",
-    "HugeInt",
-    "Decimal",
-    "Float",
-    "Double",
+        // Numeric
+        "TinyInt",
+        "SmallInt",
+        "Integer",
+        "BigInt",
+        "HugeInt",
+        "Decimal",
+        "Float",
+        "Double",
 
-    // String
-    "Varchar",
+        // String
+        "Varchar",
 
-    // Date and Time
-    "Date",
-    "Time",
-    "DateTime",
-    "Timestamp",
-    "Interval",
+        // Date and Time
+        "Date",
+        "Time",
+        "DateTime",
+        "Timestamp",
+        "Interval",
 
-    // Nested types
-    "Array",
-    "Tuple",
+        // Nested types
+        "Array",
+        "Tuple",
 
-    // Geography
-    "Point",
-    "Line",
-    "LineSegment",
-    "Box",
-    "Path",
-    "Polygon",
-    "Circle",
+        // Geography
+        "Point",
+        "Line",
+        "LineSegment",
+        "Box",
+        "Path",
+        "Polygon",
+        "Circle",
 
-    // Other
-    "Bitmap",
-    "UUID",
-    "Blob",
-    "Embedding",
+        // Other
+        "Bitmap",
+        "UUID",
+        "Blob",
+        "Embedding",
 
-    // Heterogeneous/Mix type
-    "Heterogeneous",
+        // Heterogeneous/Mix type
+        "Heterogeneous",
 
-    // only used in heterogeneous type
-    "Null",
-    "Missing",
+        // only used in heterogeneous type
+        "Null",
+        "Missing",
 
-    "Invalid",
+        "Invalid",
 };
 
 static i64 type_size[] = {
-    // Bool * 1
-    1, // Boolean
+        // Bool * 1
+        1, // Boolean
 
-    // Integer * 5
-    1, // TinyInt
-    2, // SmallInt
-    4, // Integer
-    8, // BigInt
-    16, // HugeInt
+        // Integer * 5
+        1, // TinyInt
+        2, // SmallInt
+        4, // Integer
+        8, // BigInt
+        16, // HugeInt
 
-    // Decimal * 1
-    16, // Decimal
+        // Decimal * 1
+        16, // Decimal
 
-    // Float * 2
-    4, // Float
-    8, // Double
+        // Float * 2
+        4, // Float
+        8, // Double
 
-    // Varchar * 1
-    16, // Varchar
+        // Varchar * 1
+        16, // Varchar
 
-    // Date and Time * 6
-    4, // Date
-    4, // Time
-    8, // DateTime
-    8, // Timestamp
-    8, // Interval
+        // Date and Time * 6
+        4, // Date
+        4, // Time
+        8, // DateTime
+        8, // Timestamp
+        8, // Interval
 
-    // Nested types
-    8, // Array
-    4, // Tuple
+        // Nested types
+        8, // Array
+        4, // Tuple
 
-    // Geography
-    16, // Point
-    24, // Line
-    32, // LineSegment
-    32, // Box
-    16, // Path
-    48, // Polygon
-    24, // Circle
+        // Geography
+        16, // Point
+        24, // Line
+        32, // LineSegment
+        32, // Box
+        16, // Path
+        48, // Polygon
+        24, // Circle
 
-    // Other
-    16, // Bitmap
-    16, // UUID
-    16, // Blob
-    8, // Embedding
+        // Other
+        16, // Bitmap
+        16, // UUID
+        16, // Blob
+        8, // Embedding
 
-    // Heterogeneous
-    16, // Mixed
+        // Heterogeneous
+        16, // Mixed
 
-    // only used in heterogeneous type
-    0, // Null
-    0, // Missing
-    0, // Invalid
+        // only used in heterogeneous type
+        0, // Null
+        0, // Missing
+        0, // Invalid
 };
 
 String
@@ -134,14 +134,17 @@ DataType::ToString() const {
 }
 
 bool
-DataType::operator==(const DataType &other) const {
-    if(this == &other) return true;
-    if(type_ != other.type_) return false;
+DataType::operator==(const DataType& other) const {
+    if(this == &other)
+        return true;
+    if(type_ != other.type_)
+        return false;
     if(this->type_info_ == nullptr && other.type_info_ == nullptr) {
         return true;
     }
     if(this->type_info_ != nullptr && other.type_info_ != nullptr) {
-        if(*this->type_info_ != *other.type_info_) return false;
+        if(*this->type_info_ != *other.type_info_)
+            return false;
         return true;
     } else {
         return false;
@@ -170,129 +173,131 @@ DataType::Size() const {
 }
 
 i64
-DataType::CastRule(const DataType &from, const DataType &to) {
+DataType::CastRule(const DataType& from, const DataType& to) {
     return CastTable::instance().GetCastCost(from.type_, to.type_);
 }
 
 void
 DataType::MaxDataType(const DataType& right) {
     if(*this == right) {
-        return ;
+        return;
     }
 
     if(this->type_ == LogicalType::kInvalid) {
         *this = right;
-        return ;
+        return;
     }
 
     if(right.type_ == LogicalType::kInvalid) {
-        return ;
+        return;
     }
 
     if(this->IsNumeric() && right.IsNumeric()) {
         if(this->type_ > right.type_) {
-            return ;
+            return;
         } else {
             *this = right;
-            return ;
+            return;
         }
     }
 
     if(this->type_ == LogicalType::kVarchar) {
-        return ;
+        return;
     }
     if(right.type_ == LogicalType::kVarchar) {
         *this = right;
-        return ;
+        return;
     }
 
     if(this->type_ == LogicalType::kDateTime and right.type_ == LogicalType::kTimestamp) {
         *this = right;
-        return ;
+        return;
     }
 
     if(this->type_ == LogicalType::kTimestamp and right.type_ == LogicalType::kDateTime) {
-        return ;
+        return;
     }
 
     NotImplementError(fmt::format("Max type of left: {} and right: {}", this->ToString(), right.ToString()));
 }
 
-int32_t DataType::GetSizeInBytes() const {
+int32_t
+DataType::GetSizeInBytes() const {
     int32_t size = sizeof(LogicalType);
-    if (this->type_info_ != nullptr) {
-        switch (this->type_) {
-        case LogicalType::kArray:
-            NotImplementError("Array isn't implemented here.");
-            break;
-        case LogicalType::kBitmap:
-            size += sizeof(i64);
-            break;
-        case LogicalType::kDecimal:
-            size += sizeof(i64) * 2;
-            break;
-        case LogicalType::kEmbedding:
-            size += sizeof(EmbeddingDataType);
-            size += sizeof(int32_t);
-            break;
-        case LogicalType::kVarchar:
-            size += sizeof(int32_t);
-            break;
-        default:
-            TypeError(
-                fmt::format("Unexpected type {} here.", int(this->type_)));
+    if(this->type_info_ != nullptr) {
+        switch(this->type_) {
+            case LogicalType::kArray:
+                NotImplementError("Array isn't implemented here.");
+                break;
+            case LogicalType::kBitmap:
+                size += sizeof(i64);
+                break;
+            case LogicalType::kDecimal:
+                size += sizeof(i64) * 2;
+                break;
+            case LogicalType::kEmbedding:
+                size += sizeof(EmbeddingDataType);
+                size += sizeof(int32_t);
+                break;
+            case LogicalType::kVarchar:
+                size += sizeof(int32_t);
+                break;
+            default:
+                TypeError(
+                        fmt::format("Unexpected type {} here.", int(this->type_)));
         }
     }
     return size;
 }
 
-void DataType::WriteAdv(char *&ptr) const {
+void
+DataType::WriteAdv(char*& ptr) const {
     WriteBufAdv<LogicalType>(ptr, this->type_);
-    if (this->type_info_ != nullptr) {
-        switch (this->type_) {
-        case LogicalType::kArray:
-            NotImplementError("Array isn't implemented here.");
-            break;
-        case LogicalType::kBitmap: {
-            const BitmapInfo *bi =
-                dynamic_cast<BitmapInfo *>(this->type_info_.get());
-            WriteBufAdv<i64>(ptr, i64(bi->length_limit()));
-            break;
-        }
-        case LogicalType::kDecimal: {
-            const DecimalInfo *di =
-                dynamic_cast<DecimalInfo *>(this->type_info_.get());
-            WriteBufAdv<i64>(ptr, i64(di->precision()));
-            WriteBufAdv<i64>(ptr, i64(di->scale()));
-            break;
-        }
-        case LogicalType::kEmbedding: {
-            const EmbeddingInfo *ei =
-                dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
-            WriteBufAdv<EmbeddingDataType>(ptr, ei->Type());
-            WriteBufAdv<int32_t>(ptr, int32_t(ei->Dimension()));
-            break;
-        }
-        case LogicalType::kVarchar: {
-            const VarcharInfo *ei =
-                dynamic_cast<VarcharInfo *>(this->type_info_.get());
-            WriteBufAdv<int32_t>(ptr, ei->dimension());
-            break;
-        }
-        default:
-            TypeError(
-                fmt::format("Unexpected type {} here.", int(this->type_)));
+    if(this->type_info_ != nullptr) {
+        switch(this->type_) {
+            case LogicalType::kArray:
+                NotImplementError("Array isn't implemented here.");
+                break;
+            case LogicalType::kBitmap: {
+                const BitmapInfo* bi =
+                        dynamic_cast<BitmapInfo*>(this->type_info_.get());
+                WriteBufAdv<i64>(ptr, i64(bi->length_limit()));
+                break;
+            }
+            case LogicalType::kDecimal: {
+                const DecimalInfo* di =
+                        dynamic_cast<DecimalInfo*>(this->type_info_.get());
+                WriteBufAdv<i64>(ptr, i64(di->precision()));
+                WriteBufAdv<i64>(ptr, i64(di->scale()));
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                const EmbeddingInfo* ei =
+                        dynamic_cast<EmbeddingInfo*>(this->type_info_.get());
+                WriteBufAdv<EmbeddingDataType>(ptr, ei->Type());
+                WriteBufAdv<int32_t>(ptr, int32_t(ei->Dimension()));
+                break;
+            }
+            case LogicalType::kVarchar: {
+                const VarcharInfo* ei =
+                        dynamic_cast<VarcharInfo*>(this->type_info_.get());
+                WriteBufAdv<int32_t>(ptr, ei->dimension());
+                break;
+            }
+            default:
+                TypeError(
+                        fmt::format("Unexpected type {} here.", int(this->type_)));
         }
     }
     return;
 }
 
 SharedPtr<DataType>
-DataType::ReadAdv(char* &ptr, int32_t maxbytes){
-    char *const ptr_end = ptr + maxbytes;
+DataType::ReadAdv(char*& ptr, int32_t maxbytes) {
+    char* const ptr_end = ptr + maxbytes;
     LogicalType type = ReadBufAdv<LogicalType>(ptr);
-    SharedPtr<TypeInfo> type_info {nullptr};
-    switch (type) {
+    SharedPtr<TypeInfo> type_info{nullptr};
+    switch(type) {
         case LogicalType::kArray:
             NotImplementError("Array isn't implemented here.");
             break;
@@ -321,7 +326,7 @@ DataType::ReadAdv(char* &ptr, int32_t maxbytes){
         }
         default:
             break;
-        }
+    }
 
     StorageAssert(ptr <= ptr_end,
                   "ptr goes out of range when reading DataType");
@@ -344,7 +349,7 @@ DataType::Serialize() {
 SharedPtr<DataType>
 DataType::Deserialize(const nlohmann::json& data_type_json) {
     LogicalType logical_type = data_type_json["data_type"];
-    SharedPtr<TypeInfo> type_info {nullptr};
+    SharedPtr<TypeInfo> type_info{nullptr};
     if(data_type_json.contains("type_info")) {
         const nlohmann::json& type_info_json = data_type_json["type_info"];
         switch(logical_type) {
@@ -378,51 +383,111 @@ DataType::Deserialize(const nlohmann::json& data_type_json) {
     return data_type;
 }
 
-template <> String DataType::TypeToString<BooleanT>() { return "Boolean"; }
-template <> String DataType::TypeToString<TinyIntT>() { return "TinyInt"; }
-template <> String DataType::TypeToString<SmallIntT>() { return "SmallInt"; }
-template <> String DataType::TypeToString<IntegerT>() { return "Integer"; }
-template <> String DataType::TypeToString<BigIntT>() { return "BigInt"; }
-template <> String DataType::TypeToString<HugeIntT>() { return "HugeInt"; }
-template <> String DataType::TypeToString<FloatT>() { return "Float"; }
-template <> String DataType::TypeToString<DoubleT>() { return "Double"; }
-template <> String DataType::TypeToString<DecimalT>() { return "Decimal"; }
-template <> String DataType::TypeToString<VarcharT>() { return "Varchar"; }
-template <> String DataType::TypeToString<DateT>() { return "Date"; }
-template <> String DataType::TypeToString<TimeT>() { return "Time"; }
-template <> String DataType::TypeToString<DateTimeT>() { return "DateTime"; }
-template <> String DataType::TypeToString<TimestampT>() { return "Timestamp"; }
-template <> String DataType::TypeToString<IntervalT>() { return "Interval"; }
-template <> String DataType::TypeToString<ArrayT>() { return "Array"; }
+template<>
+String
+DataType::TypeToString<BooleanT>() { return "Boolean"; }
+template<>
+String
+DataType::TypeToString<TinyIntT>() { return "TinyInt"; }
+template<>
+String
+DataType::TypeToString<SmallIntT>() { return "SmallInt"; }
+template<>
+String
+DataType::TypeToString<IntegerT>() { return "Integer"; }
+template<>
+String
+DataType::TypeToString<BigIntT>() { return "BigInt"; }
+template<>
+String
+DataType::TypeToString<HugeIntT>() { return "HugeInt"; }
+template<>
+String
+DataType::TypeToString<FloatT>() { return "Float"; }
+template<>
+String
+DataType::TypeToString<DoubleT>() { return "Double"; }
+template<>
+String
+DataType::TypeToString<DecimalT>() { return "Decimal"; }
+template<>
+String
+DataType::TypeToString<VarcharT>() { return "Varchar"; }
+template<>
+String
+DataType::TypeToString<DateT>() { return "Date"; }
+template<>
+String
+DataType::TypeToString<TimeT>() { return "Time"; }
+template<>
+String
+DataType::TypeToString<DateTimeT>() { return "DateTime"; }
+template<>
+String
+DataType::TypeToString<TimestampT>() { return "Timestamp"; }
+template<>
+String
+DataType::TypeToString<IntervalT>() { return "Interval"; }
+template<>
+String
+DataType::TypeToString<ArrayT>() { return "Array"; }
 //template <> String DataType::TypeToString<TupleT>() { return "Tuple"; }
-template <> String DataType::TypeToString<PointT>() { return "Point"; }
-template <> String DataType::TypeToString<LineT>() { return "Line"; }
-template <> String DataType::TypeToString<LineSegT>() { return "LineSegment"; }
-template <> String DataType::TypeToString<BoxT>() { return "Box"; }
-template <> String DataType::TypeToString<PathT>() { return "Path"; }
-template <> String DataType::TypeToString<PolygonT>() { return "Polygon"; }
-template <> String DataType::TypeToString<CircleT>() { return "Circle"; }
-template <> String DataType::TypeToString<BitmapT>() { return "Bitmap"; }
-template <> String DataType::TypeToString<UuidT>() { return "UUID"; }
-template <> String DataType::TypeToString<BlobT>() { return "Blob"; }
-template <> String DataType::TypeToString<EmbeddingT>() { return "Embedding"; }
-template <> String DataType::TypeToString<MixedT>() { return "Heterogeneous"; }
+template<>
+String
+DataType::TypeToString<PointT>() { return "Point"; }
+template<>
+String
+DataType::TypeToString<LineT>() { return "Line"; }
+template<>
+String
+DataType::TypeToString<LineSegT>() { return "LineSegment"; }
+template<>
+String
+DataType::TypeToString<BoxT>() { return "Box"; }
+template<>
+String
+DataType::TypeToString<PathT>() { return "Path"; }
+template<>
+String
+DataType::TypeToString<PolygonT>() { return "Polygon"; }
+template<>
+String
+DataType::TypeToString<CircleT>() { return "Circle"; }
+template<>
+String
+DataType::TypeToString<BitmapT>() { return "Bitmap"; }
+template<>
+String
+DataType::TypeToString<UuidT>() { return "UUID"; }
+template<>
+String
+DataType::TypeToString<BlobT>() { return "Blob"; }
+template<>
+String
+DataType::TypeToString<EmbeddingT>() { return "Embedding"; }
+template<>
+String
+DataType::TypeToString<MixedT>() { return "Heterogeneous"; }
 
-template <> BooleanT DataType::StringToValue<BooleanT>(const StringView& str) {
-    if (str.empty()) {
+template<>
+BooleanT
+DataType::StringToValue<BooleanT>(const StringView& str) {
+    if(str.empty()) {
         return BooleanT{};
     }
     // TODO: should support True/False, maybe others
     String str_lower;
-    for (char ch : str) {
+    for(char ch: str) {
         str_lower.push_back(std::tolower(ch));
     }
-    TypeAssert(str_lower == "true" || str_lower == "false","Boolean type should be true or false");
+    TypeAssert(str_lower == "true" || str_lower == "false", "Boolean type should be true or false");
     return str_lower == "true";
 }
 
-template <> TinyIntT DataType::StringToValue<TinyIntT>(const StringView& str) {
-    if (str.empty()) {
+template<>
+TinyIntT
+DataType::StringToValue<TinyIntT>(const StringView& str) {
+    if(str.empty()) {
         return TinyIntT{};
     }
     TinyIntT value{};
@@ -431,8 +496,10 @@ template <> TinyIntT DataType::StringToValue<TinyIntT>(const StringView& str) {
     return value;
 }
 
-template <> SmallIntT DataType::StringToValue<SmallIntT>(const StringView& str) {
-    if (str.empty()) {
+template<>
+SmallIntT
+DataType::StringToValue<SmallIntT>(const StringView& str) {
+    if(str.empty()) {
         return SmallIntT{};
     }
     SmallIntT value{};
@@ -441,8 +508,10 @@ template <> SmallIntT DataType::StringToValue<SmallIntT>(const StringView& str) 
     return value;
 }
 
-template <> IntegerT DataType::StringToValue<IntegerT>(const StringView& str) {
-    if (str.empty()) {
+template<>
+IntegerT
+DataType::StringToValue<IntegerT>(const StringView& str) {
+    if(str.empty()) {
         return IntegerT{};
     }
     IntegerT value{};
@@ -451,8 +520,10 @@ template <> IntegerT DataType::StringToValue<IntegerT>(const StringView& str) {
     return value;
 }
 
-template <> BigIntT DataType::StringToValue<BigIntT>(const StringView& str) {
-    if (str.empty()) {
+template<>
+BigIntT
+DataType::StringToValue<BigIntT>(const StringView& str) {
+    if(str.empty()) {
         return BigIntT{};
     }
     BigIntT value{};
@@ -461,8 +532,10 @@ template <> BigIntT DataType::StringToValue<BigIntT>(const StringView& str) {
     return value;
 }
 
-template <> FloatT DataType::StringToValue<FloatT>(const StringView& str) {
-    if (str.empty()) {
+template<>
+FloatT
+DataType::StringToValue<FloatT>(const StringView& str) {
+    if(str.empty()) {
         return FloatT{};
     }
     FloatT value{};
@@ -476,8 +549,10 @@ template <> FloatT DataType::StringToValue<FloatT>(const StringView& str) {
     return value;
 }
 
-template <> DoubleT DataType::StringToValue<DoubleT>(const StringView& str) {
-    if (str.empty()) {
+template<>
+DoubleT
+DataType::StringToValue<DoubleT>(const StringView& str) {
+    if(str.empty()) {
         return DoubleT{};
     }
     DoubleT value{};

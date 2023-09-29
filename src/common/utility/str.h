@@ -26,7 +26,7 @@ StringToLower(String& str) {
 
 // trim from start (in place)
 inline void
-ltrim(String &s) {
+ltrim(String& s) {
     s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
         return !std::isspace(ch) && (ch != '\0');
     }));
@@ -34,7 +34,7 @@ ltrim(String &s) {
 
 // trim from end (in place)
 inline void
-rtrim(String &s) {
+rtrim(String& s) {
     s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
         return !std::isspace(ch) && (ch != '\0');
     }).base(), s.end());
@@ -42,7 +42,7 @@ rtrim(String &s) {
 
 // trim from both ends (in place)
 inline void
-trim(String &s) {
+trim(String& s) {
     ltrim(s);
     rtrim(s);
 }

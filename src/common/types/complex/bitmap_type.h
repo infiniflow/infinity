@@ -20,8 +20,8 @@ public:
     }
 
 public:
-    u64 count {0}; // bit count of the bitmap
-    u64* ptr {nullptr};
+    u64 count{0}; // bit count of the bitmap
+    u64* ptr{nullptr};
 public:
     inline
     BitmapType() {
@@ -36,7 +36,7 @@ public:
 
     // The bitmap_ptr will also be freed by BitmapType's destructor.
     inline
-    BitmapType(u64* bitmap_ptr, u64 bit_count): ptr(bitmap_ptr), count(bit_count) {
+    BitmapType(u64* bitmap_ptr, u64 bit_count) : ptr(bitmap_ptr), count(bit_count) {
         GlobalResourceUsage::IncrObjectCount();
     }
 
@@ -47,9 +47,14 @@ public:
     }
 
     BitmapType(const BitmapType& other);
+
     BitmapType(BitmapType&& other) noexcept;
-    BitmapType& operator=(const BitmapType& other);
-    BitmapType& operator=(BitmapType&& other) noexcept;
+
+    BitmapType&
+    operator=(const BitmapType& other);
+
+    BitmapType&
+    operator=(BitmapType&& other) noexcept;
 
     bool
     operator==(const BitmapType& other) const;

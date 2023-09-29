@@ -53,7 +53,7 @@ public:
     inline void
     Append(SizeT row_idx) {
         Set(latest_selection_idx_, row_idx);
-        ++ latest_selection_idx_;
+        ++latest_selection_idx_;
     }
 
     inline SizeT

@@ -35,7 +35,7 @@ TEST_F(BlobTypeTest, blob1) {
     auto blob_ptr = new char[SIZE]{0};
     GlobalResourceUsage::IncrRawMemCount();
 
-    for(i64 i = 0; i < SIZE; ++ i) {
+    for(i64 i = 0; i < SIZE; ++i) {
         blob_ptr[i] = 'a' + static_cast<char_t>(i);
     }
     blob_ptr[SIZE - 1] = 0;
@@ -87,7 +87,7 @@ TEST_F(BlobTypeTest, blob1) {
     blob_ptr = new char[SIZE]{0};
     GlobalResourceUsage::IncrRawMemCount();
 
-    for(i64 i = 0; i < SIZE; ++ i) {
+    for(i64 i = 0; i < SIZE; ++i) {
         blob_ptr[i] = 'a' + static_cast<char_t>(i);
     }
     blob_ptr[SIZE - 1] = 0;

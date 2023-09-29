@@ -11,43 +11,56 @@ namespace infinity {
 class DocListEncoder {
 public:
     DocListEncoder(
-        const DocListFormatOption& format_option,
-        MemoryPool* byte_slice_pool,
-        RecyclePool* buffer_pool);
+            const DocListFormatOption& format_option,
+            MemoryPool* byte_slice_pool,
+            RecyclePool* buffer_pool);
+
     ~DocListEncoder();
 
-    uint32_t GetCurrentTF() const {
+    uint32_t
+    GetCurrentTF() const {
         return current_tf_;
     }
 
-    uint32_t GetTotalTF() const {
+    uint32_t
+    GetTotalTF() const {
         return total_tf_;
     }
 
-    uint32_t GetDF() const {
+    uint32_t
+    GetDF() const {
         return df_;
     }
 
-    uint32_t GetLastDocID() const {
+    uint32_t
+    GetLastDocID() const {
         return last_doc_id_;
     }
 
-    uint16_t GetLastDocPayload() const {
+    uint16_t
+    GetLastDocPayload() const {
         return last_doc_payload_;
     }
 
-    void SetCurrentTF(tf_t tf) {
+    void
+    SetCurrentTF(tf_t tf) {
         current_tf_ = tf;
         total_tf_ += tf;
     }
 
-    void AddPosition();
+    void
+    AddPosition();
 
-    void EndDocument(docid_t doc_id, docpayload_t doc_payload);
+    void
+    EndDocument(docid_t doc_id, docpayload_t doc_payload);
 
-    void Flush();
+    void
+    Flush();
+
 private:
-    void AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf);
+    void
+    AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf);
+
 private:
     BufferedByteSlice doc_list_buffer_;
     DocListFormatOption format_option_;

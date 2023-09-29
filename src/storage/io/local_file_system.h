@@ -8,9 +8,10 @@
 
 namespace infinity {
 
-class LocalFileHandler: public FileHandler {
+class LocalFileHandler : public FileHandler {
 public:
-    LocalFileHandler(FileSystem& file_system, String path, i32 fd) : FileHandler(file_system, std::move(path)), fd_(fd) {}
+    LocalFileHandler(FileSystem& file_system, String path, i32 fd) : FileHandler(file_system, std::move(path)),
+                                                                     fd_(fd) {}
 
     ~LocalFileHandler() override;
 
@@ -20,7 +21,7 @@ public:
 
 class LocalFileSystem final : public FileSystem {
 public:
-    LocalFileSystem(): FileSystem(FileSystemType::kPosix) {}
+    LocalFileSystem() : FileSystem(FileSystemType::kPosix) {}
 
     ~LocalFileSystem() override = default;
 

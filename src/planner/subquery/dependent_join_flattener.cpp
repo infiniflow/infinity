@@ -73,7 +73,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
             LogicalAggregate* aggregate_node = (LogicalAggregate*)subquery_plan.get();
             SizeT column_count = bind_context_ptr_->correlated_column_exprs_.size();
             aggregate_node->groups_.reserve(aggregate_node->groups_.size() + column_count);
-            for(SizeT idx = 0; idx < column_count; ++ idx) {
+            for(SizeT idx = 0; idx < column_count; ++idx) {
                 SharedPtr<ColumnExpression> correlated_column = bind_context_ptr_->correlated_column_exprs_[idx];
                 SharedPtr<ColumnExpression> new_column = ColumnExpression::Make(
                         correlated_column->Type(),
@@ -105,9 +105,9 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
         }
         case LogicalNodeType::kCrossProduct: {
             bool left_has_correlated_expr
-                = operator2correlated_expression_map_.contains(subquery_plan->left_node()->node_id());
+                    = operator2correlated_expression_map_.contains(subquery_plan->left_node()->node_id());
             bool right_has_correlated_expr
-                = operator2correlated_expression_map_.contains(subquery_plan->right_node()->node_id());
+                    = operator2correlated_expression_map_.contains(subquery_plan->right_node()->node_id());
 
             if(!right_has_correlated_expr) {
                 auto pushed_plan = PushDependentJoinInternal(subquery_plan->left_node());
@@ -132,17 +132,17 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
 
             SizeT column_count = bind_context_ptr_->correlated_column_exprs_.size();
             join_conditions.reserve(column_count);
-            for(SizeT idx = 0; idx < column_count; ++ idx) {
+            for(SizeT idx = 0; idx < column_count; ++idx) {
                 SizeT left_correlated_column_index = left_correlated_binding.column_idx + idx;
                 SizeT right_correlated_column_index = right_correlated_binding.column_idx + idx;
 
                 SharedPtr<ColumnExpression> left_column_expr
-                    = ColumnExpression::Make(bind_context_ptr_->correlated_column_exprs_[idx]->Type(),
-                                             bind_context_ptr_->correlated_column_exprs_[idx]->table_name(),
-                                             left_correlated_binding.table_idx,
-                                             bind_context_ptr_->correlated_column_exprs_[idx]->column_name(),
-                                             left_correlated_column_index,
-                                             0);
+                        = ColumnExpression::Make(bind_context_ptr_->correlated_column_exprs_[idx]->Type(),
+                                                 bind_context_ptr_->correlated_column_exprs_[idx]->table_name(),
+                                                 left_correlated_binding.table_idx,
+                                                 bind_context_ptr_->correlated_column_exprs_[idx]->column_name(),
+                                                 left_correlated_column_index,
+                                                 0);
 
                 SharedPtr<ColumnExpression> right_column_expr
                         = ColumnExpression::Make(bind_context_ptr_->correlated_column_exprs_[idx]->Type(),
@@ -208,7 +208,7 @@ DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode>& 
             LogicalProject* project_node = (LogicalProject*)subquery_plan.get();
             SizeT column_count = bind_context_ptr_->correlated_column_exprs_.size();
             project_node->expressions_.reserve(project_node->expressions_.size() + column_count);
-            for(SizeT idx = 0; idx < column_count; ++ idx) {
+            for(SizeT idx = 0; idx < column_count; ++idx) {
                 SharedPtr<ColumnExpression> correlated_column = bind_context_ptr_->correlated_column_exprs_[idx];
                 SharedPtr<ColumnExpression> new_column = ColumnExpression::Make(
                         correlated_column->Type(),
@@ -284,7 +284,7 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
     column_names->emplace_back(correlated_columns[0]->column_name());
     column_types->emplace_back(MakeShared<DataType>(correlated_columns[0]->Type()));
     column_ids.emplace_back(correlated_columns[0]->binding().column_idx);
-    for(SizeT idx = 1; idx < column_count; ++ idx) {
+    for(SizeT idx = 1; idx < column_count; ++idx) {
         PlannerAssert(correlated_columns[idx]->binding().table_idx == table_index,
                       "Correlated column are from different table.");
         column_names->emplace_back(correlated_columns[idx]->column_name());
@@ -293,7 +293,7 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
     }
 
     const Binding* table_binding_ptr
-        = bind_context_ptr_->GetBindingFromCurrentOrParentByName(correlated_columns[0]->table_name());
+            = bind_context_ptr_->GetBindingFromCurrentOrParentByName(correlated_columns[0]->table_name());
     if(table_binding_ptr == nullptr) {
         PlannerError(fmt::format("Can't find table: {} in binding context.", correlated_columns[0]->table_name()));
     }

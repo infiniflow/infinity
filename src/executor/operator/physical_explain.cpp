@@ -83,7 +83,7 @@ PhysicalExplain::Execute(QueryContext* query_context, InputState* input_state, O
     SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
 
     column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
-    for(SizeT idx = 0; idx < row_count; ++ idx) {
+    for(SizeT idx = 0; idx < row_count; ++idx) {
         Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
         column_vector_ptr->AppendValue(str_v);
     }
@@ -133,7 +133,7 @@ PhysicalExplain::Execute(QueryContext* query_context) {
     SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
 
     column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
-    for(SizeT idx = 0; idx < row_count; ++ idx) {
+    for(SizeT idx = 0; idx < row_count; ++idx) {
         Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
         column_vector_ptr->AppendValue(str_v);
     }

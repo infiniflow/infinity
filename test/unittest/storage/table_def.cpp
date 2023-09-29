@@ -39,7 +39,7 @@ TEST_F(TableDefTest, test1) {
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id ++,
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
                                                     MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
                                                     "c1",
                                                     constraints);
@@ -49,7 +49,7 @@ TEST_F(TableDefTest, test1) {
     {
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id ++,
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
                                                     MakeShared<DataType>(DataType(LogicalType::kVarchar)),
                                                     "c2",
                                                     constraints);
@@ -77,7 +77,7 @@ TEST_F(TableDefTest, ReadWrite) {
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id ++,
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
                                                     MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
                                                     "c1",
                                                     constraints);
@@ -87,8 +87,9 @@ TEST_F(TableDefTest, ReadWrite) {
     {
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id ++,
-                                                    MakeShared<DataType>(LogicalType::kVarchar, VarcharInfo::Make(8196)),
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
+                                                    MakeShared<DataType>(LogicalType::kVarchar,
+                                                                         VarcharInfo::Make(8196)),
                                                     "c2",
                                                     constraints);
         columns.emplace_back(column_def_ptr);
@@ -99,14 +100,14 @@ TEST_F(TableDefTest, ReadWrite) {
 
     int32_t exp_size = table_def.GetSizeInBytes();
     std::vector<char> buf(exp_size, char(0));
-    char *buf_beg = buf.data();
-    char *ptr = buf_beg;
+    char* buf_beg = buf.data();
+    char* ptr = buf_beg;
     table_def.WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 
     ptr = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<TableDef> table_def2  = table_def.ReadAdv(ptr, maxbytes);
+    SharedPtr<TableDef> table_def2 = table_def.ReadAdv(ptr, maxbytes);
     LOG_TRACE("table_def2: {}", table_def2->ToString());
     EXPECT_EQ(ptr - buf_beg, exp_size);
     EXPECT_NE(table_def2, nullptr);

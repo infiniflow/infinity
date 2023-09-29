@@ -25,7 +25,7 @@ StringHeapMgr::Allocate(SizeT nbytes) {
                 current_chunk_size_ *= 2;
             }
             chunks_.emplace_back(MakeUnique<HeapChunk>(current_chunk_size_));
-            ++ current_chunk_idx_;
+            ++current_chunk_idx_;
         }
         ExecutorAssert(chunks_[current_chunk_idx_]->current_offset_ + nbytes <= current_chunk_size_,
                        "Unexpected string chunk error");
@@ -39,7 +39,7 @@ StringHeapMgr::Allocate(SizeT nbytes) {
     current_chunk->current_offset_ += nbytes;
 
     // A new object
-    ++ current_chunk->object_count_;
+    ++current_chunk->object_count_;
     return result;
 }
 
@@ -48,7 +48,7 @@ StringHeapMgr::Stats() const {
     std::stringstream ss;
     ss << "Chunk count: " << chunks_.size() << std::endl;
     for(u64 i = 0; auto& chunk: chunks_) {
-        ss << "Chunk id: " << i ++ << ", Capacity: " << chunk->capacity_
+        ss << "Chunk id: " << i++ << ", Capacity: " << chunk->capacity_
            << ", Current pos: " << chunk->current_offset_ << ", object count: " << chunk->object_count_ << std::endl;
     }
     return ss.str();

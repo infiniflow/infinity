@@ -111,7 +111,7 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
             break;
         }
 
-        // DML
+            // DML
         case LogicalNodeType::kInsert: {
             result = BuildInsert(logical_operator);
             break;
@@ -133,7 +133,7 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
             break;
         }
 
-        // Scan
+            // Scan
         case LogicalNodeType::kShow: {
             result = BuildShow(logical_operator);
             break;
@@ -150,7 +150,7 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
             break;
         }
 
-        // SELECT
+            // SELECT
         case LogicalNodeType::kAggregate: {
             result = BuildAggregate(logical_operator);
             break;
@@ -219,7 +219,7 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildCreateTable(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildCreateTable(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalCreateTable> logical_create_table =
             std::static_pointer_cast<LogicalCreateTable>(logical_operator);
     return MakeShared<PhysicalCreateTable>(
@@ -233,7 +233,7 @@ PhysicalPlanner::BuildCreateTable(const SharedPtr<LogicalNode> &logical_operator
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalCreateCollection> logical_create_collection =
             std::static_pointer_cast<LogicalCreateCollection>(logical_operator);
     return MakeShared<PhysicalCreateCollection>(
@@ -247,7 +247,7 @@ PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode> &logical_ope
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildCreateSchema(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildCreateSchema(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalCreateSchema> logical_create_schema =
             std::static_pointer_cast<LogicalCreateSchema>(logical_operator);
     return MakeShared<PhysicalCreateSchema>(
@@ -259,12 +259,12 @@ PhysicalPlanner::BuildCreateSchema(const SharedPtr<LogicalNode> &logical_operato
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildPreparedPlan(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildPreparedPlan(const SharedPtr<LogicalNode>& logical_operator) const {
     return MakeShared<PhysicalPreparedPlan>(logical_operator->node_id());
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildCreateView(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildCreateView(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalCreateView> logical_create_view =
             std::static_pointer_cast<LogicalCreateView>(logical_operator);
     return MakeShared<PhysicalCreateView>(logical_operator->node_id(),
@@ -274,7 +274,7 @@ PhysicalPlanner::BuildCreateView(const SharedPtr<LogicalNode> &logical_operator)
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalDropTable> logical_drop_table =
             std::static_pointer_cast<LogicalDropTable>(logical_operator);
 
@@ -288,7 +288,7 @@ PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) 
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildDropCollection(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildDropCollection(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalDropCollection> logical_drop_collection =
             std::static_pointer_cast<LogicalDropCollection>(logical_operator);
     return MakeShared<PhysicalDropCollection>(
@@ -299,7 +299,7 @@ PhysicalPlanner::BuildDropCollection(const SharedPtr<LogicalNode> &logical_opera
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildDropSchema(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildDropSchema(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalDropSchema> logical_drop_schema =
             std::static_pointer_cast<LogicalDropSchema>(logical_operator);
     return MakeShared<PhysicalDropSchema>(
@@ -311,7 +311,7 @@ PhysicalPlanner::BuildDropSchema(const SharedPtr<LogicalNode> &logical_operator)
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildDropView(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildDropView(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalDropView> logical_drop_view =
             std::static_pointer_cast<LogicalDropView>(logical_operator);
     return MakeShared<PhysicalDropView>(logical_drop_view->schema_name(),
@@ -323,7 +323,7 @@ PhysicalPlanner::BuildDropView(const SharedPtr<LogicalNode> &logical_operator) c
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildInsert(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildInsert(const SharedPtr<LogicalNode>& logical_operator) const {
 
     SharedPtr<LogicalInsert> logical_insert_ptr = std::dynamic_pointer_cast<LogicalInsert>(logical_operator);
     return MakeShared<PhysicalInsert>(logical_operator->node_id(),
@@ -333,17 +333,17 @@ PhysicalPlanner::BuildInsert(const SharedPtr<LogicalNode> &logical_operator) con
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildDelete(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildDelete(const SharedPtr<LogicalNode>& logical_operator) const {
     return MakeShared<PhysicalDelete>(logical_operator->node_id());
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildUpdate(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildUpdate(const SharedPtr<LogicalNode>& logical_operator) const {
     return MakeShared<PhysicalUpdate>(logical_operator->node_id());
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode>& logical_operator) const {
     LogicalImport* logical_import = (LogicalImport*)(logical_operator.get());
     return MakeShared<PhysicalImport>(logical_operator->node_id(),
                                       logical_import->table_collection_entry(),
@@ -354,7 +354,7 @@ PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode> &logical_operator) con
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildExport(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildExport(const SharedPtr<LogicalNode>& logical_operator) const {
     LogicalExport* logical_export = (LogicalExport*)(logical_operator.get());
     return MakeShared<PhysicalExport>(logical_export->node_id(),
                                       logical_export->schema_name(),
@@ -366,14 +366,14 @@ PhysicalPlanner::BuildExport(const SharedPtr<LogicalNode> &logical_operator) con
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildAlter(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildAlter(const SharedPtr<LogicalNode>& logical_operator) const {
     return MakeShared<PhysicalAlter>(logical_operator->GetOutputNames(),
                                      logical_operator->GetOutputTypes(),
                                      logical_operator->node_id());
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode>& logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     PlannerAssert(logical_operator->right_node() == nullptr,
                   "Aggregate project node shouldn't have right child.");
@@ -392,7 +392,7 @@ PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) 
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode>& logical_operator) const {
 
     auto left_node = logical_operator->left_node();
     auto right_node = logical_operator->right_node();
@@ -416,7 +416,7 @@ PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildCrossProduct(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildCrossProduct(const SharedPtr<LogicalNode>& logical_operator) const {
 
     auto left_node = logical_operator->left_node();
     auto right_node = logical_operator->right_node();
@@ -424,7 +424,7 @@ PhysicalPlanner::BuildCrossProduct(const SharedPtr<LogicalNode> &logical_operato
     PlannerAssert(right_node != nullptr, "Cross product node has no right child.");
 
     SharedPtr<LogicalCrossProduct> logical_cross_product
-                                        = std::static_pointer_cast<LogicalCrossProduct>(logical_operator);
+            = std::static_pointer_cast<LogicalCrossProduct>(logical_operator);
 
     SharedPtr<PhysicalOperator> left_physical_operator{};
     SharedPtr<PhysicalOperator> right_physical_operator{};
@@ -438,7 +438,7 @@ PhysicalPlanner::BuildCrossProduct(const SharedPtr<LogicalNode> &logical_operato
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildSort(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildSort(const SharedPtr<LogicalNode>& logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     PlannerAssert(input_logical_node != nullptr, "Logical sort node has no input node.");
     PlannerAssert(logical_operator->right_node() == nullptr,
@@ -455,7 +455,7 @@ PhysicalPlanner::BuildSort(const SharedPtr<LogicalNode> &logical_operator) const
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildLimit(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildLimit(const SharedPtr<LogicalNode>& logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     PlannerAssert(input_logical_node != nullptr, "Logical limit node has no input node.");
     PlannerAssert(logical_operator->right_node() == nullptr,
@@ -469,7 +469,7 @@ PhysicalPlanner::BuildLimit(const SharedPtr<LogicalNode> &logical_operator) cons
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode>& logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
 //    PlannerAssert(input_logical_node != nullptr, "Logical project node has no input node.");
     PlannerAssert(logical_operator->right_node() == nullptr,
@@ -486,7 +486,7 @@ PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator)
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildFilter(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildFilter(const SharedPtr<LogicalNode>& logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     PlannerAssert(input_logical_node != nullptr, "Logical filter node has no input node.");
     PlannerAssert(logical_operator->right_node() == nullptr,
@@ -502,22 +502,22 @@ PhysicalPlanner::BuildFilter(const SharedPtr<LogicalNode> &logical_operator) con
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildIntersect(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildIntersect(const SharedPtr<LogicalNode>& logical_operator) const {
     return MakeShared<PhysicalHashJoin>(logical_operator->node_id());
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildUnion(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildUnion(const SharedPtr<LogicalNode>& logical_operator) const {
     return MakeShared<PhysicalUnionAll>(logical_operator->node_id());
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildExcept(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildExcept(const SharedPtr<LogicalNode>& logical_operator) const {
     return MakeShared<PhysicalHashJoin>(logical_operator->node_id());
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildShow(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildShow(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalShow> logical_show =
             std::static_pointer_cast<LogicalShow>(logical_operator);
     return MakeShared<PhysicalShow>(logical_show->node_id(),
@@ -528,7 +528,7 @@ PhysicalPlanner::BuildShow(const SharedPtr<LogicalNode> &logical_operator) const
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalTableScan> logical_table_scan =
             std::static_pointer_cast<LogicalTableScan>(logical_operator);
 
@@ -553,12 +553,12 @@ PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) 
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode>& logical_operator) const {
     NotImplementError("BuildViewScan");
 }
 
 SharedPtr<PhysicalOperator>
-PhysicalPlanner::BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const {
+PhysicalPlanner::BuildDummyScan(const SharedPtr<LogicalNode>& logical_operator) const {
     SharedPtr<LogicalDummyScan> logical_show =
             std::static_pointer_cast<LogicalDummyScan>(logical_operator);
     return MakeShared<PhysicalDummyScan>(logical_show->node_id());
@@ -597,7 +597,7 @@ PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode>& logical_operator) co
             std::static_pointer_cast<LogicalExplain>(logical_operator);
 
     SharedPtr<PhysicalExplain> explain_node{nullptr};
-    switch (logical_explain->explain_type()) {
+    switch(logical_explain->explain_type()) {
         case ExplainType::kAnalyze: {
             NotImplementError("Explain analyze");
             break;

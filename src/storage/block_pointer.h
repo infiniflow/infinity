@@ -11,43 +11,48 @@ namespace infinity {
 class BlockPointer {
 public:
     BlockPointer() {}
-    BlockPointer(const BlockPointer &from) :
-        offset_(from.offset_),
-        size_(from.size_) {}
+    BlockPointer(const BlockPointer& from) :
+            offset_(from.offset_),
+            size_(from.size_) {}
 
     BlockPointer(u64 offset, u64 size) :
-        offset_(offset),
-        size_(size) {}
+            offset_(offset),
+            size_(size) {}
 
     template<class StrType>
-    void EncodeTo(StrType& s) const {
+    void
+    EncodeTo(StrType& s) const {
         Codec::AddVLong(s, offset_);
         Codec::AddVInt(s, size_);
     }
 
-    Status DecodeFrom(const u8 *data, const u8 *limit) {
+    Status
+    DecodeFrom(const u8* data, const u8* limit) {
         data = Codec::GetVLongPtr(data, &offset_);
-        if (!data) {
+        if(!data) {
             return Status::Corruption("bad block pointer");
         }
 
         data = Codec::GetVIntPtr(data, &size_);
-        if (!data) {
+        if(!data) {
             return Status::Corruption("bad block pointer");
         }
 
         return Status::OK();
     }
 
-    u64 Offset() const {
+    u64
+    Offset() const {
         return offset_;
     }
 
-    u32 Size() const {
+    u32
+    Size() const {
         return size_;
     }
 
-    bool Equals(const BlockPointer& other) const {
+    bool
+    Equals(const BlockPointer& other) const {
         return offset_ == other.offset_ && size_ == other.size_;
     }
 

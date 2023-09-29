@@ -23,7 +23,7 @@ enum class ShowType {
 String
 ToString(ShowType type);
 
-class LogicalShow: public LogicalNode {
+class LogicalShow : public LogicalNode {
 public:
     explicit
     LogicalShow(u64 node_id,
@@ -31,12 +31,11 @@ public:
                 String schema_name,
                 String object_name,
                 u64 table_index)
-        : LogicalNode(node_id, LogicalNodeType::kShow),
-        scan_type_(type),
-        schema_name_(std::move(schema_name)),
-        object_name_(std::move(object_name)),
-        table_index_(table_index)
-        {}
+            : LogicalNode(node_id, LogicalNodeType::kShow),
+              scan_type_(type),
+              schema_name_(std::move(schema_name)),
+              object_name_(std::move(object_name)),
+              table_index_(table_index) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {

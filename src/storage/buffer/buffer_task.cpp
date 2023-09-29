@@ -39,45 +39,45 @@ BufferIO::OnCommit(const SharedPtr<AsyncTask>& async_task) {
 
 void
 BufferReadTask::Prepare() {
-    BufferHandle* buffer_handle = (BufferHandle*) buffer_handle_;
+    BufferHandle* buffer_handle = (BufferHandle*)buffer_handle_;
     LOG_TRACE("BufferReadTask: Prepare Read {}", buffer_handle->GetFilename());
     try {
         buffer_handle->ReadFile();
-    } catch (const std::exception& e) {
+    } catch(const std::exception& e) {
         this->SetError(MakeUnique<String>(e.what()));
     }
 }
 
 void
 BufferReadTask::Commit() {
-    BufferHandle* buffer_handle = (BufferHandle*) buffer_handle_;
+    BufferHandle* buffer_handle = (BufferHandle*)buffer_handle_;
     LOG_TRACE("BufferReadTask: Commit Read {}", buffer_handle->GetFilename());
     try {
         buffer_handle->CloseFile();
-    } catch (const std::exception& e) {
+    } catch(const std::exception& e) {
         this->SetError(MakeUnique<String>(e.what()));
     }
 }
 
 void
 BufferWriteTask::Prepare() {
-    BufferHandle* buffer_handle = (BufferHandle*) buffer_handle_;
+    BufferHandle* buffer_handle = (BufferHandle*)buffer_handle_;
     LOG_TRACE("BufferWriteTask: Prepare Write {}", buffer_handle->GetFilename());
     try {
         buffer_handle->WriteFile(buffer_handle->buffer_size_);
-    } catch (const std::exception& e) {
+    } catch(const std::exception& e) {
         this->SetError(MakeUnique<String>(e.what()));
     }
 }
 
 void
 BufferWriteTask::Commit() {
-    BufferHandle* buffer_handle = (BufferHandle*) buffer_handle_;
+    BufferHandle* buffer_handle = (BufferHandle*)buffer_handle_;
     LOG_TRACE("BufferWriteTask: Commit Write {}", buffer_handle->GetFilename());
     try {
         buffer_handle->SyncFile();
         buffer_handle->CloseFile();
-    } catch (const std::exception& e) {
+    } catch(const std::exception& e) {
         this->SetError(MakeUnique<String>(e.what()));
     }
 }

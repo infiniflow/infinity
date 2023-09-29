@@ -11,11 +11,10 @@ namespace infinity {
 
 class BindContext;
 
-class JoinTableRef: public TableRef {
+class JoinTableRef : public TableRef {
 public:
     explicit JoinTableRef(String alias) :
-            TableRef(TableRefType::kJoin, std::move(alias))
-    {}
+            TableRef(TableRefType::kJoin, std::move(alias)) {}
 
     SharedPtr<BindContext> left_bind_context_;
     SharedPtr<BindContext> right_bind_context_;

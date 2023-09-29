@@ -19,7 +19,7 @@ HavingBinder::BuildExpression(const ParsedExpr& expr,
 
     // Trying to bind in group by
     if(!this->binding_agg_func_) {
-        if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
+        if(bind_context_ptr->group_index_by_name_.contains(expr_name)) {
             i64 groupby_index = bind_context_ptr->group_index_by_name_[expr_name];
             const SharedPtr<BaseExpression>& group_expr = bind_context_ptr->group_exprs_[groupby_index];
 
@@ -49,7 +49,8 @@ HavingBinder::BuildExpression(const ParsedExpr& expr,
                                                                         aggregate_index,
                                                                         depth);
 
-            result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+            result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_,
+                                                      ExprSourceType::kAggregate);
             return result;
         } else {
             // in an aggregate function, which means aggregate function nested, which is error.
@@ -80,7 +81,8 @@ HavingBinder::BuildColExpr(const ColumnExpr& expr,
         return result;
 
     } else {
-        PlannerError("Column " + String(expr.GetName()) + " must appear in the GROUP BY clause or be used in an aggregate function");
+        PlannerError("Column " + String(expr.GetName()) +
+                     " must appear in the GROUP BY clause or be used in an aggregate function");
     }
 }
 

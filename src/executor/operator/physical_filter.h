@@ -21,9 +21,8 @@ public:
     PhysicalFilter(u64 id,
                    SharedPtr<PhysicalOperator> left,
                    SharedPtr<BaseExpression> condition)
-                   : PhysicalOperator(PhysicalOperatorType::kFilter, std::move(left), nullptr, id),
-                     condition_(std::move(condition))
-                     {}
+            : PhysicalOperator(PhysicalOperatorType::kFilter, std::move(left), nullptr, id),
+              condition_(std::move(condition)) {}
 
     ~PhysicalFilter() override = default;
 

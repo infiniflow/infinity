@@ -14,9 +14,9 @@ public:
     LogicalSort(u64 node_id,
                 Vector<SharedPtr<BaseExpression>> expressions,
                 Vector<OrderType> order_by_types)
-    : LogicalNode(node_id, LogicalNodeType::kSort),
-    expressions_(std::move(expressions)),
-    order_by_types_(std::move(order_by_types)) {}
+            : LogicalNode(node_id, LogicalNodeType::kSort),
+              expressions_(std::move(expressions)),
+              order_by_types_(std::move(order_by_types)) {}
 
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final {

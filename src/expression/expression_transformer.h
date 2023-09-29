@@ -24,16 +24,16 @@ SplitExpressionByDelimiter(const SharedPtr<BaseExpression>& expression, Conjunct
 
 SharedPtr<BaseExpression>
 ComposeExpressionWithDelimiter(const Vector<SharedPtr<BaseExpression>>& expressions,
-                             ConjunctionType conjunction_type);
+                               ConjunctionType conjunction_type);
 
 
 // Traverse the expression and it's child
 void
 VisitExpression(const SharedPtr<BaseExpression>& expression,
-                const std::function<VisitControlType(SharedPtr<BaseExpression> &child)>& visitor);
+                const std::function<VisitControlType(SharedPtr<BaseExpression>& child)>& visitor);
 
 void
 VisitExpression(const SharedPtr<BaseExpression>& expression,
-                const std::function<void(SharedPtr<BaseExpression> &child)>& visitor);
+                const std::function<void(SharedPtr<BaseExpression>& child)>& visitor);
 
 }

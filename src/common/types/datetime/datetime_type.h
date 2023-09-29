@@ -13,7 +13,7 @@ struct DateTimeType {
     DateTimeType() = default;
 
     explicit
-    DateTimeType(i32 date_value, i32 time_value): date(date_value), time(time_value) {};
+    DateTimeType(i32 date_value, i32 time_value) : date(date_value), time(time_value) {};
 
     inline void
     Reset() {

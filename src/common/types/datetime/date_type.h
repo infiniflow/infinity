@@ -14,7 +14,7 @@ struct DateType {
     DateType() = default;
 
     explicit
-    DateType(i32 date_value): value(date_value) {};
+    DateType(i32 date_value) : value(date_value) {};
 
     inline void
     FromString(const String& date_str) {

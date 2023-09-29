@@ -13,23 +13,23 @@
 namespace infinity {
 
 BufferHandle::BufferHandle(void* buf_mgr) : buffer_mgr_(buf_mgr) {
-    BufferManager *buffer_mgr = (BufferManager *) buffer_mgr_;
+    BufferManager* buffer_mgr = (BufferManager*)buffer_mgr_;
     reader_processor_ = buffer_mgr->reader_.get();
     writer_processor_ = buffer_mgr->writer_.get();
 }
 
 ptr_t
 BufferHandle::LoadData() {
-    BufferManager *buffer_mgr = (BufferManager *) buffer_mgr_;
+    BufferManager* buffer_mgr = (BufferManager*)buffer_mgr_;
     {
         std::unique_lock<RWMutex> w_locker(rw_locker_);
-        switch (status_) {
+        switch(status_) {
             case BufferStatus::kLoaded: {
                 ++reference_count_;
                 return data_.get();
             }
             case BufferStatus::kUnloaded: {
-                if (reference_count_ != 0 || data_ == nullptr) {
+                if(reference_count_ != 0 || data_ == nullptr) {
                     LOG_ERROR("Error happened when buffer with unloaded status.")
                     return nullptr;
                 }
@@ -38,7 +38,7 @@ BufferHandle::LoadData() {
                 return data_.get();
             }
             case BufferStatus::kSpilled: {
-                if (reference_count_ != 0 || data_ != nullptr) {
+                if(reference_count_ != 0 || data_ != nullptr) {
                     LOG_ERROR("Error happened when buffer with spilled status.")
                     return nullptr;
                 }
@@ -66,18 +66,18 @@ BufferHandle::LoadData() {
             }
 
             case BufferStatus::kFreed: {
-                if (reference_count_ != 0 || data_ != nullptr) {
+                if(reference_count_ != 0 || data_ != nullptr) {
                     LOG_ERROR("Error happened when buffer with freed status.")
                     return nullptr;
                 }
 
                 ptr_t res{nullptr};
-                switch (buffer_type_) {
+                switch(buffer_type_) {
 
                     case BufferType::kTempFile: {
                         // Allocate memory with buffer size
                         UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
-                        if (err_msg != nullptr) {
+                        if(err_msg != nullptr) {
                             LOG_ERROR(*err_msg);
                             return nullptr;
                         }
@@ -131,13 +131,14 @@ BufferHandle::LoadData() {
 
                             nbytes = fs.Read(*file_handler_, &buffer_size_, sizeof(buffer_size_));
                             if(nbytes != sizeof(buffer_size_)) {
-                                StorageError(fmt::format("Incorrect buffer length field size: {}", sizeof(buffer_size_)));
+                                StorageError(fmt::format("Incorrect buffer length field size: {}",
+                                                         sizeof(buffer_size_)));
                             }
 
                             LOG_TRACE("Read file: {} which size: {}", file_path, buffer_size_);
                             // Need buffer size space
                             UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
-                            if (err_msg != nullptr) {
+                            if(err_msg != nullptr) {
                                 LOG_ERROR(*err_msg);
                                 return nullptr;
                             }
@@ -174,7 +175,7 @@ BufferHandle::LoadData() {
 
                         // Need buffer size space
                         UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
-                        if (err_msg != nullptr) {
+                        if(err_msg != nullptr) {
                             LOG_ERROR(*err_msg);
                             return nullptr;
                         }
@@ -194,7 +195,8 @@ BufferHandle::LoadData() {
                     }
                     case BufferType::kInvalid: {
                         LOG_TRACE("Invalid buffer type");
-                        UniquePtr<String> err_msg = MakeUnique<String>("Attempt to set non-temp file buffer to sealed status");
+                        UniquePtr<String> err_msg = MakeUnique<String>(
+                                "Attempt to set non-temp file buffer to sealed status");
                         LOG_ERROR(*err_msg);
                         return nullptr;
                     }
@@ -213,15 +215,16 @@ BufferHandle::LoadData() {
 void
 BufferHandle::UnloadData() {
     std::unique_lock<RWMutex> w_locker(rw_locker_);
-    -- reference_count_;
+    --reference_count_;
     if(reference_count_ == 0) {
-        BufferManager* buffer_mgr = (BufferManager*) buffer_mgr_;
+        BufferManager* buffer_mgr = (BufferManager*)buffer_mgr_;
         buffer_mgr->PushGCQueue(this);
         status_ = BufferStatus::kUnloaded;
     }
 }
 
-void BufferHandle::AddRefCount() {
+void
+BufferHandle::AddRefCount() {
     std::unique_lock<RWMutex> w_locker(rw_locker_);
     reference_count_++;
 }
@@ -232,10 +235,10 @@ BufferHandle::FreeData() {
     if(reference_count_ == 0) {
         if(status_ != BufferStatus::kUnloaded) {
             // The buffer was loaded again or was already freed.
-            return ;
+            return;
         }
 
-        BufferManager* buffer_mgr = (BufferManager*) buffer_mgr_;
+        BufferManager* buffer_mgr = (BufferManager*)buffer_mgr_;
         if(buffer_type_ == BufferType::kTempFile) {
             String file_path;
             if(current_dir_ == nullptr or current_dir_->empty()) {
@@ -257,16 +260,16 @@ BufferHandle::FreeData() {
 
 UniquePtr<String>
 BufferHandle::SetSealing() {
-    BufferManager *buffer_mgr = (BufferManager *) buffer_mgr_;
+    BufferManager* buffer_mgr = (BufferManager*)buffer_mgr_;
     std::unique_lock<RWMutex> w_locker(rw_locker_);
     if(buffer_type_ != BufferType::kTempFile) {
         UniquePtr<String> err_msg = MakeUnique<String>("Attempt to set non-temp file buffer to sealed status");
         LOG_ERROR(*err_msg);
         return err_msg;
     }
-    switch (status_) {
+    switch(status_) {
         case BufferStatus::kSpilled: {
-            if (reference_count_ != 0 || data_ != nullptr) {
+            if(reference_count_ != 0 || data_ != nullptr) {
                 UniquePtr<String> err_msg = MakeUnique<String>("Error happened when buffer with spilled status.");
                 LOG_ERROR(*err_msg);
                 return err_msg;
@@ -399,7 +402,7 @@ BufferHandle::ReadFile() {
 
     if(file_size != buffer_length + 3 * sizeof(u64)) {
         StorageError(fmt::format("File size: {} isn't matched with {}.",
-                                file_size, buffer_length + 3 * sizeof(u64)));
+                                 file_size, buffer_length + 3 * sizeof(u64)));
 
     }
 
@@ -473,7 +476,9 @@ BufferHandle::WriteFile(SizeT buffer_length) {
 
     nbytes = fs.Write(*file_handler_, data_.get(), buffer_length);
     if(nbytes != buffer_length) {
-        StorageError(fmt::format("Expect to write buffer with size: {}, but {} bytes is written", buffer_length, nbytes));
+        StorageError(fmt::format("Expect to write buffer with size: {}, but {} bytes is written",
+                                 buffer_length,
+                                 nbytes));
     }
 
     u64 checksum{};

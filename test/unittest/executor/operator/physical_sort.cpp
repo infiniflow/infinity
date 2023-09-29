@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
+
 #include "function/scalar/subtract.h"
 #include "function/scalar/add.h"
 #include "function/scalar_function_set.h"
@@ -64,16 +64,18 @@ TEST_F(PhysicalSortTest, test1) {
                                     HashSet<ConstraintType>());
     columns.emplace_back(col_def);
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("input_table"), columns);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"),
+                                                   MakeShared<String>("input_table"),
+                                                   columns);
 
     SharedPtr<Table> input_table = Table::Make(table_def, TableType::kIntermediate);
 
-    for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
+    for(SizeT block_id = 0; block_id < block_count; ++block_id) {
         SharedPtr<DataBlock> data_block = DataBlock::Make();
         data_block->Init(column_types);
 
         // Column 1 & 2
-        for(SizeT row_id = 0; row_id < row_count; ++ row_id) {
+        for(SizeT row_id = 0; row_id < row_count; ++row_id) {
             Value v1 = Value::MakeBool(row_id % 2 == 0);
             data_block->column_vectors[0]->AppendValue(v1);
             Value v2 = Value::MakeBigInt(row_id + block_id * 10000);
@@ -85,8 +87,8 @@ TEST_F(PhysicalSortTest, test1) {
 
     SharedPtr<Vector<RowID>> rowid_vector = MakeShared<Vector<RowID>>();
     rowid_vector->reserve(block_count * DEFAULT_VECTOR_SIZE);
-    for(i64 block_id = block_count - 1; block_id >= 0; -- block_id) {
-        for(i64 row_id = DEFAULT_VECTOR_SIZE - 1; row_id >= 0; -- row_id) {
+    for(i64 block_id = block_count - 1; block_id >= 0; --block_id) {
+        for(i64 row_id = DEFAULT_VECTOR_SIZE - 1; row_id >= 0; --row_id) {
             rowid_vector->emplace_back(RowID(block_id, row_id));
         }
     }

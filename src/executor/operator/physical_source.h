@@ -27,8 +27,7 @@ public:
             : PhysicalOperator(PhysicalOperatorType::kSource, nullptr, nullptr, id),
               type_(source_type),
               output_names_(std::move(names)),
-              output_types_(std::move(types))
-    {}
+              output_types_(std::move(types)) {}
 
     ~PhysicalSource() override = default;
 

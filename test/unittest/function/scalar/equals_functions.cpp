@@ -10,7 +10,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
 #include "function/scalar/equals.h"
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
@@ -51,11 +50,11 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                "t1",
-                                                                                1,
-                                                                                "c1",
-                                                                                0,
-                                                                                0);
+                                                                                 "t1",
+                                                                                 1,
+                                                                                 "c1",
+                                                                                 0,
+                                                                                 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
                                                                                  "t1",
                                                                                  1,
@@ -78,7 +77,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeBool(true));
                 data_block.AppendValue(1, Value::MakeBool(false));
@@ -89,7 +88,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBoolean);
@@ -107,7 +106,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             EXPECT_EQ(v.value_.boolean, false);
@@ -148,7 +147,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
                 data_block.AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
@@ -159,7 +158,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kTinyInt);
@@ -177,7 +176,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
@@ -222,7 +221,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeSmallInt(static_cast<i16>(i)));
                 data_block.AppendValue(1, Value::MakeSmallInt(static_cast<i16>(i)));
@@ -233,7 +232,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kSmallInt);
@@ -251,7 +250,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
@@ -296,7 +295,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeInt(static_cast<i32>(i)));
                 data_block.AppendValue(1, Value::MakeInt(static_cast<i32>(i)));
@@ -307,7 +306,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kInteger);
@@ -325,7 +324,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
@@ -369,7 +368,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeBigInt(static_cast<i64>(i)));
                 data_block.AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
@@ -380,7 +379,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBigInt);
@@ -398,7 +397,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
@@ -442,7 +441,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeHugeInt(HugeIntT(static_cast<i64>(i), static_cast<i64>(i))));
                 data_block.AppendValue(1, Value::MakeHugeInt(HugeIntT(static_cast<i64>(i), static_cast<i64>(i))));
@@ -453,7 +452,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kHugeInt);
@@ -471,7 +470,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
@@ -515,7 +514,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeFloat(static_cast<f32>(i)));
                 data_block.AppendValue(1, Value::MakeFloat(static_cast<f32>(i)));
@@ -526,7 +525,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kFloat);
@@ -544,7 +543,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
@@ -588,7 +587,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeDouble(static_cast<f64>(i)));
                 data_block.AppendValue(1, Value::MakeDouble(static_cast<f64>(i)));
@@ -599,7 +598,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kDouble);
@@ -617,7 +616,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {
@@ -663,7 +662,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
                 data_block.AppendValue(1, Value::MakeVarchar("Helloworld" + std::to_string(i)));
@@ -674,7 +673,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
@@ -692,7 +691,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if(i % 2 == 0) {

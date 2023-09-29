@@ -9,7 +9,7 @@
 
 namespace infinity {
 
-class ReferenceExpression: public BaseExpression {
+class ReferenceExpression : public BaseExpression {
 public:
     static inline SharedPtr<ReferenceExpression>
     Make(DataType data_type,
@@ -31,12 +31,11 @@ public:
                         String column_name,
                         String alias,
                         SizeT column_idx) :
-                        BaseExpression(ExpressionType::kReference, {}, std::move(alias)),
-                        data_type_(std::move(data_type)),
-                        table_name_(std::move(table_name)),
-                        column_name_(std::move(column_name)),
-                        column_index_(column_idx)
-                        {}
+            BaseExpression(ExpressionType::kReference, {}, std::move(alias)),
+            data_type_(std::move(data_type)),
+            table_name_(std::move(table_name)),
+            column_name_(std::move(column_name)),
+            column_index_(column_idx) {}
 
     inline SizeT
     column_index() const {

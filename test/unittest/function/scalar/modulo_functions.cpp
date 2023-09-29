@@ -9,7 +9,6 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
 #include "function/scalar/modulo.h"
 #include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
@@ -77,13 +76,13 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i + 2)));
             data_block.AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kTinyInt);
@@ -96,7 +95,7 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
 
             if(i % 256 == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
@@ -142,13 +141,13 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<i16>(i + 10)));
             data_block.AppendValue(1, Value::MakeSmallInt(static_cast<i16>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kSmallInt);
@@ -161,7 +160,7 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
@@ -206,13 +205,13 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<i32>(i + 9)));
             data_block.AppendValue(1, Value::MakeInt(static_cast<i32>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kInteger);
@@ -225,7 +224,7 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
@@ -270,13 +269,13 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<i64>(i + 5)));
             data_block.AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBigInt);
@@ -289,7 +288,7 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
@@ -361,13 +360,13 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<f32>(i + 2)));
             data_block.AppendValue(1, Value::MakeFloat(static_cast<f32>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kFloat);
@@ -380,7 +379,7 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
@@ -425,13 +424,13 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<f64>(i + 3)));
             data_block.AppendValue(1, Value::MakeDouble(static_cast<f64>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kDouble);
@@ -444,7 +443,7 @@ TEST_F(ModuloFunctionsTest, mod_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             if(i == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {

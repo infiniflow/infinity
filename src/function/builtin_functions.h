@@ -14,7 +14,8 @@ public:
     explicit
     BuiltinFunctions(UniquePtr<NewCatalog>& catalog_ptr);
 
-    void Init();
+    void
+    Init();
 
 
 private:
@@ -22,9 +23,14 @@ private:
 
 private:
 
-    void RegisterAggregateFunction();
-    void RegisterScalarFunction();
-    void RegisterTableFunction();
+    void
+    RegisterAggregateFunction();
+
+    void
+    RegisterScalarFunction();
+
+    void
+    RegisterTableFunction();
 };
 
 }

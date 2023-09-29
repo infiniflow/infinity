@@ -16,7 +16,7 @@ BufferWriter::size() const {
 }
 
 void
-BufferWriter::send_string(const std::string &value, NullTerminator null_terminator) {
+BufferWriter::send_string(const std::string& value, NullTerminator null_terminator) {
     auto position_in_string = 0u;
 
     if(!full()) {
@@ -34,9 +34,9 @@ BufferWriter::send_string(const std::string &value, NullTerminator null_terminat
     }
 
     if(null_terminator == NullTerminator::kYes) {
-        try_flush(sizeof (char));
+        try_flush(sizeof(char));
         *current_pos_ = NULL_END;
-        ++ current_pos_;
+        ++current_pos_;
     }
 }
 
@@ -47,11 +47,13 @@ BufferWriter::flush(size_t bytes) {
     size_t bytes_sent;
 
     boost::system::error_code boost_error;
-    if (std::distance(&*start_pos_, &*current_pos_) < 0) {
+    if(std::distance(&*start_pos_, &*current_pos_) < 0) {
         bytes_sent = boost::asio::write(*socket_,
-                                        std::array<boost::asio::mutable_buffer, 2> {
-                                            boost::asio::buffer(&*start_pos_, std::distance(&*start_pos_, data_.end())),
-                                            boost::asio::buffer(data_.begin(), std::distance(data_.begin(), &*current_pos_))
+                                        std::array<boost::asio::mutable_buffer, 2>{
+                                                boost::asio::buffer(&*start_pos_,
+                                                                    std::distance(&*start_pos_, data_.end())),
+                                                boost::asio::buffer(data_.begin(),
+                                                                    std::distance(data_.begin(), &*current_pos_))
                                         },
                                         boost::asio::transfer_at_least(bytes_to_send), boost_error);
 
@@ -60,7 +62,8 @@ BufferWriter::flush(size_t bytes) {
                                         boost::asio::transfer_at_least(bytes_to_send), boost_error);
     }
 
-    if(boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_sent == 0) {
+    if(boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset ||
+       bytes_sent == 0) {
         NetworkAssert(false, "Write failed. Client close connection.");
     }
 
@@ -70,7 +73,7 @@ BufferWriter::flush(size_t bytes) {
 
 void
 BufferWriter::try_flush(size_t bytes) {
-    if (bytes >= max_capacity() - size()) {
+    if(bytes >= max_capacity() - size()) {
         flush(bytes);
     }
 }

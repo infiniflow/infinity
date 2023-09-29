@@ -24,6 +24,7 @@ public:
 
 public:
     BitmaskBuffer();
+
     ~BitmaskBuffer();
 
     void
@@ -37,9 +38,9 @@ public:
         return (capacity + (UNIT_BITS - 1)) / UNIT_BITS;
     }
 public:
-    UniquePtr<u64[]> data_ptr_ {nullptr};
+    UniquePtr<u64[]> data_ptr_{nullptr};
 
-    size_t count_ {0};
+    size_t count_{0};
 };
 
 }

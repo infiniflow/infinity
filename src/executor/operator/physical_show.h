@@ -21,11 +21,10 @@ public:
                           String object_name,
                           u64 table_index)
             : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id),
-            scan_type_(type),
-            db_name_(std::move(db_name)),
-            object_name_(std::move(object_name)),
-            table_index_(table_index)
-            {}
+              scan_type_(type),
+              db_name_(std::move(db_name)),
+              object_name_(std::move(object_name)),
+              table_index_(table_index) {}
 
     ~PhysicalShow() override = default;
 
@@ -85,12 +84,12 @@ private:
     /// Execute push based show table
     void
     ExecuteShowTable(QueryContext* query_context,
-                     ShowInputState *input_state,
-                     ShowOutputState *output_state);
+                     ShowInputState* input_state,
+                     ShowOutputState* output_state);
 
     /// Execute push based describe table
     void
-    ExecuteShowColumns(QueryContext* query_context,ShowInputState *input_state,ShowOutputState *output_state);
+    ExecuteShowColumns(QueryContext* query_context, ShowInputState* input_state, ShowOutputState* output_state);
 
 
 private:

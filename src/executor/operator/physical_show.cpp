@@ -64,12 +64,12 @@ PhysicalShow::Init() {
 }
 
 void
-PhysicalShow::Execute(QueryContext *query_context,
-                      InputState *input_state,
-                      OutputState *output_state) {
+PhysicalShow::Execute(QueryContext* query_context,
+                      InputState* input_state,
+                      OutputState* output_state) {
 
     auto show_input_state = (ShowInputState*)(input_state);
-    auto show_output_state =(ShowOutputState*)(output_state);
+    auto show_output_state = (ShowOutputState*)(output_state);
 
     switch(scan_type_) {
         case ShowType::kShowTables: {
@@ -95,8 +95,8 @@ PhysicalShow::Execute(QueryContext *query_context,
  */
 void
 PhysicalShow::ExecuteShowTable(QueryContext* query_context,
-                               ShowInputState *input_state,
-                               ShowOutputState *output_state) {
+                               ShowInputState* input_state,
+                               ShowOutputState* output_state) {
     // Define output table schema
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
@@ -108,7 +108,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
 
     // Prepare the output data block
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
             varchar_type,
             varchar_type,
             varchar_type,
@@ -131,7 +131,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append table name to the 1 column
             const String* table_name = table_collection_detail.table_collection_name_.get();
@@ -140,7 +140,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         TableCollectionType table_type = table_collection_detail.table_collection_type_;
         {
             // Append base table type to the 2 column
@@ -150,7 +150,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append column count the 3 column
             switch(table_type) {
@@ -170,7 +170,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
             }
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append row count the 4 column
             switch(table_type) {
@@ -193,7 +193,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
             }
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append segment count the 5 column
             switch(table_type) {
@@ -216,7 +216,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
             }
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append block limit the 6 column
             SizeT default_row_size = table_collection_detail.segment_capacity_;
@@ -237,15 +237,15 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context,
  * @param output_state
  */
 void
-PhysicalShow::ExecuteShowColumns(QueryContext *query_context,
-                                 ShowInputState *input_state,
-                                 ShowOutputState *output_state) {
+PhysicalShow::ExecuteShowColumns(QueryContext* query_context,
+                                 ShowInputState* input_state,
+                                 ShowOutputState* output_state) {
 
     auto txn = query_context->GetTxn();
     auto result = txn->GetTableByName(db_name_, object_name_);
-    output_state->error_message_= std::move(result.err_);
-    if (result.entry_!= nullptr){
-        auto table_collection_entry= dynamic_cast<TableCollectionEntry*>(result.entry_);
+    output_state->error_message_ = std::move(result.err_);
+    if(result.entry_ != nullptr) {
+        auto table_collection_entry = dynamic_cast<TableCollectionEntry*>(result.entry_);
 
         auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
@@ -255,19 +255,21 @@ PhysicalShow::ExecuteShowColumns(QueryContext *query_context,
                 MakeShared<ColumnDef>(2, varchar_type, "constraint", HashSet<ConstraintType>()),
         };
 
-        SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
+        SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"),
+                                                       MakeShared<String>("Views"),
+                                                       column_defs);
 
         // create data block for output state
         auto output_block_ptr = DataBlock::Make();
-        Vector<SharedPtr<DataType>> column_types {
-            varchar_type,
-            varchar_type,
-            varchar_type,
+        Vector<SharedPtr<DataType>> column_types{
+                varchar_type,
+                varchar_type,
+                varchar_type,
         };
 
         output_block_ptr->Init(column_types);
 
-        for (auto& column: table_collection_entry->columns_){
+        for(auto& column: table_collection_entry->columns_) {
             SizeT column_id = 0;
             {
                 // Append column name to the first column
@@ -276,11 +278,11 @@ PhysicalShow::ExecuteShowColumns(QueryContext *query_context,
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
 
-            ++ column_id;
+            ++column_id;
             {
                 // Append column type to the second column, if the column type is embedded type, append the embedded type
                 String column_type;
-                if (column->type()->type() == kEmbedding){
+                if(column->type()->type() == kEmbedding) {
                     auto type = column->type();
                     auto embedding_type = type->type_info()->ToString();
                     column_type = fmt::format("{}({})", type->ToString(), embedding_type);
@@ -293,7 +295,7 @@ PhysicalShow::ExecuteShowColumns(QueryContext *query_context,
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
 
-            ++ column_id;
+            ++column_id;
             {
                 // Append column constraint to the third column
                 String column_constraint;
@@ -313,7 +315,7 @@ PhysicalShow::ExecuteShowColumns(QueryContext *query_context,
 }
 
 void
-PhysicalShow::Execute(QueryContext *query_context) {
+PhysicalShow::Execute(QueryContext* query_context) {
 
     switch(scan_type_) {
         case ShowType::kShowTables: {
@@ -365,7 +367,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
 
     // Prepare the output data block
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
             varchar_type,
             varchar_type,
             varchar_type,
@@ -388,7 +390,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append table name to the 1 column
             const String* table_name = table_collection_detail.table_collection_name_.get();
@@ -397,7 +399,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         TableCollectionType table_type = table_collection_detail.table_collection_type_;
         {
             // Append base table type to the 2 column
@@ -407,7 +409,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append column count the 3 column
             switch(table_type) {
@@ -428,7 +430,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
 
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append row count the 4 column
             switch(table_type) {
@@ -451,7 +453,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
             }
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append segment count the 5 column
             switch(table_type) {
@@ -474,7 +476,7 @@ PhysicalShow::ExecuteShowTable(QueryContext* query_context) {
             }
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append block limit the 6 column
             SizeT default_row_size = table_collection_detail.segment_capacity_;
@@ -500,7 +502,9 @@ PhysicalShow::ExecuteShowViews(QueryContext* query_context) {
             MakeShared<ColumnDef>(3, bigint_type, "column_count", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
+    SharedPtr<TableDef> table_def = MakeShared<TableDef>(MakeShared<String>("default"),
+                                                         MakeShared<String>("Views"),
+                                                         column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     // Get tables from catalog
@@ -510,7 +514,7 @@ PhysicalShow::ExecuteShowViews(QueryContext* query_context) {
 
     // Prepare the output data block
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
             varchar_type,
             varchar_type,
             bigint_type,
@@ -530,7 +534,7 @@ PhysicalShow::ExecuteShowViews(QueryContext* query_context) {
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append table name to the second column
             const String& table_name = *view_entry->view_name();
@@ -539,7 +543,7 @@ PhysicalShow::ExecuteShowViews(QueryContext* query_context) {
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append column count to the third column
             Value value = Value::MakeBigInt(view_entry->column_names()->size());
@@ -589,11 +593,13 @@ PhysicalShow::ExecuteShowTableDetail(QueryContext* query_context,
             MakeShared<ColumnDef>(3, varchar_type, "constraint", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"),
+                                                   MakeShared<String>("Views"),
+                                                   column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types {
+    Vector<SharedPtr<DataType>> column_types{
             varchar_type,
             varchar_type,
             varchar_type,
@@ -611,7 +617,7 @@ PhysicalShow::ExecuteShowTableDetail(QueryContext* query_context,
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append column type to the second column
             String column_type = column->type()->ToString();
@@ -620,7 +626,7 @@ PhysicalShow::ExecuteShowTableDetail(QueryContext* query_context,
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append column constraint to the third column
             String column_constraint;
@@ -648,11 +654,13 @@ PhysicalShow::ExecuteShowViewDetail(QueryContext* query_context,
             MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), output_column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"),
+                                                   MakeShared<String>("Views"),
+                                                   output_column_defs);
     output_ = MakeShared<Table>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> output_column_types {
+    Vector<SharedPtr<DataType>> output_column_types{
             varchar_type,
             varchar_type,
     };
@@ -660,7 +668,7 @@ PhysicalShow::ExecuteShowViewDetail(QueryContext* query_context,
     output_block_ptr->Init(output_column_types);
 
     SizeT column_count = view_column_types->size();
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for(SizeT idx = 0; idx < column_count; ++idx) {
         SizeT column_id = 0;
         {
             // Append column name to the first column
@@ -669,7 +677,7 @@ PhysicalShow::ExecuteShowViewDetail(QueryContext* query_context,
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        ++ column_id;
+        ++column_id;
         {
             // Append column type to the second column
             String column_type = view_column_types->at(idx)->ToString();
@@ -682,7 +690,6 @@ PhysicalShow::ExecuteShowViewDetail(QueryContext* query_context,
     output_block_ptr->Finalize();
     output_->Append(output_block_ptr);
 }
-
 
 
 }

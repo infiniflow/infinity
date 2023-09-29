@@ -17,7 +17,7 @@ ProjectBinder::BuildExpression(const ParsedExpr& expr,
     String expr_name = expr.GetName();
 
     // If the expr isn't from aggregate function and coming from group by lists.
-    if (!this->binding_agg_func_ && bind_context_ptr->group_index_by_name_.contains(expr_name)) {
+    if(!this->binding_agg_func_ && bind_context_ptr->group_index_by_name_.contains(expr_name)) {
         i64 groupby_index = bind_context_ptr->group_index_by_name_[expr_name];
         const SharedPtr<BaseExpression>& group_expr = bind_context_ptr->group_exprs_[groupby_index];
 
@@ -62,7 +62,8 @@ ProjectBinder::BuildExpression(const ParsedExpr& expr,
                                                                         aggregate_index,
                                                                         depth);
 
-            result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+            result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_,
+                                                      ExprSourceType::kAggregate);
             return result;
         }
     }
@@ -99,7 +100,8 @@ ProjectBinder::BuildFuncExpr(const FunctionExpr& expr,
                                                                              aggregate_index,
                                                                              depth);
 
-        column_expr_ptr->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+        column_expr_ptr->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_,
+                                                           ExprSourceType::kAggregate);
         this->binding_agg_func_ = false;
 
         return column_expr_ptr;

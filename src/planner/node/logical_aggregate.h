@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class LogicalAggregate: public LogicalNode {
+class LogicalAggregate : public LogicalNode {
 public:
     explicit
     LogicalAggregate(u64 node_id,
@@ -20,8 +20,7 @@ public:
               groups_(std::move(groups)),
               groupby_index_(groupby_index),
               aggregates_(std::move(aggregates)),
-              aggregate_index_(aggregate_index)
-              {}
+              aggregate_index_(aggregate_index) {}
 
     [[nodiscard]] Vector<ColumnBinding>
     GetColumnBindings() const final;
@@ -33,7 +32,7 @@ public:
     GetOutputTypes() const final;
 
     String
-    ToString(i64 &space) final;
+    ToString(i64& space) final;
 
     inline String
     name() final {

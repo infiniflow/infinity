@@ -11,14 +11,13 @@ namespace infinity {
 class LogicalDropCollection final : public LogicalNode {
 public:
     LogicalDropCollection(u64 node_id,
-                     SharedPtr<String> schema_name,
-                     SharedPtr<String> collection_name,
-                     ConflictType conflict_type)
+                          SharedPtr<String> schema_name,
+                          SharedPtr<String> collection_name,
+                          ConflictType conflict_type)
             : LogicalNode(node_id, LogicalNodeType::kDropCollection),
               schema_name_(std::move(schema_name)),
               collection_name_(std::move(collection_name)),
-              conflict_type_(conflict_type)
-    {}
+              conflict_type_(conflict_type) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {

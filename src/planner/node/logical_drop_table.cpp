@@ -15,7 +15,7 @@ LogicalDropTable::ToString(i64& space) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Drop Table: " << *schema_name_<< "." << *table_name_;
+    ss << String(space, ' ') << arrow_str << "Drop Table: " << *schema_name_ << "." << *table_name_;
     space += arrow_str.size();
 
     return ss.str();

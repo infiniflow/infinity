@@ -27,7 +27,7 @@ BindBoolCast(const DataType& source, const DataType& target) {
     }
 }
 
-struct TryCastBoolean  {
+struct TryCastBoolean {
     template<typename SourceType, typename TargetType>
     static inline bool
     Run(SourceType input, TargetType& target) {
@@ -39,7 +39,7 @@ struct TryCastBoolean  {
 // Cast BooleanT to other VarcharT type
 template<>
 inline bool
-TryCastBoolean::Run(BooleanT source, VarcharT &target) {
+TryCastBoolean::Run(BooleanT source, VarcharT& target) {
     if(source) {
         constexpr u16 TRUE_LEN = 4;
         memcpy(target.prefix, "true", TRUE_LEN);

@@ -18,6 +18,7 @@
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/txn/txn_store.h"
 #include <cstring>
+
 extern "C" {
 #include "third_party/zsv/include/zsv/common.h"
 #include "third_party/zsv/include/zsv/api.h"
@@ -72,18 +73,18 @@ PhysicalImport::Execute(QueryContext* query_context) {
 
 SizeT
 PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
-    if (table_collection_entry_->columns_.size() != 1) {
+    if(table_collection_entry_->columns_.size() != 1) {
         ExecutorError("FVECS file must have only one column.");
     }
     auto& column_type = table_collection_entry_->columns_[0]->column_type_;
-    if (column_type->type() != kEmbedding) {
+    if(column_type->type() != kEmbedding) {
         ExecutorError("FVECS file must have only one embedding column.");
     }
-    auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-    if (embedding_info->Type() != kElemFloat) {
+    auto embedding_info = static_cast<EmbeddingInfo*>(column_type->type_info().get());
+    if(embedding_info->Type() != kElemFloat) {
         ExecutorError("FVECS file must have only one embedding column with float element.");
     }
-    
+
     LocalFileSystem fs;
 
     UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
@@ -94,37 +95,38 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
     int dimension = 0;
     i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
     fs.Seek(*file_handler, 0);
-    if (nbytes != sizeof(dimension)) {
+    if(nbytes != sizeof(dimension)) {
         ExecutorError(fmt::format("Read dimension which length isn't {}.", nbytes));
     }
-    if (embedding_info->Dimension() != dimension) {
+    if(embedding_info->Dimension() != dimension) {
         ExecutorError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).",
                                   dimension, embedding_info->Dimension()));
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
-    if (file_size % row_size != 0) {
+    if(file_size % row_size != 0) {
         ExecutorError("Weird file size.");
     }
     SizeT vector_n = file_size / row_size;
 
-    Txn *txn = query_context->GetTxn();
-    const String &table_name = *table_collection_entry_->table_collection_name_;
+    Txn* txn = query_context->GetTxn();
+    const String& table_name = *table_collection_entry_->table_collection_name_;
     txn->AddTxnTableStore(table_name, MakeUnique<TxnTableStore>(table_name,
                                                                 table_collection_entry_,
                                                                 txn));
-    TxnTableStore *txn_store = txn->GetTxnTableStore(table_name);
-    
+    TxnTableStore* txn_store = txn->GetTxnTableStore(table_name);
+
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
-                                                          query_context->GetTxn()->TxnID(),
-                                                          TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
-                                                          query_context->GetTxn()->GetBufferMgr());
+                                                                              query_context->GetTxn()->TxnID(),
+                                                                              TableCollectionEntry::GetNextSegmentID(
+                                                                                      table_collection_entry_),
+                                                                              query_context->GetTxn()->GetBufferMgr());
     CommonObjectHandle object_handle(segment_entry->columns_[0]->buffer_handle_);
     SizeT row_idx = 0;
     while(true) {
         int dim;
         i64 nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
-        if (dim != dimension) {
+        if(dim != dimension) {
             ExecutorError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).",
                                       dim, dimension));
         }
@@ -132,15 +134,16 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
         segment_entry->current_row_++;
         row_idx++;
-        if (row_idx == vector_n) {
+        if(row_idx == vector_n) {
             txn_store->Import(segment_entry);
             break;
         }
-        if (segment_entry->AvailableCapacity() == 0) {
+        if(segment_entry->AvailableCapacity() == 0) {
             txn_store->Import(segment_entry);
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
                                                               query_context->GetTxn()->TxnID(),
-                                                              TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
+                                                              TableCollectionEntry::GetNextSegmentID(
+                                                                      table_collection_entry_),
                                                               query_context->GetTxn()->GetBufferMgr());
             object_handle = CommonObjectHandle(segment_entry->columns_[0]->buffer_handle_);
         }
@@ -149,8 +152,8 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
 }
 
 void
-PhysicalImport::ImportCSVHelper(QueryContext* query_context, ParserContext &parser_context) {
-    FILE *fp = fopen(file_path_.c_str(), "rb");
+PhysicalImport::ImportCSVHelper(QueryContext* query_context, ParserContext& parser_context) {
+    FILE* fp = fopen(file_path_.c_str(), "rb");
     if(!fp) {
         ExecutorError(strerror(errno));
     }
@@ -164,17 +167,18 @@ PhysicalImport::ImportCSVHelper(QueryContext* query_context, ParserContext &pars
     parser_context.txn_->AddTxnTableStore(*table_collection_entry_->table_collection_name_,
                                           MakeUnique<TxnTableStore>(
                                                   *table_collection_entry_->table_collection_name_,
-                                                                    table_collection_entry_,
-                                                                    parser_context.txn_));
+                                                  table_collection_entry_,
+                                                  parser_context.txn_));
 
 
     parser_context.segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
                                                                       parser_context.txn_->TxnID(),
-                                                                      TableCollectionEntry::GetNextSegmentID(table_collection_entry_),
+                                                                      TableCollectionEntry::GetNextSegmentID(
+                                                                              table_collection_entry_),
                                                                       parser_context.txn_->GetBufferMgr());
     parser_context.delimiter_ = delimiter_;
 
-    const String &table_name = *table_collection_entry_->table_collection_name_;
+    const String& table_name = *table_collection_entry_->table_collection_name_;
 
     if(header_) {
         opts.row_handler = CSVHeaderHandler;
@@ -185,18 +189,17 @@ PhysicalImport::ImportCSVHelper(QueryContext* query_context, ParserContext &pars
     opts.delimiter = delimiter_;
     opts.stream = fp;
     opts.ctx = &parser_context;
-    opts.buffsize = (1<<20); // default buffer size 256k, we use 1M
+    opts.buffsize = (1 << 20); // default buffer size 256k, we use 1M
 
     parser_context.parser_ = zsv_new(&opts);
     enum zsv_status csv_parser_status;
-    while((csv_parser_status = zsv_parse_more(parser_context.parser_)) == zsv_status_ok) {
-        ;
+    while((csv_parser_status = zsv_parse_more(parser_context.parser_)) == zsv_status_ok) { ;
     }
-    
+
 
     zsv_finish(parser_context.parser_);
     // flush the last segment entry
-    if (parser_context.segment_entry_->current_row_ > 0) {
+    if(parser_context.segment_entry_->current_row_ > 0) {
         auto txn_store = parser_context.txn_->GetTxnTableStore(table_name);
         txn_store->Import(parser_context.segment_entry_);
     }
@@ -221,7 +224,7 @@ PhysicalImport::ImportFVECS(QueryContext* query_context) {
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     SharedPtr<TableDef> result_table_def_ptr
-        = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+            = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 
     UniquePtr<String> result_msg = MakeUnique<String>(fmt::format("IMPORTED {} Rows", row_count));
@@ -229,7 +232,9 @@ PhysicalImport::ImportFVECS(QueryContext* query_context) {
 }
 
 void
-PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
+PhysicalImport::ImportFVECS(QueryContext* query_context,
+                            ImportInputState* input_state,
+                            ImportOutputState* output_state) {
     SizeT row_count = ImportFVECSHelper(query_context);
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
     output_state->result_msg_ = std::move(result_msg);
@@ -268,9 +273,10 @@ PhysicalImport::ImportJSON(QueryContext* query_context) {
  * @param input_state
  * @param output_state
  */
-void PhysicalImport::ImportCSV(QueryContext *query_context,
-                               ImportInputState *input_state,
-                               ImportOutputState *output_state) {
+void
+PhysicalImport::ImportCSV(QueryContext* query_context,
+                          ImportInputState* input_state,
+                          ImportOutputState* output_state) {
 
     ParserContext parser_context{};
     ImportCSVHelper(query_context, parser_context);
@@ -293,16 +299,16 @@ void PhysicalImport::ImportCSV(QueryContext *query_context,
  * @param output_state
  */
 void
-PhysicalImport::ImportJSON(QueryContext *query_context,
-                           ImportInputState *input_state,
-                           ImportOutputState *output_state) {
+PhysicalImport::ImportJSON(QueryContext* query_context,
+                           ImportInputState* input_state,
+                           ImportOutputState* output_state) {
 
 }
 
 
 void
-PhysicalImport::CSVHeaderHandler(void *context) {
-    ParserContext *parser_context = static_cast<ParserContext*>(context);
+PhysicalImport::CSVHeaderHandler(void* context) {
+    ParserContext* parser_context = static_cast<ParserContext*>(context);
     SizeT csv_column_count = zsv_cell_count(parser_context->parser_);
 
     SizeT table_column_count = parser_context->table_collection_entry_->columns_.size();
@@ -311,17 +317,17 @@ PhysicalImport::CSVHeaderHandler(void *context) {
                                                                   csv_column_count, table_column_count));
 
         zsv_abort(parser_context->parser_); // return zsv_status_cancelled
-        return ;
+        return;
     }
 
     // Not check the header column name
-    for (SizeT idx = 0; idx < csv_column_count; ++idx) {
-        auto *csv_col_name = reinterpret_cast<const char *>(
-            zsv_get_cell_str(parser_context->parser_, idx));
-        auto *table_col_name = parser_context->table_collection_entry_->columns_[idx]->name().c_str();
-        if (!strcmp(csv_col_name, table_col_name)) {
+    for(SizeT idx = 0; idx < csv_column_count; ++idx) {
+        auto* csv_col_name = reinterpret_cast<const char*>(
+                zsv_get_cell_str(parser_context->parser_, idx));
+        auto* table_col_name = parser_context->table_collection_entry_->columns_[idx]->name().c_str();
+        if(!strcmp(csv_col_name, table_col_name)) {
             parser_context->err_msg_ = MakeShared<String>(
-                fmt::format("Unmatched column name({} != {})", csv_col_name, table_col_name));
+                    fmt::format("Unmatched column name({} != {})", csv_col_name, table_col_name));
 
             zsv_abort(parser_context->parser_); // return zsv_status_cancelled
             return;
@@ -334,21 +340,22 @@ PhysicalImport::CSVHeaderHandler(void *context) {
 }
 
 namespace {
-Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
+Vector<StringView>
+SplitArrayElement(StringView data, char delimiter) {
     SizeT data_size = data.size();
-    if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
+    if(data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
         TypeAssert(false, "Embedding data must be surrounded by [ and ]");
     }
     Vector<StringView> ret;
     SizeT i = 1, j = 1;
-    while (true) {
-        if (data[i] == delimiter || data[i] == ' ' || i == data_size - 1) {
-            if (i > j) {
+    while(true) {
+        if(data[i] == delimiter || data[i] == ' ' || i == data_size - 1) {
+            if(i > j) {
                 ret.emplace_back(data.begin() + j, data.begin() + i);
             }
             j = i + 1;
         }
-        if (i == data_size - 1) {
+        if(i == data_size - 1) {
             break;
         }
         i++;
@@ -357,44 +364,53 @@ Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
 }
 
 template<typename T>
-void AppendSimpleData(ColumnDataEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
+void
+AppendSimpleData(ColumnDataEntry* column_data_entry, const StringView& str_view, SizeT dst_offset) {
     T ele = DataType::StringToValue<T>(str_view);
     ColumnDataEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T));
 }
 
 template<typename T>
-void AppendEmbeddingData(ColumnDataEntry *column_data_entry, const Vector<StringView> &ele_str_views, SizeT dst_offset) {
+void
+AppendEmbeddingData(ColumnDataEntry* column_data_entry, const Vector<StringView>& ele_str_views, SizeT dst_offset) {
     SizeT arr_len = ele_str_views.size();
-    auto tmp_buffer = MakeUnique<T []>(arr_len);
-    for (SizeT ele_idx = 0; auto &ele_str_view : ele_str_views) {
+    auto tmp_buffer = MakeUnique<T[]>(arr_len);
+    for(SizeT ele_idx = 0; auto& ele_str_view: ele_str_views) {
         T ele = DataType::StringToValue<T>(ele_str_view);
         tmp_buffer[ele_idx++] = ele;
     }
-    ColumnDataEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(tmp_buffer.get()), sizeof(T) * arr_len);
+    ColumnDataEntry::AppendRaw(column_data_entry,
+                               dst_offset,
+                               reinterpret_cast<ptr_t>(tmp_buffer.get()),
+                               sizeof(T) * arr_len);
 }
 
-void AppendVarcharData(ColumnDataEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
-    const char_t *tmp_buffer = str_view.data();
+void
+AppendVarcharData(ColumnDataEntry* column_data_entry, const StringView& str_view, SizeT dst_offset) {
+    const char_t* tmp_buffer = str_view.data();
     auto varchar_type = MakeUnique<VarcharT>(str_view.data(), str_view.size());
     // TODO shenyushi: unnecessary copy here.
-    ColumnDataEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(varchar_type.get()), sizeof(VarcharT));
+    ColumnDataEntry::AppendRaw(column_data_entry,
+                               dst_offset,
+                               reinterpret_cast<ptr_t>(varchar_type.get()),
+                               sizeof(VarcharT));
 }
 
 }
 
 
 void
-PhysicalImport::CSVRowHandler(void *context) {
-    ParserContext *parser_context = static_cast<ParserContext*>(context);
+PhysicalImport::CSVRowHandler(void* context) {
+    ParserContext* parser_context = static_cast<ParserContext*>(context);
 
-    auto *table = parser_context->table_collection_entry_;
+    auto* table = parser_context->table_collection_entry_;
     SizeT column_count = zsv_cell_count(parser_context->parser_);
-    auto *txn = parser_context->txn_;
+    auto* txn = parser_context->txn_;
     auto txn_store = txn->GetTxnTableStore(*table->table_collection_name_);
 
     auto segment_entry = parser_context->segment_entry_;
     // we have already used all space of the segment
-    if (segment_entry->AvailableCapacity() == 0) {
+    if(segment_entry->AvailableCapacity() == 0) {
         // add to txn_store
         txn_store->Import(segment_entry);
 
@@ -410,31 +426,31 @@ PhysicalImport::CSVRowHandler(void *context) {
     SizeT write_row = segment_entry->current_row_;
 
     // append data to segment entry
-    for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
+    for(SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
         struct zsv_cell cell = zsv_get_cell(parser_context->parser_, column_idx);
         StringView str_view{};
-        if (cell.len) {
-            str_view = StringView((char *)cell.str, cell.len);
+        if(cell.len) {
+            str_view = StringView((char*)cell.str, cell.len);
         }
         auto column_data_entry = segment_entry->columns_[column_idx];
         auto column_type = column_data_entry->column_type_.get();
         SizeT dst_offset = write_row * column_type->Size();
-        if (column_type->type() == kVarchar) {
-            auto varchar_info = dynamic_cast<VarcharInfo *>(column_type->type_info().get());
+        if(column_type->type() == kVarchar) {
+            auto varchar_info = dynamic_cast<VarcharInfo*>(column_type->type_info().get());
             if(varchar_info->dimension() < str_view.size()) {
                 ExecutorError("Varchar data size exceeds dimension.");
             }
 
             AppendVarcharData(column_data_entry.get(), str_view, dst_offset);
-        } else if (column_type->type() == kEmbedding) {
+        } else if(column_type->type() == kEmbedding) {
             Vector<StringView> res;
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
-            auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
+            auto embedding_info = dynamic_cast<EmbeddingInfo*>(column_type->type_info().get());
             if(embedding_info->Dimension() < ele_str_views.size()) {
                 ExecutorError("Embedding data size exceeds dimension.");
             }
 
-            switch (embedding_info->Type()) {
+            switch(embedding_info->Type()) {
                 case kElemBit: {
                     NotImplementError("Embedding bit type is not implemented.");
                 }
@@ -467,7 +483,7 @@ PhysicalImport::CSVRowHandler(void *context) {
                 }
             }
         } else {
-            switch (column_type->type()) {
+            switch(column_type->type()) {
                 case kBoolean: {
                     AppendSimpleData<BooleanT>(column_data_entry.get(), str_view, dst_offset);
                     break;

@@ -81,7 +81,7 @@ public:
     static bool
     NeedCastInInsert(const DataType& from, const DataType& to) {
         if(from.type() == to.type()) {
-            switch (from.type()) {
+            switch(from.type()) {
                 // Embedding
                 // Bitmap
                 // Decimal

@@ -15,8 +15,8 @@ public:
     }
 };
 
-auto main(int argc, char *argv[])->int
-{
+auto
+main(int argc, char* argv[]) -> int {
     using namespace infinity;
     Vector<String> inputs;
     inputs.emplace_back("create collection c1;");

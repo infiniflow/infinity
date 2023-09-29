@@ -13,10 +13,10 @@ LogicalJoin::LogicalJoin(u64 node_id,
                          Vector<SharedPtr<BaseExpression>> conditions,
                          const SharedPtr<LogicalNode>& left,
                          const SharedPtr<LogicalNode>& right)
-                         : LogicalNode(node_id, LogicalNodeType::kJoin),
-                         join_type_(join_type),
-                         alias_(std::move(alias)),
-                         conditions_(std::move(conditions)) {
+        : LogicalNode(node_id, LogicalNodeType::kJoin),
+          join_type_(join_type),
+          alias_(std::move(alias)),
+          conditions_(std::move(conditions)) {
     this->set_left_node(left);
     this->set_right_node(right);
 }

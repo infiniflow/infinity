@@ -120,13 +120,16 @@ public:
     // Object member
 public:
     // Value getter template
-    template <class T>
-    T GetValue() const {
+    template<class T>
+    T
+    GetValue() const {
         TypeError("Not implemented value getter.");
     }
 
-    [[nodiscard]] const DataType& type() const { return type_; }
-    [[nodiscard]] bool is_null() const { return is_null_; }
+    [[nodiscard]] const DataType&
+    type() const { return type_; }
+    [[nodiscard]] bool
+    is_null() const { return is_null_; }
 
     [[nodiscard]] String
     ToString() const;
@@ -135,7 +138,7 @@ public:
     Reset();
 
     bool
-    TryCastAs(const DataType &target_type, Value &new_value) const;
+    TryCastAs(const DataType& target_type, Value& new_value) const;
 
     // Member method
 public:
@@ -145,13 +148,13 @@ public:
 
     Value(const Value& other);
 
-    Value(Value&& other) noexcept ;
+    Value(Value&& other) noexcept;
 
     Value&
     operator=(const Value& other);
 
     Value&
-    operator=(Value&& other) noexcept ;
+    operator=(Value&& other) noexcept;
 
     ~Value();
 
@@ -164,42 +167,44 @@ private:
 
     void
     MoveUnionValue(Value&& other) noexcept;
+
 public:
     DataType type_;
+
     union UnionValue {
         BooleanT boolean{};
 
         TinyIntT tiny_int;
         SmallIntT small_int;
         IntegerT integer;
-        BigIntT  big_int;
+        BigIntT big_int;
         HugeIntT huge_int;
-        FloatT   float32;
-        DoubleT  float64;
+        FloatT float32;
+        DoubleT float64;
         DecimalT decimal;
 
         VarcharT varchar;
 
-        DateT    date;
-        TimeT    time;
+        DateT date;
+        TimeT time;
         DateTimeT datetime;
         TimestampT timestamp;
-        IntervalT  interval;
+        IntervalT interval;
 
-        PointT     point;
-        LineT      line;
-        LineSegT   line_segment;
-        BoxT       box;
-        PathT      path;
-        PolygonT   polygon;
-        CircleT    circle;
+        PointT point;
+        LineT line;
+        LineSegT line_segment;
+        BoxT box;
+        PathT path;
+        PolygonT polygon;
+        CircleT circle;
 
-        BitmapT    bitmap;
-        UuidT      uuid;
-        BlobT      blob;
+        BitmapT bitmap;
+        UuidT uuid;
+        BlobT blob;
         EmbeddingT embedding;
 
-        MixedT     mixed_value;
+        MixedT mixed_value;
 
         ~UnionValue() {
             // This is important for the member of union to have non-trivial destructor/copy constructor ...
@@ -218,46 +223,132 @@ public:
             ;
         };
 
-        UnionValue& operator=(const UnionValue& other) {
+        UnionValue&
+        operator=(const UnionValue& other) {
             return *this;
         };
 
-        UnionValue& operator=(UnionValue&& other) noexcept {
+        UnionValue&
+        operator=(UnionValue&& other) noexcept {
             return *this;
         };
     } value_ = {};
+
     bool is_null_{false};
 
     ArrayT array;
 };
 
 // Value getter
-template <> BooleanT Value::GetValue() const;
-template <> TinyIntT Value::GetValue() const;
-template <> SmallIntT Value::GetValue() const;
-template <> IntegerT Value::GetValue() const;
-template <> BigIntT Value::GetValue() const;
-template <> HugeIntT Value::GetValue() const;
-template <> FloatT Value::GetValue() const;
-template <> DoubleT Value::GetValue() const;
-template <> DecimalT Value::GetValue() const;
-template <> VarcharT Value::GetValue() const;
-template <> DateT Value::GetValue() const;
-template <> TimeT Value::GetValue() const;
-template <> DateTimeT Value::GetValue() const;
-template <> TimestampT Value::GetValue() const;
-template <> IntervalT Value::GetValue() const;
-template <> ArrayT Value::GetValue() const;
-template <> PointT Value::GetValue() const;
-template <> LineT Value::GetValue() const;
-template <> LineSegT Value::GetValue() const;
-template <> BoxT Value::GetValue() const;
-template <> PathT Value::GetValue() const;
-template <> PolygonT Value::GetValue() const;
-template <> CircleT Value::GetValue() const;
-template <> BitmapT Value::GetValue() const;
-template <> UuidT Value::GetValue() const;
-template <> BlobT Value::GetValue() const;
-template <> EmbeddingT Value::GetValue() const;
-template <> MixedT Value::GetValue() const;
+template<>
+BooleanT
+Value::GetValue() const;
+
+template<>
+TinyIntT
+Value::GetValue() const;
+
+template<>
+SmallIntT
+Value::GetValue() const;
+
+template<>
+IntegerT
+Value::GetValue() const;
+
+template<>
+BigIntT
+Value::GetValue() const;
+
+template<>
+HugeIntT
+Value::GetValue() const;
+
+template<>
+FloatT
+Value::GetValue() const;
+
+template<>
+DoubleT
+Value::GetValue() const;
+
+template<>
+DecimalT
+Value::GetValue() const;
+
+template<>
+VarcharT
+Value::GetValue() const;
+
+template<>
+DateT
+Value::GetValue() const;
+
+template<>
+TimeT
+Value::GetValue() const;
+
+template<>
+DateTimeT
+Value::GetValue() const;
+
+template<>
+TimestampT
+Value::GetValue() const;
+
+template<>
+IntervalT
+Value::GetValue() const;
+
+template<>
+ArrayT
+Value::GetValue() const;
+
+template<>
+PointT
+Value::GetValue() const;
+
+template<>
+LineT
+Value::GetValue() const;
+
+template<>
+LineSegT
+Value::GetValue() const;
+
+template<>
+BoxT
+Value::GetValue() const;
+
+template<>
+PathT
+Value::GetValue() const;
+
+template<>
+PolygonT
+Value::GetValue() const;
+
+template<>
+CircleT
+Value::GetValue() const;
+
+template<>
+BitmapT
+Value::GetValue() const;
+
+template<>
+UuidT
+Value::GetValue() const;
+
+template<>
+BlobT
+Value::GetValue() const;
+
+template<>
+EmbeddingT
+Value::GetValue() const;
+
+template<>
+MixedT
+Value::GetValue() const;
 }

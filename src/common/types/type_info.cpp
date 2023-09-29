@@ -7,7 +7,7 @@
 namespace infinity {
 
 bool
-TypeInfo::operator!=(const TypeInfo &other) const {
+TypeInfo::operator!=(const TypeInfo& other) const {
     return !operator==(other);
 }
 

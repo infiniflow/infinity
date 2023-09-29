@@ -8,15 +8,15 @@
 
 namespace infinity {
 
-class LogicalLimit: public LogicalNode {
+class LogicalLimit : public LogicalNode {
 public:
     explicit
     LogicalLimit(u64 node_id,
                  SharedPtr<BaseExpression> limit_expression,
                  SharedPtr<BaseExpression> offset_expression)
             : LogicalNode(node_id, LogicalNodeType::kLimit),
-            limit_expression_(std::move(limit_expression)),
-            offset_expression_(std::move(offset_expression)) {}
+              limit_expression_(std::move(limit_expression)),
+              offset_expression_(std::move(offset_expression)) {}
 
     [[nodiscard]] inline Vector<ColumnBinding>
     GetColumnBindings() const final {

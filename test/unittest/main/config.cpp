@@ -62,7 +62,7 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(*config.log_dir(), "/tmp/infinity/log");
     EXPECT_EQ(*config.log_file_path(), "/tmp/infinity/log/infinity.log");
     EXPECT_EQ(config.log_to_stdout(), false);
-    EXPECT_EQ(config.log_max_size(), 1024ul*1024ul*1024ul);
+    EXPECT_EQ(config.log_max_size(), 1024ul * 1024ul * 1024ul);
     EXPECT_EQ(config.log_file_rotate_count(), 10);
     EXPECT_EQ(config.log_level(), spdlog::level::trace);
 
@@ -70,7 +70,7 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(*config.wal_dir(), "/tmp/infinity/wal");
     EXPECT_EQ(config.default_row_size(), 8192u);
 
-    EXPECT_EQ(config.buffer_pool_size(), 4*1024ul*1024ul*1024ul);
+    EXPECT_EQ(config.buffer_pool_size(), 4 * 1024ul * 1024ul * 1024ul);
     EXPECT_EQ(*config.temp_dir(), "/tmp/infinity/temp");
 }
 
@@ -86,9 +86,9 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.time_zone_bias(), -9);
 
     EXPECT_EQ(config.total_cpu_number(), 2);
-    EXPECT_EQ(config.total_memory_size(), 8*1024ul*1024ul*1024ul);
+    EXPECT_EQ(config.total_memory_size(), 8 * 1024ul * 1024ul * 1024ul);
     EXPECT_EQ(config.query_cpu_limit(), 2);
-    EXPECT_EQ(config.query_memory_limit(), 4*1024ul*1024ul);
+    EXPECT_EQ(config.query_memory_limit(), 4 * 1024ul * 1024ul);
 
     EXPECT_EQ(config.listen_address(), "127.0.0.1");
     EXPECT_EQ(config.pg_port(), 25432);
@@ -99,7 +99,7 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(*config.log_dir(), "/var/infinity/log");
     EXPECT_EQ(*config.log_file_path(), "/var/infinity/log/info.log");
     EXPECT_EQ(config.log_to_stdout(), true);
-    EXPECT_EQ(config.log_max_size(), 2*1024ul*1024ul*1024ul);
+    EXPECT_EQ(config.log_max_size(), 2 * 1024ul * 1024ul * 1024ul);
     EXPECT_EQ(config.log_file_rotate_count(), 3);
     EXPECT_EQ(config.log_level(), spdlog::level::trace);
 
@@ -107,6 +107,6 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(*config.wal_dir(), "/var/infinity/wal");
     EXPECT_EQ(config.default_row_size(), 4096u);
 
-    EXPECT_EQ(config.buffer_pool_size(), 3*1024ul*1024ul*1024ul);
+    EXPECT_EQ(config.buffer_pool_size(), 3 * 1024ul * 1024ul * 1024ul);
     EXPECT_EQ(*config.temp_dir(), "/tmp");
 }

@@ -19,12 +19,12 @@ public:
     }
 
     void
-    Update(const ValueType *__restrict input, SizeT idx) {
+    Update(const ValueType* __restrict input, SizeT idx) {
         NotImplementError("Update min state.")
     }
 
     inline void
-    ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const ValueType* __restrict input, SizeT idx, SizeT count) {
         NotImplementError("Constant update min state.")
     }
 
@@ -50,12 +50,12 @@ public:
     }
 
     void
-    Update(const BooleanT *__restrict input, SizeT idx) {
+    Update(const BooleanT* __restrict input, SizeT idx) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const BooleanT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const BooleanT* __restrict input, SizeT idx, SizeT count) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
@@ -81,12 +81,12 @@ public:
     }
 
     void
-    Update(const TinyIntT *__restrict input, SizeT idx) {
+    Update(const TinyIntT* __restrict input, SizeT idx) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const TinyIntT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const TinyIntT* __restrict input, SizeT idx, SizeT count) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
@@ -112,12 +112,12 @@ public:
     }
 
     void
-    Update(const SmallIntT *__restrict input, SizeT idx) {
+    Update(const SmallIntT* __restrict input, SizeT idx) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const SmallIntT* __restrict input, SizeT idx, SizeT count) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
@@ -143,12 +143,12 @@ public:
     }
 
     void
-    Update(const IntegerT *__restrict input, SizeT idx) {
+    Update(const IntegerT* __restrict input, SizeT idx) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const IntegerT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const IntegerT* __restrict input, SizeT idx, SizeT count) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
@@ -174,12 +174,12 @@ public:
     }
 
     void
-    Update(const BigIntT *__restrict input, SizeT idx) {
+    Update(const BigIntT* __restrict input, SizeT idx) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const BigIntT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const BigIntT* __restrict input, SizeT idx, SizeT count) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
@@ -206,12 +206,12 @@ public:
     }
 
     void
-    Update(const HugeIntT *__restrict input, SizeT idx) {
+    Update(const HugeIntT* __restrict input, SizeT idx) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const HugeIntT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const HugeIntT* __restrict input, SizeT idx, SizeT count) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
@@ -237,12 +237,12 @@ public:
     }
 
     void
-    Update(const FloatT *__restrict input, SizeT idx) {
+    Update(const FloatT* __restrict input, SizeT idx) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const FloatT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const FloatT* __restrict input, SizeT idx, SizeT count) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
@@ -268,12 +268,12 @@ public:
     }
 
     void
-    Update(const DoubleT *__restrict input, SizeT idx) {
+    Update(const DoubleT* __restrict input, SizeT idx) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
     inline void
-    ConstantUpdate(const DoubleT *__restrict input, SizeT idx, SizeT count) {
+    ConstantUpdate(const DoubleT* __restrict input, SizeT idx, SizeT count) {
         value_ = input[idx] < value_ ? input[idx] : value_;
     }
 
@@ -289,65 +289,65 @@ public:
 };
 
 void
-RegisterMinFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterMinFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "MIN";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
 
     {
         AggregateFunction max_function
-                                  = UnaryAggregate<MinState<BooleanT, BooleanT>, BooleanT, BooleanT>(func_name,
-                DataType(LogicalType::kBoolean),
-                DataType(LogicalType::kBoolean));
+                = UnaryAggregate<MinState<BooleanT, BooleanT>, BooleanT, BooleanT>(func_name,
+                                                                                   DataType(LogicalType::kBoolean),
+                                                                                   DataType(LogicalType::kBoolean));
         function_set_ptr->AddFunction(max_function);
     }
     {
         AggregateFunction max_function
-                                  = UnaryAggregate<MinState<TinyIntT, TinyIntT>, TinyIntT, TinyIntT>(func_name,
-                DataType(LogicalType::kTinyInt),
-                DataType(LogicalType::kTinyInt));
+                = UnaryAggregate<MinState<TinyIntT, TinyIntT>, TinyIntT, TinyIntT>(func_name,
+                                                                                   DataType(LogicalType::kTinyInt),
+                                                                                   DataType(LogicalType::kTinyInt));
         function_set_ptr->AddFunction(max_function);
     }
     {
         AggregateFunction max_function
-                                  = UnaryAggregate<MinState<SmallIntT, SmallIntT>, SmallIntT, SmallIntT>(func_name,
-                DataType(LogicalType::kSmallInt),
-                DataType(LogicalType::kSmallInt));
+                = UnaryAggregate<MinState<SmallIntT, SmallIntT>, SmallIntT, SmallIntT>(func_name,
+                                                                                       DataType(LogicalType::kSmallInt),
+                                                                                       DataType(LogicalType::kSmallInt));
         function_set_ptr->AddFunction(max_function);
     }
     {
         AggregateFunction max_function
-                                  = UnaryAggregate<MinState<IntegerT, IntegerT>, IntegerT, IntegerT>(func_name,
-                DataType(LogicalType::kInteger),
-                DataType(LogicalType::kInteger));
+                = UnaryAggregate<MinState<IntegerT, IntegerT>, IntegerT, IntegerT>(func_name,
+                                                                                   DataType(LogicalType::kInteger),
+                                                                                   DataType(LogicalType::kInteger));
         function_set_ptr->AddFunction(max_function);
     }
     {
         AggregateFunction max_function
-                                  = UnaryAggregate<MinState<BigIntT, BigIntT>, BigIntT, BigIntT>(func_name,
-                DataType(LogicalType::kBigInt),
-                DataType(LogicalType::kBigInt));
+                = UnaryAggregate<MinState<BigIntT, BigIntT>, BigIntT, BigIntT>(func_name,
+                                                                               DataType(LogicalType::kBigInt),
+                                                                               DataType(LogicalType::kBigInt));
         function_set_ptr->AddFunction(max_function);
     }
     {
         AggregateFunction max_function
-                                  = UnaryAggregate<MinState<HugeIntT, HugeIntT>, HugeIntT, HugeIntT>(func_name,
-                DataType(LogicalType::kHugeInt),
-                DataType(LogicalType::kHugeInt));
+                = UnaryAggregate<MinState<HugeIntT, HugeIntT>, HugeIntT, HugeIntT>(func_name,
+                                                                                   DataType(LogicalType::kHugeInt),
+                                                                                   DataType(LogicalType::kHugeInt));
         function_set_ptr->AddFunction(max_function);
     }
     {
         AggregateFunction max_function
-                                  = UnaryAggregate<MinState<FloatT, FloatT>, FloatT, FloatT>(func_name,
-                DataType(LogicalType::kFloat),
-                DataType(LogicalType::kFloat));
+                = UnaryAggregate<MinState<FloatT, FloatT>, FloatT, FloatT>(func_name,
+                                                                           DataType(LogicalType::kFloat),
+                                                                           DataType(LogicalType::kFloat));
         function_set_ptr->AddFunction(max_function);
     }
     {
         AggregateFunction max_function
-                                  = UnaryAggregate<MinState<DoubleT, DoubleT>, DoubleT, DoubleT>(func_name,
-                DataType(LogicalType::kDouble),
-                DataType(LogicalType::kDouble));
+                = UnaryAggregate<MinState<DoubleT, DoubleT>, DoubleT, DoubleT>(func_name,
+                                                                               DataType(LogicalType::kDouble),
+                                                                               DataType(LogicalType::kDouble));
         function_set_ptr->AddFunction(max_function);
     }
 #if 0

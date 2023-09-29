@@ -11,6 +11,6 @@
 namespace infinity {
 
 void
-RegisterMulFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterMulFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
 }

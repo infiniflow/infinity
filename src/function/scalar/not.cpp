@@ -22,14 +22,14 @@ GenerateNotFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr) {
 
     ScalarFunction not_function(
             func_name,
-            { DataType(LogicalType::kBoolean) },
-            { DataType(LogicalType::kBoolean) },
+            {DataType(LogicalType::kBoolean)},
+            {DataType(LogicalType::kBoolean)},
             &ScalarFunction::UnaryFunction<BooleanT, BooleanT, NotFunction>);
     function_set_ptr->AddFunction(not_function);
 }
 
 void
-RegisterNotFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterNotFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "NOT";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);

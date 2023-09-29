@@ -19,14 +19,13 @@ struct InEqualsFunction {
 
 template<>
 inline void
-InEqualsFunction::Run(VarcharT left, VarcharT right, bool & result) {
+InEqualsFunction::Run(VarcharT left, VarcharT right, bool& result) {
     if(left.IsInlined()) {
         if(right.IsInlined()) {
             result = (memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) != 0);
-            return ;
+            return;
         }
-    } else if(right.IsInlined()) {
-        ;
+    } else if(right.IsInlined()) { ;
     } else {
         // Both left and right are not inline
         u16 min_len = std::min(right.length, left.length);
@@ -35,7 +34,7 @@ InEqualsFunction::Run(VarcharT left, VarcharT right, bool & result) {
         } else {
             result = (memcmp(left.ptr, right.ptr, min_len) != 0);
         }
-        return ;
+        return;
     }
     result = false;
 }
@@ -82,14 +81,14 @@ GenerateInEqualsFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr, DataTyp
     String func_name = "<>";
     ScalarFunction inequals_function(
             func_name,
-            { data_type, data_type },
+            {data_type, data_type},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<CompareType, CompareType, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(inequals_function);
 }
 
 void
-RegisterInEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterInEqualsFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "<>";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -135,42 +134,42 @@ RegisterInEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
     ScalarFunction mix_inequals_bigint(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, BigIntT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(mix_inequals_bigint);
 
     ScalarFunction bigint_inequals_mixed(
             func_name,
-            { DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<BigIntT, MixedT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(bigint_inequals_mixed);
 
     ScalarFunction mix_inequals_double(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kDouble) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, DoubleT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(mix_inequals_double);
 
     ScalarFunction double_inequals_mixed(
             func_name,
-            { DataType(LogicalType::kDouble), DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kDouble), DataType(LogicalType::kMixed)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<DoubleT, MixedT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(double_inequals_mixed);
 
     ScalarFunction mix_inequals_varchar(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<MixedT, VarcharT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(mix_inequals_varchar);
 
     ScalarFunction varchar_inequals_mixed(
             func_name,
-            { DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed) },
+            {DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed)},
             DataType(kBoolean),
             &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(varchar_inequals_mixed);

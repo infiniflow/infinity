@@ -10,10 +10,10 @@
 
 namespace infinity {
 
-template <typename SourceType>
+template<typename SourceType>
 static BoundCastFunc
-NumericCast(const DataType &target) {
-    switch (target.type()) {
+NumericCast(const DataType& target) {
+    switch(target.type()) {
         case kTinyInt: {
             NotImplementError("Can't cast to " + target.ToString());
         }
@@ -43,7 +43,7 @@ NumericCast(const DataType &target) {
 
 
 BoundCastFunc
-CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
+CastFunction::GetBoundFunc(const DataType& source, const DataType& target) {
     TypeAssert(source != target, "Attempt to cast from " + source.ToString() + " to " + target.ToString());
 
     switch(source.type()) {

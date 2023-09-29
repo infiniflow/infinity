@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
+
 #include "function/aggregate/sum.h"
 #include "function/aggregate_function_set.h"
 #include "expression/column_expression.h"
@@ -65,7 +65,7 @@ TEST_F(SumFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         i64 sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<TinyIntT>(i)));
             sum += static_cast<TinyIntT>(i);
         }
@@ -100,7 +100,7 @@ TEST_F(SumFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         i64 sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<SmallIntT>(i)));
             sum += static_cast<SmallIntT>(i);
         }
@@ -135,7 +135,7 @@ TEST_F(SumFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         i64 sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<IntegerT>(i)));
             sum += static_cast<IntegerT>(i);
         }
@@ -170,7 +170,7 @@ TEST_F(SumFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         i64 sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<BigIntT>(i)));
             sum += static_cast<BigIntT>(i);
         }
@@ -205,7 +205,7 @@ TEST_F(SumFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         double sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<FloatT>(i)));
             sum += static_cast<FloatT>(i);
         }
@@ -240,7 +240,7 @@ TEST_F(SumFunctionTest, avg_func) {
         data_block.Init(column_types);
 
         double sum = 0;
-        for (SizeT i = 0; i < row_count; ++i) {
+        for(SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<DoubleT>(i)));
             sum += static_cast<DoubleT>(i);
         }

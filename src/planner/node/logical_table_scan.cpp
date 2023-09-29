@@ -11,8 +11,8 @@ namespace infinity {
 
 LogicalTableScan::LogicalTableScan(u64 node_id,
                                    SharedPtr<BaseTableRef> base_table_ref)
-    : LogicalNode(node_id, LogicalNodeType::kTableScan),
-    base_table_ref_(std::move(base_table_ref)) {
+        : LogicalNode(node_id, LogicalNodeType::kTableScan),
+          base_table_ref_(std::move(base_table_ref)) {
 
     // FIXME: Disable the code: initialize column names and columns ?
 //    size_t column_count = table_ptr_->table_def()->column_count();
@@ -29,7 +29,7 @@ LogicalTableScan::GetColumnBindings() const {
     Vector<ColumnBinding> result;
     SizeT column_count = base_table_ref_->column_names_->size();
     result.reserve(column_count);
-    for(SizeT i = 0; i < column_count; ++ i) {
+    for(SizeT i = 0; i < column_count; ++i) {
         result.emplace_back(base_table_ref_->table_index_, i);
     }
     return result;
@@ -72,7 +72,7 @@ LogicalTableScan::ToString(i64& space) {
        << "TableScan: " << base_table_ref_->table_entry_ptr_->table_collection_name_
        << ", on: ";
     size_t column_count = base_table_ref_->column_names_->size();
-    for(size_t i = 0; i < column_count - 1; ++ i) {
+    for(size_t i = 0; i < column_count - 1; ++i) {
         ss << base_table_ref_->column_names_->at(i) << " ";
     }
     ss << base_table_ref_->column_names_->back();

@@ -12,7 +12,8 @@
 using namespace infinity;
 
 
-void test_concurrent_queue() {
+void
+test_concurrent_queue() {
     ConcurrentQueue queue;
     ThreadPool p(2);
 
@@ -43,7 +44,8 @@ void test_concurrent_queue() {
     p.stop(true);
 }
 
-void test_waitfree_queue() {
+void
+test_waitfree_queue() {
     WaitFreeQueue queue;
     ThreadPool p(2);
     SharedPtr<Buffer> buffer1 = MakeShared<Buffer>(BUFFER_SIZE);
@@ -98,7 +100,7 @@ execute_task(i64 id, Task* task, i64 task_count) {
         }
 
         root_task->GetResult();
-        ++ long_atomic;
+        ++long_atomic;
         if(long_atomic > task_count) {
             printf("time cost: %ld ms\n", profiler.Elapsed() / 1000000);
         }
@@ -128,7 +130,7 @@ direct_execute_task(i64 id, Task* task, i64 task_count) {
         }
 
         root_task->GetResult();
-        ++ long_atomic;
+        ++long_atomic;
         if(long_atomic > task_count) {
             printf("time cost: %ld ms\n", profiler.Elapsed() / 1000000);
         }
@@ -147,7 +149,7 @@ start_scheduler() {
 
     i64 cpu_count = std::thread::hardware_concurrency();
     HashSet<i64> cpu_set;
-    for(i64 idx = 0; idx < cpu_count; ++ idx) {
+    for(i64 idx = 0; idx < cpu_count; ++idx) {
         if(!cpu_mask.contains(idx)) {
             cpu_set.insert(idx);
         }
@@ -220,7 +222,7 @@ build_fragment1(u64 id, const String& name) {
 }
 
 auto
-main () -> int {
+main() -> int {
 
 //    u64 parallel_size = std::thread::hardware_concurrency();
 //    u64 parallel_size = 65536;

@@ -31,7 +31,10 @@ public:
         id_array_ = MakeUnique<Vector<CompoundID>>(topk * query_count_, CompoundID(-1, -1));
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * topk * query_count_);
 
-        reservoir_result_handler_ = MakeUnique<ReservoirResultHandler>(query_count, distance_array_.get(), id_array_->data(), topk);
+        reservoir_result_handler_ = MakeUnique<ReservoirResultHandler>(query_count,
+                                                                       distance_array_.get(),
+                                                                       id_array_->data(),
+                                                                       topk);
         single_reservoir_result_handler_ = MakeUnique<ReservoirSingleResultHandler>(*reservoir_result_handler_);
     }
 

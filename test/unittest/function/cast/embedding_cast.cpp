@@ -82,18 +82,18 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
     ColumnVector col_source(source_type);
     col_source.Initialize();
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
-        for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
+        for(i64 j = 0; j < embedding_info->Dimension(); ++j) {
             ((float*)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         col_source.AppendValue(v);
         v.value_.embedding.Reset();
     }
 
-    for (i64 i = 0; i < 1; ++ i) {
+    for(i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
-        for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
+        for(i64 j = 0; j < embedding_info->Dimension(); ++j) {
             ((float*)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
 
@@ -102,7 +102,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
         EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kEmbedding);
         EXPECT_EQ(vx.type().type_info()->Size(), 64);
 
-        for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
+        for(i64 j = 0; j < embedding_info->Dimension(); ++j) {
             EXPECT_FLOAT_EQ(((float*)(vx.value_.embedding.ptr))[j], ((float*)(v.value_.embedding.ptr))[j]);
         }
 

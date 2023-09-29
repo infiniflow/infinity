@@ -28,8 +28,8 @@ TEST_F(SQLFileParsingTest, tpch) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
-    SharedPtr <SQLParser> parser = MakeShared<SQLParser>();
-    SharedPtr <ParserResult> result = MakeShared<ParserResult>();
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
     // Get all tpch sql text;
     String path = String(TEST_DATA_PATH) + "/tpch";
@@ -54,10 +54,10 @@ void
 ReadSQLs(const String& file_path, Vector<String>& sqls) {
     std::ifstream infile(file_path);
     String line;
-    while (std::getline(infile, line)) {
+    while(std::getline(infile, line)) {
         std::istringstream iss(line);
         // Skip comments.
-        if (line[0] == '#' || (line[0] == '-' && line[1] == '-')) {
+        if(line[0] == '#' || (line[0] == '-' && line[1] == '-')) {
             continue;
         }
         if(line[0] == '!') {
@@ -82,7 +82,7 @@ TEST_F(SQLFileParsingTest, hyrise) {
     std::filesystem::path good_sql_path(good_sql);
     std::filesystem::path bad_sql_path(bad_sql);
 
-    Vector<String> sqls;
+    Vector <String> sqls;
     ReadSQLs(good_sql_path, sqls);
     for(auto& input_sql: sqls) {
 //        std::cout << input_sql << std::endl;
@@ -109,7 +109,7 @@ TEST_F(SQLFileParsingTest, infinity) {
     String good_sql = String(TEST_DATA_PATH) + "/infinity/good.sql";
     std::filesystem::path good_sql_path(good_sql);
 
-    Vector<String> sqls;
+    Vector <String> sqls;
     ReadSQLs(good_sql_path, sqls);
     for(auto& input_sql: sqls) {
 //        std::cout << input_sql << std::endl;

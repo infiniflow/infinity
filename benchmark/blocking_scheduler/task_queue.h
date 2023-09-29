@@ -9,9 +9,10 @@
 namespace infinity {
 
 class Task;
+
 struct BlockingQueue {
     void
-    Enqueue(Task *task) {
+    Enqueue(Task* task) {
         queue_.enqueue(task);
     }
 
@@ -22,11 +23,11 @@ struct BlockingQueue {
     }
 
     void
-    Dequeue(Task *&task) {
+    Dequeue(Task*& task) {
         queue_.wait_dequeue(task);
     }
 
-    moodycamel::BlockingConcurrentQueue<Task *> queue_;
+    moodycamel::BlockingConcurrentQueue<Task*> queue_;
 };
 
 }

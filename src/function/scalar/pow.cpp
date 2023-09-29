@@ -25,29 +25,29 @@ PowFunction::Run(MixedT base, DoubleT exponent, DoubleT& result) {
 }
 
 void
-RegisterPowFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+RegisterPowFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     String func_name = "POW";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction pow_function_float(
             func_name,
-            { DataType(LogicalType::kFloat), DataType(LogicalType::kFloat) },
-            { DataType(LogicalType::kFloat) },
+            {DataType(LogicalType::kFloat), DataType(LogicalType::kFloat)},
+            {DataType(LogicalType::kFloat)},
             &ScalarFunction::BinaryFunctionWithFailure<FloatT, FloatT, FloatT, PowFunction>);
     function_set_ptr->AddFunction(pow_function_float);
 
     ScalarFunction pow_function_double(
             func_name,
-            { DataType(LogicalType::kDouble), DataType(LogicalType::kDouble) },
-            { DataType(LogicalType::kDouble) },
+            {DataType(LogicalType::kDouble), DataType(LogicalType::kDouble)},
+            {DataType(LogicalType::kDouble)},
             &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, PowFunction>);
     function_set_ptr->AddFunction(pow_function_double);
 
     ScalarFunction pow_function_mixed_double(
             func_name,
-            { DataType(LogicalType::kMixed), DataType(LogicalType::kDouble) },
-            { DataType(LogicalType::kDouble) },
+            {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},
+            {DataType(LogicalType::kDouble)},
             &ScalarFunction::BinaryFunctionWithFailure<MixedT, DoubleT, DoubleT, PowFunction>);
     function_set_ptr->AddFunction(pow_function_mixed_double);
 

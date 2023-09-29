@@ -15,7 +15,9 @@
 namespace infinity {
 
 class ViewMeta;
+
 class BufferManager;
+
 class Txn;
 
 struct ViewEntry : public BaseEntry {
@@ -26,7 +28,7 @@ public:
               SharedPtr<String> view_name,
               SharedPtr<Vector<SharedPtr<DataType>>> column_types,
               SharedPtr<Vector<String>> column_names,
-              ViewMeta *table_collection_meta,
+              ViewMeta* table_collection_meta,
               u64 txn_id,
               TxnTimeStamp begin_ts)
             : BaseEntry(EntryType::kView),

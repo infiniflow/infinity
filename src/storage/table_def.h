@@ -20,9 +20,9 @@ public:
     TableDef(SharedPtr<String> schema, SharedPtr<String> table_name, Vector<SharedPtr<ColumnDef>> columns)
             : schema_name_(std::move(schema)),
               table_name_(std::move(table_name)),
-            columns_(std::move(columns)) {
+              columns_(std::move(columns)) {
         SizeT column_count = columns_.size();
-        for(SizeT idx = 0; idx < column_count; ++ idx) {
+        for(SizeT idx = 0; idx < column_count; ++idx) {
             column_name2id_[columns_[idx]->name()] = idx;
         }
     }
@@ -34,11 +34,16 @@ public:
     operator!=(const TableDef& other) const;
 
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
-    int32_t GetSizeInBytes() const;
+    int32_t
+    GetSizeInBytes() const;
+
     // Write to a char buffer
-    void WriteAdv(char* &buf) const;
+    void
+    WriteAdv(char*& buf) const;
+
     // Read from a serialized version
-    static SharedPtr<TableDef> ReadAdv(char* &buf, int32_t maxbytes);
+    static SharedPtr<TableDef>
+    ReadAdv(char*& buf, int32_t maxbytes);
 
     [[nodiscard]] inline const Vector<SharedPtr<ColumnDef>>&
     columns() const {

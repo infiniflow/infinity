@@ -28,7 +28,7 @@ public:
     operator==(const TypeInfo& other) const override;
 
     [[nodiscard]] SizeT
-    Size() const override {  return length_limit_; }
+    Size() const override { return length_limit_; }
 
     [[nodiscard]] SizeT
     length_limit() const { return length_limit_; }
@@ -42,7 +42,7 @@ public:
     }
 
 private:
-    SizeT length_limit_ {0};
+    SizeT length_limit_{0};
 };
 
 }

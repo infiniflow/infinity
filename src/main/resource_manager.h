@@ -10,12 +10,13 @@
 namespace infinity {
 
 class Infinity;
-class ResourceManager : public Singleton<Infinity>  {
+
+class ResourceManager : public Singleton<Infinity> {
 public:
     explicit
     ResourceManager(u64 total_cpu_count, u64 total_memory)
-        : total_cpu_count_(total_cpu_count),
-        total_memory_(total_memory) {}
+            : total_cpu_count_(total_cpu_count),
+              total_memory_(total_memory) {}
 
     inline u64
     GetCpuResource(u64 cpu_count) {

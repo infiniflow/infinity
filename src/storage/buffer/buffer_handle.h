@@ -26,11 +26,13 @@ enum class BufferStatus {
     kSpilled,
 };
 
-using BufferReadFN = void(*)(const String& path, DataType data_type);
-using BufferWriteFN = void(*)(const String& path, DataType data_type);
+using BufferReadFN = void (*)(const String& path, DataType data_type);
+using BufferWriteFN = void (*)(const String& path, DataType data_type);
 
 class ObjectHandle;
+
 class CommonObjectHandle;
+
 class IndexObjectHandle;
 
 // BufferHandle is never destructed
@@ -114,7 +116,7 @@ public:
 
     UniquePtr<char[]> data_{nullptr};
     SizeT buffer_size_{0};
-    void *buffer_mgr_{};
+    void* buffer_mgr_{};
     u64 reference_count_{0};
     BufferType buffer_type_{BufferType::kInvalid};
     BufferStatus status_{BufferStatus::kFreed};

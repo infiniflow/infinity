@@ -9,10 +9,10 @@
 
 namespace infinity {
 
-class ScalarFunctionSet final: public FunctionSet {
+class ScalarFunctionSet final : public FunctionSet {
 public:
     explicit
-    ScalarFunctionSet(String name): FunctionSet(std::move(name), FunctionType::kScalar) {}
+    ScalarFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kScalar) {}
 
     ~ScalarFunctionSet() final;
 
@@ -24,7 +24,7 @@ public:
 
 private:
     static int64_t
-    MatchFunctionCost(const ScalarFunction& func,  const Vector<SharedPtr<BaseExpression>>& arguments);
+    MatchFunctionCost(const ScalarFunction& func, const Vector<SharedPtr<BaseExpression>>& arguments);
 
     Vector<ScalarFunction> functions_;
 };

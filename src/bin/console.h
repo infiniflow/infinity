@@ -26,14 +26,14 @@ public:
     UnInit();
 
     String
-    HandleCommand(const char *command);
+    HandleCommand(const char* command);
 
 private:
     void
     Execute(const String& command);
 
     void
-    Register(const String& name, const std::function<void(const String& )> &func);
+    Register(const String& name, const std::function<void(const String&)>& func);
 
     // Command functions
     void

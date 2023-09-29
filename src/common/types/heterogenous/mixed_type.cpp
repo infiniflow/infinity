@@ -15,7 +15,7 @@ namespace infinity {
 MixedType
 MixedType::MakeInteger(i64 input) {
     MixedType value(MixedValueType::kInteger);
-    IntegerMixedType* integer_mixed_ptr = (IntegerMixedType *)(&value);
+    IntegerMixedType* integer_mixed_ptr = (IntegerMixedType*)(&value);
     integer_mixed_ptr->value = input;
     return value;
 }
@@ -23,7 +23,7 @@ MixedType::MakeInteger(i64 input) {
 MixedType
 MixedType::MakeFloat(f64 input) {
     MixedType value(MixedValueType::kFloat);
-    FloatMixedType* float_mixed_ptr = (FloatMixedType *)(&value);
+    FloatMixedType* float_mixed_ptr = (FloatMixedType*)(&value);
     float_mixed_ptr->value = input;
     return value;
 }
@@ -427,22 +427,26 @@ MixedType::MixedType(MixedType&& other) noexcept {
 
 MixedType&
 MixedType::operator=(const MixedType& other) {
-    if(this == &other) return *this;
+    if(this == &other)
+        return *this;
     Copy(other, *this);
     return *this;
 }
 
 MixedType&
 MixedType::operator=(MixedType&& other) noexcept {
-    if(this == &other) return *this;
+    if(this == &other)
+        return *this;
     Move(std::forward<MixedType>(other), *this);
     return *this;
 }
 
 bool
 MixedType::operator==(const MixedType& other) const {
-    if(this == &other) return true;
-    if(this->type != other.type) return false;
+    if(this == &other)
+        return true;
+    if(this->type != other.type)
+        return false;
     switch(this->type) {
         case MixedValueType::kInvalid:
             TypeError("Invalid heterogeneous type")
@@ -459,37 +463,43 @@ MixedType::operator==(const MixedType& other) const {
         case MixedValueType::kLongStr: {
             auto* this_long_str = (LongStrMixedType*)(this);
             auto* other_long_str = (LongStrMixedType*)(&other);
-            if(this_long_str->length != other_long_str->length) return false;
+            if(this_long_str->length != other_long_str->length)
+                return false;
             return (memcmp(this_long_str->ptr, other_long_str->ptr, this_long_str->length) == 0);
         }
         case MixedValueType::kShortStr: {
             auto* this_short_str = (ShortStrMixedType*)(this);
             auto* other_short_str = (ShortStrMixedType*)(&other);
-            if(this_short_str->length != other_short_str->length) return false;
+            if(this_short_str->length != other_short_str->length)
+                return false;
             return (memcmp(this_short_str->ptr, other_short_str->ptr, this_short_str->length) == 0);
         }
         case MixedValueType::kTuple: {
             auto* this_tuple = (TupleMixedType*)(this);
             auto* other_tuple = (TupleMixedType*)(&other);
-            if(this_tuple->count != other_tuple->count) return false;
+            if(this_tuple->count != other_tuple->count)
+                return false;
             auto* this_tuple_value = (MixedTupleValue*)(this_tuple->ptr);
             auto* other_tuple_value = (MixedTupleValue*)(other_tuple->ptr);
 
             // FIXME: current only loop to check the each entry are equivalent accordingly.
-            for(u16 i = 0; i < this_tuple->count; ++ i) {
-                if(this_tuple_value->array[i] != other_tuple_value->array[i]) return false;
+            for(u16 i = 0; i < this_tuple->count; ++i) {
+                if(this_tuple_value->array[i] != other_tuple_value->array[i])
+                    return false;
             }
             return true;
         }
         case MixedValueType::kArray: {
             auto* this_array = (ArrayMixedType*)(this);
             auto* other_array = (ArrayMixedType*)(&other);
-            if(this_array->count != other_array->count) return false;
+            if(this_array->count != other_array->count)
+                return false;
             auto* this_array_value = (MixedArrayValue*)(this_array->ptr);
             auto* other_array_value = (MixedArrayValue*)(other_array->ptr);
 
-            for(u16 i = 0; i < this_array->count; ++ i) {
-                if(this_array_value->array[i] != other_array_value->array[i]) return false;
+            for(u16 i = 0; i < this_array->count; ++i) {
+                if(this_array_value->array[i] != other_array_value->array[i])
+                    return false;
             }
             return true;
         }
@@ -502,7 +512,6 @@ MixedType::operator==(const MixedType& other) const {
 
     TypeError("Unknown heterogeneous type.");
 }
-
 
 
 void
@@ -526,7 +535,7 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
         case MixedValueType::kNull:
         case MixedValueType::kMissing:
         case MixedValueType::kDummy: {
-            return ;
+            return;
         }
         case MixedValueType::kLongStr: {
             auto* from_ptr = (LongStrMixedType*)(&from);
@@ -537,7 +546,7 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
             GlobalResourceUsage::IncrRawMemCount();
 
             memcpy(to_ptr->ptr, from_ptr->ptr, size_len);
-            return ;
+            return;
         }
         case MixedValueType::kTuple: {
             auto* from_ptr = (TupleMixedType*)(&from);
@@ -545,7 +554,7 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
 
             const u32 tuple_memory_size = from_ptr->count * BaseMixedType::TUPLE_SIZE;
 
-            to_ptr->ptr = new char_t[tuple_memory_size] {0};
+            to_ptr->ptr = new char_t[tuple_memory_size]{0};
             GlobalResourceUsage::IncrRawMemCount();
 
             // For loop to deep copy every element into new tuple space. Using memcpy will lead to shallow copy.
@@ -558,7 +567,7 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
                 target_tuple_value_ptr->array[i] = source_tuple_value_ptr->array[i];
                 target_tuple_value_ptr->array[i + 1] = source_tuple_value_ptr->array[i + 1];
             }
-            return ;
+            return;
         }
         case MixedValueType::kArray: {
             auto* from_ptr = (ArrayMixedType*)(&from);
@@ -566,7 +575,7 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
 
             const u32 array_memory_size = from_ptr->count * BaseMixedType::ELEMENT_SIZE;
 
-            to_ptr->ptr = new char_t[array_memory_size] {0};
+            to_ptr->ptr = new char_t[array_memory_size]{0};
             GlobalResourceUsage::IncrRawMemCount();
 
             // For loop to deep copy every element into new array space. Using memcpy will lead to shallow copy.
@@ -574,17 +583,17 @@ MixedType::Copy(const MixedType& from, MixedType& to) {
             MixedArrayValue* target_array_value_ptr = (MixedArrayValue*)(to_ptr->ptr);
             MixedArrayValue* source_array_value_ptr = (MixedArrayValue*)(from_ptr->ptr);
 
-            for(u16 i = 0; i < from_ptr->count; ++ i) {
+            for(u16 i = 0; i < from_ptr->count; ++i) {
                 target_array_value_ptr->array[i] = source_array_value_ptr->array[i];
             }
-            return ;
+            return;
         }
     }
 }
 
 void
 MixedType::Reset(bool in_constructor) {
-    switch (this->type) {
+    switch(this->type) {
         case MixedValueType::kInvalid:
         case MixedValueType::kInteger:
         case MixedValueType::kFloat:
@@ -592,24 +601,24 @@ MixedType::Reset(bool in_constructor) {
         case MixedValueType::kNull:
         case MixedValueType::kMissing:
         case MixedValueType::kDummy:
-            break ;
+            break;
         case MixedValueType::kLongStr: {
             // LongStrMixedType *long_str_mixed_ptr;
-            auto *long_str_mixed_ptr = (LongStrMixedType *) this;
+            auto* long_str_mixed_ptr = (LongStrMixedType*)this;
             long_str_mixed_ptr->Reset(in_constructor);
-            break ;
+            break;
         }
         case MixedValueType::kTuple: {
             // TupleMixedType *tuple_mixed_ptr;
-            auto *tuple_mixed_ptr = (TupleMixedType *) this;
+            auto* tuple_mixed_ptr = (TupleMixedType*)this;
             tuple_mixed_ptr->Reset(in_constructor);
-            break ;
+            break;
         }
         case MixedValueType::kArray: {
             // ArrayMixedType *array_mixed_ptr;
-            auto *array_mixed_ptr = (ArrayMixedType *) this;
+            auto* array_mixed_ptr = (ArrayMixedType*)this;
             array_mixed_ptr->Reset(in_constructor);
-            break ;
+            break;
         }
     }
     this->type = MixedValueType::kInvalid;

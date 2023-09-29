@@ -10,13 +10,13 @@
 
 namespace infinity {
 
-DBServer::DBServer(const StartupParameter &parameter)
-    : config_path_(parameter.config_path) {}
+DBServer::DBServer(const StartupParameter& parameter)
+        : config_path_(parameter.config_path) {}
 
 void
 DBServer::Run() {
     if(initialized) {
-        return ;
+        return;
     }
 
     initialized = true;
@@ -30,7 +30,8 @@ DBServer::Run() {
         GeneralError(fmt::format("Not a valid IPv4 address: {}", listen_address_ref));
     }
 
-    acceptor_ptr_ = MakeUnique<boost::asio::ip::tcp::acceptor>(io_service_, boost::asio::ip::tcp::endpoint(address, pg_port));
+    acceptor_ptr_ = MakeUnique<boost::asio::ip::tcp::acceptor>(io_service_,
+                                                               boost::asio::ip::tcp::endpoint(address, pg_port));
     CreateConnection();
 
     if(config_path_) {
@@ -62,19 +63,20 @@ DBServer::Shutdown() {
 void
 DBServer::CreateConnection() {
     SharedPtr<Connection> connection_ptr = MakeShared<Connection>(io_service_);
-    acceptor_ptr_->async_accept(*(connection_ptr->socket()), boost::bind(&DBServer::StartConnection, this, connection_ptr));
+    acceptor_ptr_->async_accept(*(connection_ptr->socket()),
+                                boost::bind(&DBServer::StartConnection, this, connection_ptr));
 }
 
 
 void
 DBServer::StartConnection(SharedPtr<Connection>& connection) {
-    std::thread connection_thread ([connection = connection, &num_running_connections = this->running_connection_count_]() mutable {
-        ++ num_running_connections;
+    std::thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_]() mutable {
+        ++num_running_connections;
         connection->Run();
 
         // User disconnected
         connection.reset();
-        -- num_running_connections;
+        --num_running_connections;
     });
 
     connection_thread.detach();

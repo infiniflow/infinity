@@ -4,15 +4,17 @@
 namespace infinity {
 
 BufferedByteSlice::BufferedByteSlice(
-    MemoryPool* byte_slice_pool, MemoryPool* buffer_pool) {
+        MemoryPool* byte_slice_pool, MemoryPool* buffer_pool) {
 
 }
 
-void BufferedByteSlice::Init(const PostingValues* value) {
+void
+BufferedByteSlice::Init(const PostingValues* value) {
     buffer_.Init(value);
 }
 
-size_t BufferedByteSlice::DoFlush() {
+size_t
+BufferedByteSlice::DoFlush() {
     uint32_t flush_size = 0;
     const PostingValues* posting_values = buffer_.GetPostingValues();
     for(size_t i = 0; i < posting_values->GetSize(); ++i) {
@@ -23,8 +25,9 @@ size_t BufferedByteSlice::DoFlush() {
     return flush_size;
 }
 
-size_t BufferedByteSlice::Flush() {
-    if (buffer_.Size() == 0) {
+size_t
+BufferedByteSlice::Flush() {
+    if(buffer_.Size() == 0) {
         return 0;
     }
     size_t flush_size = DoFlush();
@@ -38,13 +41,14 @@ size_t BufferedByteSlice::Flush() {
     return flush_size;
 }
 
-void BufferedByteSlice::SnapShot(BufferedByteSlice* buffer) const {
+void
+BufferedByteSlice::SnapShot(BufferedByteSlice* buffer) const {
     buffer->Init(GetPostingValues());
     buffer->flush_info_ = flush_info_;
     posting_writer_.SnapShot(buffer->posting_writer_);
     buffer_.SnapShot(buffer->buffer_);
 
-    if (flush_info_.GetFlushLength() > buffer->flush_info_.GetFlushLength()) {
+    if(flush_info_.GetFlushLength() > buffer->flush_info_.GetFlushLength()) {
         buffer->buffer_.Clear();
         buffer->flush_info_ = flush_info_;
         posting_writer_.SnapShot(buffer->posting_writer_);

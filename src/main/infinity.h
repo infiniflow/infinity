@@ -14,6 +14,7 @@
 namespace infinity {
 
 class Config;
+
 class Infinity : public Singleton<Infinity> {
 public:
     [[nodiscard]] inline FragmentScheduler*
@@ -44,6 +45,7 @@ public:
 
 private:
     friend class Singleton;
+
     Infinity() = default;
 
     UniquePtr<Config> config_{};
@@ -51,7 +53,7 @@ private:
     UniquePtr<FragmentScheduler> fragment_scheduler_{};
     UniquePtr<Storage> storage_{};
 
-    bool initialized_ {false};
+    bool initialized_{false};
 };
 
 }

@@ -3,6 +3,7 @@
 #include "common/types/internal_types.h"
 #include "common/types/type_info.h"
 #include "common/utility/infinity_assert.h"
+
 namespace infinity {
 
 SharedPtr<VarcharInfo>
@@ -13,10 +14,10 @@ VarcharInfo::Make(i64 dimension) {
 
 bool
 VarcharInfo::operator==(const TypeInfo& other) const {
-    if (other.type() != TypeInfoType::kVarchar) {
+    if(other.type() != TypeInfoType::kVarchar) {
         return false;
     }
-    auto varchar_info = static_cast<const VarcharInfo &>(other);
+    auto varchar_info = static_cast<const VarcharInfo&>(other);
     return varchar_info.dimension_ == this->dimension_;
 }
 

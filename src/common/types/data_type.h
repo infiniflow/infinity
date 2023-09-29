@@ -72,16 +72,16 @@ class DataType {
 public:
     explicit
     DataType(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr) :
-        type_(logical_type), type_info_(std::move(type_info_ptr)) {
+            type_(logical_type), type_info_(std::move(type_info_ptr)) {
     }
 
     explicit
-    DataType(LogicalType logical_type): type_(logical_type), type_info_(nullptr) {
+    DataType(LogicalType logical_type) : type_(logical_type), type_info_(nullptr) {
     }
 
     ~DataType() = default;
 
-    DataType(const DataType& other): type_(other.type_), type_info_(other.type_info_) {
+    DataType(const DataType& other) : type_(other.type_), type_info_(other.type_info_) {
     }
 
     DataType(DataType&& other) noexcept: type_(other.type_), type_info_(std::move(other.type_info_)) {
@@ -89,7 +89,8 @@ public:
 
     DataType&
     operator=(const DataType& other) {
-        if(this == &other) return *this;
+        if(this == &other)
+            return *this;
         type_ = other.type_;
         type_info_ = other.type_info_;
         return *this;
@@ -97,7 +98,8 @@ public:
 
     DataType&
     operator=(DataType&& other) noexcept {
-        if(this == &other) return *this;
+        if(this == &other)
+            return *this;
         type_ = other.type_;
         type_info_ = other.type_info_;
         other.type_info_ = nullptr;
@@ -154,12 +156,18 @@ public:
     Deserialize(const nlohmann::json& data_type_json);
 
     friend class TableDef;
+
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
-    int32_t GetSizeInBytes() const;
+    int32_t
+    GetSizeInBytes() const;
+
     // Write to a char buffer
-    void WriteAdv(char* &buf) const;
+    void
+    WriteAdv(char*& buf) const;
+
     // Read from a serialized version
-    static SharedPtr<DataType> ReadAdv(char* &buf, int32_t maxbytes);
+    static SharedPtr<DataType>
+    ReadAdv(char*& buf, int32_t maxbytes);
 
 private:
 
@@ -195,41 +203,144 @@ DataType::StringToValue(const StringView& str_view) {
     TypeError("Unexpected data type.");
 }
 
-template <> String DataType::TypeToString<BooleanT>();
-template <> String DataType::TypeToString<TinyIntT>();
-template <> String DataType::TypeToString<SmallIntT>();
-template <> String DataType::TypeToString<IntegerT>();
-template <> String DataType::TypeToString<BigIntT>();
-template <> String DataType::TypeToString<HugeIntT>();
-template <> String DataType::TypeToString<FloatT>();
-template <> String DataType::TypeToString<DoubleT>();
-template <> String DataType::TypeToString<DecimalT>();
-template <> String DataType::TypeToString<VarcharT>();
-template <> String DataType::TypeToString<DateT>();
-template <> String DataType::TypeToString<TimeT>();
-template <> String DataType::TypeToString<DateTimeT>();
-template <> String DataType::TypeToString<TimestampT>();
-template <> String DataType::TypeToString<IntervalT>();
-template <> String DataType::TypeToString<ArrayT>();
-//template <> String DataType::TypeToString<TupleT>() { return "Tuple"; }
-template <> String DataType::TypeToString<PointT>();
-template <> String DataType::TypeToString<LineT>();
-template <> String DataType::TypeToString<LineSegT>();
-template <> String DataType::TypeToString<BoxT>();
-template <> String DataType::TypeToString<PathT>();
-template <> String DataType::TypeToString<PolygonT>();
-template <> String DataType::TypeToString<CircleT>();
-template <> String DataType::TypeToString<BitmapT>();
-template <> String DataType::TypeToString<UuidT>();
-template <> String DataType::TypeToString<BlobT>();
-template <> String DataType::TypeToString<EmbeddingT>();
-template <> String DataType::TypeToString<MixedT>();
+template<>
+String
+DataType::TypeToString<BooleanT>();
 
-template <> BooleanT DataType::StringToValue<BooleanT>(const StringView& str_view);
-template <> TinyIntT DataType::StringToValue<TinyIntT>(const StringView& str_view);
-template <> SmallIntT DataType::StringToValue<SmallIntT>(const StringView& str_view);
-template <> IntegerT DataType::StringToValue<IntegerT>(const StringView& str_view);
-template <> BigIntT DataType::StringToValue<BigIntT>(const StringView& str_view);
-template <> FloatT DataType::StringToValue<FloatT>(const StringView& str_view);
-template <> DoubleT DataType::StringToValue<DoubleT>(const StringView& str_view);
+template<>
+String
+DataType::TypeToString<TinyIntT>();
+
+template<>
+String
+DataType::TypeToString<SmallIntT>();
+
+template<>
+String
+DataType::TypeToString<IntegerT>();
+
+template<>
+String
+DataType::TypeToString<BigIntT>();
+
+template<>
+String
+DataType::TypeToString<HugeIntT>();
+
+template<>
+String
+DataType::TypeToString<FloatT>();
+
+template<>
+String
+DataType::TypeToString<DoubleT>();
+
+template<>
+String
+DataType::TypeToString<DecimalT>();
+
+template<>
+String
+DataType::TypeToString<VarcharT>();
+
+template<>
+String
+DataType::TypeToString<DateT>();
+
+template<>
+String
+DataType::TypeToString<TimeT>();
+
+template<>
+String
+DataType::TypeToString<DateTimeT>();
+
+template<>
+String
+DataType::TypeToString<TimestampT>();
+
+template<>
+String
+DataType::TypeToString<IntervalT>();
+
+template<>
+String
+DataType::TypeToString<ArrayT>();
+
+//template <> String DataType::TypeToString<TupleT>() { return "Tuple"; }
+template<>
+String
+DataType::TypeToString<PointT>();
+
+template<>
+String
+DataType::TypeToString<LineT>();
+
+template<>
+String
+DataType::TypeToString<LineSegT>();
+
+template<>
+String
+DataType::TypeToString<BoxT>();
+
+template<>
+String
+DataType::TypeToString<PathT>();
+
+template<>
+String
+DataType::TypeToString<PolygonT>();
+
+template<>
+String
+DataType::TypeToString<CircleT>();
+
+template<>
+String
+DataType::TypeToString<BitmapT>();
+
+template<>
+String
+DataType::TypeToString<UuidT>();
+
+template<>
+String
+DataType::TypeToString<BlobT>();
+
+template<>
+String
+DataType::TypeToString<EmbeddingT>();
+
+template<>
+String
+DataType::TypeToString<MixedT>();
+
+template<>
+BooleanT
+DataType::StringToValue<BooleanT>(const StringView& str_view);
+
+template<>
+TinyIntT
+DataType::StringToValue<TinyIntT>(const StringView& str_view);
+
+template<>
+SmallIntT
+DataType::StringToValue<SmallIntT>(const StringView& str_view);
+
+template<>
+IntegerT
+DataType::StringToValue<IntegerT>(const StringView& str_view);
+
+template<>
+BigIntT
+DataType::StringToValue<BigIntT>(const StringView& str_view);
+
+template<>
+FloatT
+DataType::StringToValue<FloatT>(const StringView& str_view);
+
+template<>
+DoubleT
+DataType::StringToValue<DoubleT>(const StringView& str_view);
 }

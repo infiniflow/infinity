@@ -11,7 +11,7 @@ namespace infinity {
 
 class GroupBinder : public ExpressionBinder {
 public:
-    i64 group_by_expr_index {-1};
+    i64 group_by_expr_index{-1};
 
     HashSet<i64> bound_select_index_;
 
@@ -19,8 +19,8 @@ public:
     explicit
     GroupBinder(QueryContext* query_context,
                 const SharedPtr<BindAliasProxy>& bind_alias_proxy)
-                : ExpressionBinder(query_context),
-                bind_alias_proxy_(bind_alias_proxy) {}
+            : ExpressionBinder(query_context),
+              bind_alias_proxy_(bind_alias_proxy) {}
 
     // Bind expression entry
     SharedPtr<BaseExpression>
@@ -31,7 +31,7 @@ public:
 
     SharedPtr<BaseExpression>
     BindColumnReference(const ColumnExpr& expr,
-                         BindContext* bind_context_ptr);
+                        BindContext* bind_context_ptr);
 
     SharedPtr<BaseExpression>
     BindConstantExpression(const ConstantExpr& expr,
@@ -64,6 +64,7 @@ public:
                  BindContext* bind_context_ptr,
                  i64 depth,
                  bool root) override;
+
 private:
 
     const SharedPtr<BindAliasProxy>& bind_alias_proxy_;

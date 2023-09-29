@@ -17,7 +17,7 @@ struct ColumnBinding {
     }
 
     inline bool
-    operator==(const ColumnBinding &other) const {
+    operator==(const ColumnBinding& other) const {
         return table_idx == other.table_idx && column_idx == other.column_idx;
     }
 

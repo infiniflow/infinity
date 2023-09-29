@@ -79,8 +79,10 @@ SelectStatement::ToString() const {
 String
 ToString(OrderType type) {
     switch(type) {
-        case OrderType::kAsc: return "ASC";
-        case OrderType::kDesc: return "DESC";
+        case OrderType::kAsc:
+            return "ASC";
+        case OrderType::kDesc:
+            return "DESC";
     }
     TypeError("Unexpected order type");
 }

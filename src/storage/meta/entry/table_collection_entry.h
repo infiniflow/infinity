@@ -8,15 +8,17 @@
 
 #include "common/types/internal_types.h"
 #include "storage/table_def.h"
-#include "storage/table/data_table.h"
 #include "segment_entry.h"
 #include "table_collecton_type.h"
 
 namespace infinity {
 
 class DBEntry;
+
 class TableCollectionMeta;
+
 class BufferManager;
+
 class Txn;
 
 struct TableCollectionEntry : public BaseEntry {
@@ -87,7 +89,7 @@ public:
 
     static inline u64
     GetNextSegmentID(TableCollectionEntry* table_entry) {
-        return table_entry->next_segment_id_ ++;
+        return table_entry->next_segment_id_++;
     }
 
     static inline u64

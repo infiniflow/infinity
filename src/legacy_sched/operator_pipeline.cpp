@@ -9,7 +9,8 @@
 
 namespace infinity {
 
-SharedPtr<OperatorPipeline> OperatorPipeline::Create(const SharedPtr<PhysicalOperator>& op) {
+SharedPtr<OperatorPipeline>
+OperatorPipeline::Create(const SharedPtr<PhysicalOperator>& op) {
     SharedPtr<OperatorPipeline> root_pipeline = op->GenerateOperatorPipeline();
 
     if(op->left()) {
@@ -25,7 +26,7 @@ SharedPtr<OperatorPipeline> OperatorPipeline::Create(const SharedPtr<PhysicalOpe
 }
 
 OperatorPipeline::OperatorPipeline(SharedPtr<PhysicalOperator> op)
-    : Pipeline(op->node_id()), operator_(std::move(op)) {}
+        : Pipeline(op->node_id()), operator_(std::move(op)) {}
 
 void
 OperatorPipeline::OnExecute(QueryContext* query_context) {

@@ -18,9 +18,13 @@ enum class ConnectionStatus : char {
 };
 
 class QueryContext;
+
 class QueryResult;
+
 class Session;
+
 class Table;
+
 class Connection {
 public:
     explicit

@@ -17,14 +17,18 @@
 namespace infinity {
 
 class LogicalNode;
+
 class Table;
+
 class ExpressionBinder;
+
 class QueryContext;
+
 class KnnExpression;
 
 struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(String alias, SelectStatement* select_stmt, HashSet<String> masked_name_set)
-        : alias_(std::move(alias)), select_statement_(select_stmt), masked_name_set_(std::move(masked_name_set)) {}
+            : alias_(std::move(alias)), select_statement_(select_stmt), masked_name_set_(std::move(masked_name_set)) {}
 
     String alias_;
     SelectStatement* select_statement_;
@@ -46,7 +50,7 @@ public:
 public:
     explicit
     BindContext(const SharedPtr<BindContext>& parent)
-        : parent_(parent.get()) {
+            : parent_(parent.get()) {
         binding_context_id_ = GenerateBindingContextIndex();
     }
 
@@ -57,7 +61,8 @@ public:
 
     virtual ~BindContext();
 
-    void Destroy();
+    void
+    Destroy();
 
     // Parent bind context
     BindContext* parent_{nullptr};

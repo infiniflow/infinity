@@ -19,7 +19,8 @@ struct ExprBindResult {
     SharedPtr<BaseExpression> bound_expression_ptr_{};
     String err_msg_{};
 
-    inline bool IsOk() { return err_msg_.empty(); }
+    inline bool
+    IsOk() { return err_msg_.empty(); }
 };
 
 
@@ -86,15 +87,15 @@ public:
 
     virtual SharedPtr<BaseExpression>
     BuildInExpr(const InExpr& expr,
-                  BindContext* bind_context_ptr,
-                  i64 depth,
-                  bool root);
-
-    virtual SharedPtr<BaseExpression>
-    BuildKnnExpr(const KnnExpr& expr,
                 BindContext* bind_context_ptr,
                 i64 depth,
                 bool root);
+
+    virtual SharedPtr<BaseExpression>
+    BuildKnnExpr(const KnnExpr& expr,
+                 BindContext* bind_context_ptr,
+                 i64 depth,
+                 bool root);
 
     // Bind subquery expression.
     virtual SharedPtr<SubqueryExpression>

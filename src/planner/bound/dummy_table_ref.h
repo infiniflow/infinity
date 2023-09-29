@@ -6,7 +6,7 @@
 
 namespace infinity {
 
-class DummyTableRef: public TableRef  {
+class DummyTableRef : public TableRef {
 public:
     explicit DummyTableRef() : TableRef(TableRefType::kDummy, "Dummy") {}
 };

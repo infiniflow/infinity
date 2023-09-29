@@ -10,7 +10,7 @@ String
 DropCollectionInfo::ToString() const {
     std::stringstream ss;
     ss << "DROP COLLECTION: " << schema_name_ << "." << collection_name_;
-    if (this->conflict_type_ == ConflictType::kIgnore) {
+    if(this->conflict_type_ == ConflictType::kIgnore) {
         ss << " IgnoreIfExists";
     } else {
         ss << " ThrowErrorIfExists";

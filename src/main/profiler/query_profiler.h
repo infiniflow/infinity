@@ -24,22 +24,35 @@ enum class QueryPhase : size_t {
 
 class OptimizerProfiler {
 public:
-    void StartRule(const std::string& rule_name);
-    void StopRule();
-    [[nodiscard]] std::string ToString(size_t intent = 0) const;
+    void
+    StartRule(const std::string& rule_name);
+
+    void
+    StopRule();
+
+    [[nodiscard]] std::string
+    ToString(size_t intent = 0) const;
+
 private:
     std::vector<BaseProfiler> profilers_;
 };
 
 class QueryProfiler {
 public:
-    void StartPhase(QueryPhase phase);
-    void StopPhase(QueryPhase phase);
+    void
+    StartPhase(QueryPhase phase);
 
-    OptimizerProfiler& optimizer() { return optimizer_; }
-    [[nodiscard]] std::string ToString() const;
+    void
+    StopPhase(QueryPhase phase);
 
-    static std::string QueryPhaseToString(QueryPhase phase);
+    OptimizerProfiler&
+    optimizer() { return optimizer_; }
+
+    [[nodiscard]] std::string
+    ToString() const;
+
+    static std::string
+    QueryPhaseToString(QueryPhase phase);
 
 private:
     std::vector<BaseProfiler> profilers_{magic_enum::enum_integer(QueryPhase::kInvalid)};

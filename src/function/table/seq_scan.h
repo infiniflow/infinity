@@ -14,17 +14,16 @@
 namespace infinity {
 
 void
-RegisterSeqScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+RegisterSeqScanFunction(const UniquePtr<NewCatalog>& catalog_ptr);
 
-class SeqScanFunctionData: public TableFunctionData {
+class SeqScanFunctionData : public TableFunctionData {
 public:
     SeqScanFunctionData(TableCollectionEntry* table_entry_ptr,
-                          SharedPtr<Vector<SegmentEntry*>> segment_entries,
-                          Vector<SizeT> column_ids)
-        : table_entry_ptr_(table_entry_ptr),
-        segment_entries_(std::move(segment_entries)),
-        column_ids_(std::move(column_ids))
-    {}
+                        SharedPtr<Vector<SegmentEntry*>> segment_entries,
+                        Vector<SizeT> column_ids)
+            : table_entry_ptr_(table_entry_ptr),
+              segment_entries_(std::move(segment_entries)),
+              column_ids_(std::move(column_ids)) {}
 
     TableCollectionEntry* table_entry_ptr_;
     Vector<SizeT> column_ids_;
@@ -50,8 +49,7 @@ public:
 public:
     explicit
     SeqScanFunction(String name, TableFunctionType function)
-        : TableFunction(std::move(name), {}, std::move(function))
-        {}
+            : TableFunction(std::move(name), {}, std::move(function)) {}
 
 private:
 };
@@ -59,6 +57,6 @@ private:
 static void
 SeqScanFunc(QueryContext* query_context,
             TableFunctionData* table_function_data_ptr,
-            DataBlock &output);
+            DataBlock& output);
 
 }

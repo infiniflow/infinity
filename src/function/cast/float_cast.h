@@ -17,10 +17,10 @@ struct FloatTryCastToVarlen;
 
 template<class SourceType>
 static inline BoundCastFunc
-BindFloatCast(const DataType &source, const DataType &target) {
+BindFloatCast(const DataType& source, const DataType& target) {
     TypeAssert(source.type() != target.type(),
                "Attempt to cast from " + source.ToString() + " to " + target.ToString());
-    switch (target.type()) {
+    switch(target.type()) {
         case LogicalType::kTinyInt: {
             return BoundCastFunc(
                     &ColumnVectorCast::TryCastColumnVector<SourceType, TinyIntT, FloatTryCastToFixlen>);
@@ -65,7 +65,7 @@ BindFloatCast(const DataType &source, const DataType &target) {
 struct FloatTryCastToFixlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target) {
+    Run(SourceType source, TargetType& target) {
         FunctionError("No implemention to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -74,7 +74,7 @@ struct FloatTryCastToFixlen {
 struct FloatTryCastToVarlen {
     template<typename SourceType, typename TargetType>
     static inline bool
-    Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector>& vector_ptr) {
+    Run(SourceType source, TargetType& target, const SharedPtr<ColumnVector>& vector_ptr) {
         FunctionError("Not implemention to cast from " + DataType::TypeToString<SourceType>()
                       + " to " + DataType::TypeToString<TargetType>());
     }
@@ -83,7 +83,7 @@ struct FloatTryCastToVarlen {
 // Cast FloatT to other numeric type
 template<>
 inline bool
-FloatTryCastToFixlen::Run(FloatT source, TinyIntT &target) {
+FloatTryCastToFixlen::Run(FloatT source, TinyIntT& target) {
     if(source < -128.0f || source > 127.0f) {
         return false;
     }
@@ -93,7 +93,7 @@ FloatTryCastToFixlen::Run(FloatT source, TinyIntT &target) {
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(FloatT source, SmallIntT &target) {
+FloatTryCastToFixlen::Run(FloatT source, SmallIntT& target) {
     if(source < -32768.0f || source > 32767.0f) {
         return false;
     }
@@ -103,7 +103,7 @@ FloatTryCastToFixlen::Run(FloatT source, SmallIntT &target) {
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(FloatT source, IntegerT &target) {
+FloatTryCastToFixlen::Run(FloatT source, IntegerT& target) {
     if(source < -2147483648.0f || source > 2147483647.0f) {
         return false;
     }
@@ -116,7 +116,7 @@ FloatTryCastToFixlen::Run(FloatT source, IntegerT &target) {
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(FloatT source, BigIntT &target) {
+FloatTryCastToFixlen::Run(FloatT source, BigIntT& target) {
     if(source < -9223372036854775808.0f || source > 9223372036854775807.0f) {
         return false;
     }
@@ -127,13 +127,13 @@ FloatTryCastToFixlen::Run(FloatT source, BigIntT &target) {
 // TODO: Cast from float to hugeint
 template<>
 inline bool
-FloatTryCastToFixlen::Run(FloatT source, HugeIntT &target) {
-        NotImplementError("Not implemented");
+FloatTryCastToFixlen::Run(FloatT source, HugeIntT& target) {
+    NotImplementError("Not implemented");
 }
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(FloatT source, DoubleT &target) {
+FloatTryCastToFixlen::Run(FloatT source, DoubleT& target) {
     target = source;
     return true;
 }
@@ -141,14 +141,14 @@ FloatTryCastToFixlen::Run(FloatT source, DoubleT &target) {
 // TODO
 template<>
 inline bool
-FloatTryCastToFixlen::Run(FloatT source, DecimalT &target) {
+FloatTryCastToFixlen::Run(FloatT source, DecimalT& target) {
     NotImplementError("Not implemented");
 }
 
 // Cast FloatT to varlen type
 template<>
 inline bool
-FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr){
+FloatTryCastToVarlen::Run(FloatT source, VarcharT& target, const SharedPtr<ColumnVector>& vector_ptr) {
     // TODO: High-performance to_string implementation is needed.
     String tmp_str = std::to_string(source);
     target.length = static_cast<u16>(tmp_str.size());
@@ -171,7 +171,7 @@ FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const SharedPtr<Colum
 // Cast DoubleT to other numeric type
 template<>
 inline bool
-FloatTryCastToFixlen::Run(DoubleT source, TinyIntT &target) {
+FloatTryCastToFixlen::Run(DoubleT source, TinyIntT& target) {
     if(source < -128.0f || source > 127.0f) {
         return false;
     }
@@ -181,7 +181,7 @@ FloatTryCastToFixlen::Run(DoubleT source, TinyIntT &target) {
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(DoubleT source, SmallIntT &target) {
+FloatTryCastToFixlen::Run(DoubleT source, SmallIntT& target) {
     if(source < -32768.0f || source > 32767.0f) {
         return false;
     }
@@ -191,7 +191,7 @@ FloatTryCastToFixlen::Run(DoubleT source, SmallIntT &target) {
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(DoubleT source, IntegerT &target) {
+FloatTryCastToFixlen::Run(DoubleT source, IntegerT& target) {
     if(source < -2147483648.0f || source > 2147483647.0f) {
         return false;
     }
@@ -201,7 +201,7 @@ FloatTryCastToFixlen::Run(DoubleT source, IntegerT &target) {
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
+FloatTryCastToFixlen::Run(DoubleT source, BigIntT& target) {
     if(source < -9223372036854775808.0f || source > 9223372036854775807.0f) {
         return false;
     }
@@ -215,13 +215,13 @@ FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
 // TODO: Cast from double to hugeint
 template<>
 inline bool
-FloatTryCastToFixlen::Run(DoubleT source, HugeIntT &target) {
+FloatTryCastToFixlen::Run(DoubleT source, HugeIntT& target) {
     NotImplementError("Not implemented");
 }
 
 template<>
 inline bool
-FloatTryCastToFixlen::Run(DoubleT source, FloatT &target) {
+FloatTryCastToFixlen::Run(DoubleT source, FloatT& target) {
     target = source;
     return true;
 }
@@ -229,14 +229,14 @@ FloatTryCastToFixlen::Run(DoubleT source, FloatT &target) {
 // TODO
 template<>
 inline bool
-FloatTryCastToFixlen::Run(DoubleT source, DecimalT &target) {
+FloatTryCastToFixlen::Run(DoubleT source, DecimalT& target) {
     NotImplementError("Not implemented");
 }
 
 // Cast double to varlen type
 template<>
 inline bool
-FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const SharedPtr<ColumnVector>& vector_ptr){
+FloatTryCastToVarlen::Run(DoubleT source, VarcharT& target, const SharedPtr<ColumnVector>& vector_ptr) {
     // TODO: High-performance to_string implementation is needed.
     String tmp_str = std::to_string(source);
     target.length = static_cast<u16>(tmp_str.size());

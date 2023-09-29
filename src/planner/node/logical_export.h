@@ -33,16 +33,16 @@ public:
 
     [[nodiscard]] inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
-        return MakeShared <Vector<String>>();
+        return MakeShared<Vector<String>>();
     }
 
     [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final {
-        return MakeShared <Vector<SharedPtr<DataType>>>();
+        return MakeShared<Vector<SharedPtr<DataType>>>();
     }
 
     String
-    ToString(i64 &space) final;
+    ToString(i64& space) final;
 
     inline String
     name() final {
@@ -81,7 +81,7 @@ public:
 
 private:
 
-    CopyFileType file_type_ {CopyFileType::kCSV};
+    CopyFileType file_type_{CopyFileType::kCSV};
     String file_path_{};
     String table_name_{};
     String schema_name_{"default"};

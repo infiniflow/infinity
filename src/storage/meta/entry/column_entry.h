@@ -10,7 +10,6 @@
 #include "db_entry.h"
 #include "common/types/internal_types.h"
 #include "storage/table_def.h"
-#include "storage/table/data_table.h"
 
 namespace infinity {
 
@@ -18,10 +17,10 @@ class ColumnEntry : public BaseEntry {
 public:
     explicit
     ColumnEntry(SharedPtr<ColumnDef> column_def,
-               void* table_entry,
-               u64 txn_id,
-               TxnTimeStamp begin_ts,
-               void* buffer_mgr)
+                void* table_entry,
+                u64 txn_id,
+                TxnTimeStamp begin_ts,
+                void* buffer_mgr)
             : BaseEntry(EntryType::kTable), column_def_(std::move(column_def)), table_entry_(table_entry) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
