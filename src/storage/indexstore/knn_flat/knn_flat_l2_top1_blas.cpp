@@ -4,6 +4,7 @@
 
 #include "knn_flat_l2_top1_blas.h"
 #include "common/utility/infinity_assert.h"
+#include "storage/indexstore/common/distance.h"
 
 #define FINTEGER int
 

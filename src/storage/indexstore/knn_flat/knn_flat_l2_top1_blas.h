@@ -6,7 +6,6 @@
 
 #include "storage/indexstore/knn_distance.h"
 #include "storage/indexstore/knn_flat/alias.h"
-#include "storage/indexstore/common/distance.h"
 
 namespace infinity {
 
