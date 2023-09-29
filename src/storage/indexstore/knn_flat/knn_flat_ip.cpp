@@ -29,11 +29,11 @@ KnnFlatIP<DistType>::Search(const DistType* base,
     }
 
     for (int64_t i = 0; i < query_count_; i++) {
-        const float* x_i = queries_ + i * dimension_;
-        const float* y_j = base;
+        const DistType* x_i = queries_ + i * dimension_;
+        const DistType* y_j = base;
 
         for (i32 j = 0; j < base_count; j++, y_j += dimension_) {
-            float ip = faiss::fvec_inner_product(x_i, y_j, dimension_);
+            DistType ip = faiss::fvec_inner_product(x_i, y_j, dimension_);
             single_heap_result_handler_->add_result(ip, CompoundID{segment_id, j}, i);
         }
     }

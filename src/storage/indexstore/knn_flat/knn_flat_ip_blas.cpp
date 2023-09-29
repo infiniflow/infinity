@@ -37,6 +37,9 @@ KnnFlatIPBlas<DistType>::Begin() {
         heap_result_handler_->begin_multiple(i0, i1);
     }
 
+    const size_t bs_y = faiss::distance_compute_blas_database_bs;
+    ip_block_ = MakeUnique<DistType[]>(bs_x * bs_y);
+
     begin_ = true;
 }
 
@@ -51,7 +54,6 @@ KnnFlatIPBlas<DistType>::Search(const DistType* base,
 
     const SizeT bs_x = faiss::distance_compute_blas_query_bs;
     const size_t bs_y = faiss::distance_compute_blas_database_bs;
-    std::unique_ptr<float[]> ip_block(new float[bs_x * bs_y]);
     for (size_t i0 = 0; i0 < query_count_; i0 += bs_x) {
         size_t i1 = i0 + bs_x;
         if (i1 > query_count_)
@@ -76,11 +78,11 @@ KnnFlatIPBlas<DistType>::Search(const DistType* base,
                        queries_ + i0 * dimension_,
                        &di,
                        &zero,
-                       ip_block.get(),
+                       ip_block_.get(),
                        &nyi);
             }
 
-            heap_result_handler_->add_results(i0, i1, j0, j1, ip_block.get(), segment_id);
+            heap_result_handler_->add_results(i0, i1, j0, j1, ip_block_.get(), segment_id);
         }
     }
 }
