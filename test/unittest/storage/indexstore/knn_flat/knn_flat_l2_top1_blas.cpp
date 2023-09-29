@@ -14,9 +14,9 @@
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
-#include "storage/indexstore/knn_flat/knn_flat_l2_top1.h"
+#include "storage/indexstore/knn_flat/knn_flat_l2_top1_blas.h"
 
-class KnnFlatL2Top1Test : public BaseTest {
+class KnnFlatL2Top1BlasTest : public BaseTest {
     void
     SetUp() override {
         infinity::GlobalResourceUsage::Init();
@@ -33,7 +33,7 @@ class KnnFlatL2Top1Test : public BaseTest {
     }
 };
 
-TEST_F(KnnFlatL2Top1Test, test1) {
+TEST_F(KnnFlatL2Top1BlasTest, test1) {
     using namespace infinity;
 
     i64 dimension = 4;
@@ -77,13 +77,13 @@ TEST_F(KnnFlatL2Top1Test, test1) {
         query_embedding[3] = 0.4;
     }
 
-    KnnFlatL2Top1<f32> knn_distance(query_embedding.get(),
-                                    1,
-                                    dimension,
-                                    EmbeddingDataType::kElemFloat);
+    KnnFlatL2Top1Blas<f32> knn_distance(query_embedding.get(),
+                                        1,
+                                        dimension,
+                                        EmbeddingDataType::kElemFloat);
 
     knn_distance.Begin();
-    knn_distance.Search(base_embedding.get(),base_embedding_count, 0);
+    knn_distance.Search(base_embedding.get(), base_embedding_count, 0);
     knn_distance.End();
 
     f32* distance_array = knn_distance.GetDistanceByIdx(0);

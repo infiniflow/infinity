@@ -29,12 +29,13 @@ KnnFlatL2Top1<DistType>::Search(const DistType* base,
     }
 
     for (int64_t i = 0; i < query_count_; i++) {
-        const float* x_i = queries_ + i * dimension_;
-        const float* y_j = base;
+        const DistType* x_i = queries_ + i * dimension_;
+        const DistType* y_j = base;
 
         for (i32 j = 0; j < base_count; j++, y_j += dimension_) {
-            float ip = faiss::fvec_inner_product(x_i, y_j, dimension_);
-            single_result_handler_->add_result(ip, CompoundID{segment_id, j}, i);
+
+            DistType l2_distance = faiss::fvec_L2sqr(x_i, y_j, dimension_);
+            single_result_handler_->add_result(l2_distance, CompoundID{segment_id, j}, i);
         }
     }
 }

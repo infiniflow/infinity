@@ -101,12 +101,8 @@ struct NewHeapResultHandler : public ResultHandler {
      * API for multiple results (called from 1 thread)
      */
 
-//    size_t i0, i1;
-
     /// begin
     void begin_multiple(size_t i_start, size_t i_end) {
-//        this->i0 = i0;
-//        this->i1 = i1;
         for (size_t i = i_start; i < i_end; i++) {
             heap_heapify<C>(k, heap_dis_tab + i * k, heap_ids_tab + i * k);
         }
@@ -114,7 +110,6 @@ struct NewHeapResultHandler : public ResultHandler {
 
     /// add results for query i0..i1 and j0..j1
     void add_results(size_t i_start, size_t i_end, size_t j0, size_t j1, const T* dis_tab, i32 segment_id) {
-//#pragma omp parallel for
         for (int64_t i = i_start; i < i_end; i++) {
             T* heap_dis = heap_dis_tab + i * k;
             TI* heap_ids = heap_ids_tab + i * k;
@@ -284,29 +279,25 @@ struct NewReservoirResultHandler : public ResultHandler {
      * API for multiple results (called from 1 thread)
      */
 
-    size_t i0, i1;
-
     std::vector<T> reservoir_dis;
     std::vector<TI> reservoir_ids;
     std::vector<ReservoirTopN<C>> reservoirs;
 
     /// begin
-    void begin_multiple(size_t i0, size_t i1) {
-        this->i0 = i0;
-        this->i1 = i1;
-        reservoir_dis.resize((i1 - i0) * capacity);
-        reservoir_ids.resize((i1 - i0) * capacity);
+    void begin_multiple(size_t i_start, size_t i_end) {
+        reservoir_dis.resize((i_end - i_start) * capacity);
+        reservoir_ids.resize((i_end - i_start) * capacity);
         reservoirs.clear();
-        for (size_t i = i0; i < i1; i++) {
+        for (size_t i = i_start; i < i_end; i++) {
             reservoirs.emplace_back(
                     k,
                     capacity,
-                    reservoir_dis.data() + (i - i0) * capacity,
-                    reservoir_ids.data() + (i - i0) * capacity);
+                    reservoir_dis.data() + (i - i_start) * capacity,
+                    reservoir_ids.data() + (i - i_start) * capacity);
         }
     }
 
-    /// add results for query i0..i1 and j0..j1
+    /// add results for query i_start..i_end and j0..j1
     void add_results(size_t i_start, size_t i_end, size_t j0, size_t j1, const T* dis_tab, i32 segment_id) {
         // maybe parallel for
 //#pragma omp parallel for
@@ -320,7 +311,7 @@ struct NewReservoirResultHandler : public ResultHandler {
         }
     }
 
-    /// series of results for queries i0..i1 is done
+    /// series of results for queries i_start..i_end is done
     void end_multiple(size_t i_start, size_t i_end) {
         // maybe parallel for
         for (size_t i = i_start; i < i_end; i++) {
@@ -380,22 +371,17 @@ struct SingleBestResultHandler : public ResultHandler {
         }
     };
 
-    size_t i0, i1;
-
     /// begin
-    void begin_multiple(size_t i0, size_t i1) {
-        this->i0 = i0;
-        this->i1 = i1;
-
-        for (size_t i = i0; i < i1; i++) {
+    void begin_multiple(size_t i_start, size_t i_end) {
+        for (size_t i = i_start; i < i_end; i++) {
             this->dis_tab[i] = HUGE_VALF;
         }
     }
 
     /// add results for query i0..i1 and j0..j1
-    void add_results(size_t j0, size_t j1, const T* dis_tab) {
-        for (int64_t i = i0; i < i1; i++) {
-            const T* dis_tab_i = dis_tab + (j1 - j0) * (i - i0) - j0;
+    void add_results(size_t i_start, size_t i_end, size_t j0, size_t j1, const T* dis_tab, i32 segment_id) {
+        for (int64_t i = i_start; i < i_end; i++) {
+            const T* dis_tab_i = dis_tab + (j1 - j0) * (i - i_start) - j0;
 
             auto& min_distance = this->dis_tab[i];
             auto& min_index = this->ids_tab[i];
@@ -405,7 +391,7 @@ struct SingleBestResultHandler : public ResultHandler {
 
                 if (C::cmp(min_distance, distance)) {
                     min_distance = distance;
-                    min_index = j;
+                    min_index = CompoundID(segment_id, j);
                 }
             }
         }

@@ -73,6 +73,7 @@ public:
 private:
     UniquePtr<Vector<CompoundID>> id_array_{};
     UniquePtr<DistType[]> distance_array_{};
+    UniquePtr<DistType[]> ip_block_{};
 
     UniquePtr<HeapResultHandler> heap_result_handler_{};
     const DistType* queries_{};
