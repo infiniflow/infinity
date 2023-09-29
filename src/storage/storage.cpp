@@ -6,7 +6,6 @@
 #include "storage/wal/wal_manager.h"
 #include "common/constants/constants.h"
 #include "schema_definition.h"
-#include "catalog.h"
 #include "function/builtin_functions.h"
 #include "storage/io/local_file_system.h"
 #include <regex>
@@ -46,17 +45,6 @@ Storage::Init() {
                                           0,
                                           start_time_stamp + 1);
     }
-
-    // Check current schema/catalog to default database.
-
-#if 0
-    catalog_ = MakeUnique<Catalog>();
-    // Update schema need to begin transaction
-    SharedPtr<String> schema_name = MakeShared<String>("default");
-    SharedPtr<SchemaDefinition> schema_def_ptr = MakeShared<SchemaDefinition>(schema_name, ConflictType::kError);
-    catalog_->CreateSchema(schema_def_ptr);
-    // Commit transaction
-#endif
 
     BuiltinFunctions builtin_functions(new_catalog_);
     builtin_functions.Init();

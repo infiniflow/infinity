@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
+
 #include "function/aggregate/max.h"
 #include "function/aggregate_function_set.h"
 #include "expression/column_expression.h"

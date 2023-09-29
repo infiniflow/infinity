@@ -10,7 +10,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
 
-#include "storage/catalog.h"
+
 #include "function/scalar/subtract.h"
 #include "function/scalar/add.h"
 #include "function/scalar_function_set.h"

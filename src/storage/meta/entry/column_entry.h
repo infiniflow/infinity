@@ -10,7 +10,6 @@
 #include "db_entry.h"
 #include "common/types/internal_types.h"
 #include "storage/table_def.h"
-#include "storage/table/data_table.h"
 
 namespace infinity {
 

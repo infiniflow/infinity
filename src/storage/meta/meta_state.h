@@ -5,8 +5,6 @@
 #pragma once
 
 #include "common/types/internal_types.h"
-#include "column_data.h"
-#include "data_segment.h"
 
 namespace infinity {
 

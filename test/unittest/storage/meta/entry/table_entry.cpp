@@ -7,7 +7,6 @@
 #include "base_test.h"
 #include "storage/buffer/column_buffer.h"
 #include "storage/table_def.h"
-#include "storage/table/data_table.h"
 #include "storage/txn/txn_manager.h"
 #include "main/profiler/base_profiler.h"
 #include "main/logger.h"

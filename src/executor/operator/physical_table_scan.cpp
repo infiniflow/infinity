@@ -2,7 +2,6 @@
 // Created by JinHai on 2022/7/28.
 //
 
-#include "storage/table_with_fix_row.h"
 #include "physical_table_scan.h"
 #include "planner/bound/base_table_ref.h"
 #include "function/table/table_scan.h"

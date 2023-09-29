@@ -8,7 +8,7 @@
 #include "storage/meta/entry/db_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
 #include "txn_store.h"
-#include "storage/table/meta_state.h"
+#include "src/storage/meta/meta_state.h"
 #include "storage/wal/wal_entry.h"
 #include "txn_context.h"
 #include <mutex>

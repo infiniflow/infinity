@@ -11,7 +11,6 @@
 #include "main/infinity.h"
 #include "executor/expression/expression_evaluator.h"
 
-#include "storage/catalog.h"
 #include "storage/table.h"
 #include "function/scalar/subtract.h"
 #include "function/scalar/add.h"
