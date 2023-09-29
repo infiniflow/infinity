@@ -10,8 +10,9 @@ namespace infinity {
 template<typename DistType>
 void
 KnnFlatL2<DistType>::Begin() {
-    if(begin_)
+    if(begin_ || query_count_ == 0) {
         return;
+    }
 
     for(SizeT i = 0; i < query_count_; ++i) {
         single_result_handler_->begin(i);
@@ -26,7 +27,11 @@ KnnFlatL2<DistType>::Search(const DistType* base,
                             i64 base_count,
                             i32 segment_id) {
     if(!begin_) {
-        ExecutorError("KnnFlatInnerProductInternal isn't begin")
+        ExecutorError("KnnFlatL2 isn't begin")
+    }
+
+    if(base_count == 0) {
+        return;
     }
 
     for(int64_t i = 0; i < query_count_; i++) {
@@ -34,8 +39,8 @@ KnnFlatL2<DistType>::Search(const DistType* base,
         const DistType* y_j = base;
 
         for(i32 j = 0; j < base_count; j++, y_j += dimension_) {
-            DistType ip = faiss::fvec_inner_product(x_i, y_j, dimension_);
-            single_result_handler_->add_result(ip, CompoundID{segment_id, j}, i);
+            DistType l2 = faiss::fvec_L2sqr(x_i, y_j, dimension_);
+            single_result_handler_->add_result(l2, CompoundID{segment_id, j}, i);
         }
     }
 }

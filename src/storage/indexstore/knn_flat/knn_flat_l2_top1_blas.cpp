@@ -4,6 +4,7 @@
 
 #include "knn_flat_l2_top1_blas.h"
 #include "common/utility/infinity_assert.h"
+#include "storage/indexstore/common/distance.h"
 
 #define FINTEGER int
 
@@ -28,8 +29,9 @@ namespace infinity {
 template<typename DistType>
 void
 KnnFlatL2Top1Blas<DistType>::Begin() {
-    if(begin_ || query_count_ == 0)
+    if(begin_ || query_count_ == 0) {
         return;
+    }
 
     // block sizes
     const size_t bs_x = faiss::distance_compute_blas_query_bs;
@@ -57,7 +59,7 @@ KnnFlatL2Top1Blas<DistType>::Search(const DistType* base,
                                     i64 base_count,
                                     i32 segment_id) {
     if(!begin_) {
-        ExecutorError("KnnFlatInnerProductInternal isn't begin")
+        ExecutorError("KnnFlatL2Top1Blas isn't begin")
     }
 
     if(base_count == 0) {
