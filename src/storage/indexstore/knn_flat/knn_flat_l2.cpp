@@ -10,8 +10,9 @@ namespace infinity {
 template<typename DistType>
 void
 KnnFlatL2<DistType>::Begin() {
-    if(begin_)
+    if(begin_ || query_count_ == 0) {
         return;
+    }
 
     for(SizeT i = 0; i < query_count_; ++i) {
         single_result_handler_->begin(i);
@@ -26,7 +27,11 @@ KnnFlatL2<DistType>::Search(const DistType* base,
                             i64 base_count,
                             i32 segment_id) {
     if(!begin_) {
-        ExecutorError("KnnFlatInnerProductInternal isn't begin")
+        ExecutorError("KnnFlatL2 isn't begin")
+    }
+
+    if(base_count == 0) {
+        return;
     }
 
     for(int64_t i = 0; i < query_count_; i++) {

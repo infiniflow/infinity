@@ -46,145 +46,145 @@ protected:
 
 TEST_F(BufferedByteSliceTest, test1
 ) {
-buffered_byte_slice_->PushBack(0, (uint32_t)1);
-buffered_byte_slice_->PushBack(1, (uint16_t)2);
-buffered_byte_slice_->
+    buffered_byte_slice_->PushBack(0, (uint32_t)1);
+    buffered_byte_slice_->PushBack(1, (uint16_t)2);
+    buffered_byte_slice_->
 
-EndPushBack();
+            EndPushBack();
 
-FlushInfo flush_info = buffered_byte_slice_->GetFlushInfo();
-ASSERT_TRUE(flush_info
-.
+    FlushInfo flush_info = buffered_byte_slice_->GetFlushInfo();
+    ASSERT_TRUE(flush_info
+                        .
 
-IsValidShortBuffer()
+                                IsValidShortBuffer()
 
-);
+    );
 
-buffered_byte_slice_->PushBack(0, (uint32_t)2);
-buffered_byte_slice_->PushBack(1, (uint16_t)3);
-buffered_byte_slice_->
+    buffered_byte_slice_->PushBack(0, (uint32_t)2);
+    buffered_byte_slice_->PushBack(1, (uint16_t)3);
+    buffered_byte_slice_->
 
-EndPushBack();
+            EndPushBack();
 
-uint32_t doc_id_buffer[MAX_DOC_PER_RECORD];
-uint16_t doc_payload_buffer[MAX_DOC_PER_RECORD];
+    uint32_t doc_id_buffer[MAX_DOC_PER_RECORD];
+    uint16_t doc_payload_buffer[MAX_DOC_PER_RECORD];
 
-BufferedByteSliceReader reader;
-reader.
-Open(buffered_byte_slice_
-.
+    BufferedByteSliceReader reader;
+    reader.
+            Open(buffered_byte_slice_
+                         .
 
-get()
+                                 get()
 
-);
+    );
 
-size_t decode_len;
-reader.
-Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len
-);
-ASSERT_EQ((uint32_t)
-1, doc_id_buffer[0]);
-ASSERT_EQ((uint32_t)
-2, doc_id_buffer[1]);
+    size_t decode_len;
+    reader.
+            Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len
+    );
+    ASSERT_EQ((uint32_t)
+                      1, doc_id_buffer[0]);
+    ASSERT_EQ((uint32_t)
+                      2, doc_id_buffer[1]);
 
-reader.
-Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len
-);
-ASSERT_EQ((uint16_t)
-2, doc_payload_buffer[0]);
-ASSERT_EQ((uint16_t)
-3, doc_payload_buffer[1]);
+    reader.
+            Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len
+    );
+    ASSERT_EQ((uint16_t)
+                      2, doc_payload_buffer[0]);
+    ASSERT_EQ((uint16_t)
+                      3, doc_payload_buffer[1]);
 
 }
 
 TEST_F(BufferedByteSliceTest, test2
 ) {
-buffered_byte_slice_->PushBack(0, (uint32_t)1);
-buffered_byte_slice_->PushBack(1, (uint16_t)2);
-buffered_byte_slice_->
+    buffered_byte_slice_->PushBack(0, (uint32_t)1);
+    buffered_byte_slice_->PushBack(1, (uint16_t)2);
+    buffered_byte_slice_->
 
-EndPushBack();
+            EndPushBack();
 
-buffered_byte_slice_->
+    buffered_byte_slice_->
 
-Flush();
+            Flush();
 
-FlushInfo flush_info = buffered_byte_slice_->GetFlushInfo();
-ASSERT_TRUE(!flush_info.
+    FlushInfo flush_info = buffered_byte_slice_->GetFlushInfo();
+    ASSERT_TRUE(!flush_info.
 
-IsValidShortBuffer()
+            IsValidShortBuffer()
 
-);
-ASSERT_EQ((uint32_t)
-1, flush_info.
+    );
+    ASSERT_EQ((uint32_t)
+                      1, flush_info.
 
-GetFlushCount()
+            GetFlushCount()
 
-);
+    );
 
-ASSERT_EQ((size_t)
-0, buffered_byte_slice_->
+    ASSERT_EQ((size_t)
+                      0, buffered_byte_slice_->
 
-GetBufferSize()
+            GetBufferSize()
 
-);
+    );
 
-ASSERT_EQ((size_t)
-0, buffered_byte_slice_->
+    ASSERT_EQ((size_t)
+                      0, buffered_byte_slice_->
 
-Flush()
+            Flush()
 
-);
+    );
 }
 
 TEST_F(BufferedByteSliceTest, test3
 ) {
-const int32_t decode_len = 5;
-const int32_t count = 11;
-for (
-uint32_t i = 0;
-i<count;
-++i) {
-buffered_byte_slice_->PushBack(0, i);
-buffered_byte_slice_->PushBack(1, (uint16_t)(i * 2));
-buffered_byte_slice_->
+    const int32_t decode_len = 5;
+    const int32_t count = 11;
+    for(
+            uint32_t i = 0;
+            i < count;
+            ++i) {
+        buffered_byte_slice_->PushBack(0, i);
+        buffered_byte_slice_->PushBack(1, (uint16_t)(i * 2));
+        buffered_byte_slice_->
 
-EndPushBack();
+                EndPushBack();
 
-if (buffered_byte_slice_->
-NeedFlush(decode_len)
-) {
-buffered_byte_slice_->
+        if(buffered_byte_slice_->
+                NeedFlush(decode_len)
+                ) {
+            buffered_byte_slice_->
 
-Flush();
+                    Flush();
 
-}
-}
+        }
+    }
 
-BufferedByteSlice snapshot_buffered_byte_slice(byte_slice_pool_, buffer_pool_);
-buffered_byte_slice_->
-SnapShot(& snapshot_buffered_byte_slice);
+    BufferedByteSlice snapshot_buffered_byte_slice(byte_slice_pool_, buffer_pool_);
+    buffered_byte_slice_->
+            SnapShot(&snapshot_buffered_byte_slice);
 
-ASSERT_EQ(snapshot_buffered_byte_slice
-.
+    ASSERT_EQ(snapshot_buffered_byte_slice
+                      .
 
-GetTotalCount(), buffered_byte_slice_
+                              GetTotalCount(), buffered_byte_slice_
 
-->
+                      ->
 
-GetTotalCount()
+                              GetTotalCount()
 
-);
-ASSERT_EQ(snapshot_buffered_byte_slice
-.
+    );
+    ASSERT_EQ(snapshot_buffered_byte_slice
+                      .
 
-GetByteSliceList(), buffered_byte_slice_
+                              GetByteSliceList(), buffered_byte_slice_
 
-->
+                      ->
 
-GetByteSliceList()
+                              GetByteSliceList()
 
-);
+    );
 /*    BufferedByteSliceReader reader;
     reader.Open(buffered_byte_slice_.get());
 

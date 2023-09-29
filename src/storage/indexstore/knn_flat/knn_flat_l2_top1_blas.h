@@ -22,7 +22,7 @@ public:
                       i64 query_count,
                       i64 dimension,
                       EmbeddingDataType elem_data_type)
-            : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1, elem_data_type),
+            : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1Blas, elem_data_type),
               queries_(queries),
               query_count_(query_count),
               dimension_(dimension) {
@@ -88,18 +88,6 @@ private:
     UniquePtr<DistType[]> ip_block_{};
     UniquePtr<DistType[]> x_norms_{};
     UniquePtr<DistType[]> y_norms_{};
-
-private:
-    static inline void
-    fvec_norms_L2sqr(
-            DistType* __restrict nr,
-            const DistType* __restrict queries,
-            SizeT dimension,
-            SizeT query_count) {
-        for(int64_t i = 0; i < query_count; i++) {
-            nr[i] = fvec_norm_L2sqr(queries + i * dimension, dimension);
-        }
-    }
 };
 
 template

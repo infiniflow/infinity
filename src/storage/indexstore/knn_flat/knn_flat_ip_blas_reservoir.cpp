@@ -31,8 +31,9 @@ namespace infinity {
 template<typename DistType>
 void
 KnnFlatIPBlasReservoir<DistType>::Begin() {
-    if(begin_)
+    if(begin_ || query_count_ == 0) {
         return;
+    }
 
     const SizeT bs_x = faiss::distance_compute_blas_query_bs;
     for(SizeT i0 = 0; i0 < query_count_; i0 += bs_x) {
@@ -52,7 +53,11 @@ KnnFlatIPBlasReservoir<DistType>::Search(const DistType* base,
                                          i64 base_count,
                                          i32 segment_id) {
     if(!begin_) {
-        ExecutorError("KnnFlatInnerProductInternal isn't begin")
+        ExecutorError("KnnFlatIPBlasReservoir isn't begin")
+    }
+
+    if(base_count == 0) {
+        return;
     }
 
     const SizeT bs_x = faiss::distance_compute_blas_query_bs;

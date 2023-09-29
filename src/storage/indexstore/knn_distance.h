@@ -17,6 +17,7 @@ enum class KnnDistanceAlgoType {
     kKnnFlatIpBlasReservoir,
     kKnnFlatL2,
     kKnnFlatL2Top1,
+    kKnnFlatL2Top1Blas,
     kKnnFlatL2Blas,
 };
 
