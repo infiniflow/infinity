@@ -20,12 +20,11 @@ target_include_directories(faiss_benchmark PUBLIC "/usr/include")
 
 target_link_libraries(
         faiss_benchmark
-        faiss
         infinity_core
+        faiss
         gfortran
         roaring
         zsv_parser
-        onnxruntime_mlas
 )
 
 add_executable(hnsw_benchmark
