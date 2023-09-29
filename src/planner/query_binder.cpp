@@ -940,7 +940,7 @@ QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType order_t
     switch(distance_type) {
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {
-            PlannerAssert(order_type == OrderType::kAsc, "L2 need descending order");
+            PlannerAssert(order_type == OrderType::kAsc, "L2 need ascending order");
             break;
         }
         case KnnDistanceType::kInnerProduct:
