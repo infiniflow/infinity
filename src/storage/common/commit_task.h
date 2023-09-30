@@ -6,7 +6,7 @@
 
 #include <utility>
 
-#include "common/types/internal_types.h"
+
 #include "common/types/data_type.h"
 #include "storage/common/async_batch_processor.h"
 

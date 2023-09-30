@@ -1,4 +1,5 @@
 #include "bsi.h"
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
 

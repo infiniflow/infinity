@@ -4,12 +4,12 @@
 
 #include "query_profiler.h"
 #include "common/utility/infinity_assert.h"
+#include "common/types/alias/primitives.h"
 
 #include <sstream>
 #include <iomanip>
 
 namespace infinity {
-
 
 void
 OptimizerProfiler::StartRule(const String& rule_name) {

@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
 #include "main/logger.h"
 #include "common/utility/infinity_assert.h"
 

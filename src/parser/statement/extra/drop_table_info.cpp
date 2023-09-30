@@ -3,6 +3,7 @@
 //
 
 #include "drop_table_info.h"
+#include <sstream>
 
 namespace infinity {
 

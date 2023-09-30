@@ -6,7 +6,7 @@
 
 #include <utility>
 
-#include "common/types/internal_types.h"
+
 #include "parser/statement/select_statement.h"
 #include "common/types/data_type.h"
 #include "planner/bound_select_statement.h"

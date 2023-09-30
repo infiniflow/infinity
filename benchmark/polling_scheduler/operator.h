@@ -6,6 +6,8 @@
 
 #include "buffer.h"
 #include "buffer_queue.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/containers.h"
 
 namespace infinity {
 

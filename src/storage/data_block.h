@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/db_type.h"
 #include "common/column_vector/column_vector.h"
 #include "common/column_vector/selection.h"
 

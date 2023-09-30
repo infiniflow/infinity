@@ -6,7 +6,7 @@
 
 #include "common/types/type_info.h"
 #include "common/types/logical_type.h"
-#include "common/types/internal_types.h"
+
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {

@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "internal_types.h"
-
 #include "common/types/number/decimal_type.h"
 #include "common/types/number/huge_int.h"
 #include "common/types/complex/varchar_type.h"

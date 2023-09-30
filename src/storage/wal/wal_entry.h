@@ -1,6 +1,9 @@
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/db_type.h"
+#include "common/types/alias/containers.h"
 #include <cstdint>
 #include <roaring/roaring.hh>
 

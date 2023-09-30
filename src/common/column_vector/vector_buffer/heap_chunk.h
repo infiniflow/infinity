@@ -5,7 +5,10 @@
 #pragma once
 
 #include "common/memory/allocator.h"
-#include "common/types/internal_types.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/containers.h"
+#include "common/types/alias/smart_ptr.h"
+#include <limits>
 
 namespace infinity {
 

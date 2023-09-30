@@ -2,7 +2,7 @@
 // Created by jinhai on 23-5-7.
 //
 
-#include "common/types/internal_types.h"
+
 #include "task.h"
 #include "fragment.h"
 #include "concurrentqueue.h"

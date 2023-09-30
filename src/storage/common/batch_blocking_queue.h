@@ -5,7 +5,8 @@
 #pragma once
 
 #include "blockingconcurrentqueue.h"
-#include "common/types/internal_types.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/containers.h"
 #include "async_task.h"
 
 namespace infinity {

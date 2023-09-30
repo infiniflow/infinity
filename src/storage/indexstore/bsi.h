@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/primitives.h"
 
 #include <roaring/roaring.hh>
 #include <vector>

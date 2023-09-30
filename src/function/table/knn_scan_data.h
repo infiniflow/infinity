@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "function/table_function.h"
 #include "function/function_data.h"
 #include "storage/txn/constants.h"

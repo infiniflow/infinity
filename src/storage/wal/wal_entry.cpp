@@ -99,8 +99,8 @@ WalCmdDelete::operator==(const WalCmd& other) const {
        row_ids.size() != other_cmd->row_ids.size())
         return false;
     for(size_t i = 0; i < row_ids.size(); i++) {
-        if(row_ids[i].block != other_cmd->row_ids[i].block ||
-           row_ids[i].offset != other_cmd->row_ids[i].offset)
+        if(row_ids[i].segment_id_ != other_cmd->row_ids[i].segment_id_ ||
+           row_ids[i].segment_offset_ != other_cmd->row_ids[i].segment_offset_)
             return false;
     }
     return true;

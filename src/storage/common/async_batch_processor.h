@@ -4,9 +4,11 @@
 
 #pragma once
 
-#include <utility>
-
 #include "batch_blocking_queue.h"
+#include "common/types/alias/concurrency.h"
+#include "common/types/alias/containers.h"
+#include "common/types/alias/smart_ptr.h"
+#include <utility>
 
 namespace infinity {
 

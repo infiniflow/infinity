@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "logical_node.h"
 #include "expression/aggregate_expression.h"
 #include "expression/between_expression.h"

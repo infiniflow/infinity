@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <stdint.h>
+#include "common/types/alias/containers.h"
 #include "new_partitioning.h"
 #include "new_heap.h"
 

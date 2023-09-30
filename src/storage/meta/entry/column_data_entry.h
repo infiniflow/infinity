@@ -5,7 +5,7 @@
 #pragma once
 
 #include "base_entry.h"
-#include "common/types/internal_types.h"
+
 #include "storage/buffer/column_buffer.h"
 #include "common/column_vector/column_vector.h"
 

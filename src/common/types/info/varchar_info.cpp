@@ -1,6 +1,6 @@
 #include "common/types/info/varchar_info.h"
 #include "common/default_values.h"
-#include "common/types/internal_types.h"
+
 #include "common/types/type_info.h"
 #include "common/utility/infinity_assert.h"
 

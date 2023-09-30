@@ -6,7 +6,7 @@
 #include "common/default_values.h"
 #include "common/types/data_type.h"
 #include "common/types/info/varchar_info.h"
-#include "common/types/internal_types.h"
+
 #include "common/types/logical_type.h"
 #include "common/utility/defer_op.h"
 #include "common/utility/infinity_assert.h"

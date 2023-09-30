@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/types/data_type.h"
-#include "common/types/internal_types.h"
+
 
 namespace infinity {
 // TODO shenyushi: Is this file in an appropriate location?

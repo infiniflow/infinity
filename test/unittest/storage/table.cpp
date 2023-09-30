@@ -104,8 +104,8 @@ TEST_F(TableTest, test1) {
         // Check offset
         for(SizeT row_id = 0; row_id < row_count; ++row_id) {
             const RowID& row = (*offset_column_vector)[block_id * DEFAULT_VECTOR_SIZE + row_id];
-            EXPECT_EQ(row.block, block_id);
-            EXPECT_EQ(row.offset, row_id);
+            EXPECT_EQ(row.segment_id_, block_id);
+            EXPECT_EQ(row.segment_offset_, row_id);
         }
     }
 }

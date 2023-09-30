@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "base_table.h"
-#include "common/types/internal_types.h"
+
 
 namespace infinity {
 

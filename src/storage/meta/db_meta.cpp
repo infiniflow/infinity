@@ -3,7 +3,7 @@
 //
 
 #include "db_meta.h"
-#include "common/types/internal_types.h"
+
 #include "main/logger.h"
 #include "common/utility/defer_op.h"
 #include "storage/txn/txn_manager.h"

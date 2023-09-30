@@ -5,7 +5,7 @@
 #pragma once
 
 #include "common/column_vector/operator/unary_operator.h"
-#include "common/types/internal_types.h"
+
 #include "common/types/data_type.h"
 #include "common/types/null_value.h"
 

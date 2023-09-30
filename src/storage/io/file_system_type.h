@@ -5,8 +5,8 @@
 
 #pragma once
 
+#include "common/types/alias/primitives.h"
 #include <filesystem>
-#include "common/types/internal_types.h"
 
 namespace infinity {
 

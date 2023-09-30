@@ -8,8 +8,7 @@
 #include "common/utility/infinity_assert.h"
 #include "logical_type.h"
 #include "type_info.h"
-
-#include "internal_types.h"
+#include "common/types/alias/containers.h"
 #include "json.hpp"
 
 #include <string>

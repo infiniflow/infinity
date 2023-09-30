@@ -5,7 +5,7 @@
 #include "column_data_entry.h"
 #include "common/default_values.h"
 #include "common/types/data_type.h"
-#include "common/types/internal_types.h"
+
 #include "common/types/logical_type.h"
 #include "common/types/varchar_layout.h"
 #include "common/utility/infinity_assert.h"

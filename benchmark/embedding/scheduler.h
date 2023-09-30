@@ -5,7 +5,10 @@
 #pragma once
 
 #include "common/utility/mpsc_queue.h"
-#include "common/types/internal_types.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/containers.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/concurrency.h"
 #include "blockingconcurrentqueue.h"
 
 #include <unistd.h>

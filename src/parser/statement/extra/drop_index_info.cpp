@@ -3,7 +3,7 @@
 //
 
 #include "drop_index_info.h"
-
+#include <sstream>
 
 namespace infinity {
 

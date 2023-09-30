@@ -4,7 +4,7 @@
 
 #include <thread>
 
-#include "common/types/internal_types.h"
+
 #include "faiss/index_factory.h"
 #include "main/profiler/base_profiler.h"
 #include "faiss/IndexFlat.h"

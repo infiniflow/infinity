@@ -11,7 +11,7 @@
 #include "base_entry.h"
 #include "column_data_entry.h"
 #include "common/default_values.h"
-#include "common/types/internal_types.h"
+
 #include "common/utility/infinity_assert.h"
 #include "common/utility/random.h"
 #include "data_access_state.h"

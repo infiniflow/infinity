@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "storage/table.h"
 #include "physical_operator_type.h"
 #include "scheduler/fragment_data_queue.h"

@@ -3,6 +3,7 @@
 //
 
 #include "copy_statement.h"
+#include <sstream>
 
 namespace infinity {
 

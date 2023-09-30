@@ -5,7 +5,8 @@
 #pragma once
 
 #include "mixed_value_type.h"
-#include "common/types/internal_types.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/strings.h"
 
 namespace infinity {
 

@@ -6,6 +6,7 @@
 #pragma once
 
 #include "parsed_expr.h"
+#include "common/types/alias/containers.h"
 
 namespace infinity {
 

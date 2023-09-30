@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/containers.h"
 
 #include <unordered_map>
 #include <string>

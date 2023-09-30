@@ -4,7 +4,9 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/smart_ptr.h"
+#include <condition_variable>
 
 namespace infinity {
 

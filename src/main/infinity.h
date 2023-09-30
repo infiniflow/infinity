@@ -5,7 +5,7 @@
 #pragma once
 
 #include "common/singleton.h"
-#include "common/types/internal_types.h"
+
 #include "resource_manager.h"
 #include "storage/storage.h"
 #include "scheduler/fragment_scheduler.h"

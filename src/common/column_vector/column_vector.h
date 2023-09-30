@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "common/types/data_type.h"
 #include "storage/buffer/column_buffer.h"
 #include "vector_buffer/vector_buffer.h"

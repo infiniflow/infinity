@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "main/query_context.h"
 #include "executor/physical_operator.h"
 

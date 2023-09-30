@@ -3,7 +3,7 @@
 //
 
 #include "txn_store.h"
-#include "common/types/internal_types.h"
+
 #include "common/utility/infinity_assert.h"
 #include "txn.h"
 

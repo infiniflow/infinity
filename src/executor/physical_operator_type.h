@@ -4,14 +4,12 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
-
-#include <cstdint>
-
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/strings.h"
 
 namespace infinity {
 
-enum class PhysicalOperatorType : uint8_t {
+enum class PhysicalOperatorType : i8 {
     kInvalid = 0,
 
     kAggregate,

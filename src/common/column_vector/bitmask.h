@@ -5,6 +5,7 @@
 #pragma once
 
 #include "bitmask_buffer.h"
+#include "common/types/alias/strings.h"
 
 namespace infinity {
 

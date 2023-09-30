@@ -3,6 +3,7 @@
 //
 
 #include "drop_collection_info.h"
+#include <sstream>
 
 namespace infinity {
 

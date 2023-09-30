@@ -4,15 +4,17 @@
 
 #pragma once
 
+#include "buffer_reader.h"
+#include "buffer_writer.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/containers.h"
+
 #include <utility>
 #include <map>
 #include <optional>
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
-
-#include "buffer_reader.h"
-#include "buffer_writer.h"
 
 namespace infinity {
 

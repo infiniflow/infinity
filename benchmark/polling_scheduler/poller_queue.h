@@ -5,7 +5,7 @@
 #pragma once
 
 #include "blockingconcurrentqueue.h"
-#include "common/types/internal_types.h"
+#include <condition_variable>
 
 namespace infinity {
 

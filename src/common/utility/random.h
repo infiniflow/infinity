@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include <cstdlib>
 
 namespace infinity {

@@ -4,9 +4,11 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "common/types/data_type.h"
 #include "common/types/expression_type.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/containers.h"
 
 #include <memory>
 #include <utility>

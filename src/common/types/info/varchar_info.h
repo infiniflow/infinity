@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/types/type_info.h"
-
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
 

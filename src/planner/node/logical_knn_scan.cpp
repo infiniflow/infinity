@@ -40,6 +40,8 @@ LogicalKnnScan::GetOutputNames() const {
     for(const auto& knn_expr: knn_expressions_) {
         result_names->emplace_back(knn_expr->Name());
     }
+
+    result_names->emplace_back("_row_id");
     return result_names;
 }
 

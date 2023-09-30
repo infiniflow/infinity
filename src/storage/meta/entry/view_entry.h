@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "db_entry.h"
-#include "common/types/internal_types.h"
+
 #include "parser/statement/extra/create_view_info.h"
 
 // FIXME: Not finished

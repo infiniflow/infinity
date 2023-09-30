@@ -20,15 +20,15 @@ public:
             SharedPtr<DataType> type = order_by_table_->GetColumnTypeById(col_id);
             OrderType order_type = order_by_types_[col_id];
 
-            const SharedPtr<DataBlock>& left_block = order_by_table_->GetDataBlockById(left.block);
+            const SharedPtr<DataBlock>& left_block = order_by_table_->GetDataBlockById(left.segment_id_);
             const SharedPtr<ColumnVector>& left_column = left_block->column_vectors[col_id];
-            const SharedPtr<DataBlock>& right_block = order_by_table_->GetDataBlockById(right.block);
+            const SharedPtr<DataBlock>& right_block = order_by_table_->GetDataBlockById(right.segment_id_);
             const SharedPtr<ColumnVector>& right_column = right_block->column_vectors[col_id];
 
             switch(type->type()) {
                 case kBoolean: {
-                    BooleanT left_value = ((BooleanT*)(left_column->data()))[left.offset];
-                    BooleanT right_value = ((BooleanT*)(right_column->data()))[right.offset];
+                    BooleanT left_value = ((BooleanT*)(left_column->data()))[left.segment_offset_];
+                    BooleanT right_value = ((BooleanT*)(right_column->data()))[right.segment_offset_];
                     if(left_value == right_value) {
                         continue;
                     }
@@ -40,8 +40,8 @@ public:
                     }
                 }
                 case kTinyInt: {
-                    TinyIntT left_value = ((TinyIntT*)(left_column->data()))[left.offset];
-                    TinyIntT right_value = ((TinyIntT*)(right_column->data()))[right.offset];
+                    TinyIntT left_value = ((TinyIntT*)(left_column->data()))[left.segment_offset_];
+                    TinyIntT right_value = ((TinyIntT*)(right_column->data()))[right.segment_offset_];
                     if(left_value == right_value) {
                         continue;
                     }
@@ -53,8 +53,8 @@ public:
                     }
                 }
                 case kSmallInt: {
-                    SmallIntT left_value = ((SmallIntT*)(left_column->data()))[left.offset];
-                    SmallIntT right_value = ((SmallIntT*)(right_column->data()))[right.offset];
+                    SmallIntT left_value = ((SmallIntT*)(left_column->data()))[left.segment_offset_];
+                    SmallIntT right_value = ((SmallIntT*)(right_column->data()))[right.segment_offset_];
                     if(left_value == right_value) {
                         continue;
                     }
@@ -66,8 +66,8 @@ public:
                     }
                 }
                 case kInteger: {
-                    IntegerT left_value = ((IntegerT*)(left_column->data()))[left.offset];
-                    IntegerT right_value = ((IntegerT*)(right_column->data()))[right.offset];
+                    IntegerT left_value = ((IntegerT*)(left_column->data()))[left.segment_offset_];
+                    IntegerT right_value = ((IntegerT*)(right_column->data()))[right.segment_offset_];
                     if(left_value == right_value) {
                         continue;
                     }
@@ -79,8 +79,8 @@ public:
                     }
                 }
                 case kBigInt: {
-                    BigIntT left_value = ((BigIntT*)(left_column->data()))[left.offset];
-                    BigIntT right_value = ((BigIntT*)(right_column->data()))[right.offset];
+                    BigIntT left_value = ((BigIntT*)(left_column->data()))[left.segment_offset_];
+                    BigIntT right_value = ((BigIntT*)(right_column->data()))[right.segment_offset_];
                     if(left_value == right_value) {
                         continue;
                     }
@@ -95,8 +95,8 @@ public:
                     NotImplementError("HugeInt comparation isn't implemented.")
                 }
                 case kFloat: {
-                    FloatT left_value = ((FloatT*)(left_column->data()))[left.offset];
-                    FloatT right_value = ((FloatT*)(right_column->data()))[right.offset];
+                    FloatT left_value = ((FloatT*)(left_column->data()))[left.segment_offset_];
+                    FloatT right_value = ((FloatT*)(right_column->data()))[right.segment_offset_];
                     if(left_value == right_value) {
                         continue;
                     }
@@ -108,8 +108,8 @@ public:
                     }
                 }
                 case kDouble: {
-                    DoubleT left_value = ((DoubleT*)(left_column->data()))[left.offset];
-                    DoubleT right_value = ((DoubleT*)(right_column->data()))[right.offset];
+                    DoubleT left_value = ((DoubleT*)(left_column->data()))[left.segment_offset_];
+                    DoubleT right_value = ((DoubleT*)(right_column->data()))[right.segment_offset_];
                     if(left_value == right_value) {
                         continue;
                     }
@@ -124,8 +124,8 @@ public:
                     NotImplementError("Decimal comparation isn't implemented.")
                 }
                 case kVarchar: {
-                    VarcharType& left_ref = ((VarcharType*)(left_column->data()))[left.offset];
-                    VarcharType& right_ref = ((VarcharType*)(right_column->data()))[right.offset];
+                    VarcharType& left_ref = ((VarcharType*)(left_column->data()))[left.segment_offset_];
+                    VarcharType& right_ref = ((VarcharType*)(right_column->data()))[right.segment_offset_];
                     if(left_ref == right_ref) {
                         continue;
                     }
@@ -291,8 +291,8 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
         SizeT block_row_count = input_datablocks[block_id]->row_count();
         for(SizeT block_row_idx = 0; block_row_idx < block_row_count; ++block_row_idx) {
             RowID row_id = rowid_vector->at(vector_idx++);
-            u32 input_block_id = row_id.block;
-            u32 input_offset = row_id.offset;
+            u32 input_block_id = row_id.segment_id_;
+            u32 input_offset = row_id.segment_offset_;
 
             for(SizeT column_id = 0; column_id < column_count; ++column_id) {
                 switch(types[column_id]->type()) {

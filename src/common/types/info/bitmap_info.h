@@ -7,6 +7,7 @@
 #include "common/default_values.h"
 #include "common/types/type_info.h"
 #include "common/utility/infinity_assert.h"
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
 

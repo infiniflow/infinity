@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "constants.h"
 
 namespace infinity {

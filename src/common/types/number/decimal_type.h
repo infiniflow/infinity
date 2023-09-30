@@ -6,6 +6,7 @@
 
 #include "common/types/logical_type.h"
 #include "common/utility/infinity_assert.h"
+#include "common/types/alias/primitives.h"
 
 namespace infinity {
 

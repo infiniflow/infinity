@@ -3,7 +3,7 @@
 //
 
 #include "physical_show.h"
-#include "common/types/internal_types.h"
+
 #include "common/types/logical_type.h"
 #include "common/utility/infinity_assert.h"
 #include "expression/value_expression.h"

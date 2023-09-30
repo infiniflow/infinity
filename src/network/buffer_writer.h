@@ -4,11 +4,12 @@
 
 #pragma once
 
-#include <array>
 #include "pg_message.h"
 #include "common/utility/infinity_assert.h"
+#include "common/types/alias/smart_ptr.h"
 #include "ring_buffer_iterator.h"
 #include <boost/asio/ip/tcp.hpp>
+#include <array>
 
 namespace infinity {
 

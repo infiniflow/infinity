@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/primitives.h"
 #include "main/logger.h"
 
 namespace infinity {

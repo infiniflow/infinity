@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "fragment_task_block_queue.h"
 #include "fragment_task_poller_queue.h"
 #include "executor/fragment/plan_fragment.h"

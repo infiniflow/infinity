@@ -3,6 +3,7 @@
 //
 
 #include "drop_schema_info.h"
+#include <sstream>
 
 namespace infinity {
 

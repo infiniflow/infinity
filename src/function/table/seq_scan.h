@@ -5,7 +5,7 @@
 #pragma once
 //#include <utility>
 
-#include "common/types/internal_types.h"
+
 #include "function/table_function.h"
 #include "function/function_data.h"
 #include "storage/meta/catalog.h"

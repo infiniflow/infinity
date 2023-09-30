@@ -5,6 +5,7 @@
 #pragma once
 
 #include "main/stats/global_resource_usage.h"
+#include "common/types/alias/strings.h"
 
 namespace infinity {
 

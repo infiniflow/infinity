@@ -4,7 +4,9 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/smart_ptr.h"
 #include "spdlog/spdlog.h"
 
 #include <cstdint>

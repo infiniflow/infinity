@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "common/types/internal_types.h"
+
 #include "indexstore/codec.h"
 
 #include <string>

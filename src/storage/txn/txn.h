@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "storage/meta/entry/db_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
 #include "txn_store.h"

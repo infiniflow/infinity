@@ -9,7 +9,7 @@
 #include "common/types/type_info.h"
 #include "common/types/logical_type.h"
 #include "common/types/data_type.h"
-#include "common/types/internal_types.h"
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
 

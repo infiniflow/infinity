@@ -80,7 +80,8 @@ TEST_F(WalEntryTest, ReadWrite) {
             MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
     entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
     entry->cmds.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", nullptr));
-    Vector<RowID> row_ids = {{1, 2}};
+    Vector<RowID> row_ids;
+    row_ids.emplace_back(1, 2);
     entry->cmds.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
 
     entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123)));

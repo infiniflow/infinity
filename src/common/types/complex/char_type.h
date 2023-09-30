@@ -5,7 +5,7 @@
 #pragma once
 
 #include "common/utility/infinity_assert.h"
-#include "common/types/internal_types.h"
+
 #include "main/stats/global_resource_usage.h"
 #include "main/logger.h"
 

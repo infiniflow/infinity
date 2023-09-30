@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "faiss/Index.h"
 #include "storage/buffer/buffer_handle.h"
 

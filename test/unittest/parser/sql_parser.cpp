@@ -6,7 +6,7 @@
 #include "base_test.h"
 #include "common/types/info/varchar_info.h"
 #include "main/logger.h"
-#include "common/types/internal_types.h"
+
 #include "parser/parser_result.h"
 #include "parser/sql_parser.h"
 #include "main/infinity.h"

@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/primitives.h"
 #include "common/default_values.h"
 #include "common/utility/infinity_assert.h"
 #include "main/stats/global_resource_usage.h"

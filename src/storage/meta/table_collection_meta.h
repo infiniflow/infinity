@@ -6,7 +6,7 @@
 
 #include <utility>
 
-#include "common/types/internal_types.h"
+
 #include "parser/statement/extra/extra_ddl_info.h"
 #include "storage/meta/entry/base_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"

@@ -1,6 +1,6 @@
 #include "column_buffer.h"
 #include "common/types/data_type.h"
-#include "common/types/internal_types.h"
+
 #include "common/types/varchar_layout.h"
 #include "common/utility/infinity_assert.h"
 #include "storage/buffer/buffer_handle.h"

@@ -6,7 +6,7 @@
 
 #include <utility>
 
-#include "common/types/internal_types.h"
+
 #include "storage/table_def.h"
 #include "segment_entry.h"
 #include "table_collecton_type.h"

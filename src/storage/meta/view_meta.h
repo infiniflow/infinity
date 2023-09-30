@@ -7,7 +7,7 @@
 
 #include <utility>
 
-#include "common/types/internal_types.h"
+
 #include "storage/meta/entry/base_entry.h"
 #include "storage/table_def.h"
 

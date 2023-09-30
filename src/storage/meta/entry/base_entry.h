@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/concurrency.h"
+#include "common/types/alias/smart_ptr.h"
 #include "storage/txn/constants.h"
 
 namespace infinity {

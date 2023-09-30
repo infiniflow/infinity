@@ -3,6 +3,7 @@
 //
 
 #include "drop_view_info.h"
+#include <sstream>
 
 namespace infinity {
 

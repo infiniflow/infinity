@@ -7,7 +7,7 @@
 #include <thread>
 #include <utility>
 #include "base_test.h"
-#include "common/types/internal_types.h"
+
 #include "main/infinity.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/meta/catalog.h"

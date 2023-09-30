@@ -5,7 +5,7 @@
 #pragma once
 
 #include "common/utility/infinity_assert.h"
-#include "common/types/internal_types.h"
+#include "common/types/alias/strings.h"
 
 namespace infinity {
 

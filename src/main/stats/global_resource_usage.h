@@ -5,7 +5,7 @@
 #pragma once
 
 #include "common/singleton.h"
-#include "common/types/internal_types.h"
+#include "common/types/alias/primitives.h"
 
 #include <atomic>
 

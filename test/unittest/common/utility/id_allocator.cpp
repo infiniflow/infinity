@@ -3,6 +3,7 @@
 //
 #include <gtest/gtest.h>
 #include "base_test.h"
+#include "common/types/alias/primitives.h"
 #include "common/utility/id_allocator.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"

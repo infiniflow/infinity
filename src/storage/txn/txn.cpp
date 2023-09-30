@@ -3,7 +3,7 @@
 //
 
 #include "txn.h"
-#include "common/types/internal_types.h"
+
 #include "main/logger.h"
 #include "common/utility/infinity_assert.h"
 #include "common/utility/defer_op.h"

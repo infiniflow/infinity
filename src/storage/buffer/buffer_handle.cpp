@@ -5,7 +5,7 @@
 #include "buffer_handle.h"
 #include "buffer_manager.h"
 #include "buffer_task.h"
-#include "common/types/internal_types.h"
+
 #include "storage/io/file_system.h"
 #include "storage/io/local_file_system.h"
 #include "common/utility/defer_op.h"

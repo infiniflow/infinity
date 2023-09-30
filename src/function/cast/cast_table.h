@@ -6,7 +6,7 @@
 
 #include <array>
 
-#include "common/types/internal_types.h"
+
 #include "common/types/logical_type.h"
 #include "common/singleton.h"
 

@@ -4,7 +4,7 @@
 
 
 #include "executor/physical_operator_type.h"
-#include "common/types/internal_types.h"
+
 #include "common/utility/exception.h"
 
 

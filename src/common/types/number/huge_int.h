@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/primitives.h"
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {
@@ -13,8 +13,8 @@ struct HugeInt {
 public:
     HugeInt() = default;
 
-    explicit HugeInt(i64 upper, i64 lower) :
-            upper(upper), lower(lower) {}
+    explicit
+    HugeInt(i64 upper, i64 lower) : upper(upper), lower(lower) {}
 
     inline bool
     operator==(const HugeInt& other) const {

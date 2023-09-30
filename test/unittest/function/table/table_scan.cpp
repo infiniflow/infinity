@@ -5,7 +5,7 @@
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/data_type.h"
-#include "common/types/internal_types.h"
+
 #include "common/types/logical_type.h"
 #include "function/table/seq_scan.h"
 #include "main/config.h"

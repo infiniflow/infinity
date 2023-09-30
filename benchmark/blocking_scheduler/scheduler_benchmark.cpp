@@ -2,12 +2,14 @@
 // Created by jinhai on 23-5-7.
 //
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/concurrency.h"
+#include "common/types/alias/containers.h"
+#include "common/types/alias/strings.h"
 #include "task.h"
 #include "fragment.h"
 #include "concurrentqueue.h"
 #include "main/profiler/base_profiler.h"
-#include <iostream>
 
 using namespace infinity;
 

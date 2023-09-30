@@ -3,6 +3,7 @@
 //
 
 #include "create_collection_info.h"
+#include <sstream>
 
 namespace infinity {
 

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "concurrentqueue.h"
 #include "storage/common/async_batch_processor.h"
 #include "buffer_handle.h"

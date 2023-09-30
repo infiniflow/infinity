@@ -4,10 +4,11 @@
 
 #pragma once
 
-#include <boost/asio/io_service.hpp>
-#include <boost/asio/ip/tcp.hpp>
+#include "common/types/alias/concurrency.h"
 #include "connection.h"
 #include "common/singleton.h"
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/ip/tcp.hpp>
 
 namespace infinity {
 

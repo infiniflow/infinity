@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+
 #include "main/stats/global_resource_usage.h"
 
 namespace infinity {

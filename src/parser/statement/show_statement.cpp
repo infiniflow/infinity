@@ -3,6 +3,7 @@
 //
 
 #include "show_statement.h"
+#include <sstream>
 
 namespace infinity {
 

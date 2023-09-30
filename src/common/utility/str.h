@@ -4,9 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
-
-#include <string>
+#include "common/types/alias/strings.h"
 #include <algorithm>
 #include <cctype>
 #include <locale>

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "common/types/internal_types.h"
+#include "common/types/alias/concurrency.h"
 #include "operator.h"
 #include "buffer_queue.h"
 #include "task_queue.h"
