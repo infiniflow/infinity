@@ -98,8 +98,8 @@ protected:
         std::shared_ptr<BufferedByteSliceReader> reader = CreateReader(doc_count, flush_count);
         CheckDecode(doc_count, flush_count, reader);
 
-        //reader->Open(buffered_byte_slice_.get());
-        //CheckDecode(doc_count, flush_count, reader);
+        reader->Open(buffered_byte_slice_.get());
+        CheckDecode(doc_count, flush_count, reader);
     }
 
     std::shared_ptr<BufferedByteSliceReader>
