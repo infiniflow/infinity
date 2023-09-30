@@ -109,8 +109,8 @@ TEST_F(BufferedByteSliceTest, test3) {
     BufferedByteSliceReader reader;
     reader.Open(buffered_byte_slice_.get());
 
-    uint32_t buffer[count * 4];
-    uint16_t doc_payload_buffer[count * 4];
+    uint32_t buffer[count * 2];
+    uint16_t doc_payload_buffer[count * 2];
     size_t actual_decode_len;
     reader.Decode(buffer, decode_len, actual_decode_len);
     reader.Decode(doc_payload_buffer, decode_len, actual_decode_len);

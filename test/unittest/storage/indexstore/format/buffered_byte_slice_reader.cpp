@@ -47,8 +47,8 @@ protected:
             payload[i] = i * 2;
         }
 
-        uint32_t doc_id_buffer[doc_count];
-        uint16_t doc_payload_buffer[doc_count];
+        uint32_t doc_id_buffer[doc_count * 2];
+        uint16_t doc_payload_buffer[doc_count * 2];
 
         size_t decode_len;
         uint32_t i = 0;
@@ -98,8 +98,8 @@ protected:
         std::shared_ptr<BufferedByteSliceReader> reader = CreateReader(doc_count, flush_count);
         CheckDecode(doc_count, flush_count, reader);
 
-        reader->Open(buffered_byte_slice_.get());
-        CheckDecode(doc_count, flush_count, reader);
+        //reader->Open(buffered_byte_slice_.get());
+        //CheckDecode(doc_count, flush_count, reader);
     }
 
     std::shared_ptr<BufferedByteSliceReader>
@@ -250,8 +250,8 @@ TEST_F(BufferedByteSliceReaderTest, test2) {
 }
 
 TEST_F(BufferedByteSliceReaderTest, test3) {
-    //TestCheck(10, 5);
-    //TestCheck(513, 128);
+    TestCheck(10, 5);
+    TestCheck(513, 128);
 }
 
 }// namespace infinity

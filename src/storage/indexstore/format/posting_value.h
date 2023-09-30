@@ -2,8 +2,8 @@
 
 #include "storage/compression/int_encoder.h"
 
-#include <vector>
 #include <cstdint>
+#include <vector>
 
 namespace infinity {
 
@@ -81,7 +81,7 @@ struct TypedPostingValue : public PostingValue {
 
     uint32_t
     Encode(ByteSliceWriter& slice_writer, const uint8_t* src, uint32_t len) const override {
-        return encoder_->Encode(slice_writer, (const T*)src, len);
+        return encoder_->Encode(slice_writer, (const T*)src, len / sizeof(T));
     }
 
     uint32_t
@@ -122,5 +122,4 @@ struct PostingValues {
     std::vector<PostingValue*> values_;
 };
 
-}
-
+}// namespace infinity

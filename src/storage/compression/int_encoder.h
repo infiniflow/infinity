@@ -7,7 +7,7 @@
 #include "new_pfordelta_compressor.h"
 #include "storage/io/byte_slice_reader.h"
 #include "storage/io/byte_slice_writer.h"
-
+#include <iostream>
 namespace infinity {
 
 using NewPForDeltaCompressor = indexlib::NewPForDeltaCompressor;
@@ -86,7 +86,7 @@ IntEncoder<T, Compressor>::Decode(T* dest, uint32_t dest_len, ByteSliceReader& s
     if(len != comp_len) {
         StorageError("Decode posting FAILED");
     }
-    return (uint32_t)compressor_.Decompress(dest, dest_len, (const uint32_t*)buf_ptr, comp_len) / sizeof(T);
+    return (uint32_t)compressor_.Decompress(dest, dest_len, (const uint32_t*)buf_ptr, comp_len);
 }
 
 }// namespace infinity
