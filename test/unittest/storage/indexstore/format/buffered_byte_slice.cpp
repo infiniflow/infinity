@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "base_test.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
 #include "storage/indexstore/format/buffered_byte_slice.h"
 #include "storage/indexstore/format/buffered_byte_slice_reader.h"
 #include "storage/indexstore/format/doc_list_format_option.h"
@@ -36,6 +36,7 @@ public:
         buffered_byte_slice_.reset();
         doc_list_format_.reset();
     }
+
 protected:
     MemoryPool* byte_slice_pool_;
     RecyclePool* buffer_pool_;
@@ -70,11 +71,9 @@ TEST_F(BufferedByteSliceTest, test1) {
     reader.Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len);
     ASSERT_EQ((uint16_t)2, doc_payload_buffer[0]);
     ASSERT_EQ((uint16_t)3, doc_payload_buffer[1]);
-
 }
 
-TEST_F(BufferedByteSliceTest, test2
-) {
+TEST_F(BufferedByteSliceTest, test2) {
     buffered_byte_slice_->PushBack(0, (uint32_t)1);
     buffered_byte_slice_->PushBack(1, (uint16_t)2);
     buffered_byte_slice_->EndPushBack();
@@ -84,14 +83,11 @@ TEST_F(BufferedByteSliceTest, test2
     FlushInfo flush_info = buffered_byte_slice_->GetFlushInfo();
     ASSERT_TRUE(!flush_info.IsValidShortBuffer());
     ASSERT_EQ((uint32_t)1, flush_info.GetFlushCount());
-
     ASSERT_EQ((size_t)0, buffered_byte_slice_->GetBufferSize());
-
     ASSERT_EQ((size_t)0, buffered_byte_slice_->Flush());
 }
 
-TEST_F(BufferedByteSliceTest, test3
-) {
+TEST_F(BufferedByteSliceTest, test3) {
     const int32_t decode_len = 5;
     const int32_t count = 11;
     for(uint32_t i = 0; i < count; ++i) {
@@ -109,7 +105,8 @@ TEST_F(BufferedByteSliceTest, test3
 
     ASSERT_EQ(snapshot_buffered_byte_slice.GetTotalCount(), buffered_byte_slice_->GetTotalCount());
     ASSERT_EQ(snapshot_buffered_byte_slice.GetByteSliceList(), buffered_byte_slice_->GetByteSliceList());
-/*    BufferedByteSliceReader reader;
+
+    BufferedByteSliceReader reader;
     reader.Open(buffered_byte_slice_.get());
 
     uint32_t buffer[count * 2];
@@ -117,17 +114,15 @@ TEST_F(BufferedByteSliceTest, test3
     size_t actual_decode_len;
     reader.Decode(buffer, decode_len, actual_decode_len);
     reader.Decode(doc_payload_buffer, decode_len, actual_decode_len);
+    reader.Decode(buffer + decode_len, decode_len, actual_decode_len);
+    reader.Decode(doc_payload_buffer + decode_len, decode_len, actual_decode_len);
+    reader.Decode(buffer + decode_len * 2, decode_len, actual_decode_len);
+    reader.Decode(doc_payload_buffer + decode_len * 2, decode_len, actual_decode_len);
 
-    reader.Decode(buffer + decode_len*sizeof(uint32_t), decode_len, actual_decode_len);
-    reader.Decode(doc_payload_buffer + decode_len*sizeof(uint16_t), decode_len, actual_decode_len);
-
-    reader.Decode(buffer + decode_len * 2*sizeof(uint32_t), decode_len, actual_decode_len);
-    reader.Decode(doc_payload_buffer + decode_len * 2*sizeof(uint16_t), decode_len, actual_decode_len);
-
-    for (uint32_t i = 0; i < count; ++i) {
+    for(uint32_t i = 0; i < count; ++i) {
         ASSERT_EQ(i, buffer[i]);
         ASSERT_EQ(i * 2, doc_payload_buffer[i]);
-    }*/
+    }
 }
 
-} 
+}// namespace infinity
