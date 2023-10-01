@@ -7,12 +7,6 @@
 
 namespace infinity {
 
-Vector<UniquePtr<FragmentTask>>&
-PlanFragment::CreateTasks(QueryContext* query_context) {
-    context_ = FragmentContext::MakeFragmentContext(query_context, this);
-    return context_->Tasks();
-}
-
 void
 PlanFragment::AddSourceNode(QueryContext* query_context,
                             SourceType source_type,

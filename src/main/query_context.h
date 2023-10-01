@@ -171,8 +171,6 @@ private:
     u64 memory_size_limit_{};
 
     bool initialized_{false};
-
-    u64 next_node_id_{};
 };
 
 }

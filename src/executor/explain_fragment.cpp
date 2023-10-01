@@ -24,16 +24,16 @@ ExplainFragment::Explain(PlanFragment* fragment_ptr,
     }
 
     if(fragment_ptr->GetSinkNode()) {
-        ExplainPhysicalPlan::Explain(fragment_ptr->GetSinkNode(), result, true, intent_size);
+        ExplainPhysicalPlan::Explain(fragment_ptr->GetSinkNode(), result, false, intent_size);
     }
 
     Vector<PhysicalOperator*>& fragment_operators = fragment_ptr->GetOperators();
     for(auto& fragment_operator: fragment_operators) {
-        ExplainPhysicalPlan::Explain(fragment_operator, result, true, intent_size);
+        ExplainPhysicalPlan::Explain(fragment_operator, result, false, intent_size);
     }
 
     if(fragment_ptr->GetSourceNode()) {
-        ExplainPhysicalPlan::Explain(fragment_ptr->GetSourceNode(), result, true, intent_size);
+        ExplainPhysicalPlan::Explain(fragment_ptr->GetSourceNode(), result, false, intent_size);
     }
 
     intent_size += 2;

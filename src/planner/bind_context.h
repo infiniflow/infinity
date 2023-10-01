@@ -16,15 +16,9 @@
 
 namespace infinity {
 
-class LogicalNode;
-
 class Table;
 
 class ExpressionBinder;
-
-class QueryContext;
-
-class KnnExpression;
 
 struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(String alias, SelectStatement* select_stmt, HashSet<String> masked_name_set)

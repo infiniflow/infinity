@@ -35,7 +35,7 @@ public:
     }
 
     void
-    Build(const BaseStatement* statement, SharedPtr<BindContext> bind_context_ptr = nullptr);
+    Build(const BaseStatement* statement, SharedPtr<BindContext>& bind_context_ptr);
 
     void
     BuildSelect(const SelectStatement* statement, SharedPtr<BindContext>& bind_context_ptr);

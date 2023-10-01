@@ -96,6 +96,8 @@ class PhysicalMergeTop;
 
 class PhysicalMergeSort;
 
+class PhysicalMergeKnn;
+
 class ExplainPhysicalPlan {
 public:
     static void
@@ -358,6 +360,12 @@ public:
 
     static void
     Explain(const PhysicalMergeSort* merge_sort_node,
+            SharedPtr<Vector<SharedPtr<String>>>& result,
+            bool is_recursive,
+            i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalMergeKnn* merge_knn_node,
             SharedPtr<Vector<SharedPtr<String>>>& result,
             bool is_recursive,
             i64 intent_size = 0);

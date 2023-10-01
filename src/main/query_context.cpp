@@ -94,7 +94,10 @@ QueryContext::Query(const String& query) {
             this->BeginTxn();
 
             // Build unoptimized logical plan for each SQL statement.
-            logical_planner.Build(statement);
+            SharedPtr<BindContext> bind_context;
+            logical_planner.Build(statement, bind_context);
+            current_max_node_id_ = bind_context->GetNewLogicalNodeId();
+
             parsed_result->Reset();
 
             SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();

@@ -114,6 +114,7 @@ PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState* result_sink_stat
         case PhysicalOperatorType::kProjection:
         case PhysicalOperatorType::kSort:
         case PhysicalOperatorType::kMergeSort:
+        case PhysicalOperatorType::kMergeKnn:
         case PhysicalOperatorType::kDelete:
         case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kInsert:
