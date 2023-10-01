@@ -132,7 +132,8 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
         case PhysicalOperatorType::kMergeHash:
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
-        case PhysicalOperatorType::kMergeSort: {
+        case PhysicalOperatorType::kMergeSort:
+        case PhysicalOperatorType::kMergeKnn: {
             current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->AddSourceNode(query_context_ptr_,
                                                 SourceType::kLocalQueue,

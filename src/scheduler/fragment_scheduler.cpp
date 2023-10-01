@@ -88,12 +88,13 @@ FragmentScheduler::Schedule(QueryContext* query_context, PlanFragment* plan_frag
     //    if the first op isn't SCAN op, fragment task source type is kQueue and a task_result_queue need to be created.
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
-    Vector<UniquePtr<FragmentTask>>& tasks = plan_fragment->CreateTasks(query_context);
+    Vector<FragmentTask*> tasks;
+    FragmentContext::MakeFragmentContext(query_context, plan_fragment, tasks);
 
     LOG_TRACE("Create {} tasks", tasks.size());
 
     for(const auto& fragment_task: tasks) {
-        ScheduleTask(fragment_task.get());
+        ScheduleTask(fragment_task);
     }
 }
 

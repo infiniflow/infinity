@@ -105,6 +105,8 @@ PhysicalOperatorToString(PhysicalOperatorType type) {
             return "Except";
         case PhysicalOperatorType::kKnnScan:
             return "KnnScan";
+        case PhysicalOperatorType::kMergeKnn:
+            return "MergeKnn";
     }
     throw NotImplementException("Unknown physical operator type");
 }

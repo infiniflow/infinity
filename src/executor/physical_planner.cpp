@@ -61,6 +61,7 @@
 #include "executor/operator/physical_drop_schema.h"
 #include "executor/operator/physical_create_schema.h"
 #include "executor/operator/physical_knn_scan.h"
+#include "executor/operator/physical_merge_knn.h"
 #include "planner/bound/base_table_ref.h"
 #include "explain_physical_plan.h"
 
@@ -209,9 +210,9 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
         }
     }
 
-    if(logical_operator->node_id() > query_context_ptr_->max_node_id()) {
-        query_context_ptr_->set_max_node_id(logical_operator->node_id());
-    }
+//    if(logical_operator->node_id() > query_context_ptr_->max_node_id()) {
+//        query_context_ptr_->set_max_node_id(logical_operator->node_id());
+//    }
     // Initialize the physical plan node
     result->Init();
 
@@ -573,15 +574,26 @@ PhysicalPlanner::BuildFlush(const SharedPtr<LogicalNode>& logical_operator) cons
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNode>& logical_operator) const {
     auto* logical_knn_scan = (LogicalKnnScan*)(logical_operator.get());
-    return MakeShared<PhysicalKnnScan>(logical_knn_scan->node_id(),
-                                       logical_knn_scan->base_table_ref_,
-                                       logical_knn_scan->knn_expressions_,
-                                       logical_knn_scan->limit_expression_,
-                                       logical_knn_scan->filter_expression_,
-                                       logical_knn_scan->order_by_type_,
-                                       logical_knn_scan->base_table_ref_->column_names_,
-                                       logical_knn_scan->base_table_ref_->column_types_,
-                                       logical_knn_scan->knn_table_index_);
+    SharedPtr<PhysicalOperator> knn_scan_op = MakeShared<PhysicalKnnScan>(logical_knn_scan->node_id(),
+                                                                          logical_knn_scan->base_table_ref_,
+                                                                          logical_knn_scan->knn_expressions_,
+                                                                          logical_knn_scan->limit_expression_,
+                                                                          logical_knn_scan->filter_expression_,
+                                                                          logical_knn_scan->order_by_type_,
+                                                                          logical_knn_scan->GetOutputNames(),
+                                                                          logical_knn_scan->GetOutputTypes(),
+                                                                          logical_knn_scan->knn_table_index_);
+
+    if(logical_knn_scan->base_table_ref_->segment_entries_->size() > 1 && query_context_ptr_->cpu_number_limit() > 1) {
+        // There will be more than one knn scan node
+        return MakeShared<PhysicalMergeKnn>(query_context_ptr_->GetNextNodeID(),
+                                            knn_scan_op,
+                                            logical_knn_scan->GetOutputNames(),
+                                            logical_knn_scan->GetOutputTypes(),
+                                            logical_knn_scan->knn_table_index_);
+    } else {
+        return knn_scan_op;
+    }
 }
 
 SharedPtr<PhysicalOperator>

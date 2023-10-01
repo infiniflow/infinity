@@ -101,6 +101,17 @@ struct KnnScanOutputState : public OutputState {
     KnnScanOutputState() : OutputState(PhysicalOperatorType::kTableScan) {}
 };
 
+// Merge Knn
+struct MergeKnnInputState : public InputState {
+    inline explicit
+    MergeKnnInputState() : InputState(PhysicalOperatorType::kMergeKnn) {}
+};
+
+struct MergeKnnOutputState : public OutputState {
+    inline explicit
+    MergeKnnOutputState() : OutputState(PhysicalOperatorType::kMergeKnn) {}
+};
+
 // Filter
 struct FilterInputState : public InputState {
     inline explicit

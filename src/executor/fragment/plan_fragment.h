@@ -33,9 +33,6 @@ public:
         return fragment_type_;
     }
 
-    Vector<UniquePtr<FragmentTask>>&
-    CreateTasks(QueryContext* query_context);
-
     inline void
     AddOperator(PhysicalOperator* op) {
         operators_.emplace_back(op);

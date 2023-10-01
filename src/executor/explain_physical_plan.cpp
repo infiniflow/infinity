@@ -37,6 +37,17 @@
 #include "executor/operator/physical_flush.h"
 #include "executor/operator/physical_source.h"
 #include "executor/operator/physical_knn_scan.h"
+#include "executor/operator/physical_merge_knn.h"
+#include "executor/operator/physical_merge_sort.h"
+#include "executor/operator/physical_merge_limit.h"
+#include "executor/operator/physical_merge_top.h"
+#include "executor/operator/physical_merge_hash.h"
+#include "executor/operator/physical_hash.h"
+#include "executor/operator/physical_except.h"
+#include "executor/operator/physical_parallel_aggregate.h"
+#include "executor/operator/physical_intersect.h"
+#include "executor/operator/physical_merge_parallel_aggregate.h"
+#include "executor/operator/physical_sink.h"
 
 #include "expression/knn_expression.h"
 
@@ -216,6 +227,10 @@ ExplainPhysicalPlan::Explain(const PhysicalOperator* op,
             break;
         }
         case PhysicalOperatorType::kMergeSort: {
+            break;
+        }
+        case PhysicalOperatorType::kMergeKnn: {
+            Explain((PhysicalMergeKnn*)op, result, is_recursive, intent_size);
             break;
         }
         default: {
@@ -538,13 +553,9 @@ ExplainPhysicalPlan::Explain(const PhysicalInsert* insert_node,
         result->emplace_back(MakeShared<String>(insert_str));
     }
 
-    if(insert_node->left() != nullptr) {
+    if(insert_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(insert_node->left().get(), result, false, intent_size);
-        }
+        ExplainPhysicalPlan::Explain(insert_node->left().get(), result, is_recursive, intent_size);
     }
 }
 
@@ -588,13 +599,9 @@ ExplainPhysicalPlan::Explain(const PhysicalProject* project_node,
         result->emplace_back(MakeShared<String>(expression_str));
     }
 
-    if(project_node->left() != nullptr) {
+    if(project_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(project_node->left().get(), result, false, intent_size);
-        }
+        ExplainPhysicalPlan::Explain(project_node->left().get(), result, is_recursive, intent_size);
     }
 }
 
@@ -630,13 +637,9 @@ ExplainPhysicalPlan::Explain(const PhysicalFilter* filter_node,
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 
-    if(filter_node->left() != nullptr) {
+    if(filter_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(filter_node->left().get(), result, is_recursive, intent_size);
-        }
+        ExplainPhysicalPlan::Explain(filter_node->left().get(), result, is_recursive, intent_size);
     }
 }
 
@@ -680,13 +683,9 @@ ExplainPhysicalPlan::Explain(const PhysicalTableScan* table_scan_node,
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 
-    if(table_scan_node->left() != nullptr) {
+    if(table_scan_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(table_scan_node->left().get(), result, false, intent_size);
-        }
+        ExplainPhysicalPlan::Explain(table_scan_node->left().get(), result, is_recursive, intent_size);
     }
 }
 
@@ -769,8 +768,7 @@ ExplainPhysicalPlan::Explain(const PhysicalKnnScan* knn_scan_node,
     result->emplace_back(MakeShared<String>(output_columns));
 
     if(knn_scan_node->left() != nullptr) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(knn_scan_node->left().get(), result, intent_size);
+        PlannerError("Knn scan node have children nodes.")
     }
 }
 
@@ -781,7 +779,7 @@ ExplainPhysicalPlan::Explain(const PhysicalAggregate* aggregate_node,
                              i64 intent_size) {
     SizeT groups_count = aggregate_node->groups_.size();
     SizeT aggregates_count = aggregate_node->aggregates_.size();
-    if(groups_count == 0 && aggregate_node == 0) {
+    if(groups_count == 0 && aggregates_count == 0) {
         PlannerError("Both groups and aggregates are empty.")
     }
 
@@ -835,13 +833,9 @@ ExplainPhysicalPlan::Explain(const PhysicalAggregate* aggregate_node,
         result->emplace_back(MakeShared<String>(group_by_expression_str));
     }
 
-    if(aggregate_node->left() != nullptr) {
+    if(aggregate_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(aggregate_node->left().get(), result, false, intent_size);
-        }
+        ExplainPhysicalPlan::Explain(aggregate_node->left().get(), result, is_recursive, intent_size);
     }
 }
 
@@ -890,13 +884,9 @@ ExplainPhysicalPlan::Explain(const PhysicalSort* sort_node,
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 
-    if(sort_node->left() != nullptr) {
+    if(sort_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(sort_node->left().get(), result, false, intent_size);
-        }
+        ExplainPhysicalPlan::Explain(sort_node->left().get(), result, is_recursive, intent_size);
     }
 }
 
@@ -941,13 +931,9 @@ ExplainPhysicalPlan::Explain(const PhysicalLimit* limit_node,
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 
-    if(limit_node->left() != nullptr) {
+    if(limit_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(limit_node->left().get(), result, false, intent_size);
-        }
+        ExplainPhysicalPlan::Explain(limit_node->left().get(), result, is_recursive, intent_size);
     }
 }
 
@@ -980,20 +966,12 @@ ExplainPhysicalPlan::Explain(const PhysicalCrossProduct* cross_product_node,
     }
 
     intent_size += 2;
-    if(cross_product_node->left() != nullptr) {
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(cross_product_node->left().get(), result, false, intent_size);
-        }
+    if(cross_product_node->left() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(cross_product_node->left().get(), result, is_recursive, intent_size);
     }
 
-    if(cross_product_node->right() != nullptr) {
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(cross_product_node->right().get(), result, false, intent_size);
-        }
+    if(cross_product_node->right() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(cross_product_node->right().get(), result, is_recursive, intent_size);
     }
 }
 
@@ -1041,21 +1019,14 @@ ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin* join_node,
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 
+
     intent_size += 2;
-    if(join_node->left() != nullptr) {
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(join_node->left().get(), result, false, intent_size);
-        }
+    if(join_node->left() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(join_node->left().get(), result, is_recursive, intent_size);
     }
 
-    if(join_node->right() != nullptr) {
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(join_node->right().get(), result, false, intent_size);
-        }
+    if(join_node->right() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(join_node->right().get(), result, is_recursive, intent_size);
     }
 }
 
@@ -1122,13 +1093,9 @@ ExplainPhysicalPlan::Explain(const PhysicalShow* show_node,
         }
     }
 
-    if(show_node->left() != nullptr) {
+    if(show_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        if(is_recursive) {
-            return;
-        } else {
-            ExplainPhysicalPlan::Explain(show_node->left().get(), result, false, intent_size);
-        }
+        ExplainPhysicalPlan::Explain(show_node->left().get(), result, is_recursive, intent_size);
     }
 }
 
@@ -1491,11 +1458,12 @@ ExplainPhysicalPlan::Explain(const PhysicalSource* source_node,
     } else {
         explain_header_str = "SOURCE ";
     }
+    explain_header_str += "(" + std::to_string(source_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
 void
-ExplainPhysicalPlan::Explain(const PhysicalSink* flush_node,
+ExplainPhysicalPlan::Explain(const PhysicalSink* sink_node,
                              SharedPtr<Vector<SharedPtr<String>>>& result,
                              bool is_recursive,
                              i64 intent_size) {
@@ -1505,6 +1473,7 @@ ExplainPhysicalPlan::Explain(const PhysicalSink* flush_node,
     } else {
         explain_header_str = "SINK ";
     }
+    explain_header_str += "(" + std::to_string(sink_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1519,6 +1488,7 @@ ExplainPhysicalPlan::Explain(const PhysicalParallelAggregate* parallel_aggregate
     } else {
         explain_header_str = "PARALLEL AGGREGATE ";
     }
+    explain_header_str += "(" + std::to_string(parallel_aggregate_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1533,6 +1503,7 @@ ExplainPhysicalPlan::Explain(const PhysicalMergeParallelAggregate* merge_paralle
     } else {
         explain_header_str = "MERGE PARALLEL AGGREGATE ";
     }
+    explain_header_str += "(" + std::to_string(merge_parallel_aggregate_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1547,6 +1518,7 @@ ExplainPhysicalPlan::Explain(const PhysicalIntersect* intersect_node,
     } else {
         explain_header_str = "INTERSECT ";
     }
+    explain_header_str += "(" + std::to_string(intersect_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1561,6 +1533,7 @@ ExplainPhysicalPlan::Explain(const PhysicalExcept* except_node,
     } else {
         explain_header_str = "EXCEPT ";
     }
+    explain_header_str += "(" + std::to_string(except_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1575,6 +1548,7 @@ ExplainPhysicalPlan::Explain(const PhysicalHash* hash_node,
     } else {
         explain_header_str = "HASH ";
     }
+    explain_header_str += "(" + std::to_string(hash_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1589,6 +1563,7 @@ ExplainPhysicalPlan::Explain(const PhysicalMergeHash* merge_hash_node,
     } else {
         explain_header_str = "MERGE HASH ";
     }
+    explain_header_str += "(" + std::to_string(merge_hash_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1603,6 +1578,7 @@ ExplainPhysicalPlan::Explain(const PhysicalMergeLimit* merge_limit_node,
     } else {
         explain_header_str = "MERGE LIMIT ";
     }
+    explain_header_str += "(" + std::to_string(merge_limit_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1617,6 +1593,7 @@ ExplainPhysicalPlan::Explain(const PhysicalMergeTop* merge_top_node,
     } else {
         explain_header_str = "MERGE TOP ";
     }
+    explain_header_str += "(" + std::to_string(merge_top_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1631,7 +1608,46 @@ ExplainPhysicalPlan::Explain(const PhysicalMergeSort* merge_sort_node,
     } else {
         explain_header_str = "MERGE SORT ";
     }
+    explain_header_str += "(" + std::to_string(merge_sort_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
+}
+
+void
+ExplainPhysicalPlan::Explain(const PhysicalMergeKnn* merge_knn_node,
+                             SharedPtr<Vector<SharedPtr<String>>>& result,
+                             bool is_recursive,
+                             i64 intent_size) {
+    String explain_header_str;
+    if(intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> MERGE KNN ";
+    } else {
+        explain_header_str = "MERGE KNN ";
+    }
+    explain_header_str += "(" + std::to_string(merge_knn_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(explain_header_str));
+
+    // Table index
+    String table_index =
+            String(intent_size, ' ') + " - table index: #" + std::to_string(merge_knn_node->knn_table_index());
+    result->emplace_back(MakeShared<String>(table_index));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = merge_knn_node->GetOutputNames()->size();
+    if(column_count == 0) {
+        PlannerError(fmt::format("No column in merge knn node."));
+    }
+    for(SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += merge_knn_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += merge_knn_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+
+    if(merge_knn_node->left() != nullptr && is_recursive) {
+        intent_size += 2;
+        ExplainPhysicalPlan::Explain(merge_knn_node->left().get(), result, is_recursive, intent_size);
+    }
 }
 
 }
