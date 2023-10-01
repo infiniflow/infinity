@@ -309,6 +309,10 @@ DataType::TypeToString<EmbeddingT>();
 
 template<>
 String
+DataType::TypeToString<RowT>();
+
+template<>
+String
 DataType::TypeToString<MixedT>();
 
 template<>

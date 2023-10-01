@@ -85,6 +85,8 @@ TEST_F(DataTypeTest, GetTypeName) {
     EXPECT_EQ(blob_type.ToString(), "Blob");
     DataType vector_type(LogicalType::kEmbedding);
     EXPECT_EQ(vector_type.ToString(), "Embedding");
+    DataType row_id_type(LogicalType::kRowID);
+    EXPECT_EQ(row_id_type.ToString(), "RowID");
     DataType null_type(LogicalType::kNull);
     EXPECT_EQ(null_type.ToString(), "Null");
     DataType missing_type(LogicalType::kMissing);
@@ -123,6 +125,7 @@ TEST_F(DataTypeTest, TypeToString) {
     EXPECT_STREQ(DataType::TypeToString<UuidT>().c_str(), "UUID");
     EXPECT_STREQ(DataType::TypeToString<BlobT>().c_str(), "Blob");
     EXPECT_STREQ(DataType::TypeToString<EmbeddingT>().c_str(), "Embedding");
+    EXPECT_STREQ(DataType::TypeToString<RowT>().c_str(), "RowID");
 }
 
 TEST_F(DataTypeTest, Serialize) {

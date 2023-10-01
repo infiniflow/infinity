@@ -277,85 +277,116 @@ DataType::Deserialize(const nlohmann::json& data_type_json) {
 template<>
 String
 DataType::TypeToString<BooleanT>() { return "Boolean"; }
+
 template<>
 String
 DataType::TypeToString<TinyIntT>() { return "TinyInt"; }
+
 template<>
 String
 DataType::TypeToString<SmallIntT>() { return "SmallInt"; }
+
 template<>
 String
 DataType::TypeToString<IntegerT>() { return "Integer"; }
+
 template<>
 String
 DataType::TypeToString<BigIntT>() { return "BigInt"; }
+
 template<>
 String
 DataType::TypeToString<HugeIntT>() { return "HugeInt"; }
+
 template<>
 String
 DataType::TypeToString<FloatT>() { return "Float"; }
+
 template<>
 String
 DataType::TypeToString<DoubleT>() { return "Double"; }
+
 template<>
 String
 DataType::TypeToString<DecimalT>() { return "Decimal"; }
+
 template<>
 String
 DataType::TypeToString<VarcharT>() { return "Varchar"; }
+
 template<>
 String
 DataType::TypeToString<DateT>() { return "Date"; }
+
 template<>
 String
 DataType::TypeToString<TimeT>() { return "Time"; }
+
 template<>
 String
 DataType::TypeToString<DateTimeT>() { return "DateTime"; }
+
 template<>
 String
 DataType::TypeToString<TimestampT>() { return "Timestamp"; }
+
 template<>
 String
 DataType::TypeToString<IntervalT>() { return "Interval"; }
+
 template<>
 String
 DataType::TypeToString<ArrayT>() { return "Array"; }
+
 //template <> String DataType::TypeToString<TupleT>() { return "Tuple"; }
 template<>
 String
 DataType::TypeToString<PointT>() { return "Point"; }
+
 template<>
 String
 DataType::TypeToString<LineT>() { return "Line"; }
+
 template<>
 String
 DataType::TypeToString<LineSegT>() { return "LineSegment"; }
+
 template<>
 String
 DataType::TypeToString<BoxT>() { return "Box"; }
+
 template<>
 String
 DataType::TypeToString<PathT>() { return "Path"; }
+
 template<>
 String
 DataType::TypeToString<PolygonT>() { return "Polygon"; }
+
 template<>
 String
 DataType::TypeToString<CircleT>() { return "Circle"; }
+
 template<>
 String
 DataType::TypeToString<BitmapT>() { return "Bitmap"; }
+
 template<>
 String
 DataType::TypeToString<UuidT>() { return "UUID"; }
+
 template<>
 String
 DataType::TypeToString<BlobT>() { return "Blob"; }
+
 template<>
 String
 DataType::TypeToString<EmbeddingT>() { return "Embedding"; }
+
+template<>
+String
+DataType::TypeToString<RowT>() { return "RowID"; }
+
 template<>
 String
 DataType::TypeToString<MixedT>() { return "Heterogeneous"; }
