@@ -26,6 +26,7 @@ enum class PhysicalOperatorType : i8 {
     kIndexScan,
     kDummyScan,
     kKnnScan,
+    kMergeKnn,
 
     kHash,
     kMergeHash,

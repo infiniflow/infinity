@@ -248,8 +248,10 @@ BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vector<Phy
     }
 }
 
-UniquePtr<FragmentContext>
-FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* fragment_ptr) {
+void
+FragmentContext::MakeFragmentContext(QueryContext* query_context,
+                                     PlanFragment* fragment_ptr,
+                                     Vector<FragmentTask*>& task_array) {
     Vector<PhysicalOperator*>& fragment_operators = fragment_ptr->GetOperators();
     i64 operator_count = fragment_operators.size();
     if(operator_count < 1) {
@@ -347,6 +349,14 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
                                                                                       operator_id,
                                                                                       operator_count,
                                                                                       real_parallel_size);
+                break;
+            }
+            case PhysicalOperatorType::kMergeKnn: {
+                BuildParallelTaskStateTemplate<MergeKnnInputState, MergeKnnOutputState>(fragment_operators,
+                                                                                        tasks,
+                                                                                        operator_id,
+                                                                                        operator_count,
+                                                                                        real_parallel_size);
                 break;
             }
             case PhysicalOperatorType::kFilter: {
@@ -533,7 +543,11 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context, PlanFragment* 
         }
     }
 
-    return fragment_context;
+    for(const auto& task: tasks) {
+        task_array.emplace_back(task.get());
+    }
+
+    fragment_ptr->SetContext(std::move(fragment_context));
 }
 
 FragmentContext::FragmentContext(PlanFragment* fragment_ptr, QueryContext* query_context) :
@@ -668,7 +682,8 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kMergeHash:
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
-        case PhysicalOperatorType::kMergeSort: {
+        case PhysicalOperatorType::kMergeSort:
+        case PhysicalOperatorType::kMergeKnn: {
             if(fragment_type_ != FragmentType::kSerialMaterialize) {
                 SchedulerError(fmt::format("{} should in serial materialized fragment",
                                            PhysicalOperatorToString(first_operator->operator_type())));
@@ -805,6 +820,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
+        case PhysicalOperatorType::kMergeKnn:
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kShow: {
             if(fragment_type_ != FragmentType::kSerialMaterialize) {

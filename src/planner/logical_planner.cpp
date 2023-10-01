@@ -28,7 +28,7 @@
 namespace infinity {
 
 void
-LogicalPlanner::Build(const BaseStatement* statement, SharedPtr<BindContext> bind_context_ptr) {
+LogicalPlanner::Build(const BaseStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     if(bind_context_ptr == nullptr) {
         bind_context_ptr = BindContext::Make(nullptr);
     }

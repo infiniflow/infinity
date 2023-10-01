@@ -31,8 +31,8 @@ enum class FragmentType {
 
 class FragmentContext {
 public:
-    static UniquePtr<FragmentContext>
-    MakeFragmentContext(QueryContext* query_context, PlanFragment* fragment_ptr);
+    static void
+    MakeFragmentContext(QueryContext* query_context, PlanFragment* fragment_ptr, Vector<FragmentTask*>& tasks);
 
 public:
     explicit

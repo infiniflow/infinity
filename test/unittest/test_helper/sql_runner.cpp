@@ -45,7 +45,9 @@ SQLRunner::Run(const String& sql_text, bool print) {
     FragmentBuilder fragment_builder(query_context_ptr.get());
     BaseStatement* statement = (*parsed_result->statements_ptr_)[0];
 
-    logical_planner.Build(statement);
+    SharedPtr<BindContext> bind_context;
+    logical_planner.Build(statement, bind_context);
+    query_context_ptr->set_max_node_id(bind_context->GetNewLogicalNodeId());
 
     SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
 

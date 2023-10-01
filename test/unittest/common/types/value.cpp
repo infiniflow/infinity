@@ -413,6 +413,14 @@ TEST_F(ValueTest, MakeAndGet) {
         EXPECT_EQ(value.value_.boolean, true);
     }
 
+    // RowT
+    {
+        RowT row{1, 3};
+        value = Value::MakeRow(row);
+        EXPECT_EQ(value.value_.row.segment_id_, 1);
+        EXPECT_EQ(value.value_.row.segment_offset_, 3);
+    }
+
     // Mixed Integer
     {
         MixedT mixed_integer1 = MixedType::MakeInteger(10);
