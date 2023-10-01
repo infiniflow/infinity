@@ -236,6 +236,13 @@ RegisterCountFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     }
     {
         AggregateFunction count_function
+                = UnaryAggregate<CountState<RowT, BigIntT>, RowT, BigIntT>(func_name,
+                                                                           DataType(LogicalType::kRowID),
+                                                                           DataType(LogicalType::kBigInt));
+        function_set_ptr->AddFunction(count_function);
+    }
+    {
+        AggregateFunction count_function
                 = UnaryAggregate<CountState<MixedT, BigIntT>, MixedT, BigIntT>(func_name,
                                                                                DataType(LogicalType::kMixed),
                                                                                DataType(LogicalType::kBigInt));

@@ -271,6 +271,14 @@ Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> embedding_info) {
 }
 
 Value
+Value::MakeRow(RowT input) {
+    Value value(LogicalType::kRowID);
+    value.value_.row = input;
+    value.is_null_ = false;
+    return value;
+}
+
+Value
 Value::MakeMixedData(MixedT input) {
     Value value(LogicalType::kMixed);
     value.value_.mixed_value = std::move(input);
@@ -473,6 +481,13 @@ EmbeddingT
 Value::GetValue() const {
     TypeAssert(type_.type() == LogicalType::kEmbedding, "Not matched type: " + type_.ToString())
     return value_.embedding;
+}
+
+template<>
+RowT
+Value::GetValue() const {
+    TypeAssert(type_.type() == LogicalType::kRowID, "Not matched type: " + type_.ToString())
+    return value_.row;
 }
 
 template<>
@@ -690,6 +705,9 @@ Value::Init(bool in_constructor) {
             value_.embedding.SetNull();
             break;
         }
+        case kRowID: {
+            value_.row = -1;
+        }
         case kMixed: {
             value_.mixed_value.Reset(in_constructor);
             break;
@@ -837,6 +855,10 @@ Value::CopyUnionValue(const Value& other) {
             memcpy(value_.embedding.ptr, other.value_.embedding.ptr, embedding_size);
             break;
         }
+        case kRowID: {
+            value_.row = other.value_.row;
+            break;
+        }
         case kMixed: {
             // Heterogeneous data copy assignment
             value_.mixed_value = other.value_.mixed_value;
@@ -965,6 +987,10 @@ Value::MoveUnionValue(Value&& other) noexcept {
         case kEmbedding: {
             this->value_.embedding = other.value_.embedding;
             other.value_.embedding.SetNull();
+            break;
+        }
+        case kRowID: {
+            value_.row = other.value_.row;
             break;
         }
         case kMixed: {
@@ -1098,6 +1124,10 @@ Value::Reset() {
             }
             break;
         }
+        case kRowID: {
+            value_.row = -1;
+            break;
+        }
         case kMixed: {
             value_.mixed_value.Reset();
             break;
@@ -1228,6 +1258,9 @@ Value::ToString() const {
         case kEmbedding: {
             NotImplementError("Embedding")
             break;
+        }
+        case kRowID: {
+            return value_.row.ToString();
         }
         case kMixed: {
             NotImplementError("Mixed")

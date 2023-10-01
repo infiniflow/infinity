@@ -65,6 +65,7 @@ private:
         AddEntry<LogicalType::kUuid>();
         AddEntry<LogicalType::kBlob>();
         AddEntry<LogicalType::kEmbedding>();
+        AddEntry<LogicalType::kRowID>();
     }
 
     template<LogicalType data_type>

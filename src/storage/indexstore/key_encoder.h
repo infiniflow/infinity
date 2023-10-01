@@ -548,6 +548,19 @@ public:
 };
 
 template<>
+class KeyEncoderTraits<LogicalType::kRowID> {
+public:
+    static u32
+    Size() {
+        return -1;
+    }
+
+    static void
+    Encode(const void* value, std::string& buf) {
+    }
+};
+
+template<>
 class KeyEncoderTraits<LogicalType::kMixed> {
 public:
     static u32

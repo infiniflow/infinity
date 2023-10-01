@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/types/complex/embedding_type.h"
+#include "common/types/complex/row_id.h"
 #include "common/utility/infinity_assert.h"
 #include "logical_type.h"
 #include "type_info.h"
@@ -62,6 +63,7 @@ using BitmapT = BitmapType;
 using UuidT = UuidType;
 using BlobT = BlobType;
 using EmbeddingT = EmbeddingType;
+using RowT = RowID;
 
 // Heterogeneous
 using MixedT = MixedType;
@@ -70,12 +72,8 @@ using MixedT = MixedType;
 class DataType {
 public:
     explicit
-    DataType(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr) :
+    DataType(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr = nullptr) :
             type_(logical_type), type_info_(std::move(type_info_ptr)) {
-    }
-
-    explicit
-    DataType(LogicalType logical_type) : type_(logical_type), type_info_(nullptr) {
     }
 
     ~DataType() = default;
@@ -153,8 +151,6 @@ public:
 
     static SharedPtr<DataType>
     Deserialize(const nlohmann::json& data_type_json);
-
-    friend class TableDef;
 
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
     int32_t

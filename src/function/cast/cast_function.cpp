@@ -131,6 +131,9 @@ CastFunction::GetBoundFunc(const DataType& source, const DataType& target) {
         case kEmbedding: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
         }
+        case kRowID: {
+            NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
+        }
         case kMixed: {
             NotImplementError("Can't cast from " + source.ToString() + " to " + target.ToString());
         }

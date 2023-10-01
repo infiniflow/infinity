@@ -151,6 +151,10 @@ CastTable::CastTable() {
     matrix_[kEmbedding][kEmbedding] = 0;
     matrix_[kEmbedding][kVarchar] = 1;
 
+    // From row_id to other type
+    matrix_[kRowID][kRowID] = 0;
+    matrix_[kRowID][kVarchar] = 1;
+
     // From embedding to other type
     matrix_[kMixed][kMixed] = 0;
     matrix_[kMixed][kBigInt] = 1;
@@ -187,6 +191,7 @@ CastTable::CastTable() {
     matrix_[kNull][kUuid] = 0;
     matrix_[kNull][kBlob] = 0;
     matrix_[kNull][kEmbedding] = 0;
+    matrix_[kNull][kRowID] = 0;
 
     // From varchar to other type
     matrix_[kVarchar][kNull] = 2;
@@ -218,6 +223,7 @@ CastTable::CastTable() {
     matrix_[kVarchar][kUuid] = 2;
     matrix_[kVarchar][kBlob] = 2;
     matrix_[kVarchar][kEmbedding] = 2;
+    matrix_[kVarchar][kRowID] = 2;
 }
 
 i64

@@ -112,6 +112,9 @@ public:
     MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> embedding_info);
 
     static Value
+    MakeRow(RowT input);
+
+    static Value
     MakeMixedData(MixedT input);
 
     static Value
@@ -203,6 +206,7 @@ public:
         UuidT uuid;
         BlobT blob;
         EmbeddingT embedding;
+        RowT row;
 
         MixedT mixed_value;
 

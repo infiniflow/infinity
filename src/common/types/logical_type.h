@@ -76,6 +76,7 @@ enum LogicalType : i8 {
     kUuid,
     kBlob,
     kEmbedding,
+    kRowID,
 
     // Heterogeneous type * 1
     kMixed,
@@ -86,5 +87,11 @@ enum LogicalType : i8 {
 
     kInvalid,
 };
+
+extern const char*
+LogicalType2Str(LogicalType logical_type);
+
+extern i64
+LogicalTypeWidth(LogicalType logical_type);
 
 }

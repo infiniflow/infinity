@@ -104,6 +104,9 @@ BindVarcharCast(const DataType& source, const DataType& target) {
         case kEmbedding: {
             NotImplementError("Cast from varchar to embedding")
         }
+        case kRowID: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, RowT, TryCastVarchar>);
+        }
         case kMixed: {
             NotImplementError("Cast from varchar to mix")
         }

@@ -44,6 +44,7 @@ HashTable::Init(const Vector<DataType>& types) {
             case kUuid:
             case kBlob:
             case kEmbedding:
+            case kRowID:
             case kNull:
             case kMissing:
             case kInvalid: {

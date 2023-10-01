@@ -190,6 +190,10 @@ ColumnVector::Initialize(const ColumnVector& other, const Selection& input_selec
                 CopyFrom<EmbeddingT>(other.data(), this->data(), tail_index_, input_select);
                 break;
             }
+            case kRowID: {
+                CopyFrom<RowT>(other.data(), this->data(), tail_index_, input_select);
+                break;
+            }
             case kMixed: {
                 CopyFrom<MixedT>(other.data(), this->data(), tail_index_, input_select);
                 break;
@@ -440,6 +444,10 @@ ColumnVector::Initialize(ColumnVectorType vector_type,
                 CopyFrom<EmbeddingT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
                 break;
             }
+            case kRowID: {
+                CopyFrom<RowT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
             case kMixed: {
                 CopyFrom<MixedT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
                 break;
@@ -585,6 +593,10 @@ ColumnVector::CopyRow(const ColumnVector& other, SizeT dst_idx, SizeT src_idx) {
         }
         case kEmbedding: {
             CopyRowFrom<EmbeddingT>(other.data(), src_idx, this->data(), dst_idx);
+            break;
+        }
+        case kRowID: {
+            CopyRowFrom<RowT>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kMixed: {
@@ -770,6 +782,12 @@ ColumnVector::ToString() const {
             }
             break;
         }
+        case kRowID: {
+            for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
+                ss << ((RowT *)data_ptr_)[row_index].ToString() << std::endl;
+            }
+            break;
+        }
         case kMixed: {
             for(SizeT row_index = 0; row_index < tail_index_; ++row_index) {
                 ss << ((MixedT*)data_ptr_)[row_index].ToString() << std::endl;
@@ -893,6 +911,9 @@ ColumnVector::ToString(SizeT row_index) const {
             embedding_element.SetNull();
             return embedding_str;
         }
+        case kRowID: {
+            return (((RowT*)data_ptr_)[row_index]).ToString();
+        }
         case kMixed: {
             TypeError("Not implemented");
         }
@@ -1001,6 +1022,9 @@ ColumnVector::GetValue(SizeT index) const {
         case kEmbedding: {
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
             return Value::MakeEmbedding(ptr, data_type_->type_info());
+        }
+        case kRowID: {
+            return Value::MakeRow(((RowT*)data_ptr_)[index]);
         }
         case kMixed: {
             return Value::MakeMixedData(((MixedT*)data_ptr_)[index]);
@@ -1184,6 +1208,10 @@ ColumnVector::SetValue(SizeT index, const Value& value) {
         case kEmbedding: {
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
             memcpy(ptr, value.value_.embedding.ptr, data_type_->Size());
+            break;
+        }
+        case kRowID: {
+            ((RowT*)data_ptr_)[index] = value.GetValue<RowT>();
             break;
         }
         case kMixed: {
@@ -1378,6 +1406,10 @@ ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             auto* embedding_ptr = (EmbeddingT*)(value_ptr);
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
             memcpy(ptr, embedding_ptr->ptr, data_type_->Size());
+            break;
+        }
+        case kRowID: {
+            ((RowT*)data_ptr_)[index] = *(RowT*)(value_ptr);
             break;
         }
         case kMixed: {
@@ -1714,6 +1746,14 @@ ColumnVector::AppendWith(const ColumnVector& other, SizeT from, SizeT count) {
             }
             break;
         }
+        case kRowID: {
+            auto* src_ptr = (RowT*)(other.data_ptr_);
+            RowT* dst_ptr = &((RowT*)(data_ptr_))[this->tail_index_];
+            for(SizeT idx = 0; idx < count; ++idx) {
+                dst_ptr[idx] = src_ptr[idx];
+            }
+            break;
+        }
         case kMixed: {
             auto* src_ptr = (MixedT*)(other.data_ptr_);
             MixedT* dst_ptr = &((MixedT*)(data_ptr_))[this->tail_index_];
@@ -1764,7 +1804,8 @@ ColumnVector::AppendWith(ColumnBuffer& column_buffer, SizeT start_row, SizeT row
         case kCircle:
         case kBitmap:
         case kUuid:
-        case kEmbedding: {
+        case kEmbedding:
+        case kRowID: {
             ptr_t ptr = column_buffer.GetAll();
             ptr_t src_ptr = ptr + start_row * data_type_size_;
             ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;

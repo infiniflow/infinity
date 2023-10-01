@@ -159,7 +159,8 @@ ColumnDataEntry::Flush(ColumnDataEntry* column_data_entry,
         case kCircle:
         case kBitmap:
         case kUuid:
-        case kEmbedding: {
+        case kEmbedding:
+        case kRowID: {
             SizeT buffer_size = row_count * column_data_entry->column_type_->Size();
             column_data_entry->buffer_handle_->WriteFile(buffer_size);
             column_data_entry->buffer_handle_->SyncFile();
