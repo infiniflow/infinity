@@ -1,8 +1,8 @@
 #pragma once
 
 #include "buffered_byte_slice.h"
-#include "posting_value.h"
 #include "flush_info.h"
+#include "posting_value.h"
 
 #include <memory>
 
@@ -11,7 +11,7 @@ namespace infinity {
 class BufferedByteSliceReader {
 public:
     BufferedByteSliceReader()
-            : location_cursor_(0), short_buffer_cursor_(0), buffered_byte_slice_(nullptr) {}
+        : location_cursor_(0), short_buffer_cursor_(0), buffered_byte_slice_(nullptr) {}
 
     ~BufferedByteSliceReader() = default;
 
@@ -22,7 +22,6 @@ public:
         byte_slice_reader_.Open(const_cast<ByteSliceList*>(buffered_byte_slice->GetByteSliceList()));
         buffered_byte_slice_ = buffered_byte_slice;
         posting_values_ = buffered_byte_slice_->GetPostingValues();
-
     }
 
     void
@@ -62,7 +61,8 @@ private:
     uint8_t short_buffer_cursor_;
     ByteSliceReader byte_slice_reader_;
     const BufferedByteSlice* buffered_byte_slice_;
-    const PostingValues* posting_values_;;
+    const PostingValues* posting_values_;
+    ;
 
     friend class BufferedByteSliceReaderTest;
 };
@@ -103,4 +103,4 @@ BufferedByteSliceReader::Decode(T* buffer, size_t count, size_t& decode_count) {
 }
 
 
-}
+}// namespace infinity

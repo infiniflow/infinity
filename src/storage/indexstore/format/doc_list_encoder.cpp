@@ -8,8 +8,8 @@ DocListEncoder::DocListEncoder(
         const DocListFormatOption& format_option,
         MemoryPool* byte_slice_pool,
         RecyclePool* buffer_pool)
-        : doc_list_buffer_(byte_slice_pool, buffer_pool), format_option_(format_option), last_doc_id_(0),
-          current_tf_(0), total_tf_(0), df_(0), byte_slice_pool_(byte_slice_pool) {
+    : doc_list_buffer_(byte_slice_pool, buffer_pool), format_option_(format_option), last_doc_id_(0),
+      current_tf_(0), total_tf_(0), df_(0), byte_slice_pool_(byte_slice_pool) {
     doc_list_format_.reset(new DocListFormat);
     doc_list_format_->Init(format_option);
     doc_list_buffer_.Init(doc_list_format_.get());
@@ -33,7 +33,6 @@ DocListEncoder::EndDocument(docid_t doc_id, docpayload_t doc_payload) {
 
 void
 DocListEncoder::Flush() {
-
 }
 
 void
@@ -51,4 +50,4 @@ DocListEncoder::AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf) {
     last_doc_payload_ = doc_payload;
 }
 
-}
+}// namespace infinity

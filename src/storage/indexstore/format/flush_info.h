@@ -46,6 +46,7 @@ public:
     Reset() {
         flush_info_ = 0;
     }
+
 private:
     static const uint64_t OFFSET_IS_VALID = 0;
     static const uint64_t OFFSET_FLUSH_LENGTH = 1;
@@ -57,4 +58,5 @@ private:
 
     uint64_t volatile flush_info_;
 };
-}
+
+}// namespace infinity

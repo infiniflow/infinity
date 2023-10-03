@@ -3,8 +3,7 @@
 namespace infinity {
 
 SkipListWriter::SkipListWriter(MemoryPool* byte_slice_pool, RecyclePool* buffer_pool)
-        : BufferedByteSlice(byte_slice_pool, buffer_pool), last_key_(0), last_value1_(0) {
-
+    : BufferedByteSlice(byte_slice_pool, buffer_pool), last_key_(0), last_value1_(0) {
 }
 
 void
@@ -23,7 +22,6 @@ SkipListWriter::AddItem(uint32_t key, uint32_t value1) {
     PushBack(1, value1);
     EndPushBack();
     last_key_ = key;
-
 }
 
 void
@@ -33,4 +31,4 @@ SkipListWriter::AddItem(uint32_t delta_value) {
     EndPushBack();
 }
 
-}
+}// namespace infinity

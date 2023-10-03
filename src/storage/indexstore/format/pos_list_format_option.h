@@ -50,12 +50,11 @@ public:
     }
 
 private:
-    uint8_t has_position_list_: 1;
-    uint8_t has_position_payload_: 1;
-    uint8_t has_tf_bitmap_: 1;
-    uint8_t unused_: 5;
-
+    uint8_t has_position_list_ : 1;
+    uint8_t has_position_payload_ : 1;
+    uint8_t has_tf_bitmap_ : 1;
+    uint8_t unused_ : 5;
 };
 
 
-}
+}// namespace infinity

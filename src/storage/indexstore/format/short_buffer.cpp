@@ -4,8 +4,8 @@
 namespace infinity {
 
 ShortBuffer::ShortBuffer(MemoryPool* pool)
-        : buffer_(nullptr), capacity_(0), size_(0), is_buffer_valid_(true), has_pool_(false), pool_(pool),
-          posting_values_(nullptr) {
+    : buffer_(nullptr), capacity_(0), size_(0), is_buffer_valid_(true), has_pool_(false), pool_(pool),
+      posting_values_(nullptr) {
     if(!pool_) {
         pool_ = new MemoryPool;
         has_pool_ = true;
@@ -146,4 +146,4 @@ ShortBuffer::AllocatePlan(uint8_t cur_capacity) {
     return MAX_DOC_PER_RECORD;
 }
 
-}
+}// namespace infinity

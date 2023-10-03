@@ -22,6 +22,6 @@ public:
 private:
     uint32_t last_key_;
     uint32_t last_value1_;
-
 };
-}
+
+}// namespace infinity

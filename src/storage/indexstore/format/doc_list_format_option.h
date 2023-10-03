@@ -1,7 +1,7 @@
 #pragma once
 
-#include "storage/indexstore/index_defines.h"
 #include "posting_value.h"
+#include "storage/indexstore/index_defines.h"
 
 namespace infinity {
 
@@ -67,12 +67,12 @@ public:
     }
 
 private:
-    uint8_t has_tf_: 1;
-    uint8_t has_tf_list_: 1;
-    uint8_t has_tf_bitmap_: 1;
-    uint8_t has_doc_payload_: 1;
-    uint8_t short_list_vbyte_compress_: 1;
-    uint8_t unused_: 3;
+    uint8_t has_tf_ : 1;
+    uint8_t has_tf_list_ : 1;
+    uint8_t has_tf_bitmap_ : 1;
+    uint8_t has_doc_payload_ : 1;
+    uint8_t short_list_vbyte_compress_ : 1;
+    uint8_t unused_ : 3;
 };
 
 class DocSkipListFormat : public PostingValues {
@@ -142,8 +142,9 @@ public:
             values_.push_back(doc_payload_value);
         }
     }
+
 private:
     DocSkipListFormat skiplist_format_;
 };
 
-}
+}// namespace infinity
