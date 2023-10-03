@@ -1,22 +1,23 @@
 #pragma once
 
+#include "skiplist_reader.h"
 #include "storage/indexstore/index_defines.h"
 #include "storage/io/byte_slice_reader.h"
 
 namespace infinity {
-class DocListSkipListReader {
+class TriValueSkipListReader : public SkipListReader {
 public:
-    DocListSkipListReader();
+    TriValueSkipListReader();
 
-    DocListSkipListReader(const DocListSkipListReader& other) noexcept;
+    TriValueSkipListReader(const TriValueSkipListReader& other) noexcept;
 
-    ~DocListSkipListReader();
+    ~TriValueSkipListReader();
 
 public:
-    void
+    virtual void
     Load(const ByteSliceList* byte_slice_list, uint32_t start, uint32_t end, const uint32_t& item_count);
 
-    void
+    virtual void
     Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count);
 
     bool
@@ -25,21 +26,6 @@ public:
     bool
     SkipTo(uint32_t query_doc_id, uint32_t& doc_id, uint32_t& offset, uint32_t& delta) {
         return SkipTo(query_doc_id, doc_id, prev_doc_id_, offset, delta);
-    }
-
-    uint32_t
-    GetStart() const {
-        return start_;
-    }
-
-    uint32_t
-    GetEnd() const {
-        return end_;
-    }
-
-    uint32_t
-    GetSkippedItemCount() const {
-        return skipped_item_count_;
     }
 
     uint32_t
@@ -71,6 +57,7 @@ public:
     GetLastKeyInBuffer() const {
         return 0;
     }
+
 protected:
     void
     InitMember();
@@ -83,10 +70,6 @@ private:
     Load_(uint32_t start, uint32_t end, const uint32_t& item_count);
 
 protected:
-    uint32_t start_;
-    uint32_t end_;
-    ByteSliceReader byte_slice_reader_;
-    uint32_t skipped_item_count_;
     uint32_t current_doc_id_;
     uint32_t current_offset_;
     uint32_t current_ttf_;
@@ -100,4 +83,4 @@ protected:
     uint32_t num_in_buffer_;
 };
 
-}
+}// namespace infinity

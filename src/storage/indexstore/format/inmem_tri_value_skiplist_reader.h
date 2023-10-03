@@ -2,16 +2,16 @@
 
 #include "buffered_byte_slice.h"
 #include "buffered_byte_slice_reader.h"
-#include "doc_list_skiplist_reader.h"
 #include "common/memory/memory_pool.h"
+#include "tri_value_skiplist_reader.h"
 
 namespace infinity {
 
-class InMemDocListSkipListReader : public DocListSkipListReader {
+class InMemTriValueSkipListReader : public TriValueSkipListReader {
 public:
-    InMemDocListSkipListReader(MemoryPool* session_pool = nullptr)
-            : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
-    ~InMemDocListSkipListReader() {
+    InMemTriValueSkipListReader(MemoryPool* session_pool = nullptr)
+        : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
+    ~InMemTriValueSkipListReader() {
         if(session_pool_) {
             delete session_pool_;
             session_pool_ = nullptr;
@@ -41,4 +41,4 @@ private:
     BufferedByteSliceReader skiplist_reader_;
 };
 
-}
+}// namespace infinity

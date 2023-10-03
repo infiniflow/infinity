@@ -1,27 +1,29 @@
-#include "doc_list_skiplist_reader.h"
-#include "posting_value.h"
+#include "tri_value_skiplist_reader.h"
 #include "common/utility/infinity_assert.h"
 #include "main/logger.h"
+#include "posting_value.h"
 
 namespace infinity {
 
-
-DocListSkipListReader::DocListSkipListReader()
-        : start_(0), end_(0) {
+TriValueSkipListReader::TriValueSkipListReader() {
     InitMember();
 }
 
-DocListSkipListReader::DocListSkipListReader(const DocListSkipListReader& other) noexcept
-        : start_(other.start_), end_(other.end_), byte_slice_reader_(other.byte_slice_reader_),
-          skipped_item_count_(other.skipped_item_count_), current_doc_id_(other.current_doc_id_),
-          current_offset_(other.current_offset_), current_ttf_(other.current_ttf_), prev_doc_id_(other.prev_doc_id_),
-          prev_offset_(other.prev_offset_), prev_ttf_(other.prev_ttf_), current_cursor_(0), num_in_buffer_(0) {}
+TriValueSkipListReader::TriValueSkipListReader(const TriValueSkipListReader& other) noexcept
+    : current_doc_id_(other.current_doc_id_),
+      current_offset_(other.current_offset_),
+      current_ttf_(other.current_ttf_),
+      prev_doc_id_(other.prev_doc_id_),
+      prev_offset_(other.prev_offset_),
+      prev_ttf_(other.prev_ttf_),
+      current_cursor_(0),
+      num_in_buffer_(0) {}
 
 
-DocListSkipListReader::~DocListSkipListReader() {}
+TriValueSkipListReader::~TriValueSkipListReader() {}
 
 void
-DocListSkipListReader::InitMember() {
+TriValueSkipListReader::InitMember() {
     skipped_item_count_ = -1;
     current_doc_id_ = 0;
     current_offset_ = 0;
@@ -34,28 +36,22 @@ DocListSkipListReader::InitMember() {
 }
 
 void
-DocListSkipListReader::Load(const ByteSliceList* byte_slice_list,
-                            uint32_t start,
-                            uint32_t end,
-                            const uint32_t& item_count) {
-    start_ = start;
-    end_ = end;
-    byte_slice_reader_.Open(const_cast<ByteSliceList*>(byte_slice_list));
-    byte_slice_reader_.Seek(start);
+TriValueSkipListReader::Load(const ByteSliceList* byte_slice_list,
+                             uint32_t start,
+                             uint32_t end,
+                             const uint32_t& item_count) {
+    SkipListReader::Load(byte_slice_list, start, end);
     Load_(start, end, item_count);
 }
 
 void
-DocListSkipListReader::Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count) {
-    start_ = start;
-    end_ = end;
-    byte_slice_reader_.Open(byte_slice);
-    byte_slice_reader_.Seek(start);
+TriValueSkipListReader::Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count) {
+    SkipListReader::Load(byte_slice, start, end);
     Load_(start, end, item_count);
 }
 
 void
-DocListSkipListReader::Load_(uint32_t start, uint32_t end, const uint32_t& item_count) {
+TriValueSkipListReader::Load_(uint32_t start, uint32_t end, const uint32_t& item_count) {
     InitMember();
     if(item_count <= MAX_UNCOMPRESSED_SKIP_LIST_SIZE) {
         byte_slice_reader_.Read(doc_id_buffer_, item_count * sizeof(doc_id_buffer_[0]));
@@ -67,11 +63,11 @@ DocListSkipListReader::Load_(uint32_t start, uint32_t end, const uint32_t& item_
 }
 
 bool
-DocListSkipListReader::SkipTo(uint32_t query_doc_id,
-                              uint32_t& doc_id,
-                              uint32_t& prev_doc_id,
-                              uint32_t& offset,
-                              uint32_t& delta) {
+TriValueSkipListReader::SkipTo(uint32_t query_doc_id,
+                               uint32_t& doc_id,
+                               uint32_t& prev_doc_id,
+                               uint32_t& offset,
+                               uint32_t& delta) {
     assert(current_doc_id_ <= query_doc_id);
 
     uint32_t current_doc_id = current_doc_id_;
@@ -135,7 +131,7 @@ DocListSkipListReader::SkipTo(uint32_t query_doc_id,
 }
 
 std::pair<int, bool>
-DocListSkipListReader::LoadBuffer() {
+TriValueSkipListReader::LoadBuffer() {
     uint32_t end = byte_slice_reader_.Tell();
     if(end < end_) {
         const Int32Encoder* doc_id_encoder = GetSkipListEncoder();
@@ -165,4 +161,4 @@ DocListSkipListReader::LoadBuffer() {
     return std::make_pair(0, false);
 }
 
-}
+}// namespace infinity

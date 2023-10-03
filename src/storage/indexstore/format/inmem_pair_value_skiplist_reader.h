@@ -2,18 +2,18 @@
 
 #include "buffered_byte_slice.h"
 #include "buffered_byte_slice_reader.h"
-#include "pos_list_skiplist_reader.h"
 #include "common/memory/memory_pool.h"
+#include "pair_value_skiplist_reader.h"
 
 namespace infinity {
 
-class InMemPosListSkipListReader : public PosListSkipListReader {
+class InMemPairValueSkipListReader : public PairValueSkipListReader {
 public:
-    InMemPosListSkipListReader(MemoryPool* sessionPool);
+    InMemPairValueSkipListReader(MemoryPool* sessionPool);
 
-    ~InMemPosListSkipListReader();
+    ~InMemPairValueSkipListReader();
 
-    InMemPosListSkipListReader(const InMemPosListSkipListReader& other) = delete;
+    InMemPairValueSkipListReader(const InMemPairValueSkipListReader& other) = delete;
 
     void
     Load(BufferedByteSlice* postingBuffer);
@@ -27,4 +27,4 @@ private:
     BufferedByteSliceReader skiplist_reader_;
 };
 
-}
+}// namespace infinity
