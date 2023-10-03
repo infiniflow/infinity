@@ -49,4 +49,9 @@ GetSkipListEncoder() {
     return EncoderProvider::GetInstance()->GetInt32Encoder();
 }
 
+const Int32Encoder*
+GetPosListEncoder() {
+    return EncoderProvider::GetInstance()->GetInt32Encoder();
 }
+
+}// namespace infinity

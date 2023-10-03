@@ -2,6 +2,8 @@
 
 #include "buffered_byte_slice_reader.h"
 #include "common/memory/memory_pool.h"
+#include "in_doc_pos_state.h"
+#include "pair_value_skiplist_reader.h"
 #include "pos_list_format_option.h"
 
 namespace infinity {
@@ -18,7 +20,7 @@ public:
     Init(ttf_t total_tf, PairValueSkipListReader* skipListReader, BufferedByteSlice* pos_list_buffer);
 
     bool
-    SkipTo(ttf_t currentTTF, NormalInDocState* state);
+    SkipTo(ttf_t current_ttf, InDocPositionState* state);
 
     bool
     LocateRecord(const NormalInDocState* state, uint32_t& tf);
