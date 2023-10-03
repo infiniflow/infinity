@@ -3,67 +3,67 @@
 //
 
 #include "physical_planner.h"
+#include "planner/node/logical_aggregate.h"
+#include "planner/node/logical_create_collection.h"
+#include "planner/node/logical_create_schema.h"
 #include "planner/node/logical_create_table.h"
+#include "planner/node/logical_create_view.h"
+#include "planner/node/logical_cross_product.h"
+#include "planner/node/logical_drop_collection.h"
+#include "planner/node/logical_drop_schema.h"
 #include "planner/node/logical_drop_table.h"
+#include "planner/node/logical_drop_view.h"
+#include "planner/node/logical_dummy_scan.h"
+#include "planner/node/logical_explain.h"
+#include "planner/node/logical_export.h"
+#include "planner/node/logical_filter.h"
+#include "planner/node/logical_flush.h"
+#include "planner/node/logical_import.h"
 #include "planner/node/logical_insert.h"
+#include "planner/node/logical_join.h"
+#include "planner/node/logical_knn_scan.h"
+#include "planner/node/logical_limit.h"
 #include "planner/node/logical_project.h"
 #include "planner/node/logical_sort.h"
 #include "planner/node/logical_table_scan.h"
-#include "planner/node/logical_dummy_scan.h"
-#include "planner/node/logical_filter.h"
-#include "planner/node/logical_limit.h"
-#include "planner/node/logical_aggregate.h"
-#include "planner/node/logical_cross_product.h"
-#include "planner/node/logical_explain.h"
-#include "planner/node/logical_create_schema.h"
-#include "planner/node/logical_drop_schema.h"
-#include "planner/node/logical_create_collection.h"
-#include "planner/node/logical_drop_collection.h"
-#include "planner/node/logical_join.h"
-#include "planner/node/logical_create_view.h"
-#include "planner/node/logical_drop_view.h"
-#include "planner/node/logical_flush.h"
-#include "planner/node/logical_import.h"
-#include "planner/node/logical_export.h"
-#include "planner/node/logical_knn_scan.h"
 
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_aggregate.h"
 #include "executor/operator/physical_alter.h"
-#include "executor/operator/physical_create_table.h"
 #include "executor/operator/physical_create_collection.h"
+#include "executor/operator/physical_create_schema.h"
+#include "executor/operator/physical_create_table.h"
 #include "executor/operator/physical_create_view.h"
+#include "executor/operator/physical_cross_product.h"
 #include "executor/operator/physical_delete.h"
-#include "executor/operator/physical_drop_table.h"
 #include "executor/operator/physical_drop_collection.h"
+#include "executor/operator/physical_drop_schema.h"
+#include "executor/operator/physical_drop_table.h"
+#include "executor/operator/physical_dummy_operator.h"
+#include "executor/operator/physical_dummy_scan.h"
+#include "executor/operator/physical_explain.h"
 #include "executor/operator/physical_export.h"
 #include "executor/operator/physical_filter.h"
+#include "executor/operator/physical_flush.h"
 #include "executor/operator/physical_hash_join.h"
 #include "executor/operator/physical_import.h"
 #include "executor/operator/physical_index_join.h"
 #include "executor/operator/physical_index_scan.h"
 #include "executor/operator/physical_insert.h"
-#include "executor/operator/physical_nested_loop_join.h"
-#include "executor/operator/physical_cross_product.h"
-#include "executor/operator/physical_project.h"
-#include "executor/operator/physical_sort.h"
+#include "executor/operator/physical_knn_scan.h"
 #include "executor/operator/physical_limit.h"
-#include "executor/operator/physical_table_scan.h"
+#include "executor/operator/physical_merge_knn.h"
+#include "executor/operator/physical_nested_loop_join.h"
+#include "executor/operator/physical_prepared_plan.h"
+#include "executor/operator/physical_project.h"
 #include "executor/operator/physical_show.h"
+#include "executor/operator/physical_sort.h"
+#include "executor/operator/physical_table_scan.h"
 #include "executor/operator/physical_top.h"
 #include "executor/operator/physical_union_all.h"
 #include "executor/operator/physical_update.h"
-#include "executor/operator/physical_prepared_plan.h"
-#include "executor/operator/physical_dummy_operator.h"
-#include "executor/operator/physical_dummy_scan.h"
-#include "executor/operator/physical_flush.h"
-#include "executor/operator/physical_explain.h"
-#include "executor/operator/physical_drop_schema.h"
-#include "executor/operator/physical_create_schema.h"
-#include "executor/operator/physical_knn_scan.h"
-#include "executor/operator/physical_merge_knn.h"
-#include "planner/bound/base_table_ref.h"
 #include "explain_physical_plan.h"
+#include "planner/bound/base_table_ref.h"
 
 #include <limits>
 
@@ -206,13 +206,13 @@ PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode>& logical_ope
         }
         default: {
             PlannerError("Unknown logical node type: " + logical_operator->name());
-//            result = MakeShared<PhysicalDummyOperator>(std::numeric_limits<uint64_t>::max());
+            //            result = MakeShared<PhysicalDummyOperator>(std::numeric_limits<uint64_t>::max());
         }
     }
 
-//    if(logical_operator->node_id() > query_context_ptr_->max_node_id()) {
-//        query_context_ptr_->set_max_node_id(logical_operator->node_id());
-//    }
+    //    if(logical_operator->node_id() > query_context_ptr_->max_node_id()) {
+    //        query_context_ptr_->set_max_node_id(logical_operator->node_id());
+    //    }
     // Initialize the physical plan node
     result->Init();
 
@@ -400,8 +400,7 @@ PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode>& logical_operator) const
     PlannerAssert(left_node != nullptr, "Join node has no left child.");
     PlannerAssert(right_node != nullptr, "Join node has no right child.");
 
-    SharedPtr<LogicalJoin> logical_join
-            = std::static_pointer_cast<LogicalJoin>(logical_operator);
+    SharedPtr<LogicalJoin> logical_join = std::static_pointer_cast<LogicalJoin>(logical_operator);
 
     SharedPtr<PhysicalOperator> left_physical_operator{};
     SharedPtr<PhysicalOperator> right_physical_operator{};
@@ -424,8 +423,7 @@ PhysicalPlanner::BuildCrossProduct(const SharedPtr<LogicalNode>& logical_operato
     PlannerAssert(left_node != nullptr, "Cross product node has no left child.");
     PlannerAssert(right_node != nullptr, "Cross product node has no right child.");
 
-    SharedPtr<LogicalCrossProduct> logical_cross_product
-            = std::static_pointer_cast<LogicalCrossProduct>(logical_operator);
+    SharedPtr<LogicalCrossProduct> logical_cross_product = std::static_pointer_cast<LogicalCrossProduct>(logical_operator);
 
     SharedPtr<PhysicalOperator> left_physical_operator{};
     SharedPtr<PhysicalOperator> right_physical_operator{};
@@ -472,7 +470,7 @@ PhysicalPlanner::BuildLimit(const SharedPtr<LogicalNode>& logical_operator) cons
 SharedPtr<PhysicalOperator>
 PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode>& logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
-//    PlannerAssert(input_logical_node != nullptr, "Logical project node has no input node.");
+    //    PlannerAssert(input_logical_node != nullptr, "Logical project node has no input node.");
     PlannerAssert(logical_operator->right_node() == nullptr,
                   "Logical project node shouldn't have right child.");
     SharedPtr<LogicalProject> logical_project = std::static_pointer_cast<LogicalProject>(logical_operator);
@@ -533,21 +531,21 @@ PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode>& logical_operator) 
     SharedPtr<LogicalTableScan> logical_table_scan =
             std::static_pointer_cast<LogicalTableScan>(logical_operator);
 
-//    HashMap<String, size_t> name2index;
-//    size_t column_count = logical_table_scan->table_ptr()->ColumnCount();
-//    for(size_t idx = 0; idx < column_count; ++ idx) {
-//        name2index.emplace(logical_table_scan->table_ptr()->GetColumnNameById(idx), idx);
-//    }
-//
-//    Vector<size_t> column_ids;
-//    column_ids.reserve(logical_table_scan->column_names_.size());
-//    for(const auto& column_name: logical_table_scan->column_names_) {
-//        if(name2index.contains(column_name)) {
-//            column_ids.emplace_back(name2index[column_name]);
-//        } else {
-//            PlannerError("Unknown column table_name: " + column_name + " when building physical plan.");
-//        }
-//    }
+    //    HashMap<String, size_t> name2index;
+    //    size_t column_count = logical_table_scan->table_ptr()->ColumnCount();
+    //    for(size_t idx = 0; idx < column_count; ++ idx) {
+    //        name2index.emplace(logical_table_scan->table_ptr()->GetColumnNameById(idx), idx);
+    //    }
+    //
+    //    Vector<size_t> column_ids;
+    //    column_ids.reserve(logical_table_scan->column_names_.size());
+    //    for(const auto& column_name: logical_table_scan->column_names_) {
+    //        if(name2index.contains(column_name)) {
+    //            column_ids.emplace_back(name2index[column_name]);
+    //        } else {
+    //            PlannerError("Unknown column table_name: " + column_name + " when building physical plan.");
+    //        }
+    //    }
 
     return MakeShared<PhysicalTableScan>(logical_operator->node_id(),
                                          logical_table_scan->base_table_ref_);
@@ -590,6 +588,9 @@ PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNode>& logical_operator) const 
                                             knn_scan_op,
                                             logical_knn_scan->GetOutputNames(),
                                             logical_knn_scan->GetOutputTypes(),
+                                            logical_knn_scan->knn_expressions_,
+                                            logical_knn_scan->limit_expression_,
+                                            logical_knn_scan->order_by_type_,
                                             logical_knn_scan->knn_table_index_);
     } else {
         return knn_scan_op;
@@ -644,4 +645,4 @@ PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode>& logical_operator) co
     return explain_node;
 }
 
-}
+}// namespace infinity

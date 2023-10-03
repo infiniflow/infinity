@@ -38,7 +38,7 @@ public:
     void
     Execute(const SharedPtr<ColumnExpression>& expr,
             SharedPtr<ExpressionState>& state,
-            SharedPtr<ColumnVector>& output_column_vecto);
+            SharedPtr<ColumnVector>& output_column_vector);
 
     void
     Execute(const SharedPtr<FunctionExpression>& expr,
