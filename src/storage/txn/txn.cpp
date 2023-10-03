@@ -4,11 +4,11 @@
 
 #include "txn.h"
 
-#include "main/logger.h"
-#include "common/utility/infinity_assert.h"
 #include "common/utility/defer_op.h"
-#include "storage/txn/txn_manager.h"
+#include "common/utility/infinity_assert.h"
+#include "main/logger.h"
 #include "storage/meta/catalog.h"
+#include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
 
 namespace infinity {
@@ -117,7 +117,6 @@ Txn::InitializeGet(GetParam) {
 
 void
 Txn::TableGet() {
-
 }
 
 void
@@ -141,7 +140,6 @@ Txn::GetTxnTableStore(const String& table_name) {
 
 void
 Txn::IndexGet() {
-
 }
 
 SharedPtr<ScanState>
@@ -175,11 +173,11 @@ Txn::Scan(ScanState* scan_state, SharedPtr<DataBlock>& output_block) {
         TxnTableStore* local_table_store = (TxnTableStore*)scan_state->txn_table_store_;
         if(scan_state->filter_ptr_ == nullptr) {
             // No filter
-//            if(scan_state->)
+            //            if(scan_state->)
         } else {
             // With filter
         }
-//        local_table_store->blocks_
+        //        local_table_store->blocks_
     }
 
     // Scan global storage
@@ -196,12 +194,10 @@ Txn::IndexScan(ScanState* scan_state, SharedPtr<DataBlock>& output_block) {
 }
 
 void
-Txn::AnnScan(ScanState* scan_state, SharedPtr<DataBlock>& output_block) {
-    NotImplementError("Not implemented")
-}
+Txn::AnnScan(ScanState* scan_state, SharedPtr<DataBlock>& output_block){
+        NotImplementError("Not implemented")}
 
-UniquePtr<String>
-Txn::CompleteScan(const String& db_name, const String& table_name) {
+UniquePtr<String> Txn::CompleteScan(const String& db_name, const String& table_name) {
     return nullptr;
 }
 
@@ -450,27 +446,22 @@ Txn::CreateCollection(const String& db_name, const String& collection_name, Conf
 }
 
 EntryResult
-Txn::GetCollectionByName(const String& db_name, const String& table_name) {
-    TransactionError("Not Implemented")
-}
+Txn::GetCollectionByName(const String& db_name, const String& table_name){
+        TransactionError("Not Implemented")}
 
 EntryResult
-Txn::CreateView(const String& db_name, const String& view_name, ConflictType conflict_type) {
-    TransactionError("Not Implemented")
-}
+        Txn::CreateView(const String& db_name, const String& view_name, ConflictType conflict_type){
+                TransactionError("Not Implemented")}
 
 EntryResult
-Txn::DropViewByName(const String& db_name, const String& view_name, ConflictType conflict_type) {
-    TransactionError("Not Implemented")
-}
+        Txn::DropViewByName(const String& db_name, const String& view_name, ConflictType conflict_type){
+                TransactionError("Not Implemented")}
 
 EntryResult
-Txn::GetViewByName(const String& db_name, const String& view_name) {
-    TransactionError("Not Implemented")
-}
+        Txn::GetViewByName(const String& db_name, const String& view_name){
+                TransactionError("Not Implemented")}
 
-Vector<BaseEntry*>
-Txn::GetViews(const String& db_name) {
+Vector<BaseEntry*> Txn::GetViews(const String& db_name) {
     TransactionError("Not Implemented")
 }
 
@@ -490,15 +481,10 @@ Txn::CommitTxn() {
         txn_context_.SetTxnRollbacked();
         return;
     }
-    if (wal_entry_->cmds.empty()) {
-        // Read-only txn
-        txn_mgr_->Invalidate(commit_ts);
-    } else {
-        // Put wal entry to the manager in the same order as commit_ts.
-        wal_entry_->txn_id = txn_id_;
-        wal_entry_->commit_ts = commit_ts;
-        txn_mgr_->PutWalEntry(wal_entry_);
-    }
+    // Put wal entry to the manager in the same order as commit_ts.
+    wal_entry_->txn_id = txn_id_;
+    wal_entry_->commit_ts = commit_ts;
+    txn_mgr_->PutWalEntry(wal_entry_);
     // Wait until CommitTxnBottom is done.
     std::unique_lock lk(m);
     cv.wait(lk, [this] { return done_bottom_; });
@@ -586,8 +572,8 @@ Txn::RollbackTxn() {
 }
 
 void
-Txn::AddWalCmd(const SharedPtr<WalCmd>& cmd){
+Txn::AddWalCmd(const SharedPtr<WalCmd>& cmd) {
     wal_entry_->cmds.push_back(cmd);
 }
 
-}
+}// namespace infinity

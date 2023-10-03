@@ -14,10 +14,12 @@ namespace infinity {
 using namespace std;
 namespace fs = std::filesystem;
 
-WalManager::WalManager(Storage* storage, const std::string& wal_path)
-        : storage_(storage), wal_path_(wal_path), running_(false) {}
+WalManager::
+WalManager(Storage* storage, const std::string& wal_path)
+    : storage_(storage), wal_path_(wal_path), running_(false) {}
 
-WalManager::~WalManager() {
+WalManager::~
+WalManager() {
     Stop();
     while(!que_.empty()) {
         que_.pop();
@@ -81,6 +83,7 @@ void
 WalManager::Flush() {
     while(running_.load()) {
         int written = 0;
+        int total = 0;
         int32_t size_pad = 0;
         int64_t max_commit_ts = 0;
         mutex_.lock();
@@ -89,32 +92,38 @@ WalManager::Flush() {
         while(!que2_.empty()) {
             std::shared_ptr<WalEntry> entry = que2_.front();
             max_commit_ts = entry->commit_ts;
-            LOG_TRACE("WalManager::Flush begin writing wal for transaction {}",
-                      entry->txn_id);
-            int32_t exp_size = entry->GetSizeInBytes();
-            vector<char> buf(exp_size);
-            char* ptr = buf.data();
-            entry->WriteAdv(ptr);
-            int32_t act_size = ptr - buf.data();
-            if(exp_size != act_size)
-                LOG_ERROR("WalManager::Flush WalEntry estimated size {} differ "
-                          "with the actual one {}",
-                          exp_size, act_size);
-            ofs_.write(buf.data(), ptr - buf.data());
-            LOG_TRACE("WalManager::Flush done writing wal for transaction {}",
-                      entry->txn_id);
+            if(!entry->cmds.empty()) {
+                // Don't need to write empty WalEntry (read-only transactions).
+                LOG_TRACE("WalManager::Flush begin writing wal for transaction {}",
+                          entry->txn_id);
+                int32_t exp_size = entry->GetSizeInBytes();
+                vector<char> buf(exp_size);
+                char* ptr = buf.data();
+                entry->WriteAdv(ptr);
+                int32_t act_size = ptr - buf.data();
+                if(exp_size != act_size)
+                    LOG_ERROR("WalManager::Flush WalEntry estimated size {} differ "
+                              "with the actual one {}",
+                              exp_size, act_size);
+                ofs_.write(buf.data(), ptr - buf.data());
+                LOG_TRACE("WalManager::Flush done writing wal for transaction {}",
+                          entry->txn_id);
+                written++;
+            }
             que2_.pop();
             que3_.push(entry);
-            written++;
+            total++;
         }
-        if(written == 0) {
+        if(total == 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         } else {
-            LOG_TRACE("WalManager::Flush begin syncing wal for {} transactions",
-                      written);
-            ofs_.flush();
-            LOG_TRACE("WalManager::Flush done syncing wal for {} transactions",
-                      written);
+            if(written > 0) {
+                LOG_TRACE("WalManager::Flush begin syncing wal for {} transactions",
+                          written);
+                ofs_.flush();
+                LOG_TRACE("WalManager::Flush done syncing wal for {} transactions",
+                          written);
+            }
             TxnManager* txn_mgr = storage_->txn_manager();
             while(!que3_.empty()) {
                 std::shared_ptr<WalEntry> entry = que3_.front();
@@ -145,8 +154,8 @@ WalManager::Checkpoint() {
         if(lsn_pend_chk - lsn_done_chk_ < 10 ||
            (checkpoint_ts_ > 0 &&
             std::chrono::steady_clock::now().time_since_epoch().count() -
-            checkpoint_ts_ <
-            20000000000)) {
+                            checkpoint_ts_ <
+                    20000000000)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
@@ -277,7 +286,6 @@ WalManager::ReplayWALFile() {
 
     // So we can get the entry's content.
     // Deserialize the entry.
-
 }
 
-} // namespace infinity
+}// namespace infinity
