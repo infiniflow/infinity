@@ -1,11 +1,11 @@
 #pragma once
 
-#include "storage/indexstore/index_defines.h"
+#include "common/memory/byte_slice.h"
+#include "common/memory/memory_pool.h"
+#include "flush_info.h"
 #include "posting_value.h"
 #include "short_buffer.h"
-#include "flush_info.h"
-#include "common/memory/memory_pool.h"
-#include "common/memory/byte_slice.h"
+#include "storage/indexstore/index_defines.h"
 #include "storage/io/byte_slice_writer.h"
 
 namespace infinity {
@@ -93,4 +93,4 @@ BufferedByteSlice::PushBack(uint8_t row, T value) {
     buffer_.PushBack(row, value);
 }
 
-}
+}// namespace infinity

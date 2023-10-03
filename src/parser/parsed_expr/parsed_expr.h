@@ -7,6 +7,8 @@
 #include "main/logger.h"
 #include "common/utility/infinity_assert.h"
 
+#include <sstream>
+
 namespace infinity {
 
 enum class ParsedExprType {

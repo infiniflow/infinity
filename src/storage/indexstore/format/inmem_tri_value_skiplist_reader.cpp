@@ -1,10 +1,10 @@
-#include "inmem_doc_list_skiplist_reader.h"
+#include "inmem_tri_value_skiplist_reader.h"
 #include "main/logger.h"
 
 namespace infinity {
 
 void
-InMemDocListSkipListReader::Load(BufferedByteSlice* posting_buffer) {
+InMemTriValueSkipListReader::Load(BufferedByteSlice* posting_buffer) {
     InitMember();
     BufferedByteSlice* skiplist_buffer = new BufferedByteSlice(session_pool_, session_pool_);
     posting_buffer->SnapShot(skiplist_buffer);
@@ -14,7 +14,7 @@ InMemDocListSkipListReader::Load(BufferedByteSlice* posting_buffer) {
 }
 
 std::pair<int, bool>
-InMemDocListSkipListReader::LoadBuffer() {
+InMemTriValueSkipListReader::LoadBuffer() {
     size_t flush_count = skiplist_buffer_->GetTotalCount();
     FlushInfo flushInfo = skiplist_buffer_->GetFlushInfo();
 
@@ -54,7 +54,7 @@ InMemDocListSkipListReader::LoadBuffer() {
 }
 
 uint32_t
-InMemDocListSkipListReader::GetLastValueInBuffer() const {
+InMemTriValueSkipListReader::GetLastValueInBuffer() const {
     uint32_t last_value_in_buffer = current_offset_;
     uint32_t current_cursor = current_cursor_;
     while(current_cursor < num_in_buffer_) {
@@ -65,7 +65,7 @@ InMemDocListSkipListReader::GetLastValueInBuffer() const {
 }
 
 uint32_t
-InMemDocListSkipListReader::GetLastKeyInBuffer() const {
+InMemTriValueSkipListReader::GetLastKeyInBuffer() const {
     uint32_t last_key_in_buffer = current_doc_id_;
     uint32_t current_cursor = current_cursor_;
     while(current_cursor < num_in_buffer_) {
@@ -75,4 +75,4 @@ InMemDocListSkipListReader::GetLastKeyInBuffer() const {
     return last_key_in_buffer;
 }
 
-}
+}// namespace infinity

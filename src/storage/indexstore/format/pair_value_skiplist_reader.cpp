@@ -1,47 +1,51 @@
-#include "pos_list_skiplist_reader.h"
-#include "posting_value.h"
+#include "pair_value_skiplist_reader.h"
 #include "common/utility/infinity_assert.h"
 #include "main/logger.h"
+#include "posting_value.h"
 
 namespace infinity {
 
-PosListSkipListReader::PosListSkipListReader()
-        : start_(0), end_(0), skipped_item_count_(-1), current_key_(0), current_value_(0), prev_key_(0), prev_value_(0),
-          current_cursor_(0), num_in_buffer_(0), key_buffer_base_(key_buffer_), value_buffer_base_(value_buffer_) {}
+PairValueSkipListReader::PairValueSkipListReader()
+    : current_key_(0),
+      current_value_(0),
+      prev_key_(0),
+      prev_value_(0),
+      current_cursor_(0),
+      num_in_buffer_(0),
+      key_buffer_base_(key_buffer_),
+      value_buffer_base_(value_buffer_) {}
 
-PosListSkipListReader::PosListSkipListReader(const PosListSkipListReader& other) noexcept
-        : start_(other.start_), end_(other.end_), byte_slice_reader_(other.byte_slice_reader_),
-          skipped_item_count_(other.skipped_item_count_), current_key_(other.current_key_),
-          current_value_(other.current_value_), prev_key_(other.prev_key_), prev_value_(other.prev_value_),
-          current_cursor_(0), num_in_buffer_(0), key_buffer_base_(key_buffer_), value_buffer_base_(value_buffer_) {}
+PairValueSkipListReader::PairValueSkipListReader(const PairValueSkipListReader& other) noexcept
+    : current_key_(other.current_key_),
+      current_value_(other.current_value_),
+      prev_key_(other.prev_key_),
+      prev_value_(other.prev_value_),
+      current_cursor_(0),
+      num_in_buffer_(0),
+      key_buffer_base_(key_buffer_),
+      value_buffer_base_(value_buffer_) {}
 
 
-PosListSkipListReader::~PosListSkipListReader() {
+PairValueSkipListReader::~PairValueSkipListReader() {
 }
 
 void
-PosListSkipListReader::Load(const ByteSliceList* byte_slice_list,
-                            uint32_t start,
-                            uint32_t end,
-                            const uint32_t& item_count) {
-    start_ = start;
-    end_ = end;
-    byte_slice_reader_.Open(const_cast<ByteSliceList*>(byte_slice_list));
-    byte_slice_reader_.Seek(start);
+PairValueSkipListReader::Load(const ByteSliceList* byte_slice_list,
+                              uint32_t start,
+                              uint32_t end,
+                              const uint32_t& item_count) {
+    SkipListReader::Load(byte_slice_list, start, end);
     Load_(start, end, item_count);
 }
 
 void
-PosListSkipListReader::Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count) {
-    start_ = start;
-    end_ = end;
-    byte_slice_reader_.Open(byte_slice);
-    byte_slice_reader_.Seek(start);
+PairValueSkipListReader::Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count) {
+    SkipListReader::Load(byte_slice, start, end);
     Load_(start, end, item_count);
 }
 
 void
-PosListSkipListReader::Load_(uint32_t start, uint32_t end, const uint32_t& item_count) {
+PairValueSkipListReader::Load_(uint32_t start, uint32_t end, const uint32_t& item_count) {
     skipped_item_count_ = -1;
     current_key_ = 0;
     current_value_ = 0;
@@ -61,7 +65,7 @@ PosListSkipListReader::Load_(uint32_t start, uint32_t end, const uint32_t& item_
 }
 
 bool
-PosListSkipListReader::SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_key, uint32_t& value, uint32_t& delta) {
+PairValueSkipListReader::SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_key, uint32_t& value, uint32_t& delta) {
     assert(current_key_ <= query_key);
 
     uint32_t local_prev_key, local_prev_value;
@@ -114,7 +118,7 @@ PosListSkipListReader::SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_
 }
 
 std::pair<int, bool>
-PosListSkipListReader::LoadBuffer() {
+PairValueSkipListReader::LoadBuffer() {
     uint32_t end = byte_slice_reader_.Tell();
     if(end < end_) {
         key_buffer_base_ = key_buffer_;
@@ -138,4 +142,4 @@ PosListSkipListReader::LoadBuffer() {
     return std::make_pair(0, false);
 }
 
-}
+}// namespace infinity

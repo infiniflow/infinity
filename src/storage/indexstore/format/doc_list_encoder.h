@@ -1,8 +1,8 @@
 #pragma once
 
-#include "doc_list_format_option.h"
 #include "buffered_byte_slice.h"
 #include "common/memory/memory_pool.h"
+#include "doc_list_format_option.h"
 
 #include <memory>
 
@@ -74,4 +74,4 @@ private:
     MemoryPool* byte_slice_pool_;
 };
 
-}
+}// namespace infinity

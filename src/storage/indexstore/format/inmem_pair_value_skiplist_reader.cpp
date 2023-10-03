@@ -1,23 +1,22 @@
-#include "inmem_pos_list_skiplist_reader.h"
+#include "inmem_pair_value_skiplist_reader.h"
 #include "main/logger.h"
 
 namespace infinity {
-InMemPosListSkipListReader::InMemPosListSkipListReader(MemoryPool* session_pool)
-        : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
+InMemPairValueSkipListReader::InMemPairValueSkipListReader(MemoryPool* session_pool)
+    : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
 
-InMemPosListSkipListReader::~InMemPosListSkipListReader() {
+InMemPairValueSkipListReader::~InMemPairValueSkipListReader() {
     if(session_pool_) {
-        delete session_pool_;
-        session_pool_ = nullptr;
-    }
-    if(skiplist_buffer_) {
+        skiplist_buffer_->~BufferedByteSlice();
+        session_pool_->Deallocate((void*)skiplist_buffer_, sizeof(BufferedByteSlice));
+    } else {
         delete skiplist_buffer_;
         skiplist_buffer_ = nullptr;
     }
 }
 
 void
-InMemPosListSkipListReader::Load(BufferedByteSlice* posting_buffer) {
+InMemPairValueSkipListReader::Load(BufferedByteSlice* posting_buffer) {
     skipped_item_count_ = -1;
     current_key_ = 0;
     current_value_ = 0;
@@ -34,7 +33,7 @@ InMemPosListSkipListReader::Load(BufferedByteSlice* posting_buffer) {
 }
 
 std::pair<int, bool>
-InMemPosListSkipListReader::LoadBuffer() {
+InMemPairValueSkipListReader::LoadBuffer() {
     size_t key_num = 0;
     size_t flush_count = skiplist_buffer_->GetTotalCount();
     size_t decode_count = SKIP_LIST_BUFFER_SIZE;
@@ -53,4 +52,4 @@ InMemPosListSkipListReader::LoadBuffer() {
     current_cursor_ = 0;
     return std::make_pair(0, true);
 }
-}
+}// namespace infinity

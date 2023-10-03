@@ -70,6 +70,10 @@ GetDocPayloadEncoder();
 extern const Int32Encoder*
 GetSkipListEncoder();
 
+extern const Int32Encoder*
+GetPosListEncoder();
+
+
 template<typename T>
 struct TypedPostingValue : public PostingValue {
     typedef typename EncoderTypeTraits<T>::Encoder Encoder;

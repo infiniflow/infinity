@@ -1,7 +1,7 @@
 #pragma once
 
-#include <memory>
 #include <cassert>
+#include <memory>
 
 #include "common/memory/memory_pool.h"
 #include "posting_value.h"
@@ -125,8 +125,8 @@ private:
 private:
     uint8_t* volatile buffer_;
     uint8_t offset_[8];
-    uint8_t volatile capacity_;             //numnber of rows
-    uint8_t volatile size_;                 //number of columns (maximum of 128)
+    uint8_t volatile capacity_;//numnber of rows
+    uint8_t volatile size_;    //number of columns (maximum of 128)
 
     bool volatile is_buffer_valid_;
     bool has_pool_;
@@ -187,4 +187,4 @@ ShortBuffer::GetRow(uint8_t* buffer, uint8_t capacity, const PostingValue* value
     return buffer + offset * capacity;
 }
 
-}
+}// namespace infinity
