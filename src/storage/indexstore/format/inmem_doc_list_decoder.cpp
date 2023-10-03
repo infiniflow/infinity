@@ -12,10 +12,9 @@ InMemDocListDecoder::InMemDocListDecoder(MemoryPool* session_pool)
 
 InMemDocListDecoder::~InMemDocListDecoder() {
     if(session_pool_) {
-        delete session_pool_;
-        session_pool_ = nullptr;
-    }
-    if(doc_list_buffer_) {
+        doc_list_buffer_->~BufferedByteSlice();
+        session_pool_->Deallocate((void*)doc_list_buffer_, sizeof(BufferedByteSlice));
+    } else {
         delete doc_list_buffer_;
         doc_list_buffer_ = nullptr;
     }

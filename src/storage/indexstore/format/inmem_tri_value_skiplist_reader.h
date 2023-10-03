@@ -13,10 +13,9 @@ public:
         : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
     ~InMemTriValueSkipListReader() {
         if(session_pool_) {
-            delete session_pool_;
-            session_pool_ = nullptr;
-        }
-        if(skiplist_buffer_) {
+            skiplist_buffer_->~BufferedByteSlice();
+            session_pool_->Deallocate((void*)skiplist_buffer_, sizeof(BufferedByteSlice));
+        } else {
             delete skiplist_buffer_;
             skiplist_buffer_ = nullptr;
         }

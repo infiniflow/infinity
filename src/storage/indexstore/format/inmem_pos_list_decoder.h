@@ -1,16 +1,13 @@
 #pragma once
 
 #include "buffered_byte_slice_reader.h"
-#include "common/memory/memory_pool.h"
-#include "in_doc_pos_state.h"
-#include "pair_value_skiplist_reader.h"
-#include "pos_list_format_option.h"
+#include "pos_list_decoder.h"
 
 namespace infinity {
 
 class BufferedByteSlice;
 
-class InMemPositionListDecoder {
+class InMemPositionListDecoder : public PositionListDecoder {
 public:
     InMemPositionListDecoder(const PositionListFormatOption& option, MemoryPool* session_pool);
 
@@ -23,10 +20,10 @@ public:
     SkipTo(ttf_t current_ttf, InDocPositionState* state);
 
     bool
-    LocateRecord(const NormalInDocState* state, uint32_t& tf);
+    LocateRecord(const InDocPositionState* state, uint32_t& tf);
 
     uint32_t
-    DecodeRecord(pos_t* pos_buffer, uint32_t pos_buffer_len, pospayload_t* payload_buffer, uint32_t payload_buffer_len);
+    DecodeRecord(pos_t* pos_buffer, uint32_t pos_buffer_len);
 
 private:
     BufferedByteSlice* pos_list_buffer_;

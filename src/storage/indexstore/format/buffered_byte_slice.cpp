@@ -5,8 +5,8 @@
 namespace infinity {
 
 BufferedByteSlice::BufferedByteSlice(
-        MemoryPool* byte_slice_pool, MemoryPool* buffer_pool) {
-}
+        MemoryPool* byte_slice_pool,
+        MemoryPool* buffer_pool) {}
 
 void
 BufferedByteSlice::Init(const PostingValues* value) {

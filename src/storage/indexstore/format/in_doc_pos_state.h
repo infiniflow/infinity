@@ -78,6 +78,7 @@ protected:
     uint32_t total_position_count_;
     PositionListFormatOption option_;
     friend class PositionListDecoder;
+    friend class InMemPositionListDecoder;
 };
 
 }// namespace infinity
