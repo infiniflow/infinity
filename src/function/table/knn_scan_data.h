@@ -10,8 +10,8 @@
 #include "function/function_data.h"
 #include "storage/txn/constants.h"
 #include "parser/parsed_expr/knn_expr.h"
-#include "storage/indexstore/knn_distance.h"
-#include "storage/indexstore/common/compound_id.h"
+#include "storage/knnindex/knn_distance.h"
+#include "storage/knnindex/common/compound_id.h"
 
 namespace infinity {
 

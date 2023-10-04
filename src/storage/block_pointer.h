@@ -2,7 +2,7 @@
 
 
 
-#include "indexstore/codec.h"
+#include "invertedindex/codec.h"
 
 #include <string>
 
