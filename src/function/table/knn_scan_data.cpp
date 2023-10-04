@@ -3,16 +3,16 @@
 //
 
 #include "knn_scan_data.h"
-#include "storage/indexstore/knn_flat/knn_flat_ip.h"
-#include "storage/indexstore/knn_flat/knn_flat_ip_reservoir.h"
-#include "storage/indexstore/knn_flat/knn_flat_ip_blas.h"
-#include "storage/indexstore/knn_flat/knn_flat_ip_blas_reservoir.h"
-#include "storage/indexstore/knn_flat/knn_flat_l2.h"
-#include "storage/indexstore/knn_flat/knn_flat_l2_blas.h"
-#include "storage/indexstore/knn_flat/knn_flat_l2_blas_reservoir.h"
-#include "storage/indexstore/knn_flat/knn_flat_l2_reservoir.h"
-#include "storage/indexstore/knn_flat/knn_flat_l2_top1.h"
-#include "storage/indexstore/knn_flat/knn_flat_l2_top1_blas.h"
+#include "storage/knnindex/knn_flat/knn_flat_ip.h"
+#include "storage/knnindex/knn_flat/knn_flat_ip_reservoir.h"
+#include "storage/knnindex/knn_flat/knn_flat_ip_blas.h"
+#include "storage/knnindex/knn_flat/knn_flat_ip_blas_reservoir.h"
+#include "storage/knnindex/knn_flat/knn_flat_l2.h"
+#include "storage/knnindex/knn_flat/knn_flat_l2_blas.h"
+#include "storage/knnindex/knn_flat/knn_flat_l2_blas_reservoir.h"
+#include "storage/knnindex/knn_flat/knn_flat_l2_reservoir.h"
+#include "storage/knnindex/knn_flat/knn_flat_l2_top1.h"
+#include "storage/knnindex/knn_flat/knn_flat_l2_top1_blas.h"
 
 namespace infinity {
 
