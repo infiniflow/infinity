@@ -194,7 +194,8 @@ DataType::WriteAdv(char*& ptr) const {
             break;
         }
         default:
-            TypeError(fmt::format("Unexpected type {} here.", int(this->type_)));
+            // There's no type_info for other types
+            break;
     }
     return;
 }
@@ -231,7 +232,8 @@ DataType::ReadAdv(char*& ptr, int32_t maxbytes) {
             break;
         }
         default:
-            TypeError(fmt::format("Unexpected type {} here.", int(type)));
+            // There's no type_info for other types
+            break;
     }
     maxbytes = ptr_end - ptr;
     StorageAssert(maxbytes >= 0,
@@ -280,9 +282,9 @@ DataType::Deserialize(const nlohmann::json& data_type_json) {
                 type_info = VarcharInfo::Make(type_info_json["dimension"]);
                 break;
             }
-            default: {
-                TypeError(fmt::format("Unexpected type {} here.", int(logical_type)));
-            }
+            default:
+                // There's no type_info for other types
+                break;
         }
     }
     SharedPtr<DataType> data_type = MakeShared<DataType>(logical_type, type_info);

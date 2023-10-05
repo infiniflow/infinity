@@ -210,15 +210,10 @@ TableCollectionEntry::GetBlockIndex(TableCollectionEntry* table_collection_entry
 //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
     std::shared_lock<RWMutex> rw_locker(table_collection_entry->rw_locker_);
-    result->Reserve(table_collection_entry->segments_.size() + 1);
+    result->Reserve(table_collection_entry->segments_.size());
 
     for(const auto& segment_pair: table_collection_entry->segments_) {
         result->Insert(segment_pair.second.get(), txn_id);
-    }
-
-    SegmentEntry* unsealed_segment = table_collection_entry->unsealed_segment_;
-    if(unsealed_segment != nullptr) {
-        result->Insert(unsealed_segment, txn_id);
     }
 
     return result;

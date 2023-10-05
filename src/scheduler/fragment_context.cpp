@@ -33,9 +33,11 @@ BuildSerialTaskStateTemplate(Vector<PhysicalOperator*>& fragment_operators,
 
     task_ptr->operator_output_state_[operator_id] = MakeUnique<OutputStateType>();
     auto current_operator_output_state = (OutputStateType*)(task_ptr->operator_output_state_[operator_id].get());
-
-    current_operator_output_state->data_block_ = DataBlock::Make();
-    current_operator_output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
+    auto output_types = fragment_operators[operator_id]->GetOutputTypes();
+    if (output_types != nullptr) {
+        current_operator_output_state->data_block_ = DataBlock::Make();
+        current_operator_output_state->data_block_->Init(*output_types);
+    }
 
     if(operator_id == operator_count - 1) {
         // Set first operator input as the output of source operator
@@ -75,49 +77,6 @@ BuildSerialTaskStateTemplate(Vector<PhysicalOperator*>& fragment_operators,
                     break;
                 }
             }
-        }
-    }
-}
-
-template<>
-void
-BuildSerialTaskStateTemplate<ImportInputState, ImportOutputState>(Vector<PhysicalOperator*>& fragment_operators,
-                                                                  Vector<UniquePtr<FragmentTask>>& tasks,
-                                                                  i64 operator_id,
-                                                                  i64 operator_count,
-                                                                  FragmentContext* parent_fragment_context) {
-    if(tasks.size() != 1) {
-        SchedulerError("Serial fragment type will only have one task")
-    }
-
-    FragmentTask* task_ptr = tasks.back().get();
-
-    task_ptr->operator_input_state_[operator_id] = MakeUnique<ImportInputState>();
-    auto current_operator_input_state = (ImportInputState*)(task_ptr->operator_input_state_[operator_id].get());
-
-    task_ptr->operator_output_state_[operator_id] = MakeUnique<ImportOutputState>();
-    auto current_operator_output_state = (ImportOutputState*)(task_ptr->operator_output_state_[operator_id].get());
-
-//    output_state->data_block_ = DataBlock::Make();
-//    output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
-    if(operator_id == operator_count - 1) {
-        // Set first operator input as the output of source operator
-        SourceState* source_state = tasks.back()->source_state_.get();
-        source_state->SetNextState(current_operator_input_state);
-    }
-
-    if(operator_id >= 0 && operator_id < operator_count - 1) {
-        OutputState* prev_operator_output_state = task_ptr->operator_output_state_[operator_id + 1].get();
-        current_operator_input_state->ConnectToPrevOutputOpState(prev_operator_output_state);
-//        current_operator_input_state->input_data_block_ = prev_output_state->data_block_.get();
-    }
-
-    if(operator_id == 0) {
-        // Set last operator output as the input of sink operator
-        SinkState* sink_state = tasks.back()->sink_state_.get();
-        sink_state->SetPrevState(current_operator_output_state);
-        if(parent_fragment_context != nullptr) {
-            SchedulerError("Import node should only have one fragment.")
         }
     }
 }

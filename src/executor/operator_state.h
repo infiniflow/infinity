@@ -341,6 +341,7 @@ struct InsertInputState : public InputState {
 struct InsertOutputState : public OutputState {
     inline explicit
     InsertOutputState() : OutputState(PhysicalOperatorType::kInsert) {}
+    UniquePtr<String> result_msg_{};
 };
 
 // Import
