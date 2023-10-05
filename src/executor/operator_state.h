@@ -11,6 +11,7 @@
 #include "storage/meta/entry/segment_entry.h"
 #include "function/table/table_scan_data.h"
 #include "function/table/knn_scan_data.h"
+#include "storage/common/global_block_id.h"
 
 namespace infinity {
 
@@ -582,18 +583,18 @@ struct AggregateSourceState : public SourceState {
 
 struct TableScanSourceState : public SourceState {
     explicit
-    TableScanSourceState(SharedPtr<Vector<u64>> segment_ids)
-            : SourceState(SourceStateType::kTableScan), segment_entry_ids_(std::move(segment_ids)) {}
+    TableScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
+            : SourceState(SourceStateType::kTableScan), global_ids_(std::move(global_ids)) {}
 
-    SharedPtr<Vector<u64>> segment_entry_ids_;
+    SharedPtr<Vector<GlobalBlockID>> global_ids_;
 };
 
 struct KnnScanSourceState : public SourceState {
     explicit
-    KnnScanSourceState(SharedPtr<Vector<u64>> segment_ids)
-            : SourceState(SourceStateType::kKnnScan), segment_entry_ids_(std::move(segment_ids)) {}
+    KnnScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
+            : SourceState(SourceStateType::kKnnScan), global_ids_(std::move(global_ids)) {}
 
-    SharedPtr<Vector<u64>> segment_entry_ids_;
+    SharedPtr<Vector<GlobalBlockID>> global_ids_;
 };
 
 struct EmptySourceState : public SourceState {

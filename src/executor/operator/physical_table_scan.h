@@ -5,6 +5,7 @@
 #pragma once
 
 #include "executor/physical_operator.h"
+#include "storage/common/global_block_id.h"
 
 #include <utility>
 
@@ -39,7 +40,7 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>>
     GetOutputTypes() const final;
 
-    Vector<SharedPtr<Vector<u64>>>
+    Vector<SharedPtr<Vector<GlobalBlockID>>>
     PlanSegmentEntries(i64 parallel_count) const;
 
     String
@@ -52,10 +53,10 @@ public:
     TableEntry() const;
 
     SizeT
-    SegmentEntryCount() const;
+    BlockEntryCount() const;
 
-    Vector<SegmentEntry*>*
-    SegmentEntriesPtr() const;
+    BlockIndex*
+    GetBlockIndex() const;
 
     Vector<SizeT>&
     ColumnIDs() const;

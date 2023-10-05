@@ -383,15 +383,15 @@ QueryBinder::BuildBaseTable(QueryContext* query_context,
 
     SharedPtr<TableScanFunction> table_scan_function = TableScanFunction::Make(query_context->storage()->catalog(),
                                                                                "table_scan");
-    SharedPtr<Vector<SegmentEntry*>> segment_entries = TableCollectionEntry::GetSegmentEntries(table_collection_entry,
-                                                                                               txn_id,
-                                                                                               begin_ts);
+    SharedPtr<BlockIndex> block_index = TableCollectionEntry::GetBlockIndex(table_collection_entry,
+                                                                            txn_id,
+                                                                            begin_ts);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(table_scan_function,
                                               table_collection_entry,
                                               columns,
-                                              segment_entries,
+                                              std::move(block_index),
                                               alias,
                                               table_index,
                                               names_ptr,
@@ -403,7 +403,7 @@ QueryBinder::BuildBaseTable(QueryContext* query_context,
                                              table_collection_entry,
                                              types_ptr,
                                              names_ptr,
-                                             segment_entries);
+                                             block_index);
 
     return table_ref;
 }

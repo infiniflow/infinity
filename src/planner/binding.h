@@ -34,7 +34,7 @@ public:
                 TableCollectionEntry* table_collection_entry_ptr,
                 SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                 SharedPtr<Vector<String>> column_names,
-                SharedPtr<Vector<SegmentEntry*>> segment_entries);
+                SharedPtr<BlockIndex> block_index);
 
     // Binding type
     BindingType binding_type_{BindingType::kInvalid};
@@ -53,7 +53,7 @@ public:
     // if the binding is table, this is the table_ptr
     TableCollectionEntry* table_collection_entry_ptr_{nullptr};
 
-    SharedPtr<Vector<SegmentEntry*>> segment_entries_{};
+    SharedPtr<BlockIndex> block_index_{};
 
     // Column types of the binding
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};

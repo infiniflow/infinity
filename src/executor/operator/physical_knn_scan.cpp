@@ -10,7 +10,6 @@ namespace infinity {
 
 void
 PhysicalKnnScan::Init() {
-
 }
 
 void
@@ -46,9 +45,9 @@ PhysicalKnnScan::TableAlias() const {
     return base_table_ref_->alias_;
 }
 
-Vector<SegmentEntry*>*
-PhysicalKnnScan::SegmentEntriesPtr() const {
-    return base_table_ref_->segment_entries_.get();
+BlockIndex*
+PhysicalKnnScan::GetBlockIndex() const {
+    return base_table_ref_->block_index_.get();
 }
 
 Vector<SizeT>&
@@ -56,23 +55,31 @@ PhysicalKnnScan::ColumnIDs() const {
     return base_table_ref_->column_ids_;
 }
 
-Vector<SharedPtr<Vector<u64>>>
+Vector<SharedPtr<Vector<GlobalBlockID>>>
 PhysicalKnnScan::PlanSegmentEntries(i64 parallel_count) const {
-    SizeT segment_count = base_table_ref_->segment_entries_->size();
-    Vector<SharedPtr<Vector<u64>>> result(parallel_count, nullptr);
-    for(SizeT task_id = 0; task_id < parallel_count; ++task_id) {
-        result[task_id] = MakeShared<Vector<u64>>();
-    }
+    BlockIndex* block_index = base_table_ref_->block_index_.get();
 
-    for(SizeT idx = 0; idx < segment_count; ++idx) {
-        u64 task_id = idx % parallel_count;
-        result[task_id]->emplace_back(idx);
+    u64 all_block_count = block_index->BlockCount();
+    u64 block_per_task = all_block_count / parallel_count;
+    u64 residual = all_block_count % parallel_count;
+
+    Vector<SharedPtr<Vector<GlobalBlockID>>> result(parallel_count, nullptr);
+    for(u64 task_id = 0, global_block_id = 0, residual_idx = 0; task_id < parallel_count; ++task_id) {
+        result[task_id] = MakeShared<Vector<GlobalBlockID>>();
+        for(u64 block_id_in_task = 0; block_id_in_task < block_per_task; ++block_id_in_task) {
+            result[task_id]->emplace_back(block_index->global_blocks_[global_block_id++]);
+        }
+        if(residual_idx < residual) {
+            result[task_id]->emplace_back(block_index->global_blocks_[global_block_id++]);
+            ++residual_idx;
+        }
     }
     return result;
 }
 
 SizeT
-PhysicalKnnScan::SegmentEntryCount() const {
-    return base_table_ref_->segment_entries_->size();
+PhysicalKnnScan::BlockEntryCount() const {
+    return base_table_ref_->block_index_->BlockCount();
 }
+
 }

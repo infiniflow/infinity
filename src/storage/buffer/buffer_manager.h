@@ -24,7 +24,20 @@ public:
     GetBufferHandle(const SharedPtr<String>& file_dir, const SharedPtr<String>& filename, BufferType buffer_type);
 
     BufferHandle*
+    GetBufferHandle(const SharedPtr<String>& file_dir,
+                    const SharedPtr<String>& filename,
+                    offset_t offset,
+                    SizeT buffer_size,
+                    BufferType buffer_type);
+
+    BufferHandle*
     AllocateBufferHandle(const SharedPtr<String>& file_dir, const SharedPtr<String>& filename, SizeT buffer_size);
+
+    BufferHandle*
+    AllocateBufferHandle(const SharedPtr<String>& file_dir,
+                         const SharedPtr<String>& filename,
+                         offset_t offset,
+                         SizeT buffer_size);
 
     inline void
     PushGCQueue(BufferHandle* buffer_handle) {

@@ -205,7 +205,7 @@ public:
                     TableCollectionEntry* table_collection_entry_ptr,
                     SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                     SharedPtr<Vector<String>> column_names,
-                    SharedPtr<Vector<SegmentEntry*>> segment_entries);
+                    SharedPtr<BlockIndex> block_index);
 
     // Merge input bind context into this bind context
     void

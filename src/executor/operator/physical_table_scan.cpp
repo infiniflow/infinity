@@ -17,11 +17,11 @@ PhysicalTableScan::Execute(QueryContext* query_context, InputState* input_state,
     auto* table_scan_input_state = static_cast<TableScanInputState*>(input_state);
     auto* table_scan_output_state = static_cast<TableScanOutputState*>(output_state);
 
-    Vector<u64>& segment_entry_index_array = *table_scan_input_state->table_scan_function_data_->segment_indexes_;
-    for(const u64 segment_idx: segment_entry_index_array) {
-        SegmentEntry* segment_entry = base_table_ref_->segment_entries_->at(segment_idx);
-        LOG_TRACE("Segment Entry ID: {}", segment_entry->segment_id_);
-    }
+//    const MultiIndex<u64, u64, SegmentEntry*>* segment_entry_index_array = *table_scan_input_state->table_scan_function_data_->segment_index_;
+//    for(const u64 segment_idx: segment_entry_index_array) {
+//        SegmentEntry* segment_entry = base_table_ref_->segment_entries_->at(segment_idx);
+//        LOG_TRACE("Segment Entry ID: {}", segment_entry->segment_id_);
+//    }
 
     table_scan_output_state->data_block_->Reset();
 
@@ -95,13 +95,13 @@ PhysicalTableScan::TableEntry() const {
 }
 
 SizeT
-PhysicalTableScan::SegmentEntryCount() const {
-    return base_table_ref_->segment_entries_->size();
+PhysicalTableScan::BlockEntryCount() const {
+    return base_table_ref_->block_index_->BlockCount();
 }
 
-Vector<SegmentEntry*>*
-PhysicalTableScan::SegmentEntriesPtr() const {
-    return base_table_ref_->segment_entries_.get();
+BlockIndex*
+PhysicalTableScan::GetBlockIndex() const {
+    return base_table_ref_->block_index_.get();
 }
 
 Vector<SizeT>&
@@ -109,17 +109,24 @@ PhysicalTableScan::ColumnIDs() const {
     return base_table_ref_->column_ids_;
 }
 
-Vector<SharedPtr<Vector<u64>>>
+Vector<SharedPtr<Vector<GlobalBlockID>>>
 PhysicalTableScan::PlanSegmentEntries(i64 parallel_count) const {
-    SizeT segment_count = base_table_ref_->segment_entries_->size();
-    Vector<SharedPtr<Vector<u64>>> result(parallel_count, nullptr);
-    for(SizeT task_id = 0; task_id < parallel_count; ++task_id) {
-        result[task_id] = MakeShared<Vector<u64>>();
-    }
+    BlockIndex* block_index = base_table_ref_->block_index_.get();
 
-    for(SizeT idx = 0; idx < segment_count; ++idx) {
-        u64 task_id = idx % parallel_count;
-        result[task_id]->emplace_back(idx);
+    u64 all_block_count = block_index->BlockCount();
+    u64 block_per_task = all_block_count / parallel_count;
+    u64 residual = all_block_count % parallel_count;
+
+    Vector<SharedPtr<Vector<GlobalBlockID>>> result(parallel_count, nullptr);
+    for(u64 task_id = 0, global_block_id = 0, residual_idx = 0; task_id < parallel_count; ++task_id) {
+        result[task_id] = MakeShared<Vector<GlobalBlockID>>();
+        for(u64 block_id_in_task = 0; block_id_in_task < block_per_task; ++block_id_in_task) {
+            result[task_id]->emplace_back(block_index->global_blocks_[global_block_id++]);
+        }
+        if(residual_idx < residual) {
+            result[task_id]->emplace_back(block_index->global_blocks_[global_block_id++]);
+            ++residual_idx;
+        }
     }
     return result;
 }

@@ -45,18 +45,19 @@ TEST_F(FragmentTest, test_build_fragment) {
     EXPECT_EQ(result4->definition_ptr_.get()->columns()[0]->name_, "OK");
     auto result5 = SQLRunner::Run("drop database db1", true);
     EXPECT_EQ(result5->definition_ptr_.get()->columns()[0]->name_, "OK");
-    auto result6 = SQLRunner::Run("drop table t1", true);
-    EXPECT_EQ(result6->definition_ptr_.get()->columns()[0]->name_, "OK");
-
-    /// Show
-    auto result7 = SQLRunner::Run("show tables", true);
-    EXPECT_EQ(result7->definition_ptr_->column_count(), 7);
-    auto result8 = SQLRunner::Run("describe t2", true);
-    EXPECT_EQ(result8->definition_ptr_->column_count(), 3);
 
     /// SPJ
 //    SQLRunner::Run("select * from t1 where a = 1", true);
 //    SQLRunner::Run("select a+1 from t1", true);
 
+    /// DDL
+    auto result6 = SQLRunner::Run("drop table t1", true);
+    EXPECT_EQ(result6->definition_ptr_.get()->columns()[0]->name_, "OK");
+
+    /// Show
+    auto result7 = SQLRunner::Run("show tables", true);
+    EXPECT_EQ(result7->definition_ptr_->column_count(), 8);
+    auto result8 = SQLRunner::Run("describe t2", true);
+    EXPECT_EQ(result8->definition_ptr_->column_count(), 3);
 }
 

@@ -68,15 +68,17 @@ Txn::Delete(const String& db_name, const String& table_name, const Vector<RowID>
     return nullptr;
 }
 
-UniquePtr<MetaTableState>
-Txn::GetTableMeta(const String& db_name, const String& table_name, const Vector<ColumnID>& columns) {
-    UniquePtr<MetaTableState> meta_table_state = MakeUnique<MetaTableState>();
+void
+Txn::GetMetaTableState(MetaTableState* meta_table_state,
+                       const String& db_name,
+                       const String& table_name,
+                       const Vector<ColumnID>& columns) {
     auto txn_table_iter = txn_tables_store_.find(table_name);
     if(txn_table_iter != txn_tables_store_.end()) {
         Vector<SharedPtr<DataBlock>>& blocks = txn_table_iter->second->blocks_;
         meta_table_state->local_blocks_.reserve(blocks.size());
         for(const auto& data_block: blocks) {
-            MetaDataBlockState data_block_state;
+            MetaLocalDataState data_block_state;
             data_block_state.data_block_ = data_block.get();
             for(const auto& column_id: columns) {
                 MetaColumnVectorState column_vector_state;
@@ -93,21 +95,38 @@ Txn::GetTableMeta(const String& db_name, const String& table_name, const Vector<
         StorageError(*err_msg);
     }
 
-    u64 max_segment_id = TableCollectionEntry::GetMaxSegmentID(table_entry);
+    return GetMetaTableState(meta_table_state, table_entry, columns);
+}
+
+void
+Txn::GetMetaTableState(MetaTableState* meta_table_state,
+                       const TableCollectionEntry* table_collection_entry,
+                       const Vector<ColumnID>& columns) {
+    u64 max_segment_id = TableCollectionEntry::GetMaxSegmentID(table_collection_entry);
     for(u64 segment_id = 0; segment_id < max_segment_id; ++segment_id) {
-        SegmentEntry* segment_entry_ptr = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
+        SegmentEntry* segment_entry_ptr = TableCollectionEntry::GetSegmentByID(table_collection_entry, segment_id);
 
         MetaSegmentState segment_state;
         segment_state.segment_entry_ = segment_entry_ptr;
-        for(const auto& column_id: columns) {
-            MetaColumnDataState column_data_state;
-            column_data_state.column_data_ = SegmentEntry::GetColumnDataByID(segment_entry_ptr, column_id);
-            segment_state.column_data_map_[column_id] = column_data_state;
+
+        i16 max_block_id = SegmentEntry::GetMaxBlockID(segment_entry_ptr);
+        for(i16 block_id = 0; block_id < max_block_id; ++ block_id) {
+            BlockEntry* block_entry_ptr = SegmentEntry::GetBlockEntryByID(segment_entry_ptr, block_id);
+
+            MetaBlockState block_state;
+            block_state.block_entry_ = block_entry_ptr;
+
+            for(const auto& column_id: columns) {
+                MetaBlockColumnState column_data_state;
+                column_data_state.block_column_ = BlockEntry::GetColumnDataByID(block_entry_ptr, column_id);
+                block_state.column_data_map_[column_id] = column_data_state;
+            }
+
+            segment_state.block_map_[block_id] = block_state;
         }
+
         meta_table_state->segment_map_[segment_id] = segment_state;
     }
-
-    return meta_table_state;
 }
 
 SharedPtr<GetState>

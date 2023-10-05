@@ -24,7 +24,7 @@ using idx_t = u64;
 using f32 = float;
 using f64 = double;
 
-
+using offset_t = int64_t;
 
 using ptr_t = char*;
 using const_ptr_t = const char*;

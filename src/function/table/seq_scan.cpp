@@ -18,7 +18,9 @@ SeqScanFunc(QueryContext* query_context,
     Vector<SizeT>& column_ids = table_scan_function_data_ptr->column_ids_;
 
     i64 current_segment_id = table_scan_function_data_ptr->current_segment_id_;
+    i64 current_block_id = table_scan_function_data_ptr->current_block_id;
     SizeT read_offset = table_scan_function_data_ptr->read_offset_;
+
 
     if(current_segment_id == INITIAL_SEGMENT_ID) {
         auto iter = table_column_entry_ptr->segments_.begin();
@@ -29,43 +31,62 @@ SeqScanFunc(QueryContext* query_context,
         }
     }
 
+    if(current_block_id == INITIAL_BLOCK_ID && current_segment_id != INVALID_SEGMENT_ID) {
+        if(table_column_entry_ptr->segments_[current_segment_id]->block_entries_.empty()) {
+            current_block_id = INVALID_BLOCK_ID;
+        } else {
+            current_segment_id = 0;
+        }
+    }
 
-    // Here we assume output is a fresh databolck, we have never write anything into it.
+    // Here we assume output is a fresh data block, we have never written anything into it.
     auto write_capacity = output.capacity();
 
-
-    // fill the whole output datablock or we have read all data from table
+    // fill the whole output data block, or we have read all data from table
     while(write_capacity > 0 && current_segment_id != INVALID_SEGMENT_ID) {
         auto iter = table_column_entry_ptr->segments_.find(current_segment_id);
         StorageAssert(iter != table_column_entry_ptr->segments_.end(), "non-exist segment id");
-        auto segment_entry = iter->second;
-        auto remaining = segment_entry->current_row_ - read_offset;
-        auto write_size = std::min(write_capacity, remaining);
-        SizeT output_column_ids = 0;
-        for(auto column_id: column_ids) {
-            ColumnBuffer column_buffer = ColumnDataEntry::GetColumnData(segment_entry->columns_[column_id].get(),
-                                                                        query_context->storage()->buffer_manager());
-            output.column_vectors[output_column_ids++]->AppendWith(column_buffer, read_offset, write_size);
+        SegmentEntry* segment_entry = iter->second.get();
+
+        i64 block_count = segment_entry->block_entries_.size();
+        while(write_capacity > 0 && current_block_id < block_count) {
+            auto* block_entry = segment_entry->block_entries_[current_block_id].get();
+            auto remaining = block_entry->row_count_ - read_offset;
+
+            auto write_size = std::min(write_capacity, remaining);
+
+            for(i64 output_column_id = 0; auto column_id: column_ids) {
+                ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(),
+                                                                             query_context->storage()->buffer_manager());
+                output.column_vectors[output_column_id++]->AppendWith(column_buffer, read_offset, write_size);
+            }
+
+            // write_size = already read size = already write size
+            write_capacity -= write_size;
+            remaining -= write_size;
+            if(remaining == 0) {
+                ++current_block_id;
+                read_offset = 0;
+            } else {
+                read_offset += write_size;
+            }
         }
 
-        // write_size = already read size = already write size
-        write_capacity -= write_size;
-        remaining -= write_size;
-        read_offset += write_size;
-
-        // we have read all data from current segment, move to next block
-        if(remaining == 0) {
+        // we have read all data from current segment, move to next segment
+        if(write_capacity > 0) {
             ++iter;
             if(iter != table_column_entry_ptr->segments_.end()) {
                 current_segment_id = iter->first;
+                current_block_id = 0;
+                read_offset = 0;
             } else {
                 current_segment_id = INVALID_SEGMENT_ID;
             }
-            read_offset = 0;
         }
     }
     output.Finalize();
     table_scan_function_data_ptr->current_segment_id_ = current_segment_id;
+    table_scan_function_data_ptr->current_block_id = current_block_id;
     table_scan_function_data_ptr->read_offset_ = read_offset;
 }
 

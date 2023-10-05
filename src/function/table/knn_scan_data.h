@@ -12,13 +12,14 @@
 #include "parser/parsed_expr/knn_expr.h"
 #include "storage/knnindex/knn_distance.h"
 #include "storage/knnindex/common/compound_id.h"
+#include "storage/common/global_block_id.h"
 
 namespace infinity {
 
 class KnnScanFunctionData : public TableFunctionData {
 public:
-    KnnScanFunctionData(const Vector<SegmentEntry*>* segment_entries_ptr,
-                        const SharedPtr<Vector<u64>>& segment_indexes,
+    KnnScanFunctionData(const BlockIndex* block_index,
+                        const SharedPtr<Vector<GlobalBlockID>>& global_block_ids,
                         const Vector<SizeT>& non_knn_column_ids,
                         Vector<SizeT> knn_column_ids,
                         i64 topk,
@@ -27,8 +28,8 @@ public:
                         void* query_embedding,
                         EmbeddingDataType elem_type,
                         KnnDistanceType knn_distance_type)
-            : segment_entries_ptr_(segment_entries_ptr),
-              segment_indexes_(segment_indexes),
+            : block_index_(block_index),
+              global_block_ids_(global_block_ids),
               non_knn_column_ids_(non_knn_column_ids),
               knn_column_ids_(std::move(knn_column_ids)),
               topk_(topk),
@@ -38,8 +39,8 @@ public:
               elem_type_(elem_type),
               knn_distance_type_(knn_distance_type) {}
 
-    const Vector<SegmentEntry*>* segment_entries_ptr_{};
-    const SharedPtr<Vector<u64>>& segment_indexes_{};
+    const BlockIndex* block_index_{};
+    const SharedPtr<Vector<GlobalBlockID>>& global_block_ids_{};
     const Vector<SizeT>& non_knn_column_ids_{};
     Vector<SizeT> knn_column_ids_{};
     i64 topk_{0};
@@ -49,7 +50,7 @@ public:
     EmbeddingDataType elem_type_{EmbeddingDataType::kElemInvalid};
     KnnDistanceType knn_distance_type_{KnnDistanceType::kInvalid};
 
-    i64 current_segment_idx_{0};
+    i64 current_block_ids_idx_{0};
 
     UniquePtr<KnnDistanceBase> knn_distance_{nullptr};
 

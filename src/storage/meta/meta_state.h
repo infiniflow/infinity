@@ -5,30 +5,38 @@
 #pragma once
 
 
-
 namespace infinity {
-
-struct MetaColumnDataState {
-    ColumnDataEntry* column_data_{};
-};
 
 struct MetaColumnVectorState {
     ColumnVector* column_vector_{};
 };
 
-struct MetaDataBlockState {
+struct MetaLocalDataState {
     DataBlock* data_block_{};
     HashMap<u64, MetaColumnVectorState> column_vector_map_{};
 };
 
+struct MetaBlockColumnState {
+    BlockColumnEntry* block_column_{};
+};
+
+
+struct MetaBlockState {
+    BlockEntry* block_entry_{};
+    HashMap<u64, MetaBlockColumnState> column_data_map_{};
+};
+
 struct MetaSegmentState {
     SegmentEntry* segment_entry_{};
-    HashMap<u64, MetaColumnDataState> column_data_map_{};
+
+    HashMap<i16, MetaBlockState> block_map_{};
 };
 
 struct MetaTableState {
-    Vector<MetaDataBlockState> local_blocks_{};
-    HashMap<u64, MetaSegmentState> segment_map_{};
+    Vector<MetaLocalDataState> local_blocks_{};
+
+    // segment id->meta segment state
+    HashMap<i32, MetaSegmentState> segment_map_{};
 };
 
 }

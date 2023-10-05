@@ -17,8 +17,10 @@ enum EntryType : i8 {
     kView,
     kColumn,
     kSegment,
-    kColumnData,
+    kSegmentColumn,
     kBlock,
+    kBlockColumn,
+    kDeleteFile,
 };
 
 struct BaseEntry {

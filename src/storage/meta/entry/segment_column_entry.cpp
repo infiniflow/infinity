@@ -2,7 +2,7 @@
 // Created by jinhai on 23-8-12.
 //
 
-#include "column_data_entry.h"
+#include "segment_column_entry.h"
 #include "common/default_values.h"
 #include "common/types/data_type.h"
 
@@ -17,10 +17,10 @@
 
 namespace infinity {
 
-SharedPtr<ColumnDataEntry>
-ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry* segment_entry, u64 column_id, u64 row_capacity,
-                                        const SharedPtr<DataType>& data_type, BufferManager* buffer_mgr) {
-    SharedPtr<ColumnDataEntry> column_data_entry = MakeShared<ColumnDataEntry>(segment_entry);
+SharedPtr<SegmentColumnEntry>
+SegmentColumnEntry::MakeNewColumnDataEntry(const SegmentEntry* segment_entry, u64 column_id, u64 row_capacity,
+                                           const SharedPtr<DataType>& data_type, BufferManager* buffer_mgr) {
+    SharedPtr<SegmentColumnEntry> column_data_entry = MakeShared<SegmentColumnEntry>(segment_entry);
     const auto* segment_ptr = (const SegmentEntry*)segment_entry;
     column_data_entry->base_dir_ = segment_ptr->segment_dir_;
     column_data_entry->row_capacity_ = row_capacity;
@@ -37,7 +37,7 @@ ColumnDataEntry::MakeNewColumnDataEntry(const SegmentEntry* segment_entry, u64 c
 }
 
 ColumnBuffer
-ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, BufferManager* buffer_mgr) {
+SegmentColumnEntry::GetColumnData(SegmentColumnEntry* column_data_entry, BufferManager* buffer_mgr) {
     if(column_data_entry->buffer_handle_ == nullptr) {
         // Get buffer handle from buffer manager
         column_data_entry->buffer_handle_ = buffer_mgr->GetBufferHandle(column_data_entry->base_dir_,
@@ -51,22 +51,22 @@ ColumnDataEntry::GetColumnData(ColumnDataEntry* column_data_entry, BufferManager
 
 // Note!!!: caller of `Append` should guarantee the buffer_handler has enough place to append `row_n` rows.
 void
-ColumnDataEntry::Append(ColumnDataEntry* column_data_entry,
-                        const SharedPtr<ColumnVector>& column_vector,
-                        SizeT block_start_offset,
-                        SizeT column_start_offset,
-                        SizeT row_n) {
+SegmentColumnEntry::Append(SegmentColumnEntry* column_data_entry,
+                           const SharedPtr<ColumnVector>& column_vector,
+                           SizeT block_start_offset,
+                           SizeT column_start_offset,
+                           SizeT row_n) {
     if(column_data_entry->buffer_handle_ == nullptr) {
         StorageError("Not initialize buffer handle")
     }
     ptr_t src_ptr = column_vector->data() + block_start_offset * column_vector->data_type_size_;
     SizeT data_size = row_n * column_vector->data_type_size_;
     SizeT dst_offset = column_start_offset * column_vector->data_type_size_;
-    ColumnDataEntry::AppendRaw(column_data_entry, dst_offset, src_ptr, data_size);
+    SegmentColumnEntry::AppendRaw(column_data_entry, dst_offset, src_ptr, data_size);
 }
 
 void
-ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset, ptr_t src_p, SizeT data_size) {
+SegmentColumnEntry::AppendRaw(SegmentColumnEntry* column_data_entry, SizeT dst_offset, ptr_t src_p, SizeT data_size) {
     auto column_type = column_data_entry->column_type_;
     CommonObjectHandle object_handle(column_data_entry->buffer_handle_);
     ptr_t dst_ptr = object_handle.GetData() + dst_offset;
@@ -101,7 +101,7 @@ ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset,
                     if(outline_info->written_buffers_.empty() ||
                        outline_info->written_buffers_.back().second + varchar_type->length >
                        DEFAULT_OUTLINE_FILE_MAX_SIZE) {
-                        auto file_name = ColumnDataEntry::OutlineFilename(outline_info->next_file_idx++);
+                        auto file_name = SegmentColumnEntry::OutlineFilename(outline_info->next_file_idx++);
                         auto buffer_handle = outline_info->buffer_mgr_->AllocateBufferHandle(column_data_entry->base_dir_,
                                                                                              file_name,
                                                                                              DEFAULT_OUTLINE_FILE_MAX_SIZE);
@@ -135,8 +135,8 @@ ColumnDataEntry::AppendRaw(ColumnDataEntry* column_data_entry, SizeT dst_offset,
 }
 
 void
-ColumnDataEntry::Flush(ColumnDataEntry* column_data_entry,
-                       SizeT row_count) {
+SegmentColumnEntry::Flush(SegmentColumnEntry* column_data_entry,
+                          SizeT row_count) {
     switch(column_data_entry->column_type_->type()) {
         case kBoolean:
         case kTinyInt:
@@ -199,7 +199,7 @@ ColumnDataEntry::Flush(ColumnDataEntry* column_data_entry,
 }
 
 nlohmann::json
-ColumnDataEntry::Serialize(const ColumnDataEntry* column_data_entry) {
+SegmentColumnEntry::Serialize(const SegmentColumnEntry* column_data_entry) {
     nlohmann::json json_res;
     json_res["column_type"] = column_data_entry->column_type_->Serialize();
     json_res["base_dir"] = *column_data_entry->base_dir_;
@@ -217,11 +217,11 @@ ColumnDataEntry::Serialize(const ColumnDataEntry* column_data_entry) {
     return json_res;
 }
 
-SharedPtr<ColumnDataEntry>
-ColumnDataEntry::Deserialize(const nlohmann::json& column_data_json,
-                             SegmentEntry* segment_entry,
-                             BufferManager* buffer_mgr) {
-    SharedPtr<ColumnDataEntry> column_data_entry = MakeShared<ColumnDataEntry>(segment_entry);
+SharedPtr<SegmentColumnEntry>
+SegmentColumnEntry::Deserialize(const nlohmann::json& column_data_json,
+                                SegmentEntry* segment_entry,
+                                BufferManager* buffer_mgr) {
+    SharedPtr<SegmentColumnEntry> column_data_entry = MakeShared<SegmentColumnEntry>(segment_entry);
     column_data_entry->column_type_ = DataType::Deserialize(column_data_json["column_type"]);
     column_data_entry->base_dir_ = MakeShared<String>(column_data_json["base_dir"]);
     column_data_entry->file_name_ = MakeShared<String>(column_data_json["file_name"]);

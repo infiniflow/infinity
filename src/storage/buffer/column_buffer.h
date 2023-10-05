@@ -25,7 +25,8 @@ class ColumnBuffer {
     UniquePtr<OutlineBuffer> outline_buffer_{};
 
 public:
-    explicit ColumnBuffer(BufferHandle* buffer_handle, BufferManager* buffer_mgr, bool is_outline);
+    explicit
+    ColumnBuffer(BufferHandle* buffer_handle, BufferManager* buffer_mgr, bool is_outline);
 
     const ptr_t
     GetAll();

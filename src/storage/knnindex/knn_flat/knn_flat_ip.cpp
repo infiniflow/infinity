@@ -25,7 +25,8 @@ template<typename DistType>
 void
 KnnFlatIP<DistType>::Search(const DistType* base,
                             i64 base_count,
-                            i32 segment_id) {
+                            i32 segment_id,
+                            i16 block_id) {
     if(!begin_) {
         ExecutorError("KnnFlatIP isn't begin")
     }

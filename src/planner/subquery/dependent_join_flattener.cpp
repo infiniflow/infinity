@@ -304,7 +304,7 @@ DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode>& 
     SharedPtr<BaseTableRef> base_table_ref = MakeShared<BaseTableRef>(scan_function,
                                                                       table_binding_ptr->table_collection_entry_ptr_,
                                                                       column_ids,
-                                                                      table_binding_ptr->segment_entries_,
+                                                                      table_binding_ptr->block_index_,
                                                                       table_binding_ptr->table_name_,
                                                                       table_index,
                                                                       column_names,

@@ -125,6 +125,7 @@ public:
     SharedPtr<String> temp_dir_{}; // ex. /tmp/infinity/_tmp
     SharedPtr<String> current_dir_{}; // ex. table/segment0
     SharedPtr<String> file_name_{}; // ex. 0.col
+    offset_t offset_{};
     u64 id_{};
 
     // file descriptor

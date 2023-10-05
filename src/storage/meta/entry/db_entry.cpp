@@ -50,7 +50,9 @@ DBEntry::CreateTableCollection(DBEntry* db_entry,
                                                               txn_mgr);
         return res;
     } else {
-        LOG_TRACE("Add new table entry for {} in existed table meta of db_entry {}", table_name, *db_entry->db_entry_dir_);
+        LOG_TRACE("Add new table entry for {} in existed table meta of db_entry {}",
+                  table_name,
+                  *db_entry->db_entry_dir_);
         EntryResult res = TableCollectionMeta::CreateNewEntry(table_meta,
                                                               table_collection_type,
                                                               table_collection_name,
@@ -177,12 +179,12 @@ DBEntry::GetTableCollectionsDetail(DBEntry* db_entry,
         table_collection_detail.row_count_ = table_collection_entry->row_count_;
         table_collection_detail.segment_capacity_ = DEFAULT_SEGMENT_CAPACITY;
 
-        SharedPtr<Vector<SegmentEntry*>> segment_entries = TableCollectionEntry::GetSegmentEntries(
-                table_collection_entry,
-                txn_id,
-                begin_ts);
+        SharedPtr<BlockIndex> segment_index = TableCollectionEntry::GetBlockIndex(table_collection_entry,
+                                                                                  txn_id,
+                                                                                  begin_ts);
 
-        table_collection_detail.segment_count_ = segment_entries->size();
+        table_collection_detail.segment_count_ = segment_index->SegmentCount();
+        table_collection_detail.block_count_ = segment_index->BlockCount();
         results.emplace_back(table_collection_detail);
     }
 

@@ -57,7 +57,8 @@ template<typename DistType>
 void
 KnnFlatL2Top1Blas<DistType>::Search(const DistType* base,
                                     i64 base_count,
-                                    i32 segment_id) {
+                                    i32 segment_id,
+                                    i16 block_id) {
     if(!begin_) {
         ExecutorError("KnnFlatL2Top1Blas isn't begin")
     }

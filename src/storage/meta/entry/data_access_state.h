@@ -11,12 +11,13 @@ namespace infinity {
 
 struct AppendRange {
     inline explicit
-    AppendRange(u64 segment_id, u64 start_pos, u64 row_count)
-            : segment_id_(segment_id), start_pos_(start_pos), row_count_(row_count) {}
+    AppendRange(i32 segment_id, i16 block_id, i16 start_id, i16 row_count)
+            : segment_id_(segment_id), block_id_(block_id), start_id_(start_id), row_count_(row_count) {}
 
-    u64 segment_id_;
-    u64 start_pos_;
-    u64 row_count_;
+    i32 segment_id_;
+    i16 block_id_;
+    i16 start_id_;
+    i16 row_count_;
 };
 
 struct AppendState {

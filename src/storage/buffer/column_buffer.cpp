@@ -6,7 +6,7 @@
 #include "storage/buffer/buffer_handle.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/object_handle.h"
-#include "storage/meta/entry/column_data_entry.h"
+#include "storage/meta/entry/segment_column_entry.h"
 
 namespace infinity {
 
@@ -35,7 +35,7 @@ ColumnBuffer::GetVarcharAt(SizeT row_idx) {
     }
     auto& long_info = varchar_layout->u.long_info_;
     if(outline_buffer_->current_file_idx_ != long_info.file_idx_) {
-        auto filename = ColumnDataEntry::OutlineFilename(long_info.file_idx_);
+        auto filename = SegmentColumnEntry::OutlineFilename(long_info.file_idx_);
         auto buffer_handle = outline_buffer_->buffer_mgr_->GetBufferHandle(inline_col_.GetDir(),
                                                                            filename,
                                                                            BufferType::kFile);

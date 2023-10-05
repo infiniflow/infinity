@@ -88,7 +88,7 @@ public:
         return column_count_;
     }
 
-    [[nodiscard]] inline SizeT
+    [[nodiscard]] inline i16
     row_count() const {
         if(!finalized) {
             if(row_count_ == 0)

@@ -11,6 +11,7 @@
 #include "expression/column_expression.h"
 #include "expression/knn_expression.h"
 #include "expression/value_expression.h"
+#include "storage/common/global_block_id.h"
 
 namespace infinity {
 
@@ -162,8 +163,8 @@ BuildParallelTaskStateTemplate<TableScanInputState, TableScanOutputState>(Vector
 //            SchedulerError("Empty segment entry ids")
 //        }
 
-        table_scan_input_state->table_scan_function_data_ = MakeUnique<TableScanFunctionData>(physical_table_scan->SegmentEntriesPtr(),
-                                                                                              table_scan_source_state->segment_entry_ids_,
+        table_scan_input_state->table_scan_function_data_ = MakeUnique<TableScanFunctionData>(physical_table_scan->GetBlockIndex(),
+                                                                                              table_scan_source_state->global_ids_,
                                                                                               physical_table_scan->ColumnIDs());
 
         task_ptr->operator_output_state_[operator_id] = MakeUnique<TableScanOutputState>();
@@ -224,8 +225,8 @@ BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vector<Phy
             ValueExpression* limit_expr = static_cast<ValueExpression*>(physical_knn_scan->limit_expression_.get());
             i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
 
-            knn_scan_input_state->knn_scan_function_data_ = MakeUnique<KnnScanFunctionData>(physical_knn_scan->SegmentEntriesPtr(),
-                                                                                            knn_scan_source_state->segment_entry_ids_,
+            knn_scan_input_state->knn_scan_function_data_ = MakeUnique<KnnScanFunctionData>(physical_knn_scan->GetBlockIndex(),
+                                                                                            knn_scan_source_state->global_ids_,
                                                                                             physical_knn_scan->ColumnIDs(),
                                                                                             knn_column_ids,
                                                                                             topk,
@@ -255,7 +256,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
     Vector<PhysicalOperator*>& fragment_operators = fragment_ptr->GetOperators();
     i64 operator_count = fragment_operators.size();
     if(operator_count < 1) {
-        SchedulerError("No opertors in the fragment.")
+        SchedulerError("No operators in the fragment.")
     }
 
     UniquePtr<FragmentContext> fragment_context;
@@ -594,7 +595,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             case PhysicalOperatorType::kTableScan: {
                 auto* table_scan_operator = static_cast<PhysicalTableScan*>(first_operator);
                 parallel_count = std::min(parallel_count,
-                                          (i64)(table_scan_operator->SegmentEntryCount()));
+                                          (i64)(table_scan_operator->BlockEntryCount()));
                 if(parallel_count == 0) {
                     parallel_count = 1;
                 }
@@ -603,7 +604,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             case PhysicalOperatorType::kKnnScan: {
                 auto* knn_scan_operator = static_cast<PhysicalKnnScan*>(first_operator);
                 parallel_count = std::min(parallel_count,
-                                          (i64)(knn_scan_operator->SegmentEntryCount()));
+                                          (i64)(knn_scan_operator->BlockEntryCount()));
                 if(parallel_count == 0) {
                     parallel_count = 1;
                 }
@@ -727,7 +728,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
 
             // Partition the hash range to each source state
             auto* table_scan_operator = (PhysicalTableScan*)first_operator;
-            Vector<SharedPtr<Vector<u64>>> segment_id_group = table_scan_operator->PlanSegmentEntries(parallel_count);
+            Vector<SharedPtr<Vector<GlobalBlockID>>> segment_id_group = table_scan_operator->PlanSegmentEntries(parallel_count);
             for(i64 task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_[task_id]->source_state_ = MakeUnique<TableScanSourceState>(segment_id_group[task_id]);
             }
@@ -747,9 +748,9 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
 
             // Partition the hash range to each source state
             auto* knn_scan_operator = (PhysicalKnnScan*)first_operator;
-            Vector<SharedPtr<Vector<u64>>> segment_id_group = knn_scan_operator->PlanSegmentEntries(parallel_count);
+            Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = knn_scan_operator->PlanSegmentEntries(parallel_count);
             for(i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->source_state_ = MakeUnique<KnnScanSourceState>(segment_id_group[task_id]);
+                tasks_[task_id]->source_state_ = MakeUnique<KnnScanSourceState>(blocks_group[task_id]);
             }
             break;
         }

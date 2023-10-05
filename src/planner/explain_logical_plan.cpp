@@ -1036,7 +1036,7 @@ ExplainLogicalPlan::Explain(const LogicalShow* show_node,
             result->emplace_back(MakeShared<String>(show_str));
 
             String output_columns_str = String(intent_size, ' ') +
-                                        " - output columns: [database, table, type, column_count, row_count, segment_count, segment_capacity]";
+                                        " - output columns: [database, table, type, column_count, row_count, segment_count, block_count, segment_capacity]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }

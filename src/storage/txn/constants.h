@@ -13,6 +13,8 @@ namespace infinity {
 constexpr TxnTimeStamp UNCOMMIT_TS = std::numeric_limits<TxnTimeStamp>::max();
 constexpr i64 INVALID_SEGMENT_ID = std::numeric_limits<i64>::max();
 constexpr i64 INITIAL_SEGMENT_ID = -1;
+constexpr i64 INVALID_BLOCK_ID = std::numeric_limits<i64>::max();
+constexpr i64 INITIAL_BLOCK_ID = -1;
 
 constexpr SizeT KB = 1024;
 constexpr SizeT MB = 1024 * KB;

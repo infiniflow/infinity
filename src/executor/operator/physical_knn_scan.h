@@ -5,6 +5,7 @@
 #pragma once
 
 #include "executor/physical_operator.h"
+#include "storage/common/global_block_id.h"
 
 #include <memory>
 
@@ -63,17 +64,17 @@ public:
     [[nodiscard]] String
     TableAlias() const;
 
-    Vector<SegmentEntry*>*
-    SegmentEntriesPtr() const;
+    BlockIndex*
+    GetBlockIndex() const;
 
     Vector<SizeT>&
     ColumnIDs() const;
 
-    Vector<SharedPtr<Vector<u64>>>
+    Vector<SharedPtr<Vector<GlobalBlockID>>>
     PlanSegmentEntries(i64 parallel_count) const;
 
     SizeT
-    SegmentEntryCount() const;
+    BlockEntryCount() const;
 
 public:
     SharedPtr<BaseTableRef> base_table_ref_{};

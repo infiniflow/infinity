@@ -17,12 +17,13 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String>& db_entry_dir
                                            TableCollectionMeta* table_collection_meta,
                                            u64 txn_id,
                                            TxnTimeStamp begin_ts)
-                                           : BaseEntry(EntryType::kTable),
-                                           table_entry_dir_(MakeShared<String>(*db_entry_dir + "/" + *table_collection_name  + "/txn_" + std::to_string(txn_id))),
-                                           table_collection_name_(std::move(table_collection_name)),
-                                           columns_(columns),
-                                           table_collection_type_(table_collection_type),
-                                           table_collection_meta_(table_collection_meta) {
+        : BaseEntry(EntryType::kTable),
+          table_entry_dir_(MakeShared<String>(
+                  *db_entry_dir + "/" + *table_collection_name + "/txn_" + std::to_string(txn_id))),
+          table_collection_name_(std::move(table_collection_name)),
+          columns_(columns),
+          table_collection_type_(table_collection_type),
+          table_collection_meta_(table_collection_meta) {
     SizeT column_count = columns.size();
     for(SizeT idx = 0; idx < column_count; ++idx) {
         name2id_[columns[idx]->name()] = idx;
@@ -121,16 +122,20 @@ TableCollectionEntry::CommitAppend(TableCollectionEntry* table_entry,
                                    BufferManager* buffer_mgr) {
     HashSet<u64> new_segments;
     for(const auto& range: append_state_ptr->append_ranges_) {
-        LOG_TRACE("Commit, segment: {}, start: {}, count: {}", range.segment_id_, range.start_pos_, range.row_count_);
+        LOG_TRACE("Commit, segment: {}, block: {} start: {}, count: {}",
+                  range.segment_id_,
+                  range.block_id_,
+                  range.start_id_,
+                  range.row_count_);
         SegmentEntry* segment_ptr = table_entry->segments_[range.segment_id_].get();
-        SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.start_pos_, range.row_count_);
+        SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.block_id_, range.start_id_, range.row_count_);
         new_segments.insert(range.segment_id_);
     }
 
     // FIXME: now all commit will trigger flush
     for(u64 segment_id: new_segments) {
         // already flushed
-        if(table_entry->segments_[segment_id]->status_.load() == DataSegmentStatus::kClosed) {
+        if(table_entry->segments_[segment_id]->status_.load() == DataSegmentStatus::kSegmentClosed) {
             continue;
         }
 
@@ -170,10 +175,26 @@ TableCollectionEntry::ImportAppendSegment(TableCollectionEntry* table_entry,
                                           SharedPtr<SegmentEntry> segment,
                                           AppendState& append_state,
                                           BufferManager* buffer_mgr) {
-    append_state.append_ranges_.emplace_back(segment->segment_id_, 0, segment->current_row_);
+    for(const auto& block_entry: segment->block_entries_) {
+        append_state.append_ranges_.emplace_back(segment->segment_id_,
+                                                 block_entry->block_id_,
+                                                 0,
+                                                 block_entry->row_count_);
+    }
+
     std::unique_lock<RWMutex> rw_locker(table_entry->rw_locker_);
     table_entry->segments_.emplace(segment->segment_id_, std::move(segment));
     return nullptr;
+}
+
+SegmentEntry*
+TableCollectionEntry::GetSegmentByID(const TableCollectionEntry* table_entry, u64 id) {
+    auto iter = table_entry->segments_.find(id);
+    if(iter != table_entry->segments_.end()) {
+        return iter->second.get();
+    } else {
+        return nullptr;
+    }
 }
 
 DBEntry*
@@ -182,26 +203,22 @@ TableCollectionEntry::GetDBEntry(const TableCollectionEntry* table_entry) {
     return (DBEntry*)table_meta->db_entry_;
 }
 
-SharedPtr<Vector<SegmentEntry*>>
-TableCollectionEntry::GetSegmentEntries(TableCollectionEntry* table_collection_entry,
-                                        u64 txn_id,
-                                        TxnTimeStamp begin_ts) {
-    SharedPtr<Vector<SegmentEntry*>> result = MakeShared<Vector<SegmentEntry*>>();
-    std::shared_lock<RWMutex> rw_locker(table_collection_entry->rw_locker_); // prevent another read conflict with this append operation
+SharedPtr<BlockIndex>
+TableCollectionEntry::GetBlockIndex(TableCollectionEntry* table_collection_entry,
+                                    u64 txn_id,
+                                    TxnTimeStamp begin_ts) {
+//    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
+    SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
+    std::shared_lock<RWMutex> rw_locker(table_collection_entry->rw_locker_);
+    result->Reserve(table_collection_entry->segments_.size() + 1);
 
-    result->reserve(table_collection_entry->segments_.size() + 1);
     for(const auto& segment_pair: table_collection_entry->segments_) {
-        SegmentEntry* segment_entry = segment_pair.second.get();
-        if(txn_id >= segment_entry->start_txn_id_) {
-            result->emplace_back(segment_entry);
-        }
+        result->Insert(segment_pair.second.get(), txn_id);
     }
 
     SegmentEntry* unsealed_segment = table_collection_entry->unsealed_segment_;
     if(unsealed_segment != nullptr) {
-        if(txn_id > unsealed_segment->start_txn_id_) {
-            result->emplace_back(unsealed_segment);
-        }
+        result->Insert(unsealed_segment, txn_id);
     }
 
     return result;

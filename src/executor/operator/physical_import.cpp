@@ -14,7 +14,7 @@
 #include "main/query_context.h"
 #include "storage/buffer/buffer_handle.h"
 #include "storage/io/local_file_system.h"
-#include "storage/meta/entry/column_data_entry.h"
+#include "storage/meta/entry/segment_column_entry.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/txn/txn_store.h"
 #include <cstring>
@@ -110,45 +110,60 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
     SizeT vector_n = file_size / row_size;
 
     Txn* txn = query_context->GetTxn();
-    const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
+    const String& db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
     const String& table_name = *table_collection_entry_->table_collection_name_;
     txn->AddTxnTableStore(table_name, MakeUnique<TxnTableStore>(table_name,
                                                                 table_collection_entry_,
                                                                 txn));
     TxnTableStore* txn_store = txn->GetTxnTableStore(table_name);
 
+    u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
                                                                               query_context->GetTxn()->TxnID(),
-                                                                              TableCollectionEntry::GetNextSegmentID(
-                                                                                      table_collection_entry_),
+                                                                              segment_id,
                                                                               query_context->GetTxn()->GetBufferMgr());
-    CommonObjectHandle object_handle(segment_entry->columns_[0]->buffer_handle_);
+    BlockEntry* last_block_entry = segment_entry->block_entries_.back().get();
+    CommonObjectHandle object_handle(last_block_entry->columns_[0]->buffer_handle_);
     SizeT row_idx = 0;
+
     while(true) {
         int dim;
-        i64 nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
-        if(dim != dimension) {
+        nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
+        if(dim != dimension or nbytes != sizeof(dimension)) {
             ExecutorError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).",
                                       dim, dimension));
         }
         ptr_t dst_ptr = object_handle.GetData() + row_idx * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
-        segment_entry->current_row_++;
+        ++segment_entry->current_row_;
+        ++last_block_entry->row_count_;
+
+        if(BlockEntry::IsFull(last_block_entry)) {
+            segment_entry->block_entries_.emplace_back(MakeUnique<BlockEntry>(segment_entry.get(),
+                                                                              segment_entry->block_entries_.size(),
+                                                                              segment_entry->column_count_,
+                                                                              ++segment_entry->current_row_,
+                                                                              txn->GetBufferMgr()));
+            last_block_entry = segment_entry->block_entries_.back().get();
+        }
+
         row_idx++;
         if(row_idx == vector_n) {
-            txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->base_dir_));
+            txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->segment_dir_));
             txn_store->Import(segment_entry);
             break;
         }
         if(segment_entry->AvailableCapacity() == 0) {
-            txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->base_dir_));
+            txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->segment_dir_));
             txn_store->Import(segment_entry);
+            segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
                                                               query_context->GetTxn()->TxnID(),
-                                                              TableCollectionEntry::GetNextSegmentID(
-                                                                      table_collection_entry_),
+                                                              segment_id,
                                                               query_context->GetTxn()->GetBufferMgr());
-            object_handle = CommonObjectHandle(segment_entry->columns_[0]->buffer_handle_);
+
+            last_block_entry = segment_entry->block_entries_.back().get();
+            object_handle = CommonObjectHandle(last_block_entry->columns_[0]->buffer_handle_);
         }
     }
     return vector_n;
@@ -173,15 +188,14 @@ PhysicalImport::ImportCSVHelper(QueryContext* query_context, ParserContext& pars
                                                   table_collection_entry_,
                                                   parser_context.txn_));
 
-
+    u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
     parser_context.segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
                                                                       parser_context.txn_->TxnID(),
-                                                                      TableCollectionEntry::GetNextSegmentID(
-                                                                              table_collection_entry_),
+                                                                      segment_id,
                                                                       parser_context.txn_->GetBufferMgr());
     parser_context.delimiter_ = delimiter_;
 
-    const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
+    const String& db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
     const String& table_name = *table_collection_entry_->table_collection_name_;
 
     if(header_) {
@@ -204,7 +218,9 @@ PhysicalImport::ImportCSVHelper(QueryContext* query_context, ParserContext& pars
     zsv_finish(parser_context.parser_);
     // flush the last segment entry
     if(parser_context.segment_entry_->current_row_ > 0) {
-        parser_context.txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *parser_context.segment_entry_->base_dir_));
+        parser_context.txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
+                                                                table_name,
+                                                                *parser_context.segment_entry_->segment_dir_));
         auto txn_store = parser_context.txn_->GetTxnTableStore(table_name);
         txn_store->Import(parser_context.segment_entry_);
     }
@@ -370,35 +386,35 @@ SplitArrayElement(StringView data, char delimiter) {
 
 template<typename T>
 void
-AppendSimpleData(ColumnDataEntry* column_data_entry, const StringView& str_view, SizeT dst_offset) {
+AppendSimpleData(BlockColumnEntry* column_data_entry, const StringView& str_view, SizeT dst_offset) {
     T ele = DataType::StringToValue<T>(str_view);
-    ColumnDataEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T));
+    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T));
 }
 
 template<typename T>
 void
-AppendEmbeddingData(ColumnDataEntry* column_data_entry, const Vector<StringView>& ele_str_views, SizeT dst_offset) {
+AppendEmbeddingData(BlockColumnEntry* column_data_entry, const Vector<StringView>& ele_str_views, SizeT dst_offset) {
     SizeT arr_len = ele_str_views.size();
     auto tmp_buffer = MakeUnique<T[]>(arr_len);
     for(SizeT ele_idx = 0; auto& ele_str_view: ele_str_views) {
         T ele = DataType::StringToValue<T>(ele_str_view);
         tmp_buffer[ele_idx++] = ele;
     }
-    ColumnDataEntry::AppendRaw(column_data_entry,
-                               dst_offset,
-                               reinterpret_cast<ptr_t>(tmp_buffer.get()),
-                               sizeof(T) * arr_len);
+    BlockColumnEntry::AppendRaw(column_data_entry,
+                                dst_offset,
+                                reinterpret_cast<ptr_t>(tmp_buffer.get()),
+                                sizeof(T) * arr_len);
 }
 
 void
-AppendVarcharData(ColumnDataEntry* column_data_entry, const StringView& str_view, SizeT dst_offset) {
+AppendVarcharData(BlockColumnEntry* column_data_entry, const StringView& str_view, SizeT dst_offset) {
     const char_t* tmp_buffer = str_view.data();
     auto varchar_type = MakeUnique<VarcharT>(str_view.data(), str_view.size());
     // TODO shenyushi: unnecessary copy here.
-    ColumnDataEntry::AppendRaw(column_data_entry,
-                               dst_offset,
-                               reinterpret_cast<ptr_t>(varchar_type.get()),
-                               sizeof(VarcharT));
+    BlockColumnEntry::AppendRaw(column_data_entry,
+                                dst_offset,
+                                reinterpret_cast<ptr_t>(varchar_type.get()),
+                                sizeof(VarcharT));
 }
 
 }
@@ -414,12 +430,12 @@ PhysicalImport::CSVRowHandler(void* context) {
     auto txn_store = txn->GetTxnTableStore(*table->table_collection_name_);
 
     auto segment_entry = parser_context->segment_entry_;
-    const String &db_name = *TableCollectionEntry::GetDBEntry(table)->db_name_;
-    const String &table_name = *table->table_collection_name_;
+    const String& db_name = *TableCollectionEntry::GetDBEntry(table)->db_name_;
+    const String& table_name = *table->table_collection_name_;
     // we have already used all space of the segment
     if(segment_entry->AvailableCapacity() == 0) {
         // add to txn_store
-        txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->base_dir_));
+        txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->segment_dir_));
         txn_store->Import(segment_entry);
 
         // create new segment entry
@@ -433,6 +449,16 @@ PhysicalImport::CSVRowHandler(void* context) {
 
     SizeT write_row = segment_entry->current_row_;
 
+    BlockEntry* last_block_entry = segment_entry->block_entries_.back().get();
+    if(BlockEntry::IsFull(last_block_entry)) {
+        segment_entry->block_entries_.emplace_back(MakeUnique<BlockEntry>(segment_entry.get(),
+                                                                          segment_entry->block_entries_.size(),
+                                                                          segment_entry->column_count_,
+                                                                          write_row,
+                                                                          txn->GetBufferMgr()));
+        last_block_entry = segment_entry->block_entries_.back().get();
+    }
+
     // append data to segment entry
     for(SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
         struct zsv_cell cell = zsv_get_cell(parser_context->parser_, column_idx);
@@ -440,8 +466,8 @@ PhysicalImport::CSVRowHandler(void* context) {
         if(cell.len) {
             str_view = StringView((char*)cell.str, cell.len);
         }
-        auto column_data_entry = segment_entry->columns_[column_idx];
-        auto column_type = column_data_entry->column_type_.get();
+        BlockColumnEntry* block_column_entry = last_block_entry->columns_[column_idx].get();
+        auto column_type = block_column_entry->column_type_.get();
         SizeT dst_offset = write_row * column_type->Size();
         if(column_type->type() == kVarchar) {
             auto varchar_info = dynamic_cast<VarcharInfo*>(column_type->type_info().get());
@@ -449,7 +475,7 @@ PhysicalImport::CSVRowHandler(void* context) {
                 ExecutorError("Varchar data size exceeds dimension.");
             }
 
-            AppendVarcharData(column_data_entry.get(), str_view, dst_offset);
+            AppendVarcharData(block_column_entry, str_view, dst_offset);
         } else if(column_type->type() == kEmbedding) {
             Vector<StringView> res;
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
@@ -463,27 +489,27 @@ PhysicalImport::CSVRowHandler(void* context) {
                     NotImplementError("Embedding bit type is not implemented.");
                 }
                 case kElemInt8: {
-                    AppendEmbeddingData<TinyIntT>(column_data_entry.get(), ele_str_views, dst_offset);
+                    AppendEmbeddingData<TinyIntT>(block_column_entry, ele_str_views, dst_offset);
                     break;
                 }
                 case kElemInt16: {
-                    AppendEmbeddingData<SmallIntT>(column_data_entry.get(), ele_str_views, dst_offset);
+                    AppendEmbeddingData<SmallIntT>(block_column_entry, ele_str_views, dst_offset);
                     break;
                 }
                 case kElemInt32: {
-                    AppendEmbeddingData<IntegerT>(column_data_entry.get(), ele_str_views, dst_offset);
+                    AppendEmbeddingData<IntegerT>(block_column_entry, ele_str_views, dst_offset);
                     break;
                 }
                 case kElemInt64: {
-                    AppendEmbeddingData<BigIntT>(column_data_entry.get(), ele_str_views, dst_offset);
+                    AppendEmbeddingData<BigIntT>(block_column_entry, ele_str_views, dst_offset);
                     break;
                 }
                 case kElemFloat: {
-                    AppendEmbeddingData<FloatT>(column_data_entry.get(), ele_str_views, dst_offset);
+                    AppendEmbeddingData<FloatT>(block_column_entry, ele_str_views, dst_offset);
                     break;
                 }
                 case kElemDouble: {
-                    AppendEmbeddingData<DoubleT>(column_data_entry.get(), ele_str_views, dst_offset);
+                    AppendEmbeddingData<DoubleT>(block_column_entry, ele_str_views, dst_offset);
                     break;
                 }
                 case kElemInvalid: {
@@ -493,31 +519,31 @@ PhysicalImport::CSVRowHandler(void* context) {
         } else {
             switch(column_type->type()) {
                 case kBoolean: {
-                    AppendSimpleData<BooleanT>(column_data_entry.get(), str_view, dst_offset);
+                    AppendSimpleData<BooleanT>(block_column_entry, str_view, dst_offset);
                     break;
                 }
                 case kTinyInt: {
-                    AppendSimpleData<TinyIntT>(column_data_entry.get(), str_view, dst_offset);
+                    AppendSimpleData<TinyIntT>(block_column_entry, str_view, dst_offset);
                     break;
                 }
                 case kSmallInt: {
-                    AppendSimpleData<SmallIntT>(column_data_entry.get(), str_view, dst_offset);
+                    AppendSimpleData<SmallIntT>(block_column_entry, str_view, dst_offset);
                     break;
                 }
                 case kInteger: {
-                    AppendSimpleData<IntegerT>(column_data_entry.get(), str_view, dst_offset);
+                    AppendSimpleData<IntegerT>(block_column_entry, str_view, dst_offset);
                     break;
                 }
                 case kBigInt: {
-                    AppendSimpleData<BigIntT>(column_data_entry.get(), str_view, dst_offset);
+                    AppendSimpleData<BigIntT>(block_column_entry, str_view, dst_offset);
                     break;
                 }
                 case kFloat: {
-                    AppendSimpleData<FloatT>(column_data_entry.get(), str_view, dst_offset);
+                    AppendSimpleData<FloatT>(block_column_entry, str_view, dst_offset);
                     break;
                 }
                 case kDouble: {
-                    AppendSimpleData<DoubleT>(column_data_entry.get(), str_view, dst_offset);
+                    AppendSimpleData<DoubleT>(block_column_entry, str_view, dst_offset);
                     break;
                 }
                 case kMissing:
@@ -529,11 +555,10 @@ PhysicalImport::CSVRowHandler(void* context) {
                 }
             }
         }
-
     }
-
-    ++parser_context->row_count_;
+    ++last_block_entry->row_count_;
     ++segment_entry->current_row_;
+    ++parser_context->row_count_;
 }
 
 } // namespace infinity

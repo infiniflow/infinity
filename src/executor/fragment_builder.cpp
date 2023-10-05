@@ -164,8 +164,34 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
         case PhysicalOperatorType::kUpdate: {
             SchedulerError(fmt::format("Not support {}.", phys_op->GetName()));
         }
+        case PhysicalOperatorType::kKnnScan: {
+//            current_fragment_ptr->AddSourceNode(query_context_ptr_,
+//                                                SourceType::kLocalQueue,
+//                                                phys_op->GetOutputNames(),
+//                                                phys_op->GetOutputTypes());
+//            if(phys_op->left() == nullptr) {
+//                SchedulerError(fmt::format("No input node of {}", phys_op->GetName()));
+//            }
+//            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+//            next_plan_fragment->AddSinkNode(query_context_ptr_,
+//                                            SinkType::kLocalQueue,
+//                                            phys_op->left()->GetOutputNames(),
+//                                            phys_op->left()->GetOutputTypes());
+//            BuildFragments(phys_op->left().get(), next_plan_fragment.get());
+//            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
+//            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            if(phys_op->left() != nullptr or phys_op->right() != nullptr) {
+                SchedulerError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
+            }
+            current_fragment_ptr->AddOperator(phys_op);
+            current_fragment_ptr->AddSourceNode(query_context_ptr_,
+                                                SourceType::kTable,
+                                                phys_op->GetOutputNames(),
+                                                phys_op->GetOutputTypes());
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            return ;
+        }
         case PhysicalOperatorType::kTableScan:
-        case PhysicalOperatorType::kKnnScan:
         case PhysicalOperatorType::kIndexScan: {
             if(phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 SchedulerError(fmt::format("{} shouldn't have child.", phys_op->GetName()));

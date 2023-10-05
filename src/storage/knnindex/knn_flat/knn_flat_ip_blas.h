@@ -42,7 +42,8 @@ public:
     void
     Search(const DistType* base,
            i64 base_count,
-           i32 segment_id) final;
+           i32 segment_id,
+           i16 block_id) final;
 
     void
     End() final;

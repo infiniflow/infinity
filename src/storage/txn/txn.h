@@ -107,8 +107,16 @@ public:
     UniquePtr<String>
     Delete(const String& db_name, const String& table_name, const Vector<RowID>& row_ids);
 
-    UniquePtr<MetaTableState>
-    GetTableMeta(const String& db_name, const String& table_name, const Vector<ColumnID>& columns);
+    void
+    GetMetaTableState(MetaTableState* meta_table_state,
+                      const String& db_name,
+                      const String& table_name,
+                      const Vector<ColumnID>& columns);
+
+    void
+    GetMetaTableState(MetaTableState* meta_table_state,
+                      const TableCollectionEntry* table_collection_entry,
+                      const Vector<ColumnID>& columns);
 
     SharedPtr<GetState>
     InitializeGet(GetParam);

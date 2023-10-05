@@ -23,8 +23,8 @@ KnnScanFunc(QueryContext* query_context,
 
     auto* knn_scan_function_data_ptr
             = static_cast<KnnScanFunctionData*>(table_function_data_ptr);
-    const Vector<SegmentEntry*>& segment_entries = *knn_scan_function_data_ptr->segment_entries_ptr_;
-    const Vector<u64>* segment_indexes = knn_scan_function_data_ptr->segment_indexes_.get();
+    const BlockIndex* block_index = knn_scan_function_data_ptr->block_index_;
+    Vector<GlobalBlockID>* block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT>& knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
     if(knn_column_ids.size() != 1) {
         ExecutorError("More than one knn column")
@@ -32,13 +32,15 @@ KnnScanFunc(QueryContext* query_context,
 
     SizeT knn_column_id = knn_column_ids[0];
 
-    i64& segments_idx = knn_scan_function_data_ptr->current_segment_idx_;
+    i64& block_ids_idx = knn_scan_function_data_ptr->current_block_ids_idx_;
+    i32 segment_id = block_ids->at(block_ids_idx).segment_id_;
+    i16 block_id = block_ids->at(block_ids_idx).block_id_;
 
-    SegmentEntry* current_segment_entry = segment_entries[segments_idx];
-    i64 row_count = current_segment_entry->current_row_;
+    BlockEntry* current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
+    i64 row_count = current_block_entry->row_count_;
 
-    ColumnBuffer column_buffer = ColumnDataEntry::GetColumnData(current_segment_entry->columns_[knn_column_id].get(),
-                                                                query_context->storage()->buffer_manager());
+    ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(current_block_entry->columns_[knn_column_id].get(),
+                                                                 query_context->storage()->buffer_manager());
     switch(knn_scan_function_data_ptr->knn_distance_type_) {
 
         case KnnDistanceType::kInvalid: {
@@ -70,10 +72,11 @@ KnnScanFunc(QueryContext* query_context,
 
                     knn_flat_l2->Search((f32*)(column_buffer.GetAll()),
                                         row_count,
-                                        segments_idx);
+                                        segment_id,
+                                        block_id);
 
-                    if(segments_idx == segment_indexes->size() - 1) {
-                        // Last segment, Get the result according to the topk row.
+                    if(block_ids_idx == block_ids->size() - 1) {
+                        // Last block, Get the result according to the topk row.
                         knn_flat_l2->End();
 
                         for(i64 query_idx = 0;
@@ -242,9 +245,10 @@ KnnScanFunc(QueryContext* query_context,
 
                     knn_flat_ip->Search((f32*)(column_buffer.GetAll()),
                                         row_count,
-                                        segments_idx);
+                                        segment_id,
+                                        block_id);
 
-                    if(segments_idx == segment_indexes->size() - 1) {
+                    if(block_ids_idx == block_ids->size() - 1) {
                         // Last segment, Get the result according to the topk row.
                         knn_flat_ip->End();
 
@@ -395,7 +399,7 @@ KnnScanFunc(QueryContext* query_context,
     }
 
 
-    if(segments_idx == segment_indexes->size() - 1) {
+    if(block_ids_idx == block_ids->size() - 1) {
         // Last segment, Get the result according to the topk row.
     }
 #if 0

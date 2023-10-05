@@ -6,10 +6,10 @@
 
 #include <utility>
 
-
 #include "storage/table_def.h"
 #include "segment_entry.h"
 #include "table_collecton_type.h"
+#include "storage/common/block_index.h"
 
 namespace infinity {
 
@@ -97,10 +97,8 @@ public:
         return table_entry->next_segment_id_;
     }
 
-    static inline SegmentEntry*
-    GetSegmentByID(TableCollectionEntry* table_entry, u64 id) {
-        return table_entry->segments_[id].get();
-    }
+    static SegmentEntry*
+    GetSegmentByID(const TableCollectionEntry* table_entry, u64 id);
 
     static DBEntry*
     GetDBEntry(const TableCollectionEntry* table_entry);
@@ -110,10 +108,10 @@ public:
         return (TableCollectionMeta*)table_entry->table_collection_meta_;
     }
 
-    static SharedPtr<Vector<SegmentEntry*>>
-    GetSegmentEntries(TableCollectionEntry* table_entry,
-                      u64 txn_id,
-                      TxnTimeStamp begin_ts);
+    static SharedPtr<BlockIndex>
+    GetBlockIndex(TableCollectionEntry* table_collection_entry,
+                  u64 txn_id,
+                  TxnTimeStamp begin_ts);
 
     static nlohmann::json
     Serialize(const TableCollectionEntry* table_entry);

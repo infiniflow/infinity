@@ -55,7 +55,8 @@ public:
     virtual void
     Search(const DistType* base,
            i64 base_count,
-           i32 segment_id) = 0;
+           i32 segment_id,
+           i16 block_id) = 0;
 
     virtual void
     End() = 0;
