@@ -79,4 +79,27 @@ private:
     size_t total_size_;
 };
 
-}
+class ByteSliceListIterator {
+public:
+    ByteSliceListIterator(const ByteSliceList* slice_list);
+    ByteSliceListIterator(const ByteSliceListIterator& other);
+    ~ByteSliceListIterator() {}
+
+public:
+    // [begin_pos, end_pos)
+    bool
+    SeekSlice(size_t begin_pos);
+    bool
+    HasNext(size_t end_pos);
+    void
+    Next(void*& data, size_t& size);
+
+private:
+    const ByteSliceList* slice_list_;
+    ByteSlice* slice_;
+    size_t pos_in_slice_;
+    size_t seeked_slice_size_;
+    size_t end_pos_;
+};
+
+}// namespace infinity

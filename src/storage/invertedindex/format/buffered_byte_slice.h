@@ -39,6 +39,11 @@ public:
         return posting_writer_.GetByteSliceList();
     }
 
+    MemoryPool*
+    GetBufferPool() const {
+        return buffer_.GetPool();
+    }
+
     const PostingValues*
     GetPostingValues() const {
         return buffer_.GetPostingValues();
@@ -75,8 +80,16 @@ public:
     size_t
     Flush();
 
+    virtual void
+    Dump(const std::shared_ptr<FileWriter>& file) {
+        posting_writer_.Dump(file);
+    }
+
+    virtual size_t
+    EstimateDumpSize() const { return posting_writer_.GetSize(); }
+
 protected:
-    size_t
+    virtual size_t
     DoFlush();
 
 protected:
