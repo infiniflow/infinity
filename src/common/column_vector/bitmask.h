@@ -79,6 +79,16 @@ public:
     [[nodiscard]] size_t
     count() const { return count_; }
 
+    bool operator==(const Bitmask& other) const;
+    bool operator!=(const Bitmask& other) const {return !(*this == other);}
+
+    // Estimated serialized size in bytes
+    int32_t GetSizeInBytes() const;
+    // Write to a char buffer
+    void WriteAdv(char *&ptr) const;
+    // Read from a serialized version
+    static SharedPtr<Bitmask> ReadAdv(char *&ptr, int32_t maxbytes);
+
 private:
     u64* data_ptr_{nullptr};
     SharedPtr<BitmaskBuffer> buffer_ptr{nullptr};

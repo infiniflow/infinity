@@ -110,6 +110,7 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
     SizeT vector_n = file_size / row_size;
 
     Txn* txn = query_context->GetTxn();
+    const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
     const String& table_name = *table_collection_entry_->table_collection_name_;
     txn->AddTxnTableStore(table_name, MakeUnique<TxnTableStore>(table_name,
                                                                 table_collection_entry_,
@@ -135,10 +136,12 @@ PhysicalImport::ImportFVECSHelper(QueryContext* query_context) {
         segment_entry->current_row_++;
         row_idx++;
         if(row_idx == vector_n) {
+            txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->base_dir_));
             txn_store->Import(segment_entry);
             break;
         }
         if(segment_entry->AvailableCapacity() == 0) {
+            txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->base_dir_));
             txn_store->Import(segment_entry);
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
                                                               query_context->GetTxn()->TxnID(),
@@ -178,6 +181,7 @@ PhysicalImport::ImportCSVHelper(QueryContext* query_context, ParserContext& pars
                                                                       parser_context.txn_->GetBufferMgr());
     parser_context.delimiter_ = delimiter_;
 
+    const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
     const String& table_name = *table_collection_entry_->table_collection_name_;
 
     if(header_) {
@@ -200,6 +204,7 @@ PhysicalImport::ImportCSVHelper(QueryContext* query_context, ParserContext& pars
     zsv_finish(parser_context.parser_);
     // flush the last segment entry
     if(parser_context.segment_entry_->current_row_ > 0) {
+        parser_context.txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *parser_context.segment_entry_->base_dir_));
         auto txn_store = parser_context.txn_->GetTxnTableStore(table_name);
         txn_store->Import(parser_context.segment_entry_);
     }
@@ -409,9 +414,12 @@ PhysicalImport::CSVRowHandler(void* context) {
     auto txn_store = txn->GetTxnTableStore(*table->table_collection_name_);
 
     auto segment_entry = parser_context->segment_entry_;
+    const String &db_name = *TableCollectionEntry::GetDBEntry(table)->db_name_;
+    const String &table_name = *table->table_collection_name_;
     // we have already used all space of the segment
     if(segment_entry->AvailableCapacity() == 0) {
         // add to txn_store
+        txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->base_dir_));
         txn_store->Import(segment_entry);
 
         // create new segment entry

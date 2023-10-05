@@ -147,8 +147,8 @@ TableDef::ReadAdv(char*& ptr, int32_t maxbytes) {
         SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints);
         columns.push_back(cd);
     }
-    StorageAssert(ptr <= ptr_end,
-                  "ptr goes out of ranged when reading DataType");
+    maxbytes = ptr_end - ptr;
+    StorageAssert(maxbytes>=0, "ptr goes out of range when reading TableDef");
     return TableDef::Make(MakeShared<String>(schema_name), MakeShared<String>(table_name), columns);
 }
 

@@ -3,6 +3,7 @@
 //
 
 #include "data_block.h"
+#include "common/utility/serializable.h"
 
 namespace infinity {
 
@@ -211,25 +212,57 @@ DataBlock::AppendWith(const SharedPtr<DataBlock>& other, SizeT from, SizeT count
     }
 }
 
-
-int32_t
-DataBlock::GetSizeInBytes() const {
-    //FIXME
-    return 0;
+bool DataBlock::operator==(const DataBlock &other) const {
+    if (!this->initialized && !other.initialized)
+        return true;
+    if (!this->initialized || !other.initialized ||
+        this->column_count_ != other.column_count_)
+        return false;
+    for (int i = 0; i < this->column_count_; i++) {
+        const SharedPtr<ColumnVector> &column1 = this->column_vectors[i];
+        const SharedPtr<ColumnVector> &column2 = other.column_vectors[i];
+        if (column1 == nullptr || column2 == nullptr || *column1 != *column2)
+            return false;
+    }
+    return true;
 }
 
-void
-DataBlock::WriteAdv(char*& ptr) const {
-    //FIXME
+int32_t DataBlock::GetSizeInBytes() const{
+    StorageAssert(finalized, "Data block is not finalized.");
+    int32_t size = sizeof(int32_t);
+    for(int i=0; i<column_count_; i++){
+        size += this->column_vectors[i]->GetSizeInBytes();
+    }
+    return size;
+}
+
+void DataBlock::WriteAdv(char* &ptr) const{
+    StorageAssert(finalized, "Data block is not finalized.");
+    WriteBufAdv<int32_t>(ptr, column_count_);
+    for(int i=0; i<column_count_; i++){
+        this->column_vectors[i]->WriteAdv(ptr);
+    }
     return;
 }
 
-SharedPtr<DataBlock>
-DataBlock::ReadAdv(char*& ptr, int32_t maxbytes) {
-    char* const ptr_end = ptr + maxbytes;
-    StorageAssert(ptr <= ptr_end,
+SharedPtr<DataBlock> DataBlock::ReadAdv(char* &ptr, int32_t maxbytes){
+    char *const ptr_end = ptr + maxbytes;
+    int32_t column_count = ReadBufAdv<int32_t>(ptr);
+    Vector<SharedPtr<ColumnVector>> column_vectors;
+    for(int i=0; i<column_count; i++){
+        maxbytes = ptr_end - ptr;
+        StorageAssert(maxbytes > 0,
                   "ptr goes out of range when reading DataBlock");
-    return nullptr;
+        SharedPtr<ColumnVector> column_vector = ColumnVector::ReadAdv(ptr, maxbytes);
+        column_vectors.push_back(column_vector);
+    }
+    SharedPtr<DataBlock> block = DataBlock::Make();
+    block->Init(column_vectors);
+    block->Finalize();
+    maxbytes = ptr_end - ptr;
+    StorageAssert(maxbytes>=0,
+                  "ptr goes out of range when reading DataBlock");
+    return block;
 }
 
 }

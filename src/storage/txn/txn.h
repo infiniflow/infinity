@@ -166,6 +166,9 @@ public:
     TxnTableStore*
     GetTxnTableStore(const String& table_name);
 
+    void
+    AddWalCmd(const SharedPtr<WalCmd>& cmd);
+
 private:
     UniquePtr<String>
     GetTableEntry(const String& db_name, const String& table_name, TableCollectionEntry*& table_entry);

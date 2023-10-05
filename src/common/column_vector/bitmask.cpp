@@ -4,6 +4,7 @@
 
 #include "bitmask.h"
 #include "common/utility/infinity_assert.h"
+#include "common/utility/serializable.h"
 #include "main/stats/global_resource_usage.h"
 
 #include <sstream>
@@ -169,6 +170,11 @@ Bitmask::SetAllTrue() {
 
 void
 Bitmask::SetAllFalse() {
+    if(buffer_ptr == nullptr) {
+        buffer_ptr = BitmaskBuffer::Make(count_);
+        // Set raw pointer;
+        data_ptr_ = buffer_ptr->data_ptr_.get();
+    }
     SizeT u64_count = BitmaskBuffer::UnitCount(count_);
     for(SizeT i = 0; i < u64_count; ++i) {
         data_ptr_[i] = 0;
@@ -223,6 +229,54 @@ Bitmask::Merge(const Bitmask& other) {
     for(SizeT i = 0; i < u64_count; ++i) {
         data_ptr_[i] &= other.data_ptr_[i];
     }
+}
+
+bool Bitmask::operator==(const Bitmask &other) const {
+    if (count_ != other.count_)
+        return false;
+    if (data_ptr_ == other.data_ptr_)
+        return true;
+    if (data_ptr_ == nullptr || other.data_ptr_ == nullptr)
+        return false;
+
+    SizeT u64_count = BitmaskBuffer::UnitCount(count_);
+    for (SizeT i = 0; i < u64_count; ++i) {
+        if (data_ptr_[i] != other.data_ptr_[i])
+            return false;
+    }
+    return true;
+}
+
+int32_t Bitmask::GetSizeInBytes() const {
+    // count_, IsAllTrue(), buffer_content (only if !IsAllTrue)
+    int32_t size =
+        IsAllTrue() ? 0 : BitmaskBuffer::UnitCount(count_) * sizeof(u64);
+    size +=  sizeof(int32_t) + 1;
+    return size;
+}
+
+void Bitmask::WriteAdv(char *&ptr) const{
+    bool all_true = IsAllTrue();
+    WriteBufAdv(ptr, (int32_t)count_);
+    WriteBufAdv(ptr, (int8_t)all_true);
+    if(!all_true){
+        int32_t bytes = BitmaskBuffer::UnitCount(count_) * sizeof(u64);
+        memcpy(ptr, data_ptr_, bytes);
+        ptr += bytes;
+    }
+}
+
+SharedPtr<Bitmask> Bitmask::ReadAdv(char *&ptr, int32_t maxbytes){
+    int32_t count = ReadBufAdv<int32_t>(ptr);
+    auto bitmask = Bitmask::Make(count);
+    int8_t all_true = ReadBufAdv<int8_t>(ptr);
+    if(!all_true){
+        int32_t bytes = BitmaskBuffer::UnitCount(count) * sizeof(u64);
+        bitmask->SetAllFalse();
+        memcpy(bitmask->data_ptr_, ptr, bytes);
+        ptr += bytes;
+    }
+    return bitmask;
 }
 
 }

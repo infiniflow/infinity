@@ -19,18 +19,6 @@ public:
         return MakeShared<DataBlock>();
     }
 
-    // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
-    int32_t
-    GetSizeInBytes() const;
-
-    // Write to a char buffer
-    void
-    WriteAdv(char*& buf) const;
-
-    // Read from a serialized version
-    static SharedPtr<DataBlock>
-    ReadAdv(char*& buf, int32_t maxbytes);
-
 public:
 
     DataBlock() = default;
@@ -114,6 +102,16 @@ public:
     capacity() const {
         return capacity_;
     }
+
+    bool operator==(const DataBlock& other) const;
+    bool operator!=(const DataBlock& other) const {return !(*this == other);}
+
+    // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
+    int32_t GetSizeInBytes() const;
+    // Write to a char buffer
+    void WriteAdv(char* &ptr) const;
+    // Read from a serialized version
+    static SharedPtr<DataBlock> ReadAdv(char* &ptr, int32_t maxbytes);
 
     Vector<SharedPtr<ColumnVector>> column_vectors;
 

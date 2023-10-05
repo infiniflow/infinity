@@ -27,6 +27,7 @@ enum class WalCommandType : uint8_t {
     // -----------------------------
     // Data
     // -----------------------------
+    IMPORT = 20,
     APPEND = 21,
     DELETE = 22,
     // -----------------------------
@@ -45,21 +46,13 @@ struct WalCmd {
     operator==(const WalCmd& other) const {
         return typeid(*this) == typeid(other);
     }
-    bool
-    operator!=(const WalCmd& other) { return !(*this == other); }
-
-    // Estimated serialized size in bytes, ensured be no less than Write
-    // requires, allowed be larger.
-    virtual int32_t
-    GetSizeInBytes() const = 0;
-
+    bool operator!=(const WalCmd &other) { return !(*this == other); }
+    // Estimated serialized size in bytes
+    virtual int32_t GetSizeInBytes() const = 0;
     // Write to a char buffer
-    virtual void
-    WriteAdv(char*& buf) const = 0;
-
+    virtual void WriteAdv(char *&ptr) const = 0;
     // Read from a serialized version
-    static SharedPtr<WalCmd>
-    ReadAdv(char*& buf, int32_t maxbytes);
+    static SharedPtr<WalCmd> ReadAdv(char *&ptr, int32_t maxbytes);
 };
 
 struct WalCmdCreateDatabase : public WalCmd {
@@ -139,6 +132,18 @@ struct WalCmdDropTable : public WalCmd {
 
     String db_name;
     String table_name;
+};
+
+struct WalCmdImport : public WalCmd {
+    WalCmdImport(const String &db_name_, const String &table_name_, const String &segment_dir_)
+        : db_name(db_name_), table_name(table_name_), segment_dir(segment_dir_) {}
+    virtual WalCommandType GetType() { return WalCommandType::IMPORT; }
+    virtual bool operator==(const WalCmd &other) const;
+    virtual int32_t GetSizeInBytes() const;
+    virtual void WriteAdv(char *&buf) const;
+    String db_name;
+    String table_name;
+    String segment_dir;
 };
 
 struct WalCmdAppend : public WalCmd {
@@ -221,12 +226,9 @@ struct WalEntry : WalEntryHeader {
     GetSizeInBytes() const;
 
     // Write to a char buffer
-    void
-    WriteAdv(char*& buf) const;
-
+    void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<WalEntry>
-    ReadAdv(char*& buf, int32_t maxbytes);
+    static SharedPtr<WalEntry> ReadAdv(char *&ptr, int32_t maxbytes);
 
     Vector<SharedPtr<WalCmd>> cmds;
 

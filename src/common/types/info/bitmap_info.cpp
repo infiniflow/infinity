@@ -16,7 +16,7 @@ BitmapInfo::Make(i64 limit) {
 
 SharedPtr<BitmapInfo>
 BitmapInfo::Make() {
-    return MakeShared<BitmapInfo>(MAX_VARCHAR_SIZE);
+    return MakeShared<BitmapInfo>(MAX_BITMAP_SIZE);
 }
 
 bool

@@ -160,6 +160,16 @@ public:
     void
     Reset();
 
+    bool operator==(const ColumnVector& other) const;
+    bool operator!=(const ColumnVector& other) const {return !(*this == other);}
+
+    // Estimated serialized size in bytes
+    int32_t GetSizeInBytes() const;
+    // Write to a char buffer
+    void WriteAdv(char *&ptr) const;
+    // Read from a serialized version
+    static SharedPtr<ColumnVector> ReadAdv(char *&ptr, int32_t maxbytes);
+
 private:
     template<typename DataT>
     inline void

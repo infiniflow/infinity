@@ -144,41 +144,56 @@ DataType::GetSizeInBytes() const {
 void
 DataType::WriteAdv(char*& ptr) const {
     WriteBufAdv<LogicalType>(ptr, this->type_);
-    if(this->type_info_ != nullptr) {
-        switch(this->type_) {
-            case LogicalType::kArray:
-                NotImplementError("Array isn't implemented here.");
-                break;
-            case LogicalType::kBitmap: {
-                const BitmapInfo* bi =
-                        dynamic_cast<BitmapInfo*>(this->type_info_.get());
-                WriteBufAdv<i64>(ptr, i64(bi->length_limit()));
-                break;
-            }
-            case LogicalType::kDecimal: {
-                const DecimalInfo* di =
-                        dynamic_cast<DecimalInfo*>(this->type_info_.get());
-                WriteBufAdv<i64>(ptr, i64(di->precision()));
-                WriteBufAdv<i64>(ptr, i64(di->scale()));
-                break;
-            }
-            case LogicalType::kEmbedding: {
-                const EmbeddingInfo* ei =
-                        dynamic_cast<EmbeddingInfo*>(this->type_info_.get());
-                WriteBufAdv<EmbeddingDataType>(ptr, ei->Type());
-                WriteBufAdv<int32_t>(ptr, int32_t(ei->Dimension()));
-                break;
-            }
-            case LogicalType::kVarchar: {
-                const VarcharInfo* ei =
-                        dynamic_cast<VarcharInfo*>(this->type_info_.get());
-                WriteBufAdv<int32_t>(ptr, ei->dimension());
-                break;
-            }
-            default: {
-                TypeError(fmt::format("Unexpected type {} here.", int(this->type_)));
+    switch (this->type_) {
+    case LogicalType::kArray:
+        NotImplementError("Array isn't implemented here.");
+        break;
+    case LogicalType::kBitmap: {
+        i64 limit = MAX_BITMAP_SIZE;
+        if (this->type_info_ != nullptr){
+            const BitmapInfo *bitmap_info =
+                dynamic_cast<BitmapInfo *>(this->type_info_.get());
+            if (bitmap_info != nullptr)
+                limit = bitmap_info->length_limit();
+        }
+        WriteBufAdv<i64>(ptr, limit);
+        break;
+    }
+    case LogicalType::kDecimal: {
+        i64 precision = 0;
+        i64 scale = 0;
+        if (this->type_info_ != nullptr) {
+            const DecimalInfo *decimal_info =
+            dynamic_cast<DecimalInfo *>(this->type_info_.get());
+            if (decimal_info != nullptr){
+                precision = decimal_info->precision();
+                scale = decimal_info->scale();
             }
         }
+        WriteBufAdv<i64>(ptr, precision);
+        WriteBufAdv<i64>(ptr, scale);
+        break;
+    }
+    case LogicalType::kEmbedding: {
+        const EmbeddingInfo *embedding_info =
+            dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
+        TypeAssert(embedding_info!=nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
+        WriteBufAdv<EmbeddingDataType>(ptr, embedding_info->Type());
+        WriteBufAdv<int32_t>(ptr, int32_t(embedding_info->Dimension()));
+        break;
+    }
+    case LogicalType::kVarchar: {
+        int32_t capacity = MAX_VARCHAR_SIZE;
+        if (this->type_info_ != nullptr) {
+            const VarcharInfo *varchar_info =
+                dynamic_cast<VarcharInfo *>(this->type_info_.get());
+            if (varchar_info != nullptr)
+                capacity = varchar_info->dimension();
+        }
+        WriteBufAdv<int32_t>(ptr, capacity);
+        break;
+    }
+    default:
     }
     return;
 }
@@ -187,39 +202,37 @@ SharedPtr<DataType>
 DataType::ReadAdv(char*& ptr, int32_t maxbytes) {
     char* const ptr_end = ptr + maxbytes;
     LogicalType type = ReadBufAdv<LogicalType>(ptr);
-    SharedPtr<TypeInfo> type_info{nullptr};
-    switch(type) {
-        case LogicalType::kArray:
-            NotImplementError("Array isn't implemented here.");
-            break;
-
-        case LogicalType::kBitmap: {
-            i64 limit = ReadBufAdv<i64>(ptr);
-            type_info = BitmapInfo::Make(limit);
-            break;
-        }
-        case LogicalType::kDecimal: {
-            i64 precision = ReadBufAdv<i64>(ptr);
-            i64 scale = ReadBufAdv<i64>(ptr);
-            type_info = DecimalInfo::Make(precision, scale);
-            break;
-        }
-        case LogicalType::kEmbedding: {
-            EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
-            int32_t dimension = ReadBufAdv<int32_t>(ptr);
-            type_info = EmbeddingInfo::Make(EmbeddingDataType(embedding_type), dimension);
-            break;
-        }
-        case LogicalType::kVarchar: {
-            int32_t dimension = ReadBufAdv<int32_t>(ptr);
-            type_info = VarcharInfo::Make(dimension);
-            break;
-        }
-        default:
-            break;
+    SharedPtr<TypeInfo> type_info {nullptr};
+    switch (type) {
+    case LogicalType::kArray:
+        NotImplementError("Array isn't implemented here.");
+        break;
+    case LogicalType::kBitmap: {
+        i64 limit = ReadBufAdv<i64>(ptr);
+        type_info = BitmapInfo::Make(limit);
+        break;
     }
-
-    StorageAssert(ptr <= ptr_end,
+    case LogicalType::kDecimal: {
+        i64 precision = ReadBufAdv<i64>(ptr);
+        i64 scale = ReadBufAdv<i64>(ptr);
+        type_info = DecimalInfo::Make(precision, scale);
+        break;
+    }
+    case LogicalType::kEmbedding: {
+        EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
+        int32_t dimension = ReadBufAdv<int32_t>(ptr);
+        type_info = EmbeddingInfo::Make(EmbeddingDataType(embedding_type), dimension);
+        break;
+    }
+    case LogicalType::kVarchar: {
+        int32_t dimension = ReadBufAdv<int32_t>(ptr);
+        type_info = VarcharInfo::Make(dimension);
+        break;
+    }
+    default:
+    }
+    maxbytes = ptr_end - ptr;
+    StorageAssert(maxbytes>=0,
                   "ptr goes out of range when reading DataType");
     SharedPtr<DataType> data_type = MakeShared<DataType>(type, type_info);
     return data_type;
