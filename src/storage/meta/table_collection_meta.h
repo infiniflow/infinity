@@ -23,10 +23,10 @@ class BufferManager;
 struct TableCollectionMeta {
 public:
     explicit
-    TableCollectionMeta(const SharedPtr<String>& base_dir,
+    TableCollectionMeta(const SharedPtr<String>& db_entry_dir,
                         SharedPtr<String> name,
                         DBEntry* db_entry)
-            : base_dir_(base_dir), table_collection_name_(std::move(name)), db_entry_(db_entry) {
+            : db_entry_dir_(db_entry_dir), table_collection_name_(std::move(name)), db_entry_(db_entry) {
     }
 
 public:
@@ -76,7 +76,7 @@ public:
 public:
     RWMutex rw_locker_{};
     SharedPtr<String> table_collection_name_{};
-    SharedPtr<String> base_dir_{};
+    SharedPtr<String> db_entry_dir_{};
 
     DBEntry* db_entry_{};
 

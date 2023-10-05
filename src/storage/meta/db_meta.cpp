@@ -18,7 +18,6 @@ DBMeta::CreateNewEntry(DBMeta* db_meta,
     DBEntry* res = nullptr;
     std::unique_lock<RWMutex> rw_locker(db_meta->rw_locker_);
 
-    SharedPtr<String> meta_dir = MakeShared<String>(*db_meta->base_dir_ + '/' + *db_meta->db_name_);
 //    rw_locker_.lock();
     if(db_meta->entry_list_.empty()) {
         // Insert a dummy entry.
@@ -27,7 +26,7 @@ DBMeta::CreateNewEntry(DBMeta* db_meta,
         db_meta->entry_list_.emplace_back(std::move(dummy_entry));
 
         // Insert the new db entry
-        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_,
                                                           db_meta->db_name_,
                                                           txn_id,
                                                           begin_ts);
@@ -41,7 +40,7 @@ DBMeta::CreateNewEntry(DBMeta* db_meta,
         // Already have a db_entry, check if the db_entry is valid here.
         BaseEntry* header_base_entry = db_meta->entry_list_.front().get();
         if(header_base_entry->entry_type_ == EntryType::kDummy) {
-            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_,
                                                               db_meta->db_name_,
                                                               txn_id,
                                                               begin_ts);
@@ -55,7 +54,7 @@ DBMeta::CreateNewEntry(DBMeta* db_meta,
             if(begin_ts > header_db_entry->commit_ts_) {
                 if(header_db_entry->deleted_) {
                     // No conflict
-                    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+                    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_,
                                                                       db_meta->db_name_,
                                                                       txn_id,
                                                                       begin_ts);
@@ -83,7 +82,7 @@ DBMeta::CreateNewEntry(DBMeta* db_meta,
                     if(header_db_entry->txn_id_ == txn_id) {
                         // Same txn
                         if(header_db_entry->deleted_) {
-                            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+                            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_,
                                                                               db_meta->db_name_,
                                                                               txn_id,
                                                                               begin_ts);
@@ -114,7 +113,7 @@ DBMeta::CreateNewEntry(DBMeta* db_meta,
                     db_meta->entry_list_.erase(db_meta->entry_list_.begin());
 
                     // Append new one
-                    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(meta_dir,
+                    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_,
                                                                       db_meta->db_name_,
                                                                       txn_id,
                                                                       begin_ts);
@@ -156,7 +155,7 @@ DBMeta::DropNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnMana
                 return {nullptr, MakeUnique<String>("DB is dropped before.")};
             }
 
-            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->base_dir_,
+            UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_,
                                                               db_meta->db_name_,
                                                               txn_id,
                                                               begin_ts);
@@ -249,8 +248,8 @@ DBMeta::GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts) {
 SharedPtr<String>
 DBMeta::ToString(DBMeta* db_meta) {
     std::shared_lock<RWMutex> r_locker(db_meta->rw_locker_);
-    SharedPtr<String> res = MakeShared<String>(fmt::format("DBMeta, base dir: {}, db name: {}, entry count: ",
-                                                           *db_meta->base_dir_,
+    SharedPtr<String> res = MakeShared<String>(fmt::format("DBMeta, data_dir: {}, db name: {}, entry count: ",
+                                                           *db_meta->data_dir_,
                                                            *db_meta->db_name_,
                                                            db_meta->entry_list_.size()));
     return res;
@@ -260,7 +259,7 @@ nlohmann::json
 DBMeta::Serialize(const DBMeta* db_meta) {
     nlohmann::json json_res;
 
-    json_res["base_dir"] = *db_meta->base_dir_;
+    json_res["data_dir"] = *db_meta->data_dir_;
     json_res["db_name"] = *db_meta->db_name_;
     for(const auto& base_entry: db_meta->entry_list_) {
         if(base_entry->entry_type_ == EntryType::kDatabase) {
@@ -278,9 +277,9 @@ DBMeta::Serialize(const DBMeta* db_meta) {
 UniquePtr<DBMeta>
 DBMeta::Deserialize(const nlohmann::json& db_meta_json,
                     BufferManager* buffer_mgr) {
-    SharedPtr<String> base_dir = MakeShared<String>(db_meta_json["base_dir"]);
+    SharedPtr<String> data_dir = MakeShared<String>(db_meta_json["data_dir"]);
     SharedPtr<String> db_name = MakeShared<String>(db_meta_json["db_name"]);
-    UniquePtr<DBMeta> res = MakeUnique<DBMeta>(base_dir, db_name);
+    UniquePtr<DBMeta> res = MakeUnique<DBMeta>(data_dir, db_name);
 
     if(db_meta_json.contains("entries")) {
         for(const auto& db_entry_json: db_meta_json["entries"]) {

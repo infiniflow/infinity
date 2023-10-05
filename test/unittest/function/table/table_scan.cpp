@@ -76,51 +76,41 @@ TEST_F(TableScanTest, block_read_test) {
     segment_entry1->segment_id_ = 1;
     segment_entry1->row_capacity_ = 1000;
     segment_entry1->current_row_ = 1000;
-    segment_entry1->base_dir_ = MakeShared<String>("segment1/tx1");
-    segment_entry1->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry1.get(),
-                                                                               0,
-                                                                               1000,
-                                                                               MakeShared<DataType>(LogicalType::kInteger),
-                                                                               storage.buffer_manager()));
+    segment_entry1->segment_dir_= MakeShared<String>("segment1/tx1");
+    segment_entry1->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry1.get(), 0, 1000,
+     MakeShared<DataType>(LogicalType::kInteger),storage.buffer_manager()));
 
     auto segment_entry2 = MakeShared<SegmentEntry>(nullptr);
     segment_entry2->segment_id_ = 10;
     segment_entry2->row_capacity_ = 10000;
     segment_entry2->current_row_ = 8000;
-    segment_entry2->base_dir_ = MakeShared<String>("segment2/tx1");
-    segment_entry2->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry2.get(),
-                                                                               0,
-                                                                               8000,
-                                                                               MakeShared<DataType>(LogicalType::kInteger),
-                                                                               storage.buffer_manager()));
+    segment_entry2->segment_dir_= MakeShared<String>("segment2/tx1");
+    segment_entry2->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry2.get(), 0, 8000,
+     MakeShared<DataType>(LogicalType::kInteger),storage.buffer_manager()));
 
     auto segment_entry3 = MakeShared<SegmentEntry>(nullptr);
     segment_entry3->segment_id_ = 30;
     segment_entry3->row_capacity_ = 10000;
     segment_entry3->current_row_ = 8000;
-    segment_entry3->base_dir_ = MakeShared<String>("segment3/tx1");
-    segment_entry3->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry3.get(),
-                                                                               0,
-                                                                               8000,
-                                                                               MakeShared<DataType>(LogicalType::kInteger),
-                                                                               storage.buffer_manager()));
+    segment_entry3->segment_dir_= MakeShared<String>("segment3/tx1");
+    segment_entry3->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry3.get(), 0, 8000,
+     MakeShared<DataType>(LogicalType::kInteger),storage.buffer_manager()));
 
     auto segment_entry4 = MakeShared<SegmentEntry>(nullptr);
     segment_entry4->segment_id_ = 20;
     segment_entry4->row_capacity_ = 1000;
     segment_entry4->current_row_ = 408;
-    segment_entry4->base_dir_ = MakeShared<String>("segment4/tx1");
-    segment_entry4->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry4.get(),
-                                                                               0,
-                                                                               1000,
-                                                                               MakeShared<DataType>(LogicalType::kInteger),
-                                                                               storage.buffer_manager()));
+    segment_entry4->segment_dir_= MakeShared<String>("segment4/tx1");
+    segment_entry4->columns_.push_back(ColumnDataEntry::MakeNewColumnDataEntry(segment_entry4.get(), 0, 1000,
+     MakeShared<DataType>(LogicalType::kInteger),storage.buffer_manager()));
 
 
 
+    auto db_entry_dir = MakeShared<String>("/tmp/infinity/data/default/tx_0");
+    auto table_name = MakeShared<String>("table1");
     // total_row smaller than block size
     {
-        TableCollectionEntry entry(nullptr, nullptr, {}, TableCollectionType::kTableEntry,
+        TableCollectionEntry entry(db_entry_dir, table_name, {}, TableCollectionType::kTableEntry,
                                    nullptr, 0, 0);
         entry.segments_[segment_entry1->segment_id_] = segment_entry1;
 
@@ -152,7 +142,7 @@ TEST_F(TableScanTest, block_read_test) {
 
     // total row larger than block size
     {
-        TableCollectionEntry entry(nullptr, nullptr, {}, TableCollectionType::kTableEntry,
+        TableCollectionEntry entry(db_entry_dir, table_name, {}, TableCollectionType::kTableEntry,
                                    nullptr, 0, 0);
         entry.segments_[segment_entry1->segment_id_] = segment_entry1;
         entry.segments_[segment_entry2->segment_id_] = segment_entry2;
@@ -184,7 +174,7 @@ TEST_F(TableScanTest, block_read_test) {
 
     // total row is multipy of block size
     {
-        TableCollectionEntry entry(nullptr, nullptr, {}, TableCollectionType::kTableEntry,
+        TableCollectionEntry entry(db_entry_dir, table_name, {}, TableCollectionType::kTableEntry,
                                    nullptr, 0, 0);
         entry.segments_[segment_entry1->segment_id_] = segment_entry1;
         entry.segments_[segment_entry2->segment_id_] = segment_entry2;

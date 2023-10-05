@@ -10,19 +10,19 @@
 
 namespace infinity {
 
-TableCollectionEntry::TableCollectionEntry(const SharedPtr<String>& base_dir,
+TableCollectionEntry::TableCollectionEntry(const SharedPtr<String>& db_entry_dir,
                                            SharedPtr<String> table_collection_name,
                                            const Vector<SharedPtr<ColumnDef>>& columns,
                                            TableCollectionType table_collection_type,
                                            TableCollectionMeta* table_collection_meta,
                                            u64 txn_id,
                                            TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kTable),
-          base_dir_(base_dir),
-          table_collection_name_(std::move(table_collection_name)),
-          columns_(columns),
-          table_collection_type_(table_collection_type),
-          table_collection_meta_(table_collection_meta) {
+                                           : BaseEntry(EntryType::kTable),
+                                           table_entry_dir_(MakeShared<String>(*db_entry_dir + "/" + *table_collection_name  + "/txn_" + std::to_string(txn_id))),
+                                           table_collection_name_(std::move(table_collection_name)),
+                                           columns_(columns),
+                                           table_collection_type_(table_collection_type),
+                                           table_collection_meta_(table_collection_meta) {
     SizeT column_count = columns.size();
     for(SizeT idx = 0; idx < column_count; ++idx) {
         name2id_[columns[idx]->name()] = idx;
@@ -211,7 +211,7 @@ nlohmann::json
 TableCollectionEntry::Serialize(const TableCollectionEntry* table_entry) {
     nlohmann::json json_res;
 
-    json_res["base_dir"] = *table_entry->base_dir_;
+    json_res["table_entry_dir"] = *table_entry->table_entry_dir_;
     json_res["table_name"] = *table_entry->table_collection_name_;
     json_res["table_entry_type"] = table_entry->table_collection_type_;
     json_res["row_count"] = table_entry->row_count_;
@@ -248,7 +248,7 @@ TableCollectionEntry::Deserialize(const nlohmann::json& table_entry_json,
                                   BufferManager* buffer_mgr) {
     nlohmann::json json_res;
 
-    SharedPtr<String> base_dir = MakeShared<String>(table_entry_json["base_dir"]);
+    SharedPtr<String> table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_entry_json["table_name"]);
     TableCollectionType table_entry_type = table_entry_json["table_entry_type"];
     u64 row_count = table_entry_json["row_count"];
@@ -278,7 +278,7 @@ TableCollectionEntry::Deserialize(const nlohmann::json& table_entry_json,
     u64 txn_id = table_entry_json["txn_id"];
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
 
-    UniquePtr<TableCollectionEntry> table_entry = MakeUnique<TableCollectionEntry>(base_dir,
+    UniquePtr<TableCollectionEntry> table_entry = MakeUnique<TableCollectionEntry>(table_entry_dir,
                                                                                    table_name,
                                                                                    columns,
                                                                                    table_entry_type,

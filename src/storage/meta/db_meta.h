@@ -16,9 +16,9 @@ class TxnManager;
 struct DBMeta {
 public:
     explicit
-    DBMeta(const SharedPtr<String>& base_dir,
+    DBMeta(const SharedPtr<String>& data_dir,
            SharedPtr<String> name)
-            : db_name_(std::move(name)), base_dir_(base_dir) {
+            : db_name_(std::move(name)), data_dir_(data_dir) {
     }
 
 public:
@@ -52,7 +52,7 @@ public:
 public:
     RWMutex rw_locker_{};
     SharedPtr<String> db_name_{};
-    SharedPtr<String> base_dir_{};
+    SharedPtr<String> data_dir_{};
 
     // Ordered by commit_ts from latest to oldest.
     List<UniquePtr<BaseEntry>> entry_list_{};
