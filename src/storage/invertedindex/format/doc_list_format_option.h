@@ -106,17 +106,24 @@ public:
             values_.push_back(offset_value);
         }
     }
+
+    bool
+    HasTfList() const { return GetSize() > 1; }
 };
 
 class DocListFormat : public PostingValues {
 public:
-    DocListFormat() = default;
+    DocListFormat() : skiplist_format_(nullptr) {}
 
-    ~DocListFormat() = default;
+    ~DocListFormat() {
+        if(skiplist_format_) {
+            delete skiplist_format_;
+            skiplist_format_ = nullptr;
+        }
+    };
 
     void
     Init(const DocListFormatOption& option) {
-        skiplist_format_.Init(option);
         uint8_t row_count = 0;
         uint32_t offset = 0;
         {
@@ -141,10 +148,15 @@ public:
             doc_payload_value->offset_ = offset;
             values_.push_back(doc_payload_value);
         }
+        skiplist_format_ = new DocSkipListFormat;
+        skiplist_format_->Init(option);
     }
 
+    const DocSkipListFormat*
+    GetDocSkipListFormat() const { return skiplist_format_; }
+
 private:
-    DocSkipListFormat skiplist_format_;
+    DocSkipListFormat* skiplist_format_;
 };
 
 }// namespace infinity

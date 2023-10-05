@@ -21,7 +21,7 @@ public:
     Load(ByteSlice* byte_slice, uint32_t start, uint32_t end, const uint32_t& item_count);
 
     bool
-    SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_key, uint32_t& value, uint32_t& delta);
+    SkipTo(uint32_t query_key, uint32_t& key, uint32_t& prev_key, uint32_t& value, uint32_t& delta) override;
 
     bool
     SkipTo(uint32_t query_key, uint32_t& key, uint32_t& value, uint32_t& delta) {

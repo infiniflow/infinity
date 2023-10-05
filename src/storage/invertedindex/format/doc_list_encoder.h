@@ -1,8 +1,12 @@
 #pragma once
 
 #include "buffered_byte_slice.h"
+#include "buffered_skiplist_writer.h"
 #include "common/memory/memory_pool.h"
 #include "doc_list_format_option.h"
+#include "inmem_doc_list_decoder.h"
+#include "position_bitmap_writer.h"
+#include "storage/io/file_writer.h"
 
 #include <memory>
 
@@ -55,11 +59,26 @@ public:
     EndDocument(docid_t doc_id, docpayload_t doc_payload);
 
     void
+    Dump(const std::shared_ptr<FileWriter>& file);
+
+    void
     Flush();
+
+    InMemDocListDecoder*
+    GetInMemDocListDecoder(MemoryPool* session_pool) const;
 
 private:
     void
     AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf);
+
+    void
+    FlushDocListBuffer();
+
+    void
+    CreateDocSkipListWriter();
+
+    void
+    AddSkipListItem(uint32_t item_size);
 
 private:
     BufferedByteSlice doc_list_buffer_;
@@ -71,6 +90,9 @@ private:
     tf_t current_tf_;
     tf_t total_tf_;
     df_t df_;
+
+    PositionBitmapWriter* tf_bitmap_writer_;
+    BufferedSkipListWriter* doc_skiplist_writer_;
     MemoryPool* byte_slice_pool_;
 };
 
