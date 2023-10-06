@@ -35,6 +35,11 @@ public:
     void
     DecodeCurrentDocPayloadBuffer(docpayload_t* doc_payload_buffer);
 
+    uint32_t
+    GetSeekedDocCount() const {
+        return skiped_item_count_ << MAX_DOC_PER_RECORD_BIT_NUM;
+    }
+
 private:
     bool
     DecodeDocBufferWithoutSkipList(docid_t last_doc_id_in_prev_record, uint32_t offset, docid_t start_doc_id, DocBufferInfo& doc_buffer_info);

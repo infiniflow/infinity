@@ -47,12 +47,11 @@ typedef uint32_t tf_t;
 typedef int64_t ttf_t;
 typedef uint32_t field_len_t;
 
-constexpr optionflag_t OPTION_FLAG_ALL =
-        of_term_payload | of_doc_payload | of_position_list | of_term_frequency;
-constexpr optionflag_t NO_TERM_FREQUENCY =
-        of_doc_payload | of_term_payload;
+constexpr optionflag_t OPTION_FLAG_ALL = of_term_payload | of_doc_payload | of_position_list | of_term_frequency;
+constexpr optionflag_t NO_TERM_FREQUENCY = of_doc_payload | of_term_payload;
+constexpr optionflag_t OPTION_FLAG_NONE = of_none;
 constexpr uint32_t MAX_DOC_PER_RECORD = 128;
-constexpr uint8_t SKIP_LIST_BUFFER_SIZE = 32;
+constexpr uint32_t MAX_DOC_PER_RECORD_BIT_NUM = 7;
 constexpr uint32_t MAX_DOC_PER_BITMAP_BLOCK = 256;
 constexpr uint32_t MAX_DOC_PER_BITMAP_BLOCK_BIT_NUM = 8;
 constexpr uint32_t MAX_POS_PER_RECORD = 128;
@@ -61,5 +60,6 @@ constexpr uint32_t MAX_POS_PER_RECORD_MASK = MAX_POS_PER_RECORD - 1;
 constexpr uint32_t MAX_UNCOMPRESSED_DOC_LIST_SIZE = 5;
 constexpr uint32_t MAX_UNCOMPRESSED_POS_LIST_SIZE = 5;
 constexpr uint32_t MAX_UNCOMPRESSED_SKIP_LIST_SIZE = 10;
+constexpr uint8_t SKIP_LIST_BUFFER_SIZE = 32;
 
 }// namespace infinity

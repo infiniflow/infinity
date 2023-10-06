@@ -9,9 +9,12 @@ namespace infinity {
 DocListEncoder::DocListEncoder(
         const DocListFormatOption& format_option,
         MemoryPool* byte_slice_pool,
-        RecyclePool* buffer_pool)
+        RecyclePool* buffer_pool,
+        DocListFormat* doc_list_format)
     : doc_list_buffer_(byte_slice_pool, buffer_pool),
       format_option_(format_option),
+      own_doc_list_format_(false),
+      doc_list_format_(doc_list_format),
       last_doc_id_(0),
       current_tf_(0),
       total_tf_(0),
@@ -19,21 +22,28 @@ DocListEncoder::DocListEncoder(
       tf_bitmap_writer_(nullptr),
       doc_skiplist_writer_(nullptr),
       byte_slice_pool_(byte_slice_pool) {
-    doc_list_format_.reset(new DocListFormat);
-    doc_list_format_->Init(format_option);
-    doc_list_buffer_.Init(doc_list_format_.get());
+    if(!doc_list_format) {
+        doc_list_format_ = new DocListFormat;
+        doc_list_format_->Init(format_option);
+        own_doc_list_format_ = true;
+    }
+    doc_list_buffer_.Init(doc_list_format_);
     if(format_option_.HasTfBitmap()) {
         tf_bitmap_writer_ = new PositionBitmapWriter(byte_slice_pool_);
     }
 }
 
 DocListEncoder::~DocListEncoder() {
+    if(own_doc_list_format_) {
+        delete doc_list_format_;
+        doc_list_format_ = nullptr;
+    }
     if(tf_bitmap_writer_) {
         delete tf_bitmap_writer_;
         tf_bitmap_writer_ = nullptr;
     }
     if(doc_skiplist_writer_) {
-        delete doc_skiplist_writer_;
+        doc_skiplist_writer_->~BufferedSkipListWriter();
         doc_skiplist_writer_ = nullptr;
     }
 }
@@ -142,7 +152,7 @@ DocListEncoder::AddSkipListItem(uint32_t item_size) {
 InMemDocListDecoder*
 DocListEncoder::GetInMemDocListDecoder(MemoryPool* session_pool) const {
     df_t df = df_;
-
+    //TODO memory problem
     SkipListReader* skiplist_reader = nullptr;
     if(doc_skiplist_writer_) {
         const DocSkipListFormat* skiplist_format = doc_list_format_->GetDocSkipListFormat();
