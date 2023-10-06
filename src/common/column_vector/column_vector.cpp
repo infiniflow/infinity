@@ -1965,14 +1965,14 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
     }
     default:
         NotImplementError(
-            std::format("Not supported data_type {}", int(data_type_->type())));
+            fmt::format("Not supported data_type {}", int(data_type_->type())));
     }
     return true;
 }
 
 int32_t ColumnVector::GetSizeInBytes() const{
     StorageAssert(initialized, "Column vector isn't initialized.")
-    NotImplementAssert(vector_type_==ColumnVectorType::kFlat || vector_type_==ColumnVectorType::kConstant, std::format("Not supported vector_type {}", int(vector_type_)));
+    NotImplementAssert(vector_type_==ColumnVectorType::kFlat || vector_type_==ColumnVectorType::kConstant, fmt::format("Not supported vector_type {}", int(vector_type_)));
     int32_t size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
     switch(data_type_->type()) {
         case kBoolean:
@@ -2002,7 +2002,7 @@ int32_t ColumnVector::GetSizeInBytes() const{
         }
         default:
             //TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
-            NotImplementError(std::format("Not supported data_type {}", data_type_->ToString()));
+            NotImplementError(fmt::format("Not supported data_type {}", data_type_->ToString()));
     }
     size += this->nulls_ptr_->GetSizeInBytes();
     return size;
@@ -2010,7 +2010,7 @@ int32_t ColumnVector::GetSizeInBytes() const{
 
 void ColumnVector::WriteAdv(char *&ptr) const{
     StorageAssert(initialized, "Column vector isn't initialized.")
-    NotImplementAssert(vector_type_==ColumnVectorType::kFlat || vector_type_==ColumnVectorType::kConstant, std::format("Not supported vector_type {}", int(vector_type_)));
+    NotImplementAssert(vector_type_==ColumnVectorType::kFlat || vector_type_==ColumnVectorType::kConstant, fmt::format("Not supported vector_type {}", int(vector_type_)));
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
     switch(data_type_->type()) {
@@ -2043,7 +2043,7 @@ void ColumnVector::WriteAdv(char *&ptr) const{
         }
         default:
             //TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
-            NotImplementError(std::format("Not supported data_type {}", data_type_->ToString()));
+            NotImplementError(fmt::format("Not supported data_type {}", data_type_->ToString()));
     }
     this->nulls_ptr_->WriteAdv(ptr);
     return;
@@ -2087,7 +2087,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, int32_t maxbytes){
         }
         default:
             //TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
-            NotImplementError(std::format("Not supported data_type {}", data_type->ToString()));
+            NotImplementError(fmt::format("Not supported data_type {}", data_type->ToString()));
     }
     maxbytes = ptr_end - ptr;
     StorageAssert(maxbytes>0, "ptr goes out of range when reading ColumnVector");

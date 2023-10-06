@@ -142,4 +142,26 @@ PairValueSkipListReader::LoadBuffer() {
     return std::make_pair(0, false);
 }
 
+uint32_t
+PairValueSkipListReader::GetLastValueInBuffer() const {
+    uint32_t last_value_in_buffer = current_value_;
+    uint32_t current_cursor = current_cursor_;
+    while(current_cursor < num_in_buffer_) {
+        last_value_in_buffer = value_buffer_base_[current_cursor] + last_value_in_buffer;
+        current_cursor++;
+    }
+    return last_value_in_buffer;
+}
+
+uint32_t
+PairValueSkipListReader::GetLastKeyInBuffer() const {
+    uint32_t last_key_in_buffer = current_key_;
+    uint32_t current_cursor = current_cursor_;
+    while(current_cursor < num_in_buffer_) {
+        last_key_in_buffer = key_buffer_base_[current_cursor] + last_key_in_buffer;
+        current_cursor++;
+    }
+    return last_key_in_buffer;
+}
+
 }// namespace infinity

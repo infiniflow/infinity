@@ -17,7 +17,8 @@ public:
     DocListEncoder(
             const DocListFormatOption& format_option,
             MemoryPool* byte_slice_pool,
-            RecyclePool* buffer_pool);
+            RecyclePool* buffer_pool,
+            DocListFormat* doc_list_format = nullptr);
 
     ~DocListEncoder();
 
@@ -82,8 +83,9 @@ private:
 
 private:
     BufferedByteSlice doc_list_buffer_;
+    bool own_doc_list_format_;
     DocListFormatOption format_option_;
-    std::unique_ptr<DocListFormat> doc_list_format_;
+    DocListFormat* doc_list_format_;
 
     docid_t last_doc_id_;
     docpayload_t last_doc_payload_;

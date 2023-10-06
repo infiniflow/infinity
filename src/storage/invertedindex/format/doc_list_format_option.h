@@ -86,21 +86,21 @@ public:
         uint8_t row_count = 0;
         uint32_t offset = 0;
         {
-            PostingValue* doc_id_value = new TypedPostingValue<uint32_t>;
+            TypedPostingValue<uint32_t>* doc_id_value = new TypedPostingValue<uint32_t>;
             doc_id_value->location_ = row_count++;
             doc_id_value->offset_ = offset;
             values_.push_back(doc_id_value);
             offset += sizeof(uint32_t);
         }
         if(option.HasTfList()) {
-            PostingValue* tf_value = new TypedPostingValue<uint32_t>;
+            TypedPostingValue<uint32_t>* tf_value = new TypedPostingValue<uint32_t>;
             tf_value->location_ = row_count++;
             tf_value->offset_ = offset;
             values_.push_back(tf_value);
             offset += sizeof(uint32_t);
         }
         {
-            PostingValue* offset_value = new TypedPostingValue<uint32_t>;
+            TypedPostingValue<uint32_t>* offset_value = new TypedPostingValue<uint32_t>;
             offset_value->location_ = row_count++;
             offset_value->offset_ = offset;
             values_.push_back(offset_value);
@@ -113,6 +113,9 @@ public:
 
 class DocListFormat : public PostingValues {
 public:
+    DocListFormat(const DocListFormatOption& option) : skiplist_format_(nullptr) {
+        Init(option);
+    }
     DocListFormat() : skiplist_format_(nullptr) {}
 
     ~DocListFormat() {

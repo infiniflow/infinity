@@ -38,7 +38,6 @@ public:
         return current_key_;
     }
 
-
     uint32_t
     GetLastValueInBuffer() const override;
     uint32_t
