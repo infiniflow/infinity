@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include "common/types/alias/smart_ptr.h"
 #include "segment_entry.h"
 #include "storage/common/block_index.h"
 #include "storage/table_def.h"
@@ -53,6 +54,8 @@ public:
                                                  SharedPtr<SegmentEntry> segment,
                                                  AppendState &append_state,
                                                  BufferManager *buffer_mgr);
+
+    static UniquePtr<String> CreateIndex(TableCollectionEntry *table_entry, Txn *txn_ptr);
 
     static inline u64 GetNextSegmentID(TableCollectionEntry *table_entry) { return table_entry->next_segment_id_++; }
 

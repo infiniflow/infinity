@@ -8,6 +8,7 @@
 
 #include "base_entry.h"
 
+#include "parser/statement/extra/create_index_info.h"
 #include "parser/statement/extra/extra_ddl_info.h"
 #include "storage/common/table_collection_detail.h"
 #include "storage/meta/table_collection_meta.h"

@@ -3,12 +3,15 @@
 //
 
 #include "logical_planner.h"
-#include "explain_logical_plan.h"
-#include "expression/cast_expression.h"
-#include "function/cast/cast_function.h"
-#include "parser/statement.h"
+#include "common/utility/infinity_assert.h"
+#include "parser/statement/extra/create_index_info.h"
+#include "query_binder.h"
+#include "planner/node/logical_create_table.h"
+#include "planner/node/logical_drop_table.h"
+#include "planner/node/logical_drop_schema.h"
 #include "planner/binder/insert_binder.h"
 #include "planner/node/logical_create_collection.h"
+#include "planner/node/logical_create_index.h"
 #include "planner/node/logical_create_schema.h"
 #include "planner/node/logical_create_table.h"
 #include "planner/node/logical_create_view.h"
@@ -347,8 +350,37 @@ void LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr
     this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
-void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+void
+LogicalPlanner::BuildCreateIndex(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
     PlannerError("Creating index isn't supported.");
+
+    auto* create_index_info = (CreateIndexInfo*)statement->create_info_.get();    
+
+    auto schema_name_ptr = MakeShared<String>(create_index_info->schema_name_);
+    auto table_name_ptr = MakeShared<String>(create_index_info->table_name_);
+    if (create_index_info->column_names_->size() != 1) {
+        NotImplementError("Creating index only support single column.");
+    }
+    auto column_names_ptr = MakeShared<Vector<String>>(Vector<String>{create_index_info->column_names_[0]});
+    auto index_name_ptr = MakeShared<String>(create_index_info->index_name_);
+    if (!create_index_info->index_para_list_->empty()) {
+        NotImplementError("Creating index with parameters isn't supported.");
+    }
+
+    auto index_def_ptr = IndexDef::Make(schema_name_ptr,
+                                        table_name_ptr,
+                                        column_names_ptr,
+                                        index_name_ptr,
+                                        create_index_info->method_type_);
+
+    auto logical_create_index_operator = LogicalCreateIndex::Make(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  schema_name_ptr,
+                                                                  index_def_ptr,
+                                                                  create_index_info->conflict_type_);
+
+    this->logical_plan_ = logical_create_index_operator;
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {

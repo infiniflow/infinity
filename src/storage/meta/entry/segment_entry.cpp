@@ -5,6 +5,7 @@
 #include "segment_entry.h"
 #include "common/default_values.h"
 #include "common/utility/defer_op.h"
+#include "common/utility/random.h"
 #include "storage/io/local_file_system.h"
 #include "storage/txn/txn.h"
 #include <ctime>
@@ -106,6 +107,14 @@ void SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendS
         append_state_ptr->current_block_++;
         append_state_ptr->current_block_offset_ = 0;
     }
+}
+
+void SegmentEntry::CreateIndex(SegmentEntry *segment_entry, Txn *txn_ptr, u64 column_id) {
+    // TODO shenyushi 1
+    // for (const auto& block_entry: segment_entry->block_entries_) {
+    //     auto block_column_entry = block_entry->columns_[column_id].get();
+    //     CommonObjectHandle object_handle(block_column_entry->buffer_handle_);
+    // }
 }
 
 void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count) {

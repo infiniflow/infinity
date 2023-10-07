@@ -62,6 +62,8 @@ public:
 
     EntryResult CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
+    EntryResult CreateIndex(const String &db_name, ConflictType conflict_type);
+
     EntryResult GetTableByName(const String &db_name, const String &table_name);
 
     EntryResult CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type);

@@ -3,8 +3,10 @@
 //
 
 #include "physical_planner.h"
+#include "executor/operator/physical_create_index.h"
 #include "planner/node/logical_aggregate.h"
 #include "planner/node/logical_create_collection.h"
+#include "planner/node/logical_create_index.h"
 #include "planner/node/logical_create_schema.h"
 #include "planner/node/logical_create_table.h"
 #include "planner/node/logical_create_view.h"
@@ -76,6 +78,10 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         // DDL
         case LogicalNodeType::kCreateTable: {
             result = BuildCreateTable(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCreateIndex: {
+            result = BuildCreateIndex(logical_operator);
             break;
         }
         case LogicalNodeType::kCreateCollection: {
@@ -226,6 +232,16 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildCreateTable(const SharedPtr<Lo
                                            logical_create_table->GetOutputTypes(),
                                            logical_create_table->conflict_type(),
                                            logical_create_table->table_index(),
+                                           logical_operator->node_id());
+}
+
+SharedPtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<LogicalNode> &logical_operator) const {
+    auto logical_create_index = std::static_pointer_cast<LogicalCreateIndex>(logical_operator);
+    return MakeShared<PhysicalCreateIndex>(logical_create_index->schema_name(),
+                                           logical_create_index->index_definition(),
+                                           logical_create_index->conflict_type(),
+                                           logical_create_index->GetOutputNames(),
+                                           logical_create_index->GetOutputTypes(),
                                            logical_operator->node_id());
 }
 

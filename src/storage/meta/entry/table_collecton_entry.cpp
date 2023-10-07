@@ -148,6 +148,16 @@ UniquePtr<String> TableCollectionEntry::ImportAppendSegment(TableCollectionEntry
     return nullptr;
 }
 
+UniquePtr<String> TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry, Txn *txn_ptr) {
+    NotImplementError("TableCollectionEntry::CreateIndex");
+    // TODO shenyushi 1
+    // u64 column_id = table_entry->GetColumnIdByName("id");
+    // for (auto& [_segment_id, segment_entry]: table_entry->segments_) {
+    //     segment_entry->CreateIndex(segment_entry.get(), txn_ptr, column_id);
+    // }
+    // return nullptr;
+}
+
 SegmentEntry *TableCollectionEntry::GetSegmentByID(const TableCollectionEntry *table_entry, u64 id) {
     auto iter = table_entry->segments_.find(id);
     if (iter != table_entry->segments_.end()) {

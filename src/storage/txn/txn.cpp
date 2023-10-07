@@ -318,6 +318,36 @@ EntryResult Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &t
     return res;
 }
 
+EntryResult Txn::CreateIndex(const String &db_name, ConflictType conflict_type) {
+    // TODO shenyushi 1
+
+    // TxnState txn_state = txn_context_.GetTxnState();
+
+    // if(txn_state != TxnState::kStarted) {
+    //     LOG_TRACE("Transaction isn't started.")
+    //     return {nullptr, MakeUnique<String>("Transaction isn't started.")};
+    // }
+
+    // TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+
+    // EntryResult db_entry_result = NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
+    // if(db_entry_result.entry_ == nullptr) {
+    //     // Error
+    //     return db_entry_result;
+    // }
+
+    // DBEntry* db_entry = (DBEntry*)db_entry_result.entry_;
+
+    // EntryResult res = DBEntry::CreateIndex(db_entry,
+    //                                        "table_name",
+    //                                        "index_name",
+    //                                        IndexMethod::kBTree,
+    //                                        conflict_type,
+    //                                        txn_id_,
+    //                                        begin_ts,
+    //                                        txn_mgr_);
+}
+
 EntryResult Txn::DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
 

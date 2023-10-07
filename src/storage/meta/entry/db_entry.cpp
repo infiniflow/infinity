@@ -4,6 +4,7 @@
 
 #include "db_entry.h"
 #include "parser/statement/extra/extra_ddl_info.h"
+#include "storage/meta/entry/base_entry.h"
 
 namespace infinity {
 

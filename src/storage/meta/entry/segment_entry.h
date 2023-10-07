@@ -4,17 +4,12 @@
 
 #pragma once
 
-#include <mutex>
-#include <utility>
-
 #include "base_entry.h"
 #include "common/default_values.h"
 #include "segment_column_entry.h"
 
-#include "storage/meta/entry/block_entry.h"
-// #include "common/utility/infinity_assert.h"
-#include "common/utility/random.h"
 #include "data_access_state.h"
+#include "storage/meta/entry/block_entry.h"
 
 namespace infinity {
 
@@ -91,6 +86,8 @@ public:
                                                        SizeT segment_row = DEFAULT_SEGMENT_ROW);
 
     static void AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
+
+    static void CreateIndex(SegmentEntry *segment_entry, Txn *txn_ptr, u64 column_id);
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count);
 

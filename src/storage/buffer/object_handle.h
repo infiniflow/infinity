@@ -30,6 +30,7 @@ public:
 class CommonObjectHandle : public ObjectHandle {
     ptr_t ptr_{};
 
+public:
     CommonObjectHandle() {}
 
     explicit CommonObjectHandle(BufferHandle *buffer_handle);
