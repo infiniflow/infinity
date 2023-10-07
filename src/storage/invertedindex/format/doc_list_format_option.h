@@ -2,7 +2,7 @@
 
 #include "posting_value.h"
 #include "storage/invertedindex/index_defines.h"
-
+#include <iostream>
 namespace infinity {
 
 class DocListFormatOption {
@@ -108,7 +108,7 @@ public:
     }
 
     bool
-    HasTfList() const { return GetSize() > 1; }
+    HasTfList() const { return GetSize() > 2; }
 };
 
 class DocListFormat : public PostingValues {

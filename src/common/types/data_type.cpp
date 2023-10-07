@@ -3,15 +3,15 @@
 //
 
 #include "data_type.h"
-#include "common/types/logical_type.h"
-#include "common/types/type_info.h"
-#include "function/cast/cast_table.h"
-#include "common/utility/infinity_assert.h"
-#include "info/bitmap_info.h"
 #include "common/types/info/decimal_info.h"
 #include "common/types/info/embedding_info.h"
-#include "common/utility/serializable.h"
 #include "common/types/info/varchar_info.h"
+#include "common/types/logical_type.h"
+#include "common/types/type_info.h"
+#include "common/utility/infinity_assert.h"
+#include "common/utility/serializable.h"
+#include "function/cast/cast_table.h"
+#include "info/bitmap_info.h"
 #include <charconv>
 
 namespace infinity {
@@ -53,7 +53,7 @@ DataType::Size() const {
         TypeError(fmt::format("Invalid logical data type {}.", int(type_)));
     }
 
-    // embedding, varchar data can get data here. 
+    // embedding, varchar data can get data here.
     if(type_info_ != nullptr) {
         return type_info_->Size();
     }
@@ -144,56 +144,57 @@ DataType::GetSizeInBytes() const {
 void
 DataType::WriteAdv(char*& ptr) const {
     WriteBufAdv<LogicalType>(ptr, this->type_);
-    switch (this->type_) {
-    case LogicalType::kArray:
-        NotImplementError("Array isn't implemented here.");
-        break;
-    case LogicalType::kBitmap: {
-        i64 limit = MAX_BITMAP_SIZE;
-        if (this->type_info_ != nullptr){
-            const BitmapInfo *bitmap_info =
-                dynamic_cast<BitmapInfo *>(this->type_info_.get());
-            if (bitmap_info != nullptr)
-                limit = bitmap_info->length_limit();
-        }
-        WriteBufAdv<i64>(ptr, limit);
-        break;
-    }
-    case LogicalType::kDecimal: {
-        i64 precision = 0;
-        i64 scale = 0;
-        if (this->type_info_ != nullptr) {
-            const DecimalInfo *decimal_info =
-            dynamic_cast<DecimalInfo *>(this->type_info_.get());
-            if (decimal_info != nullptr){
-                precision = decimal_info->precision();
-                scale = decimal_info->scale();
+    switch(this->type_) {
+        case LogicalType::kArray:
+            NotImplementError("Array isn't implemented here.");
+            break;
+        case LogicalType::kBitmap: {
+            i64 limit = MAX_BITMAP_SIZE;
+            if(this->type_info_ != nullptr) {
+                const BitmapInfo* bitmap_info =
+                        dynamic_cast<BitmapInfo*>(this->type_info_.get());
+                if(bitmap_info != nullptr)
+                    limit = bitmap_info->length_limit();
             }
+            WriteBufAdv<i64>(ptr, limit);
+            break;
         }
-        WriteBufAdv<i64>(ptr, precision);
-        WriteBufAdv<i64>(ptr, scale);
-        break;
-    }
-    case LogicalType::kEmbedding: {
-        const EmbeddingInfo *embedding_info =
-            dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
-        TypeAssert(embedding_info!=nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
-        WriteBufAdv<EmbeddingDataType>(ptr, embedding_info->Type());
-        WriteBufAdv<int32_t>(ptr, int32_t(embedding_info->Dimension()));
-        break;
-    }
-    case LogicalType::kVarchar: {
-        int32_t capacity = MAX_VARCHAR_SIZE;
-        if (this->type_info_ != nullptr) {
-            const VarcharInfo *varchar_info =
-                dynamic_cast<VarcharInfo *>(this->type_info_.get());
-            if (varchar_info != nullptr)
-                capacity = varchar_info->dimension();
+        case LogicalType::kDecimal: {
+            i64 precision = 0;
+            i64 scale = 0;
+            if(this->type_info_ != nullptr) {
+                const DecimalInfo* decimal_info =
+                        dynamic_cast<DecimalInfo*>(this->type_info_.get());
+                if(decimal_info != nullptr) {
+                    precision = decimal_info->precision();
+                    scale = decimal_info->scale();
+                }
+            }
+            WriteBufAdv<i64>(ptr, precision);
+            WriteBufAdv<i64>(ptr, scale);
+            break;
         }
-        WriteBufAdv<int32_t>(ptr, capacity);
-        break;
-    }
-    default:
+        case LogicalType::kEmbedding: {
+            const EmbeddingInfo* embedding_info =
+                    dynamic_cast<EmbeddingInfo*>(this->type_info_.get());
+            TypeAssert(embedding_info != nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
+            WriteBufAdv<EmbeddingDataType>(ptr, embedding_info->Type());
+            WriteBufAdv<int32_t>(ptr, int32_t(embedding_info->Dimension()));
+            break;
+        }
+        case LogicalType::kVarchar: {
+            int32_t capacity = MAX_VARCHAR_SIZE;
+            if(this->type_info_ != nullptr) {
+                const VarcharInfo* varchar_info =
+                        dynamic_cast<VarcharInfo*>(this->type_info_.get());
+                if(varchar_info != nullptr)
+                    capacity = varchar_info->dimension();
+            }
+            WriteBufAdv<int32_t>(ptr, capacity);
+            break;
+        }
+        default:
+            TypeError(fmt::format("Unexpected type {} here.", int(this->type_)));
     }
     return;
 }
@@ -202,37 +203,38 @@ SharedPtr<DataType>
 DataType::ReadAdv(char*& ptr, int32_t maxbytes) {
     char* const ptr_end = ptr + maxbytes;
     LogicalType type = ReadBufAdv<LogicalType>(ptr);
-    SharedPtr<TypeInfo> type_info {nullptr};
-    switch (type) {
-    case LogicalType::kArray:
-        NotImplementError("Array isn't implemented here.");
-        break;
-    case LogicalType::kBitmap: {
-        i64 limit = ReadBufAdv<i64>(ptr);
-        type_info = BitmapInfo::Make(limit);
-        break;
-    }
-    case LogicalType::kDecimal: {
-        i64 precision = ReadBufAdv<i64>(ptr);
-        i64 scale = ReadBufAdv<i64>(ptr);
-        type_info = DecimalInfo::Make(precision, scale);
-        break;
-    }
-    case LogicalType::kEmbedding: {
-        EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
-        int32_t dimension = ReadBufAdv<int32_t>(ptr);
-        type_info = EmbeddingInfo::Make(EmbeddingDataType(embedding_type), dimension);
-        break;
-    }
-    case LogicalType::kVarchar: {
-        int32_t dimension = ReadBufAdv<int32_t>(ptr);
-        type_info = VarcharInfo::Make(dimension);
-        break;
-    }
-    default:
+    SharedPtr<TypeInfo> type_info{nullptr};
+    switch(type) {
+        case LogicalType::kArray:
+            NotImplementError("Array isn't implemented here.");
+            break;
+        case LogicalType::kBitmap: {
+            i64 limit = ReadBufAdv<i64>(ptr);
+            type_info = BitmapInfo::Make(limit);
+            break;
+        }
+        case LogicalType::kDecimal: {
+            i64 precision = ReadBufAdv<i64>(ptr);
+            i64 scale = ReadBufAdv<i64>(ptr);
+            type_info = DecimalInfo::Make(precision, scale);
+            break;
+        }
+        case LogicalType::kEmbedding: {
+            EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
+            int32_t dimension = ReadBufAdv<int32_t>(ptr);
+            type_info = EmbeddingInfo::Make(EmbeddingDataType(embedding_type), dimension);
+            break;
+        }
+        case LogicalType::kVarchar: {
+            int32_t dimension = ReadBufAdv<int32_t>(ptr);
+            type_info = VarcharInfo::Make(dimension);
+            break;
+        }
+        default:
+            TypeError(fmt::format("Unexpected type {} here.", int(type)));
     }
     maxbytes = ptr_end - ptr;
-    StorageAssert(maxbytes>=0,
+    StorageAssert(maxbytes >= 0,
                   "ptr goes out of range when reading DataType");
     SharedPtr<DataType> data_type = MakeShared<DataType>(type, type_info);
     return data_type;
@@ -427,7 +429,7 @@ DataType::StringToValue<TinyIntT>(const StringView& str) {
     }
     TinyIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    TypeAssert(res.ptr == str.data() + str.size(), "Parse TinyInt error"); // TODO: throw error here
+    TypeAssert(res.ptr == str.data() + str.size(), "Parse TinyInt error");// TODO: throw error here
     return value;
 }
 
@@ -475,7 +477,7 @@ DataType::StringToValue<FloatT>(const StringView& str) {
     }
     FloatT value{};
 #if defined(__APPLE__)
-    auto ret = std::sscanf(str.data(),"%a",&value);
+    auto ret = std::sscanf(str.data(), "%a", &value);
     TypeAssert(ret == str.size(), "Parse Float error");
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
@@ -492,7 +494,7 @@ DataType::StringToValue<DoubleT>(const StringView& str) {
     }
     DoubleT value{};
 #if defined(__APPLE__)
-    auto ret = std::sscanf(str.data(),"%la",&value);
+    auto ret = std::sscanf(str.data(), "%la", &value);
     TypeAssert(ret == str.size(), "Parse Double error");
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
@@ -500,6 +502,4 @@ DataType::StringToValue<DoubleT>(const StringView& str) {
 #endif
     return value;
 }
-}
-
-
+}// namespace infinity
