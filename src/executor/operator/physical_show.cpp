@@ -86,6 +86,8 @@ PhysicalShow::Execute(QueryContext* query_context,
             ExecutorError("Invalid chunk scan type");
         }
     }
+
+    output_state->SetComplete();
 }
 
 

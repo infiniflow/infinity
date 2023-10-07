@@ -17,6 +17,7 @@ PhysicalCreateSchema::Execute(QueryContext* query_context, InputState* input_sta
     auto result = txn->CreateDatabase(*schema_name_, conflict_type_);
     auto create_database_output_state = (CreateDatabaseOutputState*)(output_state);
     create_database_output_state->error_message_ = std::move(result.err_);
+    output_state->SetComplete();
 }
 
 void

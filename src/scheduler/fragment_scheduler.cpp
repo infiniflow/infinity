@@ -78,18 +78,18 @@ FragmentScheduler::Schedule(QueryContext* query_context, PlanFragment* plan_frag
         SchedulerError("Empty plan fragment")
     }
 
-    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
-    if(!children.empty()) {
-        SchedulerError("Only support one fragment query")
-    }
+//    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
+//    if(!children.empty()) {
+//        SchedulerError("Only support one fragment query")
+//    }
     // 1. Recursive traverse the fragment tree
     // 2. Check the fragment
-    //    if the first op is SCAN op, then get all segment entry and create the source type is kScan.
+    //    if the first op is SCAN op, then get all block entry and create the source type is kScan.
     //    if the first op isn't SCAN op, fragment task source type is kQueue and a task_result_queue need to be created.
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
     Vector<FragmentTask*> tasks;
-    FragmentContext::MakeFragmentContext(query_context, plan_fragment, tasks);
+    FragmentContext::MakeFragmentContext(query_context, nullptr, plan_fragment, tasks);
 
     LOG_TRACE("Create {} tasks", tasks.size());
 
@@ -159,6 +159,9 @@ FragmentScheduler::WorkerLoop(FragmentTaskBlockQueue* task_queue, i64 worker_id)
         }
 
         fragment_task->OnExecute(worker_id);
+        if(!fragment_task->Complete()) {
+            ScheduleTask(fragment_task);
+        }
     }
 //    LOG_TRACE("Stop fragment task coordinator on CPU: {}", worker_id);
 }
@@ -180,19 +183,11 @@ FragmentScheduler::PollerLoop(FragmentTaskPollerQueue* poller_queue, i64 worker_
                 local_ready_queue.emplace_back(task_ptr);
                 local_task_list.erase(task_iter++);
             } else {
-                FragmentTaskState fragment_task_state = task_ptr->state_.load();
-                switch(fragment_task_state) {
-                    case FragmentTaskState::kRunning:
-                    case FragmentTaskState::kCancelled:
-                    case FragmentTaskState::kFinished:
-                    case FragmentTaskState::kReady: {
-                        local_task_list.erase(task_iter++);
-                        local_ready_queue.push_back(task_ptr);
-                        break;
-                    }
-                    case FragmentTaskState::kPending: {
-                        ++task_iter;
-                    }
+                if(task_ptr->Ready()) {
+                    local_task_list.erase(task_iter++);
+                    local_ready_queue.push_back(task_ptr);
+                } else {
+                    ++task_iter;
                 }
             }
 

@@ -41,7 +41,7 @@ public:
     GetOutputTypes() const final;
 
     Vector<SharedPtr<Vector<GlobalBlockID>>>
-    PlanSegmentEntries(i64 parallel_count) const;
+    PlanBlockEntries(i64 parallel_count) const;
 
     String
     table_alias() const;
@@ -70,6 +70,13 @@ public:
     IsExchange() const override {
         return true;
     }
+
+private:
+
+    void
+    ExecuteInternal(QueryContext* query_context,
+                    TableScanInputState* table_scan_input_state,
+                    TableScanOutputState* table_scan_output_state);
 
 private:
     SharedPtr<BaseTableRef> base_table_ref_{};

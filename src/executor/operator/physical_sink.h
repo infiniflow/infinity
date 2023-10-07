@@ -60,13 +60,16 @@ public:
 
 private:
     void
-    FillSinkStateFromLastOutputState(GeneralSinkState* common_sink_state, OutputState* task_output_state);
+    FillSinkStateFromLastOutputState(MaterializeSinkState* materialize_sink_state, OutputState* task_output_state);
 
     void
-    FillSinkStateFromLastOutputState(ResultSinkState* common_sink_state, OutputState* task_output_state);
+    FillSinkStateFromLastOutputState(ResultSinkState* result_sink_state, OutputState* task_output_state);
 
     void
-    FillSinkStateFromLastOutputState(MessageSinkState* common_sink_state, OutputState* task_output_state);
+    FillSinkStateFromLastOutputState(MessageSinkState* message_sink_state, OutputState* task_output_state);
+
+    void
+    FillSinkStateFromLastOutputState(QueueSinkState* queue_sink_state, OutputState* task_output_state);
 
 private:
     SharedPtr<Vector<String>> output_names_{};

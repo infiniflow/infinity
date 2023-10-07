@@ -13,7 +13,7 @@ PhysicalDropCollection::Init() {
 
 void
 PhysicalDropCollection::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
-
+    output_state->SetComplete();
 }
 
 void

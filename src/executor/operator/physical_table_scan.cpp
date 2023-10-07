@@ -17,17 +17,19 @@ PhysicalTableScan::Execute(QueryContext* query_context, InputState* input_state,
     auto* table_scan_input_state = static_cast<TableScanInputState*>(input_state);
     auto* table_scan_output_state = static_cast<TableScanOutputState*>(output_state);
 
+    ExecuteInternal(query_context, table_scan_input_state, table_scan_output_state);
+
 //    const MultiIndex<u64, u64, SegmentEntry*>* segment_entry_index_array = *table_scan_input_state->table_scan_function_data_->segment_index_;
 //    for(const u64 segment_idx: segment_entry_index_array) {
 //        SegmentEntry* segment_entry = base_table_ref_->segment_entries_->at(segment_idx);
 //        LOG_TRACE("Segment Entry ID: {}", segment_entry->segment_id_);
 //    }
 
-    table_scan_output_state->data_block_->Reset();
-
-    base_table_ref_->table_func_->main_function_(query_context,
-                                                 table_scan_input_state->table_scan_function_data_.get(),
-                                                 *table_scan_output_state->data_block_);
+//    table_scan_output_state->data_block_->Reset();
+//
+//    base_table_ref_->table_func_->main_function_(query_context,
+//                                                 table_scan_input_state->table_scan_function_data_.get(),
+//                                                 *table_scan_output_state->data_block_);
 }
 
 void
@@ -110,7 +112,7 @@ PhysicalTableScan::ColumnIDs() const {
 }
 
 Vector<SharedPtr<Vector<GlobalBlockID>>>
-PhysicalTableScan::PlanSegmentEntries(i64 parallel_count) const {
+PhysicalTableScan::PlanBlockEntries(i64 parallel_count) const {
     BlockIndex* block_index = base_table_ref_->block_index_.get();
 
     u64 all_block_count = block_index->BlockCount();
@@ -129,6 +131,62 @@ PhysicalTableScan::PlanSegmentEntries(i64 parallel_count) const {
         }
     }
     return result;
+}
+
+void
+PhysicalTableScan::ExecuteInternal(QueryContext* query_context,
+                                   TableScanInputState* table_scan_input_state,
+                                   TableScanOutputState* table_scan_output_state) {
+    DataBlock* output_ptr = table_scan_output_state->data_block_.get();
+    output_ptr->Reset();
+
+    TableScanFunctionData* table_scan_function_data_ptr = table_scan_input_state->table_scan_function_data_.get();
+    const BlockIndex* block_index = table_scan_function_data_ptr->block_index_;
+    Vector<GlobalBlockID>* block_ids = table_scan_function_data_ptr->global_block_ids_.get();
+    const Vector<SizeT>& column_ids = table_scan_function_data_ptr->column_ids_;
+    i64& block_ids_idx = table_scan_function_data_ptr->current_block_ids_idx_;
+    if(block_ids_idx >= block_ids->size()) {
+        // No data or all data is read
+        table_scan_output_state->SetComplete();
+        return;
+    }
+
+    SizeT& read_offset = table_scan_function_data_ptr->current_read_offset_;
+
+    // Here we assume output is a fresh data block, we have never written anything into it.
+    auto write_capacity = output_ptr->capacity();
+    while(write_capacity > 0 && block_ids_idx < block_ids->size()) {
+        i32 segment_id = block_ids->at(block_ids_idx).segment_id_;
+        i16 block_id = block_ids->at(block_ids_idx).block_id_;
+
+        BlockEntry* current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
+
+        auto remaining_rows = current_block_entry->row_count_ - read_offset;
+        auto write_size = std::min(write_capacity, remaining_rows);
+
+        SizeT output_column_id{0};
+        for(auto column_id: column_ids) {
+            ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(),
+                                                                         query_context->storage()->buffer_manager());
+            output_ptr->column_vectors[output_column_id++]->AppendWith(column_buffer, read_offset, write_size);
+        }
+
+        // write_size = already read size = already write size
+        write_capacity -= write_size;
+        remaining_rows -= write_size;
+        read_offset += write_size;
+
+        // we have read all data from current segment, move to next block
+        if(remaining_rows == 0) {
+            ++block_ids_idx;
+            read_offset = 0;
+        }
+    }
+    if(block_ids_idx >= block_ids->size()) {
+        table_scan_output_state->SetComplete();
+    }
+
+    output_ptr->Finalize();
 }
 
 }

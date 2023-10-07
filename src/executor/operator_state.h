@@ -22,6 +22,18 @@ struct OutputState {
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     SharedPtr<DataBlock> data_block_{};
     UniquePtr<String> error_message_{};
+
+    bool complete_{false};
+
+    inline void
+    SetComplete() {
+        complete_ = true;
+    }
+
+    inline bool
+    Complete() const {
+        return complete_;
+    }
 };
 
 struct InputState {
@@ -29,7 +41,16 @@ struct InputState {
     InputState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
 
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
-    DataBlock* input_data_block_{};
+    DataBlock* input_data_block_{nullptr};
+    bool* input_complete_ptr_{nullptr};
+    i64 received_data_count_{0};
+    i64 total_data_count_{0};
+
+    inline void
+    ConnectToPrevOutputOpState(OutputState* output_state) {
+        input_data_block_ = output_state->data_block_.get();
+        input_complete_ptr_ = &output_state->complete_;
+    }
 };
 
 // Aggregate
@@ -92,14 +113,14 @@ struct TableScanOutputState : public OutputState {
 // KnnScan
 struct KnnScanInputState : public InputState {
     inline explicit
-    KnnScanInputState() : InputState(PhysicalOperatorType::kTableScan) {}
+    KnnScanInputState() : InputState(PhysicalOperatorType::kKnnScan) {}
 
     UniquePtr<KnnScanFunctionData> knn_scan_function_data_{};
 };
 
 struct KnnScanOutputState : public OutputState {
     inline explicit
-    KnnScanOutputState() : OutputState(PhysicalOperatorType::kTableScan) {}
+    KnnScanOutputState() : OutputState(PhysicalOperatorType::kKnnScan) {}
 };
 
 // Merge Knn
@@ -486,9 +507,10 @@ struct FlushOutputState : public OutputState {
 // Sink
 enum class SinkStateType {
     kInvalid,
-    kGeneral,
+    kMaterialize,
     kResult,
     kMessage,
+    kQueue,
 };
 
 
@@ -511,9 +533,17 @@ struct SinkState {
     UniquePtr<String> error_message_{};
 };
 
-struct GeneralSinkState : public SinkState {
+struct QueueSinkState: public SinkState {
     inline explicit
-    GeneralSinkState() : SinkState(SinkStateType::kGeneral) {}
+    QueueSinkState() : SinkState(SinkStateType::kQueue) {}
+
+    Vector<SharedPtr<DataBlock>> data_block_array_{};
+    Vector<FragmentDataQueue*> fragment_data_queues_;
+};
+
+struct MaterializeSinkState : public SinkState {
+    inline explicit
+    MaterializeSinkState() : SinkState(SinkStateType::kMaterialize) {}
 
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
     SharedPtr<Vector<String>> column_names_{};
@@ -537,7 +567,7 @@ struct MessageSinkState : public SinkState {
 // Source
 enum class SourceStateType {
     kInvalid,
-    kCommon,
+    kQueue,
     kAggregate,
     kTableScan,
     kKnnScan,
@@ -557,11 +587,13 @@ struct SourceState {
     SourceStateType state_type_{SourceStateType::kInvalid};
 };
 
-struct CommonSourceState : public SourceState {
+struct QueueSourceState : public SourceState {
     inline explicit
-    CommonSourceState() : SourceState(SourceStateType::kCommon) {}
+    QueueSourceState() : SourceState(SourceStateType::kQueue) {}
 
     FragmentDataQueue source_queue_;
+
+    SharedPtr<FragmentData> current_fragment_data_{};
 };
 
 struct AggregateSourceState : public SourceState {

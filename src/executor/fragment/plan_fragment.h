@@ -76,9 +76,9 @@ public:
         return children_;
     }
 
-    inline PlanFragment*
-    ChildPtr() const {
-        return child_.get();
+    inline bool
+    HasChild() {
+        return !children_.empty();
     }
 
     SharedPtr<Vector<String>>
@@ -113,8 +113,6 @@ private:
     UniquePtr<PhysicalSource> source_{};
 
     PlanFragment* parent_{};
-
-    UniquePtr<PlanFragment> child_{};
 
     Vector<UniquePtr<PlanFragment>> children_{};
 

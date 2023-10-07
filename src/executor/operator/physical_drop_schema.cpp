@@ -27,7 +27,7 @@ PhysicalDropSchema::Execute(QueryContext* query_context, InputState* input_state
     auto result_table_def_ptr
             = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
-
+    output_state->SetComplete();
 }
 
 void

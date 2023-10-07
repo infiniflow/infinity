@@ -32,7 +32,10 @@ enum class FragmentType {
 class FragmentContext {
 public:
     static void
-    MakeFragmentContext(QueryContext* query_context, PlanFragment* fragment_ptr, Vector<FragmentTask*>& tasks);
+    MakeFragmentContext(QueryContext* query_context,
+                        FragmentContext* parent_context,
+                        PlanFragment* fragment_ptr,
+                        Vector<FragmentTask*>& tasks);
 
 public:
     explicit
@@ -53,15 +56,6 @@ public:
 
     Vector<PhysicalOperator*>&
     GetOperators();
-
-    bool
-    HasChild() const;
-
-    i64
-    GetChildParallelCount() const;
-
-    i64
-    GetParallelCount() const;
 
     [[nodiscard]] PhysicalSink*
     GetSinkOperator() const;
