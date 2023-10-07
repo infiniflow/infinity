@@ -13,7 +13,7 @@ PhysicalCreateView::Init() {
 
 void
 PhysicalCreateView::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
-
+    output_state->SetComplete();
 }
 
 void

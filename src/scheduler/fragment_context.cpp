@@ -20,34 +20,62 @@ void
 BuildSerialTaskStateTemplate(Vector<PhysicalOperator*>& fragment_operators,
                              Vector<UniquePtr<FragmentTask>>& tasks,
                              i64 operator_id,
-                             i64 operator_count) {
+                             i64 operator_count,
+                             FragmentContext* parent_fragment_context) {
     if(tasks.size() != 1) {
-        SchedulerError("Serial fragment type will only have one task")
+        SchedulerError("Serial fragment type will only have one task(one concurrency)")
     }
 
     FragmentTask* task_ptr = tasks.back().get();
-    SourceState* source_ptr = tasks.back()->source_state_.get();
-    SinkState* sink_ptr = tasks.back()->sink_state_.get();
 
     task_ptr->operator_input_state_[operator_id] = MakeUnique<InputStateType>();
-    auto input_state = (InputStateType*)(task_ptr->operator_input_state_[operator_id].get());
+    auto current_operator_input_state = (InputStateType*)(task_ptr->operator_input_state_[operator_id].get());
+
     task_ptr->operator_output_state_[operator_id] = MakeUnique<OutputStateType>();
-    auto output_state = (OutputStateType*)(task_ptr->operator_output_state_[operator_id].get());
-    output_state->data_block_ = DataBlock::Make();
-    output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
-    if(operator_id == 0) {
-        // First operator must get data source node
-        source_ptr->SetNextState(input_state);
+    auto current_operator_output_state = (OutputStateType*)(task_ptr->operator_output_state_[operator_id].get());
+
+    current_operator_output_state->data_block_ = DataBlock::Make();
+    current_operator_output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
+
+    if(operator_id == operator_count - 1) {
+        // Set first operator input as the output of source operator
+        SourceState* source_state = task_ptr->source_state_.get();
+        source_state->SetNextState(current_operator_input_state);
     }
 
     if(operator_id > 0 && operator_id < operator_count) {
-        OutputState* prev_output_state = task_ptr->operator_output_state_[operator_id - 1].get();
-        input_state->input_data_block_ = prev_output_state->data_block_.get();
+        OutputState* prev_operator_output_state = task_ptr->operator_output_state_[operator_id - 1].get();
+        current_operator_input_state->ConnectToPrevOutputOpState(prev_operator_output_state);
+//        current_operator_input_state->input_data_block_ = prev_operator_output_state->data_block_.get();
     }
 
-    if(operator_id == operator_count - 1) {
-        // Last operator
-        sink_ptr->SetPrevState(output_state);
+    if(operator_id == 0) {
+        // Set last operator output as the input of sink operator
+        SinkState* sink_state = task_ptr->sink_state_.get();
+        sink_state->SetPrevState(current_operator_output_state);
+
+        if(parent_fragment_context != nullptr) {
+            // this fragment has parent fragment, which means the sink node of current fragment
+            // will sink data to the parent fragment.
+            switch(sink_state->state_type_) {
+                case SinkStateType::kQueue: {
+                    auto* queue_sink_state = static_cast<QueueSinkState*>(sink_state);
+
+                    for(const auto& next_fragment_task: parent_fragment_context->Tasks()) {
+                        auto* next_fragment_source_state = static_cast<QueueSourceState*>(next_fragment_task->source_state_.get());
+                        queue_sink_state->fragment_data_queues_.emplace_back(&next_fragment_source_state->source_queue_);
+                    }
+
+                    break;
+                }
+                case SinkStateType::kInvalid: {
+                    SchedulerError("Invalid sink operator state type.")
+                }
+                default: {
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -56,34 +84,41 @@ void
 BuildSerialTaskStateTemplate<ImportInputState, ImportOutputState>(Vector<PhysicalOperator*>& fragment_operators,
                                                                   Vector<UniquePtr<FragmentTask>>& tasks,
                                                                   i64 operator_id,
-                                                                  i64 operator_count) {
+                                                                  i64 operator_count,
+                                                                  FragmentContext* parent_fragment_context) {
     if(tasks.size() != 1) {
         SchedulerError("Serial fragment type will only have one task")
     }
 
     FragmentTask* task_ptr = tasks.back().get();
-    SourceState* source_ptr = tasks.back()->source_state_.get();
-    SinkState* sink_ptr = tasks.back()->sink_state_.get();
 
     task_ptr->operator_input_state_[operator_id] = MakeUnique<ImportInputState>();
-    auto input_state = (ImportInputState*)(task_ptr->operator_input_state_[operator_id].get());
+    auto current_operator_input_state = (ImportInputState*)(task_ptr->operator_input_state_[operator_id].get());
+
     task_ptr->operator_output_state_[operator_id] = MakeUnique<ImportOutputState>();
-    auto output_state = (ImportOutputState*)(task_ptr->operator_output_state_[operator_id].get());
+    auto current_operator_output_state = (ImportOutputState*)(task_ptr->operator_output_state_[operator_id].get());
+
 //    output_state->data_block_ = DataBlock::Make();
 //    output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
     if(operator_id == operator_count - 1) {
-        // First operator must get data source node
-        source_ptr->SetNextState(input_state);
+        // Set first operator input as the output of source operator
+        SourceState* source_state = tasks.back()->source_state_.get();
+        source_state->SetNextState(current_operator_input_state);
     }
 
     if(operator_id >= 0 && operator_id < operator_count - 1) {
-        OutputState* prev_output_state = task_ptr->operator_output_state_[operator_id + 1].get();
-        input_state->input_data_block_ = prev_output_state->data_block_.get();
+        OutputState* prev_operator_output_state = task_ptr->operator_output_state_[operator_id + 1].get();
+        current_operator_input_state->ConnectToPrevOutputOpState(prev_operator_output_state);
+//        current_operator_input_state->input_data_block_ = prev_output_state->data_block_.get();
     }
 
     if(operator_id == 0) {
-        // Last operator
-        sink_ptr->SetPrevState(output_state);
+        // Set last operator output as the input of sink operator
+        SinkState* sink_state = tasks.back()->sink_state_.get();
+        sink_state->SetPrevState(current_operator_output_state);
+        if(parent_fragment_context != nullptr) {
+            SchedulerError("Import node should only have one fragment.")
+        }
     }
 }
 
@@ -93,32 +128,59 @@ BuildParallelTaskStateTemplate(Vector<PhysicalOperator*>& fragment_operators,
                                Vector<UniquePtr<FragmentTask>>& tasks,
                                i64 operator_id,
                                i64 operator_count,
+                               FragmentContext* parent_fragment_context,
                                i64 real_parallel_size) {
     for(i64 task_id = 0; task_id < real_parallel_size; ++task_id) {
         FragmentTask* task_ptr = tasks[task_id].get();
-        SourceState* source_ptr = tasks[task_id]->source_state_.get();
-        SinkState* sink_ptr = tasks[task_id]->sink_state_.get();
 
         task_ptr->operator_input_state_[operator_id] = MakeUnique<InputStateType>();
-        auto input_state = (InputStateType*)(task_ptr->operator_input_state_[operator_id].get());
+        auto current_operator_input_state = (InputStateType*)(task_ptr->operator_input_state_[operator_id].get());
+
         task_ptr->operator_output_state_[operator_id] = MakeUnique<OutputStateType>();
-        auto output_state = (OutputStateType*)(task_ptr->operator_output_state_[operator_id].get());
-        output_state->data_block_ = DataBlock::Make();
-        output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
+        auto current_operator_output_state = (OutputStateType*)(task_ptr->operator_output_state_[operator_id].get());
+
+        current_operator_output_state->data_block_ = DataBlock::Make();
+        current_operator_output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
 
         if(operator_id == operator_count - 1) {
-            // First operator must get data source node
-            source_ptr->SetNextState(input_state);
+            // Set first operator input as the output of source operator
+            SourceState* source_state = tasks[task_id]->source_state_.get();
+            source_state->SetNextState(current_operator_input_state);
         }
 
         if(operator_id >= 0 && operator_id < operator_count - 1) {
-            OutputState* prev_output_state = task_ptr->operator_output_state_[operator_id + 1].get();
-            input_state->input_data_block_ = prev_output_state->data_block_.get();
+            OutputState* prev_operator_output_state = task_ptr->operator_output_state_[operator_id + 1].get();
+            current_operator_input_state->ConnectToPrevOutputOpState(prev_operator_output_state);
+//            current_operator_input_state->input_data_block_ = prev_output_state->data_block_.get();
         }
 
         if(operator_id == 0) {
-            // Last operator
-            sink_ptr->SetPrevState(output_state);
+            // Set last operator output as the input of sink operator
+            SinkState* sink_state = tasks[task_id]->sink_state_.get();
+            sink_state->SetPrevState(current_operator_output_state);
+
+            if(parent_fragment_context != nullptr) {
+                // this fragment has parent fragment, which means the sink node of current fragment
+                // will sink data to the parent fragment.
+                switch(sink_state->state_type_) {
+                    case SinkStateType::kQueue: {
+                        auto* queue_sink_state = static_cast<QueueSinkState*>(sink_state);
+
+                        for(const auto& next_fragment_task: parent_fragment_context->Tasks()) {
+                            auto* next_fragment_source_state = static_cast<QueueSourceState*>(next_fragment_task->source_state_.get());
+                            queue_sink_state->fragment_data_queues_.emplace_back(&next_fragment_source_state->source_queue_);
+                        }
+
+                        break;
+                    }
+                    case SinkStateType::kInvalid: {
+                        SchedulerError("Invalid sink operator state type.")
+                    }
+                    default: {
+                        break;
+                    }
+                }
+            }
         }
     }
 }
@@ -129,6 +191,7 @@ BuildParallelTaskStateTemplate<TableScanInputState, TableScanOutputState>(Vector
                                                                           Vector<UniquePtr<FragmentTask>>& tasks,
                                                                           i64 operator_id,
                                                                           i64 operator_count,
+                                                                          FragmentContext* parent_fragment_context,
                                                                           i64 real_parallel_size) {
 
     // TableScan must be the first operator of the fragment
@@ -148,14 +211,14 @@ BuildParallelTaskStateTemplate<TableScanInputState, TableScanOutputState>(Vector
 
     for(i64 task_id = 0; task_id < real_parallel_size; ++task_id) {
         FragmentTask* task_ptr = tasks[task_id].get();
-        SourceState* source_ptr = tasks[task_id]->source_state_.get();
+        SourceState* source_state = tasks[task_id]->source_state_.get();
 //        SinkState* sink_ptr = tasks[task_id]->sink_state_.get();
 
-        if(source_ptr->state_type_ != SourceStateType::kTableScan) {
+        if(source_state->state_type_ != SourceStateType::kTableScan) {
             SchedulerError("Expect table scan source state")
         }
 
-        auto* table_scan_source_state = static_cast<TableScanSourceState*>(source_ptr);
+        auto* table_scan_source_state = static_cast<TableScanSourceState*>(source_state);
         task_ptr->operator_input_state_[operator_id] = MakeUnique<TableScanInputState>();
         auto table_scan_input_state = (TableScanInputState*)(task_ptr->operator_input_state_[operator_id].get());
 
@@ -168,11 +231,12 @@ BuildParallelTaskStateTemplate<TableScanInputState, TableScanOutputState>(Vector
                                                                                               physical_table_scan->ColumnIDs());
 
         task_ptr->operator_output_state_[operator_id] = MakeUnique<TableScanOutputState>();
-        auto output_state = (TableScanOutputState*)(task_ptr->operator_output_state_[operator_id].get());
-        output_state->data_block_ = DataBlock::Make();
-        output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
+        auto table_scan_output_state = (TableScanOutputState*)(task_ptr->operator_output_state_[operator_id].get());
 
-        source_ptr->SetNextState(table_scan_input_state);
+        table_scan_output_state->data_block_ = DataBlock::Make();
+        table_scan_output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
+
+        source_state->SetNextState(table_scan_input_state);
     }
 }
 
@@ -182,15 +246,12 @@ BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vector<Phy
                                                                       Vector<UniquePtr<FragmentTask>>& tasks,
                                                                       i64 operator_id,
                                                                       i64 operator_count,
+                                                                      FragmentContext* parent_fragment_context,
                                                                       i64 real_parallel_size) {
 
-    // TableScan must be the first operator of the fragment
+    // KnnScan must be the first operator of the fragment
     if(operator_id != operator_count - 1) {
         SchedulerError("Knn scan operator must be the first operator of the fragment.")
-    }
-
-    if(operator_id == 0) {
-        SchedulerError("Knn scan shouldn't be the last operator of the fragment.")
     }
 
     PhysicalOperator* physical_op = fragment_operators[operator_id];
@@ -201,14 +262,14 @@ BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vector<Phy
 
     for(i64 task_id = 0; task_id < real_parallel_size; ++task_id) {
         FragmentTask* task_ptr = tasks[task_id].get();
-        SourceState* source_ptr = tasks[task_id]->source_state_.get();
+        SourceState* source_state = tasks[task_id]->source_state_.get();
 //        SinkState* sink_ptr = tasks[task_id]->sink_state_.get();
 
-        if(source_ptr->state_type_ != SourceStateType::kKnnScan) {
+        if(source_state->state_type_ != SourceStateType::kKnnScan) {
             SchedulerError("Expect knn scan source state")
         }
 
-        auto* knn_scan_source_state = static_cast<KnnScanSourceState*>(source_ptr);
+        auto* knn_scan_source_state = static_cast<KnnScanSourceState*>(source_state);
         task_ptr->operator_input_state_[operator_id] = MakeUnique<KnnScanInputState>();
         auto knn_scan_input_state = (KnnScanInputState*)(task_ptr->operator_input_state_[operator_id].get());
 
@@ -237,20 +298,50 @@ BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vector<Phy
                                                                                             knn_expr->distance_type_);
             knn_scan_input_state->knn_scan_function_data_->Init();
         } else {
-            SchedulerError("Currently, we only support one knn column case")
+            SchedulerError("Currently, we only support one knn column scenario")
         }
 
         task_ptr->operator_output_state_[operator_id] = MakeUnique<KnnScanOutputState>();
-        auto output_state = (KnnScanOutputState*)(task_ptr->operator_output_state_[operator_id].get());
-        output_state->data_block_ = DataBlock::Make();
-        output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
+        auto knn_scan_output_state = (KnnScanOutputState*)(task_ptr->operator_output_state_[operator_id].get());
+        knn_scan_output_state->data_block_ = DataBlock::Make();
+        knn_scan_output_state->data_block_->Init(*fragment_operators[operator_id]->GetOutputTypes());
 
-        source_ptr->SetNextState(knn_scan_input_state);
+        source_state->SetNextState(knn_scan_input_state);
+
+        if(operator_id == 0) {
+            // Set last operator output as the input of sink operator
+            SinkState* sink_state = tasks[task_id]->sink_state_.get();
+            sink_state->SetPrevState(knn_scan_output_state);
+
+            if(parent_fragment_context != nullptr) {
+                // this fragment has parent fragment, which means the sink node of current fragment
+                // will sink data to the parent fragment.
+                switch(sink_state->state_type_) {
+                    case SinkStateType::kQueue: {
+                        auto* queue_sink_state = static_cast<QueueSinkState*>(sink_state);
+
+                        for(const auto& next_fragment_task: parent_fragment_context->Tasks()) {
+                            auto* next_fragment_source_state = static_cast<QueueSourceState*>(next_fragment_task->source_state_.get());
+                            queue_sink_state->fragment_data_queues_.emplace_back(&next_fragment_source_state->source_queue_);
+                        }
+
+                        break;
+                    }
+                    case SinkStateType::kInvalid: {
+                        SchedulerError("Invalid sink operator state type.")
+                    }
+                    default: {
+                        SchedulerError("Sink type isn't queue after knn scan operator")
+                    }
+                }
+            }
+        }
     }
 }
 
 void
 FragmentContext::MakeFragmentContext(QueryContext* query_context,
+                                     FragmentContext* parent_context,
                                      PlanFragment* fragment_ptr,
                                      Vector<FragmentTask*>& task_array) {
     Vector<PhysicalOperator*>& fragment_operators = fragment_ptr->GetOperators();
@@ -296,6 +387,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                                           tasks,
                                                                                           operator_id,
                                                                                           operator_count,
+                                                                                          parent_context,
                                                                                           real_parallel_size);
 
                 break;
@@ -306,6 +398,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                         tasks,
                         operator_id,
                         operator_count,
+                        parent_context,
                         real_parallel_size);
                 break;
             }
@@ -314,7 +407,8 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                         fragment_operators,
                         tasks,
                         operator_id,
-                        operator_count);
+                        operator_count,
+                        parent_context);
                 break;
             }
             case PhysicalOperatorType::kUnionAll:
@@ -341,6 +435,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                                           tasks,
                                                                                           operator_id,
                                                                                           operator_count,
+                                                                                          parent_context,
                                                                                           real_parallel_size);
                 break;
             }
@@ -349,6 +444,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                                       tasks,
                                                                                       operator_id,
                                                                                       operator_count,
+                                                                                      parent_context,
                                                                                       real_parallel_size);
                 break;
             }
@@ -357,6 +453,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                                         tasks,
                                                                                         operator_id,
                                                                                         operator_count,
+                                                                                        parent_context,
                                                                                         real_parallel_size);
                 break;
             }
@@ -365,6 +462,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                                     tasks,
                                                                                     operator_id,
                                                                                     operator_count,
+                                                                                    parent_context,
                                                                                     real_parallel_size);
                 break;
             }
@@ -373,6 +471,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                                           tasks,
                                                                                           operator_id,
                                                                                           operator_count,
+                                                                                          parent_context,
                                                                                           real_parallel_size);
                 break;
             }
@@ -381,6 +480,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                                 tasks,
                                                                                 operator_id,
                                                                                 operator_count,
+                                                                                parent_context,
                                                                                 real_parallel_size);
                 break;
             }
@@ -388,7 +488,8 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                 BuildSerialTaskStateTemplate<MergeHashInputState, MergeHashOutputState>(fragment_operators,
                                                                                         tasks,
                                                                                         operator_id,
-                                                                                        operator_count);
+                                                                                        operator_count,
+                                                                                        parent_context);
                 break;
             }
             case PhysicalOperatorType::kLimit: {
@@ -396,6 +497,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                                   tasks,
                                                                                   operator_id,
                                                                                   operator_count,
+                                                                                  parent_context,
                                                                                   real_parallel_size);
                 break;
             }
@@ -403,7 +505,8 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                 BuildSerialTaskStateTemplate<MergeLimitInputState, MergeLimitOutputState>(fragment_operators,
                                                                                           tasks,
                                                                                           operator_id,
-                                                                                          operator_count);
+                                                                                          operator_count,
+                                                                                          parent_context);
                 break;
             }
             case PhysicalOperatorType::kTop: {
@@ -411,6 +514,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                               tasks,
                                                                               operator_id,
                                                                               operator_count,
+                                                                              parent_context,
                                                                               real_parallel_size);
                 break;
             }
@@ -418,7 +522,8 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                 BuildSerialTaskStateTemplate<MergeTopInputState, MergeTopOutputState>(fragment_operators,
                                                                                       tasks,
                                                                                       operator_id,
-                                                                                      operator_count);
+                                                                                      operator_count,
+                                                                                      parent_context);
                 break;
             }
             case PhysicalOperatorType::kProjection: {
@@ -426,6 +531,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                                             tasks,
                                                                                             operator_id,
                                                                                             operator_count,
+                                                                                            parent_context,
                                                                                             real_parallel_size);
                 break;
             }
@@ -434,6 +540,7 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                                                                                 tasks,
                                                                                 operator_id,
                                                                                 operator_count,
+                                                                                parent_context,
                                                                                 real_parallel_size);
                 break;
             }
@@ -441,106 +548,132 @@ FragmentContext::MakeFragmentContext(QueryContext* query_context,
                 BuildSerialTaskStateTemplate<MergeSortInputState, MergeSortOutputState>(fragment_operators,
                                                                                         tasks,
                                                                                         operator_id,
-                                                                                        operator_count);
+                                                                                        operator_count,
+                                                                                        parent_context);
                 break;
             }
             case PhysicalOperatorType::kDelete: {
                 BuildSerialTaskStateTemplate<DeleteInputState, DeleteOutputState>(fragment_operators,
                                                                                   tasks,
                                                                                   operator_id,
-                                                                                  operator_count);
+                                                                                  operator_count,
+                                                                                  parent_context);
                 break;
             }
             case PhysicalOperatorType::kInsert: {
                 BuildSerialTaskStateTemplate<InsertInputState, InsertOutputState>(fragment_operators,
                                                                                   tasks,
                                                                                   operator_id,
-                                                                                  operator_count);
+                                                                                  operator_count,
+                                                                                  parent_context);
                 break;
             }
             case PhysicalOperatorType::kImport: {
                 BuildSerialTaskStateTemplate<ImportInputState, ImportOutputState>(fragment_operators,
                                                                                   tasks,
                                                                                   operator_id,
-                                                                                  operator_count);
+                                                                                  operator_count,
+                                                                                  parent_context);
                 break;
             }
             case PhysicalOperatorType::kExport: {
                 BuildSerialTaskStateTemplate<ExportInputState, ExportOutputState>(fragment_operators,
                                                                                   tasks,
                                                                                   operator_id,
-                                                                                  operator_count);
+                                                                                  operator_count,
+                                                                                  parent_context);
                 break;
             }
             case PhysicalOperatorType::kCreateTable: {
                 BuildSerialTaskStateTemplate<CreateTableInputState, CreateTableOutputState>(fragment_operators,
                                                                                             tasks,
                                                                                             operator_id,
-                                                                                            operator_count);
+                                                                                            operator_count,
+                                                                                            parent_context);
                 break;
             }
             case PhysicalOperatorType::kCreateCollection: {
                 BuildSerialTaskStateTemplate<CreateCollectionInputState, CreateCollectionOutputState>(fragment_operators,
                                                                                                       tasks,
                                                                                                       operator_id,
-                                                                                                      operator_count);
+                                                                                                      operator_count,
+                                                                                                      parent_context);
                 break;
             }
             case PhysicalOperatorType::kCreateDatabase: {
                 BuildSerialTaskStateTemplate<CreateDatabaseInputState, CreateDatabaseOutputState>(fragment_operators,
                                                                                                   tasks,
                                                                                                   operator_id,
-                                                                                                  operator_count);
+                                                                                                  operator_count,
+                                                                                                  parent_context);
                 break;
             }
             case PhysicalOperatorType::kCreateView: {
                 BuildSerialTaskStateTemplate<CreateViewInputState, CreateViewOutputState>(fragment_operators,
                                                                                           tasks,
                                                                                           operator_id,
-                                                                                          operator_count);
+                                                                                          operator_count,
+                                                                                          parent_context);
                 break;
             }
             case PhysicalOperatorType::kDropTable: {
                 BuildSerialTaskStateTemplate<DropTableInputState, DropTableOutputState>(fragment_operators,
                                                                                         tasks,
-                                                                                        operator_id, operator_count);
+                                                                                        operator_id,
+                                                                                        operator_count,
+                                                                                        parent_context);
                 break;
             }
             case PhysicalOperatorType::kDropCollection: {
                 BuildSerialTaskStateTemplate<DropCollectionInputState, DropCollectionOutputState>(fragment_operators,
                                                                                                   tasks,
                                                                                                   operator_id,
-                                                                                                  operator_count);
+                                                                                                  operator_count,
+                                                                                                  parent_context);
                 break;
             }
             case PhysicalOperatorType::kDropDatabase: {
                 BuildSerialTaskStateTemplate<DropDatabaseInputState, DropDatabaseOutputState>(fragment_operators,
                                                                                               tasks,
                                                                                               operator_id,
-                                                                                              operator_count);
+                                                                                              operator_count,
+                                                                                              parent_context);
                 break;
             }
             case PhysicalOperatorType::kDropView: {
                 BuildSerialTaskStateTemplate<DropViewInputState, DropViewOutputState>(fragment_operators,
                                                                                       tasks,
                                                                                       operator_id,
-                                                                                      operator_count);
+                                                                                      operator_count,
+                                                                                      parent_context);
                 break;
             }
             case PhysicalOperatorType::kExplain: {
                 BuildSerialTaskStateTemplate<ExplainInputState, ExplainOutputState>(fragment_operators,
                                                                                     tasks,
                                                                                     operator_id,
-                                                                                    operator_count);
+                                                                                    operator_count,
+                                                                                    parent_context);
                 break;
             }
             case PhysicalOperatorType::kShow: {
                 BuildSerialTaskStateTemplate<ShowInputState, ShowOutputState>(fragment_operators,
                                                                               tasks,
                                                                               operator_id,
-                                                                              operator_count);
+                                                                              operator_count,
+                                                                              parent_context);
                 break;
             }
+        }
+    }
+
+    if(fragment_ptr->HasChild()) {
+        // current fragment have children
+        for(const auto& child_fragment: fragment_ptr->Children()) {
+            FragmentContext::MakeFragmentContext(query_context,
+                                                 fragment_context.get(),
+                                                 child_fragment.get(),
+                                                 task_array);
         }
     }
 
@@ -559,21 +692,6 @@ FragmentContext::GetOperators() {
     return fragment_ptr_->GetOperators();
 }
 
-bool
-FragmentContext::HasChild() const {
-    return fragment_ptr_->ChildPtr() != nullptr;
-}
-
-i64
-FragmentContext::GetChildParallelCount() const {
-    return fragment_ptr_->ChildPtr()->GetContext()->GetParallelCount();
-}
-
-i64
-FragmentContext::GetParallelCount() const {
-    return tasks_.size();
-}
-
 PhysicalSink*
 FragmentContext::GetSinkOperator() const {
     return fragment_ptr_->GetSinkNode();
@@ -587,37 +705,34 @@ FragmentContext::GetSourceOperator() const {
 void
 FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
     i64 parallel_count = cpu_count;
-    if(HasChild()) {
-        parallel_count = std::min(GetChildParallelCount(), parallel_count);
-    } else {
-        PhysicalOperator* first_operator = this->GetOperators().back();
-        switch(first_operator->operator_type()) {
-            case PhysicalOperatorType::kTableScan: {
-                auto* table_scan_operator = static_cast<PhysicalTableScan*>(first_operator);
-                parallel_count = std::min(parallel_count,
-                                          (i64)(table_scan_operator->BlockEntryCount()));
-                if(parallel_count == 0) {
-                    parallel_count = 1;
-                }
-                break;
-            }
-            case PhysicalOperatorType::kKnnScan: {
-                auto* knn_scan_operator = static_cast<PhysicalKnnScan*>(first_operator);
-                parallel_count = std::min(parallel_count,
-                                          (i64)(knn_scan_operator->BlockEntryCount()));
-                if(parallel_count == 0) {
-                    parallel_count = 1;
-                }
-                break;
-            }
-            case PhysicalOperatorType::kProjection: {
-                // Serial Materialize
+    PhysicalOperator* first_operator = this->GetOperators().back();
+    switch(first_operator->operator_type()) {
+        case PhysicalOperatorType::kTableScan: {
+            auto* table_scan_operator = static_cast<PhysicalTableScan*>(first_operator);
+            parallel_count = std::min(parallel_count,
+                                      (i64)(table_scan_operator->BlockEntryCount()));
+            if(parallel_count == 0) {
                 parallel_count = 1;
-                break;
             }
-            default: {
-                break;
+            break;
+        }
+        case PhysicalOperatorType::kKnnScan: {
+            auto* knn_scan_operator = static_cast<PhysicalKnnScan*>(first_operator);
+            parallel_count = std::min(parallel_count,
+                                      (i64)(knn_scan_operator->BlockEntryCount()));
+            if(parallel_count == 0) {
+                parallel_count = 1;
             }
+            break;
+        }
+        case PhysicalOperatorType::kMergeKnn:
+        case PhysicalOperatorType::kProjection: {
+            // Serial Materialize
+            parallel_count = 1;
+            break;
+        }
+        default: {
+            break;
         }
     }
 
@@ -627,7 +742,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
         case FragmentType::kSerialMaterialize: {
             std::unique_lock<std::mutex> locker(locker_);
-            tasks_.reserve(1);
+            tasks_.reserve(parallel_count);
             tasks_.emplace_back(MakeUnique<FragmentTask>(this, 0, operator_count));
             break;
         }
@@ -643,7 +758,6 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
     }
 
     // Determine which type of source state.
-    PhysicalOperator* first_operator = this->GetOperators().back();
     switch(first_operator->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
             SchedulerError("Unexpected operator type")
@@ -686,7 +800,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kMergeSort:
         case PhysicalOperatorType::kMergeKnn: {
             if(fragment_type_ != FragmentType::kSerialMaterialize) {
-                SchedulerError(fmt::format("{} should in serial materialized fragment",
+                SchedulerError(fmt::format("{} should be serial materialized fragment",
                                            PhysicalOperatorToString(first_operator->operator_type())));
             }
 
@@ -695,7 +809,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                                            PhysicalOperatorToString(first_operator->operator_type())));
             }
 
-            tasks_[0]->source_state_ = MakeUnique<CommonSourceState>();
+            tasks_[0]->source_state_ = MakeUnique<QueueSourceState>();
             break;
         }
         case PhysicalOperatorType::kUnionAll:
@@ -728,9 +842,10 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
 
             // Partition the hash range to each source state
             auto* table_scan_operator = (PhysicalTableScan*)first_operator;
-            Vector<SharedPtr<Vector<GlobalBlockID>>> segment_id_group = table_scan_operator->PlanSegmentEntries(parallel_count);
+            Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = table_scan_operator->PlanBlockEntries(
+                    parallel_count);
             for(i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->source_state_ = MakeUnique<TableScanSourceState>(segment_id_group[task_id]);
+                tasks_[task_id]->source_state_ = MakeUnique<TableScanSourceState>(blocks_group[task_id]);
             }
             break;
         }
@@ -748,7 +863,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
 
             // Partition the hash range to each source state
             auto* knn_scan_operator = (PhysicalKnnScan*)first_operator;
-            Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = knn_scan_operator->PlanSegmentEntries(parallel_count);
+            Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = knn_scan_operator->PlanBlockEntries(parallel_count);
             for(i64 task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_[task_id]->source_state_ = MakeUnique<KnnScanSourceState>(blocks_group[task_id]);
             }
@@ -812,7 +927,7 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             }
 
             for(i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->sink_state_ = MakeUnique<GeneralSinkState>();
+                tasks_[task_id]->sink_state_ = MakeUnique<MaterializeSinkState>();
             }
             break;
         }
@@ -834,17 +949,13 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                                            PhysicalOperatorToString(last_operator->operator_type())));
             }
 
-            tasks_[0]->sink_state_ = MakeUnique<GeneralSinkState>();
-            GeneralSinkState* sink_state_ptr = static_cast<GeneralSinkState*>(tasks_[0]->sink_state_.get());
+            tasks_[0]->sink_state_ = MakeUnique<MaterializeSinkState>();
+            MaterializeSinkState* sink_state_ptr = static_cast<MaterializeSinkState*>(tasks_[0]->sink_state_.get());
             sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
             sink_state_ptr->column_names_ = last_operator->GetOutputNames();
             break;
         }
-        case PhysicalOperatorType::kTableScan:
-        case PhysicalOperatorType::kKnnScan:
-        case PhysicalOperatorType::kFilter:
-        case PhysicalOperatorType::kIndexScan:
-        case PhysicalOperatorType::kProjection: {
+        case PhysicalOperatorType::kKnnScan: {
             if(fragment_type_ == FragmentType::kSerialMaterialize) {
                 SchedulerError(fmt::format("{} should in parallel materialized/stream fragment",
                                            PhysicalOperatorToString(last_operator->operator_type())));
@@ -856,10 +967,54 @@ FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             }
 
             for(i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->sink_state_ = MakeUnique<GeneralSinkState>();
-                GeneralSinkState* sink_state_ptr = static_cast<GeneralSinkState*>(tasks_[task_id]->sink_state_.get());
+                tasks_[task_id]->sink_state_ = MakeUnique<QueueSinkState>();
+//                QueueSinkState* sink_state_ptr = static_cast<QueueSinkState*>(tasks_[task_id]->sink_state_.get());
+            }
+            break;
+        }
+        case PhysicalOperatorType::kTableScan:
+        case PhysicalOperatorType::kFilter:
+        case PhysicalOperatorType::kIndexScan: {
+            if(fragment_type_ == FragmentType::kSerialMaterialize) {
+                SchedulerError(fmt::format("{} should in parallel materialized/stream fragment",
+                                           PhysicalOperatorToString(last_operator->operator_type())));
+            }
+
+            if(tasks_.size() != parallel_count) {
+                SchedulerError(fmt::format("{} task count isn't correct.",
+                                           PhysicalOperatorToString(last_operator->operator_type())));
+            }
+
+            for(i64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->sink_state_ = MakeUnique<MaterializeSinkState>();
+                MaterializeSinkState* sink_state_ptr = static_cast<MaterializeSinkState*>(tasks_[task_id]->sink_state_.get());
                 sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
                 sink_state_ptr->column_names_ = last_operator->GetOutputNames();
+            }
+            break;
+        }
+        case PhysicalOperatorType::kProjection: {
+            if(fragment_type_ == FragmentType::kSerialMaterialize) {
+                if(tasks_.size() != 1) {
+                    SchedulerError("SerialMaterialize type fragment should only have 1 task.");
+                }
+
+                tasks_[0]->sink_state_ = MakeUnique<MaterializeSinkState>();
+                MaterializeSinkState* sink_state_ptr = static_cast<MaterializeSinkState*>(tasks_[0]->sink_state_.get());
+                sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
+                sink_state_ptr->column_names_ = last_operator->GetOutputNames();
+            } else {
+                if(tasks_.size() != parallel_count) {
+                    SchedulerError(fmt::format("{} task count isn't correct.",
+                                               PhysicalOperatorToString(last_operator->operator_type())));
+                }
+
+                for(i64 task_id = 0; task_id < parallel_count; ++task_id) {
+                    tasks_[task_id]->sink_state_ = MakeUnique<MaterializeSinkState>();
+                    MaterializeSinkState* sink_state_ptr = static_cast<MaterializeSinkState*>(tasks_[task_id]->sink_state_.get());
+                    sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
+                    sink_state_ptr->column_names_ = last_operator->GetOutputNames();
+                }
             }
             break;
         }
@@ -937,21 +1092,21 @@ SerialMaterializedFragmentCtx::GetResultInternal() {
             SchedulerError("Invalid sink state type")
             break;
         }
-        case SinkStateType::kGeneral: {
-            auto* common_sink_state = static_cast<GeneralSinkState*>(tasks_[0]->sink_state_.get());
+        case SinkStateType::kMaterialize: {
+            auto* materialize_sink_state = static_cast<MaterializeSinkState*>(tasks_[0]->sink_state_.get());
 
             Vector<SharedPtr<ColumnDef>> column_defs;
-            SizeT column_count = common_sink_state->column_names_->size();
+            SizeT column_count = materialize_sink_state->column_names_->size();
             column_defs.reserve(column_count);
             for(SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
                 column_defs.emplace_back(MakeShared<ColumnDef>(col_idx,
-                                                               common_sink_state->column_types_->at(col_idx),
-                                                               common_sink_state->column_names_->at(col_idx),
+                                                               materialize_sink_state->column_types_->at(col_idx),
+                                                               materialize_sink_state->column_names_->at(col_idx),
                                                                HashSet<ConstraintType>()));
             }
 
             SharedPtr<Table> result_table = Table::MakeResultTable(column_defs);
-            result_table->data_blocks_ = std::move(common_sink_state->data_block_array_);
+            result_table->data_blocks_ = std::move(materialize_sink_state->data_block_array_);
             return result_table;
         }
         case SinkStateType::kResult: {
@@ -976,6 +1131,9 @@ SerialMaterializedFragmentCtx::GetResultInternal() {
             result_table->SetResultMsg(std::move(message_sink_state->message_));
             return result_table;
         }
+        case SinkStateType::kQueue: {
+            SchedulerError("Can't get result from Queue sink type.")
+        }
     }
     SchedulerError("Unreachable")
 }
@@ -985,36 +1143,36 @@ ParallelMaterializedFragmentCtx::GetResultInternal() {
 
     SharedPtr<Table> result_table = nullptr;
 
-    auto* first_common_sink_state = static_cast<GeneralSinkState*>(tasks_[0]->sink_state_.get());
-    if(first_common_sink_state->error_message_ != nullptr) {
-        ExecutorError(*first_common_sink_state->error_message_)
+    auto* first_materialize_sink_state = static_cast<MaterializeSinkState*>(tasks_[0]->sink_state_.get());
+    if(first_materialize_sink_state->error_message_ != nullptr) {
+        ExecutorError(*first_materialize_sink_state->error_message_)
     }
 
     Vector<SharedPtr<ColumnDef>> column_defs;
-    SizeT column_count = first_common_sink_state->column_names_->size();
+    SizeT column_count = first_materialize_sink_state->column_names_->size();
     column_defs.reserve(column_count);
     for(SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
         column_defs.emplace_back(MakeShared<ColumnDef>(col_idx,
-                                                       first_common_sink_state->column_types_->at(col_idx),
-                                                       first_common_sink_state->column_names_->at(col_idx),
+                                                       first_materialize_sink_state->column_types_->at(col_idx),
+                                                       first_materialize_sink_state->column_names_->at(col_idx),
                                                        HashSet<ConstraintType>()));
     }
 
     for(const auto& task: tasks_) {
-        if(task->sink_state_->state_type() != SinkStateType::kGeneral) {
+        if(task->sink_state_->state_type() != SinkStateType::kMaterialize) {
             SchedulerError("Parallel materialized fragment will only have common sink stte")
         }
 
-        auto* common_sink_state = static_cast<GeneralSinkState*>(task->sink_state_.get());
-        if(common_sink_state->error_message_ != nullptr) {
-            ExecutorError(*common_sink_state->error_message_)
+        auto* materialize_sink_state = static_cast<MaterializeSinkState*>(task->sink_state_.get());
+        if(materialize_sink_state->error_message_ != nullptr) {
+            ExecutorError(*materialize_sink_state->error_message_)
         }
 
         if(result_table == nullptr) {
             result_table = Table::MakeResultTable(column_defs);
         }
 
-        for(const auto& result_data_block: common_sink_state->data_block_array_) {
+        for(const auto& result_data_block: materialize_sink_state->data_block_array_) {
             result_table->Append(result_data_block);
         }
     }
@@ -1026,31 +1184,31 @@ SharedPtr<Table>
 ParallelStreamFragmentCtx::GetResultInternal() {
     SharedPtr<Table> result_table = nullptr;
 
-    auto* common_sink_state = static_cast<GeneralSinkState*>(tasks_[0]->sink_state_.get());
+    auto* first_materialize_sink_state = static_cast<MaterializeSinkState*>(tasks_[0]->sink_state_.get());
 
     Vector<SharedPtr<ColumnDef>> column_defs;
-    SizeT column_count = common_sink_state->column_names_->size();
+    SizeT column_count = first_materialize_sink_state->column_names_->size();
     column_defs.reserve(column_count);
     for(SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
         column_defs.emplace_back(MakeShared<ColumnDef>(col_idx,
-                                                       common_sink_state->column_types_->at(col_idx),
-                                                       common_sink_state->column_names_->at(col_idx),
+                                                       first_materialize_sink_state->column_types_->at(col_idx),
+                                                       first_materialize_sink_state->column_names_->at(col_idx),
                                                        HashSet<ConstraintType>()));
     }
 
     for(const auto& task: tasks_) {
-        if(task->sink_state_->state_type() != SinkStateType::kGeneral) {
+        if(task->sink_state_->state_type() != SinkStateType::kMaterialize) {
             SchedulerError("Parallel materialized fragment will only have common sink stte")
         }
 
-        auto* common_sink_state = static_cast<GeneralSinkState*>(task->sink_state_.get());
+        auto* materialize_sink_state = static_cast<MaterializeSinkState*>(task->sink_state_.get());
 
 
         if(result_table == nullptr) {
             result_table = Table::MakeResultTable(column_defs);
         }
 
-        for(const auto& result_data_block: common_sink_state->data_block_array_) {
+        for(const auto& result_data_block: materialize_sink_state->data_block_array_) {
             result_table->Append(result_data_block);
         }
     }

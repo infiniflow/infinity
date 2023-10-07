@@ -252,8 +252,7 @@ KnnScanFunc(QueryContext* query_context,
                         // Last segment, Get the result according to the topk row.
                         knn_flat_ip->End();
 
-                        for(i64 query_idx = 0;
-                            query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++query_idx) {
+                        for(i64 query_idx = 0; query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++query_idx) {
 
                             f32* top_distance = knn_flat_ip->GetDistanceByIdx(query_idx);
                             CompoundID* compound_id = knn_flat_ip->GetIDByIdx(query_idx);

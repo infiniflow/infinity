@@ -43,6 +43,9 @@ public:
     void
     Execute(QueryContext* query_context, SourceState* source_state);
 
+    bool
+    ReadyToExec(SourceState* source_state);
+
     inline SharedPtr<Vector<String>>
     GetOutputNames() const final {
         return output_names_;

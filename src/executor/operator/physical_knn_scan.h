@@ -71,7 +71,7 @@ public:
     ColumnIDs() const;
 
     Vector<SharedPtr<Vector<GlobalBlockID>>>
-    PlanSegmentEntries(i64 parallel_count) const;
+    PlanBlockEntries(i64 parallel_count) const;
 
     SizeT
     BlockEntryCount() const;
@@ -88,6 +88,10 @@ public:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
     u64 knn_table_index_{};
+
+private:
+    void
+    ExecuteInternal(QueryContext* query_context, KnnScanInputState* input_state, KnnScanOutputState* output_state);
 };
 
 }

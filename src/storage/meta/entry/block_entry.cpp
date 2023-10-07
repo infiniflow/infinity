@@ -167,10 +167,10 @@ BlockEntry::Deserialize(const nlohmann::json& block_entry_json,
                         BufferManager* buffer_mgr) {
     u64 block_id = block_entry_json["block_id"];
     SizeT start_row = block_entry_json["start_row"];
-    u64 column_count = segment_entry->column_count_;
+//    u64 column_count = segment_entry->column_count_;
     UniquePtr<BlockEntry> block_entry = MakeUnique<BlockEntry>(segment_entry,
                                                                block_id,
-                                                               column_count,
+                                                               0,
                                                                start_row,
                                                                buffer_mgr);
 
@@ -178,6 +178,8 @@ BlockEntry::Deserialize(const nlohmann::json& block_entry_json,
     block_entry->row_count_ = block_entry_json["row_count"];
     block_entry->min_row_ts_ = block_entry_json["min_row_ts"];
     block_entry->max_row_ts_ = block_entry_json["max_row_ts"];
+
+
     for(const auto& block_column_json: block_entry_json["columns"]) {
         block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json,
                                                                          block_entry.get(),

@@ -6,15 +6,14 @@
 
 
 #include "blockingconcurrentqueue.h"
+#include "scheduler/fragment_data.h"
 
 namespace infinity {
 
-class DataBlock;
-
 struct FragmentDataQueue {
     inline void
-    Enqueue(const SharedPtr<DataBlock>& data_block) {
-        queue_.enqueue(data_block);
+    Enqueue(const SharedPtr<FragmentData>& fragment_data) {
+        queue_.enqueue(fragment_data);
     }
 
     template<class It>
@@ -24,13 +23,13 @@ struct FragmentDataQueue {
     }
 
     inline bool
-    TryDequeue(SharedPtr<DataBlock>& data_block) {
-        return queue_.try_dequeue(data_block);
+    TryDequeue(SharedPtr<FragmentData>& fragment_data) {
+        return queue_.try_dequeue(fragment_data);
     }
 
     inline void
-    Dequeue(SharedPtr<DataBlock>& data_block) {
-        queue_.wait_dequeue(data_block);
+    Dequeue(SharedPtr<FragmentData>& fragment_data) {
+        queue_.wait_dequeue(fragment_data);
     }
 
     inline SizeT
@@ -38,7 +37,7 @@ struct FragmentDataQueue {
         return queue_.size_approx();
     }
 
-    moodycamel::BlockingConcurrentQueue<SharedPtr<DataBlock>> queue_;
+    moodycamel::BlockingConcurrentQueue<SharedPtr<FragmentData>> queue_;
 };
 
 }

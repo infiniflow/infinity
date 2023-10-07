@@ -63,9 +63,11 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
             PlannerError("Invalid physical operator type")
         }
         case PhysicalOperatorType::kExplain: {
-            LOG_INFO("Fragment Builder: Explain");
-            BuildExplain(phys_op, current_fragment_ptr);
+            if(phys_op->left() != nullptr) {
+                SchedulerError("Explain statement shouldn't have child operator here.");
+            }
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            BuildExplain(phys_op, current_fragment_ptr);
             return;
         }
         case PhysicalOperatorType::kAlter:
@@ -87,11 +89,11 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
             if(phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 SchedulerError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
             }
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             current_fragment_ptr->AddSourceNode(query_context_ptr_,
                                                 SourceType::kEmpty,
                                                 phys_op->GetOutputNames(),
                                                 phys_op->GetOutputTypes());
-            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             return;
         }
         case PhysicalOperatorType::kAggregate: {
@@ -103,6 +105,7 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
             if(phys_op->left() == nullptr) {
                 SchedulerError("No input node of aggregate operator")
             }
+            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
             auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
             next_plan_fragment->AddSinkNode(query_context_ptr_,
                                             SinkType::kLocalQueue,
@@ -110,7 +113,6 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
                                             phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op->left().get(), next_plan_fragment.get());
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
-            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
             return;
         }
         case PhysicalOperatorType::kParallelAggregate:
@@ -123,9 +125,9 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
             if(phys_op->left() == nullptr) {
                 SchedulerError(fmt::format("No input node of {}", phys_op->GetName()));
             }
+            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
             current_fragment_ptr->AddOperator(phys_op);
             BuildFragments(phys_op->left().get(), current_fragment_ptr);
-            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
             break;
         }
         case PhysicalOperatorType::kMergeParallelAggregate:
@@ -142,6 +144,8 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
             if(phys_op->left() == nullptr) {
                 SchedulerError(fmt::format("No input node of {}", phys_op->GetName()));
             }
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+
             auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
             next_plan_fragment->AddSinkNode(query_context_ptr_,
                                             SinkType::kLocalQueue,
@@ -149,7 +153,6 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
                                             phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op->left().get(), next_plan_fragment.get());
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
-            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             return;
         }
         case PhysicalOperatorType::kUnionAll:
@@ -183,12 +186,12 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
             if(phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 SchedulerError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
             }
+            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
             current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->AddSourceNode(query_context_ptr_,
                                                 SourceType::kTable,
                                                 phys_op->GetOutputNames(),
                                                 phys_op->GetOutputTypes());
-            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             return ;
         }
         case PhysicalOperatorType::kTableScan:
@@ -196,26 +199,27 @@ FragmentBuilder::BuildFragments(PhysicalOperator* phys_op, PlanFragment* current
             if(phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 SchedulerError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
             }
+            current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
             current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->AddSourceNode(query_context_ptr_,
                                                 SourceType::kTable,
                                                 phys_op->GetOutputNames(),
                                                 phys_op->GetOutputTypes());
-            current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
             return;
         }
 
         case PhysicalOperatorType::kProjection: {
             current_fragment_ptr->AddOperator(phys_op);
             if(phys_op->left() == nullptr) {
+                current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
                 current_fragment_ptr->AddSourceNode(query_context_ptr_,
                                                     SourceType::kEmpty,
                                                     phys_op->GetOutputNames(),
                                                     phys_op->GetOutputTypes());
-                current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
+
             } else {
-                BuildFragments(phys_op->left().get(), current_fragment_ptr);
                 current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
+                BuildFragments(phys_op->left().get(), current_fragment_ptr);
             }
             return;
         }

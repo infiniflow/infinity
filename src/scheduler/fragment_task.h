@@ -89,6 +89,12 @@ public:
         return last_worker_id_;
     }
 
+    [[nodiscard]] bool
+    Ready() const;
+
+    [[nodiscard]] bool
+    Complete() const;
+
 public:
     std::atomic<FragmentTaskState> state_{FragmentTaskState::kReady};
 

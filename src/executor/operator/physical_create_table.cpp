@@ -55,6 +55,7 @@ PhysicalCreateTable::Execute(QueryContext* query_context, InputState* input_stat
     if(result.err_ != nullptr) {
         create_table_output_state->error_message_ = std::move(result.err_);
     }
+    output_state->SetComplete();
 }
 
 void

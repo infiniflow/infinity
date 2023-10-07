@@ -91,6 +91,7 @@ PhysicalExplain::Execute(QueryContext* query_context, InputState* input_state, O
 
     ExplainOutputState* explain_output_state = static_cast<ExplainOutputState*>(output_state);
     explain_output_state->data_block_ = output_data_block;
+    output_state->SetComplete();
 }
 
 void

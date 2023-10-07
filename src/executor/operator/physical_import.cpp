@@ -45,15 +45,19 @@ PhysicalImport::Execute(QueryContext* query_context, InputState* input_state, Ou
     auto import_output_state = static_cast<ImportOutputState*>(output_state);
     switch(file_type_) {
         case CopyFileType::kCSV: {
-            return ImportCSV(query_context, import_input_state, import_output_state);
+            ImportCSV(query_context, import_input_state, import_output_state);
+            break;
         }
         case CopyFileType::kJSON: {
-            return ImportJSON(query_context);
+            ImportJSON(query_context);
+            break;
         }
         case CopyFileType::kFVECS: {
-            return ImportFVECS(query_context, import_input_state, import_output_state);
+            ImportFVECS(query_context, import_input_state, import_output_state);
+            break;
         }
     }
+    output_state->SetComplete();
 }
 
 void

@@ -20,6 +20,13 @@ FragmentTask::OnExecute(i64 worker_id) {
     LOG_TRACE("Execute fragment task on {}", worker_id);
     FragmentContext* fragment_context = (FragmentContext*)fragment_context_;
 
+    // TODO:
+    // Tell the fragment type:
+    // For materialized type, we need to run the sink on the last source
+    //     - Each execution will fetch data or data reference from source
+    //     - Source operator will indicate the last execution
+    // For streaming type, we need to run sink each execution
+
     PhysicalSource* source_op = fragment_context->GetSourceOperator();
     source_op->Execute(fragment_context->query_context(), source_state_.get());
 
@@ -42,8 +49,23 @@ FragmentTask::OnExecute(i64 worker_id) {
         PhysicalSink* sink_op = fragment_context->GetSinkOperator();
         sink_op->Execute(fragment_context->query_context(), sink_state_.get());
     }
+}
 
-    fragment_context->Complete();
+bool
+FragmentTask::Ready() const {
+    FragmentContext* fragment_context = (FragmentContext*)fragment_context_;
+    PhysicalSource* source_op = fragment_context->GetSourceOperator();
+    return source_op->ReadyToExec(source_state_.get());
+}
+
+bool
+FragmentTask::Complete() const {
+    FragmentContext* fragment_context = (FragmentContext*)fragment_context_;
+    PhysicalSink* sink_op = fragment_context->GetSinkOperator();
+    if(sink_state_->prev_output_state_->Complete() && sink_op->sink_type() == SinkType::kResult) {
+        fragment_context->Complete();
+    }
+    return true;
 }
 
 }

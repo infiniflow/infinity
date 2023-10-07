@@ -26,10 +26,10 @@ PhysicalSink::Execute(QueryContext* query_context, SinkState* sink_state) {
     switch(sink_state->state_type_) {
         case SinkStateType::kInvalid:
             break;
-        case SinkStateType::kGeneral: {
+        case SinkStateType::kMaterialize: {
             // Output general output
-            auto* general_sink_state = static_cast<GeneralSinkState*>(sink_state);
-            FillSinkStateFromLastOutputState(general_sink_state, general_sink_state->prev_output_state_);
+            auto* materialize_sink_state = static_cast<MaterializeSinkState*>(sink_state);
+            FillSinkStateFromLastOutputState(materialize_sink_state, materialize_sink_state->prev_output_state_);
             break;
         }
         case SinkStateType::kResult: {
@@ -44,18 +44,23 @@ PhysicalSink::Execute(QueryContext* query_context, SinkState* sink_state) {
             FillSinkStateFromLastOutputState(message_sink_state, message_sink_state->prev_output_state_);
             break;
         }
+        case SinkStateType::kQueue: {
+            QueueSinkState* queue_sink_state = static_cast<QueueSinkState*>(sink_state);
+            FillSinkStateFromLastOutputState(queue_sink_state, queue_sink_state->prev_output_state_);
+            break;
+        }
     }
 }
 
 void
-PhysicalSink::FillSinkStateFromLastOutputState(GeneralSinkState* general_sink_state, OutputState* task_output_state) {
+PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState* materialize_sink_state, OutputState* task_output_state) {
     switch(task_output_state->operator_type_) {
         case PhysicalOperatorType::kInvalid: {
             ExecutorError("Invalid operator")
         }
         case PhysicalOperatorType::kShow: {
             ShowOutputState* show_output_state = static_cast<ShowOutputState*>(task_output_state);
-            general_sink_state->data_block_array_ = std::move(show_output_state->output_);
+            materialize_sink_state->data_block_array_ = std::move(show_output_state->output_);
             break;
         }
         case PhysicalOperatorType::kExplain: {
@@ -64,7 +69,7 @@ PhysicalSink::FillSinkStateFromLastOutputState(GeneralSinkState* general_sink_st
             if(explain_output_state->data_block_ == nullptr) {
                 ExecutorError("Empty explain output")
             }
-            general_sink_state->data_block_array_.emplace_back(explain_output_state->data_block_);
+            materialize_sink_state->data_block_array_.emplace_back(explain_output_state->data_block_);
             break;
         }
         case PhysicalOperatorType::kProjection: {
@@ -72,7 +77,15 @@ PhysicalSink::FillSinkStateFromLastOutputState(GeneralSinkState* general_sink_st
             if(projection_output_state->data_block_ == nullptr) {
                 ExecutorError("Empty projection output")
             }
-            general_sink_state->data_block_array_.emplace_back(projection_output_state->data_block_);
+            materialize_sink_state->data_block_array_.emplace_back(projection_output_state->data_block_);
+            break;
+        }
+        case PhysicalOperatorType::kKnnScan: {
+            KnnScanOutputState* knn_output_state = static_cast<KnnScanOutputState*>(task_output_state);
+            if(knn_output_state->data_block_ == nullptr) {
+                ExecutorError("Empty knn scan output")
+            }
+            materialize_sink_state->data_block_array_.emplace_back(knn_output_state->data_block_);
             break;
         }
         default: {
@@ -261,5 +274,28 @@ PhysicalSink::FillSinkStateFromLastOutputState(MessageSinkState* message_sink_st
     }
 
 }
+
+void
+PhysicalSink::FillSinkStateFromLastOutputState(QueueSinkState* message_sink_state, OutputState* task_output_state) {
+    switch(task_output_state->operator_type_) {
+        case PhysicalOperatorType::kKnnScan: {
+            KnnScanOutputState* knn_output_state = static_cast<KnnScanOutputState*>(task_output_state);
+            SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
+            fragment_data->data_block_ = knn_output_state->data_block_;
+            fragment_data->data_count_ = 1;
+            fragment_data->data_idx_ = 1;
+            for(const auto& next_fragment_queue: message_sink_state->fragment_data_queues_) {
+                next_fragment_queue->Enqueue(fragment_data);
+            }
+            break;
+        }
+        default: {
+            NotImplementError(fmt::format("{} isn't supported here.",
+                                          PhysicalOperatorToString(task_output_state->operator_type_)));
+            break;
+        }
+    }
+}
+
 
 }
