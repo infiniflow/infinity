@@ -3,6 +3,7 @@
 //
 
 #include "wal_manager.h"
+#include "common/types/alias/primitives.h"
 #include "common/utility/exception.h"
 #include "main/logger.h"
 #include "storage/storage.h"
@@ -57,8 +58,11 @@ WalManager::Stop() {
     bool changed = running_.compare_exchange_strong(expected, false);
     if(!changed)
         return;
-    flush_thread_.join();
+    while(wait_for_checkpoint_){
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
     checkpoint_thread_.join();
+    flush_thread_.join();
     ofs_.close();
 }
 
@@ -69,10 +73,14 @@ WalManager::PutEntry(std::shared_ptr<WalEntry> entry) {
     if(!running_.load()) {
         return -1;
     }
+    int rc = 0;
     mutex_.lock();
-    que_.push(entry);
+    if (running_.load()) {
+        que_.push(entry);
+        rc = -1;
+    }
     mutex_.unlock();
-    return 0;
+    return rc;
 }
 
 // Flush is scheduled regularly. It collects a batch of transactions, sync
@@ -140,7 +148,7 @@ WalManager::Flush() {
             if(file_size > kWALFileSizeThreshold) {
                 this->SwapWALFile(max_commit_ts);
             }
-            lsn_pend_chk_.store(max_commit_ts);
+            commit_ts_pend_.store(max_commit_ts);
         }
     }
 }
@@ -150,8 +158,8 @@ void
 WalManager::Checkpoint() {
     // Fuzzy checkpoint for every 10 transactions or 20s.
     while(running_.load()) {
-        int64_t lsn_pend_chk = lsn_pend_chk_.load();
-        if(lsn_pend_chk - lsn_done_chk_ < 10 ||
+        TxnTimeStamp commit_ts_pend = commit_ts_pend_.load();
+        if(commit_ts_pend - commit_ts_done_ < 2 ||
            (checkpoint_ts_ > 0 &&
             std::chrono::steady_clock::now().time_since_epoch().count() -
                             checkpoint_ts_ <
@@ -162,11 +170,41 @@ WalManager::Checkpoint() {
 
         // Checkponit is heavy and infrequent operation.
         LOG_INFO("WalManager::Checkpoint enter for transactions' lsn <= {}",
-                 lsn_pend_chk);
-        std::this_thread::sleep_for(std::chrono::seconds(10));
-        LOG_INFO("WalManager::Checkpoint quit", lsn_pend_chk);
+                 commit_ts_pend);
+        // std::this_thread::sleep_for(std::chrono::seconds(10));
+        wait_for_checkpoint_ = true;
+
+        auto txn = storage_->txn_manager()->CreateTxn();
+        txn->BeginTxn();
+        txn->Checkpoint(commit_ts_pend);
+        txn->CommitTxn();
+        commit_ts_done_= commit_ts_pend;
+
+        LOG_INFO("WalManager::Checkpoint quit", commit_ts_done_);
         checkpoint_ts_ =
                 std::chrono::steady_clock::now().time_since_epoch().count();
+
+        // Gc old wal files.
+        LOG_INFO("WalManager::Checkpoint begin to gc wal files")
+        if (fs::exists(wal_path_)) {
+            for (const auto &entry : fs::directory_iterator(fs::path(wal_path_).parent_path())) {
+                // Only delete the wal.log.* files. the wal.log file is current wal file.
+                // Check if the wal.log.* files are too old.
+                // if * is little than the max_commit_ts, we will delete it.
+                if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
+                    auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
+                    LOG_INFO("WalManager::Checkpoint suffix: {}", suffix.c_str());
+                    LOG_INFO("WalManager::Checkpoint lsn_done_chk_: {}", commit_ts_done_);
+                    if (std::stoll(suffix) < commit_ts_done_) {
+                        fs::remove(entry.path());
+                        LOG_INFO("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str());
+                    }
+                }
+            }
+        }
+        LOG_INFO("WalManager::Checkpoint end to gc wal files")
+
+        wait_for_checkpoint_ = false;
     }
 }
 
@@ -272,9 +310,9 @@ WalManager::ReplayWALFile() {
 
         auto commands = entry->cmds;
 
-
-        return max_commit_ts;
+        break;  
     }
+    return max_commit_ts;
 
     // 2.2.2 Read the wal file.
     // Get the last entry of the wal file.

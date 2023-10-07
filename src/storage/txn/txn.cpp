@@ -4,12 +4,14 @@
 
 #include "txn.h"
 
+#include "common/types/alias/strings.h"
 #include "common/utility/defer_op.h"
 #include "common/utility/infinity_assert.h"
 #include "main/logger.h"
 #include "storage/meta/catalog.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
+#include "storage/wal/wal_entry.h"
 
 namespace infinity {
 
@@ -500,6 +502,16 @@ Txn::CommitTxn() {
         txn_context_.SetTxnRollbacked();
         return;
     }
+
+     // If the txn is Checkpointed
+    if(is_checkpoint_) {
+       // flush the catalog
+        String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir() + "/catalog";
+        String file_name = "META_" + std::to_string(txn_id_) + ".json";
+        LOG_TRACE("Checkpoint: Going to store META as file {}/{}", dir_name, file_name);
+        NewCatalog::SaveAsFile(catalog_, dir_name, file_name);
+    }
+
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id = txn_id_;
     wal_entry_->commit_ts = commit_ts;
@@ -546,7 +558,7 @@ Txn::CommitTxnBottom() {
     // TODO: Flush the whole catalog.
     if(!is_read_only_txn) {
         String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir() + "/catalog";
-        String file_name = "META_" + std::to_string(commit_ts) + ".json";
+        String file_name = "META_" + std::to_string(txn_id_) + ".json";
         LOG_TRACE("Going to store META as file {}/{}", dir_name, file_name);
         NewCatalog::SaveAsFile(catalog_, dir_name, file_name);
     }
@@ -593,6 +605,14 @@ Txn::RollbackTxn() {
 void
 Txn::AddWalCmd(const SharedPtr<WalCmd>& cmd) {
     wal_entry_->cmds.push_back(cmd);
+}
+
+void
+Txn::Checkpoint(const TxnTimeStamp max_commit_ts) {
+    is_checkpoint_ = true;
+    String catalog_path = "META_" + std::to_string(txn_id_) + ".json";
+
+    AddWalCmd(MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path));
 }
 
 }// namespace infinity

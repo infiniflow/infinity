@@ -18,6 +18,7 @@
 class CatalogTest : public BaseTest {
     void
     SetUp() override {
+        system("rm -rf /tmp/infinity/");
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
@@ -29,10 +30,7 @@ class CatalogTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-
-        system("rm -rf /tmp/infinity/data/db");
-        system("rm -rf /tmp/infinity/data/catalog/*");
-        system("rm -rf /tmp/infinity/_tmp");
+        system("rm -rf /tmp/infinity/");
     }
 
 };

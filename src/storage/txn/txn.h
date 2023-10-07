@@ -177,6 +177,9 @@ public:
     void
     AddWalCmd(const SharedPtr<WalCmd>& cmd);
 
+    void 
+    Checkpoint(const TxnTimeStamp max_commit_ts);
+
 private:
     UniquePtr<String>
     GetTableEntry(const String& db_name, const String& table_name, TableCollectionEntry*& table_entry);
@@ -209,6 +212,7 @@ private:
     bool done_bottom_{false};
 
     TxnManager* txn_mgr_{};
+    bool is_checkpoint_{false};
 };
 
 }

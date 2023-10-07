@@ -69,7 +69,8 @@ WalCmd::ReadAdv(char*& ptr, int32_t maxbytes) {
     }
     case WalCommandType::CHECKPOINT: {
         int64_t max_commit_ts = ReadBufAdv<int64_t>(ptr);
-        cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts);
+        String catalog_path = ReadBufAdv<String>(ptr);
+        cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path);
         break;
     }
     default:
@@ -125,7 +126,7 @@ WalCmdDelete::operator==(const WalCmd& other) const {
 bool
 WalCmdCheckpoint::operator==(const WalCmd& other) const {
     auto other_cmd = dynamic_cast<const WalCmdCheckpoint*>(&other);
-    return other_cmd != nullptr && max_commit_ts == other_cmd->max_commit_ts;
+    return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_;
 }
 
 int32_t
@@ -170,7 +171,8 @@ WalCmdDelete::GetSizeInBytes() const {
 
 int32_t
 WalCmdCheckpoint::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(int64_t);
+    return sizeof(WalCommandType) + sizeof(int64_t) + sizeof(int32_t) +
+           this->catalog_path_.size();
 }
 
 void
@@ -227,7 +229,8 @@ WalCmdDelete::WriteAdv(char*& buf) const {
 void
 WalCmdCheckpoint::WriteAdv(char*& buf) const {
     WriteBufAdv(buf, WalCommandType::CHECKPOINT);
-    WriteBufAdv(buf, this->max_commit_ts);
+    WriteBufAdv(buf, this->max_commit_ts_);
+    WriteBufAdv(buf, this->catalog_path_);
 }
 
 bool

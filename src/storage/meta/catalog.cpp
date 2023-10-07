@@ -290,6 +290,8 @@ NewCatalog::SaveAsFile(const NewCatalog* catalog_ptr,
     }
     catalog_file_handler->Sync();
     catalog_file_handler->Close();
+
+    LOG_INFO("Saved catalog to: {}", file_path);
 }
 
 }

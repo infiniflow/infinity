@@ -95,7 +95,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
     Vector<RowID> row_ids = {RowID(1, 2)};
     entry->cmds.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
-    entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123)));
+    entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), std::string("catalog")));
 
     int32_t exp_size = entry->GetSizeInBytes();
     std::vector<char> buf(exp_size, char(0));
