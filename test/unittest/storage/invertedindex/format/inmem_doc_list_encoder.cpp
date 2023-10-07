@@ -270,7 +270,7 @@ TEST_F(InMemDocListDecoderTest, test2) {
 }
 
 TEST_F(InMemDocListDecoderTest, test3) {
-    /*    
+
     docid_t first_doc_id = 0;
     docid_t last_doc_id = 0;
     ttf_t current_ttf = 0;
@@ -297,6 +297,5 @@ TEST_F(InMemDocListDecoderTest, test3) {
 
     doc_list_decoder_->~InMemDocListDecoder();
     byte_slice_pool_->Deallocate((void*)doc_list_decoder_, sizeof(InMemDocListDecoder));
-    */
 }
 }// namespace infinity
