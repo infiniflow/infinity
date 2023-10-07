@@ -38,7 +38,7 @@ public:
 
 private:
     SharedPtr<String> schema_name_{};
-    SharedPtr<IndexDef> index_definition_{};
+    SharedPtr<IndexDef> index_def_ptr_{};
     ConflictType conflict_type_{};
 
     SharedPtr<Vector<String>> output_names_{};

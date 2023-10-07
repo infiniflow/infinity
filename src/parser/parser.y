@@ -2145,10 +2145,13 @@ semicolon : ';'
 | /* nothing */
 ;
 
-// TODO shenyushi: add null
+// TODO shenyushi -1: Can no parameter be represented as this?
 with_index_para_list : WITH '(' index_para_list ')' {
     $$ = $3;
-};
+}
+| {
+    $$ = new std::vector<infinity::CreateIndexPara*>();
+}
 
 index_para_list : index_para {
     $$ = new std::vector<infinity::CreateIndexPara*>();

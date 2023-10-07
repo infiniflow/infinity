@@ -50,12 +50,28 @@ EntryResult DBEntry::CreateTableCollection(DBEntry *db_entry,
     }
 }
 
-EntryResult DBEntry::DropTableCollection(DBEntry *db_entry,
-                                         const String &table_collection_name,
-                                         ConflictType conflict_type,
-                                         u64 txn_id,
-                                         TxnTimeStamp begin_ts,
-                                         TxnManager *txn_mgr) {
+EntryResult
+DBEntry::CreateIndex(DBEntry* db_entry,
+            // TableCollectionType table_collection_type,
+            const String& table_name,
+            const Vector<String>& column_names,
+            const String& index_name,
+            IndexMethod index_method,
+            u64 txn_id,
+            TxnTimeStamp begin_ts,
+            TxnManager* txn_mgr) {
+    // TODO shenyushi 2
+    db_entry->rw_locker_.lock_shared();
+    db_entry->rw_locker_.unlock_shared();
+}
+
+EntryResult
+DBEntry::DropTableCollection(DBEntry* db_entry,
+                             const String& table_collection_name,
+                             ConflictType conflict_type,
+                             u64 txn_id,
+                             TxnTimeStamp begin_ts,
+                             TxnManager* txn_mgr) {
     db_entry->rw_locker_.lock_shared();
 
     TableCollectionMeta *table_meta{nullptr};

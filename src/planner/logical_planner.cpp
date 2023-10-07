@@ -352,8 +352,6 @@ void LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr
 
 void
 LogicalPlanner::BuildCreateIndex(const CreateStatement* statement, SharedPtr<BindContext>& bind_context_ptr) {
-    PlannerError("Creating index isn't supported.");
-
     auto* create_index_info = (CreateIndexInfo*)statement->create_info_.get();    
 
     auto schema_name_ptr = MakeShared<String>(create_index_info->schema_name_);

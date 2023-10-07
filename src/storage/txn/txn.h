@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "src/storage/meta/meta_state.h"
+#include "storage/index_def.h"
 #include "storage/meta/entry/db_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
 #include "storage/wal/wal_entry.h"
@@ -62,7 +62,7 @@ public:
 
     EntryResult CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
-    EntryResult CreateIndex(const String &db_name, ConflictType conflict_type);
+    EntryResult CreateIndex(const String &db_name, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type);
 
     EntryResult GetTableByName(const String &db_name, const String &table_name);
 

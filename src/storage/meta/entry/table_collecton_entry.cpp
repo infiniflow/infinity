@@ -150,7 +150,7 @@ UniquePtr<String> TableCollectionEntry::ImportAppendSegment(TableCollectionEntry
 
 UniquePtr<String> TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry, Txn *txn_ptr) {
     NotImplementError("TableCollectionEntry::CreateIndex");
-    // TODO shenyushi 1
+    // TODO shenyushi 2
     // u64 column_id = table_entry->GetColumnIdByName("id");
     // for (auto& [_segment_id, segment_entry]: table_entry->segments_) {
     //     segment_entry->CreateIndex(segment_entry.get(), txn_ptr, column_id);

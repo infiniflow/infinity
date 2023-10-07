@@ -8,8 +8,7 @@ PhysicalCreateIndex::Init() {}
 void
 PhysicalCreateIndex::Execute(QueryContext* query_context) {
     auto txn = query_context->GetTxn();
-    // TODO shenyushi 1
-    txn->CreateIndex(*schema_name_, conflict_type_);
+    txn->CreateIndex(*schema_name_, index_def_ptr_, conflict_type_);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
             MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -21,8 +20,7 @@ PhysicalCreateIndex::Execute(QueryContext* query_context,
                              InputState* input_state,
                              OutputState* output_state) {
     auto txn = query_context->GetTxn();
-    // TODO shenyushi 1
-    auto result = txn->CreateIndex(*schema_name_, conflict_type_);
+    auto result = txn->CreateIndex(*schema_name_, index_def_ptr_, conflict_type_);
 
     auto create_table_output_state = (CreateTableOutputState*)output_state;
     if(result.err_ != nullptr) {
@@ -44,7 +42,7 @@ PhysicalCreateIndex::PhysicalCreateIndex(SharedPtr<String> schema_name,
                                          u64 id)
     : PhysicalOperator(PhysicalOperatorType::kCreateIndex, nullptr, nullptr, id),
       schema_name_(std::move(schema_name)),
-      index_definition_(std::move(index_definition)),
+      index_def_ptr_(std::move(index_definition)),
       conflict_type_(conflict_type),
       output_names_(std::move(output_names)),
       output_types_(std::move(output_types)) {

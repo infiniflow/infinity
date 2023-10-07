@@ -110,7 +110,7 @@ void SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendS
 }
 
 void SegmentEntry::CreateIndex(SegmentEntry *segment_entry, Txn *txn_ptr, u64 column_id) {
-    // TODO shenyushi 1
+    // TODO shenyushi 2
     // for (const auto& block_entry: segment_entry->block_entries_) {
     //     auto block_column_entry = block_entry->columns_[column_id].get();
     //     CommonObjectHandle object_handle(block_column_entry->buffer_handle_);

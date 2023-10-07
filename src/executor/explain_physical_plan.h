@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "common/types/alias/smart_ptr.h"
+#include "executor/operator/physical_create_index.h"
 #include "physical_operator.h"
 
 namespace infinity {
@@ -40,7 +42,7 @@ class PhysicalCreateSchema;
 
 class PhysicalCreateTable;
 
-class PhysicalCreateTable;
+class PhysicalCreateIndex;
 
 class PhysicalCreateCollection;
 
@@ -135,6 +137,12 @@ public:
     Explain(const PhysicalCreateSchema *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size = 0);
 
     static void Explain(const PhysicalCreateTable *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalCreateIndex *create_index,
+            SharedPtr<Vector<SharedPtr<String>>> &result,
+            bool is_recursive,
+            i64 intent_size = 0);
 
     static void
     Explain(const PhysicalCreateCollection *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size = 0);

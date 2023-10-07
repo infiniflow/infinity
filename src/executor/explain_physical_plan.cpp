@@ -7,6 +7,7 @@
 #include "executor/operator/physical_aggregate.h"
 #include "executor/operator/physical_alter.h"
 #include "executor/operator/physical_create_collection.h"
+#include "executor/operator/physical_create_index.h"
 #include "executor/operator/physical_create_schema.h"
 #include "executor/operator/physical_create_table.h"
 #include "executor/operator/physical_create_view.h"
@@ -149,6 +150,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kCreateTable: {
             Explain((PhysicalCreateTable *)op, result, is_recursive, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kCreateIndex: {
+            Explain((PhysicalCreateIndex *)op, result, is_recursive, intent_size);
             break;
         }
         case PhysicalOperatorType::kCreateCollection: {
@@ -325,6 +330,13 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node,
         String output_columns_str = String(intent_size, ' ') + " - output columns: [OK]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalCreateIndex *create_node,
+                                  SharedPtr<Vector<SharedPtr<String>>> &result,
+                                  bool is_recursive,
+                                  i64 intent_size) {
+    // TODO shenyushi -1
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node,

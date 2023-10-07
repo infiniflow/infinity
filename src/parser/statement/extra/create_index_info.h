@@ -22,6 +22,21 @@ enum class IndexMethod {
     kInvalid,
 };
 
+inline String IndexMethodToString(IndexMethod method) {
+    switch (method) {
+        case IndexMethod::kFlat:
+            return "FLAT";
+        case IndexMethod::kIVFFlat:
+            return "IVF_FLAT";
+        case IndexMethod::kIVFSQ8:
+            return "IVF_SQ8";
+        case IndexMethod::kHnsw:
+            return "HNSW";
+        default:
+            return "INVALID";
+    }
+}
+
 class CreateIndexInfo final : public ExtraDDLInfo {
 public:
     explicit CreateIndexInfo() : ExtraDDLInfo(DDLType::kIndex) {}
