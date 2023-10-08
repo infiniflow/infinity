@@ -266,6 +266,11 @@ PhysicalSink::FillSinkStateFromLastOutputState(MessageSinkState* message_sink_st
             message_sink_state->message_ = std::move(import_output_state->result_msg_);
             break;
         }
+        case PhysicalOperatorType::kInsert: {
+            auto* insert_output_state = static_cast<InsertOutputState*>(task_output_state);
+            message_sink_state->message_ = std::move(insert_output_state->result_msg_);
+            break;
+        }
         default: {
             NotImplementError(fmt::format("{} isn't supported here.",
                                           PhysicalOperatorToString(task_output_state->operator_type_)));
