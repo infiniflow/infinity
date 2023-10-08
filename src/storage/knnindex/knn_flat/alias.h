@@ -10,7 +10,7 @@
 namespace infinity {
 
 
-using ReservoirResultHandler = NewReservoirResultHandler<faiss::CMin<float, CompoundID>>;
+using ReservoirResultHandler = NewReservoirResultHandler<faiss::CMin<float, RowID>>;
 using ReservoirSingleResultHandler = ReservoirResultHandler::ReservoirSingleResultHandler;
 
 }

@@ -13,7 +13,7 @@ namespace infinity {
 template<typename DistType>
 class KnnFlatL2Reservoir final : public KnnDistance<DistType> {
 
-    using ReservoirResultHandler = NewReservoirResultHandler<faiss::CMax<float, CompoundID>>;
+    using ReservoirResultHandler = NewReservoirResultHandler<faiss::CMax<float, RowID>>;
     using ReservoirSingleResultHandler = ReservoirResultHandler::ReservoirSingleResultHandler;
 
 public:
@@ -29,7 +29,7 @@ public:
               dimension_(dimension),
               top_k_(topk) {
 
-        id_array_ = MakeUnique<Vector<CompoundID>>(topk * query_count_, CompoundID(-1, -1));
+        id_array_ = MakeUnique<Vector<RowID>>(topk * query_count_, RowID());
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * topk * query_count_);
 
         reservoir_result_handler_ = MakeUnique<ReservoirResultHandler>(query_count,
@@ -44,7 +44,7 @@ public:
 
     void
     Search(const DistType* base,
-           i64 base_count,
+           i16 base_count,
            i32 segment_id,
            i16 block_id) final;
 
@@ -56,7 +56,7 @@ public:
         return reservoir_result_handler_->heap_dis_tab;
     }
 
-    [[nodiscard]] inline CompoundID*
+    [[nodiscard]] inline RowID*
     GetIDs() const final {
         return reservoir_result_handler_->heap_ids_tab;
     }
@@ -69,7 +69,7 @@ public:
         return reservoir_result_handler_->heap_dis_tab + idx * top_k_;
     }
 
-    [[nodiscard]] inline CompoundID*
+    [[nodiscard]] inline RowID*
     GetIDByIdx(i64 idx) const final {
         if(idx >= query_count_) {
             ExecutorError("Query index exceeds the limit")
@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    UniquePtr<Vector<CompoundID>> id_array_{};
+    UniquePtr<Vector<RowID>> id_array_{};
     UniquePtr<DistType[]> distance_array_{};
 
     UniquePtr<ReservoirResultHandler> reservoir_result_handler_{};

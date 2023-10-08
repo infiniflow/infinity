@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 #include "base_test.h"
 #include "storage/data_block.h"
-#include "storage/txn/constants.h"
+#include "storage/txn/txn_state.h"
 #include "main/profiler/base_profiler.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"

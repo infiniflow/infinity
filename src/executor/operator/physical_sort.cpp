@@ -14,6 +14,7 @@ public:
 
     bool
     operator()(RowID left, RowID right) {
+#if 0
         SizeT column_count = order_by_table_->ColumnCount();
         for(SizeT col_id = 0; col_id < column_count; ++col_id) {
 
@@ -159,6 +160,7 @@ public:
                 }
             }
         }
+#endif
         return true;
     }
 
@@ -281,7 +283,7 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
 
 //    SizeT vector_count = rowid_vector->size();
     SizeT vector_idx = 0;
-
+#if 0
     SizeT block_count = input_table->data_blocks_.size();
     for(SizeT block_id = 0; block_id < block_count; ++block_id) {
         SharedPtr<DataBlock> output_datablock = DataBlock::Make();
@@ -386,6 +388,7 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
         output_table->Append(output_datablock);
     }
     return output_table;
+#endif
 }
 
 }

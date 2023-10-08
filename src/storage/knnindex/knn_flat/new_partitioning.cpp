@@ -6,7 +6,7 @@
  */
 
 #include "new_partitioning.h"
-#include "storage/knnindex/common/compound_id.h"
+#include "common/types/complex/row_id.h"
 
 #include <cassert>
 #include <cmath>
@@ -822,18 +822,18 @@ partition_fuzzy<CMax<float, int64_t>>(
 
 
 template float
-partition_fuzzy<CMin<float, CompoundID>>(
+partition_fuzzy<CMin<float, RowID>>(
         float* vals,
-        CompoundID* ids,
+        RowID* ids,
         size_t n,
         size_t q_min,
         size_t q_max,
         size_t* q_out);
 
 template float
-partition_fuzzy<CMax<float, CompoundID>>(
+partition_fuzzy<CMax<float, RowID>>(
         float* vals,
-        CompoundID* ids,
+        RowID* ids,
         size_t n,
         size_t q_min,
         size_t q_max,

@@ -9,7 +9,7 @@
 #include "function/table_function.h"
 #include "function/function_data.h"
 #include "storage/meta/catalog.h"
-#include "storage/txn/constants.h"
+#include "storage/txn/txn_state.h"
 
 namespace infinity {
 
@@ -33,8 +33,8 @@ public:
 
     i64 segment_count_{0};
 
-    i64 current_segment_id_{INITIAL_SEGMENT_ID};
-    i64 current_block_id{INITIAL_BLOCK_ID};
+    i64 current_segment_id_{INVALID_SEGMENT_ID};
+    i64 current_block_id{INVALID_BLOCK_ID};
     SizeT read_offset_{0};
 };
 

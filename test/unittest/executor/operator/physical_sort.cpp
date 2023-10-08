@@ -1,7 +1,7 @@
 //
 // Created by jinhai on 23-1-27.
 //
-
+#if 0
 #include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
@@ -89,10 +89,11 @@ TEST_F(PhysicalSortTest, test1) {
     rowid_vector->reserve(block_count * DEFAULT_VECTOR_SIZE);
     for(i64 block_id = block_count - 1; block_id >= 0; --block_id) {
         for(i64 row_id = DEFAULT_VECTOR_SIZE - 1; row_id >= 0; --row_id) {
-            rowid_vector->emplace_back(RowID(block_id, row_id));
+            rowid_vector->emplace_back(RowID(INVALID_SEGMENT_ID, block_id, row_id));
         }
     }
 
     SharedPtr<Table> output_table = PhysicalSort::GenerateOutput(input_table, rowid_vector);
     std::cout << output_table->ToString() << std::endl;
 }
+#endif

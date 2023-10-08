@@ -41,7 +41,7 @@ fvec_norms_L2sqr(
         DistType* __restrict nr,
         const DistType* __restrict queries,
         SizeT dimension,
-        SizeT query_count) {
+        i16 query_count) {
     for(int64_t i = 0; i < query_count; i++) {
         nr[i] = fvec_norm_L2sqr(queries + i * dimension, dimension);
     }
@@ -53,7 +53,7 @@ fvec_norms_L2sqr<f32>(
         f32* __restrict nr,
         const f32* __restrict queries,
         SizeT dimension,
-        SizeT query_count) {
+        i16 query_count) {
     for(int64_t i = 0; i < query_count; i++) {
         nr[i] = fvec_norm_L2sqr<f32>(queries + i * dimension, dimension);
     }

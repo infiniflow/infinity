@@ -8,7 +8,7 @@
 
 #include "function/table_function.h"
 #include "function/function_data.h"
-#include "storage/txn/constants.h"
+#include "storage/txn/txn_state.h"
 #include "storage/common/global_block_id.h"
 
 namespace infinity {

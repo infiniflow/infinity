@@ -18,67 +18,67 @@ WalCmd::ReadAdv(char*& ptr, int32_t maxbytes) {
     char* const ptr_end = ptr + maxbytes;
     SharedPtr<WalCmd> cmd = nullptr;
     WalCommandType cmd_type = ReadBufAdv<WalCommandType>(ptr);
-    switch (cmd_type) {
-    case WalCommandType::CREATE_DATABASE: {
-        String db_name = ReadBufAdv<String>(ptr);
-        cmd = MakeShared<WalCmdCreateDatabase>(db_name);
-        break;
-    }
-    case WalCommandType::DROP_DATABASE: {
-        String db_name = ReadBufAdv<String>(ptr);
-        cmd = MakeShared<WalCmdDropDatabase>(db_name);
-        break;
-    }
-    case WalCommandType::CREATE_TABLE: {
-        String db_name = ReadBufAdv<String>(ptr);
-        SharedPtr<TableDef> table_def = TableDef::ReadAdv(ptr, ptr_end - ptr);
-        cmd = MakeShared<WalCmdCreateTable>(db_name, table_def);
-        break;
-    }
-    case WalCommandType::DROP_TABLE: {
-        String db_name = ReadBufAdv<String>(ptr);
-        String table_name = ReadBufAdv<String>(ptr);
-        cmd = MakeShared<WalCmdDropTable>(db_name, table_name);
-        break;
-    }
-    case WalCommandType::IMPORT: {
-        String db_name = ReadBufAdv<String>(ptr);
-        String table_name = ReadBufAdv<String>(ptr);
-        String segment_dir = ReadBufAdv<String>(ptr);
-        cmd = MakeShared<WalCmdImport>(db_name, table_name, segment_dir);
-        break;
-    }
-    case WalCommandType::APPEND: {
-        String db_name = ReadBufAdv<String>(ptr);
-        String table_name = ReadBufAdv<String>(ptr);
-        SharedPtr<DataBlock> block = block->ReadAdv(ptr, ptr_end - ptr);
-        cmd = MakeShared<WalCmdAppend>(db_name, table_name, block);
-        break;
-    }
-    case WalCommandType::DELETE: {
-        String db_name = ReadBufAdv<String>(ptr);
-        String table_name = ReadBufAdv<String>(ptr);
-        int32_t cnt = ReadBufAdv<int32_t>(ptr);
-        Vector<RowID> row_ids;
-        for (int32_t i = 0; i < cnt; ++i) {
-            RowID row_id = ReadBufAdv<RowID>(ptr);
-            row_ids.push_back(row_id);
+    switch(cmd_type) {
+        case WalCommandType::CREATE_DATABASE: {
+            String db_name = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdCreateDatabase>(db_name);
+            break;
         }
-        cmd = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
-        break;
-    }
-    case WalCommandType::CHECKPOINT: {
-        int64_t max_commit_ts = ReadBufAdv<int64_t>(ptr);
-        String catalog_path = ReadBufAdv<String>(ptr);
-        cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path);
-        break;
-    }
-    default:
-        StorageError(
-            fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
+        case WalCommandType::DROP_DATABASE: {
+            String db_name = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdDropDatabase>(db_name);
+            break;
+        }
+        case WalCommandType::CREATE_TABLE: {
+            String db_name = ReadBufAdv<String>(ptr);
+            SharedPtr<TableDef> table_def = TableDef::ReadAdv(ptr, ptr_end - ptr);
+            cmd = MakeShared<WalCmdCreateTable>(db_name, table_def);
+            break;
+        }
+        case WalCommandType::DROP_TABLE: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdDropTable>(db_name, table_name);
+            break;
+        }
+        case WalCommandType::IMPORT: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String segment_dir = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdImport>(db_name, table_name, segment_dir);
+            break;
+        }
+        case WalCommandType::APPEND: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            SharedPtr<DataBlock> block = block->ReadAdv(ptr, ptr_end - ptr);
+            cmd = MakeShared<WalCmdAppend>(db_name, table_name, block);
+            break;
+        }
+        case WalCommandType::DELETE: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            int32_t cnt = ReadBufAdv<int32_t>(ptr);
+            Vector<RowID> row_ids;
+            for(int32_t i = 0; i < cnt; ++i) {
+                RowID row_id = ReadBufAdv<RowID>(ptr);
+                row_ids.push_back(row_id);
+            }
+            cmd = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
+            break;
+        }
+        case WalCommandType::CHECKPOINT: {
+            int64_t max_commit_ts = ReadBufAdv<int64_t>(ptr);
+            String catalog_path = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path);
+            break;
+        }
+        default:
+            StorageError(
+                    fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
     }
     maxbytes = ptr_end - ptr;
-    StorageAssert(maxbytes>=0,
+    StorageAssert(maxbytes >= 0,
                   "ptr goes out of range when reading WalCmd");
     return cmd;
 }
@@ -91,19 +91,21 @@ WalCmdCreateTable::operator==(const WalCmd& other) const {
            *table_def == *other_cmd->table_def;
 }
 
-bool WalCmdImport::operator==(const WalCmd &other) const {
-    auto other_cmd = dynamic_cast<const WalCmdImport *>(&other);
-    if (other_cmd == nullptr || db_name != other_cmd->db_name ||
-        table_name != other_cmd->table_name ||
-        segment_dir != other_cmd->segment_dir)
+bool
+WalCmdImport::operator==(const WalCmd& other) const {
+    auto other_cmd = dynamic_cast<const WalCmdImport*>(&other);
+    if(other_cmd == nullptr || db_name != other_cmd->db_name ||
+       table_name != other_cmd->table_name ||
+       segment_dir != other_cmd->segment_dir)
         return false;
     return true;
 }
 
-bool WalCmdAppend::operator==(const WalCmd &other) const {
-    auto other_cmd = dynamic_cast<const WalCmdAppend *>(&other);
-    if (other_cmd == nullptr || db_name != other_cmd->db_name ||
-        table_name != other_cmd->table_name)
+bool
+WalCmdAppend::operator==(const WalCmd& other) const {
+    auto other_cmd = dynamic_cast<const WalCmdAppend*>(&other);
+    if(other_cmd == nullptr || db_name != other_cmd->db_name ||
+       table_name != other_cmd->table_name)
         return false;
     return true;
 }
@@ -113,12 +115,13 @@ WalCmdDelete::operator==(const WalCmd& other) const {
     auto other_cmd = dynamic_cast<const WalCmdDelete*>(&other);
     if(other_cmd == nullptr || db_name != other_cmd->db_name ||
        table_name != other_cmd->table_name ||
-       row_ids.size() != other_cmd->row_ids.size())
+       row_ids.size() != other_cmd->row_ids.size()) {
         return false;
+    }
     for(size_t i = 0; i < row_ids.size(); i++) {
-        if(row_ids[i].segment_id_ != other_cmd->row_ids[i].segment_id_ ||
-           row_ids[i].segment_offset_ != other_cmd->row_ids[i].segment_offset_)
+        if(row_ids[i] != other_cmd->row_ids[i]) {
             return false;
+        }
     }
     return true;
 }
@@ -151,13 +154,15 @@ WalCmdDropTable::GetSizeInBytes() const {
            sizeof(int32_t) + this->table_name.size();
 }
 
-int32_t WalCmdImport::GetSizeInBytes() const {
+int32_t
+WalCmdImport::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() +
            sizeof(int32_t) + this->table_name.size() +
            sizeof(int32_t) + this->segment_dir.size();
 }
 
-int32_t WalCmdAppend::GetSizeInBytes() const {
+int32_t
+WalCmdAppend::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() +
            sizeof(int32_t) + this->table_name.size() + block->GetSizeInBytes();
 }
@@ -201,14 +206,16 @@ WalCmdDropTable::WriteAdv(char*& buf) const {
     WriteBufAdv(buf, this->table_name);
 }
 
-void WalCmdImport::WriteAdv(char *&buf) const {
+void
+WalCmdImport::WriteAdv(char*& buf) const {
     WriteBufAdv(buf, WalCommandType::IMPORT);
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
     WriteBufAdv(buf, this->segment_dir);
 }
 
-void WalCmdAppend::WriteAdv(char *&buf) const {
+void
+WalCmdAppend::WriteAdv(char*& buf) const {
     WriteBufAdv(buf, WalCommandType::APPEND);
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
@@ -290,8 +297,9 @@ WalEntry::WriteAdv(char*& ptr) const {
     return;
 }
 
-SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
+SharedPtr<WalEntry>
+WalEntry::ReadAdv(char*& ptr, int32_t maxbytes) {
+    char* const ptr_end = ptr + maxbytes;
     StorageAssert(maxbytes > 0, "ptr goes out of range when reading WalEntry");
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     WalEntryHeader* header = (WalEntryHeader*)ptr;
@@ -320,7 +328,7 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t maxbytes) {
     }
     ptr += sizeof(int32_t);
     maxbytes = ptr_end - ptr;
-    StorageAssert(maxbytes>=0, "ptr goes out of range when reading WalEntry");
+    StorageAssert(maxbytes >= 0, "ptr goes out of range when reading WalEntry");
     return entry;
 }
 

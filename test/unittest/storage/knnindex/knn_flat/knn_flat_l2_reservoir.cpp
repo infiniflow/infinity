@@ -88,21 +88,25 @@ TEST_F(KnnFlatL2ReservoirTest, test1) {
     knn_distance.End();
 
     f32* distance_array = knn_distance.GetDistanceByIdx(0);
-    CompoundID* id_array = knn_distance.GetIDByIdx(0);
+    RowID* id_array = knn_distance.GetIDByIdx(0);
     EXPECT_FLOAT_EQ(distance_array[0], 0);
     EXPECT_FLOAT_EQ(id_array[0].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[0].segment_offset_, 0);
+    EXPECT_FLOAT_EQ(id_array[0].block_id_, 0);
+    EXPECT_FLOAT_EQ(id_array[0].block_offset_, 0);
 
     EXPECT_FLOAT_EQ(distance_array[1], 0.02);
     EXPECT_FLOAT_EQ(id_array[1].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[1].segment_offset_, 1);
+    EXPECT_FLOAT_EQ(id_array[1].block_id_, 0);
+    EXPECT_FLOAT_EQ(id_array[1].block_offset_, 1);
 
     EXPECT_FLOAT_EQ(distance_array[2], 0.08);
     EXPECT_FLOAT_EQ(id_array[2].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[2].segment_offset_, 2);
+    EXPECT_FLOAT_EQ(id_array[2].block_id_, 0);
+    EXPECT_FLOAT_EQ(id_array[2].block_offset_, 2);
 
     EXPECT_FLOAT_EQ(distance_array[3], 0.2);
     EXPECT_FLOAT_EQ(id_array[3].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[3].segment_offset_, 3);
+    EXPECT_FLOAT_EQ(id_array[3].block_id_, 0);
+    EXPECT_FLOAT_EQ(id_array[3].block_offset_, 3);
 
 }

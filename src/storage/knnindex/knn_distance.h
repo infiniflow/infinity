@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "storage/knnindex/common/compound_id.h"
 #include "common/types/complex/embedding_type.h"
+#include "common/types/complex/row_id.h"
 
 namespace infinity {
 
@@ -54,7 +54,7 @@ public:
 
     virtual void
     Search(const DistType* base,
-           i64 base_count,
+           i16 base_count,
            i32 segment_id,
            i16 block_id) = 0;
 
@@ -67,10 +67,10 @@ public:
     virtual DistType*
     GetDistanceByIdx(i64 idx) const = 0;
 
-    virtual CompoundID*
+    virtual RowID*
     GetIDs() const = 0;
 
-    virtual CompoundID*
+    virtual RowID*
     GetIDByIdx(i64 idx) const = 0;
 };
 

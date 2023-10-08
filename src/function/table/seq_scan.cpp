@@ -22,7 +22,7 @@ SeqScanFunc(QueryContext* query_context,
     SizeT read_offset = table_scan_function_data_ptr->read_offset_;
 
 
-    if(current_segment_id == INITIAL_SEGMENT_ID) {
+    if(current_segment_id == INVALID_SEGMENT_ID) {
         auto iter = table_column_entry_ptr->segments_.begin();
         if(iter != table_column_entry_ptr->segments_.end()) {
             current_segment_id = iter->first;
@@ -31,7 +31,7 @@ SeqScanFunc(QueryContext* query_context,
         }
     }
 
-    if(current_block_id == INITIAL_BLOCK_ID && current_segment_id != INVALID_SEGMENT_ID) {
+    if(current_block_id == INVALID_BLOCK_ID && current_segment_id != INVALID_SEGMENT_ID) {
         if(table_column_entry_ptr->segments_[current_segment_id]->block_entries_.empty()) {
             current_block_id = INVALID_BLOCK_ID;
         } else {

@@ -56,7 +56,7 @@ PhysicalProject::Execute(QueryContext* query_context, InputState* input_state, O
     }
 
     project_output_state->data_block_->Finalize();
-    if(*project_input_state->input_complete_ptr_) {
+    if(project_input_state->Complete()) {
         project_output_state->SetComplete();
     }
 }

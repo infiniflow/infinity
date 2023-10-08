@@ -6,7 +6,8 @@
 
 #include "common/types/alias/concurrency.h"
 #include "common/types/alias/smart_ptr.h"
-#include "storage/txn/constants.h"
+#include "storage/txn/txn_state.h"
+#include "common/default_values.h"
 
 namespace infinity {
 

@@ -156,7 +156,7 @@ void
 DataBlock::FillRowIDVector(SharedPtr<Vector<RowID>>& row_ids, u32 block_id) const {
     StorageAssert(finalized, "DataBlock isn't finalized.")
     for(u32 offset = 0; offset < row_count_; ++offset) {
-        row_ids->emplace_back(block_id, offset);
+        row_ids->emplace_back(INVALID_SEGMENT_ID, block_id, offset);
     }
 }
 

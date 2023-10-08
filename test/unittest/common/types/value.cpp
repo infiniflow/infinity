@@ -415,10 +415,11 @@ TEST_F(ValueTest, MakeAndGet) {
 
     // RowT
     {
-        RowT row{1, 3};
+        RowT row{1, 2, 3};
         value = Value::MakeRow(row);
         EXPECT_EQ(value.value_.row.segment_id_, 1);
-        EXPECT_EQ(value.value_.row.segment_offset_, 3);
+        EXPECT_EQ(value.value_.row.block_id_, 2);
+        EXPECT_EQ(value.value_.row.block_offset_, 3);
     }
 
     // Mixed Integer

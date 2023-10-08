@@ -24,7 +24,7 @@ KnnFlatL2Top1<DistType>::Begin() {
 template<typename DistType>
 void
 KnnFlatL2Top1<DistType>::Search(const DistType* base,
-                                i64 base_count,
+                                i16 base_count,
                                 i32 segment_id,
                                 i16 block_id) {
     if(!begin_) {
@@ -39,10 +39,10 @@ KnnFlatL2Top1<DistType>::Search(const DistType* base,
         const DistType* x_i = queries_ + i * dimension_;
         const DistType* y_j = base;
 
-        for(i32 j = 0; j < base_count; j++, y_j += dimension_) {
+        for(i16 j = 0; j < base_count; j++, y_j += dimension_) {
 
             DistType l2_distance = faiss::fvec_L2sqr(x_i, y_j, dimension_);
-            single_result_handler_->add_result(l2_distance, CompoundID{segment_id, j}, i);
+            single_result_handler_->add_result(l2_distance, RowID{segment_id, block_id, j}, i);
         }
     }
 }

@@ -5,8 +5,7 @@
 
 #pragma once
 
-
-#include "constants.h"
+#include "txn_state.h"
 
 namespace infinity {
 

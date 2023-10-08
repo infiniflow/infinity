@@ -12,7 +12,7 @@ namespace infinity {
 template<typename DistType>
 class KnnFlatL2Top1 final : public KnnDistance<DistType> {
 
-    using SingleBestResultHandler = SingleBestResultHandler<faiss::CMax<DistType, CompoundID>>;
+    using SingleBestResultHandler = SingleBestResultHandler<faiss::CMax<DistType, RowID>>;
     using SingleResultHandler = SingleBestResultHandler::SingleResultHandler;
 
 public:
@@ -26,7 +26,7 @@ public:
               query_count_(query_count),
               dimension_(dimension) {
 
-        id_array_ = MakeUnique<Vector<CompoundID>>(query_count_, CompoundID(-1, -1));
+        id_array_ = MakeUnique<Vector<RowID>>(query_count_, RowID());
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * query_count_);
 
         single_best_result_handler_ = MakeUnique<SingleBestResultHandler>(query_count,
@@ -41,7 +41,7 @@ public:
 
     void
     Search(const DistType* base,
-           i64 base_count,
+           i16 base_count,
            i32 segment_id,
            i16 block_id) final;
 
@@ -53,7 +53,7 @@ public:
         return single_best_result_handler_->dis_tab;
     }
 
-    [[nodiscard]] inline CompoundID*
+    [[nodiscard]] inline RowID*
     GetIDs() const final {
         return single_best_result_handler_->ids_tab;
     }
@@ -66,7 +66,7 @@ public:
         return single_best_result_handler_->dis_tab + idx * 1;
     }
 
-    [[nodiscard]] inline CompoundID*
+    [[nodiscard]] inline RowID*
     GetIDByIdx(i64 idx) const final {
         if(idx >= query_count_) {
             ExecutorError("Query index exceeds the limit")
@@ -75,7 +75,7 @@ public:
     }
 
 private:
-    UniquePtr<Vector<CompoundID>> id_array_{};
+    UniquePtr<Vector<RowID>> id_array_{};
     UniquePtr<DistType[]> distance_array_{};
 
     UniquePtr<SingleBestResultHandler> single_best_result_handler_{};

@@ -83,13 +83,14 @@ KnnScanFunc(QueryContext* query_context,
                             query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++query_idx) {
 
                             f32* top_distance = knn_flat_l2->GetDistanceByIdx(query_idx);
-                            CompoundID* compound_id = knn_flat_l2->GetIDByIdx(query_idx);
+                            RowID* row_id = knn_flat_l2->GetIDByIdx(query_idx);
 
                             for(i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE("Row offset: {}: {}, distance {}",
-                                          compound_id[id].segment_id_,
-                                          compound_id[id].segment_offset_,
+                                LOG_TRACE("Row offset: {}: {}: {}, distance {}",
+                                          row_id[id].segment_id_,
+                                          row_id[id].block_id_,
+                                          row_id[id].block_offset_,
                                           top_distance[id]);
                             }
                         }
@@ -255,13 +256,14 @@ KnnScanFunc(QueryContext* query_context,
                         for(i64 query_idx = 0; query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++query_idx) {
 
                             f32* top_distance = knn_flat_ip->GetDistanceByIdx(query_idx);
-                            CompoundID* compound_id = knn_flat_ip->GetIDByIdx(query_idx);
+                            RowID* row_id = knn_flat_ip->GetIDByIdx(query_idx);
 
                             for(i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE("Row offset: {}: {}, distance {}",
-                                          compound_id[id].segment_id_,
-                                          compound_id[id].segment_offset_,
+                                LOG_TRACE("Row offset: {}: {}: {}, distance {}",
+                                          row_id[id].segment_id_,
+                                          row_id[id].block_id_,
+                                          row_id[id].block_offset_,
                                           top_distance[id]);
                             }
                         }

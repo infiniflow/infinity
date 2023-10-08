@@ -212,7 +212,8 @@ inline RowT
 NullValue() {
     RowT row_id;
     row_id.segment_id_ = std::numeric_limits<i32>::infinity();
-    row_id.segment_offset_ = std::numeric_limits<i32>::infinity();
+    row_id.block_id_ = std::numeric_limits<i32>::infinity();
+    row_id.block_offset_ = std::numeric_limits<i32>::infinity();
     return row_id;
 }
 

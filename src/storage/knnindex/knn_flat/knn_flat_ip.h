@@ -12,7 +12,7 @@ namespace infinity {
 template<typename DistType>
 class KnnFlatIP final : public KnnDistance<DistType> {
 
-    using HeapResultHandler = NewHeapResultHandler<faiss::CMin<DistType, CompoundID>>;
+    using HeapResultHandler = NewHeapResultHandler<faiss::CMin<DistType, RowID>>;
     using HeapSingleHandler = HeapResultHandler::HeapSingleResultHandler;
 
 public:
@@ -27,7 +27,7 @@ public:
               query_count_(query_count),
               dimension_(dimension),
               top_k_(topk) {
-        id_array_ = MakeUnique<Vector<CompoundID>>(topk * query_count_, CompoundID(-1, -1));
+        id_array_ = MakeUnique<Vector<RowID>>(topk * query_count_, RowID());
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * topk * query_count_);
 
         heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count,
@@ -42,7 +42,7 @@ public:
 
     void
     Search(const DistType* base,
-           i64 base_count,
+           i16 base_count,
            i32 segment_id,
            i16 block_id) final;
 
@@ -54,7 +54,7 @@ public:
         return heap_result_handler_->heap_dis_tab;
     }
 
-    [[nodiscard]] inline CompoundID*
+    [[nodiscard]] inline RowID*
     GetIDs() const final {
         return heap_result_handler_->heap_ids_tab;
     }
@@ -67,7 +67,7 @@ public:
         return heap_result_handler_->heap_dis_tab + idx * top_k_;
     }
 
-    [[nodiscard]] inline CompoundID*
+    [[nodiscard]] inline RowID*
     GetIDByIdx(i64 idx) const final {
         if(idx >= query_count_) {
             ExecutorError("Query index exceeds the limit")
@@ -76,7 +76,7 @@ public:
     }
 
 private:
-    UniquePtr<Vector<CompoundID>> id_array_{};
+    UniquePtr<Vector<RowID>> id_array_{};
     UniquePtr<DistType[]> distance_array_{};
 
     UniquePtr<HeapResultHandler> heap_result_handler_{};

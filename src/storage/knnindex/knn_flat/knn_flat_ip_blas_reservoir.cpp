@@ -47,7 +47,7 @@ KnnFlatIPBlasReservoir<DistType>::Begin() {
 template<typename DistType>
 void
 KnnFlatIPBlasReservoir<DistType>::Search(const DistType* base,
-                                         i64 base_count,
+                                         i16 base_count,
                                          i32 segment_id,
                                          i16 block_id) {
     if(!begin_) {
@@ -66,8 +66,8 @@ KnnFlatIPBlasReservoir<DistType>::Search(const DistType* base,
         if(i1 > query_count_)
             i1 = query_count_;
 
-        for(size_t j0 = 0; j0 < base_count; j0 += bs_y) {
-            size_t j1 = j0 + bs_y;
+        for(i16 j0 = 0; j0 < base_count; j0 += bs_y) {
+            i16 j1 = j0 + bs_y;
             if(j1 > base_count)
                 j1 = base_count;
             /* compute the actual dot products */
@@ -89,7 +89,7 @@ KnnFlatIPBlasReservoir<DistType>::Search(const DistType* base,
                        &nyi);
             }
 
-            reservoir_result_handler_->add_results(i0, i1, j0, j1, ip_block.get(), segment_id);
+            reservoir_result_handler_->add_results(i0, i1, j0, j1, ip_block.get(), segment_id, block_id);
         }
     }
 }

@@ -36,11 +36,8 @@ PhysicalSource::Execute(QueryContext* query_context, SourceState* source_state) 
         case SourceStateType::kQueue: {
             QueueSourceState* queue_source_state = static_cast<QueueSourceState*>(source_state);
             queue_source_state->source_queue_.Dequeue(queue_source_state->current_fragment_data_);
-            if(source_state->next_input_state_->total_data_count_ == 0) {
-                source_state->next_input_state_->total_data_count_ = queue_source_state->current_fragment_data_->data_count_;
-            }
-            source_state->next_input_state_->input_data_block_ = queue_source_state->current_fragment_data_->data_block_.get();
-            ++ source_state->next_input_state_->received_data_count_;
+            queue_source_state->SetTotalDataCount(queue_source_state->current_fragment_data_->data_count_);
+            queue_source_state->PushData(queue_source_state->current_fragment_data_->data_block_.get());
             break;
         }
         default: {
@@ -51,11 +48,13 @@ PhysicalSource::Execute(QueryContext* query_context, SourceState* source_state) 
 
 bool
 PhysicalSource::ReadyToExec(SourceState* source_state) {
+
+    bool result = true;
     if(source_state->state_type_ == SourceStateType::kQueue) {
         QueueSourceState* queue_source_state = static_cast<QueueSourceState*>(source_state);
-        return queue_source_state->source_queue_.ApproxSize() > 0;
+        result = queue_source_state->source_queue_.ApproxSize() > 0;
     }
-    return true;
+    return result;
 }
 
 }

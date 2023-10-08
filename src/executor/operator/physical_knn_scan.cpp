@@ -108,7 +108,7 @@ PhysicalKnnScan::ExecuteInternal(QueryContext* query_context,
     i16 block_id = block_ids->at(block_ids_idx).block_id_;
 
     BlockEntry* current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
-    i64 row_count = current_block_entry->row_count_;
+    i16 row_count = current_block_entry->row_count_;
 
     ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(current_block_entry->columns_[knn_column_id].get(),
                                                                  query_context->storage()->buffer_manager());
@@ -140,6 +140,18 @@ PhysicalKnnScan::ExecuteInternal(QueryContext* query_context,
                             knn_flat_l2 = static_cast<KnnFlatL2BlasReservoir<f32>*>(knn_scan_function_data_ptr->knn_distance_.get());
                         }
                     }
+#if 0
+                    f32* elem = (f32*)(column_buffer.GetAll());
+                    for(i16 row_id = 0; row_id < row_count; ++row_id) {
+                        std::stringstream ss;
+                        for(SizeT di = 0; di < knn_scan_function_data_ptr->dimension_; ++di) {
+                            ss << elem[di] << ", ";
+                        }
+                        elem += knn_scan_function_data_ptr->dimension_;
+                        LOG_TRACE("Base Row[{}]: {}", row_id, ss.str());
+
+                    }
+#endif
 
                     knn_flat_l2->Search((f32*)(column_buffer.GetAll()),
                                         row_count,
@@ -154,13 +166,14 @@ PhysicalKnnScan::ExecuteInternal(QueryContext* query_context,
                             query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++query_idx) {
 
                             f32* top_distance = knn_flat_l2->GetDistanceByIdx(query_idx);
-                            CompoundID* compound_id = knn_flat_l2->GetIDByIdx(query_idx);
+                            RowID* row_id = knn_flat_l2->GetIDByIdx(query_idx);
 
                             for(i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE("Row offset: {}: {}, distance {}",
-                                          compound_id[id].segment_id_,
-                                          compound_id[id].segment_offset_,
+                                LOG_TRACE("Row offset: {}: {}: {}, distance {}",
+                                          row_id[id].segment_id_,
+                                          row_id[id].block_id_,
+                                          row_id[id].block_offset_,
                                           top_distance[id]);
                             }
                         }
@@ -323,16 +336,18 @@ PhysicalKnnScan::ExecuteInternal(QueryContext* query_context,
                         // Last segment, Get the result according to the topk row.
                         knn_flat_ip->End();
 
-                        for(i64 query_idx = 0; query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++query_idx) {
+                        for(i64 query_idx = 0;
+                            query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++query_idx) {
 
                             f32* top_distance = knn_flat_ip->GetDistanceByIdx(query_idx);
-                            CompoundID* compound_id = knn_flat_ip->GetIDByIdx(query_idx);
+                            RowID* row_id = knn_flat_ip->GetIDByIdx(query_idx);
 
                             for(i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE("Row offset: {}: {}, distance {}",
-                                          compound_id[id].segment_id_,
-                                          compound_id[id].segment_offset_,
+                                LOG_TRACE("Row offset: {}: {}: {}, distance {}",
+                                          row_id[id].segment_id_,
+                                          row_id[id].block_id_,
+                                          row_id[id].block_offset_,
                                           top_distance[id]);
                             }
                         }

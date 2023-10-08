@@ -24,7 +24,7 @@ KnnFlatIP<DistType>::Begin() {
 template<typename DistType>
 void
 KnnFlatIP<DistType>::Search(const DistType* base,
-                            i64 base_count,
+                            i16 base_count,
                             i32 segment_id,
                             i16 block_id) {
     if(!begin_) {
@@ -39,9 +39,9 @@ KnnFlatIP<DistType>::Search(const DistType* base,
         const DistType* x_i = queries_ + i * dimension_;
         const DistType* y_j = base;
 
-        for(i32 j = 0; j < base_count; j++, y_j += dimension_) {
+        for(i16 j = 0; j < base_count; j++, y_j += dimension_) {
             DistType ip = faiss::fvec_inner_product(x_i, y_j, dimension_);
-            single_heap_result_handler_->add_result(ip, CompoundID{segment_id, j}, i);
+            single_heap_result_handler_->add_result(ip, RowID{segment_id, block_id, j}, i);
         }
     }
 }

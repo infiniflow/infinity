@@ -46,6 +46,11 @@ struct InputState {
     i64 received_data_count_{0};
     i64 total_data_count_{0};
 
+    inline bool
+    Complete() const {
+        return *input_complete_ptr_ == true;
+    }
+
     inline void
     ConnectToPrevOutputOpState(OutputState* output_state) {
         input_data_block_ = output_state->data_block_.get();
@@ -582,8 +587,10 @@ struct SourceState {
     inline void
     SetNextState(InputState* next_state) {
         next_input_state_ = next_state;
+        next_input_state_->input_complete_ptr_ = &complete_;
     }
 
+    bool complete_{false};
     InputState* next_input_state_{};
     SourceStateType state_type_{SourceStateType::kInvalid};
 };
@@ -591,6 +598,16 @@ struct SourceState {
 struct QueueSourceState : public SourceState {
     inline explicit
     QueueSourceState() : SourceState(SourceStateType::kQueue) {}
+
+    inline void
+    SetTotalDataCount(i64 data_count) {
+        if(next_input_state_->total_data_count_ == 0) {
+            next_input_state_->total_data_count_ = data_count;
+        }
+    }
+
+    void
+    PushData(DataBlock* input_data_block);
 
     FragmentDataQueue source_queue_;
 
