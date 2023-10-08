@@ -28,8 +28,6 @@ using BufferReadFN = void (*)(const String &path, DataType data_type);
 using BufferWriteFN = void (*)(const String &path, DataType data_type);
 
 class ObjectHandle;
-class CommonObjectHandle;
-class IndexObjectHandle;
 
 class CommonObjectHandle;
 
