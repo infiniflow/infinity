@@ -187,7 +187,7 @@ struct WalCmdDelete : public WalCmd {
 };
 
 struct WalCmdCheckpoint : public WalCmd {
-    WalCmdCheckpoint(int64_t max_commit_ts_) : max_commit_ts(max_commit_ts_) {}
+    WalCmdCheckpoint(int64_t max_commit_ts_, String catalog_path) : max_commit_ts_(max_commit_ts_),catalog_path_(catalog_path) {}
     virtual WalCommandType
     GetType() { return WalCommandType::CHECKPOINT; }
 
@@ -200,7 +200,8 @@ struct WalCmdCheckpoint : public WalCmd {
     virtual void
     WriteAdv(char*& buf) const;
 
-    int64_t max_commit_ts;
+    int64_t max_commit_ts_;
+    String catalog_path_;
 };
 
 struct WalEntryHeader {

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "common/types/alias/primitives.h"
 #include "storage/txn/txn_manager.h"
 #include "common/constants/constants.h"
 #include "wal_entry.h"
@@ -79,13 +80,16 @@ private:
     std::ofstream ofs_;
 
     SeqGenerator lsn_gen_;
-    std::atomic<int64_t> lsn_pend_chk_;
-    int64_t lsn_done_chk_{};
+    std::atomic<TxnTimeStamp> commit_ts_pend_;
+    TxnTimeStamp commit_ts_done_{};
+
     int64_t checkpoint_ts_{};
 
     Storage* storage_;
 
     Vector<String> wal_list_;
+
+    bool wait_for_checkpoint_{false};
 };
 
 } // namespace infinity
