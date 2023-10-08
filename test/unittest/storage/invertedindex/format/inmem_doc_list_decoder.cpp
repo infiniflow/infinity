@@ -298,4 +298,139 @@ TEST_F(InMemDocListDecoderTest, test3) {
     doc_list_decoder_->~InMemDocListDecoder();
     byte_slice_pool_->Deallocate((void*)doc_list_decoder_, sizeof(InMemDocListDecoder));
 }
+
+TEST_F(InMemDocListDecoderTest, test4)
+{
+    docid_t first_doc_id = 0;
+    docid_t last_doc_id = 0;
+    ttf_t current_ttf = 0;
+    docid_t doc_buffer[MAX_DOC_PER_RECORD];
+
+    doc_list_encoder_->EndDocument(1001, 0);
+    doc_list_encoder_->EndDocument(1002, 0);
+
+    BufferedByteSlice* posting_buffer = doc_list_encoder_->GetDocListBuffer();
+    posting_buffer->Flush();
+
+    doc_list_decoder_ = doc_list_encoder_->GetInMemDocListDecoder(byte_slice_pool_);
+
+    ASSERT_TRUE(doc_list_decoder_->DecodeDocBuffer(1000, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+
+    ASSERT_EQ(1000, first_doc_id);
+    ASSERT_EQ(1002, last_doc_id);
+    ASSERT_EQ((ttf_t)0, current_ttf);
+    ASSERT_EQ(490, doc_buffer[0]);
+    ASSERT_EQ(1, doc_buffer[1]);
+    ASSERT_EQ(1, doc_buffer[2]);
+
+    ASSERT_TRUE(!doc_list_decoder_->DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+
+    doc_list_decoder_->~InMemDocListDecoder();
+    byte_slice_pool_->Deallocate((void*)doc_list_decoder_, sizeof(InMemDocListDecoder));
+}
+
+TEST_F(InMemDocListDecoderTest, test5)
+{
+    docid_t first_doc_id = 0;
+    docid_t last_doc_id = 0;
+    ttf_t current_ttf = 0;
+    docid_t doc_buffer[MAX_DOC_PER_RECORD];
+
+    BufferedByteSlice* posting_buffer = doc_list_encoder_->GetDocListBuffer();
+
+    for (docid_t i = 0; i < 300; ++i) {
+        posting_buffer->PushBack(0, i);
+        posting_buffer->EndPushBack();
+        if (posting_buffer->NeedFlush()) {
+            posting_buffer->Flush();
+        }
+    }
+    doc_list_decoder_ = doc_list_encoder_->GetInMemDocListDecoder(byte_slice_pool_);
+
+    ASSERT_TRUE(doc_list_decoder_->DecodeDocBuffer(1000, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+
+    ASSERT_EQ(1000, first_doc_id);
+    ASSERT_EQ(9001, last_doc_id);
+    ASSERT_EQ((ttf_t)0, current_ttf);
+    ASSERT_EQ(490, doc_buffer[0]);
+    ASSERT_EQ(0, doc_buffer[1]);
+    ASSERT_EQ(1, doc_buffer[2]);
+    ASSERT_EQ(2, doc_buffer[3]);
+
+    ASSERT_TRUE(!doc_list_decoder_->DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+
+    doc_list_decoder_->~InMemDocListDecoder();
+    byte_slice_pool_->Deallocate((void*)doc_list_decoder_, sizeof(InMemDocListDecoder));
+}
+
+TEST_F(InMemDocListDecoderTest, test6)
+{
+    docid_t docids[] = {1, 10};
+    tf_t tfs[] = {2, 4};
+    TestDecodeWithOptionFlag(of_term_frequency, 2, docids, tfs, nullptr);
+}
+
+TEST_F(InMemDocListDecoderTest, test7)
+{
+    docid_t docids[] = {1, 10};
+    docpayload_t docPayloads[] = {2, 4};
+    TestDecodeWithOptionFlag(of_doc_payload, 2, docids, nullptr, docPayloads);
+}
+
+
+TEST_F(InMemDocListDecoderTest, test8)
+{
+    docid_t docids[] = {1, 10};
+    tf_t tfs[] = {2, 4};
+    docpayload_t docPayloads[] = {2, 4};
+    TestDecodeWithOptionFlag(of_term_frequency | of_doc_payload, 2, docids, tfs, docPayloads);
+}
+
+TEST_F(InMemDocListDecoderTest, test9)
+{
+    TestDecode(1);
+    TestDecode(MAX_UNCOMPRESSED_DOC_LIST_SIZE + 1);
+    TestDecode(MAX_DOC_PER_RECORD);
+    TestDecode(MAX_DOC_PER_RECORD + 10);
+    TestDecode(MAX_DOC_PER_RECORD * 5 + 1);
+    TestDecode(MAX_DOC_PER_RECORD * MAX_UNCOMPRESSED_SKIP_LIST_SIZE + 1);
+    TestDecode(MAX_DOC_PER_RECORD * SKIP_LIST_BUFFER_SIZE + 1);
+    TestDecode(MAX_DOC_PER_RECORD * SKIP_LIST_BUFFER_SIZE * 2 + 1);
+}
+
+TEST_F(InMemDocListDecoderTest, test10)
+{
+    TestDecode(1, true);
+    TestDecode(MAX_UNCOMPRESSED_DOC_LIST_SIZE + 1, true);
+    TestDecode(MAX_DOC_PER_RECORD, true);
+    TestDecode(MAX_DOC_PER_RECORD + 10, true);
+    TestDecode(MAX_DOC_PER_RECORD * 5 + 1, true);
+    TestDecode(MAX_DOC_PER_RECORD * MAX_UNCOMPRESSED_SKIP_LIST_SIZE + 1, true);
+    TestDecode(MAX_DOC_PER_RECORD * SKIP_LIST_BUFFER_SIZE + 1, true);
+    TestDecode(MAX_DOC_PER_RECORD * SKIP_LIST_BUFFER_SIZE * 2 + 1, true);
+}
+
+TEST_F(InMemDocListDecoderTest, test11)
+{
+    TestDecode(1, false, true);
+    TestDecode(MAX_UNCOMPRESSED_DOC_LIST_SIZE + 1, false, true);
+    TestDecode(MAX_DOC_PER_RECORD, false, true);
+    TestDecode(MAX_DOC_PER_RECORD + 10, false, true);
+    TestDecode(MAX_DOC_PER_RECORD * 5 + 1, false, true);
+    TestDecode(MAX_DOC_PER_RECORD * MAX_UNCOMPRESSED_SKIP_LIST_SIZE + 1, false, true);
+    TestDecode(MAX_DOC_PER_RECORD * SKIP_LIST_BUFFER_SIZE + 1, false, true);
+    TestDecode(MAX_DOC_PER_RECORD * SKIP_LIST_BUFFER_SIZE * 2 + 1, false, true);
+}
+
+TEST_F(InMemDocListDecoderTest, test12)
+{
+    TestDecode(1, true, true);
+    TestDecode(MAX_UNCOMPRESSED_DOC_LIST_SIZE + 1, true, true);
+    TestDecode(MAX_DOC_PER_RECORD, true, true);
+    TestDecode(MAX_DOC_PER_RECORD + 10, true, true);
+    TestDecode(MAX_DOC_PER_RECORD * 5 + 1, true, true);
+    TestDecode(MAX_DOC_PER_RECORD * MAX_UNCOMPRESSED_SKIP_LIST_SIZE + 1, true, true);
+    TestDecode(MAX_DOC_PER_RECORD * SKIP_LIST_BUFFER_SIZE + 1, true, true);
+    TestDecode(MAX_DOC_PER_RECORD * SKIP_LIST_BUFFER_SIZE * 2 + 1, true, true);
+}
 }// namespace infinity
