@@ -5,7 +5,6 @@
 #pragma once
 
 
-#include "constants.h"
 #include "common/types/alias/concurrency.h"
 #include "txn_state.h"
 
