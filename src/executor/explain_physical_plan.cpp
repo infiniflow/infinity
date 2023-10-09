@@ -529,16 +529,28 @@ void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node,
     // Values
     {
         String insert_str;
-        insert_str = " - values (";
+        insert_str = " - values ";
         SizeT value_count = insert_node->value_list().size();
         if (value_count == 0) {
             PlannerError("No value list in insert statement");
         }
-        for (SizeT idx = 0; idx < value_count - 1; ++idx) {
-            auto &value_expr = insert_node->value_list()[idx];
-            insert_str += value_expr->Name() + ", ";
+        for (SizeT idx = 0; idx < value_count; ++idx) {
+            if (idx != 0)
+                insert_str += ", ";
+            const Vector<std::shared_ptr<infinity::BaseExpression>> &value = insert_node->value_list()[idx];
+            SizeT column_count = value.size();
+            for (SizeT col = 0; col < column_count; ++col) {
+                auto &value_expr = value[idx];
+                if (col == 0)
+                    insert_str += "(";
+                else
+                    insert_str += ", ";
+                insert_str += value_expr->Name();
+                if (col == column_count - 1)
+                    insert_str += ")";
+            }
         }
-        insert_str += insert_node->value_list().back()->Name() + ")";
+
         result->emplace_back(MakeShared<String>(insert_str));
     }
 

@@ -73,9 +73,10 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kInsert: {
             auto &node = (LogicalInsert &)op;
-            for (auto &expression : node.value_list()) {
-                VisitExpression(expression);
-            }
+            for (auto &value : node.value_list())
+                for (auto &expression : value) {
+                    VisitExpression(expression);
+                }
             break;
         }
         default: {

@@ -146,9 +146,20 @@ void Statement::BuildInsert(const InsertStatement *insert_statement, SharedPtr<V
         PlannerError("Insert value list is empty");
     }
     for (SizeT idx = 0; idx < value_count - 1; ++idx) {
-        values += insert_statement->values_->at(idx)->ToString() + ", ";
+        if (idx != 0)
+            values += ", ";
+        Vector<ParsedExpr *> *expr_array = insert_statement->values_->at(idx);
+        SizeT column_count = insert_statement->values_->at(0)->size();
+        for (SizeT idx2 = 0; idx2 < column_count; ++idx2) {
+            if (idx2 == 0)
+                values += "(";
+            else
+                values += ", ";
+            values += expr_array->at(idx2)->ToString();
+            if (idx2 == column_count - 1)
+                values += ")";
+        }
     }
-    values += insert_statement->values_->back()->ToString();
     result->emplace_back(MakeShared<String>(values));
 }
 

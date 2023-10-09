@@ -39,12 +39,11 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
         LOG_TRACE("No append is done.");
         return;
     }
-    if (table_entry->unsealed_segment_ == nullptr) {
-        // No segment at all.
+    {
         std::unique_lock<RWMutex> rw_locker(table_entry->rw_locker_); // prevent another read conflict with this append operation
 
-        // Need double-check
-        if (table_entry->unsealed_segment_ == nullptr) {
+        // No segment, or unsealed_segment_ is already closed(flushed to disk).
+        if (table_entry->unsealed_segment_ == nullptr || table_entry->unsealed_segment_->status_ != DataSegmentStatus::kSegmentOpen) {
             u64 next_segment_id = TableCollectionEntry::GetNextSegmentID(table_entry);
             SharedPtr<SegmentEntry> new_segment = SegmentEntry::MakeNewSegmentEntry(table_entry, table_entry->txn_id_, next_segment_id, buffer_mgr);
             table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
