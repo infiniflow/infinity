@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include "common/utility/str.h"
+#include "main/logger.h"
+#include "storage/invertedindex/key_encoder.h"
 #include "txn.h"
 #include "storage/wal/wal_entry.h"
 #include <mutex>
@@ -29,7 +32,12 @@ public:
               buffer_mgr_(buffer_mgr),
               put_wal_entry_(put_wal_entry_fn),
               txn_id_(start_txn_id),
-              txn_ts_(start_ts) {}
+              txn_ts_(start_ts),
+              is_running_(true) {}
+
+    ~TxnManager() {
+        Stop();
+    }
 
     Txn*
     CreateTxn();
@@ -67,6 +75,15 @@ public:
     void
     PutWalEntry(std::shared_ptr<WalEntry> entry);
 
+    void
+    Start();
+
+    void
+    Stop();
+
+    bool
+    Stopped();
+
 private:
     u64
     GetNewTxnID();
@@ -83,6 +100,8 @@ private:
     std::mutex mutex_;
     TxnTimeStamp txn_ts_{};
     std::map<TxnTimeStamp, std::shared_ptr<WalEntry>> priority_que_;   //TODO: use C++23 std::flat_map?
+    // For stop the txn manager
+    std::atomic<bool> is_running_{false};
 };
 
 }

@@ -3,12 +3,21 @@
 //
 
 #include "txn_manager.h"
+#include "common/utility/infinity_assert.h"
+#include "function/function_set.h"
+#include "main/logger.h"
+#include "spdlog/fmt/bundled/core.h"
 #include "storage/meta/catalog.h"
 
 namespace infinity {
 
 Txn*
 TxnManager::CreateTxn() {
+    // Check if the is_running_ is true
+    if (!is_running_) {
+        LOG_WARN("TxnManager is not running, cannot create txn");
+        TransactionError("TxnManager is not running, cannot create txn");
+    }
     rw_locker_.lock();
     u64 new_txn_id = GetNewTxnID();
     UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, catalog_, new_txn_id);
@@ -59,6 +68,11 @@ TxnManager::GetTimestamp(bool prepare_wal) {
 
 void
 TxnManager::Invalidate(TxnTimeStamp commit_ts) {
+    // Check if the is_running_ is true
+    if (!is_running_) {
+        LOG_WARN("TxnManager is not running, cannot invalidate");
+        TransactionError("TxnManager is not running, cannot invalidate");
+    }
     std::lock_guard guard(mutex_);
     size_t cnt = priority_que_.erase(commit_ts);
     if(cnt > 0 && !priority_que_.empty()) {
@@ -72,6 +86,11 @@ TxnManager::Invalidate(TxnTimeStamp commit_ts) {
 
 void
 TxnManager::PutWalEntry(std::shared_ptr<WalEntry> entry) {
+    // Check if the is_running_ is true
+    if (!is_running_) {
+        LOG_WARN("TxnManager is not running, cannot put wal entry");
+        TransactionError("TxnManager is not running, cannot put wal entry");
+    }
     if(put_wal_entry_ == nullptr)
         return;
     std::unique_lock lk(mutex_);
@@ -81,6 +100,35 @@ TxnManager::PutWalEntry(std::shared_ptr<WalEntry> entry) {
         put_wal_entry_(it->second);
         it = priority_que_.erase(it);
     }
+    return;
 }
+
+void
+TxnManager::Start(){
+        is_running_.store(true, std::memory_order_relaxed);
+    }
+
+void 
+TxnManager::Stop(){
+        bool expected = true;
+        bool changed = is_running_.compare_exchange_strong(expected, false);
+        if (!changed)
+            LOG_INFO("TxnManager is already stopped");
+            return;
+
+        LOG_INFO("TxnManager is stopping...");
+        LOG_INFO("TxnManager is cleaning up...");
+        std::lock_guard guard(mutex_);
+        while(!priority_que_.empty()) {
+            auto it = priority_que_.begin();
+            // When stopping, the priority_que_ rest entries not need to be notify to wal_manager 
+            // because the will not enter to queue of wal_manager
+            priority_que_.erase(it);
+        }
+    }
+
+bool TxnManager::Stopped(){
+        return is_running_.load()==false;
+    }
 
 } // namespace infinity

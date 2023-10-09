@@ -7,6 +7,7 @@
 
 
 #include "constants.h"
+#include "common/types/alias/concurrency.h"
 
 namespace infinity {
 

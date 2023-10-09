@@ -194,7 +194,7 @@ DataType::WriteAdv(char*& ptr) const {
             break;
         }
         default:
-            TypeError(fmt::format("Unexpected type {} here.", int(this->type_)));
+            break;
     }
     return;
 }
@@ -231,7 +231,7 @@ DataType::ReadAdv(char*& ptr, int32_t maxbytes) {
             break;
         }
         default:
-            TypeError(fmt::format("Unexpected type {} here.", int(type)));
+            break;
     }
     maxbytes = ptr_end - ptr;
     StorageAssert(maxbytes >= 0,

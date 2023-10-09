@@ -71,6 +71,7 @@ private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
     // and do serial writing.
     String wal_path_;
+    // WalManager state
     std::atomic<bool> running_;
     std::thread flush_thread_;
     std::thread checkpoint_thread_;

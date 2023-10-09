@@ -56,6 +56,9 @@ public:
     CommitTxnBottom();
 
     void
+    CancelCommitTxnBottom();
+
+    void
     RollbackTxn();
 
     void

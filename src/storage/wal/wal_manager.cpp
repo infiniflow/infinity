@@ -8,6 +8,7 @@
 #include "main/logger.h"
 #include "storage/storage.h"
 #include <filesystem>
+#include <iterator>
 #include <vector>
 
 namespace infinity {
@@ -15,26 +16,23 @@ namespace infinity {
 using namespace std;
 namespace fs = std::filesystem;
 
-WalManager::
-WalManager(Storage* storage, const std::string& wal_path)
+WalManager::WalManager(Storage *storage, const std::string &wal_path)
     : storage_(storage), wal_path_(wal_path), running_(false) {}
 
-WalManager::~
-WalManager() {
+WalManager::~WalManager() {
     Stop();
-    while(!que_.empty()) {
+    while (!que_.empty()) {
         que_.pop();
     }
-    while(!que2_.empty()) {
+    while (!que2_.empty()) {
         que2_.pop();
     }
-    while(!que3_.empty()) {
+    while (!que3_.empty()) {
         que3_.pop();
     }
 }
 
-void
-WalManager::Start() {
+void WalManager::Start() {
     bool expected = false;
     bool changed = running_.compare_exchange_strong(expected, true);
     if(!changed)
@@ -57,20 +55,43 @@ WalManager::Stop() {
     bool expected = true;
     bool changed = running_.compare_exchange_strong(expected, false);
     if(!changed)
+        // Already stopped.
         return;
-    while(wait_for_checkpoint_){
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+
+    LOG_INFO("WalManager::Stop begin to stop txn manager");
+    // Notify txn manager to stop.
+    TxnManager* txn_mgr = storage_->txn_manager();
+    txn_mgr->Stop();
+
+    // pop all the entries in the queue. and notify the condition variable.
+    std::lock_guard guard(mutex_);
+    while(!que_.empty()) {
+        auto wal_entry = que_.front();
+        Txn* txn = txn_mgr->GetTxn(wal_entry->txn_id);
+        if(txn != nullptr) {
+            txn->CancelCommitTxnBottom();
+        }
+        que_.pop();
     }
+
+    // Notify checkpoint thread to stop.
+    LOG_INFO("WalManager::Stop begin to stop checkpoint thread");
     checkpoint_thread_.join();
+    LOG_INFO("WalManager::Stop done to stop checkpoint thread");
+
+    // Notify flush thread to stop.
+    LOG_INFO("WalManager::Stop begin to stop flush thread");
     flush_thread_.join();
+    LOG_INFO("WalManager::Stop done to stop flush thread");
+
     ofs_.close();
 }
 
 // Session request to persist an entry. Assuming txn_id of the entry has
 // been initialized.
-int
-WalManager::PutEntry(std::shared_ptr<WalEntry> entry) {
-    if(!running_.load()) {
+int WalManager::PutEntry(std::shared_ptr<WalEntry> entry) {
+    if (!running_.load()) {
         return -1;
     }
     int rc = 0;
@@ -87,9 +108,8 @@ WalManager::PutEntry(std::shared_ptr<WalEntry> entry) {
 // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
 // ~10s. So it's necessary to sync for a batch of transactions, and to
 // checkpoint for a batch of sync.
-void
-WalManager::Flush() {
-    while(running_.load()) {
+void WalManager::Flush() {
+    while (running_.load()) {
         int written = 0;
         int total = 0;
         int32_t size_pad = 0;
@@ -97,7 +117,9 @@ WalManager::Flush() {
         mutex_.lock();
         que_.swap(que2_);
         mutex_.unlock();
-        while(!que2_.empty()) {
+        LOG_INFO("WalManager::Flush q1 swap {} entries to q2", que2_.size());
+
+        while (!que2_.empty()) {
             std::shared_ptr<WalEntry> entry = que2_.front();
             max_commit_ts = entry->commit_ts;
             if(!entry->cmds.empty()) {
@@ -143,10 +165,16 @@ WalManager::Flush() {
                 }
                 que3_.pop();
             }
+
             // Check if the wal file is too large.
-            auto file_size = fs::file_size(wal_path_);
-            if(file_size > kWALFileSizeThreshold) {
-                this->SwapWALFile(max_commit_ts);
+            try {
+                auto file_size = fs::file_size(wal_path_);
+                if(file_size > kWALFileSizeThreshold) {
+                    this->SwapWALFile(max_commit_ts);
+                }
+                
+            } catch (const std::exception &) {
+                LOG_WARN("WalManager::SwapWALFile failed to swap wal file");
             }
             commit_ts_pend_.store(max_commit_ts);
         }
@@ -154,16 +182,15 @@ WalManager::Flush() {
 }
 
 // Do checkpoint for transactions which's lsn no larger than the given one.
-void
-WalManager::Checkpoint() {
+void WalManager::Checkpoint() {
     // Fuzzy checkpoint for every 10 transactions or 20s.
-    while(running_.load()) {
+    while (running_.load()) {
         TxnTimeStamp commit_ts_pend = commit_ts_pend_.load();
-        if(commit_ts_pend - commit_ts_done_ < 2 ||
-           (checkpoint_ts_ > 0 &&
-            std::chrono::steady_clock::now().time_since_epoch().count() -
-                            checkpoint_ts_ <
-                    20000000000)) {
+        if (commit_ts_pend - commit_ts_done_ < 2 ||
+            (checkpoint_ts_ > 0 &&
+             std::chrono::steady_clock::now().time_since_epoch().count() -
+                     checkpoint_ts_ <
+                 20000000000)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
@@ -174,11 +201,30 @@ WalManager::Checkpoint() {
         // std::this_thread::sleep_for(std::chrono::seconds(10));
         wait_for_checkpoint_ = true;
 
-        auto txn = storage_->txn_manager()->CreateTxn();
-        txn->BeginTxn();
-        txn->Checkpoint(commit_ts_pend);
-        txn->CommitTxn();
-        commit_ts_done_= commit_ts_pend;
+        TxnManager *txn_mgr = nullptr;
+        Txn *txn = nullptr;
+        try {
+            txn_mgr = storage_->txn_manager();
+            txn = txn_mgr->CreateTxn();
+            txn->BeginTxn();
+            txn->Checkpoint(commit_ts_pend);
+        } catch (const std::exception &e) {
+            LOG_WARN("WalManager::Checkpoint failed to stop txn manager");
+            return;
+        } catch (...) {
+            LOG_WARN("WalManager::Checkpoint failed to commit checkpoint txn");
+            return;
+        }
+
+        try {
+            txn->CommitTxn();
+        } catch (const std::exception &) {
+            //txn->CancelCommitTxnBottom();
+            LOG_WARN("WalManager::Checkpoint failed to commit checkpoint txn");
+            return;
+        }
+
+        commit_ts_done_ = commit_ts_pend;
 
         LOG_INFO("WalManager::Checkpoint quit", commit_ts_done_);
         checkpoint_ts_ =
@@ -208,14 +254,14 @@ WalManager::Checkpoint() {
     }
 }
 
-
 /**
  * @brief Swap the wal file to a new one.
  * We will swap a new wal file when the current wal file is too large.
- * Just rename the current wal file to a new one, and create a new wal file with the original name.
- * So we only focus on the current wal file: wal.log
- * When replaying the wal file, we will just start with the wal.log file.
- * @param max_commit_ts The max commit timestamp of the transactions in the current wal file.
+ * Just rename the current wal file to a new one, and create a new wal file with
+ * the original name. So we only focus on the current wal file: wal.log When
+ * replaying the wal file, we will just start with the wal.log file.
+ * @param max_commit_ts The max commit timestamp of the transactions in the
+ * current wal file.
  */
 void
 WalManager::SwapWALFile(const int64_t max_commit_ts) {
@@ -243,14 +289,13 @@ WalManager::SwapWALFile(const int64_t max_commit_ts) {
  * @return int64_t The max commit timestamp of the transactions in the wal file.
  *
  */
-int64_t
-WalManager::ReplayWALFile() {
+int64_t WalManager::ReplayWALFile() {
     // if the wal directory does not exist, just return 0.
-    if(!fs::exists(wal_path_)) {
+    if (!fs::exists(wal_path_)) {
         return 0;
     }
     // if the wal file is empty, just return 0.
-    if(fs::file_size(wal_path_) == 0) {
+    if (fs::file_size(wal_path_) == 0) {
         return 0;
     }
     // if the wal file is not empty, we will replay the wal file.
@@ -259,17 +304,20 @@ WalManager::ReplayWALFile() {
     // wal_list_ is sorted by the suffix of the wal file path.
     // e.g. wal_list_ = {wal.log.1, wal.log.2, wal.log.3}
     LOG_INFO("WAL PATH: {}", wal_path_.c_str());
-    for(const auto& entry: fs::directory_iterator(fs::path(wal_path_).parent_path())) {
-        if(entry.is_regular_file()) {
+    for (const auto &entry :
+         fs::directory_iterator(fs::path(wal_path_).parent_path())) {
+        if (entry.is_regular_file()) {
             wal_list_.push_back(entry.path().string());
         }
     }
-    std::sort(wal_list_.begin(), wal_list_.end(), [](const String& a, const String& b) {
-        return a.substr(a.find_last_of('.') + 1) > b.substr(b.find_last_of('.') + 1);
-    });
+    std::sort(wal_list_.begin(), wal_list_.end(),
+              [](const String &a, const String &b) {
+                  return a.substr(a.find_last_of('.') + 1) >
+                         b.substr(b.find_last_of('.') + 1);
+              });
 
     // log the wal files.
-    for(const auto& wal_file: wal_list_) {
+    for (const auto &wal_file : wal_list_) {
         LOG_INFO("WAL FILE: {}", wal_file.c_str());
     }
 
@@ -281,18 +329,18 @@ WalManager::ReplayWALFile() {
     // 2.1 Get the max commit timestamp of the transactions in the wal files.
     int64_t max_commit_ts = 0;
     // 2.2 Replay the wal files one by one.
-    for(const auto& wal_file: wal_list_) {
+    for (const auto &wal_file : wal_list_) {
         // 2.2.1 Open the wal file.
 
         std::ifstream ifs(wal_file, std::ios::binary | std::ios::ate);
-        if(!ifs.is_open()) {
+        if (!ifs.is_open()) {
             throw StorageException("Failed to open wal file: " + wal_file);
         }
         std::streamsize size = ifs.tellg();
         ifs.seekg(size - 4, std::ios::beg);
         int32_t entry_size;
 
-        ifs.read(reinterpret_cast<char*>(&entry_size), 4);
+        ifs.read(reinterpret_cast<char *>(&entry_size), 4);
 
         ifs.seekg(size - 4 - (entry_size - 4), std::ios::beg);
 
@@ -302,7 +350,7 @@ WalManager::ReplayWALFile() {
 
         ifs.close();
 
-        char* ptr = buf.data();
+        char *ptr = buf.data();
 
         auto entry = WalEntry::ReadAdv(ptr, entry_size);
 
@@ -310,7 +358,7 @@ WalManager::ReplayWALFile() {
 
         auto commands = entry->cmds;
 
-        break;  
+        break;
     }
     return max_commit_ts;
 
@@ -326,4 +374,4 @@ WalManager::ReplayWALFile() {
     // Deserialize the entry.
 }
 
-}// namespace infinity
+} // namespace infinity
