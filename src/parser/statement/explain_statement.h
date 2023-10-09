@@ -8,14 +8,7 @@
 
 namespace infinity {
 
-enum class ExplainType {
-    kAnalyze,
-    kAst,
-    kUnOpt,
-    kOpt,
-    kPhysical,
-    kPipeline
-};
+enum class ExplainType { kAnalyze, kAst, kUnOpt, kOpt, kPhysical, kPipeline };
 
 class ExplainStatement final : public BaseStatement {
 public:
@@ -23,12 +16,11 @@ public:
 
     ~ExplainStatement() final;
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     ExplainType type_{ExplainType::kOpt};
 
-    BaseStatement* statement_{nullptr};
+    BaseStatement *statement_{nullptr};
 };
 
-}
+} // namespace infinity

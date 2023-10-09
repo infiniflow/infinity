@@ -2,23 +2,21 @@
 // Created by JinHai on 2022/9/7.
 //
 
-#include <gtest/gtest.h>
-#include "base_test.h"
 #include "main/profiler/query_profiler.h"
+#include "base_test.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class QueryProfilerTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -35,7 +33,7 @@ TEST_F(QueryProfilerTest, test1) {
     EXPECT_EQ(infinity::QueryProfiler::QueryPhaseToString(infinity::QueryPhase::kExecution), "Execution");
     try {
         infinity::QueryProfiler::QueryPhaseToString(infinity::QueryPhase::kInvalid);
-    } catch(std::exception& e) {
+    } catch (std::exception &e) {
         std::string result(e.what());
         std::string sub = result.substr(0, result.find_first_of('@', 0) - 1);
         EXPECT_EQ(sub, "Invalid query phase in query profiler");
@@ -47,7 +45,7 @@ TEST_F(QueryProfilerTest, test2) {
     infinity::QueryProfiler profiler;
     try {
         profiler.StopPhase(infinity::QueryPhase::kParser);
-    } catch(std::exception& e) {
+    } catch (std::exception &e) {
         std::string result(e.what());
         std::string sub = result.substr(0, result.find_first_of('@', 0) - 1);
         EXPECT_EQ(sub, "Query phase isn't started, yet");
@@ -57,13 +55,12 @@ TEST_F(QueryProfilerTest, test2) {
         profiler.StartPhase(infinity::QueryPhase::kParser);
         profiler.StartPhase(infinity::QueryPhase::kLogicalPlan);
 
-    } catch(std::exception& e) {
+    } catch (std::exception &e) {
         std::string result(e.what());
         std::string sub = result.substr(0, result.find_first_of('@', 0) - 1);
         EXPECT_EQ(sub, "Can't start new query phase before current phase(Parser) is finished");
     }
 }
-
 
 TEST_F(QueryProfilerTest, test3) {
     infinity::QueryProfiler profiler;

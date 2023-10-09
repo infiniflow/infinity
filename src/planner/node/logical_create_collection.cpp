@@ -8,11 +8,10 @@
 
 namespace infinity {
 
-String
-LogicalCreateCollection::ToString(i64& space) {
+String LogicalCreateCollection::ToString(i64 &space) {
     std::stringstream ss;
     String arrow_str;
-    if(space > 3) {
+    if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
@@ -22,4 +21,4 @@ LogicalCreateCollection::ToString(i64& space) {
     return ss.str();
 }
 
-}
+} // namespace infinity

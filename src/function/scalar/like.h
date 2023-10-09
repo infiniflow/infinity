@@ -4,16 +4,14 @@
 
 #pragma once
 
-#include "function/scalar_function.h"
 #include "function/function_set.h"
+#include "function/scalar_function.h"
 #include "storage/meta/catalog.h"
 
 namespace infinity {
 
-void
-RegisterLikeFunction(const UniquePtr<NewCatalog>& catalog_ptr);
+void RegisterLikeFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
-void
-RegisterNotLikeFunction(const UniquePtr<NewCatalog>& catalog_ptr);
+void RegisterNotLikeFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
-}
+} // namespace infinity

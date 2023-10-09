@@ -22,14 +22,11 @@ enum TimeUnit : i32 {
 struct IntervalType {
     IntervalType() = default;
 
-    inline explicit
-    IntervalType(i32 v) : value(v) {}
+    inline explicit IntervalType(i32 v) : value(v) {}
 
-    String
-    ToString() const;
+    String ToString() const;
 
-    inline void
-    Reset() {
+    inline void Reset() {
         unit = TimeUnit::kInvalidUnit;
         value = 0;
     }
@@ -38,8 +35,4 @@ struct IntervalType {
     i32 value{};
 };
 
-}
-
-
-
-
+} // namespace infinity

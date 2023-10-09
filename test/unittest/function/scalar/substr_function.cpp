@@ -2,31 +2,27 @@
 // Created by jinhai on 23-3-20.
 //
 
-
-
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
-#include "function/scalar/substring.h"
-#include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
 #include "expression/value_expression.h"
+#include "function/scalar/substring.h"
+#include "function/scalar_function_set.h"
 
 class SubstrFunctionTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -51,12 +47,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         SharedPtr<DataType> data_type0 = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(*data_type0,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(*data_type0, "t1", 1, "c1", 0, 0);
 
         Value v1 = Value::MakeBigInt(1);
         SharedPtr<ValueExpression> pos_value_expr = MakeShared<ValueExpression>(v1);
@@ -88,7 +79,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         col2->Initialize(ColumnVectorType::kConstant);
         len_value_expr->AppendToChunk(col2);
 
-        for(SizeT idx = 0; idx < row_count; ++idx) {
+        for (SizeT idx = 0; idx < row_count; ++idx) {
             String s = "hello" + std::to_string(idx);
             VarcharT varchar_value(s);
             Value v = Value::MakeVarchar(varchar_value);
@@ -96,7 +87,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
             Value vx = col0->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_TRUE(vx.value_.varchar.IsInlined());
-            if(vx.value_.varchar.IsInlined()) {
+            if (vx.value_.varchar.IsInlined()) {
                 String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
                 EXPECT_STREQ(prefix.c_str(), s.c_str());
             } else {
@@ -112,7 +103,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT idx = 0; idx < row_count; ++idx) {
+        for (SizeT idx = 0; idx < row_count; ++idx) {
             Value vx = result->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_TRUE(vx.value_.varchar.IsInlined());
@@ -130,12 +121,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         SharedPtr<DataType> data_type0 = MakeShared<DataType>(LogicalType::kVarchar);
-        SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(*data_type0,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col0_expr_ptr = MakeShared<ColumnExpression>(*data_type0, "t1", 1, "c1", 0, 0);
 
         Value v1 = Value::MakeBigInt(15);
         SharedPtr<ValueExpression> pos_value_expr = MakeShared<ValueExpression>(v1);
@@ -167,7 +153,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         col2->Initialize(ColumnVectorType::kConstant);
         len_value_expr->AppendToChunk(col2);
 
-        for(SizeT idx = 0; idx < row_count; ++idx) {
+        for (SizeT idx = 0; idx < row_count; ++idx) {
             String s = "hellohellohellohello" + std::to_string(idx);
             VarcharT varchar_value(s);
             Value v = Value::MakeVarchar(varchar_value);
@@ -175,7 +161,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
             Value vx = col0->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_FALSE(vx.value_.varchar.IsInlined());
-            if(vx.value_.varchar.IsInlined()) {
+            if (vx.value_.varchar.IsInlined()) {
                 String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
                 EXPECT_STREQ(prefix.c_str(), s.c_str());
             } else {
@@ -191,7 +177,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT idx = 0; idx < row_count; ++idx) {
+        for (SizeT idx = 0; idx < row_count; ++idx) {
             Value vx = result->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_TRUE(vx.value_.varchar.IsInlined());

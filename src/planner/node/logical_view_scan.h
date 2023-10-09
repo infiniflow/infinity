@@ -13,41 +13,23 @@ namespace infinity {
 class LogicalViewScan : public LogicalNode {
 
 public:
-    explicit LogicalViewScan(u64 node_id,
-                             SharedPtr<View> view_ptr)
-            : LogicalNode(node_id, LogicalNodeType::kViewScan), view_ptr_(std::move(view_ptr)) {}
+    explicit LogicalViewScan(u64 node_id, SharedPtr<View> view_ptr)
+        : LogicalNode(node_id, LogicalNodeType::kViewScan), view_ptr_(std::move(view_ptr)) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding>
-    GetColumnBindings() const final {
-        return left_node_->GetColumnBindings();
-    }
+    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return left_node_->GetColumnBindings(); }
 
-    [[nodiscard]] inline SharedPtr<Vector<String>>
-    GetOutputNames() const final {
-        return left_node_->GetOutputNames();
-    }
+    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_node_->GetOutputNames(); }
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final {
-        return left_node_->GetOutputTypes();
-    }
+    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_node_->GetOutputTypes(); }
 
-    [[nodiscard]] SharedPtr<View>
-    view_ptr() const {
-        return view_ptr_;
-    }
+    [[nodiscard]] SharedPtr<View> view_ptr() const { return view_ptr_; }
 
-    String
-    ToString(i64& space) final;
+    String ToString(i64 &space) final;
 
-    inline String
-    name() final {
-        return "LogicalViewScan";
-    }
+    inline String name() final { return "LogicalViewScan"; }
 
 private:
     SharedPtr<View> view_ptr_{nullptr};
-
 };
 
-}
+} // namespace infinity

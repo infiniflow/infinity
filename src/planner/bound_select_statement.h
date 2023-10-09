@@ -6,8 +6,8 @@
 
 #include <utility>
 
-#include "planner/bound/table_ref.h"
 #include "bound_statement.h"
+#include "planner/bound/table_ref.h"
 
 namespace infinity {
 
@@ -15,71 +15,46 @@ class LogicalKnnScan;
 
 struct BoundSelectStatement final : public BoundStatement {
 public:
-    static inline SharedPtr<BoundSelectStatement>
-    Make(SharedPtr<BindContext> bind_context) {
+    static inline SharedPtr<BoundSelectStatement> Make(SharedPtr<BindContext> bind_context) {
         return MakeShared<BoundSelectStatement>(std::move(bind_context));
     }
 
 public:
-    inline explicit
-    BoundSelectStatement(SharedPtr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
+    inline explicit BoundSelectStatement(SharedPtr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
 
-    SharedPtr<LogicalNode>
-    BuildPlan(QueryContext* query_context) final;
+    SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) final;
 
     SharedPtr<LogicalKnnScan>
-    BuildInitialKnnScan(SharedPtr<TableRef>& table_ref,
-                        QueryContext* query_context,
-                        const SharedPtr<BindContext>& bind_context);
+    BuildInitialKnnScan(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+
+    SharedPtr<LogicalNode> BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+
+    SharedPtr<LogicalNode> BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
 
     SharedPtr<LogicalNode>
-    BuildFrom(SharedPtr<TableRef>& table_ref,
-              QueryContext* query_context,
-              const SharedPtr<BindContext>& bind_context);
+    BuildSubqueryTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
 
     SharedPtr<LogicalNode>
-    BuildBaseTable(SharedPtr<TableRef>& table_ref,
-                   QueryContext* query_context,
-                   const SharedPtr<BindContext>& bind_context);
+    BuildCrossProductTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode>
-    BuildSubqueryTable(SharedPtr<TableRef>& table_ref,
-                       QueryContext* query_context,
-                       const SharedPtr<BindContext>& bind_context);
+    SharedPtr<LogicalNode> BuildJoinTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode>
-    BuildCrossProductTable(SharedPtr<TableRef>& table_ref,
-                           QueryContext* query_context,
-                           const SharedPtr<BindContext>& bind_context);
+    SharedPtr<LogicalNode> BuildDummyTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode>
-    BuildJoinTable(SharedPtr<TableRef>& table_ref,
-                   QueryContext* query_context,
-                   const SharedPtr<BindContext>& bind_context);
+    SharedPtr<LogicalNode> BuildFilter(SharedPtr<LogicalNode> &root,
+                                       Vector<SharedPtr<BaseExpression>> &conditions,
+                                       QueryContext *query_context,
+                                       const SharedPtr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode>
-    BuildDummyTable(SharedPtr<TableRef>& table_ref,
-                    QueryContext* query_context,
-                    const SharedPtr<BindContext>& bind_context);
+    void BuildSubquery(SharedPtr<LogicalNode> &root,
+                       SharedPtr<BaseExpression> &condition,
+                       QueryContext *query_context,
+                       const SharedPtr<BindContext> &bind_context);
 
-    SharedPtr<LogicalNode>
-    BuildFilter(SharedPtr<LogicalNode>& root,
-                Vector<SharedPtr<BaseExpression>>& conditions,
-                QueryContext* query_context,
-                const SharedPtr<BindContext>& bind_context);
-
-
-    void
-    BuildSubquery(SharedPtr<LogicalNode>& root,
-                  SharedPtr<BaseExpression>& condition,
-                  QueryContext* query_context,
-                  const SharedPtr<BindContext>& bind_context);
-
-    SharedPtr<BaseExpression>
-    UnnestSubquery(SharedPtr<LogicalNode>& root,
-                   SharedPtr<BaseExpression>& condition,
-                   QueryContext* query_context,
-                   const SharedPtr<BindContext>& bind_context);
+    SharedPtr<BaseExpression> UnnestSubquery(SharedPtr<LogicalNode> &root,
+                                             SharedPtr<BaseExpression> &condition,
+                                             QueryContext *query_context,
+                                             const SharedPtr<BindContext> &bind_context);
 
 public:
     SharedPtr<BindContext> bind_context_{};
@@ -115,10 +90,10 @@ public:
 
     bool distinct_ = false;
 
-//    SharedPtr<LogicalNode>
-//    BuildPlan() override {
-//        return this->logical_plan_;
-//    }
+    //    SharedPtr<LogicalNode>
+    //    BuildPlan() override {
+    //        return this->logical_plan_;
+    //    }
 
     u64 groupby_index_{0};
     u64 aggregate_index_{0};
@@ -130,4 +105,4 @@ public:
     bool building_subquery_{false};
 };
 
-}
+} // namespace infinity

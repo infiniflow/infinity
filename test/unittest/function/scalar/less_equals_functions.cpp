@@ -2,28 +2,26 @@
 // Created by jinhai on 23-1-7.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
+#include "expression/column_expression.h"
 #include "function/scalar/less_equals.h"
 #include "function/scalar_function_set.h"
-#include "expression/column_expression.h"
 
 class LessEqualsFunctionsTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -49,18 +47,8 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c2",
-                                                                                 1,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -77,13 +65,13 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
             data_block.AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i + i)));
         }
         data_block.Finalize();
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kTinyInt);
@@ -96,10 +84,10 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-            if(static_cast<i8>(i) <= static_cast<i8>(i + i)) {
+            if (static_cast<i8>(i) <= static_cast<i8>(i + i)) {
                 EXPECT_EQ(v.value_.boolean, true);
             } else {
                 EXPECT_EQ(v.value_.boolean, false);
@@ -112,18 +100,8 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c2",
-                                                                                 1,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -140,13 +118,13 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<i16>(i)));
             data_block.AppendValue(1, Value::MakeSmallInt(static_cast<i16>(i / 2)));
         }
         data_block.Finalize();
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kSmallInt);
@@ -159,10 +137,10 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-            if(static_cast<i16>(i) <= static_cast<i16>(i / 2)) {
+            if (static_cast<i16>(i) <= static_cast<i16>(i / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
             } else {
                 EXPECT_EQ(v.value_.boolean, false);
@@ -175,18 +153,8 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c2",
-                                                                                 1,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -203,13 +171,13 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<i32>(i)));
             data_block.AppendValue(1, Value::MakeInt(static_cast<i32>(i / 2)));
         }
         data_block.Finalize();
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kInteger);
@@ -222,10 +190,10 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-            if(static_cast<i32>(i) <= static_cast<i32>(i / 2)) {
+            if (static_cast<i32>(i) <= static_cast<i32>(i / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
             } else {
                 EXPECT_EQ(v.value_.boolean, false);
@@ -238,18 +206,8 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c2",
-                                                                                 1,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -266,13 +224,13 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<i64>(i)));
             data_block.AppendValue(1, Value::MakeBigInt(static_cast<i64>(i / 2)));
         }
         data_block.Finalize();
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBigInt);
@@ -285,10 +243,10 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-            if(static_cast<i64>(i) <= static_cast<i64>(i / 2)) {
+            if (static_cast<i64>(i) <= static_cast<i64>(i / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
             } else {
                 EXPECT_EQ(v.value_.boolean, false);
@@ -301,18 +259,8 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c2",
-                                                                                 1,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -329,13 +277,13 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeHugeInt(HugeIntT(static_cast<i64>(i), static_cast<i64>(i))));
             data_block.AppendValue(1, Value::MakeHugeInt(HugeIntT(static_cast<i64>(i / 2), static_cast<i64>(i / 2))));
         }
         data_block.Finalize();
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kHugeInt);
@@ -348,11 +296,10 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-            if(HugeIntT(static_cast<i64>(i), static_cast<i64>(i)) <=
-               HugeIntT(static_cast<i64>(i / 2), static_cast<i64>(i / 2))) {
+            if (HugeIntT(static_cast<i64>(i), static_cast<i64>(i)) <= HugeIntT(static_cast<i64>(i / 2), static_cast<i64>(i / 2))) {
                 EXPECT_EQ(v.value_.boolean, true);
             } else {
                 EXPECT_EQ(v.value_.boolean, false);
@@ -365,18 +312,8 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c2",
-                                                                                 1,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -393,13 +330,13 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<f32>(i)));
             data_block.AppendValue(1, Value::MakeFloat(static_cast<f32>(i) / 2));
         }
         data_block.Finalize();
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kFloat);
@@ -412,10 +349,10 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-            if(static_cast<f32>(i) <= (static_cast<f32>(i) / 2)) {
+            if (static_cast<f32>(i) <= (static_cast<f32>(i) / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
             } else {
                 EXPECT_EQ(v.value_.boolean, false);
@@ -428,18 +365,8 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDouble);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c2",
-                                                                                 1,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -456,13 +383,13 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<f64>(i)));
             data_block.AppendValue(1, Value::MakeDouble(static_cast<f64>(i) / 2));
         }
         data_block.Finalize();
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kDouble);
@@ -475,10 +402,10 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-            if(static_cast<f64>(i) <= (static_cast<f64>(i) / 2)) {
+            if (static_cast<f64>(i) <= (static_cast<f64>(i) / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
             } else {
                 EXPECT_EQ(v.value_.boolean, false);
@@ -492,18 +419,8 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         SharedPtr<DataType> data_type1 = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<DataType> data_type2 = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type1,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type2,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c2",
-                                                                                 1,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type1, "t1", 1, "c1", 0, 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type2, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -520,8 +437,8 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
-            if(i % 2 == 0) {
+        for (SizeT i = 0; i < row_count; ++i) {
+            if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
                 data_block.AppendValue(1, Value::MakeVarchar("Helloworld" + std::to_string(i)));
             } else {
@@ -531,12 +448,12 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         }
         data_block.Finalize();
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
             EXPECT_EQ(v2.type_.type(), LogicalType::kVarchar);
-            if(i % 2 == 0) {
+            if (i % 2 == 0) {
                 EXPECT_EQ(v1.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
                 EXPECT_EQ(v2.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
             } else {
@@ -549,13 +466,13 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-            if(i % 2 == 0) {
+            if (i % 2 == 0) {
                 String s1 = "Helloworld" + std::to_string(i);
                 String s2 = "Helloworld" + std::to_string(i);
-                if(s1 <= s2) {
+                if (s1 <= s2) {
                     EXPECT_EQ(v.value_.boolean, true);
                 } else {
                     EXPECT_EQ(v.value_.boolean, false);
@@ -563,7 +480,7 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
             } else {
                 String s1 = "Helloworld" + std::to_string(i);
                 String s2 = "helloworld" + std::to_string(i);
-                if(s1 <= s2) {
+                if (s1 <= s2) {
                     EXPECT_EQ(v.value_.boolean, true);
                 } else {
                     EXPECT_EQ(v.value_.boolean, false);

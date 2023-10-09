@@ -2,34 +2,26 @@
 // Created by jinhai on 23-9-8.
 //
 
-
 #pragma once
 
-#include "common/types/alias/primitives.h"
 #include "blockingconcurrentqueue.h"
+#include "common/types/alias/primitives.h"
 
 namespace infinity {
 
 class FragmentTask;
 
 struct FragmentTaskBlockQueue {
-    void
-    Enqueue(FragmentTask* task) {
-        queue_.enqueue(task);
-    }
+    void Enqueue(FragmentTask *task) { queue_.enqueue(task); }
 
-    template<class It>
-    void
-    EnqueueBulk(It iter, SizeT count) {
+    template <class It>
+    void EnqueueBulk(It iter, SizeT count) {
         queue_.enqueue_bulk(std::forward<It>(iter), count);
     }
 
-    void
-    Dequeue(FragmentTask*& task) {
-        queue_.wait_dequeue(task);
-    }
+    void Dequeue(FragmentTask *&task) { queue_.wait_dequeue(task); }
 
-    moodycamel::BlockingConcurrentQueue<FragmentTask*> queue_;
+    moodycamel::BlockingConcurrentQueue<FragmentTask *> queue_;
 };
 
-}
+} // namespace infinity

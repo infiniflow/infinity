@@ -7,9 +7,8 @@
 
 namespace infinity {
 
-void
-Infinity::Init(const SharedPtr<String>& config_path) {
-    if(initialized_) {
+void Infinity::Init(const SharedPtr<String> &config_path) {
+    if (initialized_) {
         return;
     } else {
         // Config
@@ -29,9 +28,8 @@ Infinity::Init(const SharedPtr<String>& config_path) {
     }
 }
 
-void
-Infinity::UnInit() {
-    if(!initialized_) {
+void Infinity::UnInit() {
+    if (!initialized_) {
         return;
     }
     initialized_ = false;
@@ -46,4 +44,4 @@ Infinity::UnInit() {
     config_.reset();
 }
 
-}
+} // namespace infinity

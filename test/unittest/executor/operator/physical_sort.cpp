@@ -2,20 +2,19 @@
 // Created by jinhai on 23-1-27.
 //
 #if 0
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
-
-#include "function/scalar/subtract.h"
-#include "function/scalar/add.h"
-#include "function/scalar_function_set.h"
-#include "expression/column_expression.h"
 #include "executor/operator/physical_sort.h"
+#include "expression/column_expression.h"
+#include "function/scalar/add.h"
+#include "function/scalar/subtract.h"
+#include "function/scalar_function_set.h"
 
 class PhysicalSortTest : public BaseTest {
     void

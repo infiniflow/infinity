@@ -7,7 +7,7 @@
 
 namespace infinity {
 
-PolygonType::PolygonType(const PolygonType& other) {
+PolygonType::PolygonType(const PolygonType &other) {
     this->point_count = other.point_count;
 
     this->bounding_box = other.bounding_box;
@@ -18,7 +18,7 @@ PolygonType::PolygonType(const PolygonType& other) {
     memcpy(this->ptr, other.ptr, point_count * sizeof(PointType));
 }
 
-PolygonType::PolygonType(PolygonType&& other) noexcept {
+PolygonType::PolygonType(PolygonType &&other) noexcept {
     this->point_count = other.point_count;
     this->bounding_box = other.bounding_box;
     this->ptr = other.ptr;
@@ -26,11 +26,10 @@ PolygonType::PolygonType(PolygonType&& other) noexcept {
     other.point_count = 0;
 }
 
-PolygonType&
-PolygonType::operator=(const PolygonType& other) {
-    if(this == &other)
+PolygonType &PolygonType::operator=(const PolygonType &other) {
+    if (this == &other)
         return *this;
-    if(point_count != other.point_count) {
+    if (point_count != other.point_count) {
         Reset();
         point_count = other.point_count;
 
@@ -42,11 +41,10 @@ PolygonType::operator=(const PolygonType& other) {
     return *this;
 }
 
-PolygonType&
-PolygonType::operator=(PolygonType&& other) noexcept {
-    if(this == &other)
+PolygonType &PolygonType::operator=(PolygonType &&other) noexcept {
+    if (this == &other)
         return *this;
-    if(this->point_count != 0) {
+    if (this->point_count != 0) {
         Reset();
     }
     this->point_count = other.point_count;
@@ -57,4 +55,4 @@ PolygonType::operator=(PolygonType&& other) noexcept {
     return *this;
 }
 
-}
+} // namespace infinity

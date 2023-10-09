@@ -6,13 +6,10 @@
 
 namespace infinity {
 
-std::atomic<bool>
-        GlobalResourceUsage::initialized_ = false;
+std::atomic<bool> GlobalResourceUsage::initialized_ = false;
 
-std::atomic<i64>
-        GlobalResourceUsage::object_count_ = 0;
+std::atomic<i64> GlobalResourceUsage::object_count_ = 0;
 
-std::atomic<i64>
-        GlobalResourceUsage::raw_memory_count_ = 0;
+std::atomic<i64> GlobalResourceUsage::raw_memory_count_ = 0;
 
-}
+} // namespace infinity

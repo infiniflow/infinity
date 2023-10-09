@@ -78,9 +78,6 @@ enum class PhysicalOperatorType : i8 {
     kSource,
 };
 
-
-String
-PhysicalOperatorToString(PhysicalOperatorType type);
-
+String PhysicalOperatorToString(PhysicalOperatorType type);
 
 } // namespace infinity

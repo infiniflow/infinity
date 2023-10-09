@@ -8,26 +8,17 @@ namespace infinity {
 
 class InsertBinder final : public ExpressionBinder {
 public:
-    explicit
-    InsertBinder(QueryContext* query_context) : ExpressionBinder(query_context) {}
+    explicit InsertBinder(QueryContext *query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
-    SharedPtr<BaseExpression>
-    BuildExpression(const ParsedExpr& expr,
-                    BindContext* bind_context_ptr,
-                    i64 depth,
-                    bool root) final;
+    SharedPtr<BaseExpression> BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
-    SharedPtr<BaseExpression>
-    BuildKnnExpr(const KnnExpr& expr,
-                 BindContext* bind_context_ptr,
-                 i64 depth,
-                 bool root) override;
+    SharedPtr<BaseExpression> BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) override;
 
-//    // Bind column reference expression also include correlated column reference.
-//    SharedPtr<BaseExpression>
-//    BuildColRefExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
+    //    // Bind column reference expression also include correlated column reference.
+    //    SharedPtr<BaseExpression>
+    //    BuildColRefExpr(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) override;
 private:
 };
 
-}
+} // namespace infinity

@@ -11,19 +11,16 @@ namespace infinity {
 class TableReference : public BaseTableReference {
 
 public:
-
     TableReference() : BaseTableReference(TableRefType::kTable) {}
 
     ~TableReference() override = default;
 
-    String
-    ToString() override;
+    String ToString() override;
 
     String db_name_{"default"};
     String table_name_{};
 
-    [[nodiscard]] String
-    GetTableName() const;
+    [[nodiscard]] String GetTableName() const;
 };
 
-}
+} // namespace infinity

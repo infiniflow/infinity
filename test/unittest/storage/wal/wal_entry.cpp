@@ -10,15 +10,13 @@
 #include <vector>
 
 class WalEntryTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -31,8 +29,7 @@ class WalEntryTest : public BaseTest {
 
 using namespace infinity;
 
-SharedPtr<TableDef>
-MockTableDesc2() {
+SharedPtr<TableDef> MockTableDesc2() {
     // Define columns
     Vector<SharedPtr<ColumnDef>> columns;
     {
@@ -41,42 +38,33 @@ MockTableDesc2() {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
-            auto column_def_ptr = MakeShared<ColumnDef>(
-                    column_id++,
-                    MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
-                    "tiny_int_col", constraints);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
-            auto column_def_ptr = MakeShared<ColumnDef>(
-                    column_id++,
-                    MakeShared<DataType>(DataType(LogicalType::kBigInt)),
-                    "big_int_col", constraints);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
-            auto column_def_ptr = MakeShared<ColumnDef>(
-                    column_id++,
-                    MakeShared<DataType>(DataType(LogicalType::kDouble)),
-                    "double_col", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
     }
 
-    return MakeShared<TableDef>(MakeShared<String>("default"),
-                                MakeShared<String>("tbl1"), columns);
+    return MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
 }
 
 TEST_F(WalEntryTest, ReadWrite) {
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
     entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1"));
-    entry->cmds.push_back(
-            MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
+    entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
     entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
     entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
 
@@ -86,7 +74,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
     SizeT row_count = DEFAULT_VECTOR_SIZE;
     data_block->Init(column_types);
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         data_block->AppendValue(0, Value::MakeBool(i % 2 == 0));
         data_block->AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
     }
@@ -99,8 +87,8 @@ TEST_F(WalEntryTest, ReadWrite) {
 
     int32_t exp_size = entry->GetSizeInBytes();
     std::vector<char> buf(exp_size, char(0));
-    char* buf_beg = buf.data();
-    char* ptr = buf_beg;
+    char *buf_beg = buf.data();
+    char *ptr = buf_beg;
     entry->WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 

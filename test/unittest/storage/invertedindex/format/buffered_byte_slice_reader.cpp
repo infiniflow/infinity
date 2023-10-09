@@ -22,27 +22,24 @@ public:
         delete buffer_pool_;
     }
 
-    void
-    SetUp() override {
+    void SetUp() override {
         DocListFormatOption option(NO_TERM_FREQUENCY);
         doc_list_format_.reset(new DocListFormat());
         doc_list_format_->Init(option);
         buffered_byte_slice_.reset(new BufferedByteSlice(byte_slice_pool_, buffer_pool_));
         buffered_byte_slice_->Init(doc_list_format_.get());
     }
-    void
-    TearDown() override {
+    void TearDown() override {
         buffered_byte_slice_.reset();
         doc_list_format_.reset();
     }
 
 protected:
-    void
-    CheckDecode(uint32_t doc_count, uint32_t flush_count, std::shared_ptr<BufferedByteSliceReader>& reader) {
+    void CheckDecode(uint32_t doc_count, uint32_t flush_count, std::shared_ptr<BufferedByteSliceReader> &reader) {
         uint32_t doc_id[doc_count];
         uint16_t payload[doc_count];
 
-        for(uint32_t i = 0; i < doc_count; ++i) {
+        for (uint32_t i = 0; i < doc_count; ++i) {
             doc_id[i] = i;
             payload[i] = i * 2;
         }
@@ -52,14 +49,14 @@ protected:
 
         size_t decode_len;
         uint32_t i = 0;
-        for(; i < doc_count / flush_count; ++i) {
+        for (; i < doc_count / flush_count; ++i) {
             ASSERT_TRUE(reader->Decode(doc_id_buffer + i * flush_count, flush_count, decode_len));
             ASSERT_EQ(decode_len, (size_t)flush_count);
             ASSERT_TRUE(reader->Decode(doc_payload_buffer + i * flush_count, flush_count, decode_len));
             ASSERT_EQ(decode_len, (size_t)flush_count);
         }
 
-        if(doc_count % flush_count > 0) {
+        if (doc_count % flush_count > 0) {
             ASSERT_TRUE(reader->Decode(doc_id_buffer + i * flush_count, flush_count, decode_len));
             ASSERT_EQ(decode_len, (size_t)doc_count % flush_count);
             ASSERT_TRUE(reader->Decode(doc_payload_buffer + i * flush_count, flush_count, decode_len));
@@ -68,23 +65,22 @@ protected:
         ASSERT_TRUE(!reader->Decode(doc_id_buffer + i * flush_count, flush_count, decode_len));
         ASSERT_TRUE(!reader->Decode(doc_payload_buffer + i * flush_count, flush_count, decode_len));
 
-        for(uint32_t i = 0; i < doc_count; ++i) {
+        for (uint32_t i = 0; i < doc_count; ++i) {
             ASSERT_EQ(doc_id_buffer[i], doc_id[i]);
             ASSERT_EQ(doc_payload_buffer[i], payload[i]);
         }
     }
 
-    std::shared_ptr<BufferedByteSliceReader>
-    CreateReader(uint32_t doc_id[], uint16_t doc_payload[], uint32_t doc_count, uint32_t flush_count) {
+    std::shared_ptr<BufferedByteSliceReader> CreateReader(uint32_t doc_id[], uint16_t doc_payload[], uint32_t doc_count, uint32_t flush_count) {
         buffered_byte_slice_.reset(new BufferedByteSlice(byte_slice_pool_, buffer_pool_));
         buffered_byte_slice_->Init(doc_list_format_.get());
 
         assert(buffered_byte_slice_);
-        for(size_t i = 0; i < doc_count; ++i) {
+        for (size_t i = 0; i < doc_count; ++i) {
             buffered_byte_slice_->PushBack(0, doc_id[i]);
             buffered_byte_slice_->PushBack(1, doc_payload[i]);
             buffered_byte_slice_->EndPushBack();
-            if(buffered_byte_slice_->NeedFlush(flush_count)) {
+            if (buffered_byte_slice_->NeedFlush(flush_count)) {
                 buffered_byte_slice_->Flush();
             }
         }
@@ -93,8 +89,7 @@ protected:
         return reader;
     }
 
-    void
-    TestCheck(const uint32_t doc_count, uint32_t flush_count) {
+    void TestCheck(const uint32_t doc_count, uint32_t flush_count) {
         std::shared_ptr<BufferedByteSliceReader> reader = CreateReader(doc_count, flush_count);
         CheckDecode(doc_count, flush_count, reader);
 
@@ -102,12 +97,11 @@ protected:
         CheckDecode(doc_count, flush_count, reader);
     }
 
-    std::shared_ptr<BufferedByteSliceReader>
-    CreateReader(uint32_t doc_count, uint32_t flush_count) {
+    std::shared_ptr<BufferedByteSliceReader> CreateReader(uint32_t doc_count, uint32_t flush_count) {
         uint32_t doc_id[doc_count];
         uint16_t payload[doc_count];
 
-        for(uint32_t i = 0; i < doc_count; ++i) {
+        for (uint32_t i = 0; i < doc_count; ++i) {
             doc_id[i] = i;
             payload[i] = i * 2;
         }
@@ -115,8 +109,8 @@ protected:
         return CreateReader(doc_id, payload, doc_count, flush_count);
     }
 
-    MemoryPool* byte_slice_pool_;
-    RecyclePool* buffer_pool_;
+    MemoryPool *byte_slice_pool_;
+    RecyclePool *buffer_pool_;
     std::shared_ptr<BufferedByteSlice> buffered_byte_slice_;
     std::shared_ptr<DocListFormat> doc_list_format_;
 };
@@ -254,4 +248,4 @@ TEST_F(BufferedByteSliceReaderTest, test3) {
     TestCheck(513, 128);
 }
 
-}// namespace infinity
+} // namespace infinity

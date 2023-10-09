@@ -1,7 +1,5 @@
 #pragma once
 
-#include <dirent.h>
-#include <fcntl.h>
 #include <cerrno>
 #include <climits>
 #include <cstddef>
@@ -9,6 +7,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <dirent.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -26,7 +26,7 @@
 #include <sys/sysinfo.h>
 #include <sys/vfs.h>
 
-#endif  // defined(__APPLE__)
+#endif // defined(__APPLE__)
 
 #ifdef __APPLE__
 #define fdatasync fsync

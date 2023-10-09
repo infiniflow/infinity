@@ -10,30 +10,19 @@ namespace infinity {
 
 class LogicalCrossProduct : public LogicalNode {
 public:
-    explicit
-    LogicalCrossProduct(u64 node_id,
-                        String alias,
-                        const SharedPtr<LogicalNode>& left,
-                        const SharedPtr<LogicalNode>& right);
+    explicit LogicalCrossProduct(u64 node_id, String alias, const SharedPtr<LogicalNode> &left, const SharedPtr<LogicalNode> &right);
 
-    [[nodiscard]] Vector<ColumnBinding>
-    GetColumnBindings() const final;
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>>
-    GetOutputNames() const final;
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final;
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String
-    ToString(i64& space) final;
+    String ToString(i64 &space) final;
 
-    inline String
-    name() final {
-        return "LogicalCrossProduct";
-    }
+    inline String name() final { return "LogicalCrossProduct"; }
 
     String alias_{};
 };
 
-}
+} // namespace infinity

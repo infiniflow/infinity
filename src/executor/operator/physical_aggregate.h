@@ -6,9 +6,9 @@
 
 #include <utility>
 
+#include "executor/hash_table.h"
 #include "executor/physical_operator.h"
 #include "expression/base_expression.h"
-#include "executor/hash_table.h"
 
 namespace infinity {
 
@@ -25,59 +25,38 @@ public:
                                u64 groupby_index,
                                Vector<SharedPtr<BaseExpression>> aggregates,
                                u64 aggregate_index)
-            : PhysicalOperator(PhysicalOperatorType::kAggregate, std::move(left), nullptr, id),
-              groups_(std::move(groups)),
-              groupby_index_(groupby_index),
-              aggregates_(std::move(aggregates)),
-              aggregate_index_(aggregate_index) {}
+        : PhysicalOperator(PhysicalOperatorType::kAggregate, std::move(left), nullptr, id), groups_(std::move(groups)), groupby_index_(groupby_index),
+          aggregates_(std::move(aggregates)), aggregate_index_(aggregate_index) {}
 
     ~PhysicalAggregate() override = default;
 
-    void
-    Init() override;
+    void Init() override;
 
-    void
-    Execute(QueryContext* query_context) final;
+    void Execute(QueryContext *query_context) final;
 
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    void
-    GroupByInputTable(const SharedPtr<Table>& input_table, SharedPtr<Table>& output_table);
+    void GroupByInputTable(const SharedPtr<Table> &input_table, SharedPtr<Table> &output_table);
 
-    void
-    GenerateGroupByResult(const SharedPtr<Table>& input_table, SharedPtr<Table>& output_table);
+    void GenerateGroupByResult(const SharedPtr<Table> &input_table, SharedPtr<Table> &output_table);
 
     Vector<SharedPtr<BaseExpression>> groups_{};
     Vector<SharedPtr<BaseExpression>> aggregates_{};
     HashTable hash_table_;
 
-    void
-    SimpleAggregate(SharedPtr<Table>& output_table);
+    void SimpleAggregate(SharedPtr<Table> &output_table);
 
-    inline u64
-    GroupTableIndex() const {
-        return groupby_index_;
-    }
+    inline u64 GroupTableIndex() const { return groupby_index_; }
 
-    inline u64
-    AggregateTableIndex() const {
-        return aggregate_index_;
-    }
+    inline u64 AggregateTableIndex() const { return aggregate_index_; }
 
-    SharedPtr<Vector<String>>
-    GetOutputNames() const final;
+    SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    bool
-    IsSink() const override {
-        return true;
-    }
+    bool IsSink() const override { return true; }
 
-    Vector<HashRange>
-    GetHashRanges(i64 parallel_count) const;
+    Vector<HashRange> GetHashRanges(i64 parallel_count) const;
 
 private:
     SharedPtr<Table> input_table_{};
@@ -85,5 +64,4 @@ private:
     u64 aggregate_index_{};
 };
 
-}
-
+} // namespace infinity

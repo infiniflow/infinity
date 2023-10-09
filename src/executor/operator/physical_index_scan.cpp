@@ -6,20 +6,10 @@
 
 namespace infinity {
 
-void
-PhysicalIndexScan::Init() {
+void PhysicalIndexScan::Init() {}
 
-}
+void PhysicalIndexScan::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void
-PhysicalIndexScan::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+void PhysicalIndexScan::Execute(QueryContext *query_context) {}
 
-}
-
-void
-PhysicalIndexScan::Execute(QueryContext* query_context) {
-
-}
-
-
-}
+} // namespace infinity

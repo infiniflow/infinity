@@ -11,26 +11,19 @@ namespace infinity {
 
 class BuiltinFunctions : public std::enable_shared_from_this<BuiltinFunctions> {
 public:
-    explicit
-    BuiltinFunctions(UniquePtr<NewCatalog>& catalog_ptr);
+    explicit BuiltinFunctions(UniquePtr<NewCatalog> &catalog_ptr);
 
-    void
-    Init();
-
+    void Init();
 
 private:
-    UniquePtr<NewCatalog>& catalog_ptr_;
+    UniquePtr<NewCatalog> &catalog_ptr_;
 
 private:
+    void RegisterAggregateFunction();
 
-    void
-    RegisterAggregateFunction();
+    void RegisterScalarFunction();
 
-    void
-    RegisterScalarFunction();
-
-    void
-    RegisterTableFunction();
+    void RegisterTableFunction();
 };
 
-}
+} // namespace infinity

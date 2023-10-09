@@ -7,14 +7,11 @@
 namespace infinity {
 
 CrossProductReference::~CrossProductReference() {
-    for(auto* table_ptr: tables_) {
+    for (auto *table_ptr : tables_) {
         delete (table_ptr);
     }
 }
 
-String
-CrossProductReference::ToString() {
-    return "CrossProductReference";
-}
+String CrossProductReference::ToString() { return "CrossProductReference"; }
 
-};
+}; // namespace infinity

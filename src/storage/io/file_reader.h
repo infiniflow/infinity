@@ -6,17 +6,15 @@
 
 #include "storage/io/file_system.h"
 
-
 namespace infinity {
 
 class FileReader {
 public:
-    explicit
-    FileReader(FileSystem& fs, const String& path, SizeT buffer_size);
+    explicit FileReader(FileSystem &fs, const String &path, SizeT buffer_size);
 
-    FileReader(const FileReader& other);
+    FileReader(const FileReader &other);
 
-    FileSystem& fs_;
+    FileSystem &fs_;
     String path_{};
     UniquePtr<char_t[]> data_{};
     i64 buffer_offset_{};
@@ -27,39 +25,27 @@ public:
     UniquePtr<FileHandler> file_handler_{};
 
 public:
-    u8
-    ReadByte();
+    u8 ReadByte();
 
-    i16
-    ReadShort();
+    i16 ReadShort();
 
-    i32
-    ReadInt();
+    i32 ReadInt();
 
-    i32
-    ReadVInt();
+    i32 ReadVInt();
 
-    i64
-    ReadLong();
+    i64 ReadLong();
 
-    i64
-    ReadVLong();
+    i64 ReadVLong();
 
-    void
-    Read(char_t* buffer, SizeT read_size);
+    void Read(char_t *buffer, SizeT read_size);
 
-    bool
-    Finished() const;
+    bool Finished() const;
 
-    i64
-    GetFilePointer() const;
+    i64 GetFilePointer() const;
 
-    void
-    Seek(const i64 pos);
+    void Seek(const i64 pos);
 
-    FileReader*
-    Clone();
+    FileReader *Clone();
 };
 
-}
-
+} // namespace infinity

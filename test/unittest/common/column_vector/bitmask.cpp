@@ -2,24 +2,22 @@
 // Created by jinhai on 22-12-19.
 //
 
-#include <gtest/gtest.h>
-#include "base_test.h"
 #include "common/column_vector/bitmask.h"
+#include "base_test.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class BitmaskTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -65,23 +63,23 @@ TEST_F(BitmaskTest, bitmask_a) {
     EXPECT_TRUE(bitmask2.IsAllTrue());
     EXPECT_TRUE(bitmask3.IsAllTrue());
 
-    for(size_t i = 0; i < bit_count; ++i) {
+    for (size_t i = 0; i < bit_count; ++i) {
         EXPECT_TRUE(bitmask1.IsTrue(i));
         EXPECT_TRUE(bitmask2.IsTrue(i));
         EXPECT_TRUE(bitmask3.IsTrue(i));
     }
 
     // test SetTrue and SetFalse()
-    for(size_t i = 0; i < bit_count; ++i) {
-        if(i % 2 == 0) {
+    for (size_t i = 0; i < bit_count; ++i) {
+        if (i % 2 == 0) {
             bitmask1.SetTrue(i);
         } else {
             bitmask1.SetFalse(i);
         }
     }
 
-    for(size_t i = 0; i < bit_count; ++i) {
-        if(i % 2 == 0) {
+    for (size_t i = 0; i < bit_count; ++i) {
+        if (i % 2 == 0) {
             EXPECT_TRUE(bitmask1.IsTrue(i));
         } else {
             EXPECT_FALSE(bitmask1.IsTrue(i));
@@ -89,7 +87,7 @@ TEST_F(BitmaskTest, bitmask_a) {
     }
 
     bitmask1.SetAllFalse();
-    for(SizeT i = 0; i < bit_count; ++i) {
+    for (SizeT i = 0; i < bit_count; ++i) {
         EXPECT_FALSE(bitmask1.IsTrue(i));
     }
 
@@ -99,7 +97,7 @@ TEST_F(BitmaskTest, bitmask_a) {
     // test SetAllTrue
     bitmask1.SetAllTrue();
 
-    for(size_t i = 0; i < bit_count; ++i) {
+    for (size_t i = 0; i < bit_count; ++i) {
         EXPECT_TRUE(bitmask1.IsTrue(i));
     }
 
@@ -107,15 +105,15 @@ TEST_F(BitmaskTest, bitmask_a) {
     EXPECT_EQ(bitmask1.CountTrue(), bit_count);
     EXPECT_EQ(bitmask1.CountFalse(), 0);
 
-    for(size_t i = 0; i < bit_count; ++i) {
+    for (size_t i = 0; i < bit_count; ++i) {
         bitmask1.Set(i, i % 2 == 0);
     }
 
     EXPECT_EQ(bitmask1.CountTrue(), bit_count / 2);
     EXPECT_EQ(bitmask1.CountFalse(), bit_count / 2);
 
-    for(size_t i = 0; i < bit_count; ++i) {
-        if(i % 2 == 0) {
+    for (size_t i = 0; i < bit_count; ++i) {
+        if (i % 2 == 0) {
             EXPECT_TRUE(bitmask1.IsTrue(i));
         } else {
             EXPECT_FALSE(bitmask1.IsTrue(i));
@@ -125,14 +123,14 @@ TEST_F(BitmaskTest, bitmask_a) {
     // test Resize()
     bitmask1.Resize(2 * bit_count);
     EXPECT_EQ(bitmask1.count(), 2 * bit_count);
-    for(size_t i = 0; i < bit_count; ++i) {
-        if(i % 2 == 0) {
+    for (size_t i = 0; i < bit_count; ++i) {
+        if (i % 2 == 0) {
             EXPECT_TRUE(bitmask1.IsTrue(i));
         } else {
             EXPECT_FALSE(bitmask1.IsTrue(i));
         }
     }
-    for(size_t i = bit_count; i < 2 * bit_count; ++i) {
+    for (size_t i = bit_count; i < 2 * bit_count; ++i) {
         EXPECT_TRUE(bitmask1.IsTrue(i));
     }
     EXPECT_NE(bitmask1.GetData(), nullptr);
@@ -142,8 +140,8 @@ TEST_F(BitmaskTest, bitmask_a) {
         EXPECT_THROW(bitmask2.Resize(bit_count - 1), TypeException);
     }
 
-    for(size_t i = 0; i < bit_count; ++i) {
-        if(i % 2 == 0) {
+    for (size_t i = 0; i < bit_count; ++i) {
+        if (i % 2 == 0) {
             bitmask2.Set(i, true);
             bitmask3.Set(i, false);
         } else {
@@ -151,8 +149,8 @@ TEST_F(BitmaskTest, bitmask_a) {
             bitmask3.Set(i, true);
         }
     }
-    for(size_t i = 0; i < bit_count; ++i) {
-        if(i % 2 == 0) {
+    for (size_t i = 0; i < bit_count; ++i) {
+        if (i % 2 == 0) {
             EXPECT_TRUE(bitmask2.IsTrue(i));
             EXPECT_FALSE(bitmask3.IsTrue(i));
         } else {
@@ -171,16 +169,15 @@ TEST_F(BitmaskTest, bitmask_b) {
     constexpr size_t bit_count = 8192;
     SharedPtr<Bitmask> bitmask2 = Bitmask::Make(bit_count);
 
-
-    for(size_t i = 0; i < bit_count; ++i) {
+    for (size_t i = 0; i < bit_count; ++i) {
         bitmask2->Set(i, i % 2 == 0);
     }
 
     EXPECT_EQ(bitmask2->CountTrue(), bit_count / 2);
     EXPECT_EQ(bitmask2->CountFalse(), bit_count / 2);
 
-    for(size_t i = 0; i < bit_count; ++i) {
-        if(i % 2 == 0) {
+    for (size_t i = 0; i < bit_count; ++i) {
+        if (i % 2 == 0) {
             EXPECT_TRUE(bitmask2->IsTrue(i));
         } else {
             EXPECT_FALSE(bitmask2->IsTrue(i));

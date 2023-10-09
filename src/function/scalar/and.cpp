@@ -2,33 +2,29 @@
 // Created by JinHai on 2022/9/28.
 //
 
-#include "less.h"
 #include "function/scalar_function.h"
 #include "function/scalar_function_set.h"
+#include "less.h"
 
 namespace infinity {
 
 struct AndFunction {
-    template<typename TA, typename TB, typename TC>
-    static inline void
-    Run(TA left, TB right, TC& result) {
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA left, TB right, TC &result) {
         result = left and right;
     }
 };
 
-static void
-GenerateAndFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr) {
+static void GenerateAndFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) {
     String func_name = "AND";
-    ScalarFunction and_function(
-            func_name,
-            {DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean)},
-            {DataType(LogicalType::kBoolean)},
-            &ScalarFunction::BinaryFunction<BooleanT, BooleanT, BooleanT, AndFunction>);
+    ScalarFunction and_function(func_name,
+                                {DataType(LogicalType::kBoolean), DataType(LogicalType::kBoolean)},
+                                {DataType(LogicalType::kBoolean)},
+                                &ScalarFunction::BinaryFunction<BooleanT, BooleanT, BooleanT, AndFunction>);
     function_set_ptr->AddFunction(and_function);
 }
 
-void
-RegisterAndFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
+void RegisterAndFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "AND";
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
@@ -37,4 +33,4 @@ RegisterAndFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

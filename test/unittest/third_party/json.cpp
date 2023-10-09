@@ -2,35 +2,32 @@
 // Created by jinhai on 23-8-21.
 //
 
-#include <gtest/gtest.h>
-#include <fstream>
+#include "json.hpp"
 #include "base_test.h"
 #include "bin/compilation_config.h"
-#include "main/profiler/base_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
+#include "main/logger.h"
+#include "main/profiler/base_profiler.h"
+#include "main/stats/global_resource_usage.h"
 #include "storage/common/async_batch_processor.h"
 #include "storage/common/async_dummy_task.h"
-#include "json.hpp"
+#include <fstream>
+#include <gtest/gtest.h>
 
 class JsonTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
     }
 };
-
 
 TEST_F(JsonTest, test1) {
     using namespace infinity;

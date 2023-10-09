@@ -4,7 +4,4 @@
 
 #include "session.h"
 
-namespace infinity {
-
-
-}
+namespace infinity {}

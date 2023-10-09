@@ -6,9 +6,6 @@
 
 namespace infinity {
 
-String
-DropStatement::ToString() const {
-    return drop_info_->ToString();
-}
+String DropStatement::ToString() const { return drop_info_->ToString(); }
 
-}
+} // namespace infinity

@@ -5,41 +5,28 @@
 #pragma once
 
 #include "common/utility/infinity_assert.h"
-#include "main/stats/global_resource_usage.h"
 #include "main/logger.h"
+#include "main/stats/global_resource_usage.h"
 
-#include <sstream>
 #include <bitset>
+#include <sstream>
 
 namespace infinity {
 
-enum EmbeddingDataType : i8 {
-    kElemBit,
-    kElemInt8,
-    kElemInt16,
-    kElemInt32,
-    kElemInt64,
-    kElemFloat,
-    kElemDouble,
-    kElemInvalid
-};
+enum EmbeddingDataType : i8 { kElemBit, kElemInt8, kElemInt16, kElemInt32, kElemInt64, kElemFloat, kElemDouble, kElemInvalid };
 
 struct EmbeddingType {
 public:
     ptr_t ptr = nullptr;
 
-    static size_t
-            embedding_type_width[];
-public:
-    static inline size_t
-    EmbeddingDataWidth(EmbeddingDataType type_index) {
-        return embedding_type_width[type_index];
-    }
+    static size_t embedding_type_width[];
 
-    static inline size_t
-    EmbeddingSize(EmbeddingDataType type, size_t dimension) {
+public:
+    static inline size_t EmbeddingDataWidth(EmbeddingDataType type_index) { return embedding_type_width[type_index]; }
+
+    static inline size_t EmbeddingSize(EmbeddingDataType type, size_t dimension) {
         TypeAssert(type != EmbeddingDataType::kElemInvalid, "Invalid embedding data type");
-        if(type == EmbeddingDataType::kElemBit) {
+        if (type == EmbeddingDataType::kElemBit) {
             size_t byte_count = (dimension + 7) >> 3;
             return byte_count;
         }
@@ -47,9 +34,8 @@ public:
         return dimension * EmbeddingDataWidth(type);
     }
 
-    static inline String
-    EmbeddingDataType2String(EmbeddingDataType type) {
-        switch(type) {
+    static inline String EmbeddingDataType2String(EmbeddingDataType type) {
+        switch (type) {
             case kElemBit:
                 return "BIT";
             case kElemInt8:
@@ -70,9 +56,8 @@ public:
         }
     }
 
-    static inline String
-    Embedding2String(const EmbeddingType& embedding, EmbeddingDataType type, size_t dimension) {
-        switch(type) {
+    static inline String Embedding2String(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension) {
+        switch (type) {
             case kElemBit:
                 return BitmapEmbedding2StringInternal(embedding, dimension);
             case kElemInt8:
@@ -94,114 +79,93 @@ public:
     }
 
 private:
-    template<typename T>
-    static inline String
-    Embedding2StringInternal(const EmbeddingType& embedding, size_t dimension) {
+    template <typename T>
+    static inline String Embedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
         // TODO: High-performance implementation is needed here.
         std::stringstream ss;
-        for(size_t i = 0; i < dimension - 1; ++i) {
-            ss << ((T*)(embedding.ptr))[i] << ',';
+        for (size_t i = 0; i < dimension - 1; ++i) {
+            ss << ((T *)(embedding.ptr))[i] << ',';
         }
-        ss << ((T*)(embedding.ptr))[dimension - 1];
+        ss << ((T *)(embedding.ptr))[dimension - 1];
         return ss.str();
     }
 
-    static inline String
-    BitmapEmbedding2StringInternal(const EmbeddingType& embedding, size_t dimension) {
+    static inline String BitmapEmbedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
         // TODO:  This is for bitmap, and high-performance implementation is needed here.
         std::stringstream ss;
         TypeAssert(dimension % 8 == 0, "Binary embedding dimension should be the times of 8.")
 
-        i64* array = (i64*)(embedding.ptr);
+            i64 *array = (i64 *)(embedding.ptr);
 
-        for(size_t i = 0; i < dimension / 8; ++i) {
+        for (size_t i = 0; i < dimension / 8; ++i) {
             ss << std::bitset<8>(array[i]);
         }
         return ss.str();
     }
-public:
-    inline explicit
-    EmbeddingType(ptr_t&& from_ptr) : ptr(from_ptr) {
-        from_ptr = nullptr;
-    }
 
-    inline
-    EmbeddingType(EmbeddingDataType type, size_t dimension) {
+public:
+    inline explicit EmbeddingType(ptr_t &&from_ptr) : ptr(from_ptr) { from_ptr = nullptr; }
+
+    inline EmbeddingType(EmbeddingDataType type, size_t dimension) {
         size_t mem_size = EmbeddingSize(type, dimension);
         ptr = new char_t[mem_size]{0};
         GlobalResourceUsage::IncrRawMemCount();
     }
 
-    inline
-    ~EmbeddingType() {
-        if(ptr != nullptr) {
+    inline ~EmbeddingType() {
+        if (ptr != nullptr) {
             LOG_TRACE("Embedding type isn't null, need to manually SetNull or Reset");
             Reset();
         }
     }
 
-    inline
-    EmbeddingType(const EmbeddingType& other) = default;
+    inline EmbeddingType(const EmbeddingType &other) = default;
 
-    inline
-    EmbeddingType(EmbeddingType&& other) noexcept {
+    inline EmbeddingType(EmbeddingType &&other) noexcept {
         this->ptr = other.ptr;
         other.ptr = nullptr;
     }
 
-    EmbeddingType&
-    operator=(const EmbeddingType& other) {
-        if(this == &other)
+    EmbeddingType &operator=(const EmbeddingType &other) {
+        if (this == &other)
             return *this;
-        if(ptr != nullptr) {
+        if (ptr != nullptr) {
             LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
-//            Reset();
+            //            Reset();
         }
         ptr = other.ptr;
         return *this;
     }
 
-    EmbeddingType&
-    operator=(EmbeddingType&& other) noexcept {
-        if(this == &other)
+    EmbeddingType &operator=(EmbeddingType &&other) noexcept {
+        if (this == &other)
             return *this;
-        if(ptr != nullptr) {
+        if (ptr != nullptr) {
             LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
-//            Reset();
+            //            Reset();
         }
         ptr = other.ptr;
         other.ptr = nullptr;
         return *this;
     }
 
-    void
-    Init(const void* ptr, SizeT size);
+    void Init(const void *ptr, SizeT size);
 
-    bool
-    operator==(const EmbeddingType& other) const = delete;
+    bool operator==(const EmbeddingType &other) const = delete;
 
-    inline bool
-    operator!=(const EmbeddingType& other) const = delete;
+    inline bool operator!=(const EmbeddingType &other) const = delete;
 
-    inline void
-    Reset() {
-        if(ptr != nullptr) {
+    inline void Reset() {
+        if (ptr != nullptr) {
             delete[] ptr;
             ptr = nullptr;
             GlobalResourceUsage::DecrRawMemCount();
         }
     }
 
-    inline void
-    SetNull() {
-        ptr = nullptr;
-    }
+    inline void SetNull() { ptr = nullptr; }
 
-    [[nodiscard]] inline String
-    ToString() const {
-        TypeError("ToString() isn't implemented");
-    }
+    [[nodiscard]] inline String ToString() const { TypeError("ToString() isn't implemented"); }
 };
 
-}
-
+} // namespace infinity

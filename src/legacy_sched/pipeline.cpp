@@ -11,10 +11,9 @@ namespace infinity {
 
 Pipeline::~Pipeline() = default;
 
-void
-Pipeline::SetPredecessorOf(const SharedPtr<Pipeline>& successor) {
+void Pipeline::SetPredecessorOf(const SharedPtr<Pipeline> &successor) {
     // Prevents add a duplicated successor.
-    if(std::find(successors_.cbegin(), successors_.cend(), &*successor) != successors_.cend()) {
+    if (std::find(successors_.cbegin(), successors_.cend(), &*successor) != successors_.cend()) {
         LOG_WARN("Trying to insert a duplicated pipeline id: {}", successor->Id());
         return;
     }
@@ -24,26 +23,14 @@ Pipeline::SetPredecessorOf(const SharedPtr<Pipeline>& successor) {
     // If this task isn't finished, its successor will have one more dependent predecessor.
     // I suppose the top is set before running, so no race protection for the state change.
     // pending_predecessors is an atomic value, which is safe for change in any cases.
-    if(!IsDone())
+    if (!IsDone())
         successor->pending_predecessors_++;
 }
 
-void
-Pipeline::Schedule() {
+void Pipeline::Schedule() {}
 
-}
+void Pipeline::Execute(QueryContext *query_context) { OnExecute(query_context); }
 
-void
-Pipeline::Execute(QueryContext* query_context) {
-    OnExecute(query_context);
-}
+void Pipeline::OnPredecessorDone() {}
 
-void
-Pipeline::OnPredecessorDone() {
-
-}
-
-
-}
-
-
+} // namespace infinity

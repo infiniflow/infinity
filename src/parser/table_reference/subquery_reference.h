@@ -12,16 +12,13 @@ class SelectStatement;
 class SubqueryReference : public BaseTableReference {
 
 public:
-
     SubqueryReference() : BaseTableReference(TableRefType::kSubquery) {}
 
     ~SubqueryReference() override;
 
-    String
-    ToString() override;
+    String ToString() override;
 
-    SelectStatement* select_statement_{nullptr};
+    SelectStatement *select_statement_{nullptr};
 };
 
-}
-
+} // namespace infinity

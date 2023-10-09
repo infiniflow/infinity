@@ -17,4 +17,4 @@ struct __attribute__((packed)) FloatMixedType : public BaseMixedType {
     f64 value{0};
 };
 
-}
+} // namespace infinity

@@ -3,22 +3,16 @@
 //
 
 #include "physical_aggregate.h"
-#include "executor/expression/expression_evaluator.h"
 #include "common/utility/utility.h"
+#include "executor/expression/expression_evaluator.h"
 
 namespace infinity {
 
-void
-PhysicalAggregate::Init() {
-}
+void PhysicalAggregate::Init() {}
 
-void
-PhysicalAggregate::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+void PhysicalAggregate::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-}
-
-void
-PhysicalAggregate::Execute(QueryContext* query_context) {
+void PhysicalAggregate::Execute(QueryContext *query_context) {
 #if 0
     input_table_ = left_->output();
     ExecutorAssert(input_table_ != nullptr, "No left input.");
@@ -170,30 +164,29 @@ PhysicalAggregate::Execute(QueryContext* query_context) {
 #endif
 }
 
-void
-PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, SharedPtr<Table>& grouped_input_table) {
+void PhysicalAggregate::GroupByInputTable(const SharedPtr<Table> &input_table, SharedPtr<Table> &grouped_input_table) {
     SizeT column_count = input_table->ColumnCount();
 
     // 1. Get output table column types.
     Vector<SharedPtr<DataType>> types;
     types.reserve(column_count);
-    for(SizeT column_id = 0; column_id < column_count; ++column_id) {
+    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = grouped_input_table->GetColumnTypeById(column_id);
-        if(*input_type != *output_type) {
+        if (*input_type != *output_type) {
             ExecutorError("Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
         }
         types.emplace_back(input_type);
     }
 
     // 2. Generate data blocks and append it into output table according to the group by hash table.
-    const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;
-    for(const auto& item: hash_table_.hash_table_) {
+    const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
+    for (const auto &item : hash_table_.hash_table_) {
 
         // 2.1 Each hash bucket will be insert in to one data block
         SharedPtr<DataBlock> output_datablock = DataBlock::Make();
         SizeT datablock_size = 0;
-        for(const auto& vec_pair: item.second) {
+        for (const auto &vec_pair : item.second) {
             datablock_size += vec_pair.second.size();
         }
         SizeT datablock_capacity = NextPowerOfTwo(datablock_size);
@@ -201,74 +194,73 @@ PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, Shared
 
         // Loop each block
         SizeT output_row_idx = 0;
-        for(const auto& vec_pair: item.second) {
+        for (const auto &vec_pair : item.second) {
             SizeT input_block_id = vec_pair.first;
 
             // Loop each row of same block
-            for(const auto input_offset: vec_pair.second) {
+            for (const auto input_offset : vec_pair.second) {
 
                 // Forloop each column
-                for(SizeT column_id = 0; column_id < column_count; ++column_id) {
-                    switch(types[column_id]->type()) {
+                for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+                    switch (types[column_id]->type()) {
                         case LogicalType::kBoolean: {
-                            ((BooleanT*)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
-                                    = ((BooleanT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            ((BooleanT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
+                                ((BooleanT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
                         case LogicalType::kTinyInt: {
-                            ((TinyIntT*)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
-                                    = ((TinyIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            ((TinyIntT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
+                                ((TinyIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
                         case LogicalType::kSmallInt: {
-                            ((SmallIntT*)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
-                                    = ((SmallIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            ((SmallIntT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
+                                ((SmallIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
                         case LogicalType::kInteger: {
-                            ((IntegerT*)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
-                                    = ((IntegerT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            ((IntegerT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
+                                ((IntegerT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
                         case LogicalType::kBigInt: {
-                            ((BigIntT*)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
-                                    = ((BigIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            ((BigIntT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
+                                ((BigIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
                         case kHugeInt: {
                             NotImplementError("HugeInt data shuffle isn't implemented.")
                         }
                         case kFloat: {
-                            ((FloatT*)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
-                                    = ((FloatT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
+                                ((FloatT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
                         case kDouble: {
-                            ((DoubleT*)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
-                                    = ((DoubleT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
+                                ((DoubleT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
                         case kDecimal: {
                             NotImplementError("Decimal data shuffle isn't implemented.")
                         }
                         case kVarchar: {
-                            VarcharT& dst_ref = ((VarcharT*)(output_datablock->column_vectors[column_id]->data()))[output_row_idx];
-                            VarcharT& src_ref = ((VarcharT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                            if(src_ref.IsInlined()) {
-                                memcpy((char*)&dst_ref, (char*)&src_ref, sizeof(VarcharT));
+                            VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx];
+                            VarcharT &src_ref = ((VarcharT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            if (src_ref.IsInlined()) {
+                                memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
                             } else {
                                 dst_ref.length = src_ref.length;
                                 memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
 
-                                dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->heap_mgr_->Allocate(
-                                        src_ref.length);
+                                dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->heap_mgr_->Allocate(src_ref.length);
                                 memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
                             }
                             break;
                         }
                         case kDate: {
-                            ((DateT*)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]
-                                    = ((DateT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                            ((DateT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
+                                ((DateT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                             break;
                         }
                         case kTime: {
@@ -297,10 +289,9 @@ PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, Shared
         }
 
         ExecutorAssert(output_row_idx == datablock_size,
-                       "Expected block size: " + std::to_string(datablock_size)
-                       + ", but only copied data size: " + std::to_string(output_row_idx));
+                       "Expected block size: " + std::to_string(datablock_size) + ", but only copied data size: " + std::to_string(output_row_idx));
 
-        for(SizeT column_id = 0; column_id < column_count; ++column_id) {
+        for (SizeT column_id = 0; column_id < column_count; ++column_id) {
             output_datablock->column_vectors[column_id]->tail_index_ = datablock_size;
         }
 
@@ -309,25 +300,23 @@ PhysicalAggregate::GroupByInputTable(const SharedPtr<Table>& input_table, Shared
     }
 }
 
-void
-PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, SharedPtr<Table>& output_table) {
+void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table> &input_table, SharedPtr<Table> &output_table) {
 
     SizeT column_count = input_table->ColumnCount();
     Vector<SharedPtr<DataType>> types;
     types.reserve(column_count);
-    for(SizeT column_id = 0; column_id < column_count; ++column_id) {
+    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = output_table->GetColumnTypeById(column_id);
-        ExecutorAssert(*input_type == *output_type,
-                       "Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
+        ExecutorAssert(*input_type == *output_type, "Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
         types.emplace_back(input_type);
     }
 
     SharedPtr<DataBlock> output_datablock = nullptr;
-    const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;
+    const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
     SizeT row_count = hash_table_.hash_table_.size();
 #if 1
-    for(SizeT block_row_idx = 0; const auto& item: hash_table_.hash_table_) {
+    for (SizeT block_row_idx = 0; const auto &item : hash_table_.hash_table_) {
         // Each hash bucket will generate one data block.
         output_datablock = DataBlock::Make();
         output_datablock->Init(types);
@@ -337,54 +326,54 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
         SizeT input_offset = item.second.begin()->second.front();
 
         // Only the first position of the column vector has value.
-        for(SizeT column_id = 0; column_id < column_count; ++column_id) {
-            switch(types[column_id]->type()) {
+        for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+            switch (types[column_id]->type()) {
                 case LogicalType::kBoolean: {
-                    ((BooleanT*)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((BooleanT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((BooleanT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((BooleanT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case LogicalType::kTinyInt: {
-                    ((TinyIntT*)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((TinyIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((TinyIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((TinyIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case LogicalType::kSmallInt: {
-                    ((SmallIntT*)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((SmallIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((SmallIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((SmallIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case LogicalType::kInteger: {
-                    ((IntegerT*)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((IntegerT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((IntegerT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((IntegerT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case LogicalType::kBigInt: {
-                    ((BigIntT*)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((BigIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((BigIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((BigIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case kHugeInt: {
                     NotImplementError("HugeInt data shuffle isn't implemented.")
                 }
                 case kFloat: {
-                    ((FloatT*)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((FloatT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((FloatT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case kDouble: {
-                    ((DoubleT*)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((DoubleT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((DoubleT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case kDecimal: {
                     NotImplementError("Decimal data shuffle isn't implemented.")
                 }
                 case kVarchar: {
-                    VarcharT& dst_ref = ((VarcharT*)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
-                    VarcharT& src_ref = ((VarcharT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    if(src_ref.IsInlined()) {
-                        memcpy((char*)&dst_ref, (char*)&src_ref, sizeof(VarcharT));
+                    VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
+                    VarcharT &src_ref = ((VarcharT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    if (src_ref.IsInlined()) {
+                        memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
                     } else {
                         dst_ref.length = src_ref.length;
                         memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
@@ -395,8 +384,8 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
                     break;
                 }
                 case kDate: {
-                    ((DateT*)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((DateT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((DateT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((DateT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case kTime: {
@@ -426,11 +415,11 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
         output_table->Append(output_datablock);
     }
 #else
-    for(SizeT row_id = 0, block_row_idx = 0; const auto& item: hash_table_.hash_table_) {
+    for (SizeT row_id = 0, block_row_idx = 0; const auto &item : hash_table_.hash_table_) {
         // DEFAULT VECTOR SIZE buckets will generate one data block.
-        if(row_id % DEFAULT_VECTOR_SIZE == 0) {
-            if(output_datablock != nullptr) {
-                for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+        if (row_id % DEFAULT_VECTOR_SIZE == 0) {
+            if (output_datablock != nullptr) {
+                for (SizeT column_id = 0; column_id < column_count; ++column_id) {
                     output_datablock->column_vectors[column_id]->tail_index_ = block_row_idx;
                 }
 
@@ -441,51 +430,49 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
 
             output_datablock = DataBlock::Make();
             output_datablock->Init(types);
-
-
         }
 
         SizeT input_block_id = item.second.begin()->first;
         SizeT input_offset = item.second.begin()->second.front();
 
-        for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+        for (SizeT column_id = 0; column_id < column_count; ++column_id) {
             switch (types[column_id].type()) {
                 case LogicalType::kBoolean: {
-                    ((BooleanT *) (output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((BooleanT *) (input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((BooleanT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((BooleanT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case LogicalType::kTinyInt: {
-                    ((TinyIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((TinyIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((TinyIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((TinyIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case LogicalType::kSmallInt: {
-                    ((SmallIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((SmallIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((SmallIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((SmallIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case LogicalType::kInteger: {
-                    ((IntegerT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((IntegerT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((IntegerT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((IntegerT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case LogicalType::kBigInt: {
-                    ((BigIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((BigIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((BigIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((BigIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case kHugeInt: {
                     NotImplementError("HugeInt data shuffle isn't implemented.")
                 }
                 case kFloat: {
-                    ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((FloatT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((FloatT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case kDouble: {
-                    ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx]
-                            = ((DoubleT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+                    ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
+                        ((DoubleT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
                     break;
                 }
                 case kDecimal: {
@@ -521,12 +508,12 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
             }
         }
 
-        ++ block_row_idx;
-        ++ row_id;
+        ++block_row_idx;
+        ++row_id;
 
-        if(row_id == row_count) {
+        if (row_id == row_count) {
             // All hash table data are checked
-            for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
+            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
                 output_datablock->column_vectors[column_id]->tail_index_ = block_row_idx;
             }
 
@@ -538,8 +525,7 @@ PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table>& input_table, Sh
 #endif
 }
 
-void
-PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
+void PhysicalAggregate::SimpleAggregate(SharedPtr<Table> &output_table) {
 #if 0
     SizeT aggregates_count = aggregates_.size();
     ExecutorAssert(aggregates_count > 0, "Simple Aggregate without aggregate expression");
@@ -613,41 +599,38 @@ PhysicalAggregate::SimpleAggregate(SharedPtr<Table>& output_table) {
 #endif
 }
 
-SharedPtr<Vector<String>>
-PhysicalAggregate::GetOutputNames() const {
+SharedPtr<Vector<String>> PhysicalAggregate::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
     SizeT groups_count = groups_.size();
     SizeT aggregates_count = aggregates_.size();
     result->reserve(groups_count + aggregates_count);
-    for(SizeT i = 0; i < groups_count; ++i) {
+    for (SizeT i = 0; i < groups_count; ++i) {
         result->emplace_back(groups_[i]->Name());
     }
-    for(SizeT i = 0; i < aggregates_count; ++i) {
+    for (SizeT i = 0; i < aggregates_count; ++i) {
         result->emplace_back(aggregates_[i]->Name());
     }
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>>
-PhysicalAggregate::GetOutputTypes() const {
+SharedPtr<Vector<SharedPtr<DataType>>> PhysicalAggregate::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
     SizeT groups_count = groups_.size();
     SizeT aggregates_count = aggregates_.size();
     result->reserve(groups_count + aggregates_count);
-    for(SizeT i = 0; i < groups_count; ++i) {
+    for (SizeT i = 0; i < groups_count; ++i) {
         result->emplace_back(MakeShared<DataType>(groups_[i]->Type()));
     }
-    for(SizeT i = 0; i < aggregates_count; ++i) {
+    for (SizeT i = 0; i < aggregates_count; ++i) {
         result->emplace_back(MakeShared<DataType>(aggregates_[i]->Type()));
     }
     return result;
 }
 
-Vector<HashRange>
-PhysicalAggregate::GetHashRanges(i64 parallel_count) const {
+Vector<HashRange> PhysicalAggregate::GetHashRanges(i64 parallel_count) const {
     Vector<HashRange> result;
     result.resize(parallel_count);
     return result;
 }
 
-}
+} // namespace infinity

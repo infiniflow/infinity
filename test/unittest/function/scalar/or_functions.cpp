@@ -2,28 +2,26 @@
 // Created by jinhai on 23-1-7.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
+#include "expression/column_expression.h"
 #include "function/scalar/or.h"
 #include "function/scalar_function_set.h"
-#include "expression/column_expression.h"
 
 class OrFunctionsTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -49,18 +47,8 @@ TEST_F(OrFunctionsTest, or_func) {
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c1",
-                                                                                 0,
-                                                                                 0);
-        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                 "t1",
-                                                                                 1,
-                                                                                 "c2",
-                                                                                 1,
-                                                                                 0);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
         inputs.emplace_back(col1_expr_ptr);
         inputs.emplace_back(col2_expr_ptr);
@@ -77,8 +65,8 @@ TEST_F(OrFunctionsTest, or_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
-            if(i % 2 == 0) {
+        for (SizeT i = 0; i < row_count; ++i) {
+            if (i % 2 == 0) {
                 data_block.AppendValue(0, Value::MakeBool(true));
                 data_block.AppendValue(1, Value::MakeBool(false));
             } else {
@@ -88,12 +76,12 @@ TEST_F(OrFunctionsTest, or_func) {
         }
         data_block.Finalize();
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
             Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kBoolean);
             EXPECT_EQ(v2.type_.type(), LogicalType::kBoolean);
-            if(i % 2 == 0) {
+            if (i % 2 == 0) {
                 EXPECT_EQ(v1.value_.boolean, true);
                 EXPECT_EQ(v2.value_.boolean, false);
             } else {
@@ -106,7 +94,7 @@ TEST_F(OrFunctionsTest, or_func) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             EXPECT_EQ(v.value_.boolean, true);

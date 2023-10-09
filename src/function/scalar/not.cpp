@@ -2,34 +2,30 @@
 // Created by jinhai on 23-1-12.
 //
 
-#include "less.h"
 #include "function/scalar_function.h"
 #include "function/scalar_function_set.h"
+#include "less.h"
 
 namespace infinity {
 
 struct NotFunction {
-    template<typename TA, typename TB>
-    static inline void
-    Run(TA input, TB& result) {
+    template <typename TA, typename TB>
+    static inline void Run(TA input, TB &result) {
         result = !input;
     }
 };
 
-static void
-GenerateNotFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr) {
+static void GenerateNotFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) {
     String func_name = "NOT";
 
-    ScalarFunction not_function(
-            func_name,
-            {DataType(LogicalType::kBoolean)},
-            {DataType(LogicalType::kBoolean)},
-            &ScalarFunction::UnaryFunction<BooleanT, BooleanT, NotFunction>);
+    ScalarFunction not_function(func_name,
+                                {DataType(LogicalType::kBoolean)},
+                                {DataType(LogicalType::kBoolean)},
+                                &ScalarFunction::UnaryFunction<BooleanT, BooleanT, NotFunction>);
     function_set_ptr->AddFunction(not_function);
 }
 
-void
-RegisterNotFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
+void RegisterNotFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "NOT";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -39,4 +35,4 @@ RegisterNotFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

@@ -1,26 +1,23 @@
 //
 // Created by xwg on 23-9-6.
 //
-#include <gtest/gtest.h>
-#include "test_helper/sql_runner.h"
 #include "base_test.h"
-#include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
-#include "function/scalar/subtract.h"
 #include "expression/column_expression.h"
-
+#include "function/scalar/subtract.h"
+#include "main/infinity.h"
+#include "main/stats/global_resource_usage.h"
+#include "test_helper/sql_runner.h"
+#include <gtest/gtest.h>
 
 class FragmentTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         system("rm -rf /tmp/infinity/");
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -47,8 +44,8 @@ TEST_F(FragmentTest, test_build_fragment) {
     EXPECT_EQ(result5->definition_ptr_.get()->columns()[0]->name_, "OK");
 
     /// SPJ
-//    SQLRunner::Run("select * from t1 where a = 1", true);
-//    SQLRunner::Run("select a+1 from t1", true);
+    //    SQLRunner::Run("select * from t1 where a = 1", true);
+    //    SQLRunner::Run("select a+1 from t1", true);
 
     /// DDL
     auto result6 = SQLRunner::Run("drop table t1", true);
@@ -60,4 +57,3 @@ TEST_F(FragmentTest, test_build_fragment) {
     auto result8 = SQLRunner::Run("describe t2", true);
     EXPECT_EQ(result8->definition_ptr_->column_count(), 3);
 }
-

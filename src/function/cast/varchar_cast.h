@@ -16,10 +16,9 @@ struct TryCastVarchar;
 struct TryCastVarcharToChar;
 struct TryCastVarcharToVarchar;
 
-inline static BoundCastFunc
-BindVarcharCast(const DataType& source, const DataType& target) {
+inline static BoundCastFunc BindVarcharCast(const DataType &source, const DataType &target) {
     TypeAssert(source.type() == LogicalType::kVarchar, "Expect Varchar type, but it is " + source.ToString());
-    switch(target.type()) {
+    switch (target.type()) {
         case kBoolean: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, BooleanT, TryCastVarchar>);
         }
@@ -117,34 +116,30 @@ BindVarcharCast(const DataType& source, const DataType& target) {
 }
 
 struct TryCastVarchar {
-    template<typename SourceType, typename TargetType>
-    static inline bool
-    Run(const SourceType& input, TargetType& target) {
-        FunctionError("No implementation to cast from " + DataType::TypeToString<SourceType>()
-                      + " to " + DataType::TypeToString<TargetType>());
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(const SourceType &input, TargetType &target) {
+        FunctionError("No implementation to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
     }
 };
 
 // Cast VarcharT to Boolean type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, BooleanT& target) {
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, BooleanT &target) {
 
-    if(source.length == 4) {
-        bool res = tolower(source.prefix[0]) == 't' && tolower(source.prefix[1]) == 'r'
-                   && tolower(source.prefix[2]) == 'u' && tolower(source.prefix[3]) == 'e';
-        if(res) {
+    if (source.length == 4) {
+        bool res = tolower(source.prefix[0]) == 't' && tolower(source.prefix[1]) == 'r' && tolower(source.prefix[2]) == 'u' &&
+                   tolower(source.prefix[3]) == 'e';
+        if (res) {
             target = true;
             return true;
         } else {
             return false;
         }
     }
-    if(source.length == 5) {
-        bool res = tolower(source.prefix[0]) == 'f' && tolower(source.prefix[1]) == 'a'
-                   && tolower(source.prefix[2]) == 'l' && tolower(source.prefix[3]) == 's'
-                   && tolower(source.prefix[4]) == 'e';
-        if(res) {
+    if (source.length == 5) {
+        bool res = tolower(source.prefix[0]) == 'f' && tolower(source.prefix[1]) == 'a' && tolower(source.prefix[2]) == 'l' &&
+                   tolower(source.prefix[3]) == 's' && tolower(source.prefix[4]) == 'e';
+        if (res) {
             target = false;
             return true;
         } else {
@@ -155,20 +150,19 @@ TryCastVarchar::Run(const VarcharT& source, BooleanT& target) {
 }
 
 // Cast VarcharT to TinyT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, TinyIntT& target) {
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, TinyIntT &target) {
     i64 value{0};
-    char* endptr{nullptr};
+    char *endptr{nullptr};
     SizeT len{0};
-    if(source.IsInlined()) {
+    if (source.IsInlined()) {
         value = std::strtol(source.prefix, &endptr, 10);
         len = (endptr - source.prefix);
     } else {
         value = std::strtol(source.ptr, &endptr, 10);
         len = (endptr - source.ptr);
     }
-    if(len != source.length) {
+    if (len != source.length) {
         return false;
     }
     target = static_cast<TinyIntT>(value);
@@ -176,18 +170,17 @@ TryCastVarchar::Run(const VarcharT& source, TinyIntT& target) {
 }
 
 // Cast VarcharT to SmallIntT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, SmallIntT& target) {
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, SmallIntT &target) {
     i64 value{0};
-    char* endptr{nullptr};
+    char *endptr{nullptr};
     SizeT len{0};
-    if(source.IsInlined()) {
+    if (source.IsInlined()) {
         value = std::strtol(source.prefix, &endptr, 10);
     } else {
         value = std::strtol(source.ptr, &endptr, 10);
     }
-    if(len != source.length) {
+    if (len != source.length) {
         return false;
     }
     target = static_cast<SmallIntT>(value);
@@ -195,18 +188,17 @@ TryCastVarchar::Run(const VarcharT& source, SmallIntT& target) {
 }
 
 // Cast VarcharT to IntegerT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, IntegerT& target) {
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, IntegerT &target) {
     i64 value{0};
-    char* endptr{nullptr};
+    char *endptr{nullptr};
     SizeT len{0};
-    if(source.IsInlined()) {
+    if (source.IsInlined()) {
         value = std::strtol(source.prefix, &endptr, 10);
     } else {
         value = std::strtol(source.ptr, &endptr, 10);
     }
-    if(len != source.length) {
+    if (len != source.length) {
         return false;
     }
     target = static_cast<IntegerT>(value);
@@ -214,68 +206,63 @@ TryCastVarchar::Run(const VarcharT& source, IntegerT& target) {
 }
 
 // Cast VarcharT to BigIntT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, i64& target) {
-    char* endptr{nullptr};
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, i64 &target) {
+    char *endptr{nullptr};
     SizeT len{0};
-    if(source.IsInlined()) {
+    if (source.IsInlined()) {
         target = std::strtol(source.prefix, &endptr, 10);
     } else {
         target = std::strtol(source.ptr, &endptr, 10);
     }
-    if(len != source.length) {
+    if (len != source.length) {
         return false;
     }
     return true;
 }
 
 // Cast VarcharT to HugeIntT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, HugeIntT& target) {
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, HugeIntT &target) {
     NotImplementError("Cast varchar to hugeint")
 }
 
 // Cast VarcharT to FloatT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, FloatT& target) {
-    char* endptr{nullptr};
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, FloatT &target) {
+    char *endptr{nullptr};
     SizeT len{0};
-    if(source.IsInlined()) {
+    if (source.IsInlined()) {
         target = std::strtof(source.prefix, &endptr);
     } else {
         target = std::strtof(source.ptr, &endptr);
     }
-    if(len != source.length) {
+    if (len != source.length) {
         return false;
     }
     return true;
 }
 
 // Cast VarcharT to DoubleT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, DoubleT& target) {
-    char* endptr{nullptr};
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, DoubleT &target) {
+    char *endptr{nullptr};
     SizeT len{0};
-    if(source.IsInlined()) {
+    if (source.IsInlined()) {
         target = std::strtod(source.prefix, &endptr);
     } else {
         target = std::strtod(source.ptr, &endptr);
     }
-    if(len != source.length) {
+    if (len != source.length) {
         return false;
     }
     return true;
 }
 
 // Cast VarcharT to DateT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, DateT& target) {
-    if(source.IsInlined()) {
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, DateT &target) {
+    if (source.IsInlined()) {
         target.FromString(source.prefix, source.length);
     } else {
         target.FromString(source.ptr, source.length);
@@ -284,35 +271,27 @@ TryCastVarchar::Run(const VarcharT& source, DateT& target) {
 }
 
 // Cast VarcharT to TimeT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, TimeT& target) {
-    NotImplementError("Cast from varchar to time")
-    return true;
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, TimeT &target) {
+    NotImplementError("Cast from varchar to time") return true;
 }
 
 // Cast VarcharT to DateTimeT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, DateTimeT& target) {
-    NotImplementError("Cast from varchar to datetime")
-    return true;
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, DateTimeT &target) {
+    NotImplementError("Cast from varchar to datetime") return true;
 }
 
 // Cast VarcharT to TimestampT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, TimestampT& target) {
-    NotImplementError("Cast from varchar to timestamp")
-    return true;
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, TimestampT &target) {
+    NotImplementError("Cast from varchar to timestamp") return true;
 }
 
 // Cast VarcharT to IntervalT type
-template<>
-inline bool
-TryCastVarchar::Run(const VarcharT& source, IntervalT& target) {
-    NotImplementError("Cast from varchar to interval")
-    return true;
+template <>
+inline bool TryCastVarchar::Run(const VarcharT &source, IntervalT &target) {
+    NotImplementError("Cast from varchar to interval") return true;
 }
 
-}
+} // namespace infinity

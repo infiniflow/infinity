@@ -2,25 +2,23 @@
 // Created by jinhai on 23-6-23.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
+#include "main/infinity.h"
+#include "main/logger.h"
+#include "main/profiler/base_profiler.h"
+#include "main/stats/global_resource_usage.h"
 #include "storage/data_block.h"
 #include "storage/txn/txn_manager.h"
-#include "main/profiler/base_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class TableTxnTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -33,8 +31,7 @@ class TableTxnTest : public BaseTest {
 
 using namespace infinity;
 
-UniquePtr<TableDef>
-MockTableDesc() {
+UniquePtr<TableDef> MockTableDesc() {
     // Define columns
     Vector<SharedPtr<ColumnDef>> columns;
     {
@@ -43,48 +40,38 @@ MockTableDesc() {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
-            auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
-                                                        "tiny_int_col",
-                                                        constraints);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
             columns.emplace_back(column_def_ptr);
-
         }
         {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
-            auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        MakeShared<DataType>(DataType(LogicalType::kBigInt)),
-                                                        "big_int_col",
-                                                        constraints);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
-            auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        MakeShared<DataType>(DataType(LogicalType::kDouble)),
-                                                        "double_col",
-                                                        constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
     }
 
-    UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"),
-                                                        MakeShared<String>("tbl1"),
-                                                        columns);
+    UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
     return MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
 }
 
 TEST_F(TableTxnTest, test1) {
 
     using namespace infinity;
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     EntryResult create1_res, table1_res, create2_res, dropped_res, get_res;
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr->CreateTxn();
+    Txn *new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn->BeginTxn();
@@ -122,12 +109,12 @@ TEST_F(TableTxnTest, test1) {
 TEST_F(TableTxnTest, test2) {
 
     using namespace infinity;
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     EntryResult create1_res, table1_res, create2_res, dropped_res, get_res;
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr->CreateTxn();
+    Txn *new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn->BeginTxn();
@@ -180,12 +167,12 @@ TEST_F(TableTxnTest, test2) {
 
 TEST_F(TableTxnTest, test3) {
     using namespace infinity;
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     EntryResult create1_res, table1_res, create2_res, dropped_res, get_res;
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr->CreateTxn();
+    Txn *new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn->BeginTxn();
@@ -239,12 +226,12 @@ TEST_F(TableTxnTest, test3) {
 TEST_F(TableTxnTest, test4) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
 
@@ -285,9 +272,9 @@ TEST_F(TableTxnTest, test4) {
 TEST_F(TableTxnTest, test5) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
     // Txn1: Begin, OK
@@ -302,13 +289,13 @@ TEST_F(TableTxnTest, test5) {
     new_txn1->CommitTxn();
 
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
 
     // Txn3: Create, OK
-    Txn* new_txn3 = txn_mgr->CreateTxn();
+    Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();
@@ -328,7 +315,6 @@ TEST_F(TableTxnTest, test5) {
     new_txn3->CommitTxn();
 }
 
-
 // ------+------------+--------------+-----------------+-----------------------+------------------------+------------->
 //       |            |              |                 |                       |                        |
 //   TXN2 Begin       |      TXN2 Create tbl1          |                       |                TXN2 Commit
@@ -336,9 +322,9 @@ TEST_F(TableTxnTest, test5) {
 TEST_F(TableTxnTest, test6) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
     // Txn1: Begin, OK
@@ -353,13 +339,13 @@ TEST_F(TableTxnTest, test6) {
     new_txn1->CommitTxn();
 
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
 
     // Txn3: Create, OK
-    Txn* new_txn3 = txn_mgr->CreateTxn();
+    Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();
@@ -382,9 +368,9 @@ TEST_F(TableTxnTest, test6) {
 TEST_F(TableTxnTest, test7) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
     // Txn1: Begin, OK
@@ -403,7 +389,7 @@ TEST_F(TableTxnTest, test7) {
     new_txn1->RollbackTxn();
 
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
@@ -423,9 +409,9 @@ TEST_F(TableTxnTest, test7) {
 TEST_F(TableTxnTest, test8) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
     // Txn1: Begin, OK
@@ -440,7 +426,7 @@ TEST_F(TableTxnTest, test8) {
     new_txn1->CommitTxn();
 
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
@@ -453,7 +439,7 @@ TEST_F(TableTxnTest, test8) {
     new_txn2->RollbackTxn();
 
     // Txn3: Create, OK
-    Txn* new_txn3 = txn_mgr->CreateTxn();
+    Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();
@@ -478,10 +464,10 @@ TEST_F(TableTxnTest, test9) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
     // Txn1: Begin, OK
@@ -496,7 +482,7 @@ TEST_F(TableTxnTest, test9) {
     new_txn1->CommitTxn();
 
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
@@ -506,7 +492,7 @@ TEST_F(TableTxnTest, test9) {
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn3: Create, OK
-    Txn* new_txn3 = txn_mgr->CreateTxn();
+    Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();
@@ -533,12 +519,12 @@ TEST_F(TableTxnTest, test9) {
 TEST_F(TableTxnTest, test10) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     EntryResult create1_res, create2_res, create3_res, dropped1_res, get_res;
 
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn1->BeginTxn();
@@ -552,10 +538,10 @@ TEST_F(TableTxnTest, test10) {
     new_txn1->CommitTxn();
 
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     // Txn3: Create, OK
-    Txn* new_txn3 = txn_mgr->CreateTxn();
+    Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
     new_txn2->BeginTxn();
@@ -581,4 +567,3 @@ TEST_F(TableTxnTest, test10) {
     // Txn3: Commit, OK
     new_txn3->CommitTxn();
 }
-

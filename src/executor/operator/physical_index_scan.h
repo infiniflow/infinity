@@ -10,34 +10,23 @@ namespace infinity {
 
 class PhysicalIndexScan : public PhysicalOperator {
 public:
-    explicit PhysicalIndexScan(uint64_t id)
-            : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id) {}
+    explicit PhysicalIndexScan(uint64_t id) : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id) {}
 
     ~PhysicalIndexScan() override = default;
 
-    void
-    Init() override;
+    void Init() override;
 
-    void
-    Execute(QueryContext* query_context) final;
+    void Execute(QueryContext *query_context) final;
 
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    inline SharedPtr<Vector<String>>
-    GetOutputNames() const final {
-        return output_names_;
-    }
+    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final {
-        return output_types_;
-    }
+    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
-
 };
 
-}
+} // namespace infinity

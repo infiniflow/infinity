@@ -9,7 +9,6 @@
 
 namespace infinity {
 
-void
-RegisterCountFunction(const UniquePtr<NewCatalog>& catalog_ptr);
+void RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

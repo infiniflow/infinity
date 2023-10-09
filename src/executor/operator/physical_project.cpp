@@ -7,28 +7,25 @@
 
 namespace infinity {
 
-void
-PhysicalProject::Init() {
-//    executor.Init(expressions_);
-//
-//    Vector<SharedPtr<ColumnDef>> columns;
-//    for(i64 idx = 0; auto& expr: expressions_) {
-//        SharedPtr<ColumnDef> col_def = ColumnDef::Make(expr->ToString(), idx, expr->Type(), Set<ConstrainType>());
-//        columns.emplace_back(col_def);
-//        ++ idx;
-//    }
-//    SharedPtr<TableDef> table_def = TableDef::Make("project", columns, false);
-//
-//    outputs_[output_table_index_] = Table::Make(table_def, TableType::kIntermediate);
+void PhysicalProject::Init() {
+    //    executor.Init(expressions_);
+    //
+    //    Vector<SharedPtr<ColumnDef>> columns;
+    //    for(i64 idx = 0; auto& expr: expressions_) {
+    //        SharedPtr<ColumnDef> col_def = ColumnDef::Make(expr->ToString(), idx, expr->Type(), Set<ConstrainType>());
+    //        columns.emplace_back(col_def);
+    //        ++ idx;
+    //    }
+    //    SharedPtr<TableDef> table_def = TableDef::Make("project", columns, false);
+    //
+    //    outputs_[output_table_index_] = Table::Make(table_def, TableType::kIntermediate);
 }
 
-void
-PhysicalProject::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
-    auto* project_input_state = static_cast<ProjectionInputState*>(input_state);
-    auto* project_output_state = static_cast<ProjectionOutputState*>(output_state);
+void PhysicalProject::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+    auto *project_input_state = static_cast<ProjectionInputState *>(input_state);
+    auto *project_output_state = static_cast<ProjectionOutputState *>(output_state);
 
     // FIXME: need to handle statement like: SELECT 1;
-
 
     project_output_state->data_block_->Reset();
 
@@ -42,27 +39,24 @@ PhysicalProject::Execute(QueryContext* query_context, InputState* input_state, O
     Vector<SharedPtr<ExpressionState>> expr_states;
     expr_states.reserve(expression_count);
 
-    for(const auto& expr: expressions_) {
+    for (const auto &expr : expressions_) {
         // expression state
         expr_states.emplace_back(ExpressionState::CreateState(expr));
     }
 
-    for(SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
-//        Vector<SharedPtr<ColumnVector>> blocks_column;
-//        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
-        evaluator.Execute(expressions_[expr_idx],
-                          expr_states[expr_idx],
-                          project_output_state->data_block_->column_vectors[expr_idx]);
+    for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
+        //        Vector<SharedPtr<ColumnVector>> blocks_column;
+        //        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
+        evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], project_output_state->data_block_->column_vectors[expr_idx]);
     }
 
     project_output_state->data_block_->Finalize();
-    if(project_input_state->Complete()) {
+    if (project_input_state->Complete()) {
         project_output_state->SetComplete();
     }
 }
 
-void
-PhysicalProject::Execute(QueryContext* query_context) {
+void PhysicalProject::Execute(QueryContext *query_context) {
     SizeT expression_count = expressions_.size();
 
     // Prepare the output table columns
@@ -77,16 +71,13 @@ PhysicalProject::Execute(QueryContext* query_context) {
     Vector<SharedPtr<DataType>> output_types;
     output_types.reserve(expression_count);
 
-    for(i64 idx = 0; auto& expr: expressions_) {
+    for (i64 idx = 0; auto &expr : expressions_) {
         // expression state
         expr_states.emplace_back(ExpressionState::CreateState(expr));
         SharedPtr<DataType> data_type = MakeShared<DataType>(expr->Type());
 
         // column definition
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
-                                                             data_type,
-                                                             expr->Name(),
-                                                             HashSet<ConstraintType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, data_type, expr->Name(), HashSet<ConstraintType>());
         projection_columns.emplace_back(col_def);
 
         // for output block
@@ -96,24 +87,19 @@ PhysicalProject::Execute(QueryContext* query_context) {
     }
 
     // output table definition
-    SharedPtr<TableDef> projection_tabledef = TableDef::Make(MakeShared<String>("default"),
-                                                             MakeShared<String>("projection"),
-                                                             projection_columns);
+    SharedPtr<TableDef> projection_tabledef = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("projection"), projection_columns);
     SharedPtr<Table> projection_table = Table::Make(projection_tabledef, TableType::kAggregate);
 
-    if(left_ == nullptr) {
+    if (left_ == nullptr) {
         Vector<SharedPtr<DataBlock>> empty_input_blocks;
         SharedPtr<DataBlock> output_data_block = DataBlock::Make();
         output_data_block->Init(output_types);
         ExpressionEvaluator evaluator;
         evaluator.Init(nullptr);
-        for(SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
+        for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
             Vector<SharedPtr<ColumnVector>> blocks_column;
             blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
-            evaluator.Execute(expressions_[expr_idx],
-                              expr_states[expr_idx],
-                              output_data_block->column_vectors[expr_idx]);
-
+            evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
         }
         output_data_block->Finalize();
         projection_table->Append(output_data_block);
@@ -125,19 +111,17 @@ PhysicalProject::Execute(QueryContext* query_context) {
         SizeT input_block_count = input_table->DataBlockCount();
 
         // Loop blocks
-        for(SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
+        for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_types);
 
             // Loop aggregate expression
             ExpressionEvaluator evaluator;
             evaluator.Init(input_table->GetDataBlockById(block_idx).get());
-            for(SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
+            for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
                 Vector<SharedPtr<ColumnVector>> blocks_column;
-                evaluator.Execute(expressions_[expr_idx],
-                                  expr_states[expr_idx],
-                                  output_data_block->column_vectors[expr_idx]);
-                if(blocks_column[0].get() != output_data_block->column_vectors[expr_idx].get()) {
+                evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
+                if (blocks_column[0].get() != output_data_block->column_vectors[expr_idx].get()) {
                     // column vector in blocks column might be changed to the column vector from column reference.
                     // This check and assignment is to make sure the right column vector are assign to output_data_block
                     output_data_block->column_vectors[expr_idx] = blocks_column[0];
@@ -151,28 +135,26 @@ PhysicalProject::Execute(QueryContext* query_context) {
     output_ = projection_table;
 }
 
-SharedPtr<Vector<String>>
-PhysicalProject::GetOutputNames() const {
+SharedPtr<Vector<String>> PhysicalProject::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
     SizeT expression_count = expressions_.size();
     result->reserve(expression_count);
-    for(SizeT i = 0; i < expression_count; ++i) {
+    for (SizeT i = 0; i < expression_count; ++i) {
         result->emplace_back(expressions_[i]->Name());
     }
 
     return result;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>>
-PhysicalProject::GetOutputTypes() const {
+SharedPtr<Vector<SharedPtr<DataType>>> PhysicalProject::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
     SizeT expression_count = expressions_.size();
     result->reserve(expression_count);
-    for(SizeT i = 0; i < expression_count; ++i) {
+    for (SizeT i = 0; i < expression_count; ++i) {
         result->emplace_back(MakeShared<DataType>(expressions_[i]->Type()));
     }
 
     return result;
 }
 
-}
+} // namespace infinity

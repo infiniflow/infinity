@@ -6,19 +6,12 @@
 
 namespace infinity {
 
-void
-PhysicalFlush::Init() {
+void PhysicalFlush::Init() {}
 
-}
+void PhysicalFlush::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) { output_state->SetComplete(); }
 
-void
-PhysicalFlush::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
-    output_state->SetComplete();
-}
-
-void
-PhysicalFlush::Execute(QueryContext* query_context) {
-    switch(flush_type_) {
+void PhysicalFlush::Execute(QueryContext *query_context) {
+    switch (flush_type_) {
         case FlushType::kData: {
             FlushData(query_context);
             break;
@@ -34,40 +27,31 @@ PhysicalFlush::Execute(QueryContext* query_context) {
     }
 }
 
-void
-PhysicalFlush::FlushData(QueryContext* query_context) {
+void PhysicalFlush::FlushData(QueryContext *query_context) {
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
-    };
+        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
 
-    SharedPtr<TableDef> result_table_def_ptr
-            = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 
-void
-PhysicalFlush::FlushLog(QueryContext* query_context) {
+void PhysicalFlush::FlushLog(QueryContext *query_context) {
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
-    };
+        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
 
-    SharedPtr<TableDef> result_table_def_ptr
-            = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 
-void
-PhysicalFlush::FlushBuffer(QueryContext* query_context) {
+void PhysicalFlush::FlushBuffer(QueryContext *query_context) {
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())
-    };
+        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
 
-    SharedPtr<TableDef> result_table_def_ptr
-            = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
 }
 
-}
+} // namespace infinity

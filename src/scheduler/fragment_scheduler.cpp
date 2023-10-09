@@ -2,42 +2,34 @@
 // Created by jinhai on 23-9-8.
 //
 
-#include <random>
 #include "fragment_scheduler.h"
-#include "fragment_task.h"
 #include "common/utility/threadutil.h"
+#include "fragment_task.h"
+#include <random>
 
 namespace infinity {
 
 // Non-static memory methods
 
-FragmentScheduler::FragmentScheduler(const Config* config_ptr) {
-    Init(config_ptr);
-}
+FragmentScheduler::FragmentScheduler(const Config *config_ptr) { Init(config_ptr); }
 
-FragmentScheduler::~FragmentScheduler() {
-    UnInit();
-}
+FragmentScheduler::~FragmentScheduler() { UnInit(); }
 
-void
-FragmentScheduler::Init(const Config* config_ptr) {
+void FragmentScheduler::Init(const Config *config_ptr) {
     u64 total_cpu_count = config_ptr->total_cpu_number();
-    for(u64 i = 0; i < total_cpu_count; ++i) {
+    for (u64 i = 0; i < total_cpu_count; ++i) {
         cpu_set_.emplace(i);
     }
 
-    if(cpu_set_.empty()) {
+    if (cpu_set_.empty()) {
         SchedulerError("No cpu is used in scheduler")
     }
 
-    for(i64 cpu_id: cpu_set_) {
+    for (i64 cpu_id : cpu_set_) {
         cpu_array_.emplace_back(cpu_id);
 
         UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();
-        UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&FragmentScheduler::WorkerLoop,
-                                                             this,
-                                                             worker_queue.get(),
-                                                             cpu_id);
+        UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&FragmentScheduler::WorkerLoop, this, worker_queue.get(), cpu_id);
         // Pin the thread to specific cpu
         ThreadUtil::pin(*worker_thread, cpu_id);
 
@@ -58,78 +50,74 @@ FragmentScheduler::Init(const Config* config_ptr) {
     initialized_ = true;
 }
 
-void
-FragmentScheduler::UnInit() {
+void FragmentScheduler::UnInit() {
     initialized_ = false;
     UniquePtr<FragmentTask> terminate_task = MakeUnique<FragmentTask>(true);
     poller_queue_->Enqueue(terminate_task.get());
     poller_->join();
     coordinator_->join();
-    for(i64 cpu_id: cpu_set_) {
+    for (i64 cpu_id : cpu_set_) {
         worker_queues_[cpu_id]->Enqueue(terminate_task.get());
         workers[cpu_id]->join();
     }
 }
 
-void
-FragmentScheduler::Schedule(QueryContext* query_context, PlanFragment* plan_fragment) {
+void FragmentScheduler::Schedule(QueryContext *query_context, PlanFragment *plan_fragment) {
     //    NotImplementError("Not implement FragmentScheduler::BuildFragmentTasks");
-    if(plan_fragment == nullptr) {
+    if (plan_fragment == nullptr) {
         SchedulerError("Empty plan fragment")
     }
 
-//    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
-//    if(!children.empty()) {
-//        SchedulerError("Only support one fragment query")
-//    }
+    //    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
+    //    if(!children.empty()) {
+    //        SchedulerError("Only support one fragment query")
+    //    }
     // 1. Recursive traverse the fragment tree
     // 2. Check the fragment
     //    if the first op is SCAN op, then get all block entry and create the source type is kScan.
     //    if the first op isn't SCAN op, fragment task source type is kQueue and a task_result_queue need to be created.
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
-    Vector<FragmentTask*> tasks;
+    Vector<FragmentTask *> tasks;
     FragmentContext::MakeFragmentContext(query_context, nullptr, plan_fragment, tasks);
 
     LOG_TRACE("Create {} tasks", tasks.size());
 
-    for(const auto& fragment_task: tasks) {
+    for (const auto &fragment_task : tasks) {
         ScheduleTask(fragment_task);
     }
 }
 
-void
-FragmentScheduler::ScheduleTask(FragmentTask* task) {
-    if(!initialized_) {
+void FragmentScheduler::ScheduleTask(FragmentTask *task) {
+    if (!initialized_) {
         SchedulerError("Scheduler isn't initialized")
     }
     poller_queue_->Enqueue(task);
 }
 
-void
-FragmentScheduler::CoordinatorLoop(FragmentTaskBlockQueue* ready_queue, i64 cpu_id) {
-    FragmentTask* fragment_task{nullptr};
+void FragmentScheduler::CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu_id) {
+    FragmentTask *fragment_task{nullptr};
     bool running{true};
-//    LOG_TRACE("Start fragment task coordinator on CPU: {}", cpu_id);
-    while(running) {
+    //    LOG_TRACE("Start fragment task coordinator on CPU: {}", cpu_id);
+    while (running) {
         ready_queue->Dequeue(fragment_task);
-        if(fragment_task == nullptr) {
+        if (fragment_task == nullptr) {
             LOG_ERROR("Fragment task coordinator: null task");
             continue;
         }
 
-        if(fragment_task->IsTerminator()) {
+        if (fragment_task->IsTerminator()) {
             LOG_TRACE("Terminator fragment task coordinator");
             running = false;
             continue;
         }
 
-        if(fragment_task->LastWorkerID() == -1) {
+        if (fragment_task->LastWorkerID() == -1) {
             // Select an available worker to dispatch
             i64 to_use_cpu_id = current_cpu_id_;
             do {
                 to_use_cpu_id = to_use_cpu_id % cpu_array_.size();
-            } while(!(DispatchTask(cpu_array_[to_use_cpu_id++], fragment_task)));
+            } while (!(DispatchTask(cpu_array_[to_use_cpu_id++], fragment_task)));
 
             ++current_cpu_id_;
         } else {
@@ -137,53 +125,51 @@ FragmentScheduler::CoordinatorLoop(FragmentTaskBlockQueue* ready_queue, i64 cpu_
             DispatchTask(fragment_task->LastWorkerID(), fragment_task);
         }
     }
-//    LOG_TRACE("Stop fragment task coordinator on CPU: {}", cpu_id);
+    //    LOG_TRACE("Stop fragment task coordinator on CPU: {}", cpu_id);
 }
 
-void
-FragmentScheduler::WorkerLoop(FragmentTaskBlockQueue* task_queue, i64 worker_id) {
-    FragmentTask* fragment_task{nullptr};
+void FragmentScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id) {
+    FragmentTask *fragment_task{nullptr};
     bool running{true};
-//    LOG_TRACE("Start fragment task worker on CPU: {}", worker_id);
-    while(running) {
+    //    LOG_TRACE("Start fragment task worker on CPU: {}", worker_id);
+    while (running) {
         task_queue->Dequeue(fragment_task);
-        if(fragment_task == nullptr) {
+        if (fragment_task == nullptr) {
             LOG_ERROR("worker {}: null task", worker_id);
             continue;
         }
 
-        if(fragment_task->IsTerminator()) {
+        if (fragment_task->IsTerminator()) {
             LOG_TRACE("Terminator fragment task on worker: {}", worker_id);
             running = false;
             continue;
         }
 
         fragment_task->OnExecute(worker_id);
-        if(!fragment_task->Complete()) {
+        if (!fragment_task->Complete()) {
             ScheduleTask(fragment_task);
         }
     }
-//    LOG_TRACE("Stop fragment task coordinator on CPU: {}", worker_id);
+    //    LOG_TRACE("Stop fragment task coordinator on CPU: {}", worker_id);
 }
 
-void
-FragmentScheduler::PollerLoop(FragmentTaskPollerQueue* poller_queue, i64 worker_id) {
-    List<FragmentTask*> local_task_list{};
-    Vector<FragmentTask*> local_ready_queue{};
+void FragmentScheduler::PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 worker_id) {
+    List<FragmentTask *> local_task_list{};
+    Vector<FragmentTask *> local_ready_queue{};
     bool running{true};
-//    LOG_TRACE("Start fragment task poller on CPU: {}", worker_id);
+    //    LOG_TRACE("Start fragment task poller on CPU: {}", worker_id);
     SizeT spin_count{0};
-    while(running) {
+    while (running) {
         poller_queue->DequeueBulk(local_task_list);
         auto task_iter = local_task_list.begin();
-        while(!local_task_list.empty()) {
-            FragmentTask*& task_ptr = (*task_iter);
-            if(task_ptr->IsTerminator()) {
+        while (!local_task_list.empty()) {
+            FragmentTask *&task_ptr = (*task_iter);
+            if (task_ptr->IsTerminator()) {
                 running = false;
                 local_ready_queue.emplace_back(task_ptr);
                 local_task_list.erase(task_iter++);
             } else {
-                if(task_ptr->Ready()) {
+                if (task_ptr->Ready()) {
                     local_task_list.erase(task_iter++);
                     local_ready_queue.push_back(task_ptr);
                 } else {
@@ -191,7 +177,7 @@ FragmentScheduler::PollerLoop(FragmentTaskPollerQueue* poller_queue, i64 worker_
                 }
             }
 
-            if(local_ready_queue.empty()) {
+            if (local_ready_queue.empty()) {
                 spin_count += 1;
             } else {
                 spin_count = 0;
@@ -200,29 +186,25 @@ FragmentScheduler::PollerLoop(FragmentTaskPollerQueue* poller_queue, i64 worker_
                 local_ready_queue.clear();
             }
 
-            if(spin_count != 0 && spin_count % 32 == 0) {
+            if (spin_count != 0 && spin_count % 32 == 0) {
                 _mm_pause();
             }
-            if(spin_count == 6400) {
+            if (spin_count == 6400) {
                 spin_count = 0;
                 sched_yield();
             }
-            if(task_iter == local_task_list.end()) {
+            if (task_iter == local_task_list.end()) {
                 task_iter = local_task_list.begin();
             }
         }
     }
-//    LOG_TRACE("Stop fragment task poller task coordinator on CPU: {}", worker_id);
+    //    LOG_TRACE("Stop fragment task poller task coordinator on CPU: {}", worker_id);
 }
 
-void
-FragmentScheduler::SubmitTask(FragmentTask* fragment_task) {
-    poller_queue_->Enqueue(fragment_task);
-}
+void FragmentScheduler::SubmitTask(FragmentTask *fragment_task) { poller_queue_->Enqueue(fragment_task); }
 
-bool
-FragmentScheduler::DispatchTask(i64 worker_id, FragmentTask* fragment_task) {
-    if(!worker_queues_.contains(worker_id)) {
+bool FragmentScheduler::DispatchTask(i64 worker_id, FragmentTask *fragment_task) {
+    if (!worker_queues_.contains(worker_id)) {
         LOG_ERROR("Can't use CPU {} to run task", worker_id);
         return false;
     }
@@ -230,4 +212,4 @@ FragmentScheduler::DispatchTask(i64 worker_id, FragmentTask* fragment_task) {
     return true;
 }
 
-}
+} // namespace infinity

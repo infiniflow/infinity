@@ -7,9 +7,8 @@
 
 namespace infinity {
 
-String
-ToString(ShowType type) {
-    switch(type) {
+String ToString(ShowType type) {
+    switch (type) {
         case ShowType::kShowTables:
             return "Show tables";
         case ShowType::kShowViews:
@@ -22,18 +21,18 @@ ToString(ShowType type) {
     }
 }
 
-String
-LogicalShow::ToString(i64& space) {
+String LogicalShow::ToString(i64 &space) {
     std::stringstream ss;
     String arrow_str;
-    if(space > 3) {
+    if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << "-> " << "Show: ";
+    ss << String(space, ' ') << "-> "
+       << "Show: ";
     space += arrow_str.size();
 
     return ss.str();
 }
 
-}
+} // namespace infinity

@@ -11,4 +11,4 @@ public:
     explicit DummyTableRef() : TableRef(TableRefType::kDummy, "Dummy") {}
 };
 
-}
+} // namespace infinity

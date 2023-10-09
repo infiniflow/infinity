@@ -14,5 +14,4 @@ public:
     MixedType array[0];
 };
 
-
-}
+} // namespace infinity

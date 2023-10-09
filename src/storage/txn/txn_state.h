@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "common/utility/infinity_assert.h"
 #include "common/types/alias/primitives.h"
+#include "common/utility/infinity_assert.h"
 #include <limits>
 
 namespace infinity {
@@ -20,9 +20,8 @@ enum class TxnState {
     kInvalid,
 };
 
-inline String
-ToString(TxnState txn_state) {
-    switch(txn_state) {
+inline String ToString(TxnState txn_state) {
+    switch (txn_state) {
         case TxnState::kNotStarted: {
             return "Not Started";
         }
@@ -48,4 +47,4 @@ ToString(TxnState txn_state) {
     StorageError("Invalid transaction state.")
 }
 
-}
+} // namespace infinity

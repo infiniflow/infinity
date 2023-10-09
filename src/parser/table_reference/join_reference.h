@@ -20,28 +20,24 @@ enum class JoinType {
     kAnti,
 };
 
-String
-ToString(JoinType type);
+String ToString(JoinType type);
 
 class JoinReference : public BaseTableReference {
 
 public:
-
-    explicit
-    JoinReference() : BaseTableReference(TableRefType::kJoin) {}
+    explicit JoinReference() : BaseTableReference(TableRefType::kJoin) {}
 
     ~JoinReference() override;
 
-    String
-    ToString() override;
+    String ToString() override;
 
-    BaseTableReference* left_{nullptr};
-    BaseTableReference* right_{nullptr};
+    BaseTableReference *left_{nullptr};
+    BaseTableReference *right_{nullptr};
 
-    ParsedExpr* condition_{nullptr};
+    ParsedExpr *condition_{nullptr};
     JoinType join_type_{JoinType::kInner};
 
-    Vector<char*>* using_columns_{nullptr};
+    Vector<char *> *using_columns_{nullptr};
 };
 
-}
+} // namespace infinity

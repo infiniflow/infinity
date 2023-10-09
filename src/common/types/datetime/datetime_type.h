@@ -12,22 +12,17 @@ namespace infinity {
 struct DateTimeType {
     DateTimeType() = default;
 
-    explicit
-    DateTimeType(i32 date_value, i32 time_value) : date(date_value), time(time_value) {};
+    explicit DateTimeType(i32 date_value, i32 time_value) : date(date_value), time(time_value){};
 
-    inline void
-    Reset() {
+    inline void Reset() {
         date = 0;
         time = 0;
     }
 
-    [[nodiscard]] inline String
-    ToString() const {
-        TypeError("ToString() isn't implemented");
-    }
+    [[nodiscard]] inline String ToString() const { TypeError("ToString() isn't implemented"); }
 
     i32 date{};
     i32 time{};
 };
 
-}
+} // namespace infinity

@@ -7,9 +7,8 @@
 
 namespace infinity {
 
-String
-IntervalType::ToString() const {
-    switch(unit) {
+String IntervalType::ToString() const {
+    switch (unit) {
         case kYear: {
             return fmt::format("{} YEAR", value);
         }
@@ -29,10 +28,9 @@ IntervalType::ToString() const {
             return fmt::format("{} SECOND", value);
         }
         default: {
-
         }
     }
     TypeError("ToString() isn't implemented");
 }
 
-}
+} // namespace infinity

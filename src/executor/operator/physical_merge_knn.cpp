@@ -6,22 +6,15 @@
 
 namespace infinity {
 
-void
-PhysicalMergeKnn::Init() {
+void PhysicalMergeKnn::Init() {}
 
-}
-
-void
-PhysicalMergeKnn::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
-    if(input_state->Complete()) {
+void PhysicalMergeKnn::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+    if (input_state->Complete()) {
         LOG_TRACE("PhysicalMergeKnn::Execute complete")
     }
     output_state->SetComplete();
 }
 
-void
-PhysicalMergeKnn::Execute(QueryContext* query_context) {
+void PhysicalMergeKnn::Execute(QueryContext *query_context) {}
 
-}
-
-}
+} // namespace infinity

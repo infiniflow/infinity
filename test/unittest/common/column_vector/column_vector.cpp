@@ -2,25 +2,23 @@
 // Created by JinHai on 2022/12/4.
 //
 
-#include <gtest/gtest.h>
-#include "base_test.h"
 #include "common/column_vector/column_vector.h"
+#include "base_test.h"
 #include "common/types/value.h"
+#include "common/utility/serializable.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
-#include "common/utility/serializable.h"
+#include <gtest/gtest.h>
 
 class ColumnVectorTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -30,14 +28,12 @@ class ColumnVectorTest : public BaseTest {
 
 TEST_F(ColumnVectorTest, ReadWrite) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(),
-              test_info_->name());
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     Vector<SharedPtr<ColumnVector>> columns;
     int vector_size = DEFAULT_VECTOR_SIZE / 3;
     {
-        SharedPtr<ColumnVector> column =
-            ColumnVector::Make(MakeShared<DataType>(LogicalType::kBoolean));
+        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kBoolean));
         column->Initialize();
         for (i64 i = 0; i < vector_size; ++i) {
             Value v = Value::MakeBool(bool(i % 2));
@@ -46,8 +42,7 @@ TEST_F(ColumnVectorTest, ReadWrite) {
         columns.push_back(column);
     }
     {
-        SharedPtr<ColumnVector> column =
-            ColumnVector::Make(MakeShared<DataType>(LogicalType::kFloat));
+        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kFloat));
         column->Initialize();
         for (i64 i = 0; i < vector_size; ++i) {
             Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
@@ -56,8 +51,7 @@ TEST_F(ColumnVectorTest, ReadWrite) {
         columns.push_back(column);
     }
     {
-        SharedPtr<ColumnVector> column =
-            ColumnVector::Make(MakeShared<DataType>(LogicalType::kFloat));
+        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kFloat));
         column->Initialize(ColumnVectorType::kConstant);
         for (i64 i = 0; i < 1; ++i) {
             Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);

@@ -12,15 +12,13 @@ class BindContext;
 
 class CrossProductTableRef : public TableRef {
 public:
-    explicit
-    CrossProductTableRef(String alias) :
-            TableRef(TableRefType::kCrossProduct, alias) {}
+    explicit CrossProductTableRef(String alias) : TableRef(TableRefType::kCrossProduct, alias) {}
 
-//    SharedPtr<BindContext> left_bind_context_{};
-//    SharedPtr<BindContext> right_bind_context_{};
+    //    SharedPtr<BindContext> left_bind_context_{};
+    //    SharedPtr<BindContext> right_bind_context_{};
 
     SharedPtr<TableRef> left_table_ref_{};
     SharedPtr<TableRef> right_table_ref_{};
 };
 
-}
+} // namespace infinity

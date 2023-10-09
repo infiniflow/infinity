@@ -6,8 +6,6 @@
 
 namespace infinity {
 
-class PreparedPlan {
+class PreparedPlan {};
 
-};
-
-}
+} // namespace infinity

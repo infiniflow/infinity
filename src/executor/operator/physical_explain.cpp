@@ -6,15 +6,14 @@
 
 namespace infinity {
 
-void
-PhysicalExplain::Init() {
+void PhysicalExplain::Init() {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
     output_names_ = MakeShared<Vector<String>>();
     output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
 
-    switch(explain_type_) {
+    switch (explain_type_) {
         case ExplainType::kAnalyze: {
             output_names_->emplace_back("Query Analyze");
             NotImplementError("Not implement: Query analyze");
@@ -43,15 +42,14 @@ PhysicalExplain::Init() {
     output_types_->emplace_back(varchar_type);
 }
 
-void
-PhysicalExplain::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+void PhysicalExplain::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
     String title;
 
     auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
 
     auto output_data_block = DataBlock::Make();
 
-    switch(explain_type_) {
+    switch (explain_type_) {
         case ExplainType::kAnalyze: {
             title = "Query Analyze";
             NotImplementError("Not implement: Query analyze");
@@ -83,26 +81,25 @@ PhysicalExplain::Execute(QueryContext* query_context, InputState* input_state, O
     SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
 
     column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
-    for(SizeT idx = 0; idx < row_count; ++idx) {
+    for (SizeT idx = 0; idx < row_count; ++idx) {
         Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
         column_vector_ptr->AppendValue(str_v);
     }
     output_data_block->Init({column_vector_ptr});
 
-    ExplainOutputState* explain_output_state = static_cast<ExplainOutputState*>(output_state);
+    ExplainOutputState *explain_output_state = static_cast<ExplainOutputState *>(output_state);
     explain_output_state->data_block_ = output_data_block;
     output_state->SetComplete();
 }
 
-void
-PhysicalExplain::Execute(QueryContext* query_context) {
+void PhysicalExplain::Execute(QueryContext *query_context) {
     String title;
 
     auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
 
     auto output_data_block = DataBlock::Make();
 
-    switch(explain_type_) {
+    switch (explain_type_) {
         case ExplainType::kAnalyze: {
             title = "Query Analyze";
             NotImplementError("Not implement: Query analyze");
@@ -134,7 +131,7 @@ PhysicalExplain::Execute(QueryContext* query_context) {
     SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
 
     column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
-    for(SizeT idx = 0; idx < row_count; ++idx) {
+    for (SizeT idx = 0; idx < row_count; ++idx) {
         Value str_v = Value::MakeVarchar(*(*this->texts_)[idx]);
         column_vector_ptr->AppendValue(str_v);
     }
@@ -142,13 +139,11 @@ PhysicalExplain::Execute(QueryContext* query_context) {
 
     // Prepare the output columns
     Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kVarchar), title, HashSet<ConstraintType>())
-    };
+        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kVarchar), title, HashSet<ConstraintType>())};
 
-    SharedPtr<TableDef> result_table_def_ptr
-            = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
     output_->Append(output_data_block);
 }
 
-}
+} // namespace infinity

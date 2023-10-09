@@ -6,7 +6,6 @@
 
 #include <utility>
 
-
 #include "common/types/data_type.h"
 #include "storage/common/async_batch_processor.h"
 
@@ -14,34 +13,23 @@ namespace infinity {
 
 class CommitTask final : public AsyncTask {
 public:
-    explicit
-    CommitTask(SizeT size) : AsyncTask(AsyncTaskType::kCommit) {
-        tasks_.reserve(size);
-    }
+    explicit CommitTask(SizeT size) : AsyncTask(AsyncTaskType::kCommit) { tasks_.reserve(size); }
 
-    inline String
-    ToString() override {
-        return "CommitTask";
-    }
+    inline String ToString() override { return "CommitTask"; }
 
-    inline void
-    Prepare() final {}
+    inline void Prepare() final {}
 
-    inline void
-    Commit() final {
-        for(auto& task: tasks_) {
+    inline void Commit() final {
+        for (auto &task : tasks_) {
             task->Commit();
             task->Notify();
         }
     };
 
-    void
-    Append(AsyncTask* task) {
-        tasks_.emplace_back(task);
-    }
+    void Append(AsyncTask *task) { tasks_.emplace_back(task); }
 
 public:
-    Vector<AsyncTask*> tasks_;
+    Vector<AsyncTask *> tasks_;
 };
 
-}
+} // namespace infinity

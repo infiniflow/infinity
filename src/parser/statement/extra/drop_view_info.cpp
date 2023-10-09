@@ -7,11 +7,10 @@
 
 namespace infinity {
 
-String
-DropViewInfo::ToString() const {
+String DropViewInfo::ToString() const {
     std::stringstream ss;
     ss << "DROP VIEW: " << schema_name_ << "." << view_name_;
-    if(this->conflict_type_ == ConflictType::kIgnore) {
+    if (this->conflict_type_ == ConflictType::kIgnore) {
         ss << " IgnoreIfExists";
     } else {
         ss << " ThrowErrorIfExists";
@@ -19,4 +18,4 @@ DropViewInfo::ToString() const {
     return ss.str();
 }
 
-}
+} // namespace infinity

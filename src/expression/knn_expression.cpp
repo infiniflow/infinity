@@ -9,22 +9,21 @@
 
 namespace infinity {
 
-String
-KnnExpression::KnnDistanceType2Str(KnnDistanceType type) {
-    switch(type) {
-        case KnnDistanceType::kInvalid : {
+String KnnExpression::KnnDistanceType2Str(KnnDistanceType type) {
+    switch (type) {
+        case KnnDistanceType::kInvalid: {
             PlannerError("Invalid KNN distance type")
         }
-        case KnnDistanceType::kL2 : {
+        case KnnDistanceType::kL2: {
             return "L2";
         }
-        case KnnDistanceType::kCosine : {
+        case KnnDistanceType::kCosine: {
             return "Cosine";
         }
-        case KnnDistanceType::kInnerProduct : {
+        case KnnDistanceType::kInnerProduct: {
             return "InnerProduct";
         }
-        case KnnDistanceType::kHamming : {
+        case KnnDistanceType::kHamming: {
             return "Hamming";
         }
     }
@@ -35,16 +34,13 @@ KnnExpression::KnnExpression(EmbeddingDataType embedding_data_type,
                              KnnDistanceType knn_distance_type,
                              EmbeddingT query_embedding,
                              Vector<SharedPtr<BaseExpression>> arguments)
-        : BaseExpression(ExpressionType::kKnn, std::move(arguments)),
-          dimension_(dimension),
-          embedding_data_type_(embedding_data_type),
-          distance_type_(knn_distance_type),
-          query_embedding_(std::move(query_embedding)) // Should call move constructor, otherwise there will be memory leak.
+    : BaseExpression(ExpressionType::kKnn, std::move(arguments)), dimension_(dimension), embedding_data_type_(embedding_data_type),
+      distance_type_(knn_distance_type),
+      query_embedding_(std::move(query_embedding)) // Should call move constructor, otherwise there will be memory leak.
 {}
 
-String
-KnnExpression::ToString() const {
-    if(!alias_.empty()) {
+String KnnExpression::ToString() const {
+    if (!alias_.empty()) {
         return alias_;
     }
 
@@ -57,5 +53,4 @@ KnnExpression::ToString() const {
     return expr_str;
 }
 
-}
-
+} // namespace infinity

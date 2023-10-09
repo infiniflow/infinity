@@ -4,42 +4,25 @@
 
 #pragma once
 
-#include "planner/expression_binder.h"
 #include "function/function.h"
+#include "planner/expression_binder.h"
 
 namespace infinity {
 
 class LimitBinder final : public ExpressionBinder {
 public:
-    explicit LimitBinder(QueryContext* query_context) : ExpressionBinder(query_context) {}
+    explicit LimitBinder(QueryContext *query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
-    SharedPtr<BaseExpression>
-    BuildExpression(const ParsedExpr& expr,
-                    BindContext* bind_context_ptr,
-                    i64 depth,
-                    bool root) final;
+    SharedPtr<BaseExpression> BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
-    SharedPtr<BaseExpression>
-    BuildFuncExpr(const FunctionExpr& expr,
-                  BindContext* bind_context_ptr,
-                  i64 depth,
-                  bool root) final;
+    SharedPtr<BaseExpression> BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
-    SharedPtr<BaseExpression>
-    BuildColExpr(const ColumnExpr& expr,
-                 BindContext* bind_context_ptr,
-                 i64 depth,
-                 bool root) final;
+    SharedPtr<BaseExpression> BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
-
-    SharedPtr<BaseExpression>
-    BuildKnnExpr(const KnnExpr& expr,
-                 BindContext* bind_context_ptr,
-                 i64 depth,
-                 bool root) final;
+    SharedPtr<BaseExpression> BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
 private:
 };
 
-}
+} // namespace infinity

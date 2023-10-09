@@ -7,18 +7,17 @@
 
 namespace infinity {
 
-String
-CopyStatement::ToString() const {
+String CopyStatement::ToString() const {
     std::stringstream ss;
     String copy_direction;
-    if(copy_from_) {
+    if (copy_from_) {
         copy_direction = " FROM ";
     } else {
         copy_direction = " TO ";
     }
 
     String file_format;
-    switch(copy_file_type_) {
+    switch (copy_file_type_) {
         case CopyFileType::kCSV: {
             file_format = "CSV";
             break;
@@ -33,12 +32,8 @@ CopyStatement::ToString() const {
         }
     }
 
-    ss << "COPY: " << schema_name_
-       << "." << table_name_
-       << copy_direction << file_path_
-       << " WITH " << file_format
-       << " delimiter: " << delimiter_;
+    ss << "COPY: " << schema_name_ << "." << table_name_ << copy_direction << file_path_ << " WITH " << file_format << " delimiter: " << delimiter_;
     return ss.str();
 }
 
-}
+} // namespace infinity

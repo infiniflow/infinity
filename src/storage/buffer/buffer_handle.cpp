@@ -6,30 +6,29 @@
 #include "buffer_manager.h"
 #include "buffer_task.h"
 
+#include "common/utility/defer_op.h"
 #include "storage/io/file_system.h"
 #include "storage/io/local_file_system.h"
-#include "common/utility/defer_op.h"
 
 namespace infinity {
 
-BufferHandle::BufferHandle(void* buf_mgr) : buffer_mgr_(buf_mgr) {
-    BufferManager* buffer_mgr = (BufferManager*)buffer_mgr_;
+BufferHandle::BufferHandle(void *buf_mgr) : buffer_mgr_(buf_mgr) {
+    BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
     reader_processor_ = buffer_mgr->reader_.get();
     writer_processor_ = buffer_mgr->writer_.get();
 }
 
-ptr_t
-BufferHandle::LoadData() {
-    BufferManager* buffer_mgr = (BufferManager*)buffer_mgr_;
+ptr_t BufferHandle::LoadData() {
+    BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
     {
         std::unique_lock<RWMutex> w_locker(rw_locker_);
-        switch(status_) {
+        switch (status_) {
             case BufferStatus::kLoaded: {
                 ++reference_count_;
                 return data_.get();
             }
             case BufferStatus::kUnloaded: {
-                if(reference_count_ != 0 || data_ == nullptr) {
+                if (reference_count_ != 0 || data_ == nullptr) {
                     LOG_ERROR("Error happened when buffer with unloaded status.")
                     return nullptr;
                 }
@@ -38,14 +37,14 @@ BufferHandle::LoadData() {
                 return data_.get();
             }
             case BufferStatus::kSpilled: {
-                if(reference_count_ != 0 || data_ != nullptr) {
+                if (reference_count_ != 0 || data_ != nullptr) {
                     LOG_ERROR("Error happened when buffer with spilled status.")
                     return nullptr;
                 }
-                if(buffer_type_ == BufferType::kTempFile) {
+                if (buffer_type_ == BufferType::kTempFile) {
                     // Restore the data from disk
                     String file_path;
-                    if(current_dir_ == nullptr or current_dir_->empty()) {
+                    if (current_dir_ == nullptr or current_dir_->empty()) {
                         file_path = *base_dir_ + '/' + *file_name_;
                     } else {
                         file_path = *current_dir_ + '/' + *file_name_;
@@ -66,24 +65,24 @@ BufferHandle::LoadData() {
             }
 
             case BufferStatus::kFreed: {
-                if(reference_count_ != 0 || data_ != nullptr) {
+                if (reference_count_ != 0 || data_ != nullptr) {
                     LOG_ERROR("Error happened when buffer with freed status.")
                     return nullptr;
                 }
 
                 ptr_t res{nullptr};
-                switch(buffer_type_) {
+                switch (buffer_type_) {
 
                     case BufferType::kTempFile: {
                         // Allocate memory with buffer size
                         UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
-                        if(err_msg != nullptr) {
+                        if (err_msg != nullptr) {
                             LOG_ERROR(*err_msg);
                             return nullptr;
                         }
 
                         String file_path;
-                        if(current_dir_ == nullptr or current_dir_->empty()) {
+                        if (current_dir_ == nullptr or current_dir_->empty()) {
                             file_path = *base_dir_ + '/' + *file_name_;
                         } else {
                             file_path = *current_dir_ + '/' + *file_name_;
@@ -100,7 +99,7 @@ BufferHandle::LoadData() {
                             LocalFileSystem fs;
 
                             String file_path;
-                            if(current_dir_ == nullptr or current_dir_->empty()) {
+                            if (current_dir_ == nullptr or current_dir_->empty()) {
                                 file_path = *base_dir_ + '/' + *file_name_;
                             } else {
                                 file_path = *current_dir_ + '/' + *file_name_;
@@ -114,31 +113,30 @@ BufferHandle::LoadData() {
 
                             SizeT file_size = fs.GetFileSize(*file_handler_);
 
-                            if(file_size < sizeof(u64) * 3) {
+                            if (file_size < sizeof(u64) * 3) {
                                 StorageError(fmt::format("Incorrect file length {}.", file_size));
                             }
 
                             // file header:
                             u64 magic_number{0};
                             i64 nbytes = fs.Read(*file_handler_, &magic_number, sizeof(magic_number));
-                            if(nbytes != sizeof(magic_number)) {
+                            if (nbytes != sizeof(magic_number)) {
                                 StorageError(fmt::format("Read magic number which length isn't {}.", nbytes));
                             }
 
-                            if(magic_number != 0x00dd3344) {
+                            if (magic_number != 0x00dd3344) {
                                 StorageError(fmt::format("Incorrect file header magic number: {}.", magic_number));
                             }
 
                             nbytes = fs.Read(*file_handler_, &buffer_size_, sizeof(buffer_size_));
-                            if(nbytes != sizeof(buffer_size_)) {
-                                StorageError(fmt::format("Incorrect buffer length field size: {}",
-                                                         sizeof(buffer_size_)));
+                            if (nbytes != sizeof(buffer_size_)) {
+                                StorageError(fmt::format("Incorrect buffer length field size: {}", sizeof(buffer_size_)));
                             }
 
                             LOG_TRACE("Read file: {} which size: {}", file_path, buffer_size_);
                             // Need buffer size space
                             UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
-                            if(err_msg != nullptr) {
+                            if (err_msg != nullptr) {
                                 LOG_ERROR(*err_msg);
                                 return nullptr;
                             }
@@ -146,21 +144,18 @@ BufferHandle::LoadData() {
                             // file body
                             data_ = MakeUnique<char[]>(buffer_size_);
                             nbytes = fs.Read(*file_handler_, data_.get(), buffer_size_);
-                            if(nbytes != buffer_size_) {
-                                StorageError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read",
-                                                         buffer_size_, nbytes));
+                            if (nbytes != buffer_size_) {
+                                StorageError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));
                             }
 
-                            if(file_size != buffer_size_ + 3 * sizeof(u64)) {
-                                StorageError(fmt::format("File size: {} isn't matched with {}.",
-                                                         file_size, buffer_size_ + 3 * sizeof(u64)));
-
+                            if (file_size != buffer_size_ + 3 * sizeof(u64)) {
+                                StorageError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
                             }
 
                             u64 checksum{};
                             // file footer: checksum
                             nbytes = fs.Read(*file_handler_, &checksum, sizeof(checksum));
-                            if(nbytes != sizeof(checksum)) {
+                            if (nbytes != sizeof(checksum)) {
                                 StorageError(fmt::format("Incorrect file checksum length: {}.", nbytes));
                             }
                         }
@@ -175,13 +170,13 @@ BufferHandle::LoadData() {
 
                         // Need buffer size space
                         UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
-                        if(err_msg != nullptr) {
+                        if (err_msg != nullptr) {
                             LOG_ERROR(*err_msg);
                             return nullptr;
                         }
 
                         String file_path;
-                        if(current_dir_ == nullptr or current_dir_->empty()) {
+                        if (current_dir_ == nullptr or current_dir_->empty()) {
                             file_path = *base_dir_ + '/' + *file_name_;
                         } else {
                             file_path = *current_dir_ + '/' + *file_name_;
@@ -195,8 +190,7 @@ BufferHandle::LoadData() {
                     }
                     case BufferType::kInvalid: {
                         LOG_TRACE("Invalid buffer type");
-                        UniquePtr<String> err_msg = MakeUnique<String>(
-                                "Attempt to set non-temp file buffer to sealed status");
+                        UniquePtr<String> err_msg = MakeUnique<String>("Attempt to set non-temp file buffer to sealed status");
                         LOG_ERROR(*err_msg);
                         return nullptr;
                     }
@@ -212,36 +206,33 @@ BufferHandle::LoadData() {
     LOG_ERROR("Reach unexpected position")
 }
 
-void
-BufferHandle::UnloadData() {
+void BufferHandle::UnloadData() {
     std::unique_lock<RWMutex> w_locker(rw_locker_);
     --reference_count_;
-    if(reference_count_ == 0) {
-        BufferManager* buffer_mgr = (BufferManager*)buffer_mgr_;
+    if (reference_count_ == 0) {
+        BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
         buffer_mgr->PushGCQueue(this);
         status_ = BufferStatus::kUnloaded;
     }
 }
 
-void
-BufferHandle::AddRefCount() {
+void BufferHandle::AddRefCount() {
     std::unique_lock<RWMutex> w_locker(rw_locker_);
     reference_count_++;
 }
 
-void
-BufferHandle::FreeData() {
+void BufferHandle::FreeData() {
     std::unique_lock<RWMutex> w_locker(rw_locker_);
-    if(reference_count_ == 0) {
-        if(status_ != BufferStatus::kUnloaded) {
+    if (reference_count_ == 0) {
+        if (status_ != BufferStatus::kUnloaded) {
             // The buffer was loaded again or was already freed.
             return;
         }
 
-        BufferManager* buffer_mgr = (BufferManager*)buffer_mgr_;
-        if(buffer_type_ == BufferType::kTempFile) {
+        BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
+        if (buffer_type_ == BufferType::kTempFile) {
             String file_path;
-            if(current_dir_ == nullptr or current_dir_->empty()) {
+            if (current_dir_ == nullptr or current_dir_->empty()) {
                 file_path = *base_dir_ + '/' + *file_name_;
             } else {
                 file_path = *current_dir_ + '/' + *file_name_;
@@ -258,26 +249,25 @@ BufferHandle::FreeData() {
     }
 }
 
-UniquePtr<String>
-BufferHandle::SetSealing() {
-    BufferManager* buffer_mgr = (BufferManager*)buffer_mgr_;
+UniquePtr<String> BufferHandle::SetSealing() {
+    BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
     std::unique_lock<RWMutex> w_locker(rw_locker_);
-    if(buffer_type_ != BufferType::kTempFile) {
+    if (buffer_type_ != BufferType::kTempFile) {
         UniquePtr<String> err_msg = MakeUnique<String>("Attempt to set non-temp file buffer to sealed status");
         LOG_ERROR(*err_msg);
         return err_msg;
     }
-    switch(status_) {
+    switch (status_) {
         case BufferStatus::kSpilled: {
-            if(reference_count_ != 0 || data_ != nullptr) {
+            if (reference_count_ != 0 || data_ != nullptr) {
                 UniquePtr<String> err_msg = MakeUnique<String>("Error happened when buffer with spilled status.");
                 LOG_ERROR(*err_msg);
                 return err_msg;
             }
-            if(buffer_type_ == BufferType::kTempFile) {
+            if (buffer_type_ == BufferType::kTempFile) {
                 // Restore the data from disk
                 String file_path;
-                if(current_dir_ == nullptr or current_dir_->empty()) {
+                if (current_dir_ == nullptr or current_dir_->empty()) {
                     file_path = *base_dir_ + '/' + *file_name_;
                 } else {
                     file_path = *current_dir_ + '/' + *file_name_;
@@ -292,7 +282,7 @@ BufferHandle::SetSealing() {
                 reader_processor_->Submit(read_task);
                 read_task->Wait();
 
-                if(read_task->IsError()) {
+                if (read_task->IsError()) {
                     return MakeUnique<String>(read_task->GetError());
                 }
 
@@ -322,25 +312,23 @@ BufferHandle::SetSealing() {
     return nullptr;
 }
 
-String
-BufferHandle::GetFilename() const {
+String BufferHandle::GetFilename() const {
     SharedPtr<String> root_dir{};
-    if(buffer_type_ == BufferType::kTempFile) {
+    if (buffer_type_ == BufferType::kTempFile) {
         root_dir = temp_dir_;
     } else {
         root_dir = base_dir_;
     }
-    if(current_dir_ == nullptr or current_dir_->empty()) {
+    if (current_dir_ == nullptr or current_dir_->empty()) {
         return *root_dir + '/' + *file_name_;
     } else {
         return *root_dir + '/' + *current_dir_ + '/' + *file_name_;
     }
 }
 
-void
-BufferHandle::UpdateToFileType() {
+void BufferHandle::UpdateToFileType() {
     std::unique_lock<RWMutex> w_locker(rw_locker_);
-    if(buffer_type_ == BufferType::kTempFile) {
+    if (buffer_type_ == BufferType::kTempFile) {
         // Move the file to standard file dir
         buffer_type_ = BufferType::kFile;
     } else {
@@ -348,8 +336,7 @@ BufferHandle::UpdateToFileType() {
     }
 }
 
-void
-BufferHandle::ReadFile() {
+void BufferHandle::ReadFile() {
     // File structure:
     // - header: magic number
     // - header: buffer size
@@ -358,7 +345,7 @@ BufferHandle::ReadFile() {
     LocalFileSystem fs;
 
     String file_path;
-    if(current_dir_ == nullptr or current_dir_->empty()) {
+    if (current_dir_ == nullptr or current_dir_->empty()) {
         file_path = *base_dir_ + '/' + *file_name_;
     } else {
         file_path = *current_dir_ + '/' + *file_name_;
@@ -372,57 +359,53 @@ BufferHandle::ReadFile() {
 
     SizeT file_size = fs.GetFileSize(*file_handler_);
 
-    if(file_size < sizeof(u64) * 3) {
+    if (file_size < sizeof(u64) * 3) {
         StorageError(fmt::format("Incorrect file length {}.", file_size));
     }
 
     // file header:
     u64 magic_number{0};
     i64 nbytes = fs.Read(*file_handler_, &magic_number, sizeof(magic_number));
-    if(nbytes != sizeof(magic_number)) {
+    if (nbytes != sizeof(magic_number)) {
         StorageError(fmt::format("Read magic number which length isn't {}.", nbytes));
     }
 
-    if(magic_number != 0x00dd3344) {
+    if (magic_number != 0x00dd3344) {
         StorageError(fmt::format("Incorrect file header magic number: {}.", magic_number));
     }
 
     u64 buffer_length{};
     nbytes = fs.Read(*file_handler_, &buffer_length, sizeof(buffer_length));
-    if(nbytes != sizeof(buffer_length)) {
+    if (nbytes != sizeof(buffer_length)) {
         StorageError(fmt::format("Unmatched buffer length: {} / {}", nbytes, buffer_length));
     }
 
     // file body
     data_ = MakeUnique<char[]>(buffer_length);
     nbytes = fs.Read(*file_handler_, data_.get(), buffer_length);
-    if(nbytes != buffer_length) {
+    if (nbytes != buffer_length) {
         StorageError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_length, nbytes));
     }
 
-    if(file_size != buffer_length + 3 * sizeof(u64)) {
-        StorageError(fmt::format("File size: {} isn't matched with {}.",
-                                 file_size, buffer_length + 3 * sizeof(u64)));
-
+    if (file_size != buffer_length + 3 * sizeof(u64)) {
+        StorageError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_length + 3 * sizeof(u64)));
     }
 
     u64 checksum{};
     // file footer: checksum
     nbytes = fs.Read(*file_handler_, &checksum, sizeof(checksum));
-    if(nbytes != sizeof(checksum)) {
+    if (nbytes != sizeof(checksum)) {
         StorageError(fmt::format("Incorrect file checksum length: {}.", nbytes));
     }
 }
 
-void
-BufferHandle::CloseFile() {
+void BufferHandle::CloseFile() {
     LocalFileSystem fs;
     fs.Close(*file_handler_);
 }
 
-void
-BufferHandle::WriteFile(SizeT buffer_length) {
-    if(data_ == nullptr) {
+void BufferHandle::WriteFile(SizeT buffer_length) {
+    if (data_ == nullptr) {
         StorageError("No data will be written.")
     }
 
@@ -434,7 +417,7 @@ BufferHandle::WriteFile(SizeT buffer_length) {
     LocalFileSystem fs;
 
     String to_write_path;
-    if(current_dir_ == nullptr or current_dir_->empty()) {
+    if (current_dir_ == nullptr or current_dir_->empty()) {
         to_write_path = *base_dir_;
 
     } else {
@@ -442,12 +425,11 @@ BufferHandle::WriteFile(SizeT buffer_length) {
     }
     String to_write_file = to_write_path + '/' + *file_name_;
 
-
-    if(!fs.Exists(to_write_path)) {
+    if (!fs.Exists(to_write_path)) {
         fs.CreateDirectory(to_write_path);
     }
 
-    if(fs.Exists(to_write_file)) {
+    if (fs.Exists(to_write_file)) {
         String err_msg = fmt::format("File {} was already been created before.", to_write_file);
         LOG_ERROR(err_msg);
         StorageError(err_msg);
@@ -457,7 +439,7 @@ BufferHandle::WriteFile(SizeT buffer_length) {
 
     bool prepare_success = false;
     DeferFn defer_fn([&]() {
-        if(!prepare_success) {
+        if (!prepare_success) {
             file_handler_->Close();
             file_handler_ = nullptr;
         }
@@ -465,34 +447,31 @@ BufferHandle::WriteFile(SizeT buffer_length) {
 
     u64 magic_number = 0x00dd3344;
     i64 nbytes = fs.Write(*file_handler_, &magic_number, sizeof(magic_number));
-    if(nbytes != sizeof(magic_number)) {
+    if (nbytes != sizeof(magic_number)) {
         StorageError(fmt::format("Write magic number which length is {}.", nbytes));
     }
 
     nbytes = fs.Write(*file_handler_, &buffer_length, sizeof(buffer_length));
-    if(nbytes != sizeof(buffer_length)) {
+    if (nbytes != sizeof(buffer_length)) {
         StorageError(fmt::format("Write buffer length field which length is {}.", nbytes));
     }
 
     nbytes = fs.Write(*file_handler_, data_.get(), buffer_length);
-    if(nbytes != buffer_length) {
-        StorageError(fmt::format("Expect to write buffer with size: {}, but {} bytes is written",
-                                 buffer_length,
-                                 nbytes));
+    if (nbytes != buffer_length) {
+        StorageError(fmt::format("Expect to write buffer with size: {}, but {} bytes is written", buffer_length, nbytes));
     }
 
     u64 checksum{};
     nbytes = fs.Write(*file_handler_, &checksum, sizeof(checksum));
-    if(nbytes != sizeof(checksum)) {
+    if (nbytes != sizeof(checksum)) {
         StorageError(fmt::format("Write buffer length field which length is {}.", nbytes));
     }
     prepare_success = true; // Not run defer_fn
 }
 
-void
-BufferHandle::SyncFile() {
+void BufferHandle::SyncFile() {
     LocalFileSystem fs;
     fs.SyncFile(*file_handler_);
 }
 
-}
+} // namespace infinity

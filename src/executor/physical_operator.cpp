@@ -3,14 +3,13 @@
 //
 
 #include "physical_operator.h"
-#include "physical_operator_type.h"
 #include "legacy_sched/operator_pipeline.h"
+#include "physical_operator_type.h"
 
 namespace infinity {
 
-SharedPtr<OperatorPipeline>
-PhysicalOperator::GenerateOperatorPipeline() {
-    if(operator_pipeline_.expired()) {
+SharedPtr<OperatorPipeline> PhysicalOperator::GenerateOperatorPipeline() {
+    if (operator_pipeline_.expired()) {
         SharedPtr<OperatorPipeline> shared_operator_pipeline = MakeShared<OperatorPipeline>(shared_from_this());
         operator_pipeline_ = std::weak_ptr<OperatorPipeline>(shared_operator_pipeline);
 
@@ -21,12 +20,6 @@ PhysicalOperator::GenerateOperatorPipeline() {
     }
 }
 
-String
-PhysicalOperator::GetName() const {
-    return PhysicalOperatorToString(operator_type_);
-}
+String PhysicalOperator::GetName() const { return PhysicalOperatorToString(operator_type_); }
 
 } // namespace infinity
-
-
-

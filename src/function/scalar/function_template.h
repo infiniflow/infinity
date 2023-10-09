@@ -15,15 +15,12 @@ struct UnaryMathFunctionData {
     bool all_converted_{false};
 };
 
-template<typename Operator>
+template <typename Operator>
 struct TryUnaryMathFunction {
-    template<typename SourceValueType, typename TargetValueType>
-    inline static TargetValueType
-    Execute(SourceValueType input, Bitmask* nulls_ptr, size_t idx, void* state_ptr) {
+    template <typename SourceValueType, typename TargetValueType>
+    inline static TargetValueType Execute(SourceValueType input, Bitmask *nulls_ptr, size_t idx, void *state_ptr) {
         return Operator::template Run<SourceValueType, TargetValueType>(input);
     }
 };
 
-}
-
-
+} // namespace infinity

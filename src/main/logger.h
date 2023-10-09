@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "spdlog/logger.h"
 #include "config.h"
+#include "spdlog/logger.h"
 #include <memory>
 
 namespace infinity {
@@ -14,12 +14,9 @@ extern SharedPtr<spdlog::logger> infinity_logger;
 
 class Logger {
 public:
-    static void
-    Initialize(const Config* config_ptr);
+    static void Initialize(const Config *config_ptr);
 
-    static void
-    Shutdown();
-
+    static void Shutdown();
 };
 
 #define LOG_TRACE(...) infinity::infinity_logger->trace(__VA_ARGS__);
@@ -28,4 +25,4 @@ public:
 #define LOG_ERROR(...) infinity::infinity_logger->error(__VA_ARGS__);
 #define LOG_CRITICAL(...) infinity::infinity_logger->critical(__VA_ARGS__);
 
-}
+} // namespace infinity

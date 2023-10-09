@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "common/types/alias/smart_ptr.h"
 #include "common/types/alias/primitives.h"
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
 
@@ -19,4 +19,4 @@ struct FragmentData {
     i64 data_count_{-1};
 };
 
-}
+} // namespace infinity

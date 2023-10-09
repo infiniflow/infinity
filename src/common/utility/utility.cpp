@@ -6,8 +6,7 @@
 
 namespace infinity {
 
-SizeT
-NextPowerOfTwo(SizeT input) {
+SizeT NextPowerOfTwo(SizeT input) {
     --input;
     input |= input >> 1;
     input |= input >> 2;
@@ -18,4 +17,4 @@ NextPowerOfTwo(SizeT input) {
     return ++input;
 }
 
-}
+} // namespace infinity

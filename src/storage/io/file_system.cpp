@@ -6,26 +6,12 @@
 
 namespace infinity {
 
-i64
-FileHandler::Read(void* data, infinity::u64 nbytes) {
-    return file_system_.Read(*this, data, nbytes);
-}
+i64 FileHandler::Read(void *data, infinity::u64 nbytes) { return file_system_.Read(*this, data, nbytes); }
 
-i64
-FileHandler::Write(void* data, u64 nbytes) {
-    return file_system_.Write(*this, data, nbytes);
-}
+i64 FileHandler::Write(void *data, u64 nbytes) { return file_system_.Write(*this, data, nbytes); }
 
-void
-FileHandler::Sync() {
-    return file_system_.SyncFile(*this);
-}
+void FileHandler::Sync() { return file_system_.SyncFile(*this); }
 
-void
-FileHandler::Close() {
-    return file_system_.Close(*this);
-}
+void FileHandler::Close() { return file_system_.Close(*this); }
 
-}
-
-
+} // namespace infinity

@@ -7,10 +7,9 @@
 
 namespace infinity {
 
-i32
-DatabaseHelper::CreateLockerFile(const String& dir_name) {
+i32 DatabaseHelper::CreateLockerFile(const String &dir_name) {
     NotImplementError("");
     return -1;
 }
 
-}
+} // namespace infinity

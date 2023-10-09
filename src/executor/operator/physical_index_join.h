@@ -10,26 +10,19 @@ namespace infinity {
 
 class PhysicalIndexJoin : public PhysicalOperator {
 public:
-    explicit PhysicalIndexJoin(uint64_t id)
-            : PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr, id) {}
+    explicit PhysicalIndexJoin(uint64_t id) : PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr, id) {}
 
     ~PhysicalIndexJoin() override = default;
 
-    void
-    Init() override;
+    void Init() override;
 
-    void
-    Execute(QueryContext* query_context) final;
+    void Execute(QueryContext *query_context) final;
 
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    SharedPtr<Vector<String>>
-    GetOutputNames() const final;
+    SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final;
-
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 };
 
-}
+} // namespace infinity

@@ -14,54 +14,32 @@ public:
     static constexpr i64 LENGTH = 16;
 
 public:
-    inline
-    UuidType() = default;
+    inline UuidType() = default;
 
-    explicit
-    UuidType(const_ptr_t input) {
-        Set(input);
-    }
+    explicit UuidType(const_ptr_t input) { Set(input); }
 
-    inline
-    ~UuidType() {
-        Reset();
-    }
+    inline ~UuidType() { Reset(); }
 
-    UuidType(const UuidType& other);
+    UuidType(const UuidType &other);
 
-    UuidType(UuidType&& other) noexcept;
+    UuidType(UuidType &&other) noexcept;
 
-    UuidType&
-    operator=(const UuidType& other);
+    UuidType &operator=(const UuidType &other);
 
-    UuidType&
-    operator=(UuidType&& other) noexcept;
+    UuidType &operator=(UuidType &&other) noexcept;
 
-    bool
-    operator==(const UuidType& other) const;
+    bool operator==(const UuidType &other) const;
 
-    inline bool
-    operator!=(const UuidType& other) const {
-        return !operator==(other);
-    }
+    inline bool operator!=(const UuidType &other) const { return !operator==(other); }
 
-    inline void
-    Set(const_ptr_t input) {
-        memcpy(body, input, UuidType::LENGTH);
-    }
+    inline void Set(const_ptr_t input) { memcpy(body, input, UuidType::LENGTH); }
 
-    [[nodiscard]] inline String
-    ToString() const {
-        return String(body, UuidType::LENGTH);
-    }
+    [[nodiscard]] inline String ToString() const { return String(body, UuidType::LENGTH); }
 
-    inline void
-    Reset() {
-        memset(body, 0, UuidType::LENGTH);
-    }
+    inline void Reset() { memset(body, 0, UuidType::LENGTH); }
 
 public:
     char_t body[UuidType::LENGTH];
 };
 
-}
+} // namespace infinity

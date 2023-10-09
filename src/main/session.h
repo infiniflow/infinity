@@ -4,7 +4,7 @@
 
 #pragma once
 
-//#include "query_context.h"
+// #include "query_context.h"
 #include "prepared_plan.h"
 #include "storage/txn/txn.h"
 
@@ -14,36 +14,24 @@ namespace infinity {
 
 class Session {
 public:
-    explicit
-    Session() : current_database_("default") {}
+    explicit Session() : current_database_("default") {}
 
-    [[nodiscard]] inline String&
-    current_database() {
-        return current_database_;
-    }
+    [[nodiscard]] inline String &current_database() { return current_database_; }
 
-    [[nodiscard]] inline const String&
-    user_name() const {
-        return user_name_;
-    }
+    [[nodiscard]] inline const String &user_name() const { return user_name_; }
 
-    [[nodiscard]] inline u64
-    user_id() const {
-        return user_id_;
-    }
+    [[nodiscard]] inline u64 user_id() const { return user_id_; }
 
-    inline void
-    SetClientInfo(const String& ip_address, u16 port) {
+    inline void SetClientInfo(const String &ip_address, u16 port) {
         client_address_ = ip_address;
         client_port_ = port;
     }
 
 public:
     // Txn is session level.
-    Txn* txn_{};
+    Txn *txn_{};
 
 private:
-
     // prepared plan for PREPARE and EXECUTE statement
     HashMap<String, SharedPtr<PreparedPlan>> prepared_plans_;
 
@@ -60,4 +48,4 @@ private:
     u16 client_port_{};
 };
 
-}
+} // namespace infinity

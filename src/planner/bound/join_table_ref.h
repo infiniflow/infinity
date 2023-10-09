@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "table_ref.h"
 #include "parser/table_reference/join_reference.h"
+#include "table_ref.h"
 
 namespace infinity {
 
@@ -13,8 +13,7 @@ class BindContext;
 
 class JoinTableRef : public TableRef {
 public:
-    explicit JoinTableRef(String alias) :
-            TableRef(TableRefType::kJoin, std::move(alias)) {}
+    explicit JoinTableRef(String alias) : TableRef(TableRefType::kJoin, std::move(alias)) {}
 
     SharedPtr<BindContext> left_bind_context_;
     SharedPtr<BindContext> right_bind_context_;
@@ -29,4 +28,4 @@ public:
     JoinType join_type_;
 };
 
-}
+} // namespace infinity

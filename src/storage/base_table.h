@@ -16,9 +16,8 @@ enum class BaseTableType {
     kCollection,
 };
 
-inline String
-ToString(BaseTableType type) {
-    switch(type) {
+inline String ToString(BaseTableType type) {
+    switch (type) {
         case BaseTableType::kTable: {
             return "Table";
         }
@@ -33,29 +32,19 @@ ToString(BaseTableType type) {
 
 class BaseTable {
 public:
-    explicit
-    BaseTable(TableCollectionType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
-            : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
+    explicit BaseTable(TableCollectionType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
+        : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
 
-    [[nodiscard]] inline TableCollectionType
-    kind() const {
-        return kind_;
-    }
+    [[nodiscard]] inline TableCollectionType kind() const { return kind_; }
 
     TableCollectionType kind_{TableCollectionType::kTableEntry};
 
-    [[nodiscard]] inline const SharedPtr<String>&
-    schema_name() const {
-        return schema_name_;
-    }
+    [[nodiscard]] inline const SharedPtr<String> &schema_name() const { return schema_name_; }
 
-    [[nodiscard]] inline const SharedPtr<String>&
-    table_name() const {
-        return table_name_;
-    }
+    [[nodiscard]] inline const SharedPtr<String> &table_name() const { return table_name_; }
 
     const SharedPtr<String> schema_name_{};
     const SharedPtr<String> table_name_{};
 };
 
-}
+} // namespace infinity

@@ -8,14 +8,12 @@ namespace infinity {
 
 class DropIndexInfo : public ExtraDDLInfo {
 public:
-    explicit
-    DropIndexInfo() : ExtraDDLInfo(DDLType::kIndex) {}
+    explicit DropIndexInfo() : ExtraDDLInfo(DDLType::kIndex) {}
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     String schema_name_{"default"};
     String index_name_{};
 };
 
-}
+} // namespace infinity

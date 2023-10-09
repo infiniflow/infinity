@@ -7,7 +7,7 @@
 
 namespace infinity {
 
-static const char* type2name[] = {
+static const char *type2name[] = {
     // Bool
     "Boolean",
 
@@ -66,10 +66,10 @@ static i64 type_size[] = {
     1, // Boolean
 
     // Integer * 5
-    1, // TinyInt
-    2, // SmallInt
-    4, // Integer
-    8, // BigInt
+    1,  // TinyInt
+    2,  // SmallInt
+    4,  // Integer
+    8,  // BigInt
     16, // HugeInt
 
     // Decimal * 1
@@ -106,8 +106,8 @@ static i64 type_size[] = {
     16, // Bitmap
     16, // UUID
     16, // Blob
-    8, // Embedding
-    8, // RowID
+    8,  // Embedding
+    8,  // RowID
 
     // Heterogeneous
     16, // Mixed
@@ -118,15 +118,8 @@ static i64 type_size[] = {
     0, // Invalid
 };
 
-const char*
-LogicalType2Str(LogicalType logical_type) {
-    return type2name[logical_type];
-}
+const char *LogicalType2Str(LogicalType logical_type) { return type2name[logical_type]; }
 
-i64
-LogicalTypeWidth(LogicalType logical_type) {
-    return type_size[logical_type];
-}
+i64 LogicalTypeWidth(LogicalType logical_type) { return type_size[logical_type]; }
 
-}
-
+} // namespace infinity

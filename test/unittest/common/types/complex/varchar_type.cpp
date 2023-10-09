@@ -2,23 +2,21 @@
 // Created by JinHai on 2022/11/13.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class VarcharTypeTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -70,7 +68,6 @@ TEST_F(VarcharTypeTest, TestInit) {
         EXPECT_EQ(v1.ToString(), s2);
         EXPECT_THROW(v1.Initialize(s1.c_str(), s1.length()), TypeException);
         v1.Reset();
-
     }
 }
 
@@ -299,4 +296,3 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
         EXPECT_EQ(v3.ptr, nullptr);
     }
 }
-

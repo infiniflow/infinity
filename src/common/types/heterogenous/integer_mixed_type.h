@@ -18,4 +18,4 @@ struct __attribute__((packed)) IntegerMixedType : public BaseMixedType {
     i64 value{0};
 };
 
-}
+} // namespace infinity

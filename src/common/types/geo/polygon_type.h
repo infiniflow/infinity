@@ -17,16 +17,12 @@ public:
     BoxType bounding_box{};
 
 public:
-
     PolygonType() = default;
 
-    inline ~PolygonType() {
-        Reset();
-    }
+    inline ~PolygonType() { Reset(); }
 
-    explicit inline
-    PolygonType(u64 count) : point_count(count) {
-        if(count == 0)
+    explicit inline PolygonType(u64 count) : point_count(count) {
+        if (count == 0)
             return;
 
         ptr = new char_t[point_count * sizeof(PointType)]{0};
@@ -35,70 +31,58 @@ public:
         ResetBoundingBox();
     }
 
-    PolygonType(const PolygonType& other);
+    PolygonType(const PolygonType &other);
 
-    PolygonType(PolygonType&& other) noexcept;
+    PolygonType(PolygonType &&other) noexcept;
 
-    PolygonType&
-    operator=(const PolygonType& other);
+    PolygonType &operator=(const PolygonType &other);
 
-    PolygonType&
-    operator=(PolygonType&& other) noexcept;
+    PolygonType &operator=(PolygonType &&other) noexcept;
 
-    inline bool
-    operator==(const PolygonType& other) const {
-        if(this == &other)
+    inline bool operator==(const PolygonType &other) const {
+        if (this == &other)
             return true;
-        if(this->point_count != other.point_count)
+        if (this->point_count != other.point_count)
             return false;
-        if(bounding_box != other.bounding_box)
+        if (bounding_box != other.bounding_box)
             return false;
 
-        auto* this_ptr = (PointType*)(ptr);
-        auto* other_ptr = (PointType*)(other.ptr);
-        for(u64 i = 0; i < this->point_count; ++i) {
-            if(this_ptr[i] != other_ptr[i])
+        auto *this_ptr = (PointType *)(ptr);
+        auto *other_ptr = (PointType *)(other.ptr);
+        for (u64 i = 0; i < this->point_count; ++i) {
+            if (this_ptr[i] != other_ptr[i])
                 return false;
         }
         return true;
     }
 
-    inline bool
-    operator!=(const PolygonType& other) const {
-        return !operator==(other);
-    }
+    inline bool operator!=(const PolygonType &other) const { return !operator==(other); }
 
-    inline void
-    SetPoint(u64 index, PointType point) {
-        if(ptr == nullptr)
+    inline void SetPoint(u64 index, PointType point) {
+        if (ptr == nullptr)
             TypeError("Not initialized.");
-        if(index >= point_count)
+        if (index >= point_count)
             TypeError("Index is larger than point count");
-        ((PointType*)(ptr))[index] = point;
+        ((PointType *)(ptr))[index] = point;
         bounding_box.upper_left.x = std::min(bounding_box.upper_left.x, point.x);
         bounding_box.upper_left.y = std::max(bounding_box.upper_left.y, point.y);
         bounding_box.lower_right.x = std::max(bounding_box.lower_right.x, point.x);
         bounding_box.lower_right.y = std::min(bounding_box.lower_right.y, point.y);
     }
 
-    inline PointType
-    GetPoint(u64 index) {
-        if(ptr == nullptr)
+    inline PointType GetPoint(u64 index) {
+        if (ptr == nullptr)
             TypeError("Not initialized.");
-        return ((PointType*)(ptr))[index];
+        return ((PointType *)(ptr))[index];
     }
 
-    [[nodiscard]] inline u64
-    PointCount() const {
-        return point_count;
-    }
+    [[nodiscard]] inline u64 PointCount() const { return point_count; }
 
-    inline void
-    Initialize(u64 count) {
-        if(point_count != 0) {
+    inline void Initialize(u64 count) {
+        if (point_count != 0) {
             TypeError("Already initialized, need to reset before re-initialize");
         }
-        if(count == 0)
+        if (count == 0)
             return;
         point_count = count;
 
@@ -108,9 +92,8 @@ public:
         ResetBoundingBox();
     }
 
-    inline void
-    Reset() {
-        if(point_count == 0)
+    inline void Reset() {
+        if (point_count == 0)
             return;
         delete[] ptr;
         point_count = 0;
@@ -118,19 +101,14 @@ public:
         GlobalResourceUsage::DecrRawMemCount();
     }
 
-    inline void
-    ResetBoundingBox() {
+    inline void ResetBoundingBox() {
         bounding_box.upper_left.x = std::numeric_limits<f64>::max();
         bounding_box.upper_left.y = -std::numeric_limits<f64>::max();
         bounding_box.lower_right.x = -std::numeric_limits<f64>::max();
         bounding_box.lower_right.y = std::numeric_limits<f64>::max();
     }
 
-    [[nodiscard]] inline String
-    ToString() const {
-        TypeError("ToString() isn't implemented");
-    }
+    [[nodiscard]] inline String ToString() const { TypeError("ToString() isn't implemented"); }
 };
 
-}
-
+} // namespace infinity

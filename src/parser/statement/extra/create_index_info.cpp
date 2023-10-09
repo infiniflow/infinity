@@ -7,15 +7,12 @@
 namespace infinity {
 
 CreateIndexInfo::~CreateIndexInfo() {
-    if(column_names_ != nullptr) {
+    if (column_names_ != nullptr) {
         delete column_names_;
         column_names_ = nullptr;
     }
 }
 
-String
-CreateIndexInfo::ToString() const {
-    return "create index info";
-}
+String CreateIndexInfo::ToString() const { return "create index info"; }
 
-}
+} // namespace infinity

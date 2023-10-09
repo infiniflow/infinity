@@ -8,13 +8,11 @@ namespace infinity {
 
 class DropSchemaInfo : public ExtraDDLInfo {
 public:
-    explicit
-    DropSchemaInfo() : ExtraDDLInfo(DDLType::kSchema) {}
+    explicit DropSchemaInfo() : ExtraDDLInfo(DDLType::kSchema) {}
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     String schema_name_;
 };
 
-}
+} // namespace infinity

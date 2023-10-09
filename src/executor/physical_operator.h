@@ -5,8 +5,8 @@
 #pragma once
 
 #include "main/query_context.h"
-#include "physical_operator_type.h"
 #include "operator_state.h"
+#include "physical_operator_type.h"
 #include "storage/table.h"
 
 #include <memory>
@@ -19,66 +19,36 @@ class OperatorPipeline;
 class PhysicalOperator : public std::enable_shared_from_this<PhysicalOperator> {
 
 public:
-    explicit PhysicalOperator(
-            PhysicalOperatorType type,
-            SharedPtr<PhysicalOperator> left,
-            SharedPtr<PhysicalOperator> right,
-            u64 id)
-            : operator_id_(id),
-              operator_type_(type),
-              left_(std::move(left)),
-              right_(std::move(right)) {}
+    explicit PhysicalOperator(PhysicalOperatorType type, SharedPtr<PhysicalOperator> left, SharedPtr<PhysicalOperator> right, u64 id)
+        : operator_id_(id), operator_type_(type), left_(std::move(left)), right_(std::move(right)) {}
 
-    virtual
-    ~PhysicalOperator() = default;
+    virtual ~PhysicalOperator() = default;
 
-    virtual void
-    Init() = 0;
+    virtual void Init() = 0;
 
-    SharedPtr<OperatorPipeline>
-    GenerateOperatorPipeline();
+    SharedPtr<OperatorPipeline> GenerateOperatorPipeline();
 
-    SharedPtr<PhysicalOperator>
-    left() const {
-        return left_;
-    }
+    SharedPtr<PhysicalOperator> left() const { return left_; }
 
-    SharedPtr<PhysicalOperator>
-    right() const {
-        return right_;
-    }
+    SharedPtr<PhysicalOperator> right() const { return right_; }
 
-    u64
-    node_id() const {
-        return operator_id_;
-    }
+    u64 node_id() const { return operator_id_; }
 
     /// for naive execution
-    virtual void
-    Execute(QueryContext* query_context) = 0;
+    virtual void Execute(QueryContext *query_context) = 0;
 
     /// for push based execution
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) = 0;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) = 0;
 
-    const SharedPtr<Table>&
-    output() const {
-        return output_;
-    }
+    const SharedPtr<Table> &output() const { return output_; }
 
-    inline PhysicalOperatorType
-    operator_type() const {
-        return operator_type_;
-    }
+    inline PhysicalOperatorType operator_type() const { return operator_type_; }
 
-    virtual SharedPtr<Vector<String>>
-    GetOutputNames() const = 0;
+    virtual SharedPtr<Vector<String>> GetOutputNames() const = 0;
 
-    virtual SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const = 0;
+    virtual SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const = 0;
 
-    virtual String
-    GetName() const;
+    virtual String GetName() const;
 
 protected:
     u64 operator_id_;
@@ -90,44 +60,24 @@ protected:
 
     SharedPtr<Table> output_{};
 
-
 public:
     // Operator
 
-    virtual bool
-    ParallelOperator() const {
-        return false;
-    }
+    virtual bool ParallelOperator() const { return false; }
 
 public:
     // Exchange
-    virtual bool
-    IsExchange() const {
-        return false;
-    }
+    virtual bool IsExchange() const { return false; }
 
-    virtual bool
-    ParallelExchange() const {
-        return false;
-    }
+    virtual bool ParallelExchange() const { return false; }
 
 public:
     // Sink
-    virtual bool
-    IsSink() const {
-        return false;
-    }
+    virtual bool IsSink() const { return false; }
 
-    virtual bool
-    ParallelSink() const {
-        return false;
-    }
+    virtual bool ParallelSink() const { return false; }
 
-    virtual bool
-    SinkOrderMatters() const {
-        return false;
-    }
+    virtual bool SinkOrderMatters() const { return false; }
 };
 
 } // namespace infinity
-

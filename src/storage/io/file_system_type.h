@@ -2,7 +2,6 @@
 // Created by jinhai on 23-9-7.
 //
 
-
 #pragma once
 
 #include "common/types/alias/primitives.h"
@@ -17,11 +16,7 @@ enum class FileSystemType {
     kNFS,
 };
 
-enum class FileLockType {
-    kNoLock,
-    kReadLock,
-    kWriteLock
-};
+enum class FileLockType { kNoLock, kReadLock, kWriteLock };
 
 class FileFlags {
 public:
@@ -35,4 +30,4 @@ public:
 
 using DirEntry = std::filesystem::directory_entry;
 
-}
+} // namespace infinity

@@ -2,14 +2,13 @@
 
 #include "common/types/alias/primitives.h"
 
+#include <memory>
 #include <roaring/roaring.hh>
 #include <vector>
-#include <memory>
 
 namespace infinity {
 
 using Roaring = roaring::Roaring;
-
 
 class BitSlicedIndex {
 public:
@@ -17,29 +16,21 @@ public:
 
     ~BitSlicedIndex();
 
-    bool
-    DoPut(u32 id, u64 val, u64& old_val);
+    bool DoPut(u32 id, u64 val, u64 &old_val);
 
-    void
-    DoRemove(u32 id, u64 val);
+    void DoRemove(u32 id, u64 val);
 
-    bool
-    DoGet(u32 id, u64& val);
+    bool DoGet(u32 id, u64 &val);
 
-    int
-    DoRangeLT(uint64_t expect, bool allow_eq, std::unique_ptr<Roaring>& filter);
+    int DoRangeLT(uint64_t expect, bool allow_eq, std::unique_ptr<Roaring> &filter);
 
-    int
-    DoRangeGT(uint64_t expect, bool allow_eq, std::unique_ptr<Roaring>& filter);
+    int DoRangeGT(uint64_t expect, bool allow_eq, std::unique_ptr<Roaring> &filter);
 
-    int
-    DoRangeEQ(uint64_t expect, std::unique_ptr<Roaring>& filter);
+    int DoRangeEQ(uint64_t expect, std::unique_ptr<Roaring> &filter);
 
-    int
-    DoRangeNEQ(uint64_t expect, std::unique_ptr<Roaring>& filter);
+    int DoRangeNEQ(uint64_t expect, std::unique_ptr<Roaring> &filter);
 
-    int
-    DoRangeBetween(uint64_t min, uint64_t max, std::unique_ptr<Roaring>& filter);
+    int DoRangeBetween(uint64_t min, uint64_t max, std::unique_ptr<Roaring> &filter);
 
 private:
     u64 schema_id_;
@@ -48,4 +39,4 @@ private:
     std::vector<std::shared_ptr<Roaring>> bitmaps_;
     u8 bit_depth_ = 0;
 };
-}
+} // namespace infinity

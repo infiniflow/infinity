@@ -6,7 +6,6 @@
 
 #include <utility>
 
-
 #include "storage/meta/entry/db_entry.h"
 
 namespace infinity {
@@ -15,39 +14,23 @@ class TxnManager;
 
 struct DBMeta {
 public:
-    explicit
-    DBMeta(const SharedPtr<String>& data_dir,
-           SharedPtr<String> name)
-            : db_name_(std::move(name)), data_dir_(data_dir) {
-    }
+    explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> name) : db_name_(std::move(name)), data_dir_(data_dir) {}
 
 public:
-
     // Reserved
-    static EntryResult
-    CreateNewEntry(DBMeta* db_meta,
-                   u64 txn_id,
-                   TxnTimeStamp begin_ts,
-                   TxnManager* txn_mgr);
+    static EntryResult CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    static EntryResult
-    DropNewEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager* txn_mgr);
+    static EntryResult DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    static void
-    DeleteNewEntry(DBMeta* db_meta, u64 txn_id, TxnManager* txn_mgr);
+    static void DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *txn_mgr);
 
-    static EntryResult
-    GetEntry(DBMeta* db_meta, u64 txn_id, TxnTimeStamp begin_ts);
+    static EntryResult GetEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static SharedPtr<String>
-    ToString(DBMeta* db_meta);
+    static SharedPtr<String> ToString(DBMeta *db_meta);
 
-    static nlohmann::json
-    Serialize(const DBMeta* db_meta);
+    static nlohmann::json Serialize(const DBMeta *db_meta);
 
-    static UniquePtr<DBMeta>
-    Deserialize(const nlohmann::json& db_meta_json,
-                BufferManager* buffer_mgr);
+    static UniquePtr<DBMeta> Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr);
 
 public:
     RWMutex rw_locker_{};
@@ -58,4 +41,4 @@ public:
     List<UniquePtr<BaseEntry>> entry_list_{};
 };
 
-}
+} // namespace infinity

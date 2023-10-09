@@ -7,18 +7,18 @@
 namespace infinity {
 
 InsertStatement::~InsertStatement() {
-    if(select_ != nullptr) {
+    if (select_ != nullptr) {
         delete select_;
         select_ = nullptr;
     }
 
-    if(columns_ != nullptr) {
+    if (columns_ != nullptr) {
         delete columns_;
         columns_ = nullptr;
     }
 
-    if(values_ != nullptr) {
-        for(auto& value_ptr: *values_) {
+    if (values_ != nullptr) {
+        for (auto &value_ptr : *values_) {
             delete value_ptr;
         }
         delete values_;
@@ -26,9 +26,6 @@ InsertStatement::~InsertStatement() {
     }
 }
 
-String
-InsertStatement::ToString() const {
-    return "insert statement";
-}
+String InsertStatement::ToString() const { return "insert statement"; }
 
-}
+} // namespace infinity

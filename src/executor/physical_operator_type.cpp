@@ -2,16 +2,13 @@
 // Created by xwg on 23-9-8.
 //
 
-
 #include "executor/physical_operator_type.h"
 
 #include "common/utility/exception.h"
 
-
 namespace infinity {
-String
-PhysicalOperatorToString(PhysicalOperatorType type) {
-    switch(type) {
+String PhysicalOperatorToString(PhysicalOperatorType type) {
+    switch (type) {
 
         case PhysicalOperatorType::kInvalid:
             return "Invalid";
@@ -110,4 +107,4 @@ PhysicalOperatorToString(PhysicalOperatorType type) {
     }
     throw NotImplementException("Unknown physical operator type");
 }
-}
+} // namespace infinity

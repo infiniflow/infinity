@@ -17,70 +17,44 @@ class BaseTableRef;
 
 class PhysicalTableScan : public PhysicalOperator {
 public:
-    explicit
-    PhysicalTableScan(u64 id,
-                      SharedPtr<BaseTableRef> base_table_ref)
-            : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id),
-              base_table_ref_(std::move(base_table_ref)) {}
+    explicit PhysicalTableScan(u64 id, SharedPtr<BaseTableRef> base_table_ref)
+        : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id), base_table_ref_(std::move(base_table_ref)) {}
 
     ~PhysicalTableScan() override = default;
 
-    void
-    Init() override;
+    void Init() override;
 
-    void
-    Execute(QueryContext* query_context) final;
+    void Execute(QueryContext *query_context) final;
 
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    SharedPtr<Vector<String>>
-    GetOutputNames() const final;
+    SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    Vector<SharedPtr<Vector<GlobalBlockID>>>
-    PlanBlockEntries(i64 parallel_count) const;
+    Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
 
-    String
-    table_alias() const;
+    String table_alias() const;
 
-    u64
-    TableIndex() const;
+    u64 TableIndex() const;
 
-    TableCollectionEntry*
-    TableEntry() const;
+    TableCollectionEntry *TableEntry() const;
 
-    SizeT
-    BlockEntryCount() const;
+    SizeT BlockEntryCount() const;
 
-    BlockIndex*
-    GetBlockIndex() const;
+    BlockIndex *GetBlockIndex() const;
 
-    Vector<SizeT>&
-    ColumnIDs() const;
+    Vector<SizeT> &ColumnIDs() const;
 
-    bool
-    ParallelExchange() const override {
-        return true;
-    }
+    bool ParallelExchange() const override { return true; }
 
-    bool
-    IsExchange() const override {
-        return true;
-    }
+    bool IsExchange() const override { return true; }
 
 private:
-
-    void
-    ExecuteInternal(QueryContext* query_context,
-                    TableScanInputState* table_scan_input_state,
-                    TableScanOutputState* table_scan_output_state);
+    void ExecuteInternal(QueryContext *query_context, TableScanInputState *table_scan_input_state, TableScanOutputState *table_scan_output_state);
 
 private:
     SharedPtr<BaseTableRef> base_table_ref_{};
 };
 
-
-}
+} // namespace infinity

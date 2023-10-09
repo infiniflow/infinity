@@ -3,14 +3,12 @@
 #include <unordered_map>
 
 namespace infinity {
-template<typename KeyEncoderTraits>
-KeyEncoder::KeyEncoder(KeyEncoderTraits traits)
-        : encode_func_(traits.Encode), size_func_(traits.Size) {}
+template <typename KeyEncoderTraits>
+KeyEncoder::KeyEncoder(KeyEncoderTraits traits) : encode_func_(traits.Encode), size_func_(traits.Size) {}
 
 struct FastHash {
-    template<typename T>
-    std::size_t
-    operator()(T t) const {
+    template <typename T>
+    std::size_t operator()(T t) const {
         return static_cast<std::size_t>(t);
     }
 };
@@ -18,25 +16,24 @@ struct FastHash {
 class KeyEncoderIntializer {
 public:
     ~KeyEncoderIntializer() {
-        for(auto iter: encoders_) {
+        for (auto iter : encoders_) {
             delete iter.second;
         }
     }
 
-    static KeyEncoderIntializer*
-    GetInstance() {
+    static KeyEncoderIntializer *GetInstance() {
         static KeyEncoderIntializer instance;
         return &instance;
     }
 
-    KeyEncoder*
-    GetKeyEncoder(LogicalType type) const {
+    KeyEncoder *GetKeyEncoder(LogicalType type) const {
         auto it = encoders_.find(type);
-        if(it != encoders_.end()) {
+        if (it != encoders_.end()) {
             return it->second;
         }
         return nullptr;
     }
+
 private:
     KeyEncoderIntializer() {
         AddEntry<LogicalType::kBoolean>();
@@ -68,17 +65,13 @@ private:
         AddEntry<LogicalType::kRowID>();
     }
 
-    template<LogicalType data_type>
-    void
-    AddEntry() {
+    template <LogicalType data_type>
+    void AddEntry() {
         encoders_.emplace(data_type, new KeyEncoder(KeyEncoderTraits<data_type>()));
     }
 
-    std::unordered_map<LogicalType, KeyEncoder*, FastHash> encoders_;
+    std::unordered_map<LogicalType, KeyEncoder *, FastHash> encoders_;
 };
 
-const KeyEncoder*
-GetKeyEncoder(LogicalType type) {
-    return KeyEncoderIntializer::GetInstance()->GetKeyEncoder(type);
-}
-}
+const KeyEncoder *GetKeyEncoder(LogicalType type) { return KeyEncoderIntializer::GetInstance()->GetKeyEncoder(type); }
+} // namespace infinity

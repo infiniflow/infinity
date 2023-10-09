@@ -12,9 +12,7 @@ class NaiveScheduler : public Scheduler {
 public:
     ~NaiveScheduler() override = default;
 
-    void
-    Schedule(QueryContext* query_context, const SharedPtr<Pipeline>& pipeline) override;
+    void Schedule(QueryContext *query_context, const SharedPtr<Pipeline> &pipeline) override;
 };
 
-}
-
+} // namespace infinity

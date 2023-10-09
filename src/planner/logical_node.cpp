@@ -4,5 +4,4 @@
 
 #include "logical_node.h"
 
-namespace infinity {
-}
+namespace infinity {}

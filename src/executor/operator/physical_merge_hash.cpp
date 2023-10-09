@@ -6,19 +6,10 @@
 
 namespace infinity {
 
-void
-PhysicalMergeHash::Init() {
+void PhysicalMergeHash::Init() {}
 
-}
+void PhysicalMergeHash::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void
-PhysicalMergeHash::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+void PhysicalMergeHash::Execute(QueryContext *query_context) {}
 
-}
-
-void
-PhysicalMergeHash::Execute(QueryContext* query_context) {
-
-}
-
-}
+} // namespace infinity

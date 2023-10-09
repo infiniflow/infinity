@@ -6,10 +6,10 @@
 
 #include <shared_mutex>
 
-#include "storage/io/file_system_type.h"
-#include "storage/common/async_batch_processor.h"
-#include "storage/meta/entry/db_entry.h"
 #include "db_meta.h"
+#include "storage/common/async_batch_processor.h"
+#include "storage/io/file_system_type.h"
+#include "storage/meta/entry/db_entry.h"
 
 namespace infinity {
 
@@ -23,39 +23,18 @@ class TableFunction;
 
 struct NewCatalog {
 public:
-    explicit
-    NewCatalog(SharedPtr<String> dir);
+    explicit NewCatalog(SharedPtr<String> dir);
 
 public:
+    static EntryResult CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    static EntryResult
-    CreateDatabase(NewCatalog* catalog,
-                   const String& db_name,
-                   u64 txn_id,
-                   TxnTimeStamp begin_ts,
-                   TxnManager* txn_mgr);
+    static EntryResult DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    static EntryResult
-    DropDatabase(NewCatalog* catalog,
-                 const String& db_name,
-                 u64 txn_id,
-                 TxnTimeStamp begin_ts,
-                 TxnManager* txn_mgr);
+    static EntryResult GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static EntryResult
-    GetDatabase(NewCatalog* catalog,
-                const String& db_name,
-                u64 txn_id,
-                TxnTimeStamp begin_ts);
+    static void RemoveDBEntry(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnManager *txn_mgr);
 
-    static void
-    RemoveDBEntry(NewCatalog* catalog,
-                  const String& db_name,
-                  u64 txn_id,
-                  TxnManager* txn_mgr);
-
-    static Vector<DBEntry*>
-    Databases(NewCatalog* catalog, u64 txn_id, TxnTimeStamp begin_ts);
+    static Vector<DBEntry *> Databases(NewCatalog *catalog, u64 txn_id, TxnTimeStamp begin_ts);
 
 #if 0
 
@@ -92,41 +71,26 @@ public:
 #endif
 
     // Function related methods
-    static SharedPtr<FunctionSet>
-    GetFunctionSetByName(NewCatalog* catalog, String function_name);
+    static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
 
-    static void
-    AddFunctionSet(NewCatalog* catalog, const SharedPtr<FunctionSet>& function_set);
+    static void AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
 
-    static void
-    DeleteFunctionSet(NewCatalog* catalog, String function_name);
+    static void DeleteFunctionSet(NewCatalog *catalog, String function_name);
 
     // Table Function related methods
-    static SharedPtr<TableFunction>
-    GetTableFunctionByName(NewCatalog* catalog, String function_name);
+    static SharedPtr<TableFunction> GetTableFunctionByName(NewCatalog *catalog, String function_name);
 
-    static void
-    AddTableFunction(NewCatalog* catalog, const SharedPtr<TableFunction>& table_function);
+    static void AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunction> &table_function);
 
-    static void
-    DeleteTableFunction(NewCatalog* catalog, String function_name);
+    static void DeleteTableFunction(NewCatalog *catalog, String function_name);
 
-    static nlohmann::json
-    Serialize(const NewCatalog* catalog);
+    static nlohmann::json Serialize(const NewCatalog *catalog);
 
-    static void
-    Deserialize(const nlohmann::json& catalog_json,
-                BufferManager* buffer_mgr,
-                UniquePtr<NewCatalog>& catalog);
+    static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
 
-    static UniquePtr<NewCatalog>
-    LoadFromFile(const SharedPtr<DirEntry>& dir_entry,
-                 BufferManager* buffer_mgr);
+    static UniquePtr<NewCatalog> LoadFromFile(const SharedPtr<DirEntry> &dir_entry, BufferManager *buffer_mgr);
 
-    static void
-    SaveAsFile(const NewCatalog* catalog_ptr,
-               const String& dir,
-               const String& file_name);
+    static void SaveAsFile(const NewCatalog *catalog_ptr, const String &dir, const String &file_name);
 
 public:
     SharedPtr<String> current_dir_{nullptr};
@@ -140,4 +104,4 @@ public:
     HashMap<String, SharedPtr<TableFunction>> table_functions_;
 };
 
-}
+} // namespace infinity

@@ -12,18 +12,13 @@ class CorrelatedColumnExpression : public BaseExpression {
 public:
     CorrelatedColumnExpression(DataType data_type, String column_name);
 
-    inline DataType
-    Type() const override {
-        return data_type_;
-    }
+    inline DataType Type() const override { return data_type_; }
 
-    String
-    ToString() const override;
+    String ToString() const override;
 
 private:
     DataType data_type_;
     String column_name_;
 };
 
-
-}
+} // namespace infinity

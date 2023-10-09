@@ -10,30 +10,20 @@ namespace infinity {
 
 class CorrelatedExpressionsDetector final : public LogicalNodeVisitor {
 public:
-    explicit
-    CorrelatedExpressionsDetector(const Vector<SharedPtr<ColumnExpression>>& correlated_column_exprs)
-            : correlated_column_exprs_(correlated_column_exprs) {}
+    explicit CorrelatedExpressionsDetector(const Vector<SharedPtr<ColumnExpression>> &correlated_column_exprs)
+        : correlated_column_exprs_(correlated_column_exprs) {}
 
-    void
-    VisitNode(LogicalNode& op) final;
+    void VisitNode(LogicalNode &op) final;
 
-    SharedPtr<BaseExpression>
-    VisitReplace(const SharedPtr<ColumnExpression>& expression) final;
+    SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) final;
 
-    SharedPtr<BaseExpression>
-    VisitReplace(const SharedPtr<SubqueryExpression>& expression) final;
+    SharedPtr<BaseExpression> VisitReplace(const SharedPtr<SubqueryExpression> &expression) final;
 
-    [[nodiscard]] inline bool
-    IsCorrelated() const {
-        return is_correlated_;
-    }
+    [[nodiscard]] inline bool IsCorrelated() const { return is_correlated_; }
 
 private:
-    const Vector<SharedPtr<ColumnExpression>>& correlated_column_exprs_;
+    const Vector<SharedPtr<ColumnExpression>> &correlated_column_exprs_;
     bool is_correlated_{false};
 };
 
-}
-
-
-
+} // namespace infinity

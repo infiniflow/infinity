@@ -65,11 +65,11 @@ enum class ExpressionType {
     // Unary
     kUnaryMinus,
     kIsNull,
-    kIsNotNull,  // kNot + kIsNull ?
+    kIsNotNull, // kNot + kIsNull ?
 
     // Value
     kValue,
-    kDefault, // ??
+    kDefault,   // ??
     kParameter, // ??
 
     // IN
@@ -82,7 +82,7 @@ enum class ExpressionType {
 
     // Misc.
     kKnn,
-    kDistinctFrom, // ??
+    kDistinctFrom,    // ??
     kNotDistinctFrom, // ??
     kPlaceholder,
     kPredicate, // ?

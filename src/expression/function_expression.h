@@ -11,19 +11,14 @@ namespace infinity {
 
 class FunctionExpression : public BaseExpression {
 public:
-    FunctionExpression(ScalarFunction function,
-                       Vector<SharedPtr<BaseExpression>> arguments);
+    FunctionExpression(ScalarFunction function, Vector<SharedPtr<BaseExpression>> arguments);
 
-    inline DataType
-    Type() const override {
-        return func_.return_type();
-    }
+    inline DataType Type() const override { return func_.return_type(); }
 
-    String
-    ToString() const override;
+    String ToString() const override;
 
 public:
     ScalarFunction func_;
 };
 
-}
+} // namespace infinity

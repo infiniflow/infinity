@@ -6,17 +6,13 @@
 
 namespace infinity {
 
-String
-TableReference::ToString() {
-    return "TableReference";
-}
+String TableReference::ToString() { return "TableReference"; }
 
-String
-TableReference::GetTableName() const {
-    if(alias_ != nullptr) {
+String TableReference::GetTableName() const {
+    if (alias_ != nullptr) {
         return String(alias_->alias_);
     }
     return table_name_;
 }
 
-};
+}; // namespace infinity

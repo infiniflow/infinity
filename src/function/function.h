@@ -4,10 +4,9 @@
 
 #pragma once
 
-
 #include "common/types/alias/strings.h"
-#include <string>
 #include <functional>
+#include <string>
 
 namespace infinity {
 
@@ -21,33 +20,19 @@ enum class FunctionType {
 
 class Function {
 public:
-    explicit
-    Function(String name, FunctionType type)
-            : name_(std::move(name)),
-              type_(type) {}
+    explicit Function(String name, FunctionType type) : name_(std::move(name)), type_(type) {}
 
-    virtual
-    ~Function() = default;
+    virtual ~Function() = default;
 
-    [[nodiscard]] inline FunctionType
-    type() const {
-        return type_;
-    }
+    [[nodiscard]] inline FunctionType type() const { return type_; }
 
-    [[nodiscard]] inline const String&
-    name() const {
-        return name_;
-    }
+    [[nodiscard]] inline const String &name() const { return name_; }
 
-    [[nodiscard]] virtual String
-    ToString() const = 0;
+    [[nodiscard]] virtual String ToString() const = 0;
 
 protected:
     String name_;
     FunctionType type_{FunctionType::kInvalid};
-
 };
 
-
-}
-
+} // namespace infinity

@@ -9,14 +9,12 @@ namespace infinity {
 
 class DropTableInfo : public ExtraDDLInfo {
 public:
-    explicit
-    DropTableInfo() : ExtraDDLInfo(DDLType::kTable) {}
+    explicit DropTableInfo() : ExtraDDLInfo(DDLType::kTable) {}
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     String schema_name_{"default"};
     String table_name_{};
 };
 
-}
+} // namespace infinity

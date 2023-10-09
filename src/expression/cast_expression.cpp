@@ -11,13 +11,12 @@
 
 namespace infinity {
 
-SharedPtr<BaseExpression>
-CastExpression::AddCastToType(const SharedPtr<BaseExpression>& source_expr_ptr, const DataType& target_type) {
-    if(source_expr_ptr->Type() == target_type) {
+SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpression> &source_expr_ptr, const DataType &target_type) {
+    if (source_expr_ptr->Type() == target_type) {
         return source_expr_ptr;
     }
 
-    if(CastExpression::CanCast(source_expr_ptr->Type(), target_type)) {
+    if (CastExpression::CanCast(source_expr_ptr->Type(), target_type)) {
         BoundCastFunc cast = CastFunction::GetBoundFunc(source_expr_ptr->Type(), target_type);
         return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
@@ -25,16 +24,15 @@ CastExpression::AddCastToType(const SharedPtr<BaseExpression>& source_expr_ptr, 
     }
 }
 
-bool
-CastExpression::CanCast(const DataType& source, const DataType& target) {
-    switch(target.type()) {
+bool CastExpression::CanCast(const DataType &source, const DataType &target) {
+    switch (target.type()) {
         case LogicalType::kNull:
         case LogicalType::kInvalid:
             PlannerError("Invalid data type");
         default:;
     }
 
-    switch(source.type()) {
+    switch (source.type()) {
         case LogicalType::kBoolean:
         case LogicalType::kTinyInt:
         case LogicalType::kSmallInt:
@@ -43,7 +41,7 @@ CastExpression::CanCast(const DataType& source, const DataType& target) {
         case LogicalType::kFloat:
         case LogicalType::kDouble:
         case LogicalType::kDecimal:
-            switch(target.type()) {
+            switch (target.type()) {
                 case LogicalType::kBoolean:
                 case LogicalType::kTinyInt:
                 case LogicalType::kSmallInt:
@@ -57,7 +55,7 @@ CastExpression::CanCast(const DataType& source, const DataType& target) {
                     return false;
             }
         case LogicalType::kDate:
-            switch(target.type()) {
+            switch (target.type()) {
                 case LogicalType::kDate:
                 case LogicalType::kDateTime:
                 case LogicalType::kVarchar:
@@ -66,7 +64,7 @@ CastExpression::CanCast(const DataType& source, const DataType& target) {
                     return false;
             }
         case LogicalType::kTime:
-            switch(target.type()) {
+            switch (target.type()) {
                 case LogicalType::kTime:
                 case LogicalType::kVarchar:
                     return true;
@@ -74,7 +72,7 @@ CastExpression::CanCast(const DataType& source, const DataType& target) {
                     return false;
             }
         case LogicalType::kDateTime:
-            switch(target.type()) {
+            switch (target.type()) {
                 case LogicalType::kDate:
                 case LogicalType::kDateTime:
                 case LogicalType::kVarchar:
@@ -83,7 +81,7 @@ CastExpression::CanCast(const DataType& source, const DataType& target) {
                     return false;
             }
         case LogicalType::kInterval:
-            switch(target.type()) {
+            switch (target.type()) {
                 case LogicalType::kInterval:
                 case LogicalType::kVarchar:
                     return true;
@@ -91,7 +89,7 @@ CastExpression::CanCast(const DataType& source, const DataType& target) {
                     return false;
             }
         case LogicalType::kVarchar:
-            switch(target.type()) {
+            switch (target.type()) {
                 case LogicalType::kBoolean:
                 case LogicalType::kTinyInt:
                 case LogicalType::kSmallInt:
@@ -114,8 +112,7 @@ CastExpression::CanCast(const DataType& source, const DataType& target) {
     }
 }
 
-String
-CastExpression::ToString() const {
+String CastExpression::ToString() const {
     std::stringstream ss;
 
     ss << "Cast(" << arguments_[0]->Name() << " As " << target_type_.ToString() << ")";
@@ -123,4 +120,4 @@ CastExpression::ToString() const {
     return ss.str();
 }
 
-}
+} // namespace infinity

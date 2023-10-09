@@ -2,25 +2,23 @@
 // Created by jinhai on 23-6-4.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
+#include "main/infinity.h"
+#include "main/logger.h"
+#include "main/profiler/base_profiler.h"
+#include "main/stats/global_resource_usage.h"
 #include "storage/data_block.h"
 #include "storage/txn/txn_manager.h"
-#include "main/profiler/base_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class DBTxnTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -34,10 +32,10 @@ class DBTxnTest : public BaseTest {
 TEST_F(DBTxnTest, test1) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create
-    Txn* new_txn = txn_mgr->CreateTxn();
+    Txn *new_txn = txn_mgr->CreateTxn();
 
     EntryResult create_res;
 
@@ -71,7 +69,8 @@ TEST_F(DBTxnTest, test1) {
     EXPECT_EQ(create_res.entry_, same_create_res.entry_);
 
     // Txn2: Drop db1, OK
-    EntryResult drop_db_res = new_txn->DropDatabase("db1", ConflictType::kError);;
+    EntryResult drop_db_res = new_txn->DropDatabase("db1", ConflictType::kError);
+    ;
     EXPECT_NE(drop_db_res.entry_, nullptr);
     EXPECT_EQ(drop_db_res.err_, nullptr);
 
@@ -91,7 +90,8 @@ TEST_F(DBTxnTest, test1) {
     EXPECT_EQ(same_create_res.entry_, nullptr);
 
     // Txn3: Drop db1, NOT OK
-    drop_db_res = new_txn->DropDatabase("db1", ConflictType::kError);;
+    drop_db_res = new_txn->DropDatabase("db1", ConflictType::kError);
+    ;
     EXPECT_EQ(drop_db_res.entry_, nullptr);
 
     // Txn3: Commit, OK
@@ -101,12 +101,12 @@ TEST_F(DBTxnTest, test1) {
 TEST_F(DBTxnTest, test20) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr->CreateTxn();
+    Txn *new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn->BeginTxn();
@@ -129,7 +129,8 @@ TEST_F(DBTxnTest, test20) {
     EXPECT_NE(get_res.entry_, nullptr);
 
     // Txn2: Drop db1, OK
-    create1_res = new_txn->DropDatabase("db1", ConflictType::kError);;
+    create1_res = new_txn->DropDatabase("db1", ConflictType::kError);
+    ;
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn2: Create db1, OK
@@ -164,12 +165,12 @@ TEST_F(DBTxnTest, test20) {
 TEST_F(DBTxnTest, test2) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     EntryResult create1_res, create2_res, create3_res, dropped_res, get_res;
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr->CreateTxn();
+    Txn *new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn->BeginTxn();
@@ -184,7 +185,8 @@ TEST_F(DBTxnTest, test2) {
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn1: Drop db1, OK
-    dropped_res = new_txn->DropDatabase("db1", ConflictType::kError);;
+    dropped_res = new_txn->DropDatabase("db1", ConflictType::kError);
+    ;
     EXPECT_EQ(create1_res.entry_, dropped_res.entry_);
 
     // Txn1: Get db1, NOT OK
@@ -241,13 +243,13 @@ TEST_F(DBTxnTest, test2) {
 TEST_F(DBTxnTest, test3) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
 
@@ -280,12 +282,12 @@ TEST_F(DBTxnTest, test3) {
 TEST_F(DBTxnTest, test4) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
     // Txn2: Begin, OK
@@ -312,10 +314,10 @@ TEST_F(DBTxnTest, test4) {
 TEST_F(DBTxnTest, test5) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr->CreateTxn();
+    Txn *new_txn = txn_mgr->CreateTxn();
 
     EntryResult create_res, get_res;
     // Txn1: Begin, OK
@@ -348,13 +350,13 @@ TEST_F(DBTxnTest, test5) {
 TEST_F(DBTxnTest, test6) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
 
@@ -384,7 +386,7 @@ TEST_F(DBTxnTest, test6) {
     new_txn2->CommitTxn();
 
     // Txn3: Create, OK
-    Txn* new_txn3 = txn_mgr->CreateTxn();
+    Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();
@@ -404,13 +406,13 @@ TEST_F(DBTxnTest, test6) {
 TEST_F(DBTxnTest, test7) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn* new_txn1 = txn_mgr->CreateTxn();
+    Txn *new_txn1 = txn_mgr->CreateTxn();
 
     // Txn2: Create, OK
-    Txn* new_txn2 = txn_mgr->CreateTxn();
+    Txn *new_txn2 = txn_mgr->CreateTxn();
 
     EntryResult create1_res, create2_res, dropped1_res, get_res;
 
@@ -430,7 +432,8 @@ TEST_F(DBTxnTest, test7) {
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn1: Drop db1, OK
-    dropped1_res = new_txn1->DropDatabase("db1", ConflictType::kError);;
+    dropped1_res = new_txn1->DropDatabase("db1", ConflictType::kError);
+    ;
     EXPECT_NE(dropped1_res.entry_, nullptr);
 
     // Txn2: Create db1, OK
@@ -444,7 +447,7 @@ TEST_F(DBTxnTest, test7) {
     new_txn2->CommitTxn();
 
     // Txn3: Create, OK
-    Txn* new_txn3 = txn_mgr->CreateTxn();
+    Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
     new_txn3->BeginTxn();

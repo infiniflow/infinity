@@ -2,11 +2,11 @@
 // Created by tangdonghai on 23-9-5.
 //
 
+#include "base_test.h"
 #include <gtest/gtest.h>
 #include <mutex>
 #include <thread>
 #include <utility>
-#include "base_test.h"
 
 #include "main/infinity.h"
 #include "storage/buffer/buffer_manager.h"

@@ -7,15 +7,12 @@
 namespace infinity {
 
 SubqueryReference::~SubqueryReference() {
-    if(select_statement_ != nullptr) {
+    if (select_statement_ != nullptr) {
         delete select_statement_;
         select_statement_ = nullptr;
     }
 }
 
-String
-SubqueryReference::ToString() {
-    return "SubqueryReference";
-}
+String SubqueryReference::ToString() { return "SubqueryReference"; }
 
-};
+}; // namespace infinity

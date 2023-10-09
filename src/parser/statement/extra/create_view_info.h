@@ -11,20 +11,17 @@ namespace infinity {
 
 class CreateViewInfo final : public ExtraDDLInfo {
 public:
-    explicit
-    CreateViewInfo() : ExtraDDLInfo(DDLType::kView) {}
+    explicit CreateViewInfo() : ExtraDDLInfo(DDLType::kView) {}
 
     ~CreateViewInfo() final;
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     String schema_name_{};
     String view_name_{};
 
-    Vector<String>* view_columns_{};
-    SelectStatement* select_{nullptr};
+    Vector<String> *view_columns_{};
+    SelectStatement *select_{nullptr};
 };
 
-}
-
+} // namespace infinity

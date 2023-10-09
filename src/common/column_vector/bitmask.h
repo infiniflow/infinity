@@ -11,8 +11,7 @@ namespace infinity {
 
 // use to indicate if the null or missing is set
 struct Bitmask {
-    static inline SharedPtr<Bitmask>
-    Make(size_t count) {
+    static inline SharedPtr<Bitmask> Make(size_t count) {
         SharedPtr<Bitmask> ptr = MakeShared<Bitmask>();
         ptr->Initialize(count);
         return ptr;
@@ -23,64 +22,44 @@ public:
 
     ~Bitmask();
 
-    void
-    Reset();
+    void Reset();
 
-    void
-    Initialize(size_t count);
+    void Initialize(size_t count);
 
-    void
-    DeepCopy(const Bitmask& ptr);
+    void DeepCopy(const Bitmask &ptr);
 
-    void
-    ShallowCopy(const Bitmask& ptr);
+    void ShallowCopy(const Bitmask &ptr);
 
-    [[nodiscard]] u64*
-    GetData() const {
-        return data_ptr_;
-    }
+    [[nodiscard]] u64 *GetData() const { return data_ptr_; }
 
-    void
-    Resize(size_t new_capacity);
+    void Resize(size_t new_capacity);
 
-    String
-    ToString(size_t from, size_t to);
+    String ToString(size_t from, size_t to);
 
-    [[nodiscard]] bool
-    IsAllTrue() const;
+    [[nodiscard]] bool IsAllTrue() const;
 
-    bool
-    IsTrue(size_t row_index);
+    bool IsTrue(size_t row_index);
 
-    void
-    SetTrue(size_t row_index);
+    void SetTrue(size_t row_index);
 
-    void
-    SetFalse(size_t row_index);
+    void SetFalse(size_t row_index);
 
-    void
-    Set(size_t row_index, bool valid);
+    void Set(size_t row_index, bool valid);
 
-    void
-    SetAllTrue();
+    void SetAllTrue();
 
-    void
-    SetAllFalse();
+    void SetAllFalse();
 
-    [[nodiscard]] size_t
-    CountTrue() const;
+    [[nodiscard]] size_t CountTrue() const;
 
-    [[nodiscard]] size_t
-    CountFalse() const { return count_ - CountTrue(); }
+    [[nodiscard]] size_t CountFalse() const { return count_ - CountTrue(); }
 
-    void
-    Merge(const Bitmask& other);
+    void Merge(const Bitmask &other);
 
-    [[nodiscard]] size_t
-    count() const { return count_; }
+    [[nodiscard]] size_t count() const { return count_; }
 
-    bool operator==(const Bitmask& other) const;
-    bool operator!=(const Bitmask& other) const {return !(*this == other);}
+    bool operator==(const Bitmask &other) const;
+    bool operator!=(const Bitmask &other) const { return !(*this == other); }
 
     // Estimated serialized size in bytes
     int32_t GetSizeInBytes() const;
@@ -90,9 +69,9 @@ public:
     static SharedPtr<Bitmask> ReadAdv(char *&ptr, int32_t maxbytes);
 
 private:
-    u64* data_ptr_{nullptr};
+    u64 *data_ptr_{nullptr};
     SharedPtr<BitmaskBuffer> buffer_ptr{nullptr};
     size_t count_{0};
 };
 
-}
+} // namespace infinity

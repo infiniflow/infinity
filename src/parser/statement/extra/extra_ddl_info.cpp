@@ -6,9 +6,8 @@
 
 namespace infinity {
 
-String
-ConflictTypeToStr(ConflictType type) {
-    switch(type) {
+String ConflictTypeToStr(ConflictType type) {
+    switch (type) {
         case ConflictType::kInvalid: {
             PlannerError("Invalid conflict type")
         }
@@ -25,4 +24,4 @@ ConflictTypeToStr(ConflictType type) {
     PlannerError("Unreachable")
 }
 
-}
+} // namespace infinity

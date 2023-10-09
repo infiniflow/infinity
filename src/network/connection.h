@@ -10,12 +10,7 @@
 
 namespace infinity {
 
-enum class ConnectionStatus : char {
-    kIdle,
-    kRunning,
-    kSuspend,
-    kTerminated
-};
+enum class ConnectionStatus : char { kIdle, kRunning, kSuspend, kTerminated };
 
 class QueryContext;
 
@@ -27,32 +22,22 @@ class Table;
 
 class Connection {
 public:
-    explicit
-    Connection(boost::asio::io_service& io_service);
+    explicit Connection(boost::asio::io_service &io_service);
 
-    void
-    Run();
+    void Run();
 
-    inline SharedPtr<boost::asio::ip::tcp::socket>
-    socket() {
-        return socket_;
-    }
+    inline SharedPtr<boost::asio::ip::tcp::socket> socket() { return socket_; }
 
 private:
-    void
-    HandleConnection();
+    void HandleConnection();
 
-    void
-    HandleRequest();
+    void HandleRequest();
 
-    void
-    HandlerSimpleQuery(QueryContext* query_context);
+    void HandlerSimpleQuery(QueryContext *query_context);
 
-    void
-    SendTableDescription(const SharedPtr<Table>& result_table);
+    void SendTableDescription(const SharedPtr<Table> &result_table);
 
-    void
-    SendQueryResponse(const QueryResult& query_result);
+    void SendQueryResponse(const QueryResult &query_result);
 
 private:
     const SharedPtr<boost::asio::ip::tcp::socket> socket_;
@@ -64,6 +49,4 @@ private:
     SharedPtr<Session> session_;
 };
 
-}
-
-
+} // namespace infinity

@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "common/types/alias/db_type.h"
 #include "common/column_vector/column_vector.h"
 #include "common/column_vector/selection.h"
+#include "common/types/alias/db_type.h"
 
 namespace infinity {
 
@@ -14,113 +14,79 @@ namespace infinity {
 struct DataBlock {
 
 public:
-    static inline SharedPtr<DataBlock>
-    Make() {
-        return MakeShared<DataBlock>();
-    }
+    static inline SharedPtr<DataBlock> Make() { return MakeShared<DataBlock>(); }
 
 public:
-
     DataBlock() = default;
 
-    void
-    Init(const DataBlock* input, const SharedPtr<Selection>& input_select);
+    void Init(const DataBlock *input, const SharedPtr<Selection> &input_select);
 
-    void
-    Init(const SharedPtr<DataBlock>& input, const SharedPtr<Selection>& input_select);
+    void Init(const SharedPtr<DataBlock> &input, const SharedPtr<Selection> &input_select);
 
-    void
-    Init(const SharedPtr<DataBlock>& input, SizeT start_idx, SizeT end_idx);
+    void Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT end_idx);
 
-    void
-    Init(const Vector<SharedPtr<DataType>>& types, SizeT capacity = DEFAULT_VECTOR_SIZE);
+    void Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity = DEFAULT_VECTOR_SIZE);
 
-    void
-    Init(const Vector<SharedPtr<ColumnVector>>& column_vectors);
+    void Init(const Vector<SharedPtr<ColumnVector>> &column_vectors);
 
-    void
-    UnInit();
+    void UnInit();
 
-    [[nodiscard]] inline bool
-    Initialized() const {
-        return initialized;
-    }
+    [[nodiscard]] inline bool Initialized() const { return initialized; }
 
     // Reset to just initialized state.
-    void
-    Reset();
+    void Reset();
 
-    [[nodiscard]] Value
-    GetValue(SizeT column_index, SizeT row_index) const;
+    [[nodiscard]] Value GetValue(SizeT column_index, SizeT row_index) const;
 
-    void
-    SetValue(SizeT column_index, SizeT row_index, const Value& val);
+    void SetValue(SizeT column_index, SizeT row_index, const Value &val);
 
-    void
-    AppendValue(SizeT column_index, const Value& value);
+    void AppendValue(SizeT column_index, const Value &value);
 
-    void
-    Finalize();
+    void Finalize();
 
-    [[nodiscard]] String
-    ToString() const;
+    [[nodiscard]] String ToString() const;
 
-    [[nodiscard]] bool
-    Finalized() const {
-        return finalized;
-    }
+    [[nodiscard]] bool Finalized() const { return finalized; }
 
-    void
-    FillRowIDVector(SharedPtr<Vector<RowID>>& row_ids, u32 block_id) const;
+    void FillRowIDVector(SharedPtr<Vector<RowID>> &row_ids, u32 block_id) const;
 
-    void
-    UnionWith(const SharedPtr<DataBlock>& other);
+    void UnionWith(const SharedPtr<DataBlock> &other);
 
-    void
-    AppendWith(const SharedPtr<DataBlock>& other);
+    void AppendWith(const SharedPtr<DataBlock> &other);
 
-    void
-    AppendWith(const SharedPtr<DataBlock>& other, SizeT from, SizeT count);
+    void AppendWith(const SharedPtr<DataBlock> &other, SizeT from, SizeT count);
 
 public:
-    [[nodiscard]] inline SizeT
-    column_count() const {
-        return column_count_;
-    }
+    [[nodiscard]] inline SizeT column_count() const { return column_count_; }
 
-    [[nodiscard]] inline i16
-    row_count() const {
-        if(!finalized) {
-            if(row_count_ == 0)
+    [[nodiscard]] inline i16 row_count() const {
+        if (!finalized) {
+            if (row_count_ == 0)
                 return 0;
             StorageError("Not finalized data block")
         }
         return row_count_;
     }
 
-    [[nodiscard]] inline SizeT
-    capacity() const {
-        return capacity_;
-    }
+    [[nodiscard]] inline SizeT capacity() const { return capacity_; }
 
-    bool operator==(const DataBlock& other) const;
-    bool operator!=(const DataBlock& other) const {return !(*this == other);}
+    bool operator==(const DataBlock &other) const;
+    bool operator!=(const DataBlock &other) const { return !(*this == other); }
 
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
     int32_t GetSizeInBytes() const;
     // Write to a char buffer
-    void WriteAdv(char* &ptr) const;
+    void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<DataBlock> ReadAdv(char* &ptr, int32_t maxbytes);
+    static SharedPtr<DataBlock> ReadAdv(char *&ptr, int32_t maxbytes);
 
     Vector<SharedPtr<ColumnVector>> column_vectors;
 
 private:
-
     SizeT row_count_{0};
     SizeT column_count_{0};
     SizeT capacity_{0};
     bool initialized = false;
     bool finalized = false;
 };
-}
+} // namespace infinity

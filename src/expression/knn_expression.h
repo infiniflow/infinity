@@ -7,11 +7,9 @@
 
 namespace infinity {
 
-class
-KnnExpression : public BaseExpression {
+class KnnExpression : public BaseExpression {
 public:
-    static String
-    KnnDistanceType2Str(KnnDistanceType type);
+    static String KnnDistanceType2Str(KnnDistanceType type);
 
 public:
     KnnExpression(EmbeddingDataType embedding_data_type,
@@ -20,13 +18,9 @@ public:
                   EmbeddingT query_embedding,
                   Vector<SharedPtr<BaseExpression>> arguments);
 
-    inline DataType
-    Type() const override {
-        return DataType(LogicalType::kFloat);
-    }
+    inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
-    String
-    ToString() const override;
+    String ToString() const override;
 
 public:
     i64 dimension_{0};
@@ -35,4 +29,4 @@ public:
     EmbeddingT query_embedding_;
 };
 
-}
+} // namespace infinity

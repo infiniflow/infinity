@@ -2,25 +2,23 @@
 // Created by jinhai on 23-8-31.
 //
 
-#include <gtest/gtest.h>
+#include "main/config.h"
 #include "base_test.h"
 #include "bin/compilation_config.h"
-#include "main/profiler/query_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
-#include "main/config.h"
+#include "main/logger.h"
+#include "main/profiler/query_profiler.h"
+#include "main/stats/global_resource_usage.h"
+#include <gtest/gtest.h>
 
 class ConfigTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -28,8 +26,7 @@ class ConfigTest : public BaseTest {
     }
 };
 
-static size_t
-GetAvailableMem() {
+static size_t GetAvailableMem() {
     size_t pages = sysconf(_SC_PHYS_PAGES);
     size_t page_size = sysconf(_SC_PAGE_SIZE); // Byte
     return pages * page_size;

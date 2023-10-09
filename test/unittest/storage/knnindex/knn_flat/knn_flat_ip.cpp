@@ -2,30 +2,27 @@
 // Created by jinhai on 23-9-25.
 //
 
-
-#include <gtest/gtest.h>
 #include "base_test.h"
-#include "storage/data_block.h"
 #include "common/types/info/decimal_info.h"
+#include "storage/data_block.h"
+#include <gtest/gtest.h>
 
 #include "common/types/info/array_info.h"
 #include "common/types/info/embedding_info.h"
-#include "main/profiler/base_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
+#include "main/logger.h"
+#include "main/profiler/base_profiler.h"
+#include "main/stats/global_resource_usage.h"
 #include "storage/knnindex/knn_flat/knn_flat_ip.h"
 
 class KnnFlatIpTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -77,18 +74,14 @@ TEST_F(KnnFlatIpTest, test1) {
         query_embedding[3] = 0.4;
     }
 
-    KnnFlatIP<f32> knn_distance(query_embedding.get(),
-                                1,
-                                top_k,
-                                dimension,
-                                EmbeddingDataType::kElemFloat);
+    KnnFlatIP<f32> knn_distance(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
 
     knn_distance.Begin();
     knn_distance.Search(base_embedding.get(), base_embedding_count, 0, 0);
     knn_distance.End();
 
-    f32* distance_array = knn_distance.GetDistanceByIdx(0);
-    RowID* id_array = knn_distance.GetIDByIdx(0);
+    f32 *distance_array = knn_distance.GetDistanceByIdx(0);
+    RowID *id_array = knn_distance.GetIDByIdx(0);
     EXPECT_FLOAT_EQ(distance_array[0], 0.3);
     EXPECT_FLOAT_EQ(id_array[0].segment_id_, 0);
     EXPECT_FLOAT_EQ(id_array[0].block_id_, 0);
@@ -108,5 +101,4 @@ TEST_F(KnnFlatIpTest, test1) {
     EXPECT_FLOAT_EQ(id_array[3].segment_id_, 0);
     EXPECT_FLOAT_EQ(id_array[3].block_id_, 0);
     EXPECT_FLOAT_EQ(id_array[3].block_offset_, 3);
-
 }

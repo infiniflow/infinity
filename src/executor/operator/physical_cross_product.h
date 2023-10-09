@@ -12,34 +12,24 @@ namespace infinity {
 
 class PhysicalCrossProduct final : public PhysicalOperator {
 public:
-    explicit PhysicalCrossProduct(u64 id,
-                                  SharedPtr<PhysicalOperator> left,
-                                  SharedPtr<PhysicalOperator> right)
-            : PhysicalOperator(PhysicalOperatorType::kCrossProduct,
-                               std::move(left),
-                               std::move(right),
-                               id) {}
+    explicit PhysicalCrossProduct(u64 id, SharedPtr<PhysicalOperator> left, SharedPtr<PhysicalOperator> right)
+        : PhysicalOperator(PhysicalOperatorType::kCrossProduct, std::move(left), std::move(right), id) {}
 
     ~PhysicalCrossProduct() override = default;
 
-    void
-    Init() override;
+    void Init() override;
 
-    void
-    Execute(QueryContext* query_context) final;
+    void Execute(QueryContext *query_context) final;
 
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    SharedPtr<Vector<String>>
-    GetOutputNames() const final;
+    SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
 private:
     SharedPtr<Table> left_table_{};
     SharedPtr<Table> right_table_{};
 };
 
-}
+} // namespace infinity

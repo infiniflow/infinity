@@ -15,9 +15,8 @@ namespace infinity {
 struct DateTryCastToFixlen;
 struct DateTryCastToVarlen;
 
-inline static BoundCastFunc
-BindDateCast(DataType& target) {
-    switch(target.type()) {
+inline static BoundCastFunc BindDateCast(DataType &target) {
+    switch (target.type()) {
         case LogicalType::kDateTime: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<DateT, DateTimeT, DateTryCastToFixlen>);
         }
@@ -34,39 +33,32 @@ BindDateCast(DataType& target) {
 }
 
 struct DateTryCastToFixlen {
-    template<typename SourceType, typename TargetType>
-    static inline bool
-    Run(SourceType source, TargetType& target) {
-        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
-                      + " to " + DataType::TypeToString<TargetType>());
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(SourceType source, TargetType &target) {
+        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
     }
 };
 
 struct DateTryCastToVarlen {
-    template<typename SourceType, typename TargetType>
-    static inline bool
-    Run(SourceType source, TargetType& target, const SharedPtr<ColumnVector>& vector_ptr) {
-        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
-                      + " to " + DataType::TypeToString<TargetType>());
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
     }
 };
 
-template<>
-inline bool
-DateTryCastToFixlen::Run(DateT source, DateTimeT& target) {
+template <>
+inline bool DateTryCastToFixlen::Run(DateT source, DateTimeT &target) {
     NotImplementError("Not implemented");
 }
 
-template<>
-inline bool
-DateTryCastToFixlen::Run(DateT source, TimestampT& target) {
+template <>
+inline bool DateTryCastToFixlen::Run(DateT source, TimestampT &target) {
     NotImplementError("Not implemented");
 }
 
-template<>
-inline bool
-DateTryCastToVarlen::Run(DateT source, VarcharType& target, const SharedPtr<ColumnVector>& vector_ptr) {
+template <>
+inline bool DateTryCastToVarlen::Run(DateT source, VarcharType &target, const SharedPtr<ColumnVector> &vector_ptr) {
     NotImplementError("Not implemented");
 }
 
-}
+} // namespace infinity

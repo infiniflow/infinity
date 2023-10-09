@@ -6,10 +6,10 @@
 
 #include "common/singleton.h"
 
-#include "resource_manager.h"
-#include "storage/storage.h"
-#include "scheduler/fragment_scheduler.h"
 #include "legacy_sched/scheduler.h"
+#include "resource_manager.h"
+#include "scheduler/fragment_scheduler.h"
+#include "storage/storage.h"
 
 namespace infinity {
 
@@ -17,31 +17,17 @@ class Config;
 
 class Infinity : public Singleton<Infinity> {
 public:
-    [[nodiscard]] inline FragmentScheduler*
-    fragment_scheduler() noexcept {
-        return fragment_scheduler_.get();
-    }
+    [[nodiscard]] inline FragmentScheduler *fragment_scheduler() noexcept { return fragment_scheduler_.get(); }
 
-    [[nodiscard]] inline Config*
-    config() noexcept {
-        return config_.get();
-    }
+    [[nodiscard]] inline Config *config() noexcept { return config_.get(); }
 
-    [[nodiscard]] inline Storage*
-    storage() noexcept {
-        return storage_.get();
-    }
+    [[nodiscard]] inline Storage *storage() noexcept { return storage_.get(); }
 
-    [[nodiscard]] inline ResourceManager*
-    resource_manager() noexcept {
-        return resource_manager_.get();
-    }
+    [[nodiscard]] inline ResourceManager *resource_manager() noexcept { return resource_manager_.get(); }
 
-    void
-    Init(const SharedPtr<String>& config_path);
+    void Init(const SharedPtr<String> &config_path);
 
-    void
-    UnInit();
+    void UnInit();
 
 private:
     friend class Singleton;
@@ -56,5 +42,4 @@ private:
     bool initialized_{false};
 };
 
-}
-
+} // namespace infinity

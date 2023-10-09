@@ -7,18 +7,17 @@
 namespace infinity {
 
 ConstantExpr::~ConstantExpr() {
-    if(literal_type_ == LiteralType::kString) {
+    if (literal_type_ == LiteralType::kString) {
         free(str_value_);
         return;
     }
-    if(literal_type_ == LiteralType::kDate) {
+    if (literal_type_ == LiteralType::kDate) {
         free(date_value_);
     }
 }
 
-String
-ConstantExpr::ToString() const {
-    switch(literal_type_) {
+String ConstantExpr::ToString() const {
+    switch (literal_type_) {
         case LiteralType::kBoolean:
             return fmt::format("{}", bool_value_);
         case LiteralType::kDouble:
@@ -34,7 +33,7 @@ ConstantExpr::ToString() const {
             return fmt::format("{}", date_value_);
         }
         case LiteralType::kInterval: {
-            switch(interval_type_) {
+            switch (interval_type_) {
                 case TimeUnit::kSecond: {
                     return fmt::format("{} seconds", integer_value_);
                 }
@@ -61,10 +60,10 @@ ConstantExpr::ToString() const {
         case LiteralType::kIntegerArray: {
             std::stringstream ss;
             SizeT len = long_array_.size();
-            if(len <= 0) {
+            if (len <= 0) {
                 PlannerError("Invalid long array length")
             }
-            for(SizeT i = 0; i < len - 1; ++i) {
+            for (SizeT i = 0; i < len - 1; ++i) {
                 ss << long_array_[i] << ',';
             }
             ss << long_array_.back();
@@ -73,10 +72,10 @@ ConstantExpr::ToString() const {
         case LiteralType::kDoubleArray: {
             std::stringstream ss;
             SizeT len = double_array_.size();
-            if(len <= 0) {
+            if (len <= 0) {
                 PlannerError("Invalid double array length")
             }
-            for(SizeT i = 0; i < len - 1; ++i) {
+            for (SizeT i = 0; i < len - 1; ++i) {
                 ss << double_array_[i] << ',';
             }
             ss << double_array_.back();
@@ -86,4 +85,4 @@ ConstantExpr::ToString() const {
     PlannerError("Unexpected branch");
 }
 
-}
+} // namespace infinity

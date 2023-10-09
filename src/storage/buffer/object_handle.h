@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "faiss/Index.h"
 #include "storage/buffer/buffer_handle.h"
 
@@ -8,28 +7,24 @@ namespace infinity {
 
 class ObjectHandle {
 protected:
-    BufferHandle* buffer_handle_{};
+    BufferHandle *buffer_handle_{};
 
 public:
     ObjectHandle() {}
 
-    explicit
-    ObjectHandle(BufferHandle* buffer_handle);
+    explicit ObjectHandle(BufferHandle *buffer_handle);
 
-    ObjectHandle(const ObjectHandle& other) = delete;
+    ObjectHandle(const ObjectHandle &other) = delete;
 
-    ObjectHandle&
-    operator=(const ObjectHandle& other) = delete;
+    ObjectHandle &operator=(const ObjectHandle &other) = delete;
 
-    ObjectHandle(ObjectHandle&& other);
+    ObjectHandle(ObjectHandle &&other);
 
-    ObjectHandle&
-    operator=(ObjectHandle&& other);
+    ObjectHandle &operator=(ObjectHandle &&other);
 
     ~ObjectHandle();
 
-    SharedPtr<String>
-    GetDir() const;
+    SharedPtr<String> GetDir() const;
 };
 
 class CommonObjectHandle : public ObjectHandle {
@@ -38,42 +33,34 @@ class CommonObjectHandle : public ObjectHandle {
 public:
     CommonObjectHandle() {}
 
-    explicit
-    CommonObjectHandle(BufferHandle* buffer_handle);
+    explicit CommonObjectHandle(BufferHandle *buffer_handle);
 
-    CommonObjectHandle(const CommonObjectHandle& other) = delete;
+    CommonObjectHandle(const CommonObjectHandle &other) = delete;
 
-    CommonObjectHandle&
-    operator=(const CommonObjectHandle& other) = delete;
+    CommonObjectHandle &operator=(const CommonObjectHandle &other) = delete;
 
-    CommonObjectHandle(CommonObjectHandle&& other);
+    CommonObjectHandle(CommonObjectHandle &&other);
 
-    CommonObjectHandle&
-    operator=(CommonObjectHandle&& other);
+    CommonObjectHandle &operator=(CommonObjectHandle &&other);
 
-    [[nodiscard]] ptr_t
-    GetData();
+    [[nodiscard]] ptr_t GetData();
 };
 
 class IndexObjectHandle : public ObjectHandle {
-    faiss::Index* index_{};
+    faiss::Index *index_{};
 
 public:
-    explicit
-    IndexObjectHandle(BufferHandle* buffer_handle);
+    explicit IndexObjectHandle(BufferHandle *buffer_handle);
 
-    IndexObjectHandle(const IndexObjectHandle& other) = delete;
+    IndexObjectHandle(const IndexObjectHandle &other) = delete;
 
-    IndexObjectHandle&
-    operator=(const IndexObjectHandle& other) = delete;
+    IndexObjectHandle &operator=(const IndexObjectHandle &other) = delete;
 
-    IndexObjectHandle(IndexObjectHandle&& other);
+    IndexObjectHandle(IndexObjectHandle &&other);
 
-    IndexObjectHandle&
-    operator=(IndexObjectHandle&& other);
+    IndexObjectHandle &operator=(IndexObjectHandle &&other);
 
-    [[nodiscard]] faiss::Index*
-    GetIndex();
+    [[nodiscard]] faiss::Index *GetIndex();
 };
 
-}
+} // namespace infinity

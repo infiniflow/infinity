@@ -6,28 +6,25 @@
 
 #include "parser.h"
 #include "parser_result.h"
+
 #include "lexer.h"
 
-#include <string>
 #include <memory>
+#include <string>
 
 namespace infinity {
 
 class SQLParser {
 
 public:
-
     SQLParser();
 
     ~SQLParser();
 
-    void
-    Parse(const std::string& sql_text, std::shared_ptr<ParserResult>& result);
+    void Parse(const std::string &sql_text, std::shared_ptr<ParserResult> &result);
 
-    void* scanner_{};
+    void *scanner_{};
     YY_BUFFER_STATE state_;
-
 };
 
-}
-
+} // namespace infinity

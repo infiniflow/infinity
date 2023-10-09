@@ -4,29 +4,25 @@
 
 #pragma once
 
-#include "function_set.h"
 #include "aggregate_function.h"
+#include "function_set.h"
 
 namespace infinity {
 
 class AggregateFunctionSet final : public FunctionSet {
 public:
-    explicit
-    AggregateFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kAggregate) {}
+    explicit AggregateFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kAggregate) {}
 
     ~AggregateFunctionSet() final;
 
-    void
-    AddFunction(const AggregateFunction& func);
+    void AddFunction(const AggregateFunction &func);
 
-    AggregateFunction
-    GetMostMatchFunction(const SharedPtr<BaseExpression>& input_argument);
+    AggregateFunction GetMostMatchFunction(const SharedPtr<BaseExpression> &input_argument);
 
 private:
-    static int64_t
-    MatchFunctionCost(const AggregateFunction& func, const SharedPtr<BaseExpression>& argument);
+    static int64_t MatchFunctionCost(const AggregateFunction &func, const SharedPtr<BaseExpression> &argument);
 
     Vector<AggregateFunction> functions_;
 };
 
-}
+} // namespace infinity

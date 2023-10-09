@@ -3,53 +3,36 @@
 //
 
 #include "storage/meta/entry/block_entry.h"
-#include "storage/meta/entry/segment_entry.h"
 #include "common/utility/defer_op.h"
-#include "storage/txn/txn.h"
 #include "storage/io/local_file_system.h"
+#include "storage/meta/entry/segment_entry.h"
+#include "storage/txn/txn.h"
 
 namespace infinity {
 
-BlockEntry::BlockEntry(const SegmentEntry* segment_entry,
-                       i16 block_id,
-                       u64 column_count,
-                       SizeT start_row,
-                       BufferManager* buffer_mgr)
-        : BaseEntry(EntryType::kBlock),
-          segment_entry_(segment_entry),
-          block_id_(block_id),
-          start_row_(start_row),
-          row_capacity_(DEFAULT_VECTOR_SIZE),
-          row_count_(0) {
+BlockEntry::BlockEntry(const SegmentEntry *segment_entry, i16 block_id, u64 column_count, SizeT start_row, BufferManager *buffer_mgr)
+    : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), start_row_(start_row), row_capacity_(DEFAULT_VECTOR_SIZE),
+      row_count_(0) {
     base_dir_ = BlockEntry::DetermineFilename(*segment_entry->segment_dir_, block_id);
     columns_.reserve(column_count);
-    for(SizeT column_id = 0; column_id < column_count; ++column_id) {
-        columns_.emplace_back(BlockColumnEntry::MakeNewBlockColumnEntry(this,
-                                                                        column_id,
-                                                                        buffer_mgr));
+    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+        columns_.emplace_back(BlockColumnEntry::MakeNewBlockColumnEntry(this, column_id, buffer_mgr));
     }
 
     block_version_ = MakeUnique<BlockVersion>(row_capacity_);
 }
 
-i16
-BlockEntry::AppendData(BlockEntry* block_entry,
-                       Txn* txn_ptr,
-                       DataBlock* input_data_block,
-                       offset_t input_offset,
-                       i16 append_rows) {
+i16 BlockEntry::AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows) {
     block_entry->rw_locker_.lock();
-    DeferFn defer_fn([&]() {
-        block_entry->rw_locker_.unlock();
-    });
+    DeferFn defer_fn([&]() { block_entry->rw_locker_.unlock(); });
 
     i16 actual_copied = append_rows;
-    if(block_entry->row_count_ + append_rows > block_entry->row_capacity_) {
+    if (block_entry->row_count_ + append_rows > block_entry->row_capacity_) {
         actual_copied = block_entry->row_capacity_ - block_entry->row_count_;
     }
 
     SizeT column_count = block_entry->columns_.size();
-    for(SizeT column_id = 0; column_id < column_count; ++column_id) {
+    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
         BlockColumnEntry::Append(block_entry->columns_[column_id].get(),
                                  block_entry->row_count_,
                                  input_data_block->column_vectors[column_id].get(),
@@ -63,7 +46,7 @@ BlockEntry::AppendData(BlockEntry* block_entry,
                   actual_copied)
     }
 
-    for(SizeT i = 0; i < actual_copied; ++i) {
+    for (SizeT i = 0; i < actual_copied; ++i) {
         block_entry->block_version_->txn_ptr_[i] = (u64)txn_ptr;
     }
 
@@ -71,79 +54,64 @@ BlockEntry::AppendData(BlockEntry* block_entry,
     return actual_copied;
 }
 
-void
-BlockEntry::CommitAppend(BlockEntry* block_entry, u64 committing_txn_id) {
+void BlockEntry::CommitAppend(BlockEntry *block_entry, u64 committing_txn_id) {
     block_entry->rw_locker_.lock();
-    DeferFn defer_fn([&]() {
-        block_entry->rw_locker_.unlock();
-    });
+    DeferFn defer_fn([&]() { block_entry->rw_locker_.unlock(); });
 
-    if(block_entry->min_row_ts_ == MAX_TXN_ID) {
+    if (block_entry->min_row_ts_ == MAX_TXN_ID) {
         block_entry->min_row_ts_ = committing_txn_id;
     }
 
-    if(committing_txn_id < block_entry->min_row_ts_) {
+    if (committing_txn_id < block_entry->min_row_ts_) {
         block_entry->min_row_ts_ = committing_txn_id;
     }
 
-    if(block_entry->max_row_ts_ == MAX_TXN_ID) {
+    if (block_entry->max_row_ts_ == MAX_TXN_ID) {
         block_entry->max_row_ts_ = committing_txn_id;
     }
 
-    if(committing_txn_id > block_entry->max_row_ts_) {
+    if (committing_txn_id > block_entry->max_row_ts_) {
         block_entry->max_row_ts_ = committing_txn_id;
     }
 
-    if(block_entry->txn_ptr_ != nullptr) {
+    if (block_entry->txn_ptr_ != nullptr) {
         block_entry->start_ts_ = committing_txn_id;
         block_entry->txn_ptr_ = nullptr;
     }
 }
 
-void
-BlockEntry::CommitDelete(BlockEntry* block_entry, Txn* txn_ptr, u64 start_row_in_segment, u64 row_count) {
+void BlockEntry::CommitDelete(BlockEntry *block_entry, Txn *txn_ptr, u64 start_row_in_segment, u64 row_count) {
     u64 start_offset = start_row_in_segment - block_entry->start_row_;
     u64 end_offset = start_offset + row_count;
-    Vector<au64>& deleted_vector = block_entry->block_version_->deleted_;
-    for(SizeT i = start_offset; i < end_offset; ++i) {
+    Vector<au64> &deleted_vector = block_entry->block_version_->deleted_;
+    for (SizeT i = start_offset; i < end_offset; ++i) {
         deleted_vector[i] = txn_ptr->CommitTS();
     }
 }
 
-bool
-BlockEntry::PrepareFlush(BlockEntry* block_entry) {
+bool BlockEntry::PrepareFlush(BlockEntry *block_entry) {
     BlockEntryStatus expected = BlockEntryStatus::kBlockOpen;
-    return block_entry->status_.compare_exchange_strong(expected,
-                                                        BlockEntryStatus::kBlockFlushing,
-                                                        std::memory_order_seq_cst);
+    return block_entry->status_.compare_exchange_strong(expected, BlockEntryStatus::kBlockFlushing, std::memory_order_seq_cst);
 }
 
-UniquePtr<String>
-BlockEntry::Flush(BlockEntry* block_entry) {
-    LOG_TRACE("Segment: {}, Block: {} is being flushing",
-              block_entry->segment_entry_->segment_id_,
-              block_entry->block_id_);
-    for(SizeT column_id = 0; const auto& column_data: block_entry->columns_) {
+UniquePtr<String> BlockEntry::Flush(BlockEntry *block_entry) {
+    LOG_TRACE("Segment: {}, Block: {} is being flushing", block_entry->segment_entry_->segment_id_, block_entry->block_id_);
+    for (SizeT column_id = 0; const auto &column_data : block_entry->columns_) {
         column_data->Flush(column_data.get(), block_entry->row_count_);
         LOG_TRACE("ColumnData: {} is flushed", column_id);
         ++column_id;
     }
 
     BlockEntryStatus expected = BlockEntryStatus::kBlockFlushing;
-    if(!block_entry->status_.compare_exchange_strong(expected,
-                                                     BlockEntryStatus::kBlockClosed,
-                                                     std::memory_order_seq_cst)) {
+    if (!block_entry->status_.compare_exchange_strong(expected, BlockEntryStatus::kBlockClosed, std::memory_order_seq_cst)) {
         return MakeUnique<String>("Data block is expected as flushing status");
     }
-    LOG_TRACE("Segment: {}, Block: {} is being flushed",
-              block_entry->segment_entry_->segment_id_,
-              block_entry->block_id_);
+    LOG_TRACE("Segment: {}, Block: {} is being flushed", block_entry->segment_entry_->segment_id_, block_entry->block_id_);
 
     return nullptr;
 }
 
-nlohmann::json
-BlockEntry::Serialize(const BlockEntry* block_entry) {
+nlohmann::json BlockEntry::Serialize(const BlockEntry *block_entry) {
     nlohmann::json json_res;
 
     // if (!segment_entry->finish_shuffle) {
@@ -153,7 +121,7 @@ BlockEntry::Serialize(const BlockEntry* block_entry) {
     json_res["row_count"] = block_entry->row_count_;
     json_res["row_capacity"] = block_entry->row_capacity_;
     json_res["block_id"] = block_entry->block_id_;
-    for(const auto& block_column_entry: block_entry->columns_) {
+    for (const auto &block_column_entry : block_entry->columns_) {
         json_res["columns"].emplace_back(BlockColumnEntry::Serialize(block_column_entry.get()));
     }
     json_res["min_row_ts"] = block_entry->min_row_ts_.load();
@@ -161,41 +129,27 @@ BlockEntry::Serialize(const BlockEntry* block_entry) {
     return json_res;
 }
 
-UniquePtr<BlockEntry>
-BlockEntry::Deserialize(const nlohmann::json& block_entry_json,
-                        SegmentEntry* segment_entry,
-                        BufferManager* buffer_mgr) {
+UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
     u64 block_id = block_entry_json["block_id"];
     SizeT start_row = block_entry_json["start_row"];
-//    u64 column_count = segment_entry->column_count_;
-    UniquePtr<BlockEntry> block_entry = MakeUnique<BlockEntry>(segment_entry,
-                                                               block_id,
-                                                               0,
-                                                               start_row,
-                                                               buffer_mgr);
+    //    u64 column_count = segment_entry->column_count_;
+    UniquePtr<BlockEntry> block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, 0, start_row, buffer_mgr);
 
     block_entry->row_capacity_ = block_entry_json["row_capacity"];
     block_entry->row_count_ = block_entry_json["row_count"];
     block_entry->min_row_ts_ = block_entry_json["min_row_ts"];
     block_entry->max_row_ts_ = block_entry_json["max_row_ts"];
 
-
-    for(const auto& block_column_json: block_entry_json["columns"]) {
-        block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json,
-                                                                         block_entry.get(),
-                                                                         buffer_mgr));
+    for (const auto &block_column_json : block_entry_json["columns"]) {
+        block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));
     }
 
     return block_entry;
 }
 
-bool
-BlockEntry::IsFull(BlockEntry* block_entry) {
-    return block_entry->row_count_ >= block_entry->row_capacity_;
-}
+bool BlockEntry::IsFull(BlockEntry *block_entry) { return block_entry->row_count_ >= block_entry->row_capacity_; }
 
-SharedPtr<String>
-BlockEntry::DetermineFilename(const String& parent_dir, u64 block_id) {
+SharedPtr<String> BlockEntry::DetermineFilename(const String &parent_dir, u64 block_id) {
     LocalFileSystem fs;
     SharedPtr<String> base_dir;
     base_dir = MakeShared<String>(parent_dir + '/' + "blk_" + std::to_string(block_id));
@@ -203,4 +157,4 @@ BlockEntry::DetermineFilename(const String& parent_dir, u64 block_id) {
     return base_dir;
 }
 
-}
+} // namespace infinity

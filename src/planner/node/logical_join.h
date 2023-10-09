@@ -4,37 +4,29 @@
 
 #pragma once
 
-#include "planner/logical_node.h"
 #include "parser/table_reference/join_reference.h"
+#include "planner/logical_node.h"
 
 namespace infinity {
 
 class LogicalJoin : public LogicalNode {
 public:
-    explicit
-    LogicalJoin(u64 node_id,
-                JoinType join_type,
-                String alias,
-                Vector<SharedPtr<BaseExpression>> conditions,
-                const SharedPtr<LogicalNode>& left,
-                const SharedPtr<LogicalNode>& right);
+    explicit LogicalJoin(u64 node_id,
+                         JoinType join_type,
+                         String alias,
+                         Vector<SharedPtr<BaseExpression>> conditions,
+                         const SharedPtr<LogicalNode> &left,
+                         const SharedPtr<LogicalNode> &right);
 
-    [[nodiscard]] Vector<ColumnBinding>
-    GetColumnBindings() const final;
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>>
-    GetOutputNames() const final;
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final;
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String
-    ToString(i64& space) final;
+    String ToString(i64 &space) final;
 
-    inline String
-    name() final {
-        return "LogicalJoin";
-    }
+    inline String name() final { return "LogicalJoin"; }
 
     String alias_{};
 
@@ -45,5 +37,4 @@ public:
     Vector<SharedPtr<BaseExpression>> conditions_{};
 };
 
-}
-
+} // namespace infinity

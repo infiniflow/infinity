@@ -2,27 +2,24 @@
 // Created by jinhai on 23-8-19.
 //
 
-
-#include <gtest/gtest.h>
 #include "base_test.h"
+#include "main/infinity.h"
+#include "main/logger.h"
+#include "main/profiler/base_profiler.h"
+#include "main/stats/global_resource_usage.h"
 #include "storage/buffer/column_buffer.h"
 #include "storage/table_def.h"
 #include "storage/txn/txn_manager.h"
-#include "main/profiler/base_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class TableEntryTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -30,7 +27,6 @@ class TableEntryTest : public BaseTest {
         system("rm -rf /tmp/infinity/log /tmp/infinity/wal /tmp/infinity/data");
     }
 };
-
 
 TEST_F(TableEntryTest, test1) {
     using namespace infinity;
@@ -47,20 +43,15 @@ TEST_F(TableEntryTest, test1) {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
-            auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
-                                                        "tiny_int_col",
-                                                        constraints);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
             columns.emplace_back(column_def_ptr);
-
         }
         {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
-            auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        MakeShared<DataType>(DataType(LogicalType::kBigInt)),
-                                                        "big_int_col",
-                                                        constraints);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
 
@@ -73,27 +64,21 @@ TEST_F(TableEntryTest, test1) {
         LOG_TRACE("{}", table_def->ToString());
     }
 
-    SharedPtr<TableCollectionEntry> table_entry = MakeShared<TableCollectionEntry>(table_dir,
-                                                                                   table_def->table_name(),
-                                                                                   table_def->columns(),
-                                                                                   TableCollectionType::kTableEntry,
-                                                                                   nullptr,
-                                                                                   0,
-                                                                                   0);
-
+    SharedPtr<TableCollectionEntry> table_entry =
+        MakeShared<TableCollectionEntry>(table_dir, table_def->table_name(), table_def->columns(), TableCollectionType::kTableEntry, nullptr, 0, 0);
 }
 
 TEST_F(TableEntryTest, test2) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
-    BufferManager* buffer_mgr = infinity::Infinity::instance().storage()->buffer_manager();
+    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
+    BufferManager *buffer_mgr = infinity::Infinity::instance().storage()->buffer_manager();
 
     EntryResult create1_res, table1_res, get_res;
 
     // Txn1: Create, OK
-    Txn* new_txn = txn_mgr->CreateTxn();
+    Txn *new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
     new_txn->BeginTxn();
@@ -112,36 +97,26 @@ TEST_F(TableEntryTest, test2) {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
-            auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
-                                                        "tiny_int_col",
-                                                        constraints);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
             columns.emplace_back(column_def_ptr);
-
         }
         {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
-            auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        MakeShared<DataType>(DataType(LogicalType::kBigInt)),
-                                                        "big_int_col",
-                                                        constraints);
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
             HashSet<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
-            auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                        MakeShared<DataType>(DataType(LogicalType::kDouble)),
-                                                        "double_col",
-                                                        constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
     }
 
-    UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"),
-                                                        MakeShared<String>("tbl1"),
-                                                        columns);
+    UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
     table1_res = new_txn->CreateTable("db1", std::move(tbl1_def), ConflictType::kError);
     EXPECT_NE(table1_res.entry_, nullptr);
 
@@ -170,15 +145,15 @@ TEST_F(TableEntryTest, test2) {
         SizeT row_count = DEFAULT_VECTOR_SIZE * 2;
         input_block->Init(column_types, row_count);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             input_block->AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
         }
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             input_block->AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
         }
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             input_block->AppendValue(2, Value::MakeDouble(static_cast<f64>(i)));
         }
 
@@ -206,13 +181,13 @@ TEST_F(TableEntryTest, test2) {
             new_txn->GetMetaTableState(read_table_meta.get(), "db1", "tbl1", column_ids);
             EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
             EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
-            for(const auto& segment_pair: read_table_meta->segment_map_) {
+            for (const auto &segment_pair : read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
                 EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
                 EXPECT_EQ(segment_pair.second.segment_entry_->block_entries_.size(), 2);
                 EXPECT_EQ(segment_pair.second.block_map_.size(), 2);
-                for(const auto& block_pair: segment_pair.second.block_map_) {
-//                    EXPECT_EQ(block_pair.first, 0);
+                for (const auto &block_pair : segment_pair.second.block_map_) {
+                    //                    EXPECT_EQ(block_pair.first, 0);
                     EXPECT_NE(block_pair.second.block_entry_, nullptr);
 
                     EXPECT_EQ(block_pair.second.column_data_map_.size(), 3);
@@ -220,51 +195,51 @@ TEST_F(TableEntryTest, test2) {
                     EXPECT_TRUE(block_pair.second.column_data_map_.contains(1));
                     EXPECT_TRUE(block_pair.second.column_data_map_.contains(2));
 
-                    BlockColumnEntry* column0 = block_pair.second.column_data_map_.at(0).block_column_;
-                    BlockColumnEntry* column1 = block_pair.second.column_data_map_.at(1).block_column_;
-                    BlockColumnEntry* column2 = block_pair.second.column_data_map_.at(2).block_column_;
+                    BlockColumnEntry *column0 = block_pair.second.column_data_map_.at(0).block_column_;
+                    BlockColumnEntry *column1 = block_pair.second.column_data_map_.at(1).block_column_;
+                    BlockColumnEntry *column2 = block_pair.second.column_data_map_.at(2).block_column_;
 
                     SizeT row_count = block_pair.second.block_entry_->row_count_;
                     ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_mgr);
-                    i8* col0_ptr = (i8*)(col0_obj.GetAll());
-                    for(SizeT row = 0; row < row_count; ++row) {
-//                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                    i8 *col0_ptr = (i8 *)(col0_obj.GetAll());
+                    for (SizeT row = 0; row < row_count; ++row) {
+                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col0_ptr[row], (i8)(row));
                     }
 
                     ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_mgr);
-                    i64* col1_ptr = (i64*)(col1_obj.GetAll());
-                    for(SizeT row = 0; row < row_count; ++row) {
-//                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                    i64 *col1_ptr = (i64 *)(col1_obj.GetAll());
+                    for (SizeT row = 0; row < row_count; ++row) {
+                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col1_ptr[row], (i64)(row));
                     }
 
                     ColumnBuffer col2_obj = BlockColumnEntry::GetColumnData(column2, buffer_mgr);
-                    f64* col2_ptr = (f64*)(col2_obj.GetAll());
-                    for(SizeT row = 0; row < row_count; ++row) {
+                    f64 *col2_ptr = (f64 *)(col2_obj.GetAll());
+                    for (SizeT row = 0; row < row_count; ++row) {
                         EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                     }
                 }
 
-//                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
-//                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
-//                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-//                SegmentColumnEntry* column0 = segment_pair.second.column_data_map_.at(0).segment_column_;
-//                SegmentColumnEntry* column2 = segment_pair.second.column_data_map_.at(2).segment_column_;
-//
-//                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-//                ColumnBuffer col0_obj = SegmentColumnEntry::GetColumnData(column0, buffer_mgr);
-//                i8* col0_ptr = (i8*)(col0_obj.GetAll());
-//                for(SizeT row = 0; row < row_count; ++row) {
-////                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
-//                    EXPECT_EQ(col0_ptr[row], (i8)(row));
-//                }
-//
-//                ColumnBuffer col2_obj = SegmentColumnEntry::GetColumnData(column2, buffer_mgr);
-//                f64* col2_ptr = (f64*)(col2_obj.GetAll());
-//                for(SizeT row = 0; row < row_count; ++row) {
-//                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
-//                }
+                //                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
+                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
+                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
+                //                SegmentColumnEntry* column0 = segment_pair.second.column_data_map_.at(0).segment_column_;
+                //                SegmentColumnEntry* column2 = segment_pair.second.column_data_map_.at(2).segment_column_;
+                //
+                //                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
+                //                ColumnBuffer col0_obj = SegmentColumnEntry::GetColumnData(column0, buffer_mgr);
+                //                i8* col0_ptr = (i8*)(col0_obj.GetAll());
+                //                for(SizeT row = 0; row < row_count; ++row) {
+                ////                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                //                    EXPECT_EQ(col0_ptr[row], (i8)(row));
+                //                }
+                //
+                //                ColumnBuffer col2_obj = SegmentColumnEntry::GetColumnData(column2, buffer_mgr);
+                //                f64* col2_ptr = (f64*)(col2_obj.GetAll());
+                //                for(SizeT row = 0; row < row_count; ++row) {
+                //                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
+                //                }
             }
         }
 
@@ -281,15 +256,15 @@ TEST_F(TableEntryTest, test2) {
             SizeT row_count = DEFAULT_VECTOR_SIZE;
             input_block->Init(column_types, row_count);
 
-            for(SizeT i = 0; i < row_count; ++i) {
+            for (SizeT i = 0; i < row_count; ++i) {
                 input_block->AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
             }
 
-            for(SizeT i = 0; i < row_count; ++i) {
+            for (SizeT i = 0; i < row_count; ++i) {
                 input_block->AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
             }
 
-            for(SizeT i = 0; i < row_count; ++i) {
+            for (SizeT i = 0; i < row_count; ++i) {
                 input_block->AppendValue(2, Value::MakeDouble(static_cast<f64>(i)));
             }
 
@@ -306,29 +281,29 @@ TEST_F(TableEntryTest, test2) {
             UniquePtr<MetaTableState> read_table_meta = MakeUnique<MetaTableState>();
             new_txn->GetMetaTableState(read_table_meta.get(), "db1", "tbl1", column_ids);
             EXPECT_EQ(read_table_meta->local_blocks_.size(), 1);
-            for(const auto& local_block_state: read_table_meta->local_blocks_) {
+            for (const auto &local_block_state : read_table_meta->local_blocks_) {
                 EXPECT_NE(local_block_state.data_block_, nullptr);
                 SizeT row_count = local_block_state.data_block_->row_count();
                 EXPECT_EQ(row_count, 8192);
                 EXPECT_EQ(local_block_state.column_vector_map_.size(), 3);
 
-                ColumnVector* column0 = local_block_state.column_vector_map_.at(0).column_vector_;
-                i8* col0_ptr = (i8*)(column0->data_ptr_);
-                ColumnVector* column2 = local_block_state.column_vector_map_.at(2).column_vector_;
-                f64* col2_ptr = (f64*)(column2->data_ptr_);
-                for(SizeT row = 0; row < row_count; ++row) {
+                ColumnVector *column0 = local_block_state.column_vector_map_.at(0).column_vector_;
+                i8 *col0_ptr = (i8 *)(column0->data_ptr_);
+                ColumnVector *column2 = local_block_state.column_vector_map_.at(2).column_vector_;
+                f64 *col2_ptr = (f64 *)(column2->data_ptr_);
+                for (SizeT row = 0; row < row_count; ++row) {
                     EXPECT_EQ(col0_ptr[row], (i8)row);
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                 }
             }
 
             EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
-            for(const auto& segment_pair: read_table_meta->segment_map_) {
+            for (const auto &segment_pair : read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
                 EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
                 EXPECT_EQ(segment_pair.second.block_map_.size(), 2);
-                for(const auto& block_pair: segment_pair.second.block_map_) {
-//                    EXPECT_EQ(block_pair.first, 0);
+                for (const auto &block_pair : segment_pair.second.block_map_) {
+                    //                    EXPECT_EQ(block_pair.first, 0);
                     EXPECT_NE(block_pair.second.block_entry_, nullptr);
 
                     EXPECT_EQ(block_pair.second.column_data_map_.size(), 3);
@@ -336,53 +311,51 @@ TEST_F(TableEntryTest, test2) {
                     EXPECT_TRUE(block_pair.second.column_data_map_.contains(1));
                     EXPECT_TRUE(block_pair.second.column_data_map_.contains(2));
 
-                    BlockColumnEntry* column0 = block_pair.second.column_data_map_.at(0).block_column_;
-                    BlockColumnEntry* column1 = block_pair.second.column_data_map_.at(1).block_column_;
-                    BlockColumnEntry* column2 = block_pair.second.column_data_map_.at(2).block_column_;
+                    BlockColumnEntry *column0 = block_pair.second.column_data_map_.at(0).block_column_;
+                    BlockColumnEntry *column1 = block_pair.second.column_data_map_.at(1).block_column_;
+                    BlockColumnEntry *column2 = block_pair.second.column_data_map_.at(2).block_column_;
 
                     SizeT row_count = block_pair.second.block_entry_->row_count_;
                     ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_mgr);
-                    i8* col0_ptr = (i8*)(col0_obj.GetAll());
-                    for(SizeT row = 0; row < row_count; ++row) {
-//                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                    i8 *col0_ptr = (i8 *)(col0_obj.GetAll());
+                    for (SizeT row = 0; row < row_count; ++row) {
+                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col0_ptr[row], (i8)(row));
                     }
 
                     ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_mgr);
-                    i64* col1_ptr = (i64*)(col1_obj.GetAll());
-                    for(SizeT row = 0; row < row_count; ++row) {
-//                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                    i64 *col1_ptr = (i64 *)(col1_obj.GetAll());
+                    for (SizeT row = 0; row < row_count; ++row) {
+                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col1_ptr[row], (i64)(row));
                     }
 
                     ColumnBuffer col2_obj = BlockColumnEntry::GetColumnData(column2, buffer_mgr);
-                    f64* col2_ptr = (f64*)(col2_obj.GetAll());
-                    for(SizeT row = 0; row < row_count; ++row) {
+                    f64 *col2_ptr = (f64 *)(col2_obj.GetAll());
+                    for (SizeT row = 0; row < row_count; ++row) {
                         EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                     }
                 }
 
-
-
-//                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
-//                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
-//                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-//                SegmentColumnEntry* column0 = segment_pair.second.column_data_map_.at(0).segment_column_;
-//                SegmentColumnEntry* column2 = segment_pair.second.column_data_map_.at(2).segment_column_;
-//
-//                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-//                ColumnBuffer col0_obj = SegmentColumnEntry::GetColumnData(column0, buffer_mgr);
-//                i8* col0_ptr = (i8*)(col0_obj.GetAll());
-//                for(SizeT row = 0; row < row_count; ++row) {
-////                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
-//                    EXPECT_EQ(col0_ptr[row], (i8)(row));
-//                }
-//
-//                ColumnBuffer col2_obj = SegmentColumnEntry::GetColumnData(column2, buffer_mgr);
-//                f64* col2_ptr = (f64*)(col2_obj.GetAll());
-//                for(SizeT row = 0; row < row_count; ++row) {
-//                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
-//                }
+                //                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
+                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
+                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
+                //                SegmentColumnEntry* column0 = segment_pair.second.column_data_map_.at(0).segment_column_;
+                //                SegmentColumnEntry* column2 = segment_pair.second.column_data_map_.at(2).segment_column_;
+                //
+                //                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
+                //                ColumnBuffer col0_obj = SegmentColumnEntry::GetColumnData(column0, buffer_mgr);
+                //                i8* col0_ptr = (i8*)(col0_obj.GetAll());
+                //                for(SizeT row = 0; row < row_count; ++row) {
+                ////                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                //                    EXPECT_EQ(col0_ptr[row], (i8)(row));
+                //                }
+                //
+                //                ColumnBuffer col2_obj = SegmentColumnEntry::GetColumnData(column2, buffer_mgr);
+                //                f64* col2_ptr = (f64*)(col2_obj.GetAll());
+                //                for(SizeT row = 0; row < row_count; ++row) {
+                //                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
+                //                }
             }
         }
 
@@ -407,12 +380,12 @@ TEST_F(TableEntryTest, test2) {
             new_txn->GetMetaTableState(read_table_meta.get(), "db1", "tbl1", column_ids);
             EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
             EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
-            for(const auto& segment_pair: read_table_meta->segment_map_) {
+            for (const auto &segment_pair : read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
                 EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
                 EXPECT_EQ(segment_pair.second.block_map_.size(), 2);
-                for(const auto& block_pair: segment_pair.second.block_map_) {
-//                    EXPECT_EQ(block_pair.first, 0);
+                for (const auto &block_pair : segment_pair.second.block_map_) {
+                    //                    EXPECT_EQ(block_pair.first, 0);
                     EXPECT_NE(block_pair.second.block_entry_, nullptr);
 
                     EXPECT_EQ(block_pair.second.column_data_map_.size(), 3);
@@ -420,50 +393,50 @@ TEST_F(TableEntryTest, test2) {
                     EXPECT_TRUE(block_pair.second.column_data_map_.contains(1));
                     EXPECT_TRUE(block_pair.second.column_data_map_.contains(2));
 
-                    BlockColumnEntry* column0 = block_pair.second.column_data_map_.at(0).block_column_;
-                    BlockColumnEntry* column1 = block_pair.second.column_data_map_.at(1).block_column_;
-                    BlockColumnEntry* column2 = block_pair.second.column_data_map_.at(2).block_column_;
+                    BlockColumnEntry *column0 = block_pair.second.column_data_map_.at(0).block_column_;
+                    BlockColumnEntry *column1 = block_pair.second.column_data_map_.at(1).block_column_;
+                    BlockColumnEntry *column2 = block_pair.second.column_data_map_.at(2).block_column_;
 
                     SizeT row_count = block_pair.second.block_entry_->row_count_;
                     ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_mgr);
-                    i8* col0_ptr = (i8*)(col0_obj.GetAll());
-                    for(SizeT row = 0; row < row_count; ++row) {
-//                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                    i8 *col0_ptr = (i8 *)(col0_obj.GetAll());
+                    for (SizeT row = 0; row < row_count; ++row) {
+                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col0_ptr[row], (i8)(row));
                     }
 
                     ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_mgr);
-                    i64* col1_ptr = (i64*)(col1_obj.GetAll());
-                    for(SizeT row = 0; row < row_count; ++row) {
-//                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                    i64 *col1_ptr = (i64 *)(col1_obj.GetAll());
+                    for (SizeT row = 0; row < row_count; ++row) {
+                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col1_ptr[row], (i64)(row));
                     }
 
                     ColumnBuffer col2_obj = BlockColumnEntry::GetColumnData(column2, buffer_mgr);
-                    f64* col2_ptr = (f64*)(col2_obj.GetAll());
-                    for(SizeT row = 0; row < row_count; ++row) {
+                    f64 *col2_ptr = (f64 *)(col2_obj.GetAll());
+                    for (SizeT row = 0; row < row_count; ++row) {
                         EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                     }
                 }
-//                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
-//                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
-//                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-//                SegmentColumnEntry* column0 = segment_pair.second.column_data_map_.at(0).segment_column_;
-//                SegmentColumnEntry* column2 = segment_pair.second.column_data_map_.at(2).segment_column_;
-//
-//                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-//                ColumnBuffer col0_obj = SegmentColumnEntry::GetColumnData(column0, buffer_mgr);
-//                i8* col0_ptr = (i8*)(col0_obj.GetAll());
-//                for(SizeT row = 0; row < row_count; ++row) {
-////                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
-//                    EXPECT_EQ(col0_ptr[row], (i8)(row));
-//                }
-//
-//                ColumnBuffer col2_obj = SegmentColumnEntry::GetColumnData(column2, buffer_mgr);
-//                f64* col2_ptr = (f64*)(col2_obj.GetAll());
-//                for(SizeT row = 0; row < row_count; ++row) {
-//                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
-//                }
+                //                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
+                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
+                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
+                //                SegmentColumnEntry* column0 = segment_pair.second.column_data_map_.at(0).segment_column_;
+                //                SegmentColumnEntry* column2 = segment_pair.second.column_data_map_.at(2).segment_column_;
+                //
+                //                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
+                //                ColumnBuffer col0_obj = SegmentColumnEntry::GetColumnData(column0, buffer_mgr);
+                //                i8* col0_ptr = (i8*)(col0_obj.GetAll());
+                //                for(SizeT row = 0; row < row_count; ++row) {
+                ////                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
+                //                    EXPECT_EQ(col0_ptr[row], (i8)(row));
+                //                }
+                //
+                //                ColumnBuffer col2_obj = SegmentColumnEntry::GetColumnData(column2, buffer_mgr);
+                //                f64* col2_ptr = (f64*)(col2_obj.GetAll());
+                //                for(SizeT row = 0; row < row_count; ++row) {
+                //                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
+                //                }
             }
         }
 

@@ -26,8 +26,7 @@ class CopyStatement : public BaseStatement {
 public:
     CopyStatement() : BaseStatement(StatementType::kCopy) {}
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     bool copy_from_{false};
     String file_path_{};
@@ -36,7 +35,6 @@ public:
     bool header_{false};
     CopyFileType copy_file_type_{CopyFileType::kCSV};
     char delimiter_{','};
-
 };
 
-}
+} // namespace infinity

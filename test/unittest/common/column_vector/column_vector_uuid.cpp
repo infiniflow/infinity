@@ -2,24 +2,22 @@
 // Created by JinHai on 2022/12/6.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class ColumnVectorUuidTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -57,7 +55,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -83,7 +81,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -95,7 +93,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
 
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -137,7 +135,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
         column_vector.AppendByPtr((ptr_t)(&uuid));
@@ -149,7 +147,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -193,7 +191,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < 1; ++i) {
+    for (i64 i = 0; i < 1; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -205,7 +203,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
         EXPECT_EQ(vx.value_.uuid, uuid);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-    for(i64 i = 0; i < 1; ++i) {
+    for (i64 i = 0; i < 1; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -217,7 +215,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
     EXPECT_EQ(column_vector.tail_index_, 0);
-//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
@@ -245,7 +243,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < 1; ++i) {
+    for (i64 i = 0; i < 1; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -267,7 +265,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -275,7 +273,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -286,7 +284,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -294,7 +292,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         String s('a' + (2 * i) % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -312,7 +310,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -320,7 +318,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
@@ -337,7 +335,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for(i64 i = 0; i < count; ++i) {
+    for (i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
         String s('a' + src_idx % 26, 16);
         UuidT uuid(s.c_str());

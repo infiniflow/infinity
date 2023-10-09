@@ -6,19 +6,10 @@
 
 namespace infinity {
 
-void
-PhysicalExcept::Init() {
+void PhysicalExcept::Init() {}
 
-}
+void PhysicalExcept::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void
-PhysicalExcept::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+void PhysicalExcept::Execute(QueryContext *query_context) {}
 
-}
-
-void
-PhysicalExcept::Execute(QueryContext* query_context) {
-
-}
-
-}
+} // namespace infinity

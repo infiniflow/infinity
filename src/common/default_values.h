@@ -37,4 +37,4 @@ constexpr SizeT DEFAULT_RANDOM_SEGMENT_NAME_LEN = 10;
 constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;
-}
+} // namespace infinity

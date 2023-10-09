@@ -9,7 +9,6 @@
 
 namespace infinity {
 
-void
-RegisterAvgFunction(const UniquePtr<NewCatalog>& catalog_ptr);
+void RegisterAvgFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

@@ -5,16 +5,11 @@
 #include "join_binder.h"
 #include "common/utility/infinity_assert.h"
 
-
 namespace infinity {
 
-SharedPtr<BaseExpression>
-JoinBinder::BuildExpression(const ParsedExpr& expr,
-                            BindContext* bind_context_ptr,
-                            i64 depth,
-                            bool root) {
+SharedPtr<BaseExpression> JoinBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     SharedPtr<BaseExpression> result;
-    switch(expr.type_) {
+    switch (expr.type_) {
         case ParsedExprType::kSubquery: {
             PlannerError("Subquery isn't allowed in JOIN condition.");
         }
@@ -25,12 +20,8 @@ JoinBinder::BuildExpression(const ParsedExpr& expr,
     return result;
 }
 
-SharedPtr<BaseExpression>
-JoinBinder::BuildKnnExpr(const KnnExpr& expr,
-                         BindContext* bind_context_ptr,
-                         i64 depth,
-                         bool root) {
+SharedPtr<BaseExpression> JoinBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     PlannerError("KNN expression isn't supported in join clause")
 }
 
-}
+} // namespace infinity

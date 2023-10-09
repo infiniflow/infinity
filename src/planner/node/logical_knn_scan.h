@@ -2,11 +2,10 @@
 // Created by jinhai on 23-9-21.
 //
 
-
 #pragma once
 
-#include "planner/logical_node.h"
 #include "parser/parsed_expr/knn_expr.h"
+#include "planner/logical_node.h"
 
 namespace infinity {
 
@@ -16,35 +15,23 @@ class BaseTableRef;
 
 class LogicalKnnScan : public LogicalNode {
 public:
-    explicit
-    LogicalKnnScan(u64 node_id,
-                   SharedPtr<BaseTableRef> base_table_ref);
+    explicit LogicalKnnScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref);
 
-    [[nodiscard]] Vector<ColumnBinding>
-    GetColumnBindings() const final;
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>>
-    GetOutputNames() const final;
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final;
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    [[nodiscard]] TableCollectionEntry*
-    table_collection_ptr() const;
+    [[nodiscard]] TableCollectionEntry *table_collection_ptr() const;
 
-    [[nodiscard]] String
-    TableAlias() const;
+    [[nodiscard]] String TableAlias() const;
 
-    [[nodiscard]] u64
-    TableIndex() const;
+    [[nodiscard]] u64 TableIndex() const;
 
-    String
-    ToString(i64& space) final;
+    String ToString(i64 &space) final;
 
-    inline String
-    name() final {
-        return "LogicalKnnScan";
-    }
+    inline String name() final { return "LogicalKnnScan"; }
 
     SharedPtr<BaseTableRef> base_table_ref_{};
 
@@ -57,5 +44,4 @@ public:
     u64 knn_table_index_{};
 };
 
-}
-
+} // namespace infinity

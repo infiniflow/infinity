@@ -2,27 +2,25 @@
 // Created by jinhai on 23-6-2.
 //
 
-#include <gtest/gtest.h>
-#include "base_test.h"
-#include "main/profiler/base_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
 #include "storage/common/async_batch_processor.h"
+#include "base_test.h"
+#include "main/infinity.h"
+#include "main/logger.h"
+#include "main/profiler/base_profiler.h"
+#include "main/stats/global_resource_usage.h"
 #include "storage/common/async_dummy_task.h"
-#include "storage/common/commit_task.h"
 #include "storage/common/async_terminate_task.h"
+#include "storage/common/commit_task.h"
+#include <gtest/gtest.h>
 
 class AsyncTaskProcessorTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -32,10 +30,9 @@ class AsyncTaskProcessorTest : public BaseTest {
 
 using namespace infinity;
 
-SharedPtr<AsyncTask>
-OnPrepareTest(List<SharedPtr<AsyncTask>>& async_tasks) {
+SharedPtr<AsyncTask> OnPrepareTest(List<SharedPtr<AsyncTask>> &async_tasks) {
     SharedPtr<CommitTask> commit_task = MakeShared<CommitTask>(async_tasks.size());
-    for(const auto& async_task: async_tasks) {
+    for (const auto &async_task : async_tasks) {
         async_task->Prepare();
         LOG_TRACE("OnPrepare: " + async_task->ToString());
         commit_task->Append(async_task.get());
@@ -43,9 +40,8 @@ OnPrepareTest(List<SharedPtr<AsyncTask>>& async_tasks) {
     return commit_task;
 }
 
-void
-OnCommitTest(const SharedPtr<AsyncTask>& commit_task) {
-//    async_task->Notify();
+void OnCommitTest(const SharedPtr<AsyncTask> &commit_task) {
+    //    async_task->Notify();
     commit_task->Commit();
     LOG_TRACE("OnCommit: " + commit_task->ToString());
 }

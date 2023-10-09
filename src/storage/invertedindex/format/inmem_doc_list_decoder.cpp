@@ -2,41 +2,33 @@
 
 namespace infinity {
 
-InMemDocListDecoder::InMemDocListDecoder(MemoryPool* session_pool)
-    : skiped_item_count_(0),
-      session_pool_(session_pool),
-      skiplist_reader_(nullptr),
-      doc_list_buffer_(nullptr),
-      df_(0),
-      finish_decoded_(false) {}
+InMemDocListDecoder::InMemDocListDecoder(MemoryPool *session_pool)
+    : skiped_item_count_(0), session_pool_(session_pool), skiplist_reader_(nullptr), doc_list_buffer_(nullptr), df_(0), finish_decoded_(false) {}
 
 InMemDocListDecoder::~InMemDocListDecoder() {
-    if(session_pool_) {
+    if (session_pool_) {
         doc_list_buffer_->~BufferedByteSlice();
-        session_pool_->Deallocate((void*)doc_list_buffer_, sizeof(BufferedByteSlice));
+        session_pool_->Deallocate((void *)doc_list_buffer_, sizeof(BufferedByteSlice));
     } else {
         delete doc_list_buffer_;
         doc_list_buffer_ = nullptr;
     }
 }
 
-void
-InMemDocListDecoder::Init(df_t df, SkipListReader* skiplist_reader, BufferedByteSlice* doc_list_buffer) {
+void InMemDocListDecoder::Init(df_t df, SkipListReader *skiplist_reader, BufferedByteSlice *doc_list_buffer) {
     df_ = df;
     skiplist_reader_ = skiplist_reader;
     doc_list_buffer_ = doc_list_buffer;
     doc_list_reader_.Open(doc_list_buffer);
 }
 
-bool
-InMemDocListDecoder::DecodeDocBuffer(
-        docid_t start_doc_id,
-        docid_t* doc_buffer,
-        docid_t& first_doc_id_,
-        docid_t& last_doc_id_,
-        ttf_t& current_ttf) {
+bool InMemDocListDecoder::DecodeDocBuffer(docid_t start_doc_id,
+                                          docid_t *doc_buffer,
+                                          docid_t &first_doc_id_,
+                                          docid_t &last_doc_id_,
+                                          ttf_t &current_ttf) {
     DocBufferInfo doc_buffer_info(doc_buffer, first_doc_id_, last_doc_id_, current_ttf);
-    if(skiplist_reader_ == nullptr) {
+    if (skiplist_reader_ == nullptr) {
         current_ttf = 0;
         return DecodeDocBufferWithoutSkipList(0, 0, start_doc_id, doc_buffer_info);
     }
@@ -45,8 +37,8 @@ InMemDocListDecoder::DecodeDocBuffer(
     uint32_t record_len;
     uint32_t last_doc_id_in_prev_record;
 
-    auto ret = skiplist_reader_->SkipTo((uint32_t)start_doc_id, (uint32_t&)last_doc_id_, last_doc_id_in_prev_record, offset, record_len);
-    if(!ret) {
+    auto ret = skiplist_reader_->SkipTo((uint32_t)start_doc_id, (uint32_t &)last_doc_id_, last_doc_id_in_prev_record, offset, record_len);
+    if (!ret) {
         // we should decode buffer
         last_doc_id_in_prev_record = skiplist_reader_->GetLastKeyInBuffer();
         offset = skiplist_reader_->GetLastValueInBuffer();
@@ -66,12 +58,12 @@ InMemDocListDecoder::DecodeDocBuffer(
     return true;
 }
 
-bool
-InMemDocListDecoder::DecodeDocBufferWithoutSkipList(
-        docid_t last_doc_id_in_prev_record, uint32_t offset,
-        docid_t start_doc_id, DocBufferInfo& doc_buffer_info) {
+bool InMemDocListDecoder::DecodeDocBufferWithoutSkipList(docid_t last_doc_id_in_prev_record,
+                                                         uint32_t offset,
+                                                         docid_t start_doc_id,
+                                                         DocBufferInfo &doc_buffer_info) {
     // only decode one time
-    if(finish_decoded_) {
+    if (finish_decoded_) {
         return false;
     }
 
@@ -80,16 +72,16 @@ InMemDocListDecoder::DecodeDocBufferWithoutSkipList(
 
     // short list when no skip
     size_t decode_count;
-    if(!doc_list_reader_.Decode(doc_buffer_info.doc_buffer_, MAX_DOC_PER_RECORD, decode_count)) {
+    if (!doc_list_reader_.Decode(doc_buffer_info.doc_buffer_, MAX_DOC_PER_RECORD, decode_count)) {
         return false;
     }
 
     doc_buffer_info.last_doc_id_ = last_doc_id_in_prev_record;
-    for(size_t i = 0; i < decode_count; ++i) {
+    for (size_t i = 0; i < decode_count; ++i) {
         doc_buffer_info.last_doc_id_ += doc_buffer_info.doc_buffer_[i];
     }
     doc_buffer_info.first_doc_id_ = doc_buffer_info.doc_buffer_[0] + last_doc_id_in_prev_record;
-    if(start_doc_id > doc_buffer_info.last_doc_id_) {
+    if (start_doc_id > doc_buffer_info.last_doc_id_) {
         return false;
     }
 
@@ -97,16 +89,14 @@ InMemDocListDecoder::DecodeDocBufferWithoutSkipList(
     return true;
 }
 
-bool
-InMemDocListDecoder::DecodeCurrentTFBuffer(tf_t* tf_buffer) {
+bool InMemDocListDecoder::DecodeCurrentTFBuffer(tf_t *tf_buffer) {
     size_t decode_count;
     return doc_list_reader_.Decode(tf_buffer, MAX_DOC_PER_RECORD, decode_count);
 }
 
-void
-InMemDocListDecoder::DecodeCurrentDocPayloadBuffer(docpayload_t* doc_payload_buffer) {
+void InMemDocListDecoder::DecodeCurrentDocPayloadBuffer(docpayload_t *doc_payload_buffer) {
     size_t decode_count;
     doc_list_reader_.Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_count);
 }
 
-}// namespace infinity
+} // namespace infinity

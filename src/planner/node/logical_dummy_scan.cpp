@@ -8,18 +8,18 @@
 
 namespace infinity {
 
-String
-LogicalDummyScan::ToString(i64& space) {
+String LogicalDummyScan::ToString(i64 &space) {
     std::stringstream ss;
     String arrow_str;
-    if(space > 3) {
+    if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << "-> " << "DummyScan: " << this->table_alias_ << "(" << this->table_index_ << ")";
+    ss << String(space, ' ') << "-> "
+       << "DummyScan: " << this->table_alias_ << "(" << this->table_index_ << ")";
     space += arrow_str.size();
 
     return ss.str();
 }
 
-}
+} // namespace infinity

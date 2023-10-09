@@ -4,11 +4,10 @@
 
 #pragma once
 
-
-#include "common/types/alias/smart_ptr.h"
-#include "common/types/alias/primitives.h"
-#include "common/types/alias/containers.h"
 #include "common/types/alias/concurrency.h"
+#include "common/types/alias/containers.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/smart_ptr.h"
 
 enum class TaskState {
     kCreated,
@@ -25,62 +24,36 @@ class QueryContext;
 
 class Pipeline : public std::enable_shared_from_this<Pipeline> {
 public:
-    explicit
-    Pipeline(u64 id) : id_(id) {}
+    explicit Pipeline(u64 id) : id_(id) {}
 
-    virtual
-    ~Pipeline() = 0;
+    virtual ~Pipeline() = 0;
 
-    bool
-    IsReady() const {
-        return pending_predecessors_ == 0;
-    }
+    bool IsReady() const { return pending_predecessors_ == 0; }
 
-    bool
-    IsDone() const {
-        return state_ == TaskState::kDone;
-    }
+    bool IsDone() const { return state_ == TaskState::kDone; }
 
     // Set dependencies
-    void
-    SetPredecessorOf(const SharedPtr<Pipeline>& successor);
+    void SetPredecessorOf(const SharedPtr<Pipeline> &successor);
 
-    const Vector<SharedPtr<Pipeline>>&
-    predecessors() const {
-        return predecessors_;
-    }
+    const Vector<SharedPtr<Pipeline>> &predecessors() const { return predecessors_; }
 
-    const Vector<Pipeline*>&
-    successors() const {
-        return successors_;
-    }
+    const Vector<Pipeline *> &successors() const { return successors_; }
 
-    void
-    Schedule();
+    void Schedule();
 
-    void
-    Execute(QueryContext* query_context);
+    void Execute(QueryContext *query_context);
 
-    TaskState
-    state() const {
-        return state_;
-    }
+    TaskState state() const { return state_; }
 
-    u64
-    Id() const {
-        return id_;
-    }
+    u64 Id() const { return id_; }
 
-    virtual SharedPtr<Table>
-    GetResult() = 0;
+    virtual SharedPtr<Table> GetResult() = 0;
 
 protected:
-    virtual void
-    OnExecute(QueryContext* query_context) = 0;
+    virtual void OnExecute(QueryContext *query_context) = 0;
 
 private:
-    void
-    OnPredecessorDone();
+    void OnPredecessorDone();
 
     // Task state
     TaskState state_{TaskState::kCreated};
@@ -91,10 +64,9 @@ private:
     // TODO: leaf node will be freed due to weak ptr;
     Vector<SharedPtr<Pipeline>> predecessors_;
 
-    Vector<Pipeline*> successors_;
+    Vector<Pipeline *> successors_;
 
     u64 id_{0};
 };
 
-
-}
+} // namespace infinity

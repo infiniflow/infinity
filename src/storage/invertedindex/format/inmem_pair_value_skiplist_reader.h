@@ -9,22 +9,20 @@ namespace infinity {
 
 class InMemPairValueSkipListReader : public PairValueSkipListReader {
 public:
-    InMemPairValueSkipListReader(MemoryPool* sessionPool);
+    InMemPairValueSkipListReader(MemoryPool *sessionPool);
 
     ~InMemPairValueSkipListReader();
 
-    InMemPairValueSkipListReader(const InMemPairValueSkipListReader& other) = delete;
+    InMemPairValueSkipListReader(const InMemPairValueSkipListReader &other) = delete;
 
-    void
-    Load(BufferedByteSlice* postingBuffer);
+    void Load(BufferedByteSlice *postingBuffer);
 
 private:
-    std::pair<int, bool>
-    LoadBuffer() override;
+    std::pair<int, bool> LoadBuffer() override;
 
-    MemoryPool* session_pool_;
-    BufferedByteSlice* skiplist_buffer_;
+    MemoryPool *session_pool_;
+    BufferedByteSlice *skiplist_buffer_;
     BufferedByteSliceReader skiplist_reader_;
 };
 
-}// namespace infinity
+} // namespace infinity

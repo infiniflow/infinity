@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include "common/types/alias/strings.h"
 #include "common/types/alias/primitives.h"
+#include "common/types/alias/strings.h"
 
 namespace infinity {
 
 enum class StatementType {
-    kInvalidStmt,  // unused
+    kInvalidStmt, // unused
     kSelect,
     kCopy,
     kInsert,
@@ -28,19 +28,13 @@ enum class StatementType {
 
 class BaseStatement {
 public:
-    explicit
-    BaseStatement(StatementType type) : type_(type) {}
+    explicit BaseStatement(StatementType type) : type_(type) {}
 
-    virtual
-    ~BaseStatement() = default;
+    virtual ~BaseStatement() = default;
 
-    [[nodiscard]] virtual String
-    ToString() const = 0;
+    [[nodiscard]] virtual String ToString() const = 0;
 
-    [[nodiscard]] inline StatementType
-    Type() const {
-        return type_;
-    }
+    [[nodiscard]] inline StatementType Type() const { return type_; }
 
     StatementType type_{StatementType::kInvalidStmt};
     SizeT stmt_location_{0};
@@ -48,4 +42,4 @@ public:
     String text_{};
 };
 
-}
+} // namespace infinity

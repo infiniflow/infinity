@@ -4,9 +4,10 @@
 
 #pragma once
 
-
+#include "storage/meta/entry/table_collecton_type.h"
 
 namespace infinity {
+
 struct TableCollectionDetail {
     SharedPtr<String> db_name_{};
     SharedPtr<String> table_collection_name_{};
@@ -17,6 +18,5 @@ struct TableCollectionDetail {
     i64 block_count_{};
     i64 segment_capacity_{};
 };
-}
 
-
+} // namespace infinity

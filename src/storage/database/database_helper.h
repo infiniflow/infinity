@@ -11,8 +11,7 @@ namespace infinity {
 
 class DatabaseHelper {
 public:
-    static i32
-    CreateLockerFile(const String& dir_name);
+    static i32 CreateLockerFile(const String &dir_name);
 };
 
-}
+} // namespace infinity

@@ -8,12 +8,10 @@ namespace infinity {
 
 class Comparator {
 public:
-    explicit
-    Comparator(const SharedPtr<Table>& order_by_table, const Vector<OrderType>& order_by_types)
-            : order_by_table_(order_by_table), order_by_types_(order_by_types) {}
+    explicit Comparator(const SharedPtr<Table> &order_by_table, const Vector<OrderType> &order_by_types)
+        : order_by_table_(order_by_table), order_by_types_(order_by_types) {}
 
-    bool
-    operator()(RowID left, RowID right) {
+    bool operator()(RowID left, RowID right) {
 #if 0
         SizeT column_count = order_by_table_->ColumnCount();
         for(SizeT col_id = 0; col_id < column_count; ++col_id) {
@@ -165,22 +163,15 @@ public:
     }
 
 private:
-    const SharedPtr<Table>& order_by_table_;
-    const Vector<OrderType>& order_by_types_;
+    const SharedPtr<Table> &order_by_table_;
+    const Vector<OrderType> &order_by_types_;
 };
 
-void
-PhysicalSort::Init() {
+void PhysicalSort::Init() {}
 
-}
+void PhysicalSort::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void
-PhysicalSort::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
-
-}
-
-void
-PhysicalSort::Execute(QueryContext* query_context) {
+void PhysicalSort::Execute(QueryContext *query_context) {
 
 #if 0
     executor_.Init(this->expressions_);
@@ -217,12 +208,11 @@ PhysicalSort::Execute(QueryContext* query_context) {
 #endif
 }
 
-SharedPtr<Table>
-PhysicalSort::GetOrderTable() const {
+SharedPtr<Table> PhysicalSort::GetOrderTable() const {
     SizeT column_count = this->expressions_.size();
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
-    for(SizeT idx = 0; idx < column_count; ++idx) {
+    for (SizeT idx = 0; idx < column_count; ++idx) {
         SharedPtr<DataType> col_type = MakeShared<DataType>(this->expressions_[idx]->Type());
         String col_name = this->expressions_[idx]->Name();
 
@@ -230,24 +220,20 @@ PhysicalSort::GetOrderTable() const {
         columns.emplace_back(col_def);
     }
 
-//    // offset column is used to indicate which row this data belong to.
-//    SharedPtr<ColumnDef> offset_col = ColumnDef::Make("_offset",
-//                                                      column_count,
-//                                                      DataType(LogicalType::kInteger),
-//                                                      Set<ConstrainType>());
-//
-//    columns.emplace_back(offset_col);
+    //    // offset column is used to indicate which row this data belong to.
+    //    SharedPtr<ColumnDef> offset_col = ColumnDef::Make("_offset",
+    //                                                      column_count,
+    //                                                      DataType(LogicalType::kInteger),
+    //                                                      Set<ConstrainType>());
+    //
+    //    columns.emplace_back(offset_col);
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"),
-                                                   MakeShared<String>("order_by_key_table"),
-                                                   columns);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("order_by_key_table"), columns);
 
     return Table::Make(table_def, TableType::kIntermediate);
 }
 
-void
-PhysicalSort::Sort(const SharedPtr<Table>& order_by_table,
-                   const Vector<OrderType>& order_by_types) {
+void PhysicalSort::Sort(const SharedPtr<Table> &order_by_table, const Vector<OrderType> &order_by_types) {
     // Generate row id vector
     SharedPtr<Vector<RowID>> rowid_vector = order_by_table->GetRowIDVector();
 
@@ -257,16 +243,14 @@ PhysicalSort::Sort(const SharedPtr<Table>& order_by_table,
     output_ = GenerateOutput(input_table_, rowid_vector);
 }
 
-SharedPtr<Table>
-PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
-                             const SharedPtr<Vector<RowID>>& rowid_vector) {
+SharedPtr<Table> PhysicalSort::GenerateOutput(const SharedPtr<Table> &input_table, const SharedPtr<Vector<RowID>> &rowid_vector) {
     // output table definition is same as input
     SizeT column_count = input_table->ColumnCount();
     Vector<SharedPtr<DataType>> types;
     types.reserve(column_count);
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
-    for(SizeT idx = 0; idx < column_count; ++idx) {
+    for (SizeT idx = 0; idx < column_count; ++idx) {
         SharedPtr<DataType> col_type = input_table->GetColumnTypeById(idx);
         types.emplace_back(col_type);
 
@@ -279,9 +263,9 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("sort"), columns);
     SharedPtr<Table> output_table = Table::Make(table_def, TableType::kIntermediate);
 
-    const Vector<SharedPtr<DataBlock>>& input_datablocks = input_table->data_blocks_;
+    const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
 
-//    SizeT vector_count = rowid_vector->size();
+    //    SizeT vector_count = rowid_vector->size();
     SizeT vector_idx = 0;
 #if 0
     SizeT block_count = input_table->data_blocks_.size();
@@ -391,5 +375,4 @@ PhysicalSort::GenerateOutput(const SharedPtr<Table>& input_table,
 #endif
 }
 
-}
-
+} // namespace infinity

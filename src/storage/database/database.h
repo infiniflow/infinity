@@ -14,8 +14,7 @@ class FileSystem;
 
 class Database {
 public:
-    static inline SharedPtr<Database>
-    Open(const String& dir_name, FileSystemType file_system_type);
+    static inline SharedPtr<Database> Open(const String &dir_name, FileSystemType file_system_type);
 
 public:
     Database(String dir_name, FileSystemType file_system_type);
@@ -28,6 +27,4 @@ private:
     UniquePtr<FileSystem> file_system_{};
 };
 
-}
-
-
+} // namespace infinity

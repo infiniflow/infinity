@@ -4,25 +4,22 @@
 
 #include "config.h"
 #include "bin/compilation_config.h"
-#include "toml.hpp"
-#include "spdlog/common.h"
 #include "common/types/alias/containers.h"
-#include <iostream>
-#include <charconv>
+#include "spdlog/common.h"
+#include "toml.hpp"
 #include <boost/asio/ip/impl/address.ipp>
+#include <charconv>
+#include <iostream>
 
 namespace infinity {
 
 extern SharedPtr<spdlog::logger> infinity_logger;
 
-SharedPtr<String>
-Config::Init(const SharedPtr<String>& config_path) {
+SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     SharedPtr<String> result;
 
     // Default general config
-    String default_version = std::to_string(VERSION_MAJOR) + '.'
-                             + std::to_string(VERSION_MINOR) + '.'
-                             + std::to_string(VERSION_PATCH);
+    String default_version = std::to_string(VERSION_MAJOR) + '.' + std::to_string(VERSION_MINOR) + '.' + std::to_string(VERSION_PATCH);
 
     String default_time_zone = "UTC";
     i32 default_time_zone_bias = 8;
@@ -56,7 +53,7 @@ Config::Init(const SharedPtr<String>& config_path) {
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
     SharedPtr<String> default_temp_dir = MakeShared<String>("/tmp/infinity/temp");
 
-    if(config_path == nullptr) {
+    if (config_path == nullptr) {
         std::cout << "No config file is given, use default configs." << std::endl;
 
         // General
@@ -115,20 +112,20 @@ Config::Init(const SharedPtr<String>& config_path) {
             auto general_config = config["general"];
 
             String infinity_version = general_config["version"].value_or("invalid");
-            if(default_version != infinity_version) {
+            if (default_version != infinity_version) {
                 return MakeShared<String>("Unmatched version in config file.");
             }
             option_.version = infinity_version;
 
             String time_zone_str = general_config["timezone"].value_or("invalid");
-            if(time_zone_str == "invalid") {
+            if (time_zone_str == "invalid") {
                 result = MakeShared<String>("Timezone isn't given in config file.");
                 return result;
             }
 
             try {
                 ParseTimeZoneStr(time_zone_str, option_.time_zone, option_.time_zone_bias);
-            } catch(...) {
+            } catch (...) {
                 result = MakeShared<String>(fmt::format("Timezone can't be recognized: {}", time_zone_str));
                 return result;
             }
@@ -141,10 +138,10 @@ Config::Init(const SharedPtr<String>& config_path) {
 
             String total_memory_size_str = system_config["total_memory_size"].value_or("8GB");
             result = ParseByteSize(total_memory_size_str, option_.total_memory_size);
-            if(result != nullptr) {
+            if (result != nullptr) {
                 return result;
             }
-            if(option_.total_memory_size > default_total_memory_size) {
+            if (option_.total_memory_size > default_total_memory_size) {
                 option_.total_memory_size = default_total_memory_size;
             }
 
@@ -153,10 +150,10 @@ Config::Init(const SharedPtr<String>& config_path) {
 
             String query_memory_limit_str = system_config["query_memory_limit"].value_or("4MB");
             result = ParseByteSize(query_memory_limit_str, option_.query_memory_limit);
-            if(result != nullptr) {
+            if (result != nullptr) {
                 return result;
             }
-            if(option_.query_memory_limit > default_query_memory_limit) {
+            if (option_.query_memory_limit > default_query_memory_limit) {
                 option_.query_memory_limit = default_query_memory_limit;
             }
         }
@@ -169,7 +166,7 @@ Config::Init(const SharedPtr<String>& config_path) {
             // Validate the address format
             boost::system::error_code error;
             boost::asio::ip::make_address(option_.listen_address, error);
-            if(error) {
+            if (error) {
                 String err_msg = fmt::format("Not a valid IPv4 address: {}", option_.listen_address);
                 result = MakeShared<String>(err_msg);
                 return result;
@@ -190,22 +187,22 @@ Config::Init(const SharedPtr<String>& config_path) {
 
             String log_max_size_str = log_config["log_max_size"].value_or("1GB");
             result = ParseByteSize(log_max_size_str, option_.log_max_size);
-            if(result != nullptr) {
+            if (result != nullptr) {
                 return result;
             }
 
             option_.log_file_rotate_count = log_config["log_file_rotate_count"].value_or(default_log_file_rotate_count);
 
             String log_level = log_config["log_level"].value_or("invalid");
-            if(log_level == "trace") {
+            if (log_level == "trace") {
                 option_.log_level = spdlog::level::level_enum::trace;
-            } else if(log_level == "info") {
+            } else if (log_level == "info") {
                 option_.log_level = spdlog::level::level_enum::info;
-            } else if(log_level == "warning") {
+            } else if (log_level == "warning") {
                 option_.log_level = spdlog::level::level_enum::warn;
-            } else if(log_level == "error") {
+            } else if (log_level == "error") {
                 option_.log_level = spdlog::level::level_enum::err;
-            } else if(log_level == "critical") {
+            } else if (log_level == "critical") {
                 option_.log_level = spdlog::level::level_enum::critical;
             } else {
                 result = MakeShared<String>("Invalid log level in config file");
@@ -226,7 +223,7 @@ Config::Init(const SharedPtr<String>& config_path) {
             auto buffer_config = config["buffer"];
             String buffer_pool_size_str = buffer_config["buffer_pool_size"].value_or("4GB");
             result = ParseByteSize(buffer_pool_size_str, option_.buffer_pool_size);
-            if(result != nullptr) {
+            if (result != nullptr) {
                 return result;
             }
             option_.temp_dir = MakeShared<String>(buffer_config["temp_dir"].value_or("invalid"));
@@ -236,9 +233,8 @@ Config::Init(const SharedPtr<String>& config_path) {
     return result;
 }
 
-void
-Config::PrintAll() const {
-    if(infinity_logger != nullptr) {
+void Config::PrintAll() const {
+    if (infinity_logger != nullptr) {
         infinity::infinity_logger->info("Infinity system parameters: ");
 
         // General
@@ -264,7 +260,7 @@ Config::PrintAll() const {
         infinity::infinity_logger->info(" - log_file_rotate_count: " + std::to_string(option_.log_file_rotate_count));
         infinity::infinity_logger->info(" - log_level: " + String(spdlog::level::to_short_c_str(option_.log_level)));
 
-        //Storage
+        // Storage
         infinity::infinity_logger->info(" - data_dir: " + *option_.data_dir);
         infinity::infinity_logger->info(" - wal_dir: " + *option_.wal_dir);
         infinity::infinity_logger->info(" - default_row_size: " + std::to_string(option_.default_row_size));
@@ -275,34 +271,27 @@ Config::PrintAll() const {
     }
 }
 
-void
-Config::ParseTimeZoneStr(const String& time_zone_str, String& parsed_time_zone, i32& parsed_time_zone_bias) {
+void Config::ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias) {
     parsed_time_zone = time_zone_str.substr(0, 3);
     std::transform(parsed_time_zone.begin(), parsed_time_zone.end(), parsed_time_zone.begin(), ::toupper);
     parsed_time_zone_bias = std::stoi(time_zone_str.substr(3, std::string::npos));
 }
 
-SharedPtr<String>
-Config::ParseByteSize(const String& byte_size_str, u64& byte_size) {
+SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_size) {
 
-    HashMap<String, u64> byte_unit = {
-            {"kb", 1024ul},
-            {"mb", 1024ul * 1024ul},
-            {"gb", 1024ul * 1024ul * 1024ul}
-    };
-    if(byte_size_str.empty()) {
-        return MakeShared<String>("No byte size is given");;
+    HashMap<String, u64> byte_unit = {{"kb", 1024ul}, {"mb", 1024ul * 1024ul}, {"gb", 1024ul * 1024ul * 1024ul}};
+    if (byte_size_str.empty()) {
+        return MakeShared<String>("No byte size is given");
+        ;
     }
 
     u64 factor;
-    auto [ptr, error_code] = std::from_chars(byte_size_str.data(),
-                                             byte_size_str.data() + byte_size_str.size(),
-                                             factor);
-    if(error_code == std::errc()) {
+    auto [ptr, error_code] = std::from_chars(byte_size_str.data(), byte_size_str.data() + byte_size_str.size(), factor);
+    if (error_code == std::errc()) {
         String unit = ptr;
         std::transform(unit.begin(), unit.end(), unit.begin(), ::tolower);
         auto it = byte_unit.find(unit);
-        if(it != byte_unit.end()) {
+        if (it != byte_unit.end()) {
             byte_size = factor * it->second;
             return nullptr;
         } else {
@@ -313,12 +302,10 @@ Config::ParseByteSize(const String& byte_size_str, u64& byte_size) {
     }
 }
 
-u64
-Config::GetAvailableMem() {
+u64 Config::GetAvailableMem() {
     u64 pages = sysconf(_SC_PHYS_PAGES);
     u64 page_size = sysconf(_SC_PAGE_SIZE); // Byte
     return pages * page_size;
 }
 
-
-}
+} // namespace infinity

@@ -2,24 +2,21 @@
 // Created by jinhai on 23-1-12.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
-
+#include <gtest/gtest.h>
 
 class ValueCastTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -374,7 +371,6 @@ TEST_F(ValueCastTest, smallint_value_cast) {
             EXPECT_EQ(target_value.type_.type(), LogicalType::kTinyInt);
             EXPECT_EQ(target_value.value_.tiny_int, static_cast<TinyIntT>(source));
         }
-
     }
 
     {
@@ -1042,7 +1038,6 @@ TEST_F(ValueCastTest, bigint_value_cast) {
             EXPECT_EQ(target_value.value_.integer, source);
         }
 
-
         {
             source = std::numeric_limits<BigIntT>::min();
             value = Value::MakeBigInt(source);
@@ -1466,7 +1461,6 @@ TEST_F(ValueCastTest, float_value_cast) {
             EXPECT_EQ(target_value.value_.integer, source);
         }
 
-
         {
             source = std::numeric_limits<FloatT>::lowest();
             value = Value::MakeFloat(source);
@@ -1718,7 +1712,6 @@ TEST_F(ValueCastTest, double_value_cast) {
             EXPECT_EQ(target_value.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(target_value.value_.integer, source);
         }
-
 
         {
             source = std::numeric_limits<DoubleT>::lowest();

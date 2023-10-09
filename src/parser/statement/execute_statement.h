@@ -8,8 +8,6 @@
 
 namespace infinity {
 
-class ExecuteStatement : public BaseStatement {
+class ExecuteStatement : public BaseStatement {};
 
-};
-
-}
+} // namespace infinity

@@ -12,9 +12,8 @@ namespace infinity {
  * @param print
  * @return Table
  */
-SharedPtr<Table>
-SQLRunner::Run(const String& sql_text, bool print) {
-    if(print) {
+SharedPtr<Table> SQLRunner::Run(const String &sql_text, bool print) {
+    if (print) {
         LOG_TRACE("{}", sql_text);
     }
 
@@ -31,19 +30,18 @@ SQLRunner::Run(const String& sql_text, bool print) {
     SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
     parser->Parse(sql_text, parsed_result);
 
-    if(parsed_result->IsError()) {
+    if (parsed_result->IsError()) {
         ParserError(parsed_result->error_message_)
     }
 
     query_context_ptr->CreateTxn();
     query_context_ptr->BeginTxn();
 
-
     LogicalPlanner logical_planner(query_context_ptr.get());
     Optimizer optimizer(query_context_ptr.get());
     PhysicalPlanner physical_planner(query_context_ptr.get());
     FragmentBuilder fragment_builder(query_context_ptr.get());
-    BaseStatement* statement = (*parsed_result->statements_ptr_)[0];
+    BaseStatement *statement = (*parsed_result->statements_ptr_)[0];
 
     SharedPtr<BindContext> bind_context;
     logical_planner.Build(statement, bind_context);
@@ -73,4 +71,4 @@ SQLRunner::Run(const String& sql_text, bool print) {
     query_context_ptr->CommitTxn();
     return query_result.result_;
 }
-}
+} // namespace infinity

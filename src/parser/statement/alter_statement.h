@@ -8,8 +8,6 @@
 
 namespace infinity {
 
-class AlterStatement : public BaseStatement {
+class AlterStatement : public BaseStatement {};
 
-};
-
-}
+} // namespace infinity

@@ -13,5 +13,4 @@ struct GlobalBlockID {
     i16 block_id_{};
 };
 
-}
-
+} // namespace infinity

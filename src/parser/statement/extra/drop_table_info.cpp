@@ -7,11 +7,10 @@
 
 namespace infinity {
 
-String
-DropTableInfo::ToString() const {
+String DropTableInfo::ToString() const {
     std::stringstream ss;
     ss << "DROP TABLE: " << schema_name_ << "." << table_name_;
-    if(this->conflict_type_ == ConflictType::kIgnore) {
+    if (this->conflict_type_ == ConflictType::kIgnore) {
         ss << " IgnoreIfExists";
     } else {
         ss << " ThrowErrorIfExists";
@@ -19,4 +18,4 @@ DropTableInfo::ToString() const {
     return ss.str();
 }
 
-}
+} // namespace infinity

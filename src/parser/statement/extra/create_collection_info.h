@@ -10,14 +10,12 @@ namespace infinity {
 
 class CreateCollectionInfo final : public ExtraDDLInfo {
 public:
-    explicit
-    CreateCollectionInfo() : ExtraDDLInfo(DDLType::kCollection) {}
+    explicit CreateCollectionInfo() : ExtraDDLInfo(DDLType::kCollection) {}
 
-    [[nodiscard]] virtual String
-    ToString() const final;
+    [[nodiscard]] virtual String ToString() const final;
 
     String schema_name_{"default"};
     String collection_name_{};
 };
 
-}
+} // namespace infinity

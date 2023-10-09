@@ -2,24 +2,22 @@
 // Created by jinhai on 22-12-19.
 //
 
-#include <gtest/gtest.h>
-#include "base_test.h"
 #include "common/column_vector/bitmask_buffer.h"
+#include "base_test.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class BitmaskBufferTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -63,13 +61,10 @@ TEST_F(BitmaskBufferTest, bitmask_buffer_a) {
 
 TEST_F(BitmaskBufferTest, ReadWrite) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(),
-              test_info_->name());
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     constexpr size_t bit_count = 8192;
-    std::vector<SharedPtr<Bitmask>> masks = {Bitmask::Make(bit_count),
-                                             Bitmask::Make(bit_count),
-                                             Bitmask::Make(bit_count)};
+    std::vector<SharedPtr<Bitmask>> masks = {Bitmask::Make(bit_count), Bitmask::Make(bit_count), Bitmask::Make(bit_count)};
     masks[1]->SetAllFalse();
     masks[2]->SetFalse(4096);
 

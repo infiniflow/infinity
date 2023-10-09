@@ -13,9 +13,8 @@ enum TableCollectionType : i8 {
     kCollectionEntry,
 };
 
-inline String
-ToString(TableCollectionType type) {
-    switch(type) {
+inline String ToString(TableCollectionType type) {
+    switch (type) {
         case TableCollectionType::kTableEntry: {
             return "Table";
         }
@@ -28,4 +27,4 @@ ToString(TableCollectionType type) {
     }
 }
 
-}
+} // namespace infinity

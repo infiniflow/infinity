@@ -2,21 +2,16 @@
 // Created by jinhai on 23-2-22.
 //
 
-#include <iostream>
 #include "sql_parser.h"
+#include <iostream>
 
 class test {
 public:
-    test() {
-        std::cout << "CTOR" << std::endl;
-    }
-    ~test() {
-        std::cout << "DTOR" << std::endl;
-    }
+    test() { std::cout << "CTOR" << std::endl; }
+    ~test() { std::cout << "DTOR" << std::endl; }
 };
 
-auto
-main(int argc, char* argv[]) -> int {
+auto main(int argc, char *argv[]) -> int {
     using namespace infinity;
     Vector<String> inputs;
     inputs.emplace_back("create collection c1;");
@@ -44,7 +39,7 @@ main(int argc, char* argv[]) -> int {
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
-    for(const String& input: inputs) {
+    for (const String &input : inputs) {
         parser->Parse(input, result);
         std::cout << result->ToString() << std::endl;
         result->Reset();

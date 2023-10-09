@@ -7,8 +7,8 @@
 #include <utility>
 
 #include "executor/physical_operator.h"
-#include "parser/table_reference/join_reference.h"
 #include "expression/base_expression.h"
+#include "parser/table_reference/join_reference.h"
 
 namespace infinity {
 
@@ -19,34 +19,22 @@ public:
                                     Vector<SharedPtr<BaseExpression>> conditions,
                                     SharedPtr<PhysicalOperator> left,
                                     SharedPtr<PhysicalOperator> right)
-            : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop,
-                               std::move(left),
-                               std::move(right),
-                               id),
-              join_type_(join_type),
-              conditions_(std::move(conditions)) {}
+        : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, std::move(left), std::move(right), id), join_type_(join_type),
+          conditions_(std::move(conditions)) {}
 
     ~PhysicalNestedLoopJoin() override = default;
 
-    void
-    Init() override;
+    void Init() override;
 
-    void
-    Execute(QueryContext* query_context) final;
+    void Execute(QueryContext *query_context) final;
 
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    SharedPtr<Vector<String>>
-    GetOutputNames() const final;
+    SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    inline const Vector<SharedPtr<BaseExpression>>&
-    conditions() const {
-        return conditions_;
-    }
+    inline const Vector<SharedPtr<BaseExpression>> &conditions() const { return conditions_; }
 
 private:
     SharedPtr<Table> left_table_{};
@@ -55,4 +43,4 @@ private:
     Vector<SharedPtr<BaseExpression>> conditions_{};
 };
 
-}
+} // namespace infinity
