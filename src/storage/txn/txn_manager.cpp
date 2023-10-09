@@ -106,10 +106,10 @@ void TxnManager::Stop() {
     std::lock_guard guard(mutex_);
     while (!priority_que_.empty()) {
         auto it = priority_que_.begin();
-        while (it!= priority_que_.end() && it->second!= nullptr) {
+        while (it != priority_que_.end() && it->second != nullptr) {
             // remove and notify the wal manager condition variable
             auto txn = GetTxn(it->first);
-            if (txn!= nullptr) {
+            if (txn != nullptr) {
                 txn->CancelCommitTxnBottom();
             }
         }
