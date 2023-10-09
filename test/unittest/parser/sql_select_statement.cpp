@@ -4,11 +4,12 @@
 
 #include "base_test.h"
 #include "main/logger.h"
+#include "parser/parser_result.h"
+#include "parser/sql_parser.h"
+
 #include <gtest/gtest.h>
 
 #include "main/infinity.h"
-#include "parser/parser_result.h"
-#include "parser/sql_parser.h"
 
 class SelectStatementParsingTest : public BaseTest {
     void SetUp() override {

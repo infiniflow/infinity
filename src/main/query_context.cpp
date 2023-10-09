@@ -2,7 +2,11 @@
 // Created by JinHai on 2022/7/22.
 //
 
+#include "parser/sql_parser.h"
+#include "parser/parser_result.h"
+
 #include "query_context.h"
+#include "parser/sql_parser.h"
 #include "common/utility/defer_op.h"
 #include "common/utility/infinity_assert.h"
 #include "executor/fragment_builder.h"
@@ -11,8 +15,6 @@
 #include "infinity.h"
 #include "legacy_sched/operator_pipeline.h"
 #include "main/session.h"
-#include "parser/parser_result.h"
-#include "parser/sql_parser.h"
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
 

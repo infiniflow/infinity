@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "parser/sql_parser.h"
+
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
 #include "executor/physical_planner.h"
@@ -12,7 +14,6 @@
 #include "main/logger.h"
 #include "main/session.h"
 #include "main/stats/global_resource_usage.h"
-#include "parser/sql_parser.h"
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
 
