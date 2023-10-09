@@ -20,7 +20,6 @@ namespace infinity {
 enum class TableElementType {
     kConstraint,
     kColumn,
-    kIndex,
 };
 
 enum class ConstraintType : i8 {

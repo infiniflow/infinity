@@ -23,8 +23,8 @@ public:
     String table_name_{};
     String method_type_{};
 
-    Vector<String>* column_names_{nullptr};
-    Vector<InitParameter*>* index_para_list_{nullptr};
+    Vector<String> *column_names_{nullptr};
+    Vector<InitParameter *> *index_para_list_{nullptr};
 };
 
 } // namespace infinity

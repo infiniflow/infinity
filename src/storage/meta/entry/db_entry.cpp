@@ -49,13 +49,12 @@ EntryResult DBEntry::CreateTableCollection(DBEntry *db_entry,
     }
 }
 
-EntryResult
-DBEntry::DropTableCollection(DBEntry* db_entry,
-                             const String& table_collection_name,
-                             ConflictType conflict_type,
-                             u64 txn_id,
-                             TxnTimeStamp begin_ts,
-                             TxnManager* txn_mgr) {
+EntryResult DBEntry::DropTableCollection(DBEntry *db_entry,
+                                         const String &table_collection_name,
+                                         ConflictType conflict_type,
+                                         u64 txn_id,
+                                         TxnTimeStamp begin_ts,
+                                         TxnManager *txn_mgr) {
     db_entry->rw_locker_.lock_shared();
 
     TableCollectionMeta *table_meta{nullptr};
