@@ -72,12 +72,12 @@ void WalManager::Stop() {
         que_.pop();
     }
 
-    // Notify checkpoint thread to stop.
+    // Wait for checkpoint thread to stop.
     LOG_INFO("WalManager::Stop begin to stop checkpoint thread");
     checkpoint_thread_.join();
     LOG_INFO("WalManager::Stop done to stop checkpoint thread");
 
-    // Notify flush thread to stop.
+    // Wait for flush thread to stop
     LOG_INFO("WalManager::Stop begin to stop flush thread");
     flush_thread_.join();
     LOG_INFO("WalManager::Stop done to stop flush thread");
@@ -198,18 +198,11 @@ void WalManager::Checkpoint() {
             txn = txn_mgr->CreateTxn();
             txn->BeginTxn();
             txn->Checkpoint(commit_ts_pend);
-        } catch (const std::exception &e) {
-            LOG_WARN("WalManager::Checkpoint failed to stop txn manager");
+            txn->CommitTxn();
+        } catch (TransactionException &e) {
+            LOG_WARN(e.what());
             return;
         } catch (...) {
-            LOG_WARN("WalManager::Checkpoint failed to commit checkpoint txn");
-            return;
-        }
-
-        try {
-            txn->CommitTxn();
-        } catch (const std::exception &) {
-            // txn->CancelCommitTxnBottom();
             LOG_WARN("WalManager::Checkpoint failed to commit checkpoint txn");
             return;
         }

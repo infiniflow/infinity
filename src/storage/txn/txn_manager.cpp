@@ -13,8 +13,7 @@ namespace infinity {
 
 Txn *TxnManager::CreateTxn() {
     // Check if the is_running_ is true
-    if (!is_running_) {
-        LOG_WARN("TxnManager is not running, cannot create txn");
+    if (is_running_.load() == false) {
         TransactionError("TxnManager is not running, cannot create txn");
     }
     rw_locker_.lock();
@@ -62,8 +61,7 @@ TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
 
 void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
     // Check if the is_running_ is true
-    if (!is_running_) {
-        LOG_WARN("TxnManager is not running, cannot invalidate");
+    if (is_running_.load() == false) {
         TransactionError("TxnManager is not running, cannot invalidate");
     }
     std::lock_guard guard(mutex_);
@@ -79,8 +77,7 @@ void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
 
 void TxnManager::PutWalEntry(std::shared_ptr<WalEntry> entry) {
     // Check if the is_running_ is true
-    if (!is_running_) {
-        LOG_WARN("TxnManager is not running, cannot put wal entry");
+    if (is_running_.load() == false) {
         TransactionError("TxnManager is not running, cannot put wal entry");
     }
     if (put_wal_entry_ == nullptr)
@@ -109,12 +106,17 @@ void TxnManager::Stop() {
     std::lock_guard guard(mutex_);
     while (!priority_que_.empty()) {
         auto it = priority_que_.begin();
-        // When stopping, the priority_que_ rest entries not need to be notify to wal_manager
-        // because the will not enter to queue of wal_manager
+        while (it!= priority_que_.end() && it->second!= nullptr) {
+            // remove and notify the wal manager condition variable
+            auto txn = GetTxn(it->first);
+            if (txn!= nullptr) {
+                txn->CancelCommitTxnBottom();
+            }
+        }
         priority_que_.erase(it);
     }
 }
 
-bool TxnManager::Stopped() { return is_running_.load() == false; }
+bool TxnManager::Stopped() { return !is_running_.load(); }
 
 } // namespace infinity
