@@ -10,26 +10,25 @@
 namespace infinity {
 
 struct LessFunction {
-    template<typename TA, typename TB, typename TC>
-    static inline void
-    Run(TA left, TB right, TC& result) {
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA left, TB right, TC &result) {
         result = left < right;
     }
 };
 
-template<>
-inline void
-LessFunction::Run(VarcharT left, VarcharT right, bool& result) {
-    if(left.IsInlined()) {
-        if(right.IsInlined()) {
+template <>
+inline void LessFunction::Run(VarcharT left, VarcharT right, bool &result) {
+    if (left.IsInlined()) {
+        if (right.IsInlined()) {
             result = (memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) < 0);
             return;
         }
-    } else if(right.IsInlined()) { ;
+    } else if (right.IsInlined()) {
+        ;
     } else {
         // Both left and right are not inline
         u16 min_len = std::min(right.length, left.length);
-        if(memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) < 0) {
+        if (memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) < 0) {
             result = (memcmp(left.ptr, right.ptr, min_len) < 0);
             return;
         }
@@ -37,57 +36,48 @@ LessFunction::Run(VarcharT left, VarcharT right, bool& result) {
     result = false;
 }
 
-template<>
-inline void
-LessFunction::Run(MixedT left, BigIntT right, bool& result) {
+template <>
+inline void LessFunction::Run(MixedT left, BigIntT right, bool &result) {
     NotImplementError("Not implement: mixed == bigint")
 }
 
-template<>
-inline void
-LessFunction::Run(BigIntT left, MixedT right, bool& result) {
+template <>
+inline void LessFunction::Run(BigIntT left, MixedT right, bool &result) {
     LessFunction::Run(right, left, result);
 }
 
-template<>
-inline void
-LessFunction::Run(MixedT left, DoubleT right, bool& result) {
+template <>
+inline void LessFunction::Run(MixedT left, DoubleT right, bool &result) {
     NotImplementError("Not implement: mixed == double")
 }
 
-template<>
-inline void
-LessFunction::Run(DoubleT left, MixedT right, bool& result) {
+template <>
+inline void LessFunction::Run(DoubleT left, MixedT right, bool &result) {
     LessFunction::Run(right, left, result);
 }
 
-template<>
-inline void
-LessFunction::Run(MixedT left, VarcharT right, bool& result) {
+template <>
+inline void LessFunction::Run(MixedT left, VarcharT right, bool &result) {
     NotImplementError("Not implement: mixed == varchar")
 }
 
-template<>
-inline void
-LessFunction::Run(VarcharT left, MixedT right, bool& result) {
+template <>
+inline void LessFunction::Run(VarcharT left, MixedT right, bool &result) {
     LessFunction::Run(right, left, result);
 }
 
-template<typename CompareType>
-static void
-GenerateLessFunction(SharedPtr<ScalarFunctionSet>& function_set_ptr, DataType data_type) {
+template <typename CompareType>
+static void GenerateLessFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
     String func_name = "<";
 
-    ScalarFunction less_function(
-            func_name,
-            {data_type, data_type},
-            {DataType(LogicalType::kBoolean)},
-            &ScalarFunction::BinaryFunction<CompareType, CompareType, BooleanT, LessFunction>);
+    ScalarFunction less_function(func_name,
+                                 {data_type, data_type},
+                                 {DataType(LogicalType::kBoolean)},
+                                 &ScalarFunction::BinaryFunction<CompareType, CompareType, BooleanT, LessFunction>);
     function_set_ptr->AddFunction(less_function);
 }
 
-void
-RegisterLessFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
+void RegisterLessFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "<";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -100,65 +90,59 @@ RegisterLessFunction(const UniquePtr<NewCatalog>& catalog_ptr) {
     GenerateLessFunction<FloatT>(function_set_ptr, DataType(LogicalType::kFloat));
     GenerateLessFunction<DoubleT>(function_set_ptr, DataType(LogicalType::kDouble));
 
-//    GenerateLessFunction<Decimal16T>(function_set_ptr, DataType(LogicalType::kDecimal16));
-//    GenerateLessFunction<Decimal32T>(function_set_ptr, DataType(LogicalType::kDecimal32));
-//    GenerateLessFunction<Decimal64T>(function_set_ptr, DataType(LogicalType::kDecimal64));
-//    GenerateLessFunction<Decimal128T>(function_set_ptr, DataType(LogicalType::kDecimal128));
+    //    GenerateLessFunction<Decimal16T>(function_set_ptr, DataType(LogicalType::kDecimal16));
+    //    GenerateLessFunction<Decimal32T>(function_set_ptr, DataType(LogicalType::kDecimal32));
+    //    GenerateLessFunction<Decimal64T>(function_set_ptr, DataType(LogicalType::kDecimal64));
+    //    GenerateLessFunction<Decimal128T>(function_set_ptr, DataType(LogicalType::kDecimal128));
 
     GenerateLessFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
-//    GenerateLessFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
+    //    GenerateLessFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
     GenerateLessFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
-//    GenerateLessFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
-//    GenerateLessFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
-//    GenerateLessFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
-//    GenerateLessFunction<TimestampTZT>(function_set_ptr, DataType(LogicalType::kTimestampTZ));
+    //    GenerateLessFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
+    //    GenerateLessFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
+    //    GenerateLessFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
+    //    GenerateLessFunction<TimestampTZT>(function_set_ptr, DataType(LogicalType::kTimestampTZ));
 
-//    GenerateEqualsFunction<MixedT>(function_set_ptr, DataType(LogicalType::kMixed));
+    //    GenerateEqualsFunction<MixedT>(function_set_ptr, DataType(LogicalType::kMixed));
 
-    ScalarFunction mix_less_bigint(
-            func_name,
-            {DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt)},
-            DataType(kBoolean),
-            &ScalarFunction::BinaryFunction<MixedT, BigIntT, BooleanT, LessFunction>);
+    ScalarFunction mix_less_bigint(func_name,
+                                   {DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt)},
+                                   DataType(kBoolean),
+                                   &ScalarFunction::BinaryFunction<MixedT, BigIntT, BooleanT, LessFunction>);
     function_set_ptr->AddFunction(mix_less_bigint);
 
-    ScalarFunction bigint_less_mixed(
-            func_name,
-            {DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed)},
-            DataType(kBoolean),
-            &ScalarFunction::BinaryFunction<BigIntT, MixedT, BooleanT, LessFunction>);
+    ScalarFunction bigint_less_mixed(func_name,
+                                     {DataType(LogicalType::kBigInt), DataType(LogicalType::kMixed)},
+                                     DataType(kBoolean),
+                                     &ScalarFunction::BinaryFunction<BigIntT, MixedT, BooleanT, LessFunction>);
     function_set_ptr->AddFunction(bigint_less_mixed);
 
-    ScalarFunction mix_less_double(
-            func_name,
-            {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},
-            DataType(kBoolean),
-            &ScalarFunction::BinaryFunction<MixedT, DoubleT, BooleanT, LessFunction>);
+    ScalarFunction mix_less_double(func_name,
+                                   {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},
+                                   DataType(kBoolean),
+                                   &ScalarFunction::BinaryFunction<MixedT, DoubleT, BooleanT, LessFunction>);
     function_set_ptr->AddFunction(mix_less_double);
 
-    ScalarFunction double_less_mixed(
-            func_name,
-            {DataType(LogicalType::kDouble), DataType(LogicalType::kMixed)},
-            DataType(kBoolean),
-            &ScalarFunction::BinaryFunction<DoubleT, MixedT, BooleanT, LessFunction>);
+    ScalarFunction double_less_mixed(func_name,
+                                     {DataType(LogicalType::kDouble), DataType(LogicalType::kMixed)},
+                                     DataType(kBoolean),
+                                     &ScalarFunction::BinaryFunction<DoubleT, MixedT, BooleanT, LessFunction>);
     function_set_ptr->AddFunction(double_less_mixed);
 
-    ScalarFunction mix_less_varchar(
-            func_name,
-            {DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar)},
-            DataType(kBoolean),
-            &ScalarFunction::BinaryFunction<MixedT, VarcharT, BooleanT, LessFunction>);
+    ScalarFunction mix_less_varchar(func_name,
+                                    {DataType(LogicalType::kMixed), DataType(LogicalType::kVarchar)},
+                                    DataType(kBoolean),
+                                    &ScalarFunction::BinaryFunction<MixedT, VarcharT, BooleanT, LessFunction>);
     function_set_ptr->AddFunction(mix_less_varchar);
 
-    ScalarFunction varchar_less_mixed(
-            func_name,
-            {DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed)},
-            DataType(kBoolean),
-            &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, LessFunction>);
+    ScalarFunction varchar_less_mixed(func_name,
+                                      {DataType(LogicalType::kVarchar), DataType(LogicalType::kMixed)},
+                                      DataType(kBoolean),
+                                      &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, LessFunction>);
     function_set_ptr->AddFunction(varchar_less_mixed);
 
     NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

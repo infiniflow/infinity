@@ -10,9 +10,7 @@ namespace infinity {
 
 class PhysicalOperatorVisitor {
 public:
-    virtual void
-    VisitNode(PhysicalOperator& op) = 0;
+    virtual void VisitNode(PhysicalOperator &op) = 0;
 };
 
-}
-
+} // namespace infinity

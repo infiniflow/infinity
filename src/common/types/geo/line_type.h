@@ -20,31 +20,22 @@ struct LineType {
     f64 b;
     f64 c;
 
-    inline bool
-    operator==(const LineType& other) const {
-        if(this == &other)
+    inline bool operator==(const LineType &other) const {
+        if (this == &other)
             return true;
-        return (fabs(a - other.a) < std::numeric_limits<f64>::epsilon())
-               && (fabs(b - other.b) < std::numeric_limits<f64>::epsilon())
-               && (fabs(c - other.c) < std::numeric_limits<f64>::epsilon());
+        return (fabs(a - other.a) < std::numeric_limits<f64>::epsilon()) && (fabs(b - other.b) < std::numeric_limits<f64>::epsilon()) &&
+               (fabs(c - other.c) < std::numeric_limits<f64>::epsilon());
     }
 
-    inline bool
-    operator!=(const LineType& other) const {
-        return !operator==(other);
-    }
+    inline bool operator!=(const LineType &other) const { return !operator==(other); }
 
-    inline void
-    Reset() {
+    inline void Reset() {
         a = 0;
         b = 0;
         c = 0;
     }
 
-    [[nodiscard]] inline String
-    ToString() const {
-        TypeError("ToString() isn't implemented");
-    }
+    [[nodiscard]] inline String ToString() const { TypeError("ToString() isn't implemented"); }
 };
 
-}
+} // namespace infinity

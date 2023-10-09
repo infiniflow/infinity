@@ -7,9 +7,6 @@
 
 namespace infinity {
 
-String
-RowID::ToString() const {
-    return fmt::format("{}:{}", segment_id_, segment_offset_);
-}
+String RowID::ToString() const { return fmt::format("{}:{}:{}", segment_id_, block_id_, block_offset_); }
 
-}
+} // namespace infinity

@@ -2,19 +2,19 @@
 // Created by JinHai on 2022/7/22.
 //
 
-#include "parser/sql_parser.h"
-#include "parser/parser_result.h"
 #include "query_context.h"
+#include "common/utility/defer_op.h"
+#include "common/utility/infinity_assert.h"
+#include "executor/fragment_builder.h"
+#include "executor/physical_operator.h"
+#include "executor/physical_planner.h"
 #include "infinity.h"
+#include "legacy_sched/operator_pipeline.h"
 #include "main/session.h"
+#include "parser/parser_result.h"
+#include "parser/sql_parser.h"
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
-#include "executor/physical_planner.h"
-#include "executor/physical_operator.h"
-#include "common/utility/infinity_assert.h"
-#include "legacy_sched/operator_pipeline.h"
-#include "executor/fragment_builder.h"
-#include "common/utility/defer_op.h"
 
 #include <sstream>
 #include <utility>
@@ -23,11 +23,10 @@ namespace infinity {
 
 class Pipeline;
 
-String
-QueryResult::ToString() const {
+String QueryResult::ToString() const {
     std::stringstream ss;
 
-    switch(root_operator_type_) {
+    switch (root_operator_type_) {
         case LogicalNodeType::kInsert: {
             return "INSERT 0 1";
         }
@@ -43,9 +42,9 @@ QueryResult::ToString() const {
     }
 
     SizeT column_count = result_->ColumnCount();
-    for(SizeT idx = 0; idx < column_count; ++idx) {
+    for (SizeT idx = 0; idx < column_count; ++idx) {
         String end;
-        if(idx != column_count - 1) {
+        if (idx != column_count - 1) {
             end = " ";
         }
         ss << result_->GetColumnNameById(idx) << end;
@@ -56,7 +55,7 @@ QueryResult::ToString() const {
     SizeT block_count = result_->DataBlockCount();
 
     // Iterate all blocks
-    for(SizeT idx = 0; idx < block_count; ++idx) {
+    for (SizeT idx = 0; idx < block_count; ++idx) {
         // Get current block
         SharedPtr<DataBlock> current_block = result_->GetDataBlockById(idx);
 
@@ -66,28 +65,23 @@ QueryResult::ToString() const {
     return ss.str();
 }
 
-QueryResult
-QueryContext::Query(const String& query) {
+QueryResult QueryContext::Query(const String &query) {
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
 
     parser->Parse(query, parsed_result);
 
-    if(parsed_result->IsError()) {
+    if (parsed_result->IsError()) {
         ParserError(parsed_result->error_message_)
     }
 
-    LogicalPlanner
-    logical_planner(this);
-    Optimizer
-    optimizer(this);
-    PhysicalPlanner
-    physical_planner(this);
-    FragmentBuilder
-    fragment_builder(this);
+    LogicalPlanner logical_planner(this);
+    Optimizer optimizer(this);
+    PhysicalPlanner physical_planner(this);
+    FragmentBuilder fragment_builder(this);
 
     PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
-    for(BaseStatement* statement: *parsed_result->statements_ptr_) {
+    for (BaseStatement *statement : *parsed_result->statements_ptr_) {
         QueryResult query_result;
         try {
             this->CreateTxn();
@@ -114,20 +108,20 @@ QueryContext::Query(const String& query) {
 
             scheduler_->Schedule(this, plan_fragment.get());
             query_result.result_ = plan_fragment->GetResult();
-//
-//            // Create execution pipeline
-//            SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
-//
-//            // Schedule the query pipeline
-//            Infinity::instance().scheduler()->Schedule(this, pipeline);
-//            query_result.result_ = pipeline->GetResult();
+            //
+            //            // Create execution pipeline
+            //            SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
+            //
+            //            // Schedule the query pipeline
+            //            Infinity::instance().scheduler()->Schedule(this, pipeline);
+            //            query_result.result_ = pipeline->GetResult();
             query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
             this->CommitTxn();
-        } catch(const Exception& e) {
+        } catch (const Exception &e) {
             this->RollbackTxn();
             throw Exception(e.what());
-        } catch(std::exception& e) {
+        } catch (std::exception &e) {
             throw e;
         }
         return query_result;
@@ -136,33 +130,24 @@ QueryContext::Query(const String& query) {
     NetworkError("Not reachable");
 }
 
-void
-QueryContext::CreateTxn() {
-    if(session_ptr_->txn_ == nullptr) {
+void QueryContext::CreateTxn() {
+    if (session_ptr_->txn_ == nullptr) {
         session_ptr_->txn_ = storage_->txn_manager()->CreateTxn();
     }
 }
 
-void
-QueryContext::BeginTxn() {
-    session_ptr_->txn_->BeginTxn();
-}
+void QueryContext::BeginTxn() { session_ptr_->txn_->BeginTxn(); }
 
-void
-QueryContext::CommitTxn() {
+void QueryContext::CommitTxn() {
     session_ptr_->txn_->CommitTxn();
     session_ptr_->txn_ = nullptr;
 }
 
-void
-QueryContext::RollbackTxn() {
+void QueryContext::RollbackTxn() {
     session_ptr_->txn_->RollbackTxn();
     session_ptr_->txn_ = nullptr;
 }
 
-Txn*
-QueryContext::GetTxn() const {
-    return session_ptr_->txn_;
-}
+Txn *QueryContext::GetTxn() const { return session_ptr_->txn_; }
 
-}
+} // namespace infinity

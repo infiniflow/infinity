@@ -7,12 +7,10 @@
 
 namespace infinity {
 
-//Encapsulates methods for thread access.
+// Encapsulates methods for thread access.
 class ThreadUtil {
 public:
-
-    static bool
-    pin(std::thread& thread, const std::uint16_t cpu_id) {
+    static bool pin(std::thread &thread, const std::uint16_t cpu_id) {
 #if defined(__APPLE__)
         return false;
 #else
@@ -20,7 +18,7 @@ public:
         CPU_ZERO(&cpu_set);
         CPU_SET(cpu_id, &cpu_set);
 
-        if(pthread_setaffinity_np(thread.native_handle(), sizeof(cpu_set_t), &cpu_set) != 0) {
+        if (pthread_setaffinity_np(thread.native_handle(), sizeof(cpu_set_t), &cpu_set) != 0) {
             std::cerr << "Can not pin thread!" << std::endl;
             return false;
         }

@@ -4,31 +4,24 @@
 
 #pragma once
 
-#include "parser/base_statement.h"
 #include "common/types/alias/containers.h"
+#include "parser/base_statement.h"
 
 namespace infinity {
 
 class ParserResult {
 public:
-
     ~ParserResult();
 
-    void
-    SetErrorMessage(const char* msg, SizeT error_line, SizeT error_position);
+    void SetErrorMessage(const char *msg, SizeT error_line, SizeT error_position);
 
-    String
-    ToString();
+    String ToString();
 
-    [[nodiscard]] inline bool
-    IsError() const {
-        return !error_message_.empty();
-    }
+    [[nodiscard]] inline bool IsError() const { return !error_message_.empty(); }
 
-    void
-    Reset() {
-        if(statements_ptr_ != nullptr) {
-            for(auto* statement_ptr: *statements_ptr_) {
+    void Reset() {
+        if (statements_ptr_ != nullptr) {
+            for (auto *statement_ptr : *statements_ptr_) {
                 delete statement_ptr;
             }
             delete statements_ptr_;
@@ -39,11 +32,10 @@ public:
         error_position_ = 0;
     }
 
-    Vector<BaseStatement*>* statements_ptr_;
+    Vector<BaseStatement *> *statements_ptr_;
     String error_message_;
     SizeT error_line_;
     SizeT error_position_;
 };
 
-}
-
+} // namespace infinity

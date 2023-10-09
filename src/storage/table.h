@@ -6,9 +6,9 @@
 
 #include <utility>
 
-#include "table_def.h"
-#include "data_block.h"
 #include "base_table.h"
+#include "data_block.h"
+#include "table_def.h"
 
 namespace infinity {
 
@@ -27,116 +27,67 @@ enum class TableType {
 
 class Table : public BaseTable {
 public:
-    static inline SharedPtr<Table>
-    Make(SharedPtr<TableDef> table_def_ptr, TableType type) {
+    static inline SharedPtr<Table> Make(SharedPtr<TableDef> table_def_ptr, TableType type) {
         return MakeShared<Table>(std::move(table_def_ptr), type);
     }
 
-    static inline SharedPtr<Table>
-    MakeResultTable(const Vector<SharedPtr<ColumnDef>>& column_defs) {
+    static inline SharedPtr<Table> MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs) {
         SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, column_defs);
         return Make(result_table_def_ptr, TableType::kResult);
     }
 
-    static inline SharedPtr<Table>
-    MakeEmptyResultTable() {
-        SharedPtr<TableDef> result_table_def_ptr
-                = MakeShared<TableDef>(nullptr, nullptr, Vector<SharedPtr<ColumnDef>>());
+    static inline SharedPtr<Table> MakeEmptyResultTable() {
+        SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(nullptr, nullptr, Vector<SharedPtr<ColumnDef>>());
         return Make(result_table_def_ptr, TableType::kResult);
     }
 
 public:
-    explicit
-    Table(SharedPtr<TableDef> table_def_ptr, TableType type)
-            : BaseTable(TableCollectionType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()),
-              definition_ptr_(std::move(table_def_ptr)),
-              row_count_(0),
-              type_(type) {}
+    explicit Table(SharedPtr<TableDef> table_def_ptr, TableType type)
+        : BaseTable(TableCollectionType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()),
+          definition_ptr_(std::move(table_def_ptr)), row_count_(0), type_(type) {}
 
 public:
-    [[nodiscard]] SizeT
-    ColumnCount() const {
-        return definition_ptr_->column_count();
+    [[nodiscard]] SizeT ColumnCount() const { return definition_ptr_->column_count(); }
+
+    [[nodiscard]] SharedPtr<String> TableName() const { return definition_ptr_->table_name(); }
+
+    [[nodiscard]] inline const SharedPtr<String> &SchemaName() const { return definition_ptr_->schema_name(); }
+
+    SizeT GetColumnIdByName(const String &column_name) { return definition_ptr_->GetColIdByName(column_name); }
+
+    [[nodiscard]] SizeT row_count() const { return row_count_; }
+
+    [[nodiscard]] TableType type() const { return type_; }
+
+    [[nodiscard]] SizeT DataBlockCount() const { return data_blocks_.size(); }
+
+    [[nodiscard]] SharedPtr<DataBlock> &GetDataBlockById(SizeT idx) {
+        StorageAssert(idx < data_blocks_.size(),
+                      "Attempt to access invalid index: " + std::to_string(idx) + "/" + std::to_string(DataBlockCount())) return data_blocks_[idx];
     }
 
-    [[nodiscard]] SharedPtr<String>
-    TableName() const {
-        return definition_ptr_->table_name();
-    }
+    [[nodiscard]] String &GetColumnNameById(SizeT idx) const { return definition_ptr_->columns()[idx]->name(); }
 
-    [[nodiscard]] inline const SharedPtr<String>&
-    SchemaName() const {
-        return definition_ptr_->schema_name();
-    }
+    [[nodiscard]] SharedPtr<DataType> GetColumnTypeById(SizeT idx) const { return definition_ptr_->columns()[idx]->type(); }
 
-    SizeT
-    GetColumnIdByName(const String& column_name) {
-        return definition_ptr_->GetColIdByName(column_name);
-    }
-
-    [[nodiscard]] SizeT
-    row_count() const {
-        return row_count_;
-    }
-
-    [[nodiscard]] TableType
-    type() const {
-        return type_;
-    }
-
-    [[nodiscard]] SizeT
-    DataBlockCount() const {
-        return data_blocks_.size();
-    }
-
-    [[nodiscard]] SharedPtr<DataBlock>&
-    GetDataBlockById(SizeT idx) {
-        StorageAssert(idx < data_blocks_.size(), "Attempt to access invalid index: " +
-                                                 std::to_string(idx) + "/" + std::to_string(DataBlockCount()))
-        return data_blocks_[idx];
-    }
-
-    [[nodiscard]] String&
-    GetColumnNameById(SizeT idx) const {
-        return definition_ptr_->columns()[idx]->name();
-    }
-
-    [[nodiscard]] SharedPtr<DataType>
-    GetColumnTypeById(SizeT idx) const {
-        return definition_ptr_->columns()[idx]->type();
-    }
-
-    inline void
-    Append(const SharedPtr<DataBlock>& data_block) {
+    inline void Append(const SharedPtr<DataBlock> &data_block) {
         data_blocks_.emplace_back(data_block);
         UpdateRowCount(data_block->row_count());
     }
 
-    inline void
-    UpdateRowCount(SizeT row_count) {
-        row_count_ += row_count;
-    }
+    inline void UpdateRowCount(SizeT row_count) { row_count_ += row_count; }
 
-    inline void
-    SetResultMsg(UniquePtr<String> result_msg) {
-        result_msg_ = std::move(result_msg);
-    }
+    inline void SetResultMsg(UniquePtr<String> result_msg) { result_msg_ = std::move(result_msg); }
 
-    [[nodiscard]] inline String*
-    result_msg() const {
-        return result_msg_.get();
-    }
+    [[nodiscard]] inline String *result_msg() const { return result_msg_.get(); }
 
 public:
-    [[nodiscard]] String
-    ToString() const;
+    [[nodiscard]] String ToString() const;
 
-    [[nodiscard]] SharedPtr<Vector<RowID>>
-    GetRowIDVector() const;
+    [[nodiscard]] SharedPtr<Vector<RowID>> GetRowIDVector() const;
 
     // Currently this method is used in aggregate operator.
-    void
-    UnionWith(const SharedPtr<Table>& other);
+    void UnionWith(const SharedPtr<Table> &other);
 
 public:
     SharedPtr<TableDef> definition_ptr_;
@@ -146,4 +97,4 @@ public:
     SharedPtr<String> result_msg_{};
 };
 
-}
+} // namespace infinity

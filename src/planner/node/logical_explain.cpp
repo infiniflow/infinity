@@ -6,9 +6,6 @@
 
 namespace infinity {
 
-String
-LogicalExplain::ToString(i64& space) {
-    return "LogicalExplain";
-}
+String LogicalExplain::ToString(i64 &space) { return "LogicalExplain"; }
 
-}
+} // namespace infinity

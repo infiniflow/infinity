@@ -10,15 +10,13 @@
 
 namespace infinity {
 
-void
-AggregateFunction::CastArgumentTypes(BaseExpression& input_arguments) {
+void AggregateFunction::CastArgumentTypes(BaseExpression &input_arguments) {
     // Check and add a cast function to cast the input arguments expression type to target type
 
     PlannerError("Not implemented: need to cast the argument types");
 }
 
-std::string
-AggregateFunction::ToString() const {
+std::string AggregateFunction::ToString() const {
 
     std::stringstream ss;
     ss << name_;
@@ -29,4 +27,4 @@ AggregateFunction::ToString() const {
     return ss.str();
 }
 
-}
+} // namespace infinity

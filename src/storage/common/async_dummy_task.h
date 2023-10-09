@@ -10,21 +10,15 @@ namespace infinity {
 
 class AsyncDummyTask final : public AsyncTask {
 public:
-    explicit
-    AsyncDummyTask() : AsyncTask(AsyncTaskType::kDummy) {}
+    explicit AsyncDummyTask() : AsyncTask(AsyncTaskType::kDummy) {}
 
-    String
-    ToString() final {
-        return "Async Dummy Task";
-    }
+    String ToString() final { return "Async Dummy Task"; }
 
-    void
-    Prepare() final {}
+    void Prepare() final {}
 
-    void
-    Commit() final {};
+    void Commit() final{};
+
 private:
-
 };
 
-}
+} // namespace infinity

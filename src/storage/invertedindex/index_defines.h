@@ -7,8 +7,7 @@ namespace infinity {
 typedef uint8_t optionflag_t;
 typedef uint8_t token_len_t;
 
-enum HighFrequencyTermPostingType { hp_bitmap,
-                                    hp_both };
+enum HighFrequencyTermPostingType { hp_bitmap, hp_both };
 
 enum PostingIteratorType {
     pi_pk,
@@ -23,12 +22,12 @@ enum PostingIteratorType {
 
 enum OptionFlag {
     of_none = 0,
-    of_term_payload = 1,    // 1 << 0
-    of_doc_payload = 2,     // 1 << 1
-    of_position_payload = 4,// 1 << 2
-    of_position_list = 8,   // 1 << 3
-    of_term_frequency = 16, // 1 << 4
-    of_tf_bitmap = 32,      // 1 << 5
+    of_term_payload = 1,     // 1 << 0
+    of_doc_payload = 2,      // 1 << 1
+    of_position_payload = 4, // 1 << 2
+    of_position_list = 8,    // 1 << 3
+    of_term_frequency = 16,  // 1 << 4
+    of_tf_bitmap = 32,       // 1 << 5
 };
 
 enum PostingType {
@@ -62,4 +61,4 @@ constexpr uint32_t MAX_UNCOMPRESSED_POS_LIST_SIZE = 5;
 constexpr uint32_t MAX_UNCOMPRESSED_SKIP_LIST_SIZE = 10;
 constexpr uint8_t SKIP_LIST_BUFFER_SIZE = 32;
 
-}// namespace infinity
+} // namespace infinity

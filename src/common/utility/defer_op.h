@@ -8,18 +8,15 @@
 
 namespace infinity {
 
-template<typename FN>
+template <typename FN>
 class DeferFn {
 public:
-    explicit
-    DeferFn(FN func) : func_(std::move(func)) {}
+    explicit DeferFn(FN func) : func_(std::move(func)) {}
 
-    ~DeferFn() noexcept {
-        func_();
-    }
+    ~DeferFn() noexcept { func_(); }
 
 private:
     FN func_;
 };
 
-}
+} // namespace infinity

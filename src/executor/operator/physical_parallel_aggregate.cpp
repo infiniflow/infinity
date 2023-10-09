@@ -6,19 +6,10 @@
 
 namespace infinity {
 
-void
-PhysicalParallelAggregate::Init() {
+void PhysicalParallelAggregate::Init() {}
 
-}
+void PhysicalParallelAggregate::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void
-PhysicalParallelAggregate::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+void PhysicalParallelAggregate::Execute(QueryContext *query_context) {}
 
-}
-
-void
-PhysicalParallelAggregate::Execute(QueryContext* query_context) {
-
-}
-
-}
+} // namespace infinity

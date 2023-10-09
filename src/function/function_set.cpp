@@ -7,8 +7,7 @@
 
 namespace infinity {
 
-SharedPtr<FunctionSet>
-FunctionSet::GetFunctionSet(NewCatalog* catalog, const FunctionExpr& expr) {
+SharedPtr<FunctionSet> FunctionSet::GetFunctionSet(NewCatalog *catalog, const FunctionExpr &expr) {
     String function_name = expr.func_name_;
 
     // SharedPtr<NewCatalog>& catalog
@@ -17,18 +16,17 @@ FunctionSet::GetFunctionSet(NewCatalog* catalog, const FunctionExpr& expr) {
     return function_set_ptr;
 }
 
-String
-FunctionSet::ToString(const String& name, const Vector<SharedPtr<BaseExpression>>& arguments) {
+String FunctionSet::ToString(const String &name, const Vector<SharedPtr<BaseExpression>> &arguments) {
     std::stringstream ss;
 
     ss << name;
     auto argument_count = arguments.size();
-    if(argument_count == 0) {
+    if (argument_count == 0) {
         ss << "()";
 
     } else {
         ss << "(";
-        for(auto i = 0; i < argument_count - 1; ++i) {
+        for (auto i = 0; i < argument_count - 1; ++i) {
             ss << arguments[i]->Type().ToString() << ", ";
         }
         ss << arguments.back()->Type().ToString();
@@ -37,4 +35,4 @@ FunctionSet::ToString(const String& name, const Vector<SharedPtr<BaseExpression>
     return ss.str();
 }
 
-}
+} // namespace infinity

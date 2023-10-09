@@ -4,9 +4,10 @@
 
 #pragma once
 
+#include "common/default_values.h"
 #include "common/types/alias/concurrency.h"
 #include "common/types/alias/smart_ptr.h"
-#include "storage/txn/constants.h"
+#include "storage/txn/txn_state.h"
 
 namespace infinity {
 
@@ -24,33 +25,19 @@ enum EntryType : i8 {
 };
 
 struct BaseEntry {
-    explicit
-    BaseEntry(EntryType entry_type) : entry_type_(entry_type) {}
+    explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {}
 
-    virtual
-    ~BaseEntry() = default;
+    virtual ~BaseEntry() = default;
 
-    static inline void
-    Commit(BaseEntry* base_entry, TxnTimeStamp commit_ts) {
-        base_entry->commit_ts_.store(commit_ts);
-    }
+    static inline void Commit(BaseEntry *base_entry, TxnTimeStamp commit_ts) { base_entry->commit_ts_.store(commit_ts); }
 
-    static inline bool
-    Committed(BaseEntry* base_entry) {
-        return base_entry->commit_ts_ != UNCOMMIT_TS;
-    }
+    static inline bool Committed(BaseEntry *base_entry) { return base_entry->commit_ts_ != UNCOMMIT_TS; }
 
 public:
     // Reserved
-    inline void
-    Commit(TxnTimeStamp commit_ts) {
-        commit_ts_.store(commit_ts);
-    }
+    inline void Commit(TxnTimeStamp commit_ts) { commit_ts_.store(commit_ts); }
 
-    [[nodiscard]] inline bool
-    Committed() const {
-        return commit_ts_ != UNCOMMIT_TS;
-    }
+    [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
 
 public:
     std::atomic_uint64_t txn_id_{0};
@@ -63,26 +50,19 @@ public:
 };
 
 struct EntryResult {
-    BaseEntry* entry_;
+    BaseEntry *entry_;
     UniquePtr<String> err_;
 
-    bool
-    Success() {
-        return err_ == nullptr;
-    }
+    bool Success() { return err_ == nullptr; }
 
-    bool
-    Fail() {
-        return err_ != nullptr;
-    }
+    bool Fail() { return err_ != nullptr; }
 
-    String
-    ToString() {
-        if(err_ == nullptr) {
+    String ToString() {
+        if (err_ == nullptr) {
             return "Success";
         }
         return *err_.get();
     }
 };
 
-}
+} // namespace infinity

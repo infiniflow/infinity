@@ -4,13 +4,11 @@
 
 #pragma once
 
-
 #include "common/types/data_type.h"
 #include "storage/common/async_batch_processor.h"
 #include "storage/io/file_system.h"
 
 namespace infinity {
-
 
 enum class BufferType {
     kTempFile,
@@ -26,8 +24,8 @@ enum class BufferStatus {
     kSpilled,
 };
 
-using BufferReadFN = void (*)(const String& path, DataType data_type);
-using BufferWriteFN = void (*)(const String& path, DataType data_type);
+using BufferReadFN = void (*)(const String &path, DataType data_type);
+using BufferWriteFN = void (*)(const String &path, DataType data_type);
 
 class ObjectHandle;
 
@@ -44,69 +42,44 @@ class BufferHandle {
     friend class BufferMgrTest;
 
 public:
-    explicit
-    BufferHandle(void* buffer_mgr);
+    explicit BufferHandle(void *buffer_mgr);
 
     ~BufferHandle() = default;
 
-    inline void
-    SetID(u64 id) {
-        id_ = id;
-    }
+    inline void SetID(u64 id) { id_ = id; }
 
 private:
-    ptr_t
-    LoadData();
+    ptr_t LoadData();
 
 public:
-    void
-    UnloadData();
+    void UnloadData();
 
-    void
-    AddRefCount();
+    void AddRefCount();
 
+    [[nodiscard]] inline bool IsFree() const { return data_ == nullptr; }
 
-    [[nodiscard]] inline bool
-    IsFree() const {
-        return data_ == nullptr;
-    }
+    void FreeData();
 
-    void
-    FreeData();
+    UniquePtr<String> SetSealing();
 
-    UniquePtr<String>
-    SetSealing();
+    [[nodiscard]] inline u64 GetID() const { return id_; }
 
-    [[nodiscard]] inline u64
-    GetID() const {
-        return id_;
-    }
+    String GetFilename() const;
 
-    String
-    GetFilename() const;
+    void UpdateToFileType();
 
-    void
-    UpdateToFileType();
+    void Spill();
 
-
-    void
-    Spill();
-
-    void
-    RestoreFromSpill();
+    void RestoreFromSpill();
 
     // File read and write
-    void
-    ReadFile();
+    void ReadFile();
 
-    void
-    CloseFile();
+    void CloseFile();
 
-    void
-    WriteFile(SizeT buffer_length);
+    void WriteFile(SizeT buffer_length);
 
-    void
-    SyncFile();
+    void SyncFile();
 
 private:
     UniquePtr<FileHandler> file_handler_{nullptr};
@@ -116,15 +89,15 @@ public:
 
     UniquePtr<char[]> data_{nullptr};
     SizeT buffer_size_{0};
-    void* buffer_mgr_{};
+    void *buffer_mgr_{};
     u64 reference_count_{0};
     BufferType buffer_type_{BufferType::kInvalid};
     BufferStatus status_{BufferStatus::kFreed};
 
-    SharedPtr<String> base_dir_{}; // ex. /tmp/infinity/data
-    SharedPtr<String> temp_dir_{}; // ex. /tmp/infinity/_tmp
+    SharedPtr<String> base_dir_{};    // ex. /tmp/infinity/data
+    SharedPtr<String> temp_dir_{};    // ex. /tmp/infinity/_tmp
     SharedPtr<String> current_dir_{}; // ex. table/segment0
-    SharedPtr<String> file_name_{}; // ex. 0.col
+    SharedPtr<String> file_name_{};   // ex. 0.col
     offset_t offset_{};
     u64 id_{};
 
@@ -136,8 +109,8 @@ public:
     BufferWriteFN write_func_{};
 
     // reader/writer processor
-    AsyncBatchProcessor* reader_processor_{};
-    AsyncBatchProcessor* writer_processor_{};
+    AsyncBatchProcessor *reader_processor_{};
+    AsyncBatchProcessor *writer_processor_{};
 };
 
-}
+} // namespace infinity

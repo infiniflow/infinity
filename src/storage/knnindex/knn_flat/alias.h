@@ -4,13 +4,12 @@
 
 #pragma once
 
-#include "new_result_handler.h"
 #include "faiss/utils/distances.h"
+#include "new_result_handler.h"
 
 namespace infinity {
 
-
-using ReservoirResultHandler = NewReservoirResultHandler<faiss::CMin<float, CompoundID>>;
+using ReservoirResultHandler = NewReservoirResultHandler<faiss::CMin<float, RowID>>;
 using ReservoirSingleResultHandler = ReservoirResultHandler::ReservoirSingleResultHandler;
 
-}
+} // namespace infinity

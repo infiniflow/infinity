@@ -7,11 +7,10 @@
 
 namespace infinity {
 
-String
-DropIndexInfo::ToString() const {
+String DropIndexInfo::ToString() const {
     std::stringstream ss;
     ss << "DROP INDEX: " << index_name_;
-    if(this->conflict_type_ == ConflictType::kIgnore) {
+    if (this->conflict_type_ == ConflictType::kIgnore) {
         ss << " IgnoreIfNotExists";
     } else {
         ss << " ThrowErrorIfNotExists";
@@ -19,4 +18,4 @@ DropIndexInfo::ToString() const {
     return ss.str();
 }
 
-}
+} // namespace infinity

@@ -16,50 +16,29 @@ enum class SourceType {
     kRemote,
 };
 
-
 class PhysicalSource final : public PhysicalOperator {
 public:
-    explicit
-    PhysicalSource(u64 id,
-                   SourceType source_type,
-                   SharedPtr<Vector<String>> names,
-                   SharedPtr<Vector<SharedPtr<DataType>>> types)
-            : PhysicalOperator(PhysicalOperatorType::kSource, nullptr, nullptr, id),
-              type_(source_type),
-              output_names_(std::move(names)),
-              output_types_(std::move(types)) {}
+    explicit PhysicalSource(u64 id, SourceType source_type, SharedPtr<Vector<String>> names, SharedPtr<Vector<SharedPtr<DataType>>> types)
+        : PhysicalOperator(PhysicalOperatorType::kSource, nullptr, nullptr, id), type_(source_type), output_names_(std::move(names)),
+          output_types_(std::move(types)) {}
 
     ~PhysicalSource() override = default;
 
-    void
-    Init() override;
+    void Init() override;
 
-    void
-    Execute(QueryContext* query_context) final;
+    void Execute(QueryContext *query_context) final;
 
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    void
-    Execute(QueryContext* query_context, SourceState* source_state);
+    void Execute(QueryContext *query_context, SourceState *source_state);
 
-    bool
-    ReadyToExec(SourceState* source_state);
+    bool ReadyToExec(SourceState *source_state);
 
-    inline SharedPtr<Vector<String>>
-    GetOutputNames() const final {
-        return output_names_;
-    }
+    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final {
-        return output_types_;
-    }
+    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    inline SourceType
-    source_type() const {
-        return type_;
-    }
+    inline SourceType source_type() const { return type_; }
 
 private:
     SharedPtr<Vector<String>> output_names_{};
@@ -67,4 +46,4 @@ private:
     SourceType type_{SourceType::kInvalid};
 };
 
-}
+} // namespace infinity

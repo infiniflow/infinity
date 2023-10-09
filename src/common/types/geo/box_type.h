@@ -4,7 +4,6 @@
 
 #pragma once
 
-
 #include "point_type.h"
 
 namespace infinity {
@@ -13,33 +12,25 @@ namespace infinity {
 struct BoxType {
     BoxType() = default;
 
-    BoxType(PointType ul, PointType lr) : upper_left(ul), lower_right(lr) {};
+    BoxType(PointType ul, PointType lr) : upper_left(ul), lower_right(lr){};
 
     PointType upper_left;
     PointType lower_right;
 
-    inline bool
-    operator==(const BoxType& other) const {
-        if(this == &other)
+    inline bool operator==(const BoxType &other) const {
+        if (this == &other)
             return true;
         return (upper_left == other.upper_left) && (lower_right == other.lower_right);
     }
 
-    inline bool
-    operator!=(const BoxType& other) const {
-        return !operator==(other);
-    }
+    inline bool operator!=(const BoxType &other) const { return !operator==(other); }
 
-    void
-    Reset() {
+    void Reset() {
         upper_left.Reset();
         lower_right.Reset();
     }
 
-    [[nodiscard]] inline String
-    ToString() const {
-        TypeError("ToString() isn't implemented");
-    }
+    [[nodiscard]] inline String ToString() const { TypeError("ToString() isn't implemented"); }
 };
 
-}
+} // namespace infinity

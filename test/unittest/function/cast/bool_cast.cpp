@@ -2,25 +2,23 @@
 // Created by JinHai on 2022/12/16.
 //
 
-#include <gtest/gtest.h>
+#include "function/cast/bool_cast.h"
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
-#include "function/cast/bool_cast.h"
+#include <gtest/gtest.h>
 
 class BoolCastTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -62,12 +60,12 @@ TEST_F(BoolCastTest, bool_cast1) {
     SharedPtr<ColumnVector> col_bool = MakeShared<ColumnVector>(bool_type);
     col_bool->Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeBool(i % 2 == 0);
         col_bool->AppendValue(v);
         Value vx = col_bool->GetValue(i);
     }
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = col_bool->GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, i % 2 == 0);
@@ -85,11 +83,11 @@ TEST_F(BoolCastTest, bool_cast1) {
         CastParameters cast_parameters;
         bool result = bool2varchar_ptr.function(col_bool, col_varchar_ptr, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
-        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             Value vx = col_varchar_ptr->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             String res = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
-            if(i % 2 == 0) {
+            if (i % 2 == 0) {
                 EXPECT_STREQ(res.c_str(), "true");
             } else {
                 EXPECT_STREQ(res.c_str(), "false");
@@ -109,5 +107,4 @@ TEST_F(BoolCastTest, bool_cast1) {
         DataType target(LogicalType::kBoolean);
         EXPECT_THROW(BindBoolCast(source, target), TypeException);
     }
-
 }

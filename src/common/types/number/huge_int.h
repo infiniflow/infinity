@@ -13,68 +13,48 @@ struct HugeInt {
 public:
     HugeInt() = default;
 
-    explicit
-    HugeInt(i64 upper, i64 lower) : upper(upper), lower(lower) {}
+    explicit HugeInt(i64 upper, i64 lower) : upper(upper), lower(lower) {}
 
-    inline bool
-    operator==(const HugeInt& other) const {
-        if(this == &other)
+    inline bool operator==(const HugeInt &other) const {
+        if (this == &other)
             return true;
         return other.upper == upper && other.lower == lower;
     }
 
-    inline bool
-    operator!=(const HugeInt& other) const {
-        return !(operator==(other));
-    }
+    inline bool operator!=(const HugeInt &other) const { return !(operator==(other)); }
 
-    inline bool
-    operator>(const HugeInt& other) const {
-        if(this->upper > other.upper)
+    inline bool operator>(const HugeInt &other) const {
+        if (this->upper > other.upper)
             return true;
-        if(this->upper == other.upper && this->lower > other.lower)
+        if (this->upper == other.upper && this->lower > other.lower)
             return true;
         return false;
     }
 
-    inline bool
-    operator<(const HugeInt& other) const {
-        if(this->upper < other.upper)
+    inline bool operator<(const HugeInt &other) const {
+        if (this->upper < other.upper)
             return true;
-        if(this->upper == other.upper && this->lower < other.lower)
+        if (this->upper == other.upper && this->lower < other.lower)
             return true;
         return false;
     }
 
-    inline bool
-    operator<=(const HugeInt& other) const {
-        return !(operator>(other));
-    }
+    inline bool operator<=(const HugeInt &other) const { return !(operator>(other)); }
 
-    inline bool
-    operator>=(const HugeInt& other) const {
-        return !(operator<(other));
-    }
+    inline bool operator>=(const HugeInt &other) const { return !(operator<(other)); }
 
     i64 upper{};
     i64 lower{};
 
 public:
-    [[nodiscard]] inline String
-    ToString() const;
+    [[nodiscard]] inline String ToString() const;
 
-    inline void
-    Reset() {
+    inline void Reset() {
         upper = 0;
         lower = 0;
     }
 };
 
-String
-HugeInt::ToString() const {
-    TypeError("ToString() isn't implemented");
-}
+String HugeInt::ToString() const { TypeError("ToString() isn't implemented"); }
 
-}
-
-
+} // namespace infinity

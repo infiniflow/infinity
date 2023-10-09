@@ -7,19 +7,16 @@
 namespace infinity {
 
 CreateViewInfo::~CreateViewInfo() {
-    if(select_ != nullptr) {
+    if (select_ != nullptr) {
         delete select_;
         select_ = nullptr;
     }
-    if(view_columns_ != nullptr) {
+    if (view_columns_ != nullptr) {
         delete view_columns_;
         view_columns_ = nullptr;
     }
 }
 
-String
-CreateViewInfo::ToString() const {
-    return "Create view info";
-}
+String CreateViewInfo::ToString() const { return "Create view info"; }
 
-}
+} // namespace infinity

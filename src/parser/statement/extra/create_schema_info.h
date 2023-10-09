@@ -10,13 +10,11 @@ namespace infinity {
 
 class CreateSchemaInfo final : public ExtraDDLInfo {
 public:
-    explicit
-    CreateSchemaInfo() : ExtraDDLInfo(DDLType::kSchema) {}
+    explicit CreateSchemaInfo() : ExtraDDLInfo(DDLType::kSchema) {}
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     String schema_name_;
 };
 
-}
+} // namespace infinity

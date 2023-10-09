@@ -2,29 +2,26 @@
 // Created by jinhai on 23-3-19.
 //
 
-
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
+#include "expression/column_expression.h"
 #include "function/scalar/extract.h"
 #include "function/scalar_function_set.h"
-#include "expression/column_expression.h"
 
 class ExtractFunctionTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -49,12 +46,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                "t1",
-                                                                                1,
-                                                                                "c1",
-                                                                                0,
-                                                                                0);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
@@ -68,7 +60,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             DateT date_value;
             std::stringstream ss;
             ss << i + 1 << "-1-1";
@@ -77,7 +69,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         }
         data_block.Finalize();
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDate);
             std::stringstream ss;
@@ -90,7 +82,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, i + 1);
@@ -106,12 +98,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                "t1",
-                                                                                1,
-                                                                                "c1",
-                                                                                0,
-                                                                                0);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
@@ -125,7 +112,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             DateT date_value;
             std::stringstream ss;
             ss << i + 1 << "-" << i % 12 + 1 << "-1";
@@ -139,7 +126,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, i % 12 + 1);
@@ -155,12 +142,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
-        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type,
-                                                                                "t1",
-                                                                                1,
-                                                                                "c1",
-                                                                                0,
-                                                                                0);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
@@ -174,10 +156,11 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             DateT date_value;
             std::stringstream ss;
-            ss << "1-1" << "-" << i % 28 + 1;
+            ss << "1-1"
+               << "-" << i % 28 + 1;
             date_value.FromString(ss.str());
             data_block.AppendValue(0, Value::MakeDate(date_value));
         }
@@ -188,7 +171,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for(SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, i % 28 + 1);

@@ -2,77 +2,69 @@
 // Created by jinhai on 23-6-17.
 //
 
-
 #pragma once
 
 
 #include "constants.h"
 #include "common/types/alias/concurrency.h"
+#include "txn_state.h"
 
 namespace infinity {
 
 class TxnContext {
 public:
-    inline void
-    BeginCommit(TxnTimeStamp begin_ts) {
+    inline void BeginCommit(TxnTimeStamp begin_ts) {
         std::unique_lock<RWMutex> w_locker(rw_locker_);
-        if(state_ != TxnState::kNotStarted) {
+        if (state_ != TxnState::kNotStarted) {
             StorageError("Transaction isn't in NOT_STARTED status.")
         }
         begin_ts_ = begin_ts;
         state_ = TxnState::kStarted;
     }
 
-    inline TxnTimeStamp
-    GetBeginTS() {
+    inline TxnTimeStamp GetBeginTS() {
         std::shared_lock<RWMutex> r_locker(rw_locker_);
         return begin_ts_;
     }
 
-    inline TxnTimeStamp
-    GetCommitTS() {
+    inline TxnTimeStamp GetCommitTS() {
         std::shared_lock<RWMutex> r_locker(rw_locker_);
         return commit_ts_;
     }
 
-    inline TxnState
-    GetTxnState() {
+    inline TxnState GetTxnState() {
         std::shared_lock<RWMutex> r_locker(rw_locker_);
         return state_;
     }
 
-    inline void
-    SetTxnRollbacking(TxnTimeStamp rollback_ts) {
+    inline void SetTxnRollbacking(TxnTimeStamp rollback_ts) {
         std::unique_lock<RWMutex> w_locker(rw_locker_);
-        if(state_ != TxnState::kStarted) {
+        if (state_ != TxnState::kStarted) {
             StorageError("Transaction isn't in STARTED status.")
         }
         state_ = TxnState::kRollbacking;
         commit_ts_ = rollback_ts;
     }
 
-    inline void
-    SetTxnRollbacked() {
+    inline void SetTxnRollbacked() {
         std::unique_lock<RWMutex> w_locker(rw_locker_);
-        if(state_ != TxnState::kRollbacking) {
+        if (state_ != TxnState::kRollbacking) {
             StorageError("Transaction isn't in ROLLBACKING status.")
         }
         state_ = TxnState::kRollbacked;
     }
 
-    inline void
-    SetTxnCommitted() {
+    inline void SetTxnCommitted() {
         std::unique_lock<RWMutex> w_locker(rw_locker_);
-        if(state_ != TxnState::kCommitting) {
+        if (state_ != TxnState::kCommitting) {
             StorageError("Transaction isn't in COMMITTING status.")
         }
         state_ = TxnState::kCommitted;
     }
 
-    inline void
-    SetTxnCommitting(TxnTimeStamp commit_ts) {
+    inline void SetTxnCommitting(TxnTimeStamp commit_ts) {
         std::unique_lock<RWMutex> w_locker(rw_locker_);
-        if(state_ != TxnState::kStarted) {
+        if (state_ != TxnState::kStarted) {
             StorageError("Transaction isn't in STARTED status.")
         }
         state_ = TxnState::kCommitting;
@@ -86,4 +78,4 @@ private:
     TxnState state_{TxnState::kNotStarted};
 };
 
-}
+} // namespace infinity

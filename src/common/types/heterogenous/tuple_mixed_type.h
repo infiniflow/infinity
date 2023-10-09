@@ -13,21 +13,16 @@ struct __attribute__((packed)) TupleMixedType : public BaseMixedType {
 public:
     TupleMixedType() : BaseMixedType(MixedValueType::kTuple) {}
 
-    void
-    Reset(bool in_constructor = false);
+    void Reset(bool in_constructor = false);
 
-    ~TupleMixedType() {
-        Reset();
-    }
+    ~TupleMixedType() { Reset(); }
+
 public:
-
     i8 _dummy1{};
     i16 _dummy2{};
     i16 _dummy3{};
-    u16 count{
-            0};        // count of the tuple, each tuple will have two MixedType member, one for key, another for value.
-    ptr_t ptr{nullptr};  // pointer to mixed type of tuple
+    u16 count{0};       // count of the tuple, each tuple will have two MixedType member, one for key, another for value.
+    ptr_t ptr{nullptr}; // pointer to mixed type of tuple
 };
 
-}
-
+} // namespace infinity

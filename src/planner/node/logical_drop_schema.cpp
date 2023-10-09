@@ -7,11 +7,10 @@
 
 namespace infinity {
 
-String
-LogicalDropSchema::ToString(i64& space) {
+String LogicalDropSchema::ToString(i64 &space) {
     std::stringstream ss;
     String arrow_str;
-    if(space > 3) {
+    if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
@@ -21,4 +20,4 @@ LogicalDropSchema::ToString(i64& space) {
     return ss.str();
 }
 
-}
+} // namespace infinity

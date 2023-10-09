@@ -1,7 +1,7 @@
 #pragma once
 
-#include "pipeline.h"
 #include "executor/physical_operator.h"
+#include "pipeline.h"
 
 #include <vector>
 
@@ -9,18 +9,15 @@ namespace infinity {
 
 class PipelineTask {
 public:
-    PipelineTask(SharedPtr<Pipeline>& pipeline, std::uint16_t index);
+    PipelineTask(SharedPtr<Pipeline> &pipeline, std::uint16_t index);
 
     ~PipelineTask() noexcept = default;
 
-    void
-    Execute();
+    void Execute();
 
-    void
-    Close();
+    void Close();
 
-    void
-    Finalize();
+    void Finalize();
 
 private:
     std::uint16_t index_;
@@ -31,6 +28,6 @@ private:
     SharedPtr<PhysicalOperator> root_;
 };
 
-using PipelineTaskPtr = PipelineTask*;
+using PipelineTaskPtr = PipelineTask *;
 
-}
+} // namespace infinity

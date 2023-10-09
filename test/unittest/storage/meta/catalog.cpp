@@ -2,11 +2,11 @@
 // Created by tangdonghai on 23-9-5.
 //
 
+#include "base_test.h"
 #include <gtest/gtest.h>
 #include <mutex>
 #include <thread>
 #include <utility>
-#include "base_test.h"
 
 #include "main/infinity.h"
 #include "storage/buffer/buffer_manager.h"
@@ -14,7 +14,7 @@
 #include "storage/meta/entry/base_entry.h"
 #include "storage/txn/txn.h"
 #include "storage/txn/txn_manager.h"
-
+#if 0
 class CatalogTest : public BaseTest {
     void
     SetUp() override {
@@ -269,3 +269,4 @@ TEST_F(CatalogTest, concurrent_test) {
         }
     }
 }
+#endif

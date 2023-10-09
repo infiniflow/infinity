@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include "common/singleton.h"
 #include "common/types/alias/concurrency.h"
 #include "connection.h"
-#include "common/singleton.h"
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
@@ -18,21 +18,16 @@ struct StartupParameter {
 
 class DBServer : public Singleton<DBServer> {
 public:
-    explicit
-    DBServer(const StartupParameter& parameter);
+    explicit DBServer(const StartupParameter &parameter);
 
-    void
-    Run();
+    void Run();
 
-    void
-    Shutdown();
+    void Shutdown();
 
 private:
-    void
-    CreateConnection();
+    void CreateConnection();
 
-    void
-    StartConnection(SharedPtr<Connection>& connection);
+    void StartConnection(SharedPtr<Connection> &connection);
 
     std::atomic_bool initialized{false};
     au64 running_connection_count_{0};
@@ -41,6 +36,4 @@ private:
     SharedPtr<String> config_path_{};
 };
 
-}
-
-
+} // namespace infinity

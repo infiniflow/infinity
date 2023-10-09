@@ -9,8 +9,9 @@
 #include "storage/invertedindex/key_encoder.h"
 #include "txn.h"
 #include "storage/wal/wal_entry.h"
-#include <mutex>
+#include "txn.h"
 #include <map>
+#include <mutex>
 
 namespace infinity {
 
@@ -39,41 +40,26 @@ public:
         Stop();
     }
 
-    Txn*
-    CreateTxn();
 
-    void
-    DestroyTxn(u64 txn_id);
+    Txn *CreateTxn();
 
-    Txn*
-    GetTxn(u64 txn_id);
+    void DestroyTxn(u64 txn_id);
 
-    TxnState
-    GetTxnState(u64 txn_id);
+    Txn *GetTxn(u64 txn_id);
 
-    inline void
-    Lock() {
-        rw_locker_.lock();
-    }
+    TxnState GetTxnState(u64 txn_id);
 
-    inline void
-    UnLock() {
-        rw_locker_.unlock();
-    }
+    inline void Lock() { rw_locker_.lock(); }
 
-    BufferManager*
-    GetBufferMgr() const {
-        return buffer_mgr_;
-    }
+    inline void UnLock() { rw_locker_.unlock(); }
 
-    TxnTimeStamp
-    GetTimestamp(bool prepare_wal = false);
+    BufferManager *GetBufferMgr() const { return buffer_mgr_; }
 
-    void
-    Invalidate(TxnTimeStamp commit_ts);
+    TxnTimeStamp GetTimestamp(bool prepare_wal = false);
 
-    void
-    PutWalEntry(std::shared_ptr<WalEntry> entry);
+    void Invalidate(TxnTimeStamp commit_ts);
+
+    void PutWalEntry(std::shared_ptr<WalEntry> entry);
 
     void
     Start();
@@ -85,14 +71,13 @@ public:
     Stopped();
 
 private:
-    u64
-    GetNewTxnID();
+    u64 GetNewTxnID();
 
 private:
-    NewCatalog* catalog_{};
+    NewCatalog *catalog_{};
     RWMutex rw_locker_{};
     u64 txn_id_{};
-    BufferManager* buffer_mgr_{};
+    BufferManager *buffer_mgr_{};
     HashMap<u64, UniquePtr<Txn>> txn_map_{};
     PutWalEntryFn put_wal_entry_{};
 
@@ -104,4 +89,4 @@ private:
     std::atomic<bool> is_running_{false};
 };
 
-}
+} // namespace infinity

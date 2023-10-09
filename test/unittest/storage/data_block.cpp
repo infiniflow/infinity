@@ -2,28 +2,26 @@
 // Created by JinHai on 2022/11/12.
 //
 
-#include <gtest/gtest.h>
-#include "base_test.h"
 #include "storage/data_block.h"
+#include "base_test.h"
 #include "common/types/info/decimal_info.h"
+#include <gtest/gtest.h>
 
 #include "common/types/info/array_info.h"
 #include "common/types/info/embedding_info.h"
-#include "main/profiler/base_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
+#include "main/logger.h"
+#include "main/profiler/base_profiler.h"
+#include "main/stats/global_resource_usage.h"
 
 class DataBlockTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -34,7 +32,6 @@ class DataBlockTest : public BaseTest {
 TEST_F(DataBlockTest, test1) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-
 
     DataBlock data_block;
     Vector<SharedPtr<DataType>> column_types;
@@ -66,8 +63,7 @@ TEST_F(DataBlockTest, test1) {
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kInterval));
 
     // Nested types * 2
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kArray,
-                                                   ArrayInfo::Make(DataType(LogicalType::kBigInt))));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt))));
 
     // TODO: how to handle Tuple type?
     // column_types.emplace_back(LogicalType::kTuple);
@@ -87,8 +83,7 @@ TEST_F(DataBlockTest, test1) {
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kBlob));
 
     // 32 dimension * float vector
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kEmbedding,
-                                                   EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
 
     // Heterogeneous type * 1
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kMixed));
@@ -99,12 +94,12 @@ TEST_F(DataBlockTest, test1) {
 
     // Boolean: Test DataBlock::AppendValue
     constexpr SizeT BoolColumnIndex = 0;
-    for(SizeT i = 0; i < row_count; ++i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(BoolColumnIndex, Value::MakeBool(i % 2 == 0));
     }
 
     // Boolean: Test DataBlock::GetValue
-    for(SizeT i = 0; i < row_count; ++i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         Value value = data_block.GetValue(BoolColumnIndex, i);
         EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
@@ -112,12 +107,12 @@ TEST_F(DataBlockTest, test1) {
 
     // TinyInt: Test DataBlock::AppendValue
     constexpr SizeT TinyIntColumnIndex = 1;
-    for(SizeT i = 0; i < row_count; ++i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(TinyIntColumnIndex, Value::MakeTinyInt(static_cast<i8>(i)));
     }
 
     // Test DataBlock::GetValue
-    for(SizeT i = 0; i < row_count; ++i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         Value value = data_block.GetValue(TinyIntColumnIndex, i);
         EXPECT_EQ(value.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(value.value_.tiny_int, i8(i));
@@ -125,11 +120,11 @@ TEST_F(DataBlockTest, test1) {
 
     // Test DataBlock::Reset
     data_block.Reset();
-    for(SizeT i = 0; i < row_count; ++i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
 
-    for(SizeT i = 0; i < row_count; ++i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         Value value = data_block.GetValue(0, i);
         EXPECT_EQ(value.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(value.value_.boolean, (i % 2 == 0));
@@ -149,7 +144,7 @@ TEST_F(DataBlockTest, test2) {
     data_block.Init(column_types);
 
     // Test DataBlock::AppendValue
-    for(SizeT i = 0; i < row_count; ++i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
     EXPECT_THROW(data_block.AppendValue(1, Value::MakeBool(true)), StorageException);
@@ -164,9 +159,10 @@ TEST_F(DataBlockTest, test2) {
     SharedPtr<Vector<RowID>> row_ids = MakeShared<Vector<RowID>>();
     row_ids->reserve(row_count);
     data_block.FillRowIDVector(row_ids, 1);
-    for(SizeT row_id = 0; row_id < row_count; ++row_id) {
-        EXPECT_EQ((*row_ids)[row_id].segment_offset_, row_id);
-        EXPECT_EQ((*row_ids)[row_id].segment_id_, 1);
+    for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+        EXPECT_EQ((*row_ids)[row_id].block_offset_, row_id);
+        EXPECT_EQ((*row_ids)[row_id].block_id_, 1);
+        EXPECT_EQ((*row_ids)[row_id].segment_id_, INVALID_SEGMENT_ID);
     }
 }
 
@@ -197,7 +193,7 @@ TEST_F(DataBlockTest, test3) {
 
     // Test DataBlock::AppendValue
     profiler.Begin();
-    for(SizeT i = 0; i < row_count; ++i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
     }
     profiler.End();
@@ -206,14 +202,13 @@ TEST_F(DataBlockTest, test3) {
     data_block.Finalize();
 
     // Validate the inserted data.
-    for(SizeT i = 0; i < row_count; ++i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         auto v = Value::MakeTinyInt(static_cast<i8>(i));
         auto vx = data_block.GetValue(0, i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(vx.value_.tiny_int, v.value_.tiny_int);
     }
 }
-
 
 TEST_F(DataBlockTest, ReadWrite) {
     using namespace infinity;
@@ -226,57 +221,57 @@ TEST_F(DataBlockTest, ReadWrite) {
 
     // Integer * 5
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
-/*     column_types.emplace_back(MakeShared<DataType>(LogicalType::kSmallInt));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kInteger));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kHugeInt));
+    /*     column_types.emplace_back(MakeShared<DataType>(LogicalType::kSmallInt));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kInteger));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kHugeInt));
 
-    // Float * 2
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kFloat));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDouble));
+        // Float * 2
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kFloat));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kDouble));
 
-    // Decimal * 1
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDecimal, DecimalInfo::Make(38, 2)));
+        // Decimal * 1
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kDecimal, DecimalInfo::Make(38, 2)));
 
-    // Varchar * 1
-    //column_types.emplace_back(MakeShared<DataType>(LogicalType::kVarchar));
+        // Varchar * 1
+        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kVarchar));
 
-    // Date and Time * 6
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDate));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTime));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kDateTime));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTimestamp));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kInterval));
+        // Date and Time * 6
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kDate));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTime));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kDateTime));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTimestamp));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kInterval));
 
-    // Nested types * 2
-    //column_types.emplace_back(MakeShared<DataType>(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt))));
+        // Nested types * 2
+        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kArray, ArrayInfo::Make(DataType(LogicalType::kBigInt))));
 
-    // TODO: how to handle Tuple type?
-    // column_types.emplace_back(LogicalType::kTuple);
+        // TODO: how to handle Tuple type?
+        // column_types.emplace_back(LogicalType::kTuple);
 
-    // Geography * 7
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPoint));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kLine));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kLineSeg));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBox));
-    //column_types.emplace_back(MakeShared<DataType>(LogicalType::kPath));
-    //column_types.emplace_back(MakeShared<DataType>(LogicalType::kPolygon));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kCircle));
+        // Geography * 7
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kPoint));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kLine));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kLineSeg));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBox));
+        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kPath));
+        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kPolygon));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kCircle));
 
-    // Other * 4
-    //column_types.emplace_back(MakeShared<DataType>(LogicalType::kBitmap));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kUuid));
-    //column_types.emplace_back(MakeShared<DataType>(LogicalType::kBlob));
+        // Other * 4
+        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kBitmap));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kUuid));
+        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kBlob));
 
-    // 32 dimension * float vector
-    //column_types.emplace_back(MakeShared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
+        // 32 dimension * float vector
+        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));
 
-    // Heterogeneous type * 1
-    //column_types.emplace_back(MakeShared<DataType>(LogicalType::kMixed));
- */
+        // Heterogeneous type * 1
+        //column_types.emplace_back(MakeShared<DataType>(LogicalType::kMixed));
+     */
     SizeT row_count = DEFAULT_VECTOR_SIZE;
     data_block.Init(column_types);
-    for(SizeT i = 0; i < row_count; ++ i) {
+    for (SizeT i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
         data_block.AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
     }

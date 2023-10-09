@@ -2,24 +2,22 @@
 // Created by JinHai on 2022/12/5.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class ColumnVectorBitmapTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -59,11 +57,11 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -91,11 +89,11 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -107,11 +105,11 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-    for(i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -128,7 +126,7 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
     EXPECT_EQ(column_vector.tail_index_, 0);
-//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
@@ -157,11 +155,11 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -175,11 +173,11 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
     }
 
     ColumnVector column_constant(data_type);
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -226,11 +224,11 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
-    for(i64 i = 0; i < 1; ++i) {
+    for (i64 i = 0; i < 1; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -245,11 +243,11 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    for(i64 i = 0; i < 1; ++i) {
+    for (i64 i = 0; i < 1; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -262,7 +260,7 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
     EXPECT_EQ(column_vector.tail_index_, 0);
-//    EXPECT_EQ(column_vector.data_type_size_, 0);
+    //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
@@ -290,11 +288,11 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for(i64 i = 0; i < 1; ++i) {
+    for (i64 i = 0; i < 1; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -318,11 +316,11 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -332,11 +330,11 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -348,7 +346,7 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
 
     Selection input_select;
     input_select.Initialize(DEFAULT_VECTOR_SIZE / 2);
-    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
+    for (SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++idx) {
         input_select.Append(idx * 2);
     }
 
@@ -356,11 +354,11 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
     target_column_vector.Initialize(column_vector, input_select);
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(2 * i + 10);
-        for(i64 j = 0; j <= 2 * i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= 2 * i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -379,11 +377,11 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -393,11 +391,11 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_slice_init) {
         column_vector.AppendValue(v);
     }
 
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
         bitmap.Initialize(i + 10);
-        for(i64 j = 0; j <= i; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= i; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);
@@ -415,12 +413,12 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_slice_init) {
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
-    for(i64 i = 0; i < count; ++i) {
+    for (i64 i = 0; i < count; ++i) {
         BitmapT bitmap;
         i64 src_idx = start_idx + i;
         bitmap.Initialize(src_idx + 10);
-        for(i64 j = 0; j <= src_idx; ++j) {
-            if(j % 2 == 0) {
+        for (i64 j = 0; j <= src_idx; ++j) {
+            if (j % 2 == 0) {
                 bitmap.SetBit(j, true);
             } else {
                 bitmap.SetBit(j, false);

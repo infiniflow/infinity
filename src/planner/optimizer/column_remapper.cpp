@@ -7,9 +7,8 @@
 
 namespace infinity {
 
-void
-BindingRemapper::VisitNode(LogicalNode& op) {
-    if(op.operator_type() == LogicalNodeType::kJoin) {
+void BindingRemapper::VisitNode(LogicalNode &op) {
+    if (op.operator_type() == LogicalNodeType::kJoin) {
         VisitNodeChildren(op);
         bindings_ = op.GetColumnBindings();
         VisitNodeExpression(op);
@@ -20,16 +19,11 @@ BindingRemapper::VisitNode(LogicalNode& op) {
     }
 }
 
-SharedPtr<BaseExpression>
-BindingRemapper::VisitReplace(const SharedPtr<ColumnExpression>& expression) {
+SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
     SizeT binding_count = bindings_.size();
-    for(SizeT idx = 0; idx < binding_count; ++idx) {
-        if(expression->binding() == bindings_[idx]) {
-            return ReferenceExpression::Make(expression->Type(),
-                                             expression->table_name(),
-                                             expression->column_name(),
-                                             expression->alias_,
-                                             idx);
+    for (SizeT idx = 0; idx < binding_count; ++idx) {
+        if (expression->binding() == bindings_[idx]) {
+            return ReferenceExpression::Make(expression->Type(), expression->table_name(), expression->column_name(), expression->alias_, idx);
         }
     }
     LOG_ERROR("Can't bind column expression: {} [{}.{}]",
@@ -39,6 +33,4 @@ BindingRemapper::VisitReplace(const SharedPtr<ColumnExpression>& expression) {
     return nullptr;
 }
 
-}
-
-
+} // namespace infinity

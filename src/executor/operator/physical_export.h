@@ -10,77 +10,37 @@ namespace infinity {
 
 class PhysicalExport : public PhysicalOperator {
 public:
-    explicit PhysicalExport(uint64_t id,
-                            String schema_name,
-                            String table_name,
-                            String file_path,
-                            bool header,
-                            char delimiter,
-                            CopyFileType type)
-            : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id),
-              schema_name_(std::move(schema_name)),
-              table_name_(std::move(table_name)),
-              file_path_(std::move(file_path)),
-              header_(header),
-              delimiter_(delimiter),
-              file_type_(type) {}
+    explicit PhysicalExport(uint64_t id, String schema_name, String table_name, String file_path, bool header, char delimiter, CopyFileType type)
+        : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id), schema_name_(std::move(schema_name)),
+          table_name_(std::move(table_name)), file_path_(std::move(file_path)), header_(header), delimiter_(delimiter), file_type_(type) {}
 
     ~PhysicalExport() override = default;
 
-    void
-    Init() override;
+    void Init() override;
 
-    void
-    Execute(QueryContext* query_context) final;
+    void Execute(QueryContext *query_context) final;
 
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    inline SharedPtr<Vector<String>>
-    GetOutputNames() const final {
-        return output_names_;
-    }
+    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final {
-        return output_types_;
-    }
+    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    void
-    ExportCSV(QueryContext* query_context);
+    void ExportCSV(QueryContext *query_context);
 
-    void
-    ExportJSON(QueryContext* query_context);
+    void ExportJSON(QueryContext *query_context);
 
-    inline CopyFileType
-    FileType() const {
-        return file_type_;
-    }
+    inline CopyFileType FileType() const { return file_type_; }
 
-    inline const String&
-    file_path() const {
-        return file_path_;
-    }
+    inline const String &file_path() const { return file_path_; }
 
-    inline const String&
-    schema_name() const {
-        return schema_name_;
-    }
+    inline const String &schema_name() const { return schema_name_; }
 
-    inline const String&
-    table_name() const {
-        return table_name_;
-    }
+    inline const String &table_name() const { return table_name_; }
 
-    inline bool
-    header() const {
-        return header_;
-    }
+    inline bool header() const { return header_; }
 
-    inline char
-    delimiter() const {
-        return delimiter_;
-    }
+    inline char delimiter() const { return delimiter_; }
 
 private:
     SharedPtr<Vector<String>> output_names_{};
@@ -94,4 +54,4 @@ private:
     char delimiter_{','};
 };
 
-}
+} // namespace infinity

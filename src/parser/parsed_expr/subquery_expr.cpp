@@ -6,25 +6,23 @@
 
 namespace infinity {
 
-
 SubqueryExpr::~SubqueryExpr() {
-    if(left_ != nullptr) {
+    if (left_ != nullptr) {
         delete left_;
     }
-    if(select_ != nullptr) {
+    if (select_ != nullptr) {
         delete select_;
         select_ = nullptr;
     }
 }
 
-String
-SubqueryExpr::ToString() const {
+String SubqueryExpr::ToString() const {
     std::stringstream ss;
-    if(left_ != nullptr) {
+    if (left_ != nullptr) {
         ss << left_->ToString() << " ";
     }
 
-    switch(subquery_type_) {
+    switch (subquery_type_) {
         case SubqueryType::kExists: {
             ss << "EXISTS(";
             break;
@@ -52,4 +50,4 @@ SubqueryExpr::ToString() const {
     return ss.str();
 }
 
-}
+} // namespace infinity

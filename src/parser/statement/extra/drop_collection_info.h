@@ -9,14 +9,12 @@ namespace infinity {
 
 class DropCollectionInfo final : public ExtraDDLInfo {
 public:
-    explicit
-    DropCollectionInfo() : ExtraDDLInfo(DDLType::kCollection) {}
+    explicit DropCollectionInfo() : ExtraDDLInfo(DDLType::kCollection) {}
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     String schema_name_{"default"};
     String collection_name_{};
 };
 
-}
+} // namespace infinity

@@ -13,10 +13,9 @@ namespace infinity {
 
 struct TryCastBoolean;
 
-inline static BoundCastFunc
-BindBoolCast(const DataType& source, const DataType& target) {
+inline static BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
     TypeAssert(source.type() == LogicalType::kBoolean, "Expect boolean type, but it is " + source.ToString());
-    switch(target.type()) {
+    switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, TryCastBoolean>);
         }
@@ -27,19 +26,16 @@ BindBoolCast(const DataType& source, const DataType& target) {
 }
 
 struct TryCastBoolean {
-    template<typename SourceType, typename TargetType>
-    static inline bool
-    Run(SourceType input, TargetType& target) {
-        FunctionError("No implementation to cast from " + DataType::TypeToString<SourceType>()
-                      + " to " + DataType::TypeToString<TargetType>());
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(SourceType input, TargetType &target) {
+        FunctionError("No implementation to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
     }
 };
 
 // Cast BooleanT to other VarcharT type
-template<>
-inline bool
-TryCastBoolean::Run(BooleanT source, VarcharT& target) {
-    if(source) {
+template <>
+inline bool TryCastBoolean::Run(BooleanT source, VarcharT &target) {
+    if (source) {
         constexpr u16 TRUE_LEN = 4;
         memcpy(target.prefix, "true", TRUE_LEN);
         memset(target.prefix + TRUE_LEN, 0, VarcharT::INLINE_LENGTH - TRUE_LEN);
@@ -53,4 +49,4 @@ TryCastBoolean::Run(BooleanT source, VarcharT& target) {
     return true;
 }
 
-}
+} // namespace infinity

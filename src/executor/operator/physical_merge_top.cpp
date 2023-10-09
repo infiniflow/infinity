@@ -6,19 +6,10 @@
 
 namespace infinity {
 
-void
-PhysicalMergeTop::Init() {
+void PhysicalMergeTop::Init() {}
 
-}
+void PhysicalMergeTop::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void
-PhysicalMergeTop::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+void PhysicalMergeTop::Execute(QueryContext *query_context) {}
 
-}
-
-void
-PhysicalMergeTop::Execute(QueryContext* query_context) {
-
-}
-
-}
+} // namespace infinity

@@ -10,14 +10,10 @@ namespace infinity {
 
 class TableRef {
 public:
-    explicit
-    TableRef(TableRefType type,
-             String alias) :
-            type_(type),
-            alias_(std::move(alias)) {}
+    explicit TableRef(TableRefType type, String alias) : type_(type), alias_(std::move(alias)) {}
 
     TableRefType type_{TableRefType::kTable};
     String alias_{};
 };
 
-}
+} // namespace infinity

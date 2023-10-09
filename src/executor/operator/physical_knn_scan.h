@@ -17,64 +17,43 @@ class BaseExpression;
 
 class PhysicalKnnScan final : public PhysicalOperator {
 public:
-    explicit
-    PhysicalKnnScan(u64 id,
-                    SharedPtr<BaseTableRef> base_table_ref,
-                    Vector<SharedPtr<BaseExpression>> knn_expressions,
-                    SharedPtr<BaseExpression> limit_expression,
-                    SharedPtr<BaseExpression> filter_expression,
-                    OrderType order_by_type,
-                    SharedPtr<Vector<String>> output_names,
-                    SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                    u64 knn_table_index)
-            : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id),
-              base_table_ref_(std::move(base_table_ref)),
-              knn_expressions_(std::move(knn_expressions)),
-              limit_expression_(std::move(limit_expression)),
-              filter_expression_(std::move(filter_expression)),
-              order_by_type_(order_by_type),
-              output_names_(std::move(output_names)),
-              output_types_(std::move(output_types)),
-              knn_table_index_(knn_table_index) {}
+    explicit PhysicalKnnScan(u64 id,
+                             SharedPtr<BaseTableRef> base_table_ref,
+                             Vector<SharedPtr<BaseExpression>> knn_expressions,
+                             SharedPtr<BaseExpression> limit_expression,
+                             SharedPtr<BaseExpression> filter_expression,
+                             OrderType order_by_type,
+                             SharedPtr<Vector<String>> output_names,
+                             SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                             u64 knn_table_index)
+        : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id), base_table_ref_(std::move(base_table_ref)),
+          knn_expressions_(std::move(knn_expressions)), limit_expression_(std::move(limit_expression)),
+          filter_expression_(std::move(filter_expression)), order_by_type_(order_by_type), output_names_(std::move(output_names)),
+          output_types_(std::move(output_types)), knn_table_index_(knn_table_index) {}
 
     ~PhysicalKnnScan() override = default;
 
-    void
-    Init() override;
+    void Init() override;
 
-    void
-    Execute(QueryContext* query_context) final;
+    void Execute(QueryContext *query_context) final;
 
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    inline SharedPtr<Vector<String>>
-    GetOutputNames() const final {
-        return output_names_;
-    }
+    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final {
-        return output_types_;
-    }
+    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    [[nodiscard]] TableCollectionEntry*
-    table_collection_ptr() const;
+    [[nodiscard]] TableCollectionEntry *table_collection_ptr() const;
 
-    [[nodiscard]] String
-    TableAlias() const;
+    [[nodiscard]] String TableAlias() const;
 
-    BlockIndex*
-    GetBlockIndex() const;
+    BlockIndex *GetBlockIndex() const;
 
-    Vector<SizeT>&
-    ColumnIDs() const;
+    Vector<SizeT> &ColumnIDs() const;
 
-    Vector<SharedPtr<Vector<GlobalBlockID>>>
-    PlanBlockEntries(i64 parallel_count) const;
+    Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
 
-    SizeT
-    BlockEntryCount() const;
+    SizeT BlockEntryCount() const;
 
 public:
     SharedPtr<BaseTableRef> base_table_ref_{};
@@ -90,8 +69,7 @@ public:
     u64 knn_table_index_{};
 
 private:
-    void
-    ExecuteInternal(QueryContext* query_context, KnnScanInputState* input_state, KnnScanOutputState* output_state);
+    void ExecuteInternal(QueryContext *query_context, KnnScanInputState *input_state, KnnScanOutputState *output_state);
 };
 
-}
+} // namespace infinity

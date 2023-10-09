@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "parser/parsed_expr/parsed_expr.h"
 #include "parser/base_statement.h"
+#include "parser/parsed_expr/parsed_expr.h"
 
 namespace infinity {
 
@@ -15,14 +15,12 @@ public:
 
     ~DeleteStatement() final;
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     String schema_name_{};
     String table_name_{};
 
-    ParsedExpr* where_expr_{nullptr};
-
+    ParsedExpr *where_expr_{nullptr};
 };
 
-}
+} // namespace infinity

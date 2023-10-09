@@ -11,16 +11,14 @@ namespace infinity {
 
 class TableFunctionSet final : public FunctionSet {
 public:
-    explicit
-    TableFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kTable) {}
+    explicit TableFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kTable) {}
 
     ~TableFunctionSet() final;
 
-    void
-    AddFunction(TableFunction func);
+    void AddFunction(TableFunction func);
 
 private:
     Vector<TableFunction> functions_;
 };
 
-}
+} // namespace infinity

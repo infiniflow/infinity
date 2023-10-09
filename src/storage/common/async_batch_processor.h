@@ -14,33 +14,27 @@ namespace infinity {
 
 class AsyncBatchProcessor {
 public:
-    explicit
-    AsyncBatchProcessor(SizeT prepare_queue_size,
-                        SizeT commit_queue_size,
-                        std::function<SharedPtr<AsyncTask>(List<SharedPtr<AsyncTask>>&)> on_prepare,
-                        std::function<void(const SharedPtr<AsyncTask>&)> on_commit)
-            : on_prepare_(std::move(on_prepare)), on_commit_(std::move(on_commit)) {
+    explicit AsyncBatchProcessor(SizeT prepare_queue_size,
+                                 SizeT commit_queue_size,
+                                 std::function<SharedPtr<AsyncTask>(List<SharedPtr<AsyncTask>> &)> on_prepare,
+                                 std::function<void(const SharedPtr<AsyncTask> &)> on_commit)
+        : on_prepare_(std::move(on_prepare)), on_commit_(std::move(on_commit)) {
         prepare_queue_ = MakeUnique<BatchBlockingQueue>(prepare_queue_size);
         commit_queue_ = MakeUnique<BatchBlockingQueue>(commit_queue_size);
     }
 
     ~AsyncBatchProcessor() = default;
 
-    void
-    Start();
+    void Start();
 
-    void
-    Stop();
+    void Stop();
 
-    void
-    Submit(SharedPtr<AsyncTask>);
+    void Submit(SharedPtr<AsyncTask>);
 
 private:
-    void
-    PrepareLoop();
+    void PrepareLoop();
 
-    void
-    CommitLoop();
+    void CommitLoop();
 
 private:
     UniquePtr<Thread> prepare_worker_{};
@@ -49,9 +43,8 @@ private:
     UniquePtr<Thread> commit_worker_{};
     UniquePtr<BatchBlockingQueue> commit_queue_{};
 
-    std::function<SharedPtr<AsyncTask>(List<SharedPtr<AsyncTask>>&)> on_prepare_{};
-    std::function<void(const SharedPtr<AsyncTask>&)> on_commit_{};
+    std::function<SharedPtr<AsyncTask>(List<SharedPtr<AsyncTask>> &)> on_prepare_{};
+    std::function<void(const SharedPtr<AsyncTask> &)> on_commit_{};
 };
 
-}
-
+} // namespace infinity

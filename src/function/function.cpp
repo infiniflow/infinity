@@ -4,7 +4,4 @@
 
 #include "function.h"
 
-namespace infinity {
-
-
-}
+namespace infinity {}

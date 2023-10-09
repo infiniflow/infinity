@@ -7,12 +7,11 @@
 
 namespace infinity {
 
-String
-ValueExpression::ToString() const {
-//    std::stringstream ss;
-//    ss << value_.type_.ToString() << '(' << value_.ToString()<< ")";
-//    return ss.str();
+String ValueExpression::ToString() const {
+    //    std::stringstream ss;
+    //    ss << value_.type_.ToString() << '(' << value_.ToString()<< ")";
+    //    return ss.str();
     return value_.ToString();
 }
 
-}
+} // namespace infinity

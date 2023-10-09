@@ -8,30 +8,28 @@
 
 #include "common/types/logical_type.h"
 #include "function/table/seq_scan.h"
+#include "function/table/table_scan.h"
+#include "legacy_sched/pipeline.h"
 #include "main/config.h"
 #include "main/infinity.h"
 #include "main/session.h"
 #include "main/stats/global_resource_usage.h"
-#include "legacy_sched/pipeline.h"
 #include "storage/data_block.h"
 #include "storage/meta/catalog.h"
-#include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/entry/segment_column_entry.h"
+#include "storage/meta/entry/segment_entry.h"
 #include "storage/storage.h"
-#include "function/table/table_scan.h"
 #include <math.h>
 
 class TableScanTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         system("rm -rf /tmp/infinity");
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -56,15 +54,10 @@ TEST_F(TableScanTest, block_read_test) {
     // create dummy query_context
     UniquePtr<Session> session_ptr = MakeUnique<Session>();
 
-    UniquePtr<ResourceManager> resource_manager = MakeUnique<ResourceManager>(config.total_cpu_number(),
-                                                                              config.total_memory_size());
+    UniquePtr<ResourceManager> resource_manager = MakeUnique<ResourceManager>(config.total_cpu_number(), config.total_memory_size());
 
     UniquePtr<QueryContext> query_context = MakeUnique<QueryContext>();
-    query_context->Init(session_ptr.get(),
-                        &config,
-                        nullptr,
-                        &storage,
-                        resource_manager.get());
+    query_context->Init(session_ptr.get(), &config, nullptr, &storage, resource_manager.get());
 
     Vector<SharedPtr<DataType>> column_types;
     column_types.push_back(MakeShared<DataType>(LogicalType::kInteger));

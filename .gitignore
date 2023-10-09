@@ -75,3 +75,6 @@ test/data/fvecs/
 test/sql/**/*fvecs*.slt
 
 **/*.pyc
+
+#clang-format
+clang-format-all

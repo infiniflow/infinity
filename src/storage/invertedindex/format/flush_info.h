@@ -7,45 +7,22 @@ private:
 #define GET_BIT_VALUE(mask, offset) (flush_info_ & mask) >> offset
 
 public:
-    FlushInfo() {
-        Reset();
-    }
+    FlushInfo() { Reset(); }
 
-    FlushInfo(const FlushInfo& other) {
-        flush_info_ = other.flush_info_;
-    }
+    FlushInfo(const FlushInfo &other) { flush_info_ = other.flush_info_; }
 
     ~FlushInfo() = default;
 
-    bool
-    IsValidShortBuffer() const {
-        return GET_BIT_VALUE(MASK_IS_VALID, OFFSET_IS_VALID);
-    }
-    void
-    SetIsValidShortBuffer(bool is_valid) {
+    bool IsValidShortBuffer() const { return GET_BIT_VALUE(MASK_IS_VALID, OFFSET_IS_VALID); }
+    void SetIsValidShortBuffer(bool is_valid) {
         uint64_t is_valid_short_buffer = is_valid ? 1 : 0;
         SET_BIT_VALUE(MASK_IS_VALID, OFFSET_IS_VALID, is_valid_short_buffer);
     }
-    uint32_t
-    GetFlushLength() const {
-        return GET_BIT_VALUE(MASK_FLUSH_LENGTH, OFFSET_FLUSH_LENGTH);
-    }
-    void
-    SetFlushLength(uint32_t flush_length) {
-        SET_BIT_VALUE(MASK_FLUSH_LENGTH, OFFSET_FLUSH_LENGTH, flush_length);
-    }
-    uint32_t
-    GetFlushCount() const {
-        return GET_BIT_VALUE(MASK_FLUSH_COUNT, OFFSET_FLUSH_COUNT);
-    }
-    void
-    SetFlushCount(uint32_t flush_count) {
-        SET_BIT_VALUE(MASK_FLUSH_COUNT, OFFSET_FLUSH_COUNT, flush_count);
-    }
-    void
-    Reset() {
-        flush_info_ = 0;
-    }
+    uint32_t GetFlushLength() const { return GET_BIT_VALUE(MASK_FLUSH_LENGTH, OFFSET_FLUSH_LENGTH); }
+    void SetFlushLength(uint32_t flush_length) { SET_BIT_VALUE(MASK_FLUSH_LENGTH, OFFSET_FLUSH_LENGTH, flush_length); }
+    uint32_t GetFlushCount() const { return GET_BIT_VALUE(MASK_FLUSH_COUNT, OFFSET_FLUSH_COUNT); }
+    void SetFlushCount(uint32_t flush_count) { SET_BIT_VALUE(MASK_FLUSH_COUNT, OFFSET_FLUSH_COUNT, flush_count); }
+    void Reset() { flush_info_ = 0; }
 
 private:
     static const uint64_t OFFSET_IS_VALID = 0;
@@ -59,4 +36,4 @@ private:
     uint64_t volatile flush_info_;
 };
 
-}// namespace infinity
+} // namespace infinity

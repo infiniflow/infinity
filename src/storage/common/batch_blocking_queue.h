@@ -4,43 +4,37 @@
 
 #pragma once
 
-#include "blockingconcurrentqueue.h"
-#include "common/types/alias/primitives.h"
-#include "common/types/alias/containers.h"
 #include "async_task.h"
+#include "blockingconcurrentqueue.h"
+#include "common/types/alias/containers.h"
+#include "common/types/alias/primitives.h"
 
 namespace infinity {
 
 class BatchBlockingQueue {
 public:
-    explicit
-    BatchBlockingQueue(SizeT capacity = 1024) : capacity_(capacity) {
-    }
+    explicit BatchBlockingQueue(SizeT capacity = 1024) : capacity_(capacity) {}
 
-    void
-    Enqueue(SharedPtr<AsyncTask> task_ptr) {
+    void Enqueue(SharedPtr<AsyncTask> task_ptr) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
         queue_.push_back(std::move(task_ptr));
         empty_cv_.notify_one();
     }
 
-    void
-    DequeueBulk(List<SharedPtr<AsyncTask>>& output_queue) {
+    void DequeueBulk(List<SharedPtr<AsyncTask>> &output_queue) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
         output_queue.splice(output_queue.end(), queue_);
         full_cv_.notify_one();
     }
 
-    SizeT
-    Size() const {
+    SizeT Size() const {
         std::lock_guard<std::mutex> lock(queue_mutex_);
         return queue_.size();
     }
 
-    bool
-    Empty() const {
+    bool Empty() const {
         std::lock_guard<std::mutex> lock(queue_mutex_);
         return queue_.empty();
     }
@@ -53,5 +47,4 @@ protected:
     SizeT capacity_{1024};
 };
 
-}
-
+} // namespace infinity

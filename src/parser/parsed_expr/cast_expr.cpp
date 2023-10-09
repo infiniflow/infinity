@@ -7,17 +7,16 @@
 namespace infinity {
 
 CastExpr::~CastExpr() {
-    if(expr_ != nullptr) {
+    if (expr_ != nullptr) {
         delete expr_;
         expr_ = nullptr;
     }
 }
 
-String
-CastExpr::ToString() const {
+String CastExpr::ToString() const {
     std::stringstream ss;
     ss << "CAST(" << expr_->ToString() << "  AS " << data_type_.ToString() << ")";
     return ss.str();
 }
 
-}
+} // namespace infinity

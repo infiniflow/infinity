@@ -6,19 +6,15 @@
 
 namespace infinity {
 
-void
-CorrelatedExpressionsDetector::VisitNode(LogicalNode& op) {
-    VisitNodeExpression(op);
-}
+void CorrelatedExpressionsDetector::VisitNode(LogicalNode &op) { VisitNodeExpression(op); }
 
-SharedPtr<BaseExpression>
-CorrelatedExpressionsDetector::VisitReplace(const SharedPtr<ColumnExpression>& expression) {
+SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
 
-    if(expression->depth() == 0) {
+    if (expression->depth() == 0) {
         return expression;
     }
 
-    if(expression->depth() > 1) {
+    if (expression->depth() > 1) {
         PlannerError("Column expression with depth > 1 is detected")
     }
 
@@ -26,9 +22,8 @@ CorrelatedExpressionsDetector::VisitReplace(const SharedPtr<ColumnExpression>& e
     return expression;
 }
 
-SharedPtr<BaseExpression>
-CorrelatedExpressionsDetector::VisitReplace(const SharedPtr<SubqueryExpression>& expression) {
-    if(expression->correlated_columns.empty()) {
+SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const SharedPtr<SubqueryExpression> &expression) {
+    if (expression->correlated_columns.empty()) {
         // Uncorrelated subquery
         return nullptr;
     }
@@ -36,4 +31,4 @@ CorrelatedExpressionsDetector::VisitReplace(const SharedPtr<SubqueryExpression>&
     PlannerError("Not support nested correlated subquery in the subquery plan")
 }
 
-}
+} // namespace infinity

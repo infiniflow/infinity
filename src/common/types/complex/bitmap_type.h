@@ -14,62 +14,44 @@ public:
     static constexpr i8 UNIT_BITS = 64;
     static constexpr i8 UNIT_BYTES = 8;
 
-    static inline u64
-    UnitCount(u64 bit_count) {
-        return (bit_count + (UNIT_BITS - 1)) / UNIT_BITS;
-    }
+    static inline u64 UnitCount(u64 bit_count) { return (bit_count + (UNIT_BITS - 1)) / UNIT_BITS; }
 
 public:
     u64 count{0}; // bit count of the bitmap
-    u64* ptr{nullptr};
-public:
-    inline
-    BitmapType() {
-        GlobalResourceUsage::IncrObjectCount();
-    }
+    u64 *ptr{nullptr};
 
-    explicit inline
-    BitmapType(u64 bit_count) {
+public:
+    inline BitmapType() { GlobalResourceUsage::IncrObjectCount(); }
+
+    explicit inline BitmapType(u64 bit_count) {
         GlobalResourceUsage::IncrObjectCount();
         Initialize(bit_count);
     }
 
     // The bitmap_ptr will also be freed by BitmapType's destructor.
-    inline
-    BitmapType(u64* bitmap_ptr, u64 bit_count) : ptr(bitmap_ptr), count(bit_count) {
-        GlobalResourceUsage::IncrObjectCount();
-    }
+    inline BitmapType(u64 *bitmap_ptr, u64 bit_count) : ptr(bitmap_ptr), count(bit_count) { GlobalResourceUsage::IncrObjectCount(); }
 
-    inline
-    ~BitmapType() {
+    inline ~BitmapType() {
         GlobalResourceUsage::DecrObjectCount();
         Reset();
     }
 
-    BitmapType(const BitmapType& other);
+    BitmapType(const BitmapType &other);
 
-    BitmapType(BitmapType&& other) noexcept;
+    BitmapType(BitmapType &&other) noexcept;
 
-    BitmapType&
-    operator=(const BitmapType& other);
+    BitmapType &operator=(const BitmapType &other);
 
-    BitmapType&
-    operator=(BitmapType&& other) noexcept;
+    BitmapType &operator=(BitmapType &&other) noexcept;
 
-    bool
-    operator==(const BitmapType& other) const;
+    bool operator==(const BitmapType &other) const;
 
-    inline bool
-    operator!=(const BitmapType& other) const {
-        return !operator==(other);
-    }
+    inline bool operator!=(const BitmapType &other) const { return !operator==(other); }
 
-    void
-    Initialize(u64 bit_count);
+    void Initialize(u64 bit_count);
 
-    inline void
-    Reset() {
-        if(count != 0) {
+    inline void Reset() {
+        if (count != 0) {
             delete[] ptr;
             GlobalResourceUsage::DecrRawMemCount();
             ptr = nullptr;
@@ -77,16 +59,11 @@ public:
         }
     }
 
-    bool
-    GetBit(u64 row_index) const;
+    bool GetBit(u64 row_index) const;
 
-    void
-    SetBit(u64 row_index, bool value);
+    void SetBit(u64 row_index, bool value);
 
-    [[nodiscard]] inline String
-    ToString() const {
-        TypeError("ToString() isn't implemented");
-    }
+    [[nodiscard]] inline String ToString() const { TypeError("ToString() isn't implemented"); }
 };
 
-}
+} // namespace infinity

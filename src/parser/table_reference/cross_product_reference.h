@@ -11,18 +11,13 @@ namespace infinity {
 class CrossProductReference : public BaseTableReference {
 
 public:
-
-    explicit
-    CrossProductReference() : BaseTableReference(TableRefType::kCrossProduct) {}
+    explicit CrossProductReference() : BaseTableReference(TableRefType::kCrossProduct) {}
 
     ~CrossProductReference() override;
 
-    String
-    ToString() override;
+    String ToString() override;
 
-    Vector<BaseTableReference*> tables_;
-
+    Vector<BaseTableReference *> tables_;
 };
 
-}
-
+} // namespace infinity

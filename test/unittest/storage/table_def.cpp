@@ -2,31 +2,28 @@
 // Created by jinhai on 22-12-25.
 //
 
-#include <gtest/gtest.h>
-#include "base_test.h"
 #include "storage/table_def.h"
-#include "main/profiler/base_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
+#include "base_test.h"
 #include "main/infinity.h"
+#include "main/logger.h"
+#include "main/profiler/base_profiler.h"
+#include "main/stats/global_resource_usage.h"
+#include <gtest/gtest.h>
 
 class TableDefTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
     }
 };
-
 
 TEST_F(TableDefTest, test1) {
     using namespace infinity;
@@ -39,20 +36,13 @@ TEST_F(TableDefTest, test1) {
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                    MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
-                                                    "c1",
-                                                    constraints);
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
         columns.emplace_back(column_def_ptr);
-
     }
     {
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                    MakeShared<DataType>(DataType(LogicalType::kVarchar)),
-                                                    "c2",
-                                                    constraints);
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kVarchar)), "c2", constraints);
         columns.emplace_back(column_def_ptr);
     }
 
@@ -65,7 +55,6 @@ TEST_F(TableDefTest, test1) {
     LOG_TRACE("\n{}", table_def.ToString());
 }
 
-
 TEST_F(TableDefTest, ReadWrite) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
@@ -77,21 +66,14 @@ TEST_F(TableDefTest, ReadWrite) {
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                    MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
-                                                    "c1",
-                                                    constraints);
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
         columns.emplace_back(column_def_ptr);
-
     }
     {
         HashSet<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
-        auto column_def_ptr = MakeShared<ColumnDef>(column_id++,
-                                                    MakeShared<DataType>(LogicalType::kVarchar,
-                                                                         VarcharInfo::Make(8196)),
-                                                    "c2",
-                                                    constraints);
+        auto column_def_ptr =
+            MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(LogicalType::kVarchar, VarcharInfo::Make(8196)), "c2", constraints);
         columns.emplace_back(column_def_ptr);
     }
 
@@ -100,8 +82,8 @@ TEST_F(TableDefTest, ReadWrite) {
 
     int32_t exp_size = table_def.GetSizeInBytes();
     std::vector<char> buf(exp_size, char(0));
-    char* buf_beg = buf.data();
-    char* ptr = buf_beg;
+    char *buf_beg = buf.data();
+    char *ptr = buf_beg;
     table_def.WriteAdv(ptr);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 

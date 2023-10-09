@@ -7,7 +7,5 @@
 class ParserHelper {
 
 public:
-    static void
-    ToLower(char* str);
-
+    static void ToLower(char *str);
 };

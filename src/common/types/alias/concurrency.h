@@ -17,4 +17,4 @@ using Thread = std::thread;
 using au64 = std::atomic_uint64_t;
 using aptr = std::atomic_uintptr_t;
 
-}
+} // namespace infinity

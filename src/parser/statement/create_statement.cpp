@@ -6,9 +6,6 @@
 
 namespace infinity {
 
-String
-CreateStatement::ToString() const {
-    return create_info_->ToString();
-}
+String CreateStatement::ToString() const { return create_info_->ToString(); }
 
-}
+} // namespace infinity

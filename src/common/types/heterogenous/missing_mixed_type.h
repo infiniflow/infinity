@@ -17,4 +17,4 @@ struct __attribute__((packed)) MissingMixedType : public BaseMixedType {
     i64 _dummy4{};
 };
 
-}
+} // namespace infinity

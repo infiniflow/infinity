@@ -13,44 +13,24 @@ namespace infinity {
 
 class PhysicalExplain final : public PhysicalOperator {
 public:
-    explicit PhysicalExplain(u64 id,
-                             ExplainType type,
-                             SharedPtr<Vector<SharedPtr<String>>> text_array,
-                             SharedPtr<PhysicalOperator> left)
-            : PhysicalOperator(PhysicalOperatorType::kExplain, std::move(left), nullptr, id),
-              explain_type_(type),
-              texts_(std::move(text_array)) {}
+    explicit PhysicalExplain(u64 id, ExplainType type, SharedPtr<Vector<SharedPtr<String>>> text_array, SharedPtr<PhysicalOperator> left)
+        : PhysicalOperator(PhysicalOperatorType::kExplain, std::move(left), nullptr, id), explain_type_(type), texts_(std::move(text_array)) {}
 
     ~PhysicalExplain() override = default;
 
-    void
-    Init() override;
+    void Init() override;
 
-    void
-    Execute(QueryContext* query_context) final;
+    void Execute(QueryContext *query_context) final;
 
-    virtual void
-    Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) final;
+    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    void
-    SetExplainText(SharedPtr<Vector<SharedPtr<String>>> text) {
-        texts_ = std::move(text);
-    }
+    void SetExplainText(SharedPtr<Vector<SharedPtr<String>>> text) { texts_ = std::move(text); }
 
-    inline SharedPtr<Vector<String>>
-    GetOutputNames() const final {
-        return output_names_;
-    }
+    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final {
-        return output_types_;
-    }
+    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    inline ExplainType
-    explain_type() const {
-        return explain_type_;
-    }
+    inline ExplainType explain_type() const { return explain_type_; }
 
 private:
     ExplainType explain_type_{ExplainType::kPhysical};
@@ -60,4 +40,4 @@ private:
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 };
 
-}
+} // namespace infinity

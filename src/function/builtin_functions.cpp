@@ -7,9 +7,9 @@
 // Arithmetic scalar function
 #include "scalar/add.h"
 
-#include "scalar/subtract.h"
-#include "scalar/multiply.h"
 #include "scalar/divide.h"
+#include "scalar/multiply.h"
+#include "scalar/subtract.h"
 
 // Match scalar function
 #include "scalar/abs.h"
@@ -17,18 +17,18 @@
 
 // Match comparison function
 #include "scalar/equals.h"
+#include "scalar/greater.h"
+#include "scalar/greater_equals.h"
 #include "scalar/inequals.h"
 #include "scalar/less.h"
 #include "scalar/less_equals.h"
-#include "scalar/greater.h"
-#include "scalar/greater_equals.h"
 
 // Logical scalar function
-#include "scalar/or.h"
 #include "scalar/and.h"
+#include "scalar/or.h"
 
-#include "function/scalar/like.h"
 #include "function/scalar/extract.h"
+#include "function/scalar/like.h"
 
 // Aggregate function
 #include "aggregate/avg.h"
@@ -42,24 +42,22 @@
 #include "function/scalar/substring.h"
 
 // Table function
-#include "table/seq_scan.h"
 #include "function/scalar/not.h"
-#include "function/table/table_scan.h"
 #include "function/table/knn_scan.h"
+#include "function/table/table_scan.h"
+#include "table/seq_scan.h"
 
 namespace infinity {
 
-BuiltinFunctions::BuiltinFunctions(UniquePtr<NewCatalog>& catalog_ptr) : catalog_ptr_(catalog_ptr) {}
+BuiltinFunctions::BuiltinFunctions(UniquePtr<NewCatalog> &catalog_ptr) : catalog_ptr_(catalog_ptr) {}
 
-void
-BuiltinFunctions::Init() {
+void BuiltinFunctions::Init() {
     RegisterAggregateFunction();
     RegisterScalarFunction();
     RegisterTableFunction();
 }
 
-void
-BuiltinFunctions::RegisterAggregateFunction() {
+void BuiltinFunctions::RegisterAggregateFunction() {
     RegisterAvgFunction(catalog_ptr_);
     RegisterCountFunction(catalog_ptr_);
     RegisterFirstFunction(catalog_ptr_);
@@ -68,8 +66,7 @@ BuiltinFunctions::RegisterAggregateFunction() {
     RegisterSumFunction(catalog_ptr_);
 }
 
-void
-BuiltinFunctions::RegisterScalarFunction() {
+void BuiltinFunctions::RegisterScalarFunction() {
     // Insert the function set into catalog
 
     // Arithmetic functions
@@ -107,12 +104,11 @@ BuiltinFunctions::RegisterScalarFunction() {
     RegisterSubstringFunction(catalog_ptr_);
 }
 
-void
-BuiltinFunctions::RegisterTableFunction() {
+void BuiltinFunctions::RegisterTableFunction() {
 
     RegisterSeqScanFunction(catalog_ptr_);
     RegisterTableScanFunction(catalog_ptr_);
     RegisterKnnScanFunction(catalog_ptr_);
 }
 
-}
+} // namespace infinity

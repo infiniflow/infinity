@@ -7,28 +7,22 @@
 
 namespace infinity {
 
-ScalarFunctionSet::~ScalarFunctionSet() {
-    functions_.clear();
-}
+ScalarFunctionSet::~ScalarFunctionSet() { functions_.clear(); }
 
-void
-ScalarFunctionSet::AddFunction(const ScalarFunction& func) {
-    functions_.emplace_back(func);
-}
+void ScalarFunctionSet::AddFunction(const ScalarFunction &func) { functions_.emplace_back(func); }
 
-ScalarFunction
-ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>>& input_arguments) {
+ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>> &input_arguments) {
 
     i64 lowest_cost = std::numeric_limits<i64>::max();
     SizeT function_count = functions_.size();
     Vector<i64> candidates_index;
 
-    for(auto i = 0; i < function_count; ++i) {
-        ScalarFunction& function = functions_[i];
+    for (auto i = 0; i < function_count; ++i) {
+        ScalarFunction &function = functions_[i];
         i64 cost = MatchFunctionCost(function, input_arguments);
-        if(cost >= 0 && cost <= lowest_cost) {
+        if (cost >= 0 && cost <= lowest_cost) {
             // Have matched function and may be one of the candidate
-            if(cost == lowest_cost) {
+            if (cost == lowest_cost) {
                 candidates_index.emplace_back(i);
                 continue;
             }
@@ -38,23 +32,23 @@ ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>>&
         }
     }
 
-    if(candidates_index.empty()) {
+    if (candidates_index.empty()) {
         // No matched function
         std::stringstream ss;
         ss << "Can't find matched function for " << FunctionSet::ToString(name_, input_arguments) << std::endl;
         ss << "Candidate functions: " << std::endl;
-        for(auto& function: functions_) {
+        for (auto &function : functions_) {
             ss << function.ToString() << std::endl;
         }
         PlannerError(ss.str());
     }
 
-    if(candidates_index.size() > 1) {
+    if (candidates_index.size() > 1) {
         // multiple functions matched
         std::stringstream ss;
         ss << "Multiple matched functions for " << FunctionSet::ToString(name_, input_arguments) << std::endl;
         ss << "Matched candidate functions: " << std::endl;
-        for(auto index: candidates_index) {
+        for (auto index : candidates_index) {
             ss << functions_[index].ToString() << std::endl;
         }
         PlannerError(ss.str());
@@ -63,22 +57,20 @@ ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>>&
     return functions_[candidates_index[0]];
 }
 
-i64
-ScalarFunctionSet::MatchFunctionCost(const ScalarFunction& func,
-                                     const Vector<SharedPtr<BaseExpression>>& arguments) {
+i64 ScalarFunctionSet::MatchFunctionCost(const ScalarFunction &func, const Vector<SharedPtr<BaseExpression>> &arguments) {
     // TODO: variable argument list function need to handled here.
 
-    if(func.parameter_types_.size() != arguments.size()) {
+    if (func.parameter_types_.size() != arguments.size()) {
         // Argument count is mismatched.
         return -1; // Invalid function index
     }
 
     auto argument_count = arguments.size();
     i64 total_cost = 0;
-    for(auto i = 0; i < argument_count; ++i) {
+    for (auto i = 0; i < argument_count; ++i) {
         // Get the cost from argument to parameter
         i64 type_cast_cost = DataType::CastRule(arguments[i]->Type(), func.parameter_types_[i]);
-        if(type_cast_cost < 0) {
+        if (type_cast_cost < 0) {
             // Can't cast the value type;
             return -1;
         } else {
@@ -89,4 +81,4 @@ ScalarFunctionSet::MatchFunctionCost(const ScalarFunction& func,
     return total_cost;
 }
 
-}
+} // namespace infinity

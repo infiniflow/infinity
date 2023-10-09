@@ -10,21 +10,15 @@ namespace infinity {
 
 class AsyncTerminateTask final : public AsyncTask {
 public:
-    explicit
-    AsyncTerminateTask() : AsyncTask(AsyncTaskType::kTerminate) {}
+    explicit AsyncTerminateTask() : AsyncTask(AsyncTaskType::kTerminate) {}
 
-    String
-    ToString() final {
-        return "Async Terminate Task";
-    }
+    String ToString() final { return "Async Terminate Task"; }
 
-    void
-    Prepare() final {}
+    void Prepare() final {}
 
-    void
-    Commit() final {}
+    void Commit() final {}
+
 private:
-
 };
 
-}
+} // namespace infinity

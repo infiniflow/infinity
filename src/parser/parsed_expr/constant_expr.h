@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "parsed_expr.h"
 #include "common/types/alias/containers.h"
 #include "common/types/logical_type.h"
+#include "parsed_expr.h"
 
 namespace infinity {
 
@@ -24,13 +24,11 @@ enum class LiteralType {
 
 class ConstantExpr : public ParsedExpr {
 public:
-    explicit
-    ConstantExpr(LiteralType literal_type) : ParsedExpr(ParsedExprType::kConstant), literal_type_(literal_type) {}
+    explicit ConstantExpr(LiteralType literal_type) : ParsedExpr(ParsedExprType::kConstant), literal_type_(literal_type) {}
 
     ~ConstantExpr() override;
 
-    [[nodiscard]] String
-    ToString() const override;
+    [[nodiscard]] String ToString() const override;
 
 public:
     LiteralType literal_type_;
@@ -38,12 +36,11 @@ public:
     bool bool_value_{false};
     i64 integer_value_{0};
     f64 double_value_{0};
-    char* str_value_{nullptr};
+    char *str_value_{nullptr};
     TimeUnit interval_type_{TimeUnit::kInvalidUnit};
-    char* date_value_{nullptr};
+    char *date_value_{nullptr};
     Vector<i64> long_array_{};
     Vector<f64> double_array_{};
 };
 
-}
-
+} // namespace infinity

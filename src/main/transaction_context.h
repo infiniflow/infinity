@@ -10,31 +10,21 @@ class Txn;
 
 class TransactionContext {
 public:
-    void
-    BeginTxn();
+    void BeginTxn();
 
-    void
-    CommitTxn();
+    void CommitTxn();
 
-    void
-    RollbackTxn();
+    void RollbackTxn();
 
-    void
-    ClearTxn();
+    void ClearTxn();
 
-    void
-    SetAutoCommit(bool auto_commit);
+    void SetAutoCommit(bool auto_commit);
 
-    inline bool
-    IsAutoCommit() const {
-        return auto_commit_;
-    }
+    inline bool IsAutoCommit() const { return auto_commit_; }
 
 private:
     bool auto_commit_;
-    Txn* current_txn_;
+    Txn *current_txn_;
 };
 
-}
-
-
+} // namespace infinity

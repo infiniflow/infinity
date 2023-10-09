@@ -12,22 +12,18 @@ namespace infinity {
 
 struct ColumnIdentifier {
 public:
-    static ColumnIdentifier
-    MakeColumnIdentifier(QueryContext* query_context, const ColumnExpr& expr);
+    static ColumnIdentifier MakeColumnIdentifier(QueryContext *query_context, const ColumnExpr &expr);
 
 public:
-    explicit
-    ColumnIdentifier(SharedPtr<String> db_name,
-                     SharedPtr<String> schema_name,
-                     SharedPtr<String> table_name,
-                     SharedPtr<String> column_name,
-                     SharedPtr<String> alias_name);
+    explicit ColumnIdentifier(SharedPtr<String> db_name,
+                              SharedPtr<String> schema_name,
+                              SharedPtr<String> table_name,
+                              SharedPtr<String> column_name,
+                              SharedPtr<String> alias_name);
 
-    [[nodiscard]] String
-    ToString() const;
+    [[nodiscard]] String ToString() const;
 
-    [[nodiscard]] bool
-    operator==(const ColumnIdentifier& other) const;
+    [[nodiscard]] bool operator==(const ColumnIdentifier &other) const;
 
     SharedPtr<String> db_name_ptr_;
     SharedPtr<String> schema_name_ptr_;
@@ -36,5 +32,4 @@ public:
     SharedPtr<String> alias_name_ptr_;
 };
 
-}
-
+} // namespace infinity

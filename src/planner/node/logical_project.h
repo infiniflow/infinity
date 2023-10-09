@@ -10,34 +10,22 @@ namespace infinity {
 
 class LogicalProject : public LogicalNode {
 public:
-    LogicalProject(u64 node_id,
-                   Vector<SharedPtr<BaseExpression>> expressions,
-                   u64 projection_index)
-            : LogicalNode(node_id, LogicalNodeType::kProjection),
-              expressions_(std::move(expressions)),
-              table_index_(projection_index) {}
+    LogicalProject(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions, u64 projection_index)
+        : LogicalNode(node_id, LogicalNodeType::kProjection), expressions_(std::move(expressions)), table_index_(projection_index) {}
 
-    [[nodiscard]] Vector<ColumnBinding>
-    GetColumnBindings() const final;
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] SharedPtr<Vector<String>>
-    GetOutputNames() const final;
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final;
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String
-    ToString(i64& space) final;
+    String ToString(i64 &space) final;
 
-    inline String
-    name() final {
-        return "logical_project_" + std::to_string(table_index_);
-    }
+    inline String name() final { return "logical_project_" + std::to_string(table_index_); }
 
     Vector<SharedPtr<BaseExpression>> expressions_{};
 
     u64 table_index_{};
 };
 
-
-}
+} // namespace infinity

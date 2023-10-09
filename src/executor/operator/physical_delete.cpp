@@ -6,19 +6,10 @@
 
 namespace infinity {
 
-void
-PhysicalDelete::Init() {
+void PhysicalDelete::Init() {}
 
-}
+void PhysicalDelete::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void
-PhysicalDelete::Execute(QueryContext* query_context, InputState* input_state, OutputState* output_state) {
+void PhysicalDelete::Execute(QueryContext *query_context) {}
 
-}
-
-void
-PhysicalDelete::Execute(QueryContext* query_context) {
-
-}
-
-}
+} // namespace infinity

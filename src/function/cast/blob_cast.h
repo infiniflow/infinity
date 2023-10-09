@@ -14,9 +14,8 @@ namespace infinity {
 
 struct BlobTryCastToVarlen;
 
-inline static BoundCastFunc
-BindBlobCast(DataType& target) {
-    switch(target.type()) {
+inline static BoundCastFunc BindBlobCast(DataType &target) {
+    switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<BlobT, VarcharT, BlobTryCastToVarlen>);
         }
@@ -27,29 +26,25 @@ BindBlobCast(DataType& target) {
 }
 
 struct BlobTryCastToVarlen {
-    template<typename SourceType, typename TargetType>
-    static inline bool
-    Run(const SourceType& source, TargetType& target, const SharedPtr<ColumnVector>& vector_ptr) {
-        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
-                      + " to " + DataType::TypeToString<TargetType>());
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
     }
 };
 
-template<>
-inline bool
-BlobTryCastToVarlen::Run(const BlobT& source, VarcharT& target, const SharedPtr<ColumnVector>& vector_ptr) {
-    if(source.size > VarcharT::LEN_LIMIT) {
+template <>
+inline bool BlobTryCastToVarlen::Run(const BlobT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    if (source.size > VarcharT::LEN_LIMIT) {
         return false;
     }
 
     target.length = static_cast<u16>(source.size);
-    if(target.length <= VarcharT::INLINE_LENGTH) {
+    if (target.length <= VarcharT::INLINE_LENGTH) {
         // inline varchar
         memcpy(target.prefix, source.ptr, target.length);
         memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     } else {
-        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                   "Varchar column vector should use MemoryVectorBuffer. ");
+        TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap, "Varchar column vector should use MemoryVectorBuffer. ");
         // Set varchar prefix
         memcpy(target.prefix, source.ptr, VarcharT::PREFIX_LENGTH);
 
@@ -61,4 +56,4 @@ BlobTryCastToVarlen::Run(const BlobT& source, VarcharT& target, const SharedPtr<
     return true;
 }
 
-}
+} // namespace infinity

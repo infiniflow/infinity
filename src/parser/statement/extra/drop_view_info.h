@@ -9,15 +9,12 @@ namespace infinity {
 
 class DropViewInfo : public ExtraDDLInfo {
 public:
-    explicit
-    DropViewInfo() : ExtraDDLInfo(DDLType::kView) {}
+    explicit DropViewInfo() : ExtraDDLInfo(DDLType::kView) {}
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     String schema_name_{"default"};
     String view_name_{};
 };
 
-}
-
+} // namespace infinity

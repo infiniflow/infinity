@@ -9,35 +9,30 @@ namespace infinity {
 
 class InMemTriValueSkipListReader : public TriValueSkipListReader {
 public:
-    InMemTriValueSkipListReader(MemoryPool* session_pool = nullptr)
-        : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
+    InMemTriValueSkipListReader(MemoryPool *session_pool = nullptr) : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
     ~InMemTriValueSkipListReader() {
-        if(session_pool_) {
+        if (session_pool_) {
             skiplist_buffer_->~BufferedByteSlice();
-            session_pool_->Deallocate((void*)skiplist_buffer_, sizeof(BufferedByteSlice));
+            session_pool_->Deallocate((void *)skiplist_buffer_, sizeof(BufferedByteSlice));
         } else {
             delete skiplist_buffer_;
             skiplist_buffer_ = nullptr;
         }
     }
 
-    void
-    Load(BufferedByteSlice* posting_buffer);
+    void Load(BufferedByteSlice *posting_buffer);
 
-    uint32_t
-    GetLastValueInBuffer() const override;
+    uint32_t GetLastValueInBuffer() const override;
 
-    uint32_t
-    GetLastKeyInBuffer() const override;
+    uint32_t GetLastKeyInBuffer() const override;
 
 protected:
-    std::pair<int, bool>
-    LoadBuffer() override;
+    std::pair<int, bool> LoadBuffer() override;
 
 private:
-    MemoryPool* session_pool_;
-    BufferedByteSlice* skiplist_buffer_;
+    MemoryPool *session_pool_;
+    BufferedByteSlice *skiplist_buffer_;
     BufferedByteSliceReader skiplist_reader_;
 };
 
-}// namespace infinity
+} // namespace infinity

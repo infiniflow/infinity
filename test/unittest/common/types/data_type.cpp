@@ -2,23 +2,21 @@
 // Created by JinHai on 2022/10/30.
 //
 
-#include <gtest/gtest.h>
-#include "base_test.h"
 #include "common/types/data_type.h"
+#include "base_test.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class DataTypeTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -91,7 +89,6 @@ TEST_F(DataTypeTest, GetTypeName) {
     EXPECT_EQ(null_type.ToString(), "Null");
     DataType missing_type(LogicalType::kMissing);
     EXPECT_EQ(missing_type.ToString(), "Missing");
-
 }
 
 TEST_F(DataTypeTest, TypeToString) {
@@ -113,7 +110,7 @@ TEST_F(DataTypeTest, TypeToString) {
     EXPECT_STREQ(DataType::TypeToString<TimestampT>().c_str(), "Timestamp");
     EXPECT_STREQ(DataType::TypeToString<IntervalT>().c_str(), "Interval");
     EXPECT_STREQ(DataType::TypeToString<ArrayT>().c_str(), "Array");
-//    EXPECT_EQ(DataType::TypeToString<TupleT>().c_str(), "Tuple");
+    //    EXPECT_EQ(DataType::TypeToString<TupleT>().c_str(), "Tuple");
     EXPECT_STREQ(DataType::TypeToString<PointT>().c_str(), "Point");
     EXPECT_STREQ(DataType::TypeToString<LineT>().c_str(), "Line");
     EXPECT_STREQ(DataType::TypeToString<LineSegT>().c_str(), "LineSegment");
@@ -138,13 +135,11 @@ TEST_F(DataTypeTest, Serialize) {
 
 TEST_F(DataTypeTest, ReadWrite) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(),
-              test_info_->name());
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<TypeInfo> type_info_bitmap = BitmapInfo::Make(1024);
     SharedPtr<TypeInfo> type_info_decimal = DecimalInfo::Make(i64(38), i64(3));
-    SharedPtr<TypeInfo> type_info_embedding =
-            EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 256);
+    SharedPtr<TypeInfo> type_info_embedding = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 256);
     SharedPtr<TypeInfo> type_info_varchar = VarcharInfo::Make(8196);
     EXPECT_NE(type_info_bitmap, nullptr);
     EXPECT_NE(type_info_decimal, nullptr);
@@ -152,23 +147,23 @@ TEST_F(DataTypeTest, ReadWrite) {
     EXPECT_NE(type_info_varchar, nullptr);
 
     std::vector<SharedPtr<DataType>> data_types = {
-            MakeShared<DataType>(LogicalType::kTinyInt),
-            MakeShared<DataType>(LogicalType::kFloat),
-            MakeShared<DataType>(LogicalType::kTuple),
-            MakeShared<DataType>(LogicalType::kBitmap, type_info_bitmap),
-            MakeShared<DataType>(LogicalType::kDecimal, type_info_decimal),
-            MakeShared<DataType>(LogicalType::kEmbedding, type_info_embedding),
-            MakeShared<DataType>(LogicalType::kVarchar, type_info_varchar),
+        MakeShared<DataType>(LogicalType::kTinyInt),
+        MakeShared<DataType>(LogicalType::kFloat),
+        MakeShared<DataType>(LogicalType::kTuple),
+        MakeShared<DataType>(LogicalType::kBitmap, type_info_bitmap),
+        MakeShared<DataType>(LogicalType::kDecimal, type_info_decimal),
+        MakeShared<DataType>(LogicalType::kEmbedding, type_info_embedding),
+        MakeShared<DataType>(LogicalType::kVarchar, type_info_varchar),
     };
 
-    for(int i = 0; i < data_types.size(); i++) {
-        SharedPtr<DataType>& data_type = data_types[i];
-        const SharedPtr<TypeInfo>& ti = data_type->type_info();
+    for (int i = 0; i < data_types.size(); i++) {
+        SharedPtr<DataType> &data_type = data_types[i];
+        const SharedPtr<TypeInfo> &ti = data_type->type_info();
         LOG_TRACE("{}", data_type->Serialize().dump());
         int32_t exp_size = data_type->GetSizeInBytes();
         std::vector<char> buf(exp_size);
-        char* buf_beg = buf.data();
-        char* ptr = buf_beg;
+        char *buf_beg = buf.data();
+        char *ptr = buf_beg;
         data_type->WriteAdv(ptr);
         EXPECT_EQ(ptr - buf_beg, exp_size);
 

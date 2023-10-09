@@ -8,7 +8,6 @@
 namespace infinity {
 const int kWALFileSizeThreshold = 10 * 1024;
 
-
 const std::string kWALFileTemp = "/wal.log";
 const std::string kWALFilePrefix = "wal.log.";
 } // namespace infinity

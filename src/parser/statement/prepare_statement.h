@@ -8,8 +8,6 @@
 
 namespace infinity {
 
-class PrepareStatement : public BaseStatement {
+class PrepareStatement : public BaseStatement {};
 
-};
-
-}
+} // namespace infinity

@@ -8,9 +8,6 @@
 
 namespace infinity {
 
-class LogicalDelete : public LogicalNode {
+class LogicalDelete : public LogicalNode {};
 
-};
-
-}
-
+} // namespace infinity

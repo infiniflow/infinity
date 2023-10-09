@@ -2,28 +2,26 @@
 // Created by jinhai on 23-5-18.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
-#include "storage/io/file_system.h"
-#include "storage/io/local_file_system.h"
 #include "storage/io/file_reader.h"
+#include "storage/io/file_system.h"
 #include "storage/io/file_writer.h"
+#include "storage/io/local_file_system.h"
+#include <gtest/gtest.h>
 
-#include "main/profiler/base_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
+#include "main/logger.h"
+#include "main/profiler/base_profiler.h"
+#include "main/stats/global_resource_usage.h"
 
 class FileWriteReadTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -38,7 +36,7 @@ TEST_F(FileWriteReadTest, test1) {
     String path = "/tmp/test_file1.abc";
     FileWriter file_writer(local_file_system, path, 128);
 
-    for(SizeT i = 0; i < 128; ++i) {
+    for (SizeT i = 0; i < 128; ++i) {
         String buffer = "abc";
         file_writer.Write(buffer.c_str(), buffer.size());
     }

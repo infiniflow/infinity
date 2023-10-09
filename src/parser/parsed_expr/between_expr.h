@@ -10,19 +10,16 @@ namespace infinity {
 
 class BetweenExpr : public ParsedExpr {
 public:
-    explicit
-    BetweenExpr() : ParsedExpr(ParsedExprType::kBetween) {}
+    explicit BetweenExpr() : ParsedExpr(ParsedExprType::kBetween) {}
 
     ~BetweenExpr() override;
 
-    [[nodiscard]] String
-    ToString() const override;
+    [[nodiscard]] String ToString() const override;
 
 public:
-    ParsedExpr* value_{nullptr};
-    ParsedExpr* upper_bound_{nullptr};
-    ParsedExpr* lower_bound_{nullptr};
+    ParsedExpr *value_{nullptr};
+    ParsedExpr *upper_bound_{nullptr};
+    ParsedExpr *lower_bound_{nullptr};
 };
 
-}
-
+} // namespace infinity

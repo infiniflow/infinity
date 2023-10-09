@@ -1,0 +1,21 @@
+# name: test/sql/dml/insert.slt
+# description: Test insert
+# group: [dml, insert]
+
+# Parse only support
+statement ok
+CREATE TABLE products (product_no integer, price integer);
+
+# insert data
+query I
+INSERT INTO products VALUES (1, 9);
+----
+
+query II
+SELECT * FROM products;
+----
+1 9
+
+# Clean up
+statement ok
+DROP TABLE products;

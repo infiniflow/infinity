@@ -17,24 +17,21 @@ class Binding {
 public:
     Binding() = default;
 
-    virtual
-    ~Binding() = default;
+    virtual ~Binding() = default;
 
-    static SharedPtr<Binding>
-    MakeBinding(BindingType binding_type,
-                const String& name,
-                u64 table_index,
-                SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                SharedPtr<Vector<String>> column_names);
+    static SharedPtr<Binding> MakeBinding(BindingType binding_type,
+                                          const String &name,
+                                          u64 table_index,
+                                          SharedPtr<Vector<SharedPtr<DataType>>> column_types,
+                                          SharedPtr<Vector<String>> column_names);
 
-    static SharedPtr<Binding>
-    MakeBinding(BindingType binding_type,
-                const String& name,
-                u64 table_index,
-                TableCollectionEntry* table_collection_entry_ptr,
-                SharedPtr<Vector<SharedPtr<DataType>>> column_types,
-                SharedPtr<Vector<String>> column_names,
-                SharedPtr<BlockIndex> block_index);
+    static SharedPtr<Binding> MakeBinding(BindingType binding_type,
+                                          const String &name,
+                                          u64 table_index,
+                                          TableCollectionEntry *table_collection_entry_ptr,
+                                          SharedPtr<Vector<SharedPtr<DataType>>> column_types,
+                                          SharedPtr<Vector<String>> column_names,
+                                          SharedPtr<BlockIndex> block_index);
 
     // Binding type
     BindingType binding_type_{BindingType::kInvalid};
@@ -45,13 +42,13 @@ public:
     u64 table_index_{};
 
     // Node id of the corresponding logical node
-//    i64 logical_node_id_{-1};
+    //    i64 logical_node_id_{-1};
 
     // ptr to the corresponding logical node.
-//    SharedPtr<LogicalNode> logical_node_ptr_{nullptr};
+    //    SharedPtr<LogicalNode> logical_node_ptr_{nullptr};
 
     // if the binding is table, this is the table_ptr
-    TableCollectionEntry* table_collection_entry_ptr_{nullptr};
+    TableCollectionEntry *table_collection_entry_ptr_{nullptr};
 
     SharedPtr<BlockIndex> block_index_{};
 
@@ -65,10 +62,9 @@ public:
     HashMap<String, i64> name2index_{};
 };
 
-//class TableBinding: public GenericBinding {
-//public:
+// class TableBinding: public GenericBinding {
+// public:
 //
-//};
+// };
 
-}
-
+} // namespace infinity

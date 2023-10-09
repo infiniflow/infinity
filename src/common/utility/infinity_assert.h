@@ -13,157 +13,157 @@ namespace infinity {
 
 #ifdef INFINITY_DEBUG
 
-#define ClientAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw ClientException(errmsg);                                       \
-} \
+#define ClientAssert(is_true, message)                                                                                                               \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw ClientException(errmsg);                                                                                                               \
+    }
 
-#define NetworkAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw NetworkException(errmsg);                                       \
-} \
+#define NetworkAssert(is_true, message)                                                                                                              \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw NetworkException(errmsg);                                                                                                              \
+    }
 
-#define ParserAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw ParserException(errmsg);                                       \
-}
+#define ParserAssert(is_true, message)                                                                                                               \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw ParserException(errmsg);                                                                                                               \
+    }
 
-#define PlannerAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw PlannerException(errmsg);                                       \
-}
+#define PlannerAssert(is_true, message)                                                                                                              \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw PlannerException(errmsg);                                                                                                              \
+    }
 
-#define OptimizerAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw OptimizerException(errmsg);                                       \
-}
+#define OptimizerAssert(is_true, message)                                                                                                            \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw OptimizerException(errmsg);                                                                                                            \
+    }
 
-#define ExecutorAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw ExecutorException(errmsg);                                       \
-}
+#define ExecutorAssert(is_true, message)                                                                                                             \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw ExecutorException(errmsg);                                                                                                             \
+    }
 
-#define SchedulerAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw SchedulerException(errmsg);                                       \
-}
+#define SchedulerAssert(is_true, message)                                                                                                            \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw SchedulerException(errmsg);                                                                                                            \
+    }
 
-#define CatalogAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw CatalogException(errmsg);                                       \
-}
+#define CatalogAssert(is_true, message)                                                                                                              \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw CatalogException(errmsg);                                                                                                              \
+    }
 
-#define StorageAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw StorageException(errmsg);                                       \
-}
+#define StorageAssert(is_true, message)                                                                                                              \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw StorageException(errmsg);                                                                                                              \
+    }
 
-#define TypeAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw TypeException(errmsg);                                       \
-}
+#define TypeAssert(is_true, message)                                                                                                                 \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw TypeException(errmsg);                                                                                                                 \
+    }
 
-#define FunctionAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw FunctionException(errmsg);                                       \
-}
+#define FunctionAssert(is_true, message)                                                                                                             \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw FunctionException(errmsg);                                                                                                             \
+    }
 
-#define NotImplementAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw NotImplementException(errmsg);                                       \
-}
+#define NotImplementAssert(is_true, message)                                                                                                         \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw NotImplementException(errmsg);                                                                                                         \
+    }
 
-#define TransactionAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw TransactionException(errmsg);                                       \
-}
+#define TransactionAssert(is_true, message)                                                                                                          \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw TransactionException(errmsg);                                                                                                          \
+    }
 
-#define GeneralAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__); \
-    throw std::logic_error(errmsg);                                       \
-}
+#define GeneralAssert(is_true, message)                                                                                                              \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message) + " @" + infinity::TrimPath(__FILE__) + ":" + std::to_string(__LINE__);                            \
+        throw std::logic_error(errmsg);                                                                                                              \
+    }
 
 #else
 
-#define ClientAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw NetworkException(errmsg);                                       \
-}
+#define ClientAssert(is_true, message)                                                                                                               \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw NetworkException(errmsg);                                                                                                              \
+    }
 
-#define NetworkAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw NetworkException(errmsg);                                       \
-}
+#define NetworkAssert(is_true, message)                                                                                                              \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw NetworkException(errmsg);                                                                                                              \
+    }
 
-#define ParserAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw ParserException(errmsg);                                       \
-}
+#define ParserAssert(is_true, message)                                                                                                               \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw ParserException(errmsg);                                                                                                               \
+    }
 
-#define PlannerAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw PlannerException(errmsg);                                       \
-}
+#define PlannerAssert(is_true, message)                                                                                                              \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw PlannerException(errmsg);                                                                                                              \
+    }
 
-#define OptimizerAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw OptimizerException(errmsg);                                       \
-}
+#define OptimizerAssert(is_true, message)                                                                                                            \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw OptimizerException(errmsg);                                                                                                            \
+    }
 
-#define ExecutorAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw ExecutorException(errmsg);                                       \
-}
+#define ExecutorAssert(is_true, message)                                                                                                             \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw ExecutorException(errmsg);                                                                                                             \
+    }
 
-#define SchedulerAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw SchedulerException(errmsg);                                       \
-}
+#define SchedulerAssert(is_true, message)                                                                                                            \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw SchedulerException(errmsg);                                                                                                            \
+    }
 
-#define CatalogAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw CatalogException(errmsg);                                       \
-}
+#define CatalogAssert(is_true, message)                                                                                                              \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw CatalogException(errmsg);                                                                                                              \
+    }
 
-#define StorageAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw StorageException(errmsg);                                       \
-}
+#define StorageAssert(is_true, message)                                                                                                              \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw StorageException(errmsg);                                                                                                              \
+    }
 
-#define TypeAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw TypeException(errmsg);                                       \
-}
+#define TypeAssert(is_true, message)                                                                                                                 \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw TypeException(errmsg);                                                                                                                 \
+    }
 
-#define FunctionAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw FunctionException(errmsg);                                       \
-}
+#define FunctionAssert(is_true, message)                                                                                                             \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw FunctionException(errmsg);                                                                                                             \
+    }
 
 //#define Assert(is_true, message)                                              \
 //if(!(is_true)) {                                                            \
@@ -171,23 +171,23 @@ if(!(is_true)) {                                                            \
 //    throw std::logic_error(errmsg);                                       \
 //}
 
-#define GeneralAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = std::string(message);                            \
-    throw std::logic_error(errmsg);                                       \
-}
+#define GeneralAssert(is_true, message)                                                                                                              \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = std::string(message);                                                                                                   \
+        throw std::logic_error(errmsg);                                                                                                              \
+    }
 
-#define NotImplementAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                         \
-    throw NotImplementException(errmsg);                                       \
-}
+#define NotImplementAssert(is_true, message)                                                                                                         \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw NotImplementException(errmsg);                                                                                                         \
+    }
 
-#define TransactionAssert(is_true, message)                                              \
-if(!(is_true)) {                                                            \
-    std::string errmsg = (message);                                                      \
-    throw TransactionException(errmsg);                                       \
-}
+#define TransactionAssert(is_true, message)                                                                                                          \
+    if (!(is_true)) {                                                                                                                                \
+        std::string errmsg = (message);                                                                                                              \
+        throw TransactionException(errmsg);                                                                                                          \
+    }
 
 #endif
 
@@ -205,4 +205,4 @@ if(!(is_true)) {                                                            \
 #define NotImplementError(message) NotImplementAssert(false, message)
 #define TransactionError(message) TransactionAssert(false, message)
 #define GeneralError(message) GeneralAssert(false, message)
-}
+} // namespace infinity

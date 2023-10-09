@@ -8,29 +8,22 @@
 
 namespace infinity {
 
-enum class BoundNodeType {
-    kInvalid,
-    kSelect
-};
+enum class BoundNodeType { kInvalid, kSelect };
 
 class BoundNode {
 public:
-    explicit
-    BoundNode(BoundNodeType type) : type_(type) {}
+    explicit BoundNode(BoundNodeType type) : type_(type) {}
 
-    virtual
-    ~BoundNode() = default;
+    virtual ~BoundNode() = default;
 
-    virtual SharedPtr <LogicalNode>
-    BuildPlan() = 0;
+    virtual SharedPtr<LogicalNode> BuildPlan() = 0;
 
     std::vector<String> names;
     std::vector<DataType> types;
 
-    virtual i64
-    GetTableIndex() = 0;
+    virtual i64 GetTableIndex() = 0;
 
 protected:
     BoundNodeType type_{BoundNodeType::kInvalid};
 };
-}
+} // namespace infinity

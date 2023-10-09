@@ -6,17 +6,12 @@
 
 #include <utility>
 
-template<class Func>
+template <class Func>
 class DeferOperation {
 public:
+    inline explicit DeferOperation(Func func) : defer_(std::move(func)) {}
 
-    inline explicit
-    DeferOperation(Func func) : defer_(std::move(func)) {}
-
-    inline
-    ~DeferOperation() noexcept {
-        defer_();
-    }
+    inline ~DeferOperation() noexcept { defer_(); }
 
 private:
     Func defer_;

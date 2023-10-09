@@ -53,4 +53,4 @@ enum class TransactionStateType : unsigned char {
     kFail = 'E',  // In a failed transaction
 };
 
-}
+} // namespace infinity

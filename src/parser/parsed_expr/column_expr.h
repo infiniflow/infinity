@@ -4,20 +4,18 @@
 
 #pragma once
 
-#include "parsed_expr.h"
 #include "common/types/alias/containers.h"
+#include "parsed_expr.h"
 
 namespace infinity {
 
 class ColumnExpr : public ParsedExpr {
 public:
-    explicit
-    ColumnExpr() : ParsedExpr(ParsedExprType::kColumn) {}
+    explicit ColumnExpr() : ParsedExpr(ParsedExprType::kColumn) {}
 
     ~ColumnExpr() override;
 
-    [[nodiscard]] String
-    ToString() const override;
+    [[nodiscard]] String ToString() const override;
 
 public:
     Vector<String> names_{};
@@ -28,4 +26,4 @@ public:
     bool generated_{false};
 };
 
-}
+} // namespace infinity

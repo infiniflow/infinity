@@ -2,30 +2,27 @@
 // Created by jinhai on 22-12-25.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
-#include "main/profiler/base_profiler.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
 #include "main/infinity.h"
+#include "main/logger.h"
+#include "main/profiler/base_profiler.h"
+#include "main/stats/global_resource_usage.h"
+#include <gtest/gtest.h>
 
 class ColumnDefTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
     }
 };
-
 
 TEST_F(ColumnDefTest, test1) {
     using namespace infinity;
@@ -34,10 +31,7 @@ TEST_F(ColumnDefTest, test1) {
     HashSet<ConstraintType> constraints;
     constraints.insert(ConstraintType::kUnique);
     constraints.insert(ConstraintType::kNotNull);
-    auto column_def_ptr = MakeShared<ColumnDef>(0,
-                                                MakeShared<DataType>(DataType(LogicalType::kTinyInt)),
-                                                "c1",
-                                                constraints);
+    auto column_def_ptr = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
     EXPECT_EQ(*column_def_ptr->type(), DataType(LogicalType::kTinyInt));
     EXPECT_EQ(column_def_ptr->id(), 0);
     EXPECT_STREQ(column_def_ptr->name().c_str(), "c1");
@@ -47,7 +41,6 @@ TEST_F(ColumnDefTest, test1) {
 TEST_F(ColumnDefTest, test2) {
     using namespace infinity;
     LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
-
 
     HashSet<ConstraintType> constraints;
     constraints.insert(ConstraintType::kPrimaryKey);

@@ -7,15 +7,12 @@
 namespace infinity {
 
 ExplainStatement::~ExplainStatement() {
-    if(statement_ != nullptr) {
+    if (statement_ != nullptr) {
         delete statement_;
         statement_ = nullptr;
     }
 }
 
-String
-ExplainStatement::ToString() const {
-    return "explain statement";
-}
+String ExplainStatement::ToString() const { return "explain statement"; }
 
-}
+} // namespace infinity

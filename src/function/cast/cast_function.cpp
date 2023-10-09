@@ -4,16 +4,15 @@
 
 #include "cast_function.h"
 #include "bool_cast.h"
-#include "integer_cast.h"
 #include "float_cast.h"
+#include "integer_cast.h"
 #include "varchar_cast.h"
 
 namespace infinity {
 
-template<typename SourceType>
-static BoundCastFunc
-NumericCast(const DataType& target) {
-    switch(target.type()) {
+template <typename SourceType>
+static BoundCastFunc NumericCast(const DataType &target) {
+    switch (target.type()) {
         case kTinyInt: {
             NotImplementError("Can't cast to " + target.ToString());
         }
@@ -41,12 +40,10 @@ NumericCast(const DataType& target) {
     }
 }
 
-
-BoundCastFunc
-CastFunction::GetBoundFunc(const DataType& source, const DataType& target) {
+BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
     TypeAssert(source != target, "Attempt to cast from " + source.ToString() + " to " + target.ToString());
 
-    switch(source.type()) {
+    switch (source.type()) {
         case kBoolean: {
             return BindBoolCast(source, target);
         }
@@ -145,5 +142,4 @@ CastFunction::GetBoundFunc(const DataType& source, const DataType& target) {
     }
 }
 
-
-}
+} // namespace infinity

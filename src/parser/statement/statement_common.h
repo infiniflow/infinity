@@ -14,9 +14,8 @@ enum class CopyFileType {
     kFVECS,
 };
 
-inline SharedPtr<String>
-copy_file_to_str(CopyFileType copy_file_type) {
-    switch(copy_file_type) {
+inline SharedPtr<String> copy_file_to_str(CopyFileType copy_file_type) {
+    switch (copy_file_type) {
         case CopyFileType::kCSV:
             return MakeShared<String>("CSV");
         case CopyFileType::kJSON:
@@ -27,10 +26,8 @@ copy_file_to_str(CopyFileType copy_file_type) {
 }
 
 struct TableName {
-    char* schema_name_ptr_{nullptr};
-    char* table_name_ptr_{nullptr};
+    char *schema_name_ptr_{nullptr};
+    char *table_name_ptr_{nullptr};
 };
 
-}
-
-
+} // namespace infinity

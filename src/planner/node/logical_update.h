@@ -8,8 +8,6 @@
 
 namespace infinity {
 
-class LogicalUpdate : public LogicalNode {
+class LogicalUpdate : public LogicalNode {};
 
-};
-
-}
+} // namespace infinity

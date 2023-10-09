@@ -14,9 +14,8 @@ namespace infinity {
 
 struct UuidTryCastToVarlen;
 
-inline static BoundCastFunc
-BindUuidCast(DataType& target) {
-    switch(target.type()) {
+inline static BoundCastFunc BindUuidCast(DataType &target) {
+    switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<UuidT, VarcharT, UuidTryCastToVarlen>);
         }
@@ -27,21 +26,17 @@ BindUuidCast(DataType& target) {
 }
 
 struct UuidTryCastToVarlen {
-    template<typename SourceType, typename TargetType>
-    static inline bool
-    Run(const SourceType& source, TargetType& target, const SharedPtr<ColumnVector>& vector_ptr) {
-        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
-                      + " to " + DataType::TypeToString<TargetType>());
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
     }
 };
 
-template<>
-inline bool
-UuidTryCastToVarlen::Run(const UuidT& source, VarcharT& target, const SharedPtr<ColumnVector>& vector_ptr) {
+template <>
+inline bool UuidTryCastToVarlen::Run(const UuidT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     target.length = UuidT::LENGTH;
     memcpy(target.prefix, source.body, VarcharT::PREFIX_LENGTH);
-    TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-               "Varchar column vector should use MemoryVectorBuffer. ");
+    TypeAssert(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap, "Varchar column vector should use MemoryVectorBuffer. ");
 
     ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
     memcpy(ptr, source.body, target.length);
@@ -50,4 +45,4 @@ UuidTryCastToVarlen::Run(const UuidT& source, VarcharT& target, const SharedPtr<
     return true;
 }
 
-}
+} // namespace infinity

@@ -20,21 +20,17 @@ enum class SubqueryType {
 
 class SubqueryExpr final : public ParsedExpr {
 public:
-    explicit
-    SubqueryExpr() : ParsedExpr(ParsedExprType::kSubquery) {}
+    explicit SubqueryExpr() : ParsedExpr(ParsedExprType::kSubquery) {}
 
     ~SubqueryExpr() final;
 
-    [[nodiscard]] String
-    ToString() const override;
+    [[nodiscard]] String ToString() const override;
 
 public:
     SubqueryType subquery_type_{SubqueryType::kScalar};
 
-    ParsedExpr* left_{nullptr};
-    SelectStatement* select_{nullptr};
+    ParsedExpr *left_{nullptr};
+    SelectStatement *select_{nullptr};
 };
 
-}
-
-
+} // namespace infinity

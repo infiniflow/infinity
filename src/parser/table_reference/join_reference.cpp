@@ -8,37 +8,32 @@
 namespace infinity {
 
 JoinReference::~JoinReference() {
-    if(left_ != nullptr) {
+    if (left_ != nullptr) {
         delete (left_);
         left_ = nullptr;
     }
-    if(right_ != nullptr) {
+    if (right_ != nullptr) {
         delete (right_);
         right_ = nullptr;
     }
 
-    if(condition_ != nullptr) {
+    if (condition_ != nullptr) {
         delete (condition_);
         condition_ = nullptr;
     }
 
-    if(using_columns_ != nullptr) {
-        for(auto column_ptr: *using_columns_) {
+    if (using_columns_ != nullptr) {
+        for (auto column_ptr : *using_columns_) {
             free(column_ptr);
         }
         delete using_columns_;
     }
-
 }
 
-String
-JoinReference::ToString() {
-    return "Join";
-}
+String JoinReference::ToString() { return "Join"; }
 
-String
-ToString(JoinType type) {
-    switch(type) {
+String ToString(JoinType type) {
+    switch (type) {
         case JoinType::kInner:
             return "INNER JOIN";
         case JoinType::kLeft:
@@ -61,4 +56,4 @@ ToString(JoinType type) {
     PlannerError("Unreachable");
 }
 
-};
+}; // namespace infinity

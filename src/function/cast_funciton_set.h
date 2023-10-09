@@ -11,8 +11,4 @@ public:
 private:
 };
 
-}
-
-
-
-
+} // namespace infinity

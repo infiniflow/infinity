@@ -7,11 +7,10 @@
 
 namespace infinity {
 
-String
-CreateSchemaInfo::ToString() const {
+String CreateSchemaInfo::ToString() const {
     std::stringstream ss;
     ss << "CREATE SCHEMA: " << schema_name_;
-    if(this->conflict_type_ == ConflictType::kIgnore) {
+    if (this->conflict_type_ == ConflictType::kIgnore) {
         ss << " IgnoreIfNotExists";
     } else {
         ss << " ThrowErrorIfNotExists";
@@ -19,4 +18,4 @@ CreateSchemaInfo::ToString() const {
     return ss.str();
 }
 
-}
+} // namespace infinity

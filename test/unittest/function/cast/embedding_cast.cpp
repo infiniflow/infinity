@@ -2,26 +2,23 @@
 // Created by jinhai on 22-12-24.
 //
 
-#include <gtest/gtest.h>
+#include "function/cast/embedding_cast.h"
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
-#include "function/cast/embedding_cast.h"
-
+#include <gtest/gtest.h>
 
 class EmbeddingCastTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -29,44 +26,44 @@ class EmbeddingCastTest : public BaseTest {
     }
 };
 
-//TEST_F(EmbeddingCastTest, uuid_cast0) {
-//    using namespace infinity;
+// TEST_F(EmbeddingCastTest, uuid_cast0) {
+//     using namespace infinity;
 //
-//    // Try to cast uuid type to wrong type.
-//    {
-//        auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-//        DataType source_data_type(LogicalType::kEmbedding, embedding_info);
+//     // Try to cast uuid type to wrong type.
+//     {
+//         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
+//         DataType source_data_type(LogicalType::kEmbedding, embedding_info);
 //
-//        EmbeddingT source = EmbeddingType(EmbeddingDataType::kElemFloat, 16);
-//        for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
-//            ((float*)(source.ptr))[j] = static_cast<float>(j) + 0.5f;
-//        }
+//         EmbeddingT source = EmbeddingType(EmbeddingDataType::kElemFloat, 16);
+//         for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
+//             ((float*)(source.ptr))[j] = static_cast<float>(j) + 0.5f;
+//         }
 //
-//        TinyIntT target;
-//        DataType target_data_type(LogicalType::kTinyInt);
-//        EXPECT_THROW(EmbeddingTryCastToVarlen::Run(source, source_data_type, target, target_data_type, nullptr), FunctionException);
-//    }
-//    {
-//        auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-//        DataType source_data_type(LogicalType::kEmbedding, embedding_info);
+//         TinyIntT target;
+//         DataType target_data_type(LogicalType::kTinyInt);
+//         EXPECT_THROW(EmbeddingTryCastToVarlen::Run(source, source_data_type, target, target_data_type, nullptr), FunctionException);
+//     }
+//     {
+//         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
+//         DataType source_data_type(LogicalType::kEmbedding, embedding_info);
 //
-//        EmbeddingT source = EmbeddingType(EmbeddingDataType::kElemFloat, 16);
-//        for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
-//            ((float*)(source.ptr))[j] = static_cast<float>(j) + 0.5f;
-//        }
+//         EmbeddingT source = EmbeddingType(EmbeddingDataType::kElemFloat, 16);
+//         for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
+//             ((float*)(source.ptr))[j] = static_cast<float>(j) + 0.5f;
+//         }
 //
-//        VarcharT target;
+//         VarcharT target;
 //
-//        DataType target_data_type(LogicalType::kVarchar);
+//         DataType target_data_type(LogicalType::kVarchar);
 //
-//        ColumnVector col_varchar(target_data_type);
-//        col_varchar.Initialize();
+//         ColumnVector col_varchar(target_data_type);
+//         col_varchar.Initialize();
 //
-//        EXPECT_TRUE(EmbeddingTryCastToVarlen::Run(source, source_data_type, target, target_data_type, &col_varchar));
+//         EXPECT_TRUE(EmbeddingTryCastToVarlen::Run(source, source_data_type, target, target_data_type, &col_varchar));
 //
-//        target.Reset(false);
-//    }
-//}
+//         target.Reset(false);
+//     }
+// }
 
 TEST_F(EmbeddingCastTest, embedding_cast1) {
     using namespace infinity;
@@ -82,19 +79,19 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
     ColumnVector col_source(source_type);
     col_source.Initialize();
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
-        for(i64 j = 0; j < embedding_info->Dimension(); ++j) {
-            ((float*)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
+        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+            ((float *)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         col_source.AppendValue(v);
         v.value_.embedding.Reset();
     }
 
-    for(i64 i = 0; i < 1; ++i) {
+    for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
-        for(i64 j = 0; j < embedding_info->Dimension(); ++j) {
-            ((float*)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
+        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+            ((float *)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
 
         Value vx = col_source.GetValue(i);
@@ -102,8 +99,8 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
         EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kEmbedding);
         EXPECT_EQ(vx.type().type_info()->Size(), 64);
 
-        for(i64 j = 0; j < embedding_info->Dimension(); ++j) {
-            EXPECT_FLOAT_EQ(((float*)(vx.value_.embedding.ptr))[j], ((float*)(v.value_.embedding.ptr))[j]);
+        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+            EXPECT_FLOAT_EQ(((float *)(vx.value_.embedding.ptr))[j], ((float *)(v.value_.embedding.ptr))[j]);
         }
 
         v.value_.embedding.Reset();

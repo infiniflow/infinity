@@ -6,13 +6,12 @@
 
 namespace infinity {
 
-void
-HashTable::Init(const Vector<DataType>& types) {
+void HashTable::Init(const Vector<DataType> &types) {
     types_ = types;
     SizeT type_count = types.size();
-    for(SizeT idx = 0; idx < type_count; ++idx) {
-        const DataType& data_type = types[idx];
-        switch(data_type.type()) {
+    for (SizeT idx = 0; idx < type_count; ++idx) {
+        const DataType &data_type = types[idx];
+        switch (data_type.type()) {
             case kBoolean:
             case kTinyInt:
             case kSmallInt:
@@ -60,31 +59,30 @@ HashTable::Init(const Vector<DataType>& types) {
     key_size_ += type_count;
 }
 
-void
-HashTable::Append(const Vector<SharedPtr<ColumnVector>>& columns, SizeT block_id, SizeT row_count) {
+void HashTable::Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT block_id, SizeT row_count) {
     UniquePtr<char[]> hash_key = MakeUnique<char[]>(key_size_);
     SizeT column_count = columns.size();
-    for(SizeT row_id = 0; row_id < row_count; ++row_id) {
+    for (SizeT row_id = 0; row_id < row_count; ++row_id) {
         memset(hash_key.get(), 0, key_size_);
         SizeT offset = 0;
 
-        for(SizeT column_id = 0; column_id < column_count; ++column_id) {
-            char* target_ptr = hash_key.get() + offset;
-            if(!columns[column_id]->nulls_ptr_->IsTrue(row_id)) {
+        for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+            char *target_ptr = hash_key.get() + offset;
+            if (!columns[column_id]->nulls_ptr_->IsTrue(row_id)) {
                 *(target_ptr) = '\0';
                 offset += 2;
                 continue;
             }
 
-            DataType& data_type = types_[column_id];
-            if(data_type.type() == kMixed) {
+            DataType &data_type = types_[column_id];
+            if (data_type.type() == kMixed) {
                 // Only float/boolean/integer/string can be built as hash key. Array/Tuple will be treated as null
                 ExecutorError("Attempt to construct hash key for heterogeneous type")
             }
 
-            if(data_type.type() == kVarchar) {
-                VarcharT* vchar_ptr = &((VarcharT*)(columns[column_id]->data_ptr_))[row_id];
-                if(vchar_ptr->IsInlined()) {
+            if (data_type.type() == kVarchar) {
+                VarcharT *vchar_ptr = &((VarcharT *)(columns[column_id]->data_ptr_))[row_id];
+                if (vchar_ptr->IsInlined()) {
                     memcpy(target_ptr, vchar_ptr->prefix, vchar_ptr->length);
                 } else {
                     memcpy(target_ptr, vchar_ptr->ptr, vchar_ptr->length);
@@ -102,4 +100,4 @@ HashTable::Append(const Vector<SharedPtr<ColumnVector>>& columns, SizeT block_id
     }
 }
 
-}
+} // namespace infinity

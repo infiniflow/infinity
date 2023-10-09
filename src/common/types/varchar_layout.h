@@ -2,11 +2,10 @@
 
 #include "common/types/data_type.h"
 
-
 namespace infinity {
 // TODO shenyushi: Is this file in an appropriate location?
 
-#pragma pack (1)
+#pragma pack(1)
 
 struct VarcharLayout {
     u16 length_{};
@@ -35,6 +34,6 @@ struct VarcharLayout {
 
 static_assert(sizeof(VarcharLayout) == sizeof(VarcharT));
 
-#pragma pack ()
+#pragma pack()
 
-}
+} // namespace infinity

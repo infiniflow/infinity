@@ -4,19 +4,16 @@
 
 #pragma once
 
-
-#include "common/types/data_type.h"
 #include "common/column_vector/column_vector.h"
+#include "common/types/data_type.h"
 
 namespace infinity {
 
 class HashTable {
 public:
-    void
-    Init(const Vector<DataType>& types);
+    void Init(const Vector<DataType> &types);
 
-    void
-    Append(const Vector<SharedPtr<ColumnVector>>& columns, SizeT block_id, SizeT row_count);
+    void Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT block_id, SizeT row_count);
 
 public:
     Vector<DataType> types_{};
@@ -26,4 +23,4 @@ public:
     HashMap<String, HashMap<SizeT, Vector<SizeT>>> hash_table_{};
 };
 
-}
+} // namespace infinity

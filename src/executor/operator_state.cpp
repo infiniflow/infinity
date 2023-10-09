@@ -3,3 +3,15 @@
 //
 
 #include "operator_state.h"
+
+namespace infinity {
+
+void QueueSourceState::PushData(DataBlock *input_data_block) {
+    next_input_state_->input_data_block_ = input_data_block;
+    ++next_input_state_->received_data_count_;
+    if (next_input_state_->received_data_count_ >= next_input_state_->total_data_count_) {
+        complete_ = true;
+    }
+}
+
+} // namespace infinity

@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "main/profiler/base_profiler.h"
 #include "magic_enum.hpp"
+#include "main/profiler/base_profiler.h"
 
 #include <string>
 #include <vector>
@@ -24,14 +24,11 @@ enum class QueryPhase : size_t {
 
 class OptimizerProfiler {
 public:
-    void
-    StartRule(const std::string& rule_name);
+    void StartRule(const std::string &rule_name);
 
-    void
-    StopRule();
+    void StopRule();
 
-    [[nodiscard]] std::string
-    ToString(size_t intent = 0) const;
+    [[nodiscard]] std::string ToString(size_t intent = 0) const;
 
 private:
     std::vector<BaseProfiler> profilers_;
@@ -39,20 +36,15 @@ private:
 
 class QueryProfiler {
 public:
-    void
-    StartPhase(QueryPhase phase);
+    void StartPhase(QueryPhase phase);
 
-    void
-    StopPhase(QueryPhase phase);
+    void StopPhase(QueryPhase phase);
 
-    OptimizerProfiler&
-    optimizer() { return optimizer_; }
+    OptimizerProfiler &optimizer() { return optimizer_; }
 
-    [[nodiscard]] std::string
-    ToString() const;
+    [[nodiscard]] std::string ToString() const;
 
-    static std::string
-    QueryPhaseToString(QueryPhase phase);
+    static std::string QueryPhaseToString(QueryPhase phase);
 
 private:
     std::vector<BaseProfiler> profilers_{magic_enum::enum_integer(QueryPhase::kInvalid)};
@@ -60,4 +52,4 @@ private:
     QueryPhase current_phase_{QueryPhase::kInvalid};
 };
 
-}
+} // namespace infinity

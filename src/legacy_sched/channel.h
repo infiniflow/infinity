@@ -1,7 +1,7 @@
 #pragma once
 
-#include "pipeline_task.h"
 #include "common/utility/mpsc_queue.h"
+#include "pipeline_task.h"
 
 #include <cstdint>
 
@@ -12,20 +12,15 @@ public:
 
     ~Channel() noexcept = default;
 
-    [[nodiscard]] std::uint16_t
-    ID() const {
-        return id_;
-    }
+    [[nodiscard]] std::uint16_t ID() const { return id_; }
 
-    void
-    Put(PipelineTaskPtr task);
+    void Put(PipelineTaskPtr task);
 
-    PipelineTaskPtr
-    Take();
+    PipelineTaskPtr Take();
 
 private:
     const std::uint16_t id_;
 
     MPSCQueue<PipelineTaskPtr> queue_;
 };
-}
+} // namespace infinity

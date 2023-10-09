@@ -4,7 +4,4 @@
 
 #include "view.h"
 
-
-namespace infinity {
-
-}
+namespace infinity {}

@@ -9,7 +9,6 @@
 
 namespace infinity {
 
-void
-RegisterFirstFunction(const UniquePtr<NewCatalog>& catalog_ptr);
+void RegisterFirstFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

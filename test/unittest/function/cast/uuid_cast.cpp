@@ -2,26 +2,23 @@
 // Created by jinhai on 22-12-24.
 //
 
-#include <gtest/gtest.h>
+#include "function/cast/uuid_cast.h"
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
-#include "function/cast/uuid_cast.h"
-
+#include <gtest/gtest.h>
 
 class UuidCastTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -48,7 +45,6 @@ TEST_F(UuidCastTest, uuid_cast0) {
         source.Set(uuid_str);
         VarcharT target;
 
-
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
@@ -72,14 +68,14 @@ TEST_F(UuidCastTest, uuid_cast1) {
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kUuid);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
         Value v = Value::MakeUuid(uuid);
         col_source->AppendValue(v);
     }
-    for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
         Value vx = col_source->GetValue(i);
@@ -98,7 +94,7 @@ TEST_F(UuidCastTest, uuid_cast1) {
         CastParameters cast_parameters;
         EXPECT_TRUE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters));
 
-        for(i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             String s('a' + i % 26, 16);
             UuidT uuid(s.c_str());
             String uuid_str(uuid.body, 16);

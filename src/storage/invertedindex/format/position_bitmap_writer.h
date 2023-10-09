@@ -9,29 +9,21 @@ namespace infinity {
 
 class PositionBitmapWriter {
 public:
-    PositionBitmapWriter(MemoryPool* pool)
-        : bitmap_(1, false, pool) {
-    }
+    PositionBitmapWriter(MemoryPool *pool) : bitmap_(1, false, pool) {}
 
     virtual ~PositionBitmapWriter() = default;
 
-    virtual void
-    Set(uint32_t index);
+    virtual void Set(uint32_t index);
 
-    virtual void
-    Resize(uint32_t size);
+    virtual void Resize(uint32_t size);
 
-    virtual void
-    EndDocument(uint32_t df, uint32_t total_pos_count);
+    virtual void EndDocument(uint32_t df, uint32_t total_pos_count);
 
-    virtual uint32_t
-    GetDumpLength(uint32_t bit_count) const;
+    virtual uint32_t GetDumpLength(uint32_t bit_count) const;
 
-    virtual void
-    Dump(const std::shared_ptr<FileWriter>& file, uint32_t bit_count);
+    virtual void Dump(const std::shared_ptr<FileWriter> &file, uint32_t bit_count);
 
-    const DynamicBitmap&
-    GetBitmap() const { return bitmap_; }
+    const DynamicBitmap &GetBitmap() const { return bitmap_; }
 
 private:
     // represent positions as bitmap.
@@ -41,4 +33,4 @@ private:
     std::vector<uint32_t> block_offsets_;
 };
 
-}// namespace infinity
+} // namespace infinity

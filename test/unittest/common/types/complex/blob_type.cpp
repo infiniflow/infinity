@@ -2,23 +2,21 @@
 // Created by JinHai on 2022/11/16.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class BlobTypeTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -35,7 +33,7 @@ TEST_F(BlobTypeTest, blob1) {
     auto blob_ptr = new char[SIZE]{0};
     GlobalResourceUsage::IncrRawMemCount();
 
-    for(i64 i = 0; i < SIZE; ++i) {
+    for (i64 i = 0; i < SIZE; ++i) {
         blob_ptr[i] = 'a' + static_cast<char_t>(i);
     }
     blob_ptr[SIZE - 1] = 0;
@@ -87,7 +85,7 @@ TEST_F(BlobTypeTest, blob1) {
     blob_ptr = new char[SIZE]{0};
     GlobalResourceUsage::IncrRawMemCount();
 
-    for(i64 i = 0; i < SIZE; ++i) {
+    for (i64 i = 0; i < SIZE; ++i) {
         blob_ptr[i] = 'a' + static_cast<char_t>(i);
     }
     blob_ptr[SIZE - 1] = 0;

@@ -12,11 +12,7 @@ namespace infinity {
 class LogicalCreateCollection : public LogicalNode {
 public:
     static inline SharedPtr<LogicalCreateCollection>
-    Make(u64 node_id,
-         const SharedPtr<String>& schema_name,
-         const SharedPtr<String>& collection_name,
-         u64 table_index,
-         ConflictType conflict_type) {
+    Make(u64 node_id, const SharedPtr<String> &schema_name, const SharedPtr<String> &collection_name, u64 table_index, ConflictType conflict_type) {
         return MakeShared<LogicalCreateCollection>(node_id, schema_name, collection_name, table_index, conflict_type);
     }
 
@@ -26,58 +22,34 @@ public:
                             SharedPtr<String> collection_name_,
                             u64 table_index,
                             ConflictType conflict_type)
-            : LogicalNode(node_id, LogicalNodeType::kCreateCollection),
-              schema_name_(std::move(schema_name)),
-              collection_name_(std::move(collection_name_)),
-              table_index_(table_index),
-              conflict_type_(conflict_type) {}
+        : LogicalNode(node_id, LogicalNodeType::kCreateCollection), schema_name_(std::move(schema_name)),
+          collection_name_(std::move(collection_name_)), table_index_(table_index), conflict_type_(conflict_type) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding>
-    GetColumnBindings() const final {
-        return {};
-    }
+    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return {}; }
 
-    [[nodiscard]] inline SharedPtr<Vector<String>>
-    GetOutputNames() const final {
+    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final {
         SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
         result->emplace_back("OK");
         return result;
     }
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const final {
+    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final {
         SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
         result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
         return result_type;
     }
 
-    String
-    ToString(i64& space) final;
+    String ToString(i64 &space) final;
 
-    inline String
-    name() final {
-        return "LogicalCreateCollection";
-    }
+    inline String name() final { return "LogicalCreateCollection"; }
 
-    [[nodiscard]] inline SharedPtr<String>
-    collection_name() const {
-        return collection_name_;
-    }
+    [[nodiscard]] inline SharedPtr<String> collection_name() const { return collection_name_; }
 
-    [[nodiscard]] inline SharedPtr<String>
-    schema_name() const {
-        return schema_name_;
-    }
+    [[nodiscard]] inline SharedPtr<String> schema_name() const { return schema_name_; }
 
-    [[nodiscard]] inline u64
-    table_index() const {
-        return table_index_;
-    }
+    [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline ConflictType
-    conflict_type() const {
-        return conflict_type_;
-    }
+    [[nodiscard]] inline ConflictType conflict_type() const { return conflict_type_; }
 
 private:
     SharedPtr<String> schema_name_{};
@@ -86,5 +58,4 @@ private:
     ConflictType conflict_type_{ConflictType::kInvalid};
 };
 
-}
-
+} // namespace infinity

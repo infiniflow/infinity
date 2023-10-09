@@ -5,8 +5,8 @@
 #pragma once
 
 #include "common/types/alias/containers.h"
-#include "main/logger.h"
 #include "common/utility/infinity_assert.h"
+#include "main/logger.h"
 #include "parser/parsed_expr/parsed_expr.h"
 
 namespace infinity {
@@ -15,8 +15,8 @@ class TableAlias {
 public:
     ~TableAlias();
 
-    char* alias_{};
-    Vector<String>* column_alias_array_{nullptr};
+    char *alias_{};
+    Vector<String> *column_alias_array_{nullptr};
 };
 
 enum class TableRefType {
@@ -29,18 +29,14 @@ enum class TableRefType {
 
 class BaseTableReference {
 public:
-    explicit
-    BaseTableReference(TableRefType type) : type_(type) {}
+    explicit BaseTableReference(TableRefType type) : type_(type) {}
 
-    virtual
-    ~BaseTableReference();
+    virtual ~BaseTableReference();
 
-    virtual String
-    ToString() = 0;
+    virtual String ToString() = 0;
 
     TableRefType type_{TableRefType::kTable};
-    TableAlias* alias_{nullptr};
+    TableAlias *alias_{nullptr};
 };
 
-}
-
+} // namespace infinity

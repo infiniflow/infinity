@@ -6,9 +6,8 @@
 
 #include <utility>
 
-
-#include "storage/data_block.h"
 #include "src/storage/meta/entry/data_access_state.h"
+#include "storage/data_block.h"
 #include "storage/meta/entry/table_collection_entry.h"
 
 namespace infinity {
@@ -17,30 +16,22 @@ class Txn;
 
 class TxnTableStore {
 public:
-    explicit
-    TxnTableStore(String table_name, TableCollectionEntry* table_entry, Txn* txn)
-            : table_name_(std::move(table_name)), table_entry_(table_entry), txn_(txn) {}
+    explicit TxnTableStore(String table_name, TableCollectionEntry *table_entry, Txn *txn)
+        : table_name_(std::move(table_name)), table_entry_(table_entry), txn_(txn) {}
 
-    UniquePtr<String>
-    Append(const SharedPtr<DataBlock>& input_block);
+    UniquePtr<String> Append(const SharedPtr<DataBlock> &input_block);
 
-    UniquePtr<String>
-    Import(const SharedPtr<SegmentEntry>& segment);
+    UniquePtr<String> Import(const SharedPtr<SegmentEntry> &segment);
 
-    UniquePtr<String>
-    Delete(const Vector<RowID>& row_ids);
+    UniquePtr<String> Delete(const Vector<RowID> &row_ids);
 
-    void
-    Scan(SharedPtr<DataBlock>& output_block);
+    void Scan(SharedPtr<DataBlock> &output_block);
 
-    void
-    Rollback();
+    void Rollback();
 
-    void
-    PrepareCommit();
+    void PrepareCommit();
 
-    void
-    Commit();
+    void Commit();
 
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};
@@ -50,8 +41,8 @@ public:
     SizeT current_block_id_{0};
 
     String table_name_{};
-    TableCollectionEntry* table_entry_{};
-    Txn* txn_{};
+    TableCollectionEntry *table_entry_{};
+    Txn *txn_{};
 };
 
-}
+} // namespace infinity

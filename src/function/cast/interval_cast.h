@@ -13,9 +13,8 @@ namespace infinity {
 
 struct IntervalTryCastToVarlen;
 
-inline static BoundCastFunc
-BindTimeCast(DataType& target) {
-    switch(target.type()) {
+inline static BoundCastFunc BindTimeCast(DataType &target) {
+    switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<IntervalT, VarcharT, IntervalTryCastToVarlen>);
         }
@@ -26,18 +25,15 @@ BindTimeCast(DataType& target) {
 }
 
 struct IntervalTryCastToVarlen {
-    template<typename SourceType, typename TargetType>
-    static inline bool
-    Run(SourceType source, TargetType& target, const SharedPtr<ColumnVector>& vector_ptr) {
-        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>()
-                      + " to " + DataType::TypeToString<TargetType>());
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
     }
 };
 
-template<>
-inline bool
-IntervalTryCastToVarlen::Run(IntervalT source, VarcharType& target, const SharedPtr<ColumnVector>& vector_ptr) {
+template <>
+inline bool IntervalTryCastToVarlen::Run(IntervalT source, VarcharType &target, const SharedPtr<ColumnVector> &vector_ptr) {
     NotImplementError("Not implemented");
 }
 
-}
+} // namespace infinity

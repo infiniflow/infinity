@@ -17,25 +17,17 @@ enum class ConjunctionType {
 class ConjunctionExpression : public BaseExpression {
 public:
     ConjunctionExpression(ConjunctionType conjunction_type,
-                          const SharedPtr<BaseExpression>& left_operand,
-                          const SharedPtr<BaseExpression>& right_operand);
+                          const SharedPtr<BaseExpression> &left_operand,
+                          const SharedPtr<BaseExpression> &right_operand);
 
-    inline DataType
-    Type() const override {
-        return DataType{LogicalType::kBoolean};
-    }
+    inline DataType Type() const override { return DataType{LogicalType::kBoolean}; }
 
-    String
-    ToString() const override;
+    String ToString() const override;
 
-    ConjunctionType
-    conjunction_type() const {
-        return conjunction_type_;
-    }
+    ConjunctionType conjunction_type() const { return conjunction_type_; }
 
 private:
     ConjunctionType conjunction_type_{ConjunctionType::kInvalid};
 };
 
-
-}
+} // namespace infinity

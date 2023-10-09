@@ -7,13 +7,13 @@
 namespace infinity {
 
 InExpr::~InExpr() {
-    if(left_ != nullptr) {
+    if (left_ != nullptr) {
         delete left_;
         left_ = nullptr;
     }
 
-    if(arguments_ != nullptr) {
-        for(auto& expr_ptr: *arguments_) {
+    if (arguments_ != nullptr) {
+        for (auto &expr_ptr : *arguments_) {
             delete expr_ptr;
         }
         delete arguments_;
@@ -21,17 +21,16 @@ InExpr::~InExpr() {
     }
 }
 
-String
-InExpr::ToString() const {
+String InExpr::ToString() const {
     std::stringstream ss;
     ss << left_->ToString();
-    if(not_in_) {
+    if (not_in_) {
         ss << "NOT IN (";
     } else {
         ss << "IN (";
     }
-    if(arguments_ != nullptr) {
-        for(ParsedExpr* expr_ptr: *arguments_) {
+    if (arguments_ != nullptr) {
+        for (ParsedExpr *expr_ptr : *arguments_) {
             ss << expr_ptr->ToString();
         }
     }
@@ -39,4 +38,4 @@ InExpr::ToString() const {
     return ss.str();
 }
 
-}
+} // namespace infinity

@@ -6,35 +6,26 @@
 
 #include "function.h"
 #include "function_data.h"
-#include "storage/data_block.h"
 #include "main/query_context.h"
+#include "storage/data_block.h"
 
 namespace infinity {
 
 class TableFunctionData : public FunctionData {
 public:
-
 };
 
-using TableFunctionType
-        = std::function<void(QueryContext* query_context, TableFunctionData* data, DataBlock& output)>;
-
+using TableFunctionType = std::function<void(QueryContext *query_context, TableFunctionData *data, DataBlock &output)>;
 
 class TableFunction : public Function {
 public:
-    explicit
-    TableFunction(String name,
-                  Vector<LogicalType> argument_types,
-                  TableFunctionType function
-    );
+    explicit TableFunction(String name, Vector<LogicalType> argument_types, TableFunctionType function);
 
-    [[nodiscard]] String
-    ToString() const override;
+    [[nodiscard]] String ToString() const override;
 
     TableFunctionType main_function_;
 
 private:
     Vector<LogicalType> parameter_types_;
 };
-}
-
+} // namespace infinity

@@ -2,23 +2,21 @@
 // Created by JinHai on 2022/11/14.
 //
 
-#include <gtest/gtest.h>
 #include "base_test.h"
 #include "common/types/value.h"
+#include "main/infinity.h"
 #include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
-#include "main/infinity.h"
+#include <gtest/gtest.h>
 
 class PathTypeTest : public BaseTest {
-    void
-    SetUp() override {
+    void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -35,7 +33,6 @@ TEST_F(PathTypeTest, path1) {
     EXPECT_THROW(path1.GetPoint(0), TypeException);
     EXPECT_THROW(path1.SetPoint(0, PointT(1.0, 2.1)), TypeException);
 
-
     path1.Initialize(2);
     EXPECT_THROW(path1.Initialize(0), TypeException);
     path1.SetPoint(0, PointT(1.0, 2.1));
@@ -45,7 +42,7 @@ TEST_F(PathTypeTest, path1) {
 
     EXPECT_EQ(path1.GetPoint(0).x, PointT(1.0, 2.1).x);
     EXPECT_EQ(path1.GetPoint(0).y, PointT(1.0, 2.1).y);
-//    path1.SetPointCount(2);
+    //    path1.SetPointCount(2);
     EXPECT_EQ(path1.GetPoint(1).x, PointT(1.1, 2.2).x);
     EXPECT_EQ(path1.GetPoint(1).y, PointT(1.1, 2.2).y);
     path1.Reset();

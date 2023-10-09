@@ -6,9 +6,6 @@
 
 namespace infinity {
 
-String
-FlushStatement::ToString() const {
-    return "flush statement";
-}
+String FlushStatement::ToString() const { return "flush statement"; }
 
-}
+} // namespace infinity

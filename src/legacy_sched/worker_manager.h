@@ -1,7 +1,7 @@
 #pragma once
 
-#include "worker.h"
 #include "common/utility/topology.h"
+#include "worker.h"
 
 #include <array>
 
@@ -13,31 +13,24 @@ public:
 
     ~WorkerManager();
 
-    void
-    CreateWorkers(std::uint16_t max_cores);
+    void CreateWorkers(std::uint16_t max_cores);
 
-    void
-    Start();
+    void Start();
 
-    Worker*
-    GetLeastLoadedWorker() const;
+    Worker *GetLeastLoadedWorker() const;
 
-    Worker*
-    GetMostLoadedWorker() const;
+    Worker *GetMostLoadedWorker() const;
 
-    Worker*
-    GetWorker(std::uint16_t worker_id) const;
+    Worker *GetWorker(std::uint16_t worker_id) const;
 
-    const std::size_t
-    GetNumWorkers() const {
-        return max_cores_;
-    }
+    const std::size_t GetNumWorkers() const { return max_cores_; }
+
 private:
     std::uint16_t max_cores_;
 
     Topology cpu_topology_;
 
-    std::array<Worker*, Topology::MaxCores> workers_;
+    std::array<Worker *, Topology::MaxCores> workers_;
 };
 
-}
+} // namespace infinity

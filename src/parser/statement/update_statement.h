@@ -4,23 +4,22 @@
 
 #pragma once
 
-#include "parser/parsed_expr/parsed_expr.h"
-#include "parser/base_statement.h"
 #include "common/types/alias/containers.h"
+#include "parser/base_statement.h"
+#include "parser/parsed_expr/parsed_expr.h"
 
 namespace infinity {
 
 struct UpdateExpr {
-    inline
-    ~UpdateExpr() {
-        if(value != nullptr) {
+    inline ~UpdateExpr() {
+        if (value != nullptr) {
             delete value;
             value = nullptr;
         }
     }
 
     String column_name;
-    ParsedExpr* value;
+    ParsedExpr *value;
 };
 
 class UpdateStatement final : public BaseStatement {
@@ -29,15 +28,14 @@ public:
 
     ~UpdateStatement() final;
 
-    [[nodiscard]] String
-    ToString() const final;
+    [[nodiscard]] String ToString() const final;
 
     String schema_name_{"default"};
     String table_name_{};
 
-    ParsedExpr* where_expr_{nullptr};
+    ParsedExpr *where_expr_{nullptr};
 
-    Vector<UpdateExpr*>* update_expr_array_{nullptr};
+    Vector<UpdateExpr *> *update_expr_array_{nullptr};
 };
 
-}
+} // namespace infinity

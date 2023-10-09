@@ -5,7 +5,7 @@
 #include "path_type.h"
 
 namespace infinity {
-PathType::PathType(const PathType& other) {
+PathType::PathType(const PathType &other) {
     this->point_count = other.point_count;
     this->closed = other.closed;
 
@@ -15,7 +15,7 @@ PathType::PathType(const PathType& other) {
     memcpy(this->ptr, other.ptr, point_count * sizeof(PointType));
 }
 
-PathType::PathType(PathType&& other) noexcept {
+PathType::PathType(PathType &&other) noexcept {
     this->point_count = other.point_count;
     this->closed = other.closed;
     this->ptr = other.ptr;
@@ -23,28 +23,25 @@ PathType::PathType(PathType&& other) noexcept {
     other.point_count = 0;
 }
 
-PathType&
-PathType::operator=(const PathType& other) {
-    if(this == &other)
+PathType &PathType::operator=(const PathType &other) {
+    if (this == &other)
         return *this;
-    if(point_count != other.point_count) {
+    if (point_count != other.point_count) {
         this->Reset();
         point_count = other.point_count;
 
         ptr = new char_t[point_count * sizeof(PointType)]{0};
         GlobalResourceUsage::IncrRawMemCount();
-
     }
     this->closed = other.closed;
     memcpy(this->ptr, other.ptr, point_count * sizeof(PointType));
     return *this;
 }
 
-PathType&
-PathType::operator=(PathType&& other) noexcept {
-    if(this == &other)
+PathType &PathType::operator=(PathType &&other) noexcept {
+    if (this == &other)
         return *this;
-    if(this->point_count != 0) {
+    if (this->point_count != 0) {
         Reset();
     }
     this->point_count = other.point_count;
@@ -55,4 +52,4 @@ PathType::operator=(PathType&& other) noexcept {
     return *this;
 }
 
-}
+} // namespace infinity

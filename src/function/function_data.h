@@ -6,8 +6,6 @@
 
 namespace infinity {
 
-class FunctionData {
+class FunctionData {};
 
-};
-
-}
+} // namespace infinity

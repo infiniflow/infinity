@@ -3,8 +3,8 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <limits>
 #include <iostream>
+#include <limits>
 
 #if defined(__ARM_NEON)
 #include <arm_neon.h>
@@ -16,20 +16,18 @@
 
 #endif
 
-
 namespace infinity {
 namespace detail {
-template<typename T, typename U>
-T
-bit_cast(const U& u) {
+template <typename T, typename U>
+T bit_cast(const U &u) {
     T t;
-    uint8_t* t_ptr = reinterpret_cast<uint8_t*>(&t);
-    const uint8_t* u_ptr = reinterpret_cast<const uint8_t*>(&u);
-    for(size_t i = 0; i < sizeof(U); i++)
+    uint8_t *t_ptr = reinterpret_cast<uint8_t *>(&t);
+    const uint8_t *u_ptr = reinterpret_cast<const uint8_t *>(&u);
+    for (size_t i = 0; i < sizeof(U); i++)
         t_ptr[i] = u_ptr[i];
     return t;
 }
-}
+} // namespace detail
 
 struct float16_t {
     uint16_t raw;
@@ -38,86 +36,36 @@ struct float16_t {
 
     float16_t() = default;
 
-    float16_t(float f) {
-        (*this) = f;
-    }
+    float16_t(float f) { (*this) = f; }
 
-    float16_t
-    operator+(float16_t h) const {
-        return float16_t(float(*this) + float(h));
-    }
-    float16_t
-    operator-(float16_t h) const {
-        return float16_t(float(*this) - float(h));
-    }
-    float16_t
-    operator*(float16_t h) const {
-        return float16_t(float(*this) * float(h));
-    }
-    float16_t
-    operator/(float16_t h) const {
-        return float16_t(float(*this) / float(h));
-    }
-    float16_t
-    operator-() const {
-        return float16_t(-float(*this));
-    }
+    float16_t operator+(float16_t h) const { return float16_t(float(*this) + float(h)); }
+    float16_t operator-(float16_t h) const { return float16_t(float(*this) - float(h)); }
+    float16_t operator*(float16_t h) const { return float16_t(float(*this) * float(h)); }
+    float16_t operator/(float16_t h) const { return float16_t(float(*this) / float(h)); }
+    float16_t operator-() const { return float16_t(-float(*this)); }
 
-    float16_t&
-    operator+=(float16_t h) {
-        return operator=(*this + h);
-    }
-    float16_t&
-    operator-=(float16_t h) {
-        return operator=(*this - h);
-    }
-    float16_t&
-    operator*=(float16_t h) {
-        return operator=(*this * h);
-    }
-    float16_t&
-    operator/=(float16_t h) {
-        return operator=(*this / h);
-    }
+    float16_t &operator+=(float16_t h) { return operator=(*this + h); }
+    float16_t &operator-=(float16_t h) { return operator=(*this - h); }
+    float16_t &operator*=(float16_t h) { return operator=(*this *h); }
+    float16_t &operator/=(float16_t h) { return operator=(*this / h); }
 
-    bool
-    operator==(float16_t h) const {
-        return float(*this) == float(h);
-    }
-    bool
-    operator!=(float16_t h) const {
-        return float(*this) != float(h);
-    }
-    bool
-    operator<(float16_t h) const {
-        return float(*this) < float(h);
-    }
-    bool
-    operator>(float16_t h) const {
-        return float(*this) > float(h);
-    }
-    bool
-    operator<=(float16_t h) const {
-        return float(*this) <= float(h);
-    }
-    bool
-    operator>=(float16_t h) const {
-        return float(*this) >= float(h);
-    }
+    bool operator==(float16_t h) const { return float(*this) == float(h); }
+    bool operator!=(float16_t h) const { return float(*this) != float(h); }
+    bool operator<(float16_t h) const { return float(*this) < float(h); }
+    bool operator>(float16_t h) const { return float(*this) > float(h); }
+    bool operator<=(float16_t h) const { return float(*this) <= float(h); }
+    bool operator>=(float16_t h) const { return float(*this) >= float(h); }
 
-    friend std::ostream&
-    operator<<(std::ostream& os, const float16_t& h) {
+    friend std::ostream &operator<<(std::ostream &os, const float16_t &h) {
         os << float(h);
         return os;
     }
 
-    float16_t&
-    operator=(float f) {
+    float16_t &operator=(float f) {
 #if defined __F16C__
-        this->raw = (uint16_t)_mm_cvtsi128_si32(
-                _mm_cvtps_ph(_mm_set_ss(f), _MM_FROUND_CUR_DIRECTION));
+        this->raw = (uint16_t)_mm_cvtsi128_si32(_mm_cvtps_ph(_mm_set_ss(f), _MM_FROUND_CUR_DIRECTION));
 #elif defined __ARM_NEON
-        this->raw = memcpy_cast<uint16_t>((__fp16) f);
+        this->raw = memcpy_cast<uint16_t>((__fp16)f);
 #else
         uint32_t i = detail::bit_cast<uint32_t>(f);
         uint32_t s = i >> 31;
@@ -137,7 +85,8 @@ struct float16_t {
         } else if (e == 0xFF) {
             // Preserve inf/nan.
             ee = 0x1F;
-            if (m != 0 && mm == 0) mm = 1;
+            if (m != 0 && mm == 0)
+                mm = 1;
         } else if (eee > 0 && eee < 0x1F) {
             // Normal range. Perform round to even on mantissa.
             ee = eee;
@@ -171,7 +120,7 @@ struct float16_t {
 #if defined __F16C__
         return _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128((int32_t)raw)));
 #elif defined __ARM_NEON
-        return (float) memcpy_cast<__fp16>(raw);
+        return (float)memcpy_cast<__fp16>(raw);
 #else
         uint32_t ss = raw >> 15;
         uint32_t ee = (raw >> 10) & 0x1F;
@@ -201,45 +150,36 @@ struct float16_t {
 #endif
     }
 
-
-    float
-    f() {
-        return (float)(*this);
-    }
+    float f() { return (float)(*this); }
 };
 
-}
+} // namespace infinity
 
 namespace std {
-template<>
+template <>
 struct is_trivial<infinity::float16_t> {
     static const bool value = true;
 };
-template<>
+template <>
 struct is_standard_layout<infinity::float16_t> {
     static const bool value = true;
 };
 
-template<>
+template <>
 struct is_floating_point<infinity::float16_t>
-        : std::integral_constant<
-                bool,
-                std::is_same<
-                        infinity::float16_t,
-                        typename std::remove_cv<infinity::float16_t>::type>::value> {
-};
+    : std::integral_constant<bool, std::is_same<infinity::float16_t, typename std::remove_cv<infinity::float16_t>::type>::value> {};
 
-template<>
+template <>
 struct is_signed<infinity::float16_t> {
     static const bool value = true;
 };
 
-template<>
+template <>
 struct is_unsigned<infinity::float16_t> {
     static const bool value = false;
 };
 
-template<>
+template <>
 struct numeric_limits<infinity::float16_t> {
     static const bool is_specialized = true;
     static const bool is_signed = true;
@@ -265,42 +205,15 @@ struct numeric_limits<infinity::float16_t> {
     static const bool traps = true;
     static const bool tinyness_before = false;
 
-    static infinity::float16_t
-    (min)() {
-        return infinity::float16_t((uint16_t)0x400);
-    }
-    static infinity::float16_t
-    lowest() {
-        return infinity::float16_t((uint16_t)0xfbff);
-    }
-    static infinity::float16_t
-    (max)() {
-        return infinity::float16_t((uint16_t)0x7bff);
-    }
-    static infinity::float16_t
-    epsilon() {
-        return infinity::float16_t((uint16_t)0x1400);
-    }
-    static infinity::float16_t
-    round_error() {
-        return infinity::float16_t(0.5f);
-    }
-    static infinity::float16_t
-    infinity() {
-        return infinity::float16_t((uint16_t)0x7c00);
-    }
-    static infinity::float16_t
-    quiet_NaN() {
-        return infinity::float16_t((uint16_t)0x7e00);
-    }
-    static infinity::float16_t
-    signaling_NaN() {
-        return infinity::float16_t((uint16_t)0x7e00);
-    }
-    static infinity::float16_t
-    denorm_min() {
-        return infinity::float16_t((uint16_t)0x1);
-    }
+    static infinity::float16_t(min)() { return infinity::float16_t((uint16_t)0x400); }
+    static infinity::float16_t lowest() { return infinity::float16_t((uint16_t)0xfbff); }
+    static infinity::float16_t(max)() { return infinity::float16_t((uint16_t)0x7bff); }
+    static infinity::float16_t epsilon() { return infinity::float16_t((uint16_t)0x1400); }
+    static infinity::float16_t round_error() { return infinity::float16_t(0.5f); }
+    static infinity::float16_t infinity() { return infinity::float16_t((uint16_t)0x7c00); }
+    static infinity::float16_t quiet_NaN() { return infinity::float16_t((uint16_t)0x7e00); }
+    static infinity::float16_t signaling_NaN() { return infinity::float16_t((uint16_t)0x7e00); }
+    static infinity::float16_t denorm_min() { return infinity::float16_t((uint16_t)0x1); }
 };
 
-}// namespace std
+} // namespace std

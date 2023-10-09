@@ -5,35 +5,25 @@
 #pragma once
 
 #include "base_expression.h"
-#include "common/types/value.h"
 #include "common/column_vector/column_vector.h"
+#include "common/types/value.h"
 
 namespace infinity {
 
 class ValueExpression : public BaseExpression {
 public:
-    explicit
-    ValueExpression(Value value) : BaseExpression(ExpressionType::kValue, {}), value_(std::move(value)) {}
+    explicit ValueExpression(Value value) : BaseExpression(ExpressionType::kValue, {}), value_(std::move(value)) {}
 
-    String
-    ToString() const override;
+    String ToString() const override;
 
-    inline DataType
-    Type() const override {
-        return value_.type();
-    }
+    inline DataType Type() const override { return value_.type(); }
 
-    inline void
-    AppendToChunk(SharedPtr<ColumnVector>& column_vector) {
-        column_vector->AppendValue(value_);
-    }
+    inline void AppendToChunk(SharedPtr<ColumnVector> &column_vector) { column_vector->AppendValue(value_); }
 
-    const Value&
-    GetValue() const {
-        return value_;
-    }
+    const Value &GetValue() const { return value_; }
+
 private:
     Value value_;
 };
 
-}
+} // namespace infinity

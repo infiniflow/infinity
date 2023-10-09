@@ -10,22 +10,15 @@ namespace infinity {
 
 class OrderBinder : public ExpressionBinder {
 public:
-    static void
-    PushExtraExprToSelectList(ParsedExpr* expr,
-                              const SharedPtr<BindContext>& bind_context_ptr);
+    static void PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<BindContext> &bind_context_ptr);
 
 public:
-    explicit
-    OrderBinder(QueryContext* query_context) : ExpressionBinder(query_context) {}
+    explicit OrderBinder(QueryContext *query_context) : ExpressionBinder(query_context) {}
 
     // Bind expression entry
-    SharedPtr<BaseExpression>
-    BuildExpression(const ParsedExpr& expr,
-                    BindContext* bind_context_ptr,
-                    i64 depth,
-                    bool root) override;
+    SharedPtr<BaseExpression> BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) override;
 
 private:
 };
 
-}
+} // namespace infinity

@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "common/types/alias/strings.h"
 #include "common/types/alias/primitives.h"
+#include "common/types/alias/strings.h"
 #include "json.hpp"
 #include <iostream>
 
@@ -39,38 +39,26 @@ enum class TypeInfoType : u8 {
 
 };
 
-
 class TypeInfo {
 public:
-    explicit
-    TypeInfo(TypeInfoType type) : type_(type) {
-    };
+    explicit TypeInfo(TypeInfoType type) : type_(type){};
 
-    virtual
-    ~TypeInfo() = default;
+    virtual ~TypeInfo() = default;
 
-    virtual bool
-    operator==(const TypeInfo& other) const = 0;
+    virtual bool operator==(const TypeInfo &other) const = 0;
 
-    bool
-    operator!=(const TypeInfo& other) const;
+    bool operator!=(const TypeInfo &other) const;
 
-    [[nodiscard]] virtual size_t
-    Size() const = 0;
+    [[nodiscard]] virtual size_t Size() const = 0;
 
-    [[nodiscard]] inline TypeInfoType
-    type() const noexcept {
-        return type_;
-    }
+    [[nodiscard]] inline TypeInfoType type() const noexcept { return type_; }
 
-    [[nodiscard]] virtual nlohmann::json
-    Serialize() const = 0;
+    [[nodiscard]] virtual nlohmann::json Serialize() const = 0;
 
-    [[nodiscard]] virtual String
-    ToString() const = 0;
+    [[nodiscard]] virtual String ToString() const = 0;
 
 protected:
     TypeInfoType type_{TypeInfoType::kInvalid};
 };
 
-}
+} // namespace infinity

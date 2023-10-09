@@ -8,7 +8,6 @@
 
 namespace infinity {
 
-struct DeleteFileEntry : public BaseEntry {
-};
+struct DeleteFileEntry : public BaseEntry {};
 
-}
+} // namespace infinity

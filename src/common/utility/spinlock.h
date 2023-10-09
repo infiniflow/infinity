@@ -159,85 +159,64 @@ namespace infinity {
  * interfaces.
  */
 class SpinLock {
-    enum : int32_t {
-        READER = 4,
-        UPGRADED = 2,
-        WRITER = 1
-    };
+    enum : int32_t { READER = 4, UPGRADED = 2, WRITER = 1 };
 
 public:
     constexpr SpinLock() : bits_(0) {}
 
-    SpinLock(SpinLock const&) = delete;
+    SpinLock(SpinLock const &) = delete;
 
-    SpinLock&
-    operator=(SpinLock const&) = delete;
+    SpinLock &operator=(SpinLock const &) = delete;
 
     // Lockable Concept
-    void
-    lock() noexcept {
-        while(!try_lock()) {
+    void lock() noexcept {
+        while (!try_lock()) {
             Builtin::pause();
         }
     }
 
     // Writer is responsible for clearing up both the UPGRADED and WRITER bits.
-    void
-    unlock() noexcept {
+    void unlock() noexcept {
         static_assert(READER > WRITER + UPGRADED, "wrong bits!");
         bits_.fetch_and(~(WRITER | UPGRADED), std::memory_order_release);
     }
 
     // SharedLockable Concept
-    void
-    lock_shared() noexcept {
-        while(!try_lock_shared()) {
+    void lock_shared() noexcept {
+        while (!try_lock_shared()) {
             Builtin::pause();
         }
     }
 
-    void
-    unlock_shared() noexcept {
-        bits_.fetch_add(-READER, std::memory_order_release);
-    }
+    void unlock_shared() noexcept { bits_.fetch_add(-READER, std::memory_order_release); }
 
     // Downgrade the lock from writer status to reader status.
-    void
-    unlock_and_lock_shared() noexcept {
+    void unlock_and_lock_shared() noexcept {
         bits_.fetch_add(READER, std::memory_order_acquire);
         unlock();
     }
 
     // UpgradeLockable Concept
-    void
-    lock_upgrade() noexcept {
-        while(!try_lock_upgrade()) {
+    void lock_upgrade() noexcept {
+        while (!try_lock_upgrade()) {
             Builtin::pause();
         }
     }
 
-    void
-    unlock_upgrade() noexcept {
-        bits_.fetch_add(-UPGRADED, std::memory_order_acq_rel);
-    }
+    void unlock_upgrade() noexcept { bits_.fetch_add(-UPGRADED, std::memory_order_acq_rel); }
 
     // unlock upgrade and try to acquire write lock
-    void
-    unlock_upgrade_and_lock() noexcept {
-        while(!try_unlock_upgrade_and_lock()) {
+    void unlock_upgrade_and_lock() noexcept {
+        while (!try_unlock_upgrade_and_lock()) {
             Builtin::pause();
         }
     }
 
     // unlock upgrade and read lock atomically
-    void
-    unlock_upgrade_and_lock_shared() noexcept {
-        bits_.fetch_add(READER - UPGRADED, std::memory_order_acq_rel);
-    }
+    void unlock_upgrade_and_lock_shared() noexcept { bits_.fetch_add(READER - UPGRADED, std::memory_order_acq_rel); }
 
     // write unlock and upgrade lock atomically
-    void
-    unlock_and_lock_upgrade() noexcept {
+    void unlock_and_lock_upgrade() noexcept {
         // need to do it in two steps here -- as the UPGRADED bit might be OR-ed at
         // the same time when other threads are trying do try_lock_upgrade().
         bits_.fetch_or(UPGRADED, std::memory_order_acquire);
@@ -245,8 +224,7 @@ public:
     }
 
     // Attempt to acquire writer permission. Return false if we didn't get it.
-    bool
-    try_lock() noexcept {
+    bool try_lock() noexcept {
         int32_t expect = 0;
         return bits_.compare_exchange_strong(expect, WRITER, std::memory_order_acq_rel);
     }
@@ -257,12 +235,11 @@ public:
     // its intention to write and block any new readers while waiting
     // for existing readers to finish and release their read locks. This
     // helps avoid starving writers (promoted from upgraders).
-    bool
-    try_lock_shared() noexcept {
+    bool try_lock_shared() noexcept {
         // fetch_add is considerably (100%) faster than compare_exchange,
         // so here we are optimizing for the common (lock success) case.
         int32_t value = bits_.fetch_add(READER, std::memory_order_acquire);
-        if(value & (WRITER | UPGRADED)) {
+        if (value & (WRITER | UPGRADED)) {
             bits_.fetch_add(-READER, std::memory_order_release);
             return false;
         }
@@ -270,15 +247,13 @@ public:
     }
 
     // try to unlock upgrade and write lock atomically
-    bool
-    try_unlock_upgrade_and_lock() noexcept {
+    bool try_unlock_upgrade_and_lock() noexcept {
         int32_t expect = UPGRADED;
         return bits_.compare_exchange_strong(expect, WRITER, std::memory_order_acq_rel);
     }
 
     // try to acquire an upgradable lock.
-    bool
-    try_lock_upgrade() noexcept {
+    bool try_lock_upgrade() noexcept {
         int32_t value = bits_.fetch_or(UPGRADED, std::memory_order_acquire);
 
         // Note: when failed, we cannot flip the UPGRADED bit back,
@@ -289,10 +264,7 @@ public:
     }
 
     // mainly for debugging purposes.
-    [[nodiscard]] int32_t
-    bits() const noexcept {
-        return bits_.load(std::memory_order_acquire);
-    }
+    [[nodiscard]] int32_t bits() const noexcept { return bits_.load(std::memory_order_acquire); }
 
 private:
     std::atomic<int32_t> bits_;
@@ -300,36 +272,30 @@ private:
 
 class ScopedSpinLock {
 public:
-    explicit ScopedSpinLock(SpinLock& lock) : lock_(lock) { lock_.lock(); }
+    explicit ScopedSpinLock(SpinLock &lock) : lock_(lock) { lock_.lock(); }
 
     ~ScopedSpinLock() { lock_.unlock(); }
 
 private:
-    ScopedSpinLock(const ScopedSpinLock&) = delete;
+    ScopedSpinLock(const ScopedSpinLock &) = delete;
 
-    ScopedSpinLock&
-    operator=(const ScopedSpinLock&) = delete;
+    ScopedSpinLock &operator=(const ScopedSpinLock &) = delete;
 
-    SpinLock& lock_;
+    SpinLock &lock_;
 };
 
 struct ScopedTryLock {
-    ScopedTryLock(SpinLock& lock) : lock_(lock) {
-        locked_ = lock_.try_lock();
-    }
+    ScopedTryLock(SpinLock &lock) : lock_(lock) { locked_ = lock_.try_lock(); }
 
     ~ScopedTryLock() {
-        if(locked_)
+        if (locked_)
             lock_.unlock();
     }
 
-    bool
-    is_locked() const {
-        return locked_;
-    }
+    bool is_locked() const { return locked_; }
 
     bool locked_;
-    SpinLock& lock_;
+    SpinLock &lock_;
 };
 
 } // namespace infinity
