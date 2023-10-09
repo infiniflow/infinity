@@ -4,8 +4,9 @@
 
 #pragma once
 
-#include "storage/meta/entry/db_entry.h"
+#include "storage/common/table_collection_detail.h"
 #include "storage/meta/entry/table_collection_entry.h"
+#include "storage/meta/meta_state.h"
 #include "storage/wal/wal_entry.h"
 #include "txn_context.h"
 #include "txn_store.h"

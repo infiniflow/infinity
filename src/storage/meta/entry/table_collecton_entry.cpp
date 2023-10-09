@@ -4,6 +4,7 @@
 
 #include "main/logger.h"
 #include "storage/index_def/ivfflat_index_def.h"
+#include "storage/meta/table_collection_meta.h"
 #include "storage/txn/txn.h"
 #include "storage/txn/txn_store.h"
 #include "table_collection_entry.h"

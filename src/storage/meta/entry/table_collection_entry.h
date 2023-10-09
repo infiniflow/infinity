@@ -9,7 +9,7 @@
 #include "segment_entry.h"
 #include "storage/common/block_index.h"
 #include "storage/index_def/index_def.h"
-#include "storage/table_def.h"
+#include "storage/meta/entry/data_access_state.h"
 #include "table_collecton_type.h"
 
 namespace infinity {

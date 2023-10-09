@@ -12,6 +12,7 @@
 
 #include "storage/index_def/index_def.h"
 #include "storage/meta/entry/block_entry.h"
+#include "storage/meta/entry/data_access_state.h"
 
 namespace infinity {
 
