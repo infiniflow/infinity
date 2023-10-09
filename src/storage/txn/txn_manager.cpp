@@ -83,7 +83,7 @@ void TxnManager::PutWalEntry(std::shared_ptr<WalEntry> entry) {
         LOG_WARN("TxnManager is not running, cannot put wal entry");
         TransactionError("TxnManager is not running, cannot put wal entry");
     }
-    if(put_wal_entry_ == nullptr)
+    if (put_wal_entry_ == nullptr)
         return;
     std::unique_lock lk(mutex_);
     priority_que_[entry->commit_ts] = entry;
@@ -95,30 +95,26 @@ void TxnManager::PutWalEntry(std::shared_ptr<WalEntry> entry) {
     return;
 }
 
-void TxnManager::Start(){
-        is_running_.store(true, std::memory_order_relaxed);
-    }
+void TxnManager::Start() { is_running_.store(true, std::memory_order_relaxed); }
 
-void TxnManager::Stop(){
-        bool expected = true;
-        bool changed = is_running_.compare_exchange_strong(expected, false);
-        if (!changed)
-            LOG_INFO("TxnManager is already stopped");
-            return;
+void TxnManager::Stop() {
+    bool expected = true;
+    bool changed = is_running_.compare_exchange_strong(expected, false);
+    if (!changed)
+        LOG_INFO("TxnManager is already stopped");
+    return;
 
-        LOG_INFO("TxnManager is stopping...");
-        LOG_INFO("TxnManager is cleaning up...");
-        std::lock_guard guard(mutex_);
-        while(!priority_que_.empty()) {
-            auto it = priority_que_.begin();
-            // When stopping, the priority_que_ rest entries not need to be notify to wal_manager 
-            // because the will not enter to queue of wal_manager
-            priority_que_.erase(it);
-        }
+    LOG_INFO("TxnManager is stopping...");
+    LOG_INFO("TxnManager is cleaning up...");
+    std::lock_guard guard(mutex_);
+    while (!priority_que_.empty()) {
+        auto it = priority_que_.begin();
+        // When stopping, the priority_que_ rest entries not need to be notify to wal_manager
+        // because the will not enter to queue of wal_manager
+        priority_que_.erase(it);
     }
+}
 
-bool TxnManager::Stopped(){
-        return is_running_.load()==false;
-    }
+bool TxnManager::Stopped() { return is_running_.load() == false; }
 
 } // namespace infinity

@@ -52,22 +52,21 @@ void WalManager::Start() {
 void WalManager::Stop() {
     bool expected = true;
     bool changed = running_.compare_exchange_strong(expected, false);
-    if(!changed)
+    if (!changed)
         // Already stopped.
         return;
 
-
     LOG_INFO("WalManager::Stop begin to stop txn manager");
     // Notify txn manager to stop.
-    TxnManager* txn_mgr = storage_->txn_manager();
+    TxnManager *txn_mgr = storage_->txn_manager();
     txn_mgr->Stop();
 
     // pop all the entries in the queue. and notify the condition variable.
     std::lock_guard guard(mutex_);
-    while(!que_.empty()) {
+    while (!que_.empty()) {
         auto wal_entry = que_.front();
-        Txn* txn = txn_mgr->GetTxn(wal_entry->txn_id);
-        if(txn != nullptr) {
+        Txn *txn = txn_mgr->GetTxn(wal_entry->txn_id);
+        if (txn != nullptr) {
             txn->CancelCommitTxnBottom();
         }
         que_.pop();
@@ -164,10 +163,10 @@ void WalManager::Flush() {
             // Check if the wal file is too large.
             try {
                 auto file_size = fs::file_size(wal_path_);
-                if(file_size > kWALFileSizeThreshold) {
+                if (file_size > kWALFileSizeThreshold) {
                     this->SwapWALFile(max_commit_ts);
                 }
-                
+
             } catch (const std::exception &) {
                 LOG_WARN("WalManager::SwapWALFile failed to swap wal file");
             }
@@ -182,10 +181,7 @@ void WalManager::Checkpoint() {
     while (running_.load()) {
         TxnTimeStamp commit_ts_pend = commit_ts_pend_.load();
         if (commit_ts_pend - commit_ts_done_ < 2 ||
-            (checkpoint_ts_ > 0 &&
-             std::chrono::steady_clock::now().time_since_epoch().count() -
-                     checkpoint_ts_ <
-                 20000000000)) {
+            (checkpoint_ts_ > 0 && std::chrono::steady_clock::now().time_since_epoch().count() - checkpoint_ts_ < 20000000000)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
@@ -213,7 +209,7 @@ void WalManager::Checkpoint() {
         try {
             txn->CommitTxn();
         } catch (const std::exception &) {
-            //txn->CancelCommitTxnBottom();
+            // txn->CancelCommitTxnBottom();
             LOG_WARN("WalManager::Checkpoint failed to commit checkpoint txn");
             return;
         }
