@@ -7,6 +7,7 @@
 #include "common/utility/exception.h"
 #include "main/logger.h"
 #include "storage/storage.h"
+#include <exception>
 #include <filesystem>
 #include <iterator>
 #include <vector>
@@ -167,8 +168,11 @@ void WalManager::Flush() {
                     this->SwapWALFile(max_commit_ts);
                 }
 
-            } catch (const std::exception &) {
-                LOG_WARN("WalManager::SwapWALFile failed to swap wal file");
+            } catch (std::exception &e) {
+                LOG_WARN(e.what());
+            } catch (...) {
+                LOG_WARN("WalManager::Flush threads get exception");
+                return;
             }
             commit_ts_pend_.store(max_commit_ts);
         }
@@ -199,7 +203,7 @@ void WalManager::Checkpoint() {
             txn->BeginTxn();
             txn->Checkpoint(commit_ts_pend);
             txn->CommitTxn();
-        } catch (TransactionException &e) {
+        } catch (std::exception &e) {
             LOG_WARN(e.what());
             return;
         } catch (...) {

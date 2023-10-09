@@ -104,17 +104,16 @@ void TxnManager::Stop() {
     LOG_INFO("TxnManager is stopping...");
     LOG_INFO("TxnManager is cleaning up...");
     std::lock_guard guard(mutex_);
-    while (!priority_que_.empty()) {
-        auto it = priority_que_.begin();
-        while (it != priority_que_.end() && it->second != nullptr) {
-            // remove and notify the wal manager condition variable
-            auto txn = GetTxn(it->first);
-            if (txn != nullptr) {
-                txn->CancelCommitTxnBottom();
-            }
+    auto it = priority_que_.begin();
+    while (it != priority_que_.end()) {
+        // remove and notify the wal manager condition variable
+        auto txn = GetTxn(it->first);
+        if (txn != nullptr) {
+            txn->CancelCommitTxnBottom();
         }
-        priority_que_.erase(it);
+        ++it;
     }
+    priority_que_.clear();
 }
 
 bool TxnManager::Stopped() { return !is_running_.load(); }
