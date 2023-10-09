@@ -8,7 +8,7 @@ class VByteCompressor {
 public:
     static uint32_t EncodeVInt32(uint8_t *output_byte, int32_t value);
 
-    static int32_t DecodeVInt32(uint8_t *&input_byte);
+    static int32_t DecodeVInt32(uint8_t *&input_byte, uint32_t &input_byte_length);
 
     static uint32_t GetVInt32Length(int32_t value);
 
@@ -67,7 +67,7 @@ inline uint32_t VByteCompressor::EncodeVInt32(uint8_t *output_byte, int32_t valu
     return l;
 }
 
-inline int32_t VByteCompressor::DecodeVInt32(uint8_t *&input_byte) {
+inline int32_t VByteCompressor::DecodeVInt32(uint8_t *&input_byte, uint32_t &input_byte_length) {
     uint32_t l = 0;
     auto b = ReadByte(input_byte, l);
     uint32_t i = b & 0x7F;
@@ -76,6 +76,7 @@ inline int32_t VByteCompressor::DecodeVInt32(uint8_t *&input_byte) {
         i |= (b & 0x7FL) << shift;
     }
     input_byte += l;
+    input_byte_length -= l;
     return i;
 }
 } // namespace infinity

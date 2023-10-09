@@ -2,11 +2,12 @@
 // Created by xwg on 23-9-6.
 //
 #include "base_test.h"
+#include "test_helper/sql_runner.h"
+
 #include "expression/column_expression.h"
 #include "function/scalar/subtract.h"
 #include "main/infinity.h"
 #include "main/stats/global_resource_usage.h"
-#include "test_helper/sql_runner.h"
 #include <gtest/gtest.h>
 
 class FragmentTest : public BaseTest {
