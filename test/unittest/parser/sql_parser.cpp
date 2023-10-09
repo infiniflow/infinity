@@ -10,6 +10,7 @@
 #include "main/infinity.h"
 #include "parser/parser_result.h"
 #include "parser/sql_parser.h"
+#include "parser/statement/extra/create_index_info.h"
 
 class SQLParserTest : public BaseTest {
     void SetUp() override {
@@ -496,6 +497,165 @@ TEST_F(SQLParserTest, bad_test1) {
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
 
+        result->Reset();
+    }
+}
+
+TEST_F(SQLParserTest, good_create_index_1) {
+    using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    auto parser = MakeShared<SQLParser>();
+    auto result = MakeShared<ParserResult>();
+
+    {
+        String input_sql = "CREATE INDEX ON t1 (a) USING IVFFlat;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+
+        EXPECT_EQ(statement->type_, StatementType::kCreate);
+        auto create_statement = static_cast<CreateStatement *>(statement);
+        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kInvalid);
+
+        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+        EXPECT_EQ(create_index_info->index_name_, "");
+        EXPECT_EQ(create_index_info->schema_name_, "default");
+        EXPECT_EQ(create_index_info->table_name_, "t1");
+        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
+        EXPECT_EQ(create_index_info->column_names_->size(), 1);
+        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
+        EXPECT_TRUE(create_index_info->index_para_list_->empty());
+        result->Reset();
+    }
+    {
+        String input_sql = "CREATE INDEX idx1 ON t1 (a) USING IVFFlat;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+
+        EXPECT_EQ(statement->type_, StatementType::kCreate);
+        auto create_statement = static_cast<CreateStatement *>(statement);
+        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kError);
+
+        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+        EXPECT_EQ(create_index_info->index_name_, "idx1");
+        EXPECT_EQ(create_index_info->schema_name_, "default");
+        EXPECT_EQ(create_index_info->table_name_, "t1");
+        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
+        EXPECT_EQ(create_index_info->column_names_->size(), 1);
+        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
+        EXPECT_TRUE(create_index_info->index_para_list_->empty());
+        result->Reset();
+    }
+    {
+        String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (a) USING IVFFlat;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+
+        EXPECT_EQ(statement->type_, StatementType::kCreate);
+        auto create_statement = static_cast<CreateStatement *>(statement);
+        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
+
+        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+        EXPECT_EQ(create_index_info->index_name_, "idx1");
+        EXPECT_EQ(create_index_info->schema_name_, "default");
+        EXPECT_EQ(create_index_info->table_name_, "t1");
+        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
+        EXPECT_EQ(create_index_info->column_names_->size(), 1);
+        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
+        EXPECT_TRUE(create_index_info->index_para_list_->empty());
+        result->Reset();
+    }
+    {
+        String input_sql = "CREATE INDEX ON db1.t1 (a) USING IVFFlat;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+
+        EXPECT_EQ(statement->type_, StatementType::kCreate);
+        auto create_statement = static_cast<CreateStatement *>(statement);
+        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kInvalid);
+
+        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+        EXPECT_EQ(create_index_info->index_name_, "");
+        EXPECT_EQ(create_index_info->schema_name_, "db1");
+        EXPECT_EQ(create_index_info->table_name_, "t1");
+        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
+        EXPECT_EQ(create_index_info->column_names_->size(), 1);
+        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
+        EXPECT_TRUE(create_index_info->index_para_list_->empty());
+        result->Reset();
+    }
+    {
+        String input_sql = "CREATE INDEX ON t1 (a, b) USING IVFFlat;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+
+        EXPECT_EQ(statement->type_, StatementType::kCreate);
+        auto create_statement = static_cast<CreateStatement *>(statement);
+        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kInvalid);
+
+        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+        EXPECT_EQ(create_index_info->index_name_, "");
+        EXPECT_EQ(create_index_info->schema_name_, "default");
+        EXPECT_EQ(create_index_info->table_name_, "t1");
+        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
+        EXPECT_EQ(create_index_info->column_names_->size(), 2);
+        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
+        EXPECT_EQ((*create_index_info->column_names_)[1], "b");
+        EXPECT_TRUE(create_index_info->index_para_list_->empty());
+        result->Reset();
+    }
+    {
+        String input_sql = "CREATE INDEX ON t1 (a) USING IVFFlat WITH (metric = l2);";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+
+        EXPECT_EQ(statement->type_, StatementType::kCreate);
+        auto create_statement = static_cast<CreateStatement *>(statement);
+        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kInvalid);
+
+        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+        EXPECT_EQ(create_index_info->index_name_, "");
+        EXPECT_EQ(create_index_info->schema_name_, "default");
+        EXPECT_EQ(create_index_info->table_name_, "t1");
+        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
+        EXPECT_EQ(create_index_info->column_names_->size(), 1);
+        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
+        EXPECT_EQ(create_index_info->index_para_list_->size(), 1);
+        EXPECT_EQ((*create_index_info->index_para_list_)[0]->para_name_, "metric");
+        EXPECT_EQ((*create_index_info->index_para_list_)[0]->para_value_, "l2");
+        result->Reset();
+    }
+}
+
+TEST_F(SQLParserTest, bad_create_index_1) {
+    using namespace infinity;
+    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+    {
+        String input_sql = "CREATE INDEX IF NOT EXISTS ON t1 (a) USING IVFFlat;";
+        parser->Parse(input_sql, result);
+
+        EXPECT_FALSE(result->error_message_.empty());
+        EXPECT_TRUE(result->statements_ptr_ == nullptr);
         result->Reset();
     }
 }

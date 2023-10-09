@@ -43,7 +43,11 @@ $ git clone https://github.com/infiniflow/infinity.git
 
 On Ubuntu,
 ```shell
-$ sudo apt install libboost-dev-all
+$ sudo apt install g++-13 bison flex cmake libomp-18-dev libblas-dev liblapack-dev libboost1.81-dev liburing-dev
+# if use clang++
+$ wget https://apt.llvm.org/llvm.sh
+$ chmod +x llvm.sh
+$ sudo ./llvm.sh 18
 ```
 
 On OpenSUSE Tumbleweed,

@@ -2,6 +2,15 @@ cmake_minimum_required(VERSION 3.10)
 
 project(infinity VERSION 0.1.0)
 
+# find_program(CCACHE_FOUND ccache)
+# if(CCACHE_FOUND)
+#   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+#   set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache) # Less useful to do it for linking, see edit2
+#   message("Find ccache")
+# else()
+#   message("Can not find ccache")
+# endif()
+
 set(CMAKE_CXX_STANDARD 23)
 
 # Print CMake version and project name

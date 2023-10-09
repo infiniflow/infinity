@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "common/types/alias/smart_ptr.h"
 #include "storage/meta/entry/table_collecton_type.h"
 
 namespace infinity {

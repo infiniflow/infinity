@@ -541,6 +541,14 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
                                                                                             parent_context);
                 break;
             }
+            case PhysicalOperatorType::kCreateIndex: {
+                BuildSerialTaskStateTemplate<CreateIndexInputState, CreateIndexOutputState>(fragment_operators,
+                                                                                              tasks,
+                                                                                              operator_id,
+                                                                                              operator_count,
+                                                                                              parent_context);
+                break;
+            }
             case PhysicalOperatorType::kCreateCollection: {
                 BuildSerialTaskStateTemplate<CreateCollectionInputState, CreateCollectionOutputState>(fragment_operators,
                                                                                                       tasks,
@@ -793,6 +801,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kExport:
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCreateTable:
+        case PhysicalOperatorType::kCreateIndex:
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
@@ -958,6 +967,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             break;
         }
         case PhysicalOperatorType::kCreateTable:
+        case PhysicalOperatorType::kCreateIndex:
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:

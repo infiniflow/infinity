@@ -70,6 +70,8 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "Alter";
         case PhysicalOperatorType::kCreateTable:
             return "CreateTable";
+        case PhysicalOperatorType::kCreateIndex:
+            return "CreateIndex";
         case PhysicalOperatorType::kCreateCollection:
             return "CreateCollection";
         case PhysicalOperatorType::kCreateDatabase:

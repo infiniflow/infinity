@@ -5,10 +5,11 @@
 #include "txn.h"
 
 #include "common/types/alias/strings.h"
-#include "common/utility/defer_op.h"
 #include "common/utility/infinity_assert.h"
 #include "main/logger.h"
 #include "storage/meta/catalog.h"
+#include "storage/meta/entry/table_collection_entry.h"
+#include "storage/table_def.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
 #include "storage/wal/wal_entry.h"
@@ -20,7 +21,7 @@ UniquePtr<String> Txn::GetTableEntry(const String &db_name, const String &table_
         db_name_ = db_name;
     } else {
         if (db_name_ != db_name) {
-            String err_msg = fmt::format("Attempt to insert data into another database and table {}/{}", db_name, table_name);
+            String err_msg = fmt::format("Attempt to get table {} from another database {}", db_name, table_name);
             LOG_ERROR(err_msg);
             return MakeUnique<String>(err_msg);
         }
@@ -315,6 +316,19 @@ EntryResult Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &t
     txn_tables_.insert(table_entry);
     table_names_.insert(*table_def->table_name());
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
+    return res;
+}
+
+EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type) {
+    TableCollectionEntry *table_entry{nullptr};
+    UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
+    if (err_msg != nullptr) {
+        return {nullptr, std::move(err_msg)};
+    }
+    NotImplementError("Not implemented")
+
+        auto res = TableCollectionEntry::CreateIndex(table_entry, nullptr, std::move(index_def));
+    // TODO shenyushi 4: add wal entry
     return res;
 }
 

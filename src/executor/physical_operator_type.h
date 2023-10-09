@@ -60,6 +60,7 @@ enum class PhysicalOperatorType : i8 {
     // DDL
     kAlter,
     kCreateTable,
+    kCreateIndex,
     kCreateCollection,
     kCreateDatabase,
     kCreateView,

@@ -3,12 +3,17 @@
 //
 
 #include "logical_planner.h"
-#include "explain_logical_plan.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/strings.h"
+#include "common/utility/exception.h"
+#include "common/utility/infinity_assert.h"
 #include "expression/cast_expression.h"
 #include "function/cast/cast_function.h"
-#include "parser/statement.h"
+#include "parser/statement/extra/create_index_info.h"
 #include "planner/binder/insert_binder.h"
+#include "planner/explain_logical_plan.h"
 #include "planner/node/logical_create_collection.h"
+#include "planner/node/logical_create_index.h"
 #include "planner/node/logical_create_schema.h"
 #include "planner/node/logical_create_table.h"
 #include "planner/node/logical_create_view.h"
@@ -18,12 +23,16 @@
 #include "planner/node/logical_drop_table.h"
 #include "planner/node/logical_drop_view.h"
 #include "planner/node/logical_explain.h"
+#include "planner/node/logical_export.h"
 #include "planner/node/logical_flush.h"
 #include "planner/node/logical_import.h"
 #include "planner/node/logical_insert.h"
 #include "planner/node/logical_show.h"
 #include "query_binder.h"
+#include "src/parser/statement.h"
+#include "storage/index_def/ivfflat_index_def.h"
 #include "storage/io/local_file_system.h"
+#include <memory>
 
 namespace infinity {
 
@@ -348,7 +357,48 @@ void LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr
 }
 
 void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    PlannerError("Creating index isn't supported.");
+    auto *create_index_info = (CreateIndexInfo *)statement->create_info_.get();
+
+    auto schema_name = MakeShared<String>(create_index_info->schema_name_);
+    auto table_name = MakeShared<String>(create_index_info->table_name_);
+    if (create_index_info->column_names_->size() != 1) {
+        NotImplementError("Creating index only support single column now.");
+    }
+
+    Vector<String> column_names(*create_index_info->column_names_);
+    String index_name = std::move(create_index_info->index_name_);
+    IndexMethod method_type = IndexMethod::kInvalid;
+    if (create_index_info->method_type_ == "IVFFlat") {
+        method_type = IndexMethod::kIVFFlat;
+    } else if (create_index_info->method_type_ == "IVFSQ8") {
+        method_type = IndexMethod::kIVFSQ8;
+    } else if (create_index_info->method_type_ == "HNSW") {
+        method_type = IndexMethod::kHnsw;
+    } else {
+        PlannerException("Invalid index method type.");
+    }
+    auto index_def_common = IndexDefCommon(std::move(index_name), std::move(method_type), std::move(column_names));
+
+    SharedPtr<IndexDef> index_def_ptr = nullptr;
+    switch (method_type) {
+        case IndexMethod::kIVFFlat: {
+            index_def_ptr = IVFFlatIndexDef::Make(std::move(index_def_common), *create_index_info->index_para_list_);
+            break;
+        }
+        case IndexMethod::kInvalid: {
+            PlannerError("Invalid index method type.");
+        }
+        default: {
+            NotImplementException("Not implemented");
+        }
+    }
+
+    auto logical_create_index_operator =
+        LogicalCreateIndex::Make(bind_context_ptr->GetNewLogicalNodeId(), schema_name, table_name, index_def_ptr, create_index_info->conflict_type_);
+
+    this->logical_plan_ = logical_create_index_operator;
+    this->names_ptr_->emplace_back("OK");
+    this->types_ptr_->emplace_back(LogicalType::kInteger);
 }
 
 void LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
