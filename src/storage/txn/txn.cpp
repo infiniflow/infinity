@@ -474,6 +474,7 @@ void Txn::CommitTxn() {
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id = txn_id_;
     wal_entry_->commit_ts = commit_ts;
+
     txn_mgr_->PutWalEntry(wal_entry_);
     // Wait until CommitTxnBottom is done.
     std::unique_lock lk(m);
@@ -526,6 +527,14 @@ void Txn::CommitTxnBottom() {
     LOG_TRACE("Txn: {} is committed.", txn_id_);
 
     // Notify the top half
+    std::unique_lock lk(m);
+    done_bottom_ = true;
+    cv.notify_one();
+}
+
+void Txn::CancelCommitTxnBottom() {
+    txn_context_.SetTxnRollbacking(txn_context_.GetCommitTS());
+    txn_context_.SetTxnRollbacked();
     std::unique_lock lk(m);
     done_bottom_ = true;
     cv.notify_one();

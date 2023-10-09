@@ -48,6 +48,8 @@ public:
 
     void CommitTxnBottom();
 
+    void CancelCommitTxnBottom();
+
     void RollbackTxn();
 
     void RollbackTxn(TxnTimeStamp abort_ts);

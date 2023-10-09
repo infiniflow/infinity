@@ -4,6 +4,8 @@
 
 #pragma once
 
+
+#include "common/types/alias/concurrency.h"
 #include "txn_state.h"
 
 namespace infinity {
