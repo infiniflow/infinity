@@ -145,6 +145,7 @@ TRUE            { return TRUE; }
 TINYINT         { return TINYINT; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
+USING           { return USING; }
 UPDATE          { return UPDATE; }
 UUID            { return UUID; }
 VALUES          { return VALUES; }

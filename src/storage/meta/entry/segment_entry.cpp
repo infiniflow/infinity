@@ -4,7 +4,18 @@
 
 #include "segment_entry.h"
 #include "common/default_values.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/strings.h"
 #include "common/utility/defer_op.h"
+#include "common/utility/exception.h"
+#include "common/utility/infinity_assert.h"
+#include "common/utility/random.h"
+#include "faiss/IndexFlat.h"
+#include "faiss/IndexIVFFlat.h"
+#include "faiss/index_io.h"
+#include "storage/buffer/object_handle.h"
+#include "storage/index_def/index_def.h"
+#include "storage/index_def/ivfflat_index_def.h"
 #include "storage/io/local_file_system.h"
 #include "storage/txn/txn.h"
 #include <ctime>
@@ -34,7 +45,7 @@ SharedPtr<SegmentEntry> SegmentEntry::MakeNewSegmentEntry(const TableCollectionE
     const auto *table_ptr = (const TableCollectionEntry *)table_entry;
     new_entry->column_count_ = table_ptr->columns_.size();
 
-    new_entry->segment_dir_ = SegmentEntry::DetermineFilename(*table_entry->table_entry_dir_, segment_id);
+    new_entry->segment_dir_ = SegmentEntry::DetermineSegFilename(*table_entry->table_entry_dir_, segment_id);
     if (new_entry->block_entries_.empty()) {
         new_entry->block_entries_.emplace_back(
             MakeUnique<BlockEntry>(new_entry.get(), new_entry->block_entries_.size(), new_entry->column_count_, 0, buffer_mgr));
@@ -105,6 +116,58 @@ void SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendS
 
         append_state_ptr->current_block_++;
         append_state_ptr->current_block_offset_ = 0;
+    }
+}
+
+void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id) {
+    NotImplementError("Not implemented")
+}
+
+void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, int dimension) {
+    switch (index_def.method_type()) {
+        case IndexMethod::kIVFFlat: {
+            auto ivfflat_index_def = static_cast<const IVFFlatIndexDef &>(index_def);
+            faiss::IndexFlat *quantizer_ptr = nullptr;
+            switch (ivfflat_index_def.metric_type()) {
+                case MetricType::kMerticL2: {
+                    quantizer_ptr = new faiss::IndexFlatL2(dimension);
+                    break;
+                }
+                case MetricType::kMerticInnerProduct: {
+                    quantizer_ptr = new faiss::IndexFlatIP(dimension);
+                    break;
+                }
+                case MetricType::kInvalid: {
+                    StorageException("Metric type is not supported");
+                }
+                default: {
+                    NotImplementException("Not implemented");
+                }
+            }
+            // faiss::IndexFlatL2 quantizer(dimension);
+            auto quantizer = std::unique_ptr<faiss::IndexFlat>(quantizer_ptr);
+            auto index = MakeUnique<faiss::IndexIVFFlat>(quantizer.get(), dimension, ivfflat_index_def.centroids_count());
+            for (const auto &block_entry : segment_entry->block_entries_) {
+                auto block_column_entry = block_entry->columns_[column_id].get();
+                CommonObjectHandle object_handle(block_column_entry->buffer_handle_);
+                auto block_data_ptr = (float *)object_handle.GetData();
+                SizeT block_row_cnt = block_entry->row_count_;
+                try {
+                    index->train(block_row_cnt, block_data_ptr);
+                } catch (std::exception &e) {
+                    StorageException("Train index failed: {}", e.what());
+                }
+            }
+
+            auto index_filename = DetermineIndexFilename(*segment_entry->segment_dir_, ivfflat_index_def.index_name(), segment_entry->segment_id_);
+            // TODO shenyushi: change meta data
+            // segment_entry->index_name_map_.emplace(column_id, index_filename);
+            faiss::write_index(index.get(), index_filename.get()->data());
+            return;
+        }
+        default: {
+            NotImplementException("Index method type is not supported");
+        }
     }
 }
 
@@ -258,7 +321,7 @@ SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableCollect
     return segment_entry;
 }
 
-SharedPtr<String> SegmentEntry::DetermineFilename(const String &parent_dir, u64 seg_id) {
+SharedPtr<String> SegmentEntry::DetermineSegFilename(const String &parent_dir, u64 seg_id) {
     u32 seed = time(nullptr);
     LocalFileSystem fs;
     SharedPtr<String> segment_dir;
@@ -266,5 +329,10 @@ SharedPtr<String> SegmentEntry::DetermineFilename(const String &parent_dir, u64 
         segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + std::to_string(seg_id));
     } while (!fs.CreateDirectoryNoExp(*segment_dir));
     return segment_dir;
+}
+
+SharedPtr<String> SegmentEntry::DetermineIndexFilename(const String &parent_dir, const String &index_name, u64 seg_id) {
+    // TODO shenyushi 3
+    return MakeShared<String>(parent_dir + '/' + index_name + '_' + std::to_string(seg_id));
 }
 } // namespace infinity

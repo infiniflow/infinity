@@ -4,17 +4,15 @@
 
 #pragma once
 
-#include <mutex>
-#include <utility>
-
 #include "base_entry.h"
 #include "common/default_values.h"
+#include "parser/statement/extra/create_index_info.h"
+#include "parser/statement/extra/create_table_info.h"
 #include "segment_column_entry.h"
 
+#include "storage/index_def/index_def.h"
 #include "storage/meta/entry/block_entry.h"
-// #include "common/utility/infinity_assert.h"
-#include "common/utility/random.h"
-#include "data_access_state.h"
+#include "storage/meta/entry/data_access_state.h"
 
 namespace infinity {
 
@@ -80,6 +78,11 @@ public:
 
     Vector<UniquePtr<BlockEntry>> block_entries_{};
 
+    SharedPtr<String> index_dir_{};
+
+    HashMap<u64, SharedPtr<String>> index_name_map_{};
+
+    // TODO shenyushi 3: add index here
 public:
     [[nodiscard]] inline SizeT AvailableCapacity() const { return row_capacity_ - current_row_; }
 
@@ -91,6 +94,10 @@ public:
                                                        SizeT segment_row = DEFAULT_SEGMENT_ROW);
 
     static void AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
+
+    static void CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id);
+
+    static void CreateIndexEmbedding(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, int dimension);
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count);
 
@@ -116,7 +123,9 @@ public:
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr);
 
 private:
-    static SharedPtr<String> DetermineFilename(const String &parent_dir, u64 seg_id);
+    static SharedPtr<String> DetermineSegFilename(const String &parent_dir, u64 seg_id);
+
+    static SharedPtr<String> DetermineIndexFilename(const String &parent_dir, const String &index_name, u64 seg_id);
 };
 
 } // namespace infinity

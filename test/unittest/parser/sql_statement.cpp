@@ -3,16 +3,25 @@
 //
 
 #include "base_test.h"
+#include "main/infinity.h"
 #include "main/logger.h"
-#include <gtest/gtest.h>
-
 #include "parser/parser_result.h"
 #include "parser/sql_parser.h"
+#include <gtest/gtest.h>
 
 class StatementParsingTest : public BaseTest {
-    void SetUp() override {}
+    void SetUp() override {
+        infinity::GlobalResourceUsage::Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::Infinity::instance().Init(config_path);
+    }
 
-    void TearDown() override {}
+    void TearDown() override {
+        infinity::Infinity::instance().UnInit();
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+    }
 };
 
 TEST_F(StatementParsingTest, good_test1) {
@@ -104,23 +113,29 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "CREATE INDEX index1 ON t1 (a, b);";
+        String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (c1, c2) USING IVFFlat WITH(metric = l2);";
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
 
-        for (auto &statement : *result->statements_ptr_) {
-            EXPECT_EQ(statement->type_, StatementType::kCreate);
-            auto *create_statement = (CreateStatement *)(statement);
-            EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
-            CreateIndexInfo *index_info = (CreateIndexInfo *)create_statement->create_info_.get();
-            EXPECT_EQ(index_info->schema_name_, "default");
-            EXPECT_EQ(index_info->table_name_, "t1");
-            EXPECT_EQ(index_info->conflict_type_, ConflictType::kError);
-            EXPECT_EQ((*index_info->column_names_)[0], "a");
-            EXPECT_EQ((*index_info->column_names_)[1], "b");
-        }
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_EQ(statement->type_, StatementType::kCreate);
+        auto create_statement = static_cast<CreateStatement *>(statement);
+        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
+
+        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+        EXPECT_EQ(create_index_info->index_name_, "idx1");
+        EXPECT_EQ(create_index_info->schema_name_, "default");
+        EXPECT_EQ(create_index_info->table_name_, "t1");
+        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
+        EXPECT_EQ(create_index_info->column_names_->size(), 2);
+        EXPECT_EQ((*create_index_info->column_names_)[0], "c1");
+        EXPECT_EQ((*create_index_info->column_names_)[1], "c2");
+        EXPECT_EQ(create_index_info->index_para_list_->size(), 1);
+        EXPECT_EQ((*create_index_info->index_para_list_)[0]->para_name_, "metric");
+        EXPECT_EQ((*create_index_info->index_para_list_)[0]->para_value_, "l2");
 
         result->Reset();
     }

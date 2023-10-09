@@ -27,8 +27,10 @@ void Storage::Init() {
     if (catalog_file_entry == nullptr) {
         // No catalog file at all
         new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir));
-        txn_mgr_ =
-            MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get(), std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
+        txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
+                                          buffer_mgr_.get(),
+                                          std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
+        txn_mgr_->Start();
 
         Storage::InitCatalog(new_catalog_.get(), txn_mgr_.get());
     } else {
@@ -39,15 +41,23 @@ void Storage::Init() {
                                           std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
                                           0,
                                           start_time_stamp + 1);
+
+        txn_mgr_->Start();
     }
 
     BuiltinFunctions builtin_functions(new_catalog_);
     builtin_functions.Init();
 }
 
-void Storage::Uninit() {
+void
+Storage::Uninit() {
+    txn_mgr_->Stop();
     wal_mgr_->Stop();
+
     txn_mgr_.reset();
+    wal_mgr_.reset();
+
+
     new_catalog_.reset();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;

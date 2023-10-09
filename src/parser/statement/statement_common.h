@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/strings.h"
 
 namespace infinity {
 
@@ -30,4 +31,20 @@ struct TableName {
     char *table_name_ptr_{nullptr};
 };
 
+struct InitParameter {
+    String para_name_{};
+    String para_value_{};
+};
+
+struct IfExistsInfo {
+    bool exists_{false};
+    bool if_exists_{false};
+    String info_{""};
+};
+
+struct IfNotExistsInfo {
+    bool exists_{false};
+    bool if_not_exists_{false};
+    String info_{""};
+};
 } // namespace infinity

@@ -325,6 +325,16 @@ struct CreateTableOutputState : public OutputState {
     inline explicit CreateTableOutputState() : OutputState(PhysicalOperatorType::kCreateTable) {}
 };
 
+struct CreateIndexInputState : public InputState {
+    inline explicit
+    CreateIndexInputState() : InputState(PhysicalOperatorType::kCreateIndex) {}
+};
+
+struct CreateIndexOutputState : public OutputState {
+    inline explicit
+    CreateIndexOutputState() : OutputState(PhysicalOperatorType::kCreateIndex) {}
+};
+
 // Create Collection
 struct CreateCollectionInputState : public InputState {
     inline explicit CreateCollectionInputState() : InputState(PhysicalOperatorType::kCreateCollection) {}

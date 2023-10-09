@@ -9,6 +9,7 @@
 #include "main/stats/global_resource_usage.h"
 #include "storage/data_block.h"
 #include "storage/txn/txn_manager.h"
+#include <cstdlib>
 #include <gtest/gtest.h>
 
 class DBTxnTest : public BaseTest {
@@ -24,6 +25,7 @@ class DBTxnTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
         system("rm -rf /tmp/infinity/data/db");
+        system("rm -rf /tmp/infinity/data/wal");
         system("rm -rf /tmp/infinity/data/catalog/*");
         system("rm -rf /tmp/infinity/_tmp");
     }

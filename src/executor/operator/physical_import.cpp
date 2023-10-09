@@ -388,7 +388,6 @@ void PhysicalImport::CSVRowHandler(void *context) {
         txn_store->Import(segment_entry);
 
         // create new segment entry
-        // TODO shenyushi: segment id
         parser_context->segment_entry_ =
             SegmentEntry::MakeNewSegmentEntry(table, txn->TxnID(), TableCollectionEntry::GetNextSegmentID(table), txn->GetBufferMgr());
         segment_entry = parser_context->segment_entry_;

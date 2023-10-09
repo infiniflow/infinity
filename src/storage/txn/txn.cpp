@@ -5,10 +5,11 @@
 #include "txn.h"
 
 #include "common/types/alias/strings.h"
-#include "common/utility/defer_op.h"
 #include "common/utility/infinity_assert.h"
 #include "main/logger.h"
 #include "storage/meta/catalog.h"
+#include "storage/meta/entry/table_collection_entry.h"
+#include "storage/table_def.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
 #include "storage/wal/wal_entry.h"
@@ -20,7 +21,7 @@ UniquePtr<String> Txn::GetTableEntry(const String &db_name, const String &table_
         db_name_ = db_name;
     } else {
         if (db_name_ != db_name) {
-            String err_msg = fmt::format("Attempt to insert data into another database and table {}/{}", db_name, table_name);
+            String err_msg = fmt::format("Attempt to get table {} from another database {}", db_name, table_name);
             LOG_ERROR(err_msg);
             return MakeUnique<String>(err_msg);
         }
@@ -318,6 +319,19 @@ EntryResult Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &t
     return res;
 }
 
+EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type) {
+    TableCollectionEntry *table_entry{nullptr};
+    UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
+    if (err_msg != nullptr) {
+        return {nullptr, std::move(err_msg)};
+    }
+    NotImplementError("Not implemented")
+
+        auto res = TableCollectionEntry::CreateIndex(table_entry, nullptr, std::move(index_def));
+    // TODO shenyushi 4: add wal entry
+    return res;
+}
+
 EntryResult Txn::DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
 
@@ -460,6 +474,7 @@ void Txn::CommitTxn() {
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id = txn_id_;
     wal_entry_->commit_ts = commit_ts;
+
     txn_mgr_->PutWalEntry(wal_entry_);
     // Wait until CommitTxnBottom is done.
     std::unique_lock lk(m);
@@ -512,6 +527,14 @@ void Txn::CommitTxnBottom() {
     LOG_TRACE("Txn: {} is committed.", txn_id_);
 
     // Notify the top half
+    std::unique_lock lk(m);
+    done_bottom_ = true;
+    cv.notify_one();
+}
+
+void Txn::CancelCommitTxnBottom() {
+    txn_context_.SetTxnRollbacking(txn_context_.GetCommitTS());
+    txn_context_.SetTxnRollbacked();
     std::unique_lock lk(m);
     done_bottom_ = true;
     cv.notify_one();

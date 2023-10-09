@@ -7,7 +7,9 @@
 #include "common/utility/exception.h"
 #include "main/logger.h"
 #include "storage/storage.h"
+#include <exception>
 #include <filesystem>
+#include <iterator>
 #include <vector>
 
 namespace infinity {
@@ -52,12 +54,35 @@ void WalManager::Stop() {
     bool expected = true;
     bool changed = running_.compare_exchange_strong(expected, false);
     if (!changed)
+        // Already stopped.
         return;
-    while (wait_for_checkpoint_) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    LOG_INFO("WalManager::Stop begin to stop txn manager");
+    // Notify txn manager to stop.
+    TxnManager *txn_mgr = storage_->txn_manager();
+    txn_mgr->Stop();
+
+    // pop all the entries in the queue. and notify the condition variable.
+    std::lock_guard guard(mutex_);
+    while (!que_.empty()) {
+        auto wal_entry = que_.front();
+        Txn *txn = txn_mgr->GetTxn(wal_entry->txn_id);
+        if (txn != nullptr) {
+            txn->CancelCommitTxnBottom();
+        }
+        que_.pop();
     }
+
+    // Wait for checkpoint thread to stop.
+    LOG_INFO("WalManager::Stop begin to stop checkpoint thread");
     checkpoint_thread_.join();
+    LOG_INFO("WalManager::Stop done to stop checkpoint thread");
+
+    // Wait for flush thread to stop
+    LOG_INFO("WalManager::Stop begin to stop flush thread");
     flush_thread_.join();
+    LOG_INFO("WalManager::Stop done to stop flush thread");
+
     ofs_.close();
 }
 
@@ -90,6 +115,8 @@ void WalManager::Flush() {
         mutex_.lock();
         que_.swap(que2_);
         mutex_.unlock();
+        LOG_INFO("WalManager::Flush q1 swap {} entries to q2", que2_.size());
+
         while (!que2_.empty()) {
             std::shared_ptr<WalEntry> entry = que2_.front();
             max_commit_ts = entry->commit_ts;
@@ -133,10 +160,19 @@ void WalManager::Flush() {
                 }
                 que3_.pop();
             }
+
             // Check if the wal file is too large.
-            auto file_size = fs::file_size(wal_path_);
-            if (file_size > kWALFileSizeThreshold) {
-                this->SwapWALFile(max_commit_ts);
+            try {
+                auto file_size = fs::file_size(wal_path_);
+                if (file_size > kWALFileSizeThreshold) {
+                    this->SwapWALFile(max_commit_ts);
+                }
+
+            } catch (std::exception &e) {
+                LOG_WARN(e.what());
+            } catch (...) {
+                LOG_WARN("WalManager::Flush threads get exception");
+                return;
             }
             commit_ts_pend_.store(max_commit_ts);
         }
@@ -159,10 +195,22 @@ void WalManager::Checkpoint() {
         // std::this_thread::sleep_for(std::chrono::seconds(10));
         wait_for_checkpoint_ = true;
 
-        auto txn = storage_->txn_manager()->CreateTxn();
-        txn->BeginTxn();
-        txn->Checkpoint(commit_ts_pend);
-        txn->CommitTxn();
+        TxnManager *txn_mgr = nullptr;
+        Txn *txn = nullptr;
+        try {
+            txn_mgr = storage_->txn_manager();
+            txn = txn_mgr->CreateTxn();
+            txn->BeginTxn();
+            txn->Checkpoint(commit_ts_pend);
+            txn->CommitTxn();
+        } catch (std::exception &e) {
+            LOG_WARN(e.what());
+            return;
+        } catch (...) {
+            LOG_WARN("WalManager::Checkpoint failed to commit checkpoint txn");
+            return;
+        }
+
         commit_ts_done_ = commit_ts_pend;
 
         LOG_INFO("WalManager::Checkpoint quit", commit_ts_done_);
@@ -195,10 +243,11 @@ void WalManager::Checkpoint() {
 /**
  * @brief Swap the wal file to a new one.
  * We will swap a new wal file when the current wal file is too large.
- * Just rename the current wal file to a new one, and create a new wal file with the original name.
- * So we only focus on the current wal file: wal.log
- * When replaying the wal file, we will just start with the wal.log file.
- * @param max_commit_ts The max commit timestamp of the transactions in the current wal file.
+ * Just rename the current wal file to a new one, and create a new wal file with
+ * the original name. So we only focus on the current wal file: wal.log When
+ * replaying the wal file, we will just start with the wal.log file.
+ * @param max_commit_ts The max commit timestamp of the transactions in the
+ * current wal file.
  */
 void WalManager::SwapWALFile(const int64_t max_commit_ts) {
     if (ofs_.is_open()) {

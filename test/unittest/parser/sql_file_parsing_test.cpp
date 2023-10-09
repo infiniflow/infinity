@@ -3,21 +3,27 @@
 //
 
 #include "base_test.h"
-#include <gtest/gtest.h>
-
 #include "bin/compilation_config.h"
+#include "main/infinity.h"
 #include "parser/parser_result.h"
 #include "parser/sql_parser.h"
-
 #include <filesystem>
 #include <fstream>
-#include <iostream>
-#include <streambuf>
+#include <gtest/gtest.h>
 
 class SQLFileParsingTest : public BaseTest {
-    void SetUp() override {}
+    void SetUp() override {
+        infinity::GlobalResourceUsage::Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::Infinity::instance().Init(config_path);
+    }
 
-    void TearDown() override {}
+    void TearDown() override {
+        infinity::Infinity::instance().UnInit();
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+    }
 };
 
 TEST_F(SQLFileParsingTest, tpch) {

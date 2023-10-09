@@ -3,6 +3,8 @@
 //
 
 #include "main/logger.h"
+#include "storage/index_def/ivfflat_index_def.h"
+#include "storage/meta/table_collection_meta.h"
 #include "storage/txn/txn.h"
 #include "storage/txn/txn_store.h"
 #include "table_collection_entry.h"
@@ -148,6 +150,35 @@ UniquePtr<String> TableCollectionEntry::ImportAppendSegment(TableCollectionEntry
     return nullptr;
 }
 
+EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<IndexDef> index_def) {
+    const String &column_name = index_def->column_names()[0];
+    u64 column_id = table_entry->GetColumnIdByName(column_name);
+    ColumnDef &column_def = *table_entry->columns_[column_id];
+    switch (index_def->method_type()) {
+        case IndexMethod::kIVFFlat: {
+            auto &column_def = *table_entry->columns_[column_id];
+            if (column_def.column_type_->type() != LogicalType::kEmbedding) {
+                StorageError("IVFFlat index should created on Embedding type column")
+            }
+            auto type_info = column_def.column_type_->type_info().get();
+            auto embedding_info = (EmbeddingInfo *)type_info;
+            if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
+                StorageError("IVFFlat index should created on float embedding type column")
+            }
+            for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
+                SegmentEntry::CreateIndexEmbedding(segment_entry.get(), txn_ptr, *index_def, column_id, embedding_info->Dimension());
+            }
+            break;
+        }
+        default: {
+            NotImplementException("Not implemented.");
+        }
+    }
+    // TODO shenyushi: change meta data
+    // table_entry->indexes_.emplace(index_def->index_name(), index_def);
+    return {.entry_ = nullptr, .err_ = nullptr};
+}
+
 SegmentEntry *TableCollectionEntry::GetSegmentByID(const TableCollectionEntry *table_entry, u64 id) {
     auto iter = table_entry->segments_.find(id);
     if (iter != table_entry->segments_.end()) {
@@ -206,6 +237,10 @@ nlohmann::json TableCollectionEntry::Serialize(const TableCollectionEntry *table
     u64 next_segment_id = table_entry->next_segment_id_;
     json_res["next_segment_id"] = next_segment_id;
 
+    for (const auto &[_column_id, index_def] : table_entry->indexes_) {
+        json_res["indexes"].emplace_back(index_def->Serialize());
+    }
+
     return json_res;
 }
 
@@ -256,6 +291,22 @@ TableCollectionEntry::Deserialize(const nlohmann::json &table_entry_json, TableC
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
     table_entry->deleted_ = deleted;
+
+    if (table_entry_json.contains("indexes")) {
+        for (const auto &index_json : table_entry_json["indexes"]) {
+            IndexMethod type_method = index_json["type_method"];
+            switch (type_method) {
+                case IndexMethod::kIVFFlat: {
+                    SharedPtr<IVFFlatIndexDef> index_def = IVFFlatIndexDef::Deserialize(index_json);
+                    table_entry->indexes_.emplace(index_def->index_name(), index_def);
+                    break;
+                }
+                default: {
+                    NotImplementException("Not implemented.");
+                }
+            }
+        }
+    }
 
     return table_entry;
 }

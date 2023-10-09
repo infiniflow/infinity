@@ -23,6 +23,8 @@ private:
     // Create operator
     [[nodiscard]] SharedPtr<PhysicalOperator> BuildCreateTable(const SharedPtr<LogicalNode> &logical_operator) const;
 
+    [[nodiscard]] SharedPtr<PhysicalOperator> BuildCreateIndex(const SharedPtr<LogicalNode> &logical_operator) const;
+
     [[nodiscard]] SharedPtr<PhysicalOperator> BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const;
 
     [[nodiscard]] SharedPtr<PhysicalOperator> BuildCreateSchema(const SharedPtr<LogicalNode> &logical_operator) const;

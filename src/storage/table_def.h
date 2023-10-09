@@ -5,6 +5,7 @@
 #pragma once
 
 #include "parser/statement/extra/create_table_info.h"
+#include "storage/index_def/index_def.h"
 
 namespace infinity {
 
@@ -60,6 +61,8 @@ private:
     HashMap<String, SizeT> column_name2id_{};
     SharedPtr<String> table_name_{};
     SharedPtr<String> schema_name_{};
+
+    Vector<IndexDef> indexes_{};
 };
 
 } // namespace infinity

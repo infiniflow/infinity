@@ -14,7 +14,7 @@
 #include "storage/meta/entry/base_entry.h"
 #include "storage/txn/txn.h"
 #include "storage/txn/txn_manager.h"
-#if 0
+
 class CatalogTest : public BaseTest {
     void
     SetUp() override {
@@ -269,4 +269,3 @@ TEST_F(CatalogTest, concurrent_test) {
         }
     }
 }
-#endif
