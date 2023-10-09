@@ -545,7 +545,8 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
                 BuildSerialTaskStateTemplate<CreateIndexInputState, CreateIndexOutputState>(fragment_operators,
                                                                                               tasks,
                                                                                               operator_id,
-                                                                                              operator_count);
+                                                                                              operator_count,
+                                                                                              parent_context);
                 break;
             }
             case PhysicalOperatorType::kCreateCollection: {

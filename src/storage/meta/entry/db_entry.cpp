@@ -4,7 +4,6 @@
 
 #include "db_entry.h"
 #include "parser/statement/extra/extra_ddl_info.h"
-#include "storage/meta/entry/base_entry.h"
 
 namespace infinity {
 
@@ -48,21 +47,6 @@ EntryResult DBEntry::CreateTableCollection(DBEntry *db_entry,
             TableCollectionMeta::CreateNewEntry(table_meta, table_collection_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr);
         return res;
     }
-}
-
-EntryResult
-DBEntry::CreateIndex(DBEntry* db_entry,
-            // TableCollectionType table_collection_type,
-            const String& table_name,
-            const Vector<String>& column_names,
-            const String& index_name,
-            IndexMethod index_method,
-            u64 txn_id,
-            TxnTimeStamp begin_ts,
-            TxnManager* txn_mgr) {
-    // TODO shenyushi 2
-    db_entry->rw_locker_.lock_shared();
-    db_entry->rw_locker_.unlock_shared();
 }
 
 EntryResult

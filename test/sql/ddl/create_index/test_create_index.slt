@@ -1,0 +1,9 @@
+statement ok
+CREATE TABLE table1(c1 EMBEDDING(FLOAT, 128));
+
+query I
+COPY table1 FROM '/home/shenyushi/Documents/GitHub/infiniflow/infinity/test/sql/ddl/create_index/test_create_index.slt' WITH ( DELIMITER ',', FORMAT fvecs);
+----
+
+query I
+CREATE INDEX idx1 ON table1(c1) using IVFFlat WITH(centroids_count = 4096);

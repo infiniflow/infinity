@@ -8,8 +8,6 @@
 
 #include "base_entry.h"
 
-#include "common/types/alias/strings.h"
-#include "parser/statement/extra/create_index_info.h"
 #include "parser/statement/extra/extra_ddl_info.h"
 #include "storage/common/table_collection_detail.h"
 #include "storage/meta/table_collection_meta.h"
@@ -36,16 +34,6 @@ public:
                                              u64 txn_id,
                                              TxnTimeStamp begin_ts,
                                              TxnManager *txn_mgr);
-
-    static EntryResult CreateIndex(DBEntry *db_entry,
-                                   // TableCollectionType table_collection_type,
-                                   const String &table_name,
-                                   const Vector<String> &column_names,
-                                   const String &index_name,
-                                   IndexMethod index_method,
-                                   u64 txn_id,
-                                   TxnTimeStamp begin_ts,
-                                   TxnManager *txn_mgr);
 
     static EntryResult DropTableCollection(DBEntry *db_entry,
                                            const String &table_collection_name,

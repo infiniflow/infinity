@@ -1,51 +1,28 @@
 #include "physical_create_index.h"
-#include "parser/statement/extra/create_table_info.h"
+#include "executor/operator_state.h"
 
 namespace infinity {
-void
-PhysicalCreateIndex::Init() {}
+void PhysicalCreateIndex::Init() {}
 
-void
-PhysicalCreateIndex::Execute(QueryContext* query_context) {
-    auto txn = query_context->GetTxn();
-    txn->CreateIndex(*schema_name_, index_def_ptr_, conflict_type_);
-
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
-    output_ = Table::MakeResultTable(column_defs);
+void PhysicalCreateIndex::Execute(QueryContext *query_context) {
+    // TODO shenyushi -1: delete old execute function
 }
 
-void
-PhysicalCreateIndex::Execute(QueryContext* query_context,
-                             InputState* input_state,
-                             OutputState* output_state) {
-    auto txn = query_context->GetTxn();
-    auto result = txn->CreateIndex(*schema_name_, index_def_ptr_, conflict_type_);
+void PhysicalCreateIndex::Execute(QueryContext *query_context,
+                                  InputState *input_state,
+                                  OutputState *output_state) {
+    auto create_index_input_state =
+        static_cast<CreateIndexInputState *>(input_state);
+    auto create_index_output_state =
+        static_cast<CreateIndexOutputState *>(output_state);
 
-    auto create_table_output_state = (CreateTableOutputState*)output_state;
-    if(result.err_ != nullptr) {
-        create_table_output_state->error_message_ = std::move(result.err_);
+    auto txn = query_context->GetTxn();
+    auto result = txn->CreateIndex(*schema_name_, *table_name_, index_def_ptr_,
+                                   conflict_type_);
+    if (result.err_ != nullptr) {
+        output_state->error_message_ = std::move(result.err_);
     }
-}
-// SharedPtr<Vector<String>>
-// PhysicalCreateIndex::GetOutputNames() const {}
-
-// SharedPtr<Vector<SharedPtr<DataType>>>
-// PhysicalCreateIndex::GetOutputTypes() const {}
-
-PhysicalCreateIndex::PhysicalCreateIndex(SharedPtr<String> schema_name,
-                                         SharedPtr<IndexDef> index_definition,
-                                         ConflictType conflict_type,
-
-                                         SharedPtr<Vector<String>> output_names,
-                                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                                         u64 id)
-    : PhysicalOperator(PhysicalOperatorType::kCreateIndex, nullptr, nullptr, id),
-      schema_name_(std::move(schema_name)),
-      index_def_ptr_(std::move(index_definition)),
-      conflict_type_(conflict_type),
-      output_names_(std::move(output_names)),
-      output_types_(std::move(output_types)) {
+    output_state->SetComplete();
 }
 
-}// namespace infinity
+} // namespace infinity

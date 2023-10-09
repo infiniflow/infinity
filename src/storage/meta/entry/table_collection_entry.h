@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include <utility>
-
 #include "common/types/alias/smart_ptr.h"
+#include "parser/statement/extra/create_table_info.h"
 #include "segment_entry.h"
 #include "storage/common/block_index.h"
+#include "storage/index_def/index_def.h"
 #include "storage/table_def.h"
 #include "table_collecton_type.h"
 
@@ -55,7 +55,7 @@ public:
                                                  AppendState &append_state,
                                                  BufferManager *buffer_mgr);
 
-    static UniquePtr<String> CreateIndex(TableCollectionEntry *table_entry, Txn *txn_ptr);
+    static EntryResult CreateIndex(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<IndexDef> index_def);
 
     static inline u64 GetNextSegmentID(TableCollectionEntry *table_entry) { return table_entry->next_segment_id_++; }
 
@@ -98,6 +98,8 @@ public:
     HashMap<u64, SharedPtr<SegmentEntry>> segments_{};
     SegmentEntry *unsealed_segment_{};
     au64 next_segment_id_{};
+
+    HashMap<String, SharedPtr<IndexDef>> indexes_{};
 };
 
 } // namespace infinity
