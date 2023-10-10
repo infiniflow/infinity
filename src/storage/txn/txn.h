@@ -130,6 +130,7 @@ public:
 private:
     UniquePtr<String> GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
     void CheckpointFlushMemTable();
+    void CheckpointFlushCatalog();
 
 private:
     NewCatalog *catalog_{};

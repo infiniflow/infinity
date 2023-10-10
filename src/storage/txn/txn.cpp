@@ -469,10 +469,7 @@ void Txn::CommitTxn() {
         // if changed flush the table
         // if not changed get the name
         // 2. Flush the catalog
-        String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir() + "/catalog";
-        String file_name = "META_" + std::to_string(txn_id_) + ".json";
-        LOG_TRACE("Checkpoint: Going to store META as file {}/{}", dir_name, file_name);
-        NewCatalog::SaveAsFile(catalog_, dir_name, file_name);
+        CheckpointFlushCatalog();
     }
 
     // Put wal entry to the manager in the same order as commit_ts.
@@ -486,45 +483,26 @@ void Txn::CommitTxn() {
 }
 
 void Txn::CommitTxnBottom() {
-    bool is_read_only_txn = true;
     {
         // prepare to commit txn local data into table
         for (const auto &name_table_pair : txn_tables_store_) {
             TxnTableStore *table_local_store = name_table_pair.second.get();
             table_local_store->PrepareCommit();
-            is_read_only_txn = false;
         }
     }
 
     txn_context_.SetTxnCommitted();
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
-    // Commit databases in catalog
+    // Commit databases to memory catalog
     for (auto *db_entry : txn_dbs_) {
         db_entry->Commit(commit_ts);
-        is_read_only_txn = false;
     }
 
-    // Commit tables in catalog memory
+    // Commit tables to memory catalog
     for (auto *table_entry : txn_tables_) {
         table_entry->Commit(commit_ts);
-        is_read_only_txn = false;
     }
-
-    // TURELY Commit the prepared data
-    //    for (const auto &name_table_pair : txn_tables_store_) {
-    //        TxnTableStore *table_local_store = name_table_pair.second.get();
-    //        table_local_store->Commit();
-    //        is_read_only_txn = false;
-    //    }
-
-    //    // TODO: Flush the whole catalog.
-    //    if (!is_read_only_txn) {
-    //        String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir() + "/catalog";
-    //        String file_name = "META_" + std::to_string(txn_id_) + ".json";
-    //        LOG_TRACE("Going to store META as file {}/{}", dir_name, file_name);
-    //        NewCatalog::SaveAsFile(catalog_, dir_name, file_name);
-    //    }
 
     LOG_TRACE("Txn: {} is committed.", txn_id_);
 
@@ -547,7 +525,7 @@ void Txn::RollbackTxn() {
     txn_context_.SetTxnRollbacking(abort_ts);
 
     for (const auto &base_entry : txn_tables_) {
-        TableCollectionEntry *table_entry = (TableCollectionEntry *)(base_entry);
+        auto *table_entry = (TableCollectionEntry *)(base_entry);
         TableCollectionMeta *table_meta = TableCollectionEntry::GetTableMeta(table_entry);
         DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
         DBEntry::RemoveTableCollectionEntry(db_entry, *table_meta->table_collection_name_, txn_id_, txn_mgr_);
@@ -575,19 +553,19 @@ void Txn::Checkpoint(const TxnTimeStamp max_commit_ts) {
     max_commit_ts_ = max_commit_ts;
 
     String catalog_path = "META_" + std::to_string(txn_id_) + ".json";
-
     AddWalCmd(MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path));
 }
 
+/**
+ * @brief Flush the memory table to disk
+ * traverse all the table entries and flush the segments
+ */
 void Txn::CheckpointFlushMemTable() {
     auto db_entries = NewCatalog::Databases(catalog_, txn_id_, max_commit_ts_);
     for (auto &it : db_entries) {
 
         auto table_entries = DBEntry::TableCollections(it, txn_id_, max_commit_ts_);
-
         for (auto &table_entry : table_entries) {
-
-            // table_entry->rw_locker_.lock_shared();
 
             auto segment = table_entry->segments_.begin();
             while (segment != table_entry->segments_.end()) {
@@ -595,14 +573,24 @@ void Txn::CheckpointFlushMemTable() {
                     ++segment;
                     continue;
                 }
+
                 auto changed = SegmentEntry::PrepareFlush(segment->second.get());
                 if (changed) {
                     SegmentEntry::Flush(segment->second.get());
                 }
                 ++segment;
             }
-            // table_entry->rw_locker_.unlock_shared();
         }
     }
+}
+
+/**
+ * @brief Flush the catalog to disk
+ */
+void Txn::CheckpointFlushCatalog() {
+    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir() + "/catalog";
+    String file_name = "META_" + std::to_string(txn_id_) + ".json";
+    LOG_TRACE("Checkpoint: Going to store META as file {}/{}", dir_name, file_name);
+    NewCatalog::SaveAsFile(catalog_, dir_name, file_name);
 }
 } // namespace infinity
