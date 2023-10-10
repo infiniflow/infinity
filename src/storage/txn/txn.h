@@ -129,6 +129,7 @@ public:
 
 private:
     UniquePtr<String> GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
+    void CheckpointFlushMemTable();
 
 private:
     NewCatalog *catalog_{};
@@ -145,6 +146,7 @@ private:
 
     // Only one db can be handled in one transaction.
     HashMap<String, BaseEntry *> txn_table_entries_{};
+    // Key: table name Value: TxnTableStore
     HashMap<String, UniquePtr<TxnTableStore>> txn_tables_store_{};
 
     // Handled database
@@ -157,8 +159,12 @@ private:
     std::condition_variable cv;
     bool done_bottom_{false};
 
+    // Txn Manager
     TxnManager *txn_mgr_{};
+
     bool is_checkpoint_{false};
+    // Checkpoint max commit ts only for checkpoint
+    TxnTimeStamp max_commit_ts_{};
 };
 
 } // namespace infinity

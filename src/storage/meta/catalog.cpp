@@ -110,10 +110,12 @@ Vector<DBEntry *> NewCatalog::Databases(NewCatalog *catalog, u64 txn_id, TxnTime
     for (const auto &db : catalog->databases_) {
         EntryResult result = DBMeta::GetEntry(db.second.get(), txn_id, begin_ts);
         if (result.err_ != nullptr) {
-            CatalogError(*result.err_);
+            LOG_WARN("Get database entry error: {}", *result.err_);
+        } else {
+            results.emplace_back((DBEntry *)result.entry_);
         }
-        results.emplace_back((DBEntry *)result.entry_);
     }
+    catalog->rw_locker_.unlock_shared();
 
     return results;
 }

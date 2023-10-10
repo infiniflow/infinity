@@ -93,6 +93,10 @@ void TxnTableStore::PrepareCommit() {
     LOG_TRACE("Transaction local storage table: {}, Complete commit preparing", this->table_name_);
 }
 
+/**
+ * @attention deprecated
+ * @brief Call for really commit the data to disk.
+ */
 void TxnTableStore::Commit() {
     Txn *txn_ptr = (Txn *)txn_;
     TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get(), txn_ptr->GetBufferMgr());
