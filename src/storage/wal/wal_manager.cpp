@@ -75,14 +75,12 @@ void WalManager::Stop() {
     }
 
     // Wait for checkpoint thread to stop.
-    LOG_INFO("WalManager::Stop begin to stop checkpoint thread");
+    LOG_INFO("WalManager::Stop checkpoint thread join");
     checkpoint_thread_.join();
-    LOG_INFO("WalManager::Stop done to stop checkpoint thread");
 
     // Wait for flush thread to stop
-    LOG_INFO("WalManager::Stop begin to stop flush thread");
+    LOG_INFO("WalManager::Stop flush thread join");
     flush_thread_.join();
-    LOG_INFO("WalManager::Stop done to stop flush thread");
 
     ofs_.close();
 }
@@ -116,8 +114,6 @@ void WalManager::Flush() {
         mutex_.lock();
         que_.swap(que2_);
         mutex_.unlock();
-        LOG_INFO("WalManager::Flush q1 swap {} entries to q2", que2_.size());
-
         while (!que2_.empty()) {
             std::shared_ptr<WalEntry> entry = que2_.front();
             max_commit_ts = entry->commit_ts;
@@ -193,8 +189,6 @@ void WalManager::Checkpoint() {
 
         // Checkponit is heavy and infrequent operation.
         LOG_INFO("WalManager::Checkpoint enter for transactions' lsn <= {}", commit_ts_pend);
-        // std::this_thread::sleep_for(std::chrono::seconds(10));
-        wait_for_checkpoint_ = true;
 
         TxnManager *txn_mgr = nullptr;
         Txn *txn = nullptr;
@@ -226,18 +220,14 @@ void WalManager::Checkpoint() {
                 // if * is little than the max_commit_ts, we will delete it.
                 if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
                     auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
-                    LOG_INFO("WalManager::Checkpoint suffix: {}", suffix.c_str());
-                    LOG_INFO("WalManager::Checkpoint lsn_done_chk_: {}", commit_ts_done_);
                     if (std::stoll(suffix) < commit_ts_done_) {
                         fs::remove(entry.path());
-                        LOG_INFO("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str());
+                        LOG_TRACE("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str());
                     }
                 }
             }
         }
-        LOG_INFO("WalManager::Checkpoint end to gc wal files")
-
-        wait_for_checkpoint_ = false;
+        LOG_INFO("WalManager::Checkpoint end to gc wal files");
     }
 }
 
