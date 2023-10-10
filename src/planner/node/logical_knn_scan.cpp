@@ -45,6 +45,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalKnnScan::GetOutputTypes() const {
     for (const auto &knn_expr : knn_expressions_) {
         result_types.emplace_back(MakeShared<DataType>(knn_expr->Type()));
     }
+    result_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return MakeShared<Vector<SharedPtr<DataType>>>(result_types);
 }
 

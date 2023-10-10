@@ -35,6 +35,8 @@ public:
 
     explicit CommonObjectHandle(BufferHandle *buffer_handle);
 
+    ~CommonObjectHandle();
+
     CommonObjectHandle(const CommonObjectHandle &other) = delete;
 
     CommonObjectHandle &operator=(const CommonObjectHandle &other) = delete;

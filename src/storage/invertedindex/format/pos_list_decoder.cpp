@@ -12,18 +12,20 @@ PositionListDecoder::PositionListDecoder(const PositionListFormatOption &option,
       pos_single_slice_(nullptr) {}
 
 PositionListDecoder::~PositionListDecoder() {
-    if(session_pool_) {
-        if(pos_skiplist_reader_){
+    if (session_pool_) {
+        if (pos_skiplist_reader_) {
             pos_skiplist_reader_->~PairValueSkipListReader();
-            session_pool_->Deallocate((void*)pos_skiplist_reader_, sizeof(PairValueSkipListReader));
+            session_pool_->Deallocate((void *)pos_skiplist_reader_, sizeof(PairValueSkipListReader));
         }
-        if(pos_bitmap_reader_) {
+        if (pos_bitmap_reader_) {
             pos_bitmap_reader_->~PositionBitmapReader();
-            session_pool_->Deallocate((void*)pos_bitmap_reader_, sizeof(PositionBitmapReader));
+            session_pool_->Deallocate((void *)pos_bitmap_reader_, sizeof(PositionBitmapReader));
         }
     } else {
-        if(pos_skiplist_reader_) delete pos_skiplist_reader_;
-        if(pos_bitmap_reader_) delete pos_bitmap_reader_;
+        if (pos_skiplist_reader_)
+            delete pos_skiplist_reader_;
+        if (pos_bitmap_reader_)
+            delete pos_bitmap_reader_;
         pos_skiplist_reader_ = nullptr;
         pos_bitmap_reader_ = nullptr;
     }

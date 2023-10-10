@@ -52,4 +52,28 @@ Pair<const ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefix(SizeT row_idx) {
     return {ptr, VarcharT::PREFIX_LENGTH};
 }
 
+ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
+    if (data_type.Plain()) {
+        return inline_col_.GetData() + data_type.Size() * row_idx;
+    } else {
+        switch (data_type.type()) {
+            case kVarchar:
+            case kArray:
+            case kTuple:
+            case kPath:
+            case kPolygon:
+            case kBlob:
+            case kMixed: {
+                NotImplementError("Not implement complex type GetValueAt function")
+            }
+            case kInvalid: {
+                ExecutorError("Invalid data type")
+            }
+            default:
+                break;
+        }
+    }
+    return nullptr;
+}
+
 } // namespace infinity

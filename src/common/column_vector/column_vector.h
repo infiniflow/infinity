@@ -91,9 +91,15 @@ public:
 
     void Finalize(SizeT index);
 
+    // Used by Append by Ptr
+    void SetByRawPtr(SizeT index, const ptr_t raw_ptr);
+
+    // Use by Append value
     void SetByPtr(SizeT index, const ptr_t value_ptr);
 
     void AppendValue(const Value &value);
+
+    void AppendByRawPtr(const ptr_t raw_ptr);
 
     void AppendByPtr(const ptr_t value_ptr);
 

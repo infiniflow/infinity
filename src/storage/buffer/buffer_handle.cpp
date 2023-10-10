@@ -208,7 +208,10 @@ ptr_t BufferHandle::LoadData() {
 
 void BufferHandle::UnloadData() {
     std::unique_lock<RWMutex> w_locker(rw_locker_);
-    --reference_count_;
+    if (reference_count_ > 0) {
+        --reference_count_;
+    }
+
     if (reference_count_ == 0) {
         BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
         buffer_mgr->PushGCQueue(this);

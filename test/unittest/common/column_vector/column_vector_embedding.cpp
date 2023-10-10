@@ -166,7 +166,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
         for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
             ((float *)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
-        column_vector.AppendByPtr((ptr_t)(&v.value_.embedding));
+        column_vector.AppendByPtr(v.value_.embedding.ptr);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kEmbedding);
         EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kEmbedding);

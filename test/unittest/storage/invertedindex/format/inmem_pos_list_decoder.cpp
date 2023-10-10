@@ -5,15 +5,15 @@
 #include "main/infinity.h"
 #include "main/logger.h"
 #include "storage/invertedindex/format/buffered_byte_slice.h"
-#include "storage/invertedindex/format/in_doc_pos_state.h"
-#include "storage/invertedindex/format/pos_list_encoder.h"
 #include "storage/invertedindex/format/buffered_byte_slice_reader.h"
-#include "storage/invertedindex/format/pair_value_skiplist_reader.h"
-#include "storage/invertedindex/format/pos_list_format_option.h"
+#include "storage/invertedindex/format/in_doc_pos_state.h"
 #include "storage/invertedindex/format/inmem_pos_list_decoder.h"
+#include "storage/invertedindex/format/pair_value_skiplist_reader.h"
+#include "storage/invertedindex/format/pos_list_encoder.h"
+#include "storage/invertedindex/format/pos_list_format_option.h"
 #include <iostream>
 
-namespace infinity{
+namespace infinity {
 
 class InMemPositionListDecoderTest : public BaseTest {
 public:
@@ -23,7 +23,7 @@ public:
     void TearDown() override {}
 
 protected:
-    void TestDecodeWithOptionFlag(const optionflag_t flag, tf_t tf, pos_t* pos_list,  bool need_flush) {
+    void TestDecodeWithOptionFlag(const optionflag_t flag, tf_t tf, pos_t *pos_list, bool need_flush) {
         bool hasPayload = flag;
         PositionListFormatOption option(flag);
 
@@ -36,7 +36,7 @@ protected:
             pos_list_encoder.Flush();
         }
 
-        InMemPositionListDecoder* pos_list_decoder = pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_);
+        InMemPositionListDecoder *pos_list_decoder = pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_);
         ASSERT_TRUE(pos_list_decoder);
 
         // compress mode is useless in decoder
@@ -53,8 +53,7 @@ protected:
         size_t posIdx = 0;
         pos_t lastPos = 0;
         for (size_t i = 0; i < tf / MAX_POS_PER_RECORD; ++i) {
-            uint32_t decodeCount =
-                pos_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
+            uint32_t decodeCount = pos_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
             ASSERT_EQ((uint32_t)MAX_POS_PER_RECORD, decodeCount);
             for (size_t j = 0; j < MAX_POS_PER_RECORD; ++j) {
                 ASSERT_EQ(pos_list[posIdx], lastPos + pos_buffer[j]);
@@ -63,8 +62,7 @@ protected:
             }
         }
         if (tf % MAX_POS_PER_RECORD != 0) {
-            uint32_t decodeCount =
-                pos_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
+            uint32_t decodeCount = pos_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
             ASSERT_EQ((uint32_t)(tf % MAX_POS_PER_RECORD), decodeCount);
             for (size_t j = 0; j < decodeCount; ++j) {
                 ASSERT_EQ(pos_list[posIdx], lastPos + pos_buffer[j]);
@@ -75,7 +73,7 @@ protected:
     }
 
     void InnerTestDecode(const optionflag_t flag, tf_t tf) {
-        pos_t* pos_list = new pos_t[tf];
+        pos_t *pos_list = new pos_t[tf];
 
         for (tf_t i = 0; i < tf; ++i) {
             pos_list[i] = i * 2 + 1;
@@ -102,7 +100,7 @@ protected:
             pos_list_encoder.Flush();
         }
 
-        InMemPositionListDecoder* pos_list_decoder = pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_);
+        InMemPositionListDecoder *pos_list_decoder = pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_);
         ASSERT_TRUE(pos_list_decoder);
 
         // compress mode is useless in decoder
@@ -117,8 +115,7 @@ protected:
                 ASSERT_TRUE(pos_list_decoder->LocateRecord(&state, tempTF));
                 recordOffset = state.GetRecordOffset();
                 // check decode buffer
-                uint32_t decodeCount =
-                    pos_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
+                uint32_t decodeCount = pos_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
                 uint32_t expectDecodeCount = std::min(uint32_t(ttf - i), MAX_POS_PER_RECORD);
                 ASSERT_EQ(expectDecodeCount, decodeCount);
                 for (size_t j = 0; j < (size_t)decodeCount; ++j) {
@@ -137,14 +134,14 @@ protected:
 };
 
 TEST_F(InMemPositionListDecoderTest, test1) {
-    constexpr optionflag_t NO_PAYLOAD = of_position_list | of_term_frequency;    
+    constexpr optionflag_t NO_PAYLOAD = of_position_list | of_term_frequency;
     PositionListFormatOption option(NO_PAYLOAD);
 
     PositionListEncoder pos_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
     pos_list_encoder.AddPosition(3);
     pos_list_encoder.EndDocument();
 
-    InMemPositionListDecoder* posListDecoder = pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_);
+    InMemPositionListDecoder *posListDecoder = pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_);
     ASSERT_TRUE(posListDecoder);
 
     InDocPositionState state(option);
@@ -185,7 +182,8 @@ TEST_F(InMemPositionListDecoderTest, test4) {
     PositionListFormatOption option(of_position_list);
     InDocPositionState state(option);
 
-    BufferedByteSlice* pos_list_buffer = new(byte_slice_pool_.Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(&byte_slice_pool_, &buffer_pool_);
+    BufferedByteSlice *pos_list_buffer =
+        new (byte_slice_pool_.Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(&byte_slice_pool_, &buffer_pool_);
     InMemPositionListDecoder decoder(option, &byte_slice_pool_);
     decoder.Init(100, NULL, pos_list_buffer);
 
@@ -219,4 +217,4 @@ TEST_F(InMemPositionListDecoderTest, test5) {
     InnerTestSkipAndLocateAndDecode(flag, MAX_POS_PER_RECORD * SKIP_LIST_BUFFER_SIZE * 2 + 1, false);
 }
 
-}
+} // namespace infinity

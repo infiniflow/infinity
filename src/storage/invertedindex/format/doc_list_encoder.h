@@ -46,8 +46,7 @@ public:
 
     InMemDocListDecoder *GetInMemDocListDecoder(MemoryPool *session_pool) const;
 
-    BufferedByteSlice* 
-    GetDocListBuffer() { return &doc_list_buffer_; }
+    BufferedByteSlice *GetDocListBuffer() { return &doc_list_buffer_; }
 
 private:
     void AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf);
@@ -70,9 +69,9 @@ private:
     tf_t total_tf_;
     df_t df_;
 
-    PositionBitmapWriter* tf_bitmap_writer_;
-    BufferedSkipListWriter* doc_skiplist_writer_;
-    MemoryPool* byte_slice_pool_;
+    PositionBitmapWriter *tf_bitmap_writer_;
+    BufferedSkipListWriter *doc_skiplist_writer_;
+    MemoryPool *byte_slice_pool_;
     friend class InMemDocListDecoderTest;
 };
 

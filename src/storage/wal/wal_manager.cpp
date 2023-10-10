@@ -149,7 +149,7 @@ void WalManager::Flush() {
             TxnManager *txn_mgr = storage_->txn_manager();
             while (!que3_.empty()) {
                 std::shared_ptr<WalEntry> entry = que3_.front();
-                // Commit sequently so they get visible in the same order
+                // Commit sequentially so they get visible in the same order
                 // with wal.
                 Txn *txn = txn_mgr->GetTxn(entry->txn_id);
                 if (txn != nullptr) {

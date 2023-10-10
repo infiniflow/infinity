@@ -54,9 +54,6 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             PlannerError("Invalid physical operator type")
         }
         case PhysicalOperatorType::kExplain: {
-            if (phys_op->left() != nullptr) {
-                SchedulerError("Explain statement shouldn't have child operator here.");
-            }
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             BuildExplain(phys_op, current_fragment_ptr);
             return;

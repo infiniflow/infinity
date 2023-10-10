@@ -16,6 +16,54 @@
 
 namespace infinity {
 
+DataType::DataType(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr) : type_(logical_type), type_info_(std::move(type_info_ptr)) {
+    switch (logical_type) {
+        case kBoolean:
+        case kTinyInt:
+        case kSmallInt:
+        case kInteger:
+        case kBigInt:
+        case kHugeInt:
+        case kDecimal:
+        case kFloat:
+        case kDouble:
+        case kDate:
+        case kTime:
+        case kDateTime:
+        case kTimestamp:
+        case kInterval:
+        case kPoint:
+        case kLine:
+        case kLineSeg:
+        case kBox:
+        case kCircle:
+        case kBitmap:
+        case kUuid:
+        case kEmbedding:
+        case kRowID: {
+            plain_type_ = true;
+            break;
+        }
+        case kMixed:
+        case kVarchar:
+        case kArray:
+        case kTuple:
+        case kPath:
+        case kPolygon:
+        case kBlob: {
+            plain_type_ = false;
+            break;
+        }
+        case kNull:
+        case kMissing: {
+            plain_type_ = true;
+            break;
+        }
+        case kInvalid:
+            break;
+    }
+}
+
 String DataType::ToString() const {
     if (type_ > kInvalid) {
         TypeError(fmt::format("Invalid logical data type {}.", int(type_)));
@@ -28,13 +76,16 @@ bool DataType::operator==(const DataType &other) const {
         return true;
     if (type_ != other.type_)
         return false;
+    if (plain_type_ != other.plain_type_)
+        return false;
     if (this->type_info_ == nullptr && other.type_info_ == nullptr) {
         return true;
     }
     if (this->type_info_ != nullptr && other.type_info_ != nullptr) {
         if (*this->type_info_ != *other.type_info_)
             return false;
-        return true;
+        else
+            return true;
     } else {
         return false;
     }
