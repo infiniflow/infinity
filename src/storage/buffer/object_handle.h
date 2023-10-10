@@ -52,6 +52,7 @@ public:
     [[nodiscard]] ptr_t GetData();
 };
 
+// TODO shenyushi: remove this layer. Use buffer_manager to manage different file instead
 class IndexObjectHandle : public ObjectHandle {
     faiss::Index *index_{};
 

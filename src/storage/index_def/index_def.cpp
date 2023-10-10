@@ -1,42 +1,41 @@
 #include "index_def.h"
+
+#include "common/utility/serializable.h"
+
+#include <cstdint>
 #include <sstream>
 
 namespace infinity {
-
-namespace {
-
 String IndexMethodToString(IndexMethod method) {
     switch (method) {
-    case IndexMethod::kIVFFlat: {
-        return "IVFFlat";
-    }
-    case IndexMethod::kIVFSQ8: {
-        return "IVFSQ8";
-    }
-    case IndexMethod::kHnsw: {
-        return "HNSW";
-    }
-    case IndexMethod::kInvalid: {
-        return "Invalid";
-    }
+        case IndexMethod::kIVFFlat: {
+            return "IVFFlat";
+        }
+        case IndexMethod::kIVFSQ8: {
+            return "IVFSQ8";
+        }
+        case IndexMethod::kHnsw: {
+            return "HNSW";
+        }
+        case IndexMethod::kInvalid: {
+            return "Invalid";
+        }
     }
 }
 
 String MetricTypeToString(MetricType metric_type) {
     switch (metric_type) {
-    case MetricType::kMerticInnerProduct: {
-        return "ip";
-    }
-    case MetricType::kMerticL2: {
-        return "l2";
-    }
-    case MetricType::kInvalid: {
-        return "Invalid";
-    }
+        case MetricType::kMerticInnerProduct: {
+            return "ip";
+        }
+        case MetricType::kMerticL2: {
+            return "l2";
+        }
+        case MetricType::kInvalid: {
+            return "Invalid";
+        }
     }
 }
-
-} // namespace
 
 IndexMethod StringToIndexMethod(const String &str) {
     if (str == "IVFFlat") {
@@ -59,11 +58,40 @@ MetricType StringToMetricType(const String &str) {
         return MetricType::kInvalid;
     }
 }
+} // namespace infinity
 
-String IndexDefCommon::ToString() const {
+//--------------------------------------------------
+
+namespace infinity {
+
+bool IndexDef::operator==(const IndexDef &other) const {
+    return index_name_ == other.index_name_ && method_type_ == other.method_type_ && column_names_ == other.column_names_;
+}
+
+bool IndexDef::operator!=(const IndexDef &other) const { return !(*this == other); }
+
+int32_t IndexDef::GetSizeInBytes() const {
+    int32_t size = 0;
+    size += sizeof(int32_t) + index_name_.length();
+    size += sizeof(int32_t) + sizeof(method_type_);
+    size += sizeof(int32_t);
+    for (const String &column_name : column_names_) {
+        size += column_name.length(); // Note shenyushi: whether to add sizeof(int32_t) ?
+    }
+    return size;
+}
+
+void IndexDef::WriteAdv(char *&ptr) const {
+    WriteBufAdv(ptr, index_name_);
+    WriteBufAdv(ptr, method_type_);
+    for (const String &column_name : column_names_) {
+        WriteBufAdv(ptr, column_name);
+    }
+}
+
+String IndexDef::ToString() const {
     std::stringstream ss;
-    ss << "IndexDefCommon(" << index_name_ << ", "
-       << IndexMethodToString(method_type_) << ", [";
+    ss << "IndexDef(" << index_name_ << ", " << IndexMethodToString(method_type_) << ", [";
     for (size_t i = 0; i < column_names_.size(); ++i) {
         ss << column_names_[i];
         if (i != column_names_.size() - 1) {
@@ -74,17 +102,19 @@ String IndexDefCommon::ToString() const {
     return ss.str();
 }
 
-void IndexDefCommon::Serialize(nlohmann::json &res) const {
+nlohmann::json IndexDef::Serialize() const {
+    nlohmann::json res;
     res["index_name"] = index_name_;
     res["method_type"] = IndexMethodToString(method_type_);
     res["column_names"] = column_names_;
+    return res;
 }
 
-void IndexDefCommon::Deserialize(const nlohmann::json &serialized,
-                                 IndexDefCommon &index_def_common) {
-    index_def_common.index_name_ = serialized["index_name"];
-    index_def_common.method_type_ = serialized["method_type"];
-    index_def_common.column_names_ = serialized["column_names"];
+void IndexDef::Deserialize(const nlohmann::json &serialized, IndexDef &index_def) {
+    // Hack to initialize const value after constructor
+    const_cast<String &>(index_def.index_name_) = serialized["index_name"];
+    const_cast<IndexMethod &>(index_def.method_type_) = serialized["method_type"];
+    const_cast<Vector<String> &>(index_def.column_names_) = serialized["column_names"];
 }
 
 } // namespace infinity

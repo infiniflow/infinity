@@ -2,12 +2,14 @@
 // Created by jinhai on 23-8-18.
 //
 
-#include "storage/meta/entry/table_collection_entry.h"
 #include "parser/statement/extra/create_table_info.h"
+#include "storage/common/block_index.h"
 #include "storage/index_def/ivfflat_index_def.h"
+#include "storage/meta/entry/segment_entry.h"
+#include "storage/meta/entry/table_collection_entry.h"
+#include "storage/meta/index_meta.h"
 #include "storage/meta/table_collection_meta.h"
 #include "storage/txn/txn_store.h"
-#include "storage/common/block_index.h"
 
 namespace infinity {
 
@@ -29,6 +31,87 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String> &db_entry_dir
 
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
+}
+
+EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
+                                              SharedPtr<IndexDef> index_def,
+                                              ConflictType conflict_type,
+                                              u64 txn_id,
+                                              TxnTimeStamp begin_ts,
+                                              TxnManager *txn_mgr) {
+    table_entry->rw_locker_.lock_shared();
+    IndexMeta *index_meta{nullptr};
+    if (table_entry->indexes_.find(index_def->index_name_) != table_entry->indexes_.end()) {
+        index_meta = table_entry->indexes_[index_def->index_name_].get();
+    }
+    table_entry->rw_locker_.unlock_shared();
+
+    if (index_meta == nullptr) {
+        LOG_TRACE("Create new index: {}", index_def->index_name_);
+        auto new_index_meta = MakeUnique<IndexMeta>(table_entry->table_entry_dir_, table_entry);
+        index_meta = new_index_meta.get();
+
+        table_entry->rw_locker_.lock();
+        table_entry->indexes_[index_def->index_name_] = std::move(new_index_meta);
+        table_entry->rw_locker_.unlock();
+
+        LOG_TRACE("Add new index entry for {} in new index meta of table_entry {} ", index_def->index_name_, *table_entry->table_entry_dir_);
+    } else {
+        LOG_TRACE("Add new index entry for {} in existed index meta of table_entry {}", index_def->index_name_, *table_entry->table_entry_dir_);
+    }
+    IndexDef *index_def_ptr = index_def.get();
+    EntryResult res = IndexMeta::CreateNewEntry(index_meta, std::move(index_def), txn_id, begin_ts, txn_mgr);
+
+    // Write index file
+    switch (index_def_ptr->method_type_) {
+        case IndexMethod::kIVFFlat: {
+            // check whether the column def is valid
+            if (index_def_ptr->column_names_.size() != 1) {
+                StorageException("IVFFlat index should created on one column");
+            }
+            const String &column_name = index_def_ptr->column_names_[0];
+            u64 column_id = table_entry->GetColumnIdByName(column_name);
+            ColumnDef &column_def = *table_entry->columns_[column_id];
+            if (column_def.type()->type() != LogicalType::kEmbedding) {
+                StorageException("IVFFlat index should created on Embedding type column");
+            }
+            auto type_info = column_def.type()->type_info().get();
+            auto embedding_info = (EmbeddingInfo *)type_info;
+            if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
+                StorageException("IVFFlat index should created on float embedding type column");
+            }
+
+            for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
+                // TODO shenyushi
+                SegmentEntry::CreateIndexEmbedding(segment_entry.get(), *index_def_ptr, column_id, embedding_info->Dimension());
+            }
+            break;
+        }
+        case IndexMethod::kInvalid: {
+            StorageException("Invalid index method type.");
+        }
+        default: {
+            NotImplementException("Not implemented.");
+        }
+    }
+
+    return res;
+}
+
+EntryResult
+TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+    return {.entry_ = nullptr, .err_ = nullptr};
+    // TODO
+}
+
+EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts) {
+    return {.entry_ = nullptr, .err_ = nullptr};
+    // TODO
+}
+
+EntryResult TableCollectionEntry::RemoveIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr) {
+    return {.entry_ = nullptr, .err_ = nullptr};
+    // TODO
 }
 
 void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr) {
@@ -137,35 +220,6 @@ UniquePtr<String> TableCollectionEntry::ImportAppendSegment(TableCollectionEntry
     return nullptr;
 }
 
-EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<IndexDef> index_def) {
-    const String &column_name = index_def->column_names()[0];
-    u64 column_id = table_entry->GetColumnIdByName(column_name);
-    ColumnDef &column_def = *table_entry->columns_[column_id];
-    switch (index_def->method_type()) {
-        case IndexMethod::kIVFFlat: {
-            auto &column_def = *table_entry->columns_[column_id];
-            if (column_def.column_type_->type() != LogicalType::kEmbedding) {
-                StorageError("IVFFlat index should created on Embedding type column")
-            }
-            auto type_info = column_def.column_type_->type_info().get();
-            auto embedding_info = (EmbeddingInfo *)type_info;
-            if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
-                StorageError("IVFFlat index should created on float embedding type column")
-            }
-            for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-                SegmentEntry::CreateIndexEmbedding(segment_entry.get(), txn_ptr, *index_def, column_id, embedding_info->Dimension());
-            }
-            break;
-        }
-        default: {
-            NotImplementException("Not implemented.");
-        }
-    }
-    // TODO shenyushi: change meta data
-    // table_entry->indexes_.emplace(index_def->index_name(), index_def);
-    return {.entry_ = nullptr, .err_ = nullptr};
-}
-
 SegmentEntry *TableCollectionEntry::GetSegmentByID(const TableCollectionEntry *table_entry, u64 id) {
     auto iter = table_entry->segments_.find(id);
     if (iter != table_entry->segments_.end()) {
@@ -224,9 +278,9 @@ nlohmann::json TableCollectionEntry::Serialize(const TableCollectionEntry *table
     u64 next_segment_id = table_entry->next_segment_id_;
     json_res["next_segment_id"] = next_segment_id;
 
-    for (const auto &[_column_id, index_def] : table_entry->indexes_) {
-        json_res["indexes"].emplace_back(index_def->Serialize());
-    }
+    // for (const auto &[_column_id, index_def] : table_entry->indexes_) {
+    //     json_res["indexes"].emplace_back(index_def->Serialize());
+    // }
 
     return json_res;
 }
@@ -285,7 +339,7 @@ TableCollectionEntry::Deserialize(const nlohmann::json &table_entry_json, TableC
             switch (type_method) {
                 case IndexMethod::kIVFFlat: {
                     SharedPtr<IVFFlatIndexDef> index_def = IVFFlatIndexDef::Deserialize(index_json);
-                    table_entry->indexes_.emplace(index_def->index_name(), index_def);
+                    // table_entry->indexes_.emplace(index_def->index_name(), index_def);
                     break;
                 }
                 default: {

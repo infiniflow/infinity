@@ -13,59 +13,50 @@ enum class IndexMethod {
     kInvalid,
 };
 
+// TODO shenyushi: use definition in knn_exprs.h
 enum class MetricType {
     kMerticInnerProduct,
     kMerticL2,
     kInvalid,
 };
 
+String IndexMethodToString(IndexMethod method);
+
+String MetricTypeToString(MetricType metric_type);
+
 IndexMethod StringToIndexMethod(const String &str);
 
 MetricType StringToMetricType(const String &str);
 
-struct IndexDefCommon {
-    String index_name_{};
-    IndexMethod method_type_{IndexMethod::kInvalid};
-    Vector<String> column_names_{};
-
-    explicit IndexDefCommon() {}
-
-    explicit IndexDefCommon(String index_name, IndexMethod method_type,
-                            Vector<String> column_names)
-        : index_name_(std::move(index_name)), method_type_(method_type),
-          column_names_(std::move(column_names)) {}
-
-    String ToString() const;
-
-    void Serialize(nlohmann::json &res) const;
-
-    static void Deserialize(const nlohmann::json &serialized,
-                            IndexDefCommon &index_def_common);
-};
-
 class IndexDef {
-  public:
+protected:
+    explicit IndexDef(String index_name, IndexMethod method_type, Vector<String> column_names)
+        : index_name_(std::move(index_name)), method_type_(method_type), column_names_(std::move(column_names)){};
+
+public:
     virtual ~IndexDef() = default;
 
-    virtual String ToString() const = 0;
+    virtual bool operator==(const IndexDef &other) const;
 
-    virtual nlohmann::json Serialize() const = 0;
+    virtual bool operator!=(const IndexDef &other) const;
 
-  public:
-    [[nodiscard]] inline IndexMethod method_type() const {
-        return common_.method_type_;
-    }
+public:
+    // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
+    virtual int32_t GetSizeInBytes() const;
 
-    [[nodiscard]] inline const Vector<String> &column_names() const {
-        return common_.column_names_;
-    }
+    // Write to a char buffer
+    virtual void WriteAdv(char *&ptr) const;
 
-    [[nodiscard]] inline const String &index_name() const {
-        return common_.index_name_;
-    }
+    virtual String ToString() const;
 
-  protected:
-    IndexDefCommon common_{};
+    virtual nlohmann::json Serialize() const;
+
+    static void Deserialize(const nlohmann::json &serialized, IndexDef &index_def);
+
+public:
+    const String index_name_{};
+    const IndexMethod method_type_{IndexMethod::kInvalid};
+    const Vector<String> column_names_{};
 };
 
 } // namespace infinity

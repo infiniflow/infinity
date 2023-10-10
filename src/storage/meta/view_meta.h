@@ -6,8 +6,10 @@
 
 #include <utility>
 
+#include "common/types/alias/concurrency.h"
+#include "common/types/alias/containers.h"
+#include "parser/statement/extra/create_table_info.h"
 #include "storage/meta/entry/base_entry.h"
-#include "storage/table_def.h"
 
 namespace infinity {
 

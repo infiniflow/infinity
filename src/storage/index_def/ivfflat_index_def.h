@@ -7,32 +7,35 @@
 
 namespace infinity {
 class IVFFlatIndexDef : public IndexDef {
-  public:
-    explicit IVFFlatIndexDef() {}
-
+public:
     static SharedPtr<IndexDef>
-    Make(IndexDefCommon common, const Vector<InitParameter *> &index_para_list);
+    Make(String index_name, IndexMethod method_type, Vector<String> column_names, const Vector<InitParameter *> &index_para_list);
+
+    IVFFlatIndexDef(String index_name, IndexMethod method_type, Vector<String> column_names, size_t centroids_count, MetricType metric_type)
+        : IndexDef(std::move(index_name), method_type, std::move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
 
     ~IVFFlatIndexDef() = default;
 
-    String ToString() const override;
+    virtual bool operator==(const IndexDef &other) const override;
 
-    nlohmann::json Serialize() const override;
+    virtual bool operator!=(const IndexDef &other) const override;
 
-    static SharedPtr<IVFFlatIndexDef>
-    Deserialize(const nlohmann::json &serialized);
+public:
+    // Note shenyushi: whether the virtual function of derive class needs to has "virtual" keyword? And what is "final" keyword?
+    virtual int32_t GetSizeInBytes() const override;
 
-  public:
-    [[nodiscard]] inline size_t centroids_count() const {
-        return centroids_count_;
-    }
+    virtual void WriteAdv(char *&ptr) const override;
 
-    [[nodiscard]] inline MetricType metric_type() const { return metric_type_; }
+    virtual String ToString() const override;
 
-  private:
-    size_t centroids_count_{};
+    virtual nlohmann::json Serialize() const override;
 
-    MetricType metric_type_{kInvalid};
+    static SharedPtr<IVFFlatIndexDef> Deserialize(const nlohmann::json &serialized);
+
+public:
+    const size_t centroids_count_{};
+
+    const MetricType metric_type_{kInvalid};
 };
 
 } // namespace infinity

@@ -3,12 +3,14 @@
 //
 
 #include "txn.h"
-#include "storage/meta/meta_state.h"
+#include "storage/buffer/buffer_manager.h"
 #include "storage/meta/catalog.h"
+#include "storage/meta/entry/index_entry.h"
+#include "storage/meta/entry/segment_entry.h"
+#include "storage/meta/meta_state.h"
 #include "storage/table_def.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
-#include "storage/buffer/buffer_manager.h"
 
 namespace infinity {
 
@@ -319,15 +321,33 @@ EntryResult Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &t
 }
 
 EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type) {
+    TxnState txn_state = txn_context_.GetTxnState();
+
+    if (txn_state != TxnState::kStarted) {
+        LOG_TRACE("Transaction is not started");
+        return {.entry_ = nullptr, .err_ = MakeUnique<String>("Transaction is not started")};
+    }
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+
     TableCollectionEntry *table_entry{nullptr};
     UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
     if (err_msg != nullptr) {
         return {nullptr, std::move(err_msg)};
     }
-    NotImplementError("Not implemented")
+    NotImplementError("Not implemented");
 
-        auto res = TableCollectionEntry::CreateIndex(table_entry, nullptr, std::move(index_def));
-    // TODO shenyushi 4: add wal entry
+    EntryResult res = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
+
+    if (res.entry_ == nullptr) {
+        return res;
+    }
+    if (res.entry_->entry_type_ != EntryType::kIndex) {
+        return {nullptr, MakeUnique<String>("Invalid index type")};
+    }
+    auto index_entry = static_cast<IndexEntry *>(res.entry_);
+    txn_indexes_.insert(index_entry);
+    index_names_.insert(index_def->index_name_);
+    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
     return res;
 }
 

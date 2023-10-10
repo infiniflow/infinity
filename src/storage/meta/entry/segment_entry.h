@@ -79,7 +79,6 @@ public:
 
     HashMap<u64, SharedPtr<String>> index_name_map_{};
 
-    // TODO shenyushi 3: add index here
 public:
     [[nodiscard]] inline SizeT AvailableCapacity() const { return row_capacity_ - current_row_; }
 
@@ -94,7 +93,7 @@ public:
 
     static void CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id);
 
-    static void CreateIndexEmbedding(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, int dimension);
+    static void CreateIndexEmbedding(SegmentEntry *segment_entry, const IndexDef &index_def, u64 column_id, int dimension);
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count);
 

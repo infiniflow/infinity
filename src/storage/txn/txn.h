@@ -6,9 +6,9 @@
 
 #include "common/types/alias/db_type.h"
 #include "common/types/alias/smart_ptr.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 #include "storage/common/table_collection_detail.h"
 #include "storage/meta/entry/base_entry.h"
-#include "parser/statement/extra/extra_ddl_info.h"
 
 #include "txn_context.h"
 #include <condition_variable>
@@ -19,6 +19,7 @@ namespace infinity {
 class TxnManager;
 class BufferManager;
 class NewCatalog;
+class IndexEntry;
 class TableCollectionEntry;
 class DBEntry;
 class MetaTableState;
@@ -149,10 +150,12 @@ private:
     // Related database
     Set<String> db_names_{};
     Set<String> table_names_{};
+    Set<String> index_names_{};
 
     // Txn store
     Set<DBEntry *> txn_dbs_{};
     Set<TableCollectionEntry *> txn_tables_{};
+    Set<IndexEntry *> txn_indexes_{};
 
     // Only one db can be handled in one transaction.
     HashMap<String, BaseEntry *> txn_table_entries_{};

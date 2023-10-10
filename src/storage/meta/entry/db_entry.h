@@ -56,7 +56,7 @@ public:
     RWMutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
-    HashMap<String, UniquePtr<TableCollectionMeta>> tables_{};
+    HashMap<String, UniquePtr<TableCollectionMeta>> tables_{}; // Note shenyushi: why this UniquePtr?
 };
 
 } // namespace infinity

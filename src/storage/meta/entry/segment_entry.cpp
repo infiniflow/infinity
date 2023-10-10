@@ -126,12 +126,12 @@ void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, 
     NotImplementError("Not implemented")
 }
 
-void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, int dimension) {
-    switch (index_def.method_type()) {
+void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry, const IndexDef &index_def, u64 column_id, int dimension) {
+    switch (index_def.method_type_) {
         case IndexMethod::kIVFFlat: {
             auto ivfflat_index_def = static_cast<const IVFFlatIndexDef &>(index_def);
             faiss::IndexFlat *quantizer_ptr = nullptr;
-            switch (ivfflat_index_def.metric_type()) {
+            switch (ivfflat_index_def.metric_type_) {
                 case MetricType::kMerticL2: {
                     quantizer_ptr = new faiss::IndexFlatL2(dimension);
                     break;
@@ -149,7 +149,7 @@ void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry, Txn *txn_pt
             }
             // faiss::IndexFlatL2 quantizer(dimension);
             auto quantizer = std::unique_ptr<faiss::IndexFlat>(quantizer_ptr);
-            auto index = MakeUnique<faiss::IndexIVFFlat>(quantizer.get(), dimension, ivfflat_index_def.centroids_count());
+            auto index = MakeUnique<faiss::IndexIVFFlat>(quantizer.get(), dimension, ivfflat_index_def.centroids_count_);
             for (const auto &block_entry : segment_entry->block_entries_) {
                 auto block_column_entry = block_entry->columns_[column_id].get();
                 CommonObjectHandle object_handle(block_column_entry->buffer_handle_);
@@ -162,7 +162,7 @@ void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry, Txn *txn_pt
                 }
             }
 
-            auto index_filename = DetermineIndexFilename(*segment_entry->segment_dir_, ivfflat_index_def.index_name(), segment_entry->segment_id_);
+            auto index_filename = DetermineIndexFilename(*segment_entry->segment_dir_, ivfflat_index_def.index_name_, segment_entry->segment_id_);
             // TODO shenyushi: change meta data
             // segment_entry->index_name_map_.emplace(column_id, index_filename);
             faiss::write_index(index.get(), index_filename.get()->data());

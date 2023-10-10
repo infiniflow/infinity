@@ -1,15 +1,12 @@
 #include "wal_entry.h"
+
 #include "common/utility/crc.hpp"
 #include "common/utility/serializable.h"
 #include "storage/data_block.h"
 #include "storage/table_def.h"
-#include <concepts>
+
 #include <cstdint>
 #include <cstring>
-#include <format>
-#include <iostream>
-#include <string>
-#include <type_traits>
 
 namespace infinity {
 
@@ -86,6 +83,12 @@ bool WalCmdCreateTable::operator==(const WalCmd &other) const {
            *table_def == *other_cmd->table_def;
 }
 
+bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdCreateIndex *>(&other);
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_def_ != nullptr &&
+           other_cmd->index_def_ != nullptr && *index_def_ == *other_cmd->index_def_;
+}
+
 bool WalCmdImport::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdImport *>(&other);
     if (other_cmd == nullptr || db_name != other_cmd->db_name || table_name != other_cmd->table_name || segment_dir != other_cmd->segment_dir)
@@ -126,6 +129,11 @@ int32_t WalCmdCreateTable::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + this->table_def->GetSizeInBytes();
 }
 
+int32_t WalCmdCreateIndex::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name_.size() + sizeof(int32_t) + this->table_name_.size() + sizeof(int32_t) +
+           this->index_def_->GetSizeInBytes();
+}
+
 int32_t WalCmdDropTable::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + sizeof(int32_t) + this->table_name.size();
 }
@@ -160,6 +168,13 @@ void WalCmdCreateTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_TABLE);
     WriteBufAdv(buf, this->db_name);
     this->table_def->WriteAdv(buf);
+}
+
+void WalCmdCreateIndex::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::CREATE_INDEX);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    index_def_->WriteAdv(buf);
 }
 
 void WalCmdDropTable::WriteAdv(char *&buf) const {
