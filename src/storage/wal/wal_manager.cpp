@@ -53,9 +53,10 @@ void WalManager::Start() {
 void WalManager::Stop() {
     bool expected = true;
     bool changed = running_.compare_exchange_strong(expected, false);
-    if (!changed)
-        // Already stopped.
+    if (!changed) {
+        LOG_INFO("WalManager::Stop already stopped");
         return;
+    }
 
     LOG_INFO("WalManager::Stop begin to stop txn manager");
     // Notify txn manager to stop.

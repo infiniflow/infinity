@@ -97,9 +97,10 @@ void TxnManager::Start() { is_running_.store(true, std::memory_order_relaxed); }
 void TxnManager::Stop() {
     bool expected = true;
     bool changed = is_running_.compare_exchange_strong(expected, false);
-    if (!changed)
-        LOG_INFO("TxnManager is already stopped");
-    return;
+    if (!changed) {
+        LOG_INFO("TxnManager::Stop already stopped");
+        return;
+    }
 
     LOG_INFO("TxnManager is stopping...");
     LOG_INFO("TxnManager is cleaning up...");
