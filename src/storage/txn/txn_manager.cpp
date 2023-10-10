@@ -103,7 +103,6 @@ void TxnManager::Stop() {
     }
 
     LOG_INFO("TxnManager is stopping...");
-    LOG_INFO("TxnManager is cleaning up...");
     std::lock_guard guard(mutex_);
     auto it = priority_que_.begin();
     while (it != priority_que_.end()) {
