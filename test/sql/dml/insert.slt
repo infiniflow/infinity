@@ -8,13 +8,24 @@ CREATE TABLE products (product_no integer, price integer);
 
 # insert data
 query I
-INSERT INTO products VALUES (1, 9);
+INSERT INTO products VALUES (1, 2);
 ----
 
 query II
 SELECT * FROM products;
 ----
-1 9
+1 2
+
+query I
+INSERT INTO products VALUES (3, 4), (5, 6);
+----
+
+query II rowsort
+SELECT * FROM products;
+----
+1 2
+3 4
+5 6
 
 # Clean up
 statement ok
