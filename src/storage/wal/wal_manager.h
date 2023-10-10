@@ -80,8 +80,6 @@ private:
     Storage *storage_;
 
     Vector<String> wal_list_;
-
-    bool wait_for_checkpoint_{false};
 };
 
 } // namespace infinity
