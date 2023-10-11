@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "common/constants/constants.h"
 #include "common/types/alias/primitives.h"
 #include "storage/txn/txn_manager.h"
 #include "wal_entry.h"

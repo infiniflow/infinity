@@ -3,7 +3,6 @@
 //
 
 #include "storage/storage.h"
-#include "common/constants/constants.h"
 #include "function/builtin_functions.h"
 #include "schema_definition.h"
 #include "storage/io/local_file_system.h"
