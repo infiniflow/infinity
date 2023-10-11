@@ -574,12 +574,10 @@ void Txn::CheckpointFlushMemTable() {
                     continue;
                 }
 
-                segment->second->rw_locker_.lock();
                 auto changed = SegmentEntry::PrepareFlush(segment->second.get());
                 if (changed) {
                     SegmentEntry::Flush(segment->second.get());
                 }
-                segment->second->rw_locker_.unlock();
                 ++segment;
             }
         }
