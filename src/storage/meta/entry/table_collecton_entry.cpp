@@ -97,23 +97,11 @@ void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry,
                                         Txn *txn_ptr,
                                         const AppendState *append_state_ptr,
                                         BufferManager *buffer_mgr) {
-    HashSet<u64> new_segments;
+
     for (const auto &range : append_state_ptr->append_ranges_) {
         LOG_TRACE("Commit, segment: {}, block: {} start: {}, count: {}", range.segment_id_, range.block_id_, range.start_id_, range.row_count_);
         SegmentEntry *segment_ptr = table_entry->segments_[range.segment_id_].get();
         SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.block_id_, range.start_id_, range.row_count_);
-        new_segments.insert(range.segment_id_);
-    }
-
-    // FIXME: now all commit will trigger flush
-    for (u64 segment_id : new_segments) {
-        // already flushed
-        if (table_entry->segments_[segment_id]->status_.load() == DataSegmentStatus::kSegmentClosed) {
-            continue;
-        }
-
-        SegmentEntry::PrepareFlush(table_entry->segments_[segment_id].get());
-        SegmentEntry::Flush(table_entry->segments_[segment_id].get());
     }
 }
 
